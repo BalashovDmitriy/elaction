@@ -1,0 +1,22 @@
+# Единые переводы строк во всём репозитории: LF везде, включая рабочую копию
+# на Windows. Godot и CI одинаково работают с LF, а diff'ы не шумят.
+* text=auto eol=lf
+
+*.gd      text eol=lf
+*.tscn    text eol=lf
+*.tres    text eol=lf
+*.godot   text eol=lf
+*.cfg     text eol=lf
+*.import  text eol=lf
+*.md      text eol=lf
+*.yml     text eol=lf
+
+# Бинарные ассеты
+*.png    binary
+*.jpg    binary
+*.webp   binary
+*.ogg    binary
+*.wav    binary
+*.ttf    binary
+*.otf    binary
+*.blend  binary

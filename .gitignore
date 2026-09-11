@@ -1,36 +1,37 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-dist/
-*.egg-info/
-.eggs/
+# --- Godot 4 ---
+.godot/
+/android/
+*.translation
 
-# Виртуальные окружения
+# Сборки и экспорт
+/build/
+/export/
+*.pck
+*.exe
+*.x86_64
+*.dmg
+*.apk
+*.aab
+
+# Секреты экспорта — никогда в репозиторий
+export_credentials.cfg
+*.keystore
+*.jks
+
+# Локальные оверрайды настроек
+override.cfg
+
+# --- Python-тулинг (gdlint / gdformat / pre-commit) ---
 .venv/
 venv/
-env/
+__pycache__/
+*.py[cod]
 
-# Тесты и линтеры
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-.tox/
-
-# IDE
+# --- IDE ---
 .idea/
 .vscode/
+*.swp
 
-# Окружение и секреты
-.env
-.env.local
-*.key
-
-# ОС
+# --- ОС ---
 .DS_Store
 Thumbs.db

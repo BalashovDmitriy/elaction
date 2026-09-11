@@ -1,0 +1,46 @@
+# Гейт качества перед каждым коммитом.
+#
+# Установка (один раз после клона):
+#   .venv/Scripts/pre-commit install
+#   .venv/Scripts/pre-commit install --hook-type pre-push
+#
+# Прогнать всё вручную:
+#   .venv/Scripts/pre-commit run --all-files
+
+default_install_hook_types: [pre-commit, pre-push]
+exclude: '^(\.godot/|addons/|build/|export/)'
+
+repos:
+  # mixed-line-ending намеренно не подключён: gdformat на Windows пишет CRLF,
+  # а .gitattributes (* text=auto eol=lf) всё равно нормализует переводы строк
+  # при коммите. Хук только добавлял бы лишний цикл "упало и исправило".
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.(tscn|tres|import|godot)$'
+      - id: end-of-file-fixer
+        exclude: '\.(tscn|tres|import|godot)$'
+      - id: check-yaml
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+        args: [--maxkb=5120]
+
+  # Линтер и форматтер GDScript (gdtoolkit)
+  - repo: https://github.com/Scony/godot-gdscript-toolkit
+    rev: 4.5.0
+    hooks:
+      - id: gdformat
+      - id: gdlint
+
+  # Тяжёлые проверки движком — только на push, чтобы не тормозить коммиты
+  - repo: local
+    hooks:
+      - id: godot-check
+        name: godot --headless --import (импорт ресурсов и парсинг скриптов)
+        entry: python tools/godot_check.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

@@ -1,0 +1,5 @@
+# Тулинг разработки. Ставится в локальный .venv:
+#   python -m venv .venv
+#   .venv/Scripts/pip install -r requirements-dev.txt   # Windows
+gdtoolkit==4.5.0
+pre-commit==4.6.2
