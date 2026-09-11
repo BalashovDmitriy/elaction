@@ -1,0 +1,83 @@
+# elaction — правила проекта
+
+Ремейк аркадной игры Elevator Action (Taito, 1983). Механика — как в оригинале,
+графика — современная, на динамическом 2D-освещении.
+
+**Прежде чем что-то делать, прочитай [`docs/STATUS.md`](docs/STATUS.md)** — там текущая
+веха, что сделано, что следующее. План целиком — в [`docs/EPIC.md`](docs/EPIC.md).
+
+## Стек
+
+| | |
+|---|---|
+| Движок | Godot 4.7.2 (`winget install --id GodotEngine.GodotEngine`) |
+| Язык | GDScript, **статическая типизация обязательна** |
+| Тесты | GUT 9.6.1, вендорится в `addons/gut` |
+| Линтеры | gdtoolkit 4.5.0 (`gdlint`, `gdformat`) в `.venv` |
+| Хуки | pre-commit 4.6.2, на commit и на push |
+
+Docker в проекте не используется и не предлагается — см.
+[ADR-0003](docs/adr/0003-no-docker.md).
+
+## Команды
+
+```powershell
+tools/check.ps1                 # все проверки разом, тот же набор что в CI
+python tools/run_tests.py       # тесты GUT
+python tools/godot_check.py     # импорт ресурсов и разбор скриптов движком
+python tools/capture.py M1      # скриншоты вехи в screens/M1/
+godot --path .                  # запустить игру
+godot -e --path .               # открыть редактор
+```
+
+Godot ищется в порядке `$GODOT_BIN` → PATH → пути winget; на Windows берётся
+`godot_console.exe`, потому что обычная сборка не пишет в консоль.
+
+## Жёсткие правила
+
+1. **Типы везде.** Аргументы, возвращаемые значения, поля. Это проверяет `gdlint`.
+2. **Не пушим в `main` напрямую.** Ветка на веху или задачу: `feat/m2-elevators`,
+   `fix/elevator-crush`, `chore/ci-cache`. PR мержится только при зелёном CI.
+   `gh` CLI не установлен — PR открывает и мержит пользователь в вебе.
+3. **Conventional Commits:** `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`.
+4. **Статус обновляется в каждом коммите, который трогает `src/`, `tests/` или
+   `project.godot`.** Это проверяет хук `status-updated`; без правки `docs/STATUS.md`
+   коммит не пройдёт.
+5. **Проверки не обходим.** Никаких `--no-verify`. Если хук упал — чиним причину.
+6. **Решения оформляем как ADR** в `docs/adr/`, если они влияют на архитектуру.
+
+## Завершение вехи
+
+Веха не закрыта, пока не сделано всё три:
+
+1. `python tools/capture.py <веха>` — скриншоты в `screens/<веха>/`. Папка локальная,
+   в репозиторий не идёт. Одиночный кадр в игре — **F12**.
+2. `/code-review xhigh --fix` — авторевью повышенной тщательности с автоприменением правок.
+3. `tools/check.ps1` заново после правок ревью.
+
+Только потом PR.
+
+## Структура
+
+```
+src/actors/     Otto, враги, пули
+src/systems/    лифты, двери, освещение, счёт
+src/levels/     этажи и здания
+src/ui/         HUD, меню
+src/autoload/   синглтоны (Screenshotter)
+assets/         спрайты, звук, шрифты
+tests/          тесты GUT, файлы test_*.gd
+tools/          скрипты разработчика на Python
+docs/           STATUS.md, EPIC.md, conventions.md, adr/
+```
+
+Сцена и её скрипт лежат рядом и называются одинаково: `otto.tscn` и `otto.gd`.
+Подробные соглашения по именованию и стилю — в [`docs/conventions.md`](docs/conventions.md).
+
+## Чего не делать
+
+- Не менять настройки рендера в `project.godot` без обновления
+  [ADR-0002](docs/adr/0002-visual-target.md) — они завязаны на выбранный визуальный стиль.
+- Не трогать `addons/` форматтером и линтером, это вендоренный код.
+- Не коммитить `screens/`, `.venv/`, `.godot/`.
+- Не добавлять C# — решение зафиксировано в [ADR-0001](docs/adr/0001-tech-stack.md).
