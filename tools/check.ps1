@@ -27,6 +27,10 @@ try {
     & python (Join-Path $root 'tools\godot_check.py')
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+    Write-Host '== тесты GUT ==' -ForegroundColor Cyan
+    & python (Join-Path $root 'tools\run_tests.py')
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
     Write-Host 'Все проверки пройдены.' -ForegroundColor Green
 }
 finally {

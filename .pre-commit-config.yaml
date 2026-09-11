@@ -34,12 +34,29 @@ repos:
       - id: gdformat
       - id: gdlint
 
-  # Тяжёлые проверки движком — только на push, чтобы не тормозить коммиты
   - repo: local
     hooks:
+      # Непрерывность между сессиями: код не уезжает вперёд статуса разработки.
+      - id: status-updated
+        name: docs/STATUS.md обновлён вместе с кодом
+        entry: python tools/check_status.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
+      # Тяжёлые проверки движком — только на push, чтобы не тормозить коммиты
       - id: godot-check
         name: godot --headless --import (импорт ресурсов и парсинг скриптов)
         entry: python tools/godot_check.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+      - id: gut-tests
+        name: тесты GUT (headless)
+        entry: python tools/run_tests.py
         language: system
         pass_filenames: false
         always_run: true

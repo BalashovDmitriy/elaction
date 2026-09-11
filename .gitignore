@@ -18,6 +18,9 @@ export_credentials.cfg
 *.keystore
 *.jks
 
+# Снимки экрана: локальный материал для анализа, в репозиторий не идут
+/screens/
+
 # Локальные оверрайды настроек
 override.cfg
 

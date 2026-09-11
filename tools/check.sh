@@ -24,4 +24,7 @@ echo "== gdlint =="
 echo "== godot --headless --import =="
 python tools/godot_check.py
 
+echo "== тесты GUT =="
+python tools/run_tests.py
+
 echo "Все проверки пройдены."

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Проверка проекта движком Godot.
 
-Godot умеет то, чего не умеют gdlint/gdformat: импортировать ресурсы, связать
+Godot умеет то, чего не умеют gdlint и gdformat: импортировать ресурсы, связать
 сцены со скриптами и поймать реальные ошибки разбора. Скрипт запускает
 `godot --headless --import`, а затем `--check-only` по каждому .gd.
 
@@ -9,24 +9,19 @@ Godot нередко завершается с кодом 0 даже при ош
 дополнительно просматривается на маркеры ошибок.
 
 Запуск:
-    python tools/godot_check.py            # полная проверка
-    python tools/godot_check.py --no-scripts   # только импорт ресурсов
-
-Бинарь ищется в порядке: $GODOT_BIN -> PATH -> стандартные пути winget.
+    python tools/godot_check.py              # полная проверка
+    python tools/godot_check.py --no-scripts # только импорт ресурсов
 """
 
 from __future__ import annotations
 
-import os
 import re
-import shutil
-import subprocess
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+from godot_bin import PROJECT_ROOT, require_godot, run, use_utf8_output
+
 SCRIPT_DIRS = ("src", "tests", "tools")
-TIMEOUT_SECONDS = 600
 
 ERROR_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"SCRIPT ERROR", re.IGNORECASE),
@@ -36,47 +31,6 @@ ERROR_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"Cannot open file", re.IGNORECASE),
     re.compile(r"Invalid call", re.IGNORECASE),
 )
-
-
-def find_godot() -> str | None:
-    """Возвращает путь к исполняемому файлу Godot или None."""
-    from_env = os.environ.get("GODOT_BIN")
-    if from_env and Path(from_env).exists():
-        return from_env
-
-    # На Windows обычная сборка не пишет в родительскую консоль — нужен _console.
-    names = ["godot_console", "godot"] if sys.platform == "win32" else ["godot"]
-    for name in names:
-        found = shutil.which(name)
-        if found:
-            return found
-
-    winget_links = Path.home() / "AppData/Local/Microsoft/WinGet/Links"
-    for name in names:
-        candidate = winget_links / f"{name}.exe"
-        if candidate.exists():
-            return str(candidate)
-
-    packages = Path.home() / "AppData/Local/Microsoft/WinGet/Packages"
-    for pattern in ("GodotEngine*/Godot*_win64_console.exe", "GodotEngine*/Godot*_win64.exe"):
-        for candidate in sorted(packages.glob(pattern)):
-            return str(candidate)
-
-    return None
-
-
-def run_godot(godot: str, args: list[str]) -> tuple[int, str]:
-    """Запускает Godot и возвращает (код возврата, объединённый вывод)."""
-    completed = subprocess.run(
-        [godot, "--headless", "--path", str(PROJECT_ROOT), *args],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=TIMEOUT_SECONDS,
-        check=False,
-    )
-    return completed.returncode, (completed.stdout or "") + (completed.stderr or "")
 
 
 def find_errors(output: str) -> list[str]:
@@ -112,26 +66,20 @@ def report(step: str, code: int, output: str) -> bool:
 
 
 def main(argv: list[str]) -> int:
-    # Вывод в UTF-8 независимо от кодовой страницы консоли Windows.
-    for stream in (sys.stdout, sys.stderr):
-        stream.reconfigure(encoding="utf-8", errors="replace")
-
-    godot = find_godot()
-    if godot is None:
-        print("Godot не найден. Установите его или задайте GODOT_BIN=<путь к godot>.")
-        print("Windows: winget install --id GodotEngine.GodotEngine")
-        return 127
-
+    use_utf8_output()
+    godot = require_godot()
     print(f"Godot: {godot}")
     ok = True
 
-    code, output = run_godot(godot, ["--import"])
+    code, output = run(godot, ["--headless", "--import"])
     ok &= report("импорт ресурсов (--import)", code, output)
 
     if "--no-scripts" not in argv:
         for script in gd_scripts():
             relative = script.relative_to(PROJECT_ROOT).as_posix()
-            code, output = run_godot(godot, ["--check-only", "--script", f"res://{relative}"])
+            code, output = run(
+                godot, ["--headless", "--check-only", "--script", f"res://{relative}"]
+            )
             ok &= report(f"разбор {relative}", code, output)
 
     print("Проверка пройдена." if ok else "Проверка провалена.")

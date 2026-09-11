@@ -20,8 +20,8 @@ elaction/
 └─ .github/workflows/     CI
 ```
 
-Сцена и её скрипт лежат рядом и называются одинаково: `src/actors/otto.tscn` и
-`src/actors/otto.gd`.
+Сцена и её скрипт лежат рядом и называются одинаково: `src/actors/otto/otto.tscn` и
+`src/actors/otto/otto.gd`.
 
 ## Именование
 
@@ -82,6 +82,19 @@ elaction/
   `tools/check.ps1` (Windows) или `tools/check.sh`.
 - **PR** мержим только при зелёном CI.
 
+## Завершение вехи
+
+Веха не считается закрытой, пока не сделано всё три:
+
+1. **Скриншоты** — `python tools/capture.py <веха>`. Кадры ложатся в `screens/<веха>/`
+   и служат материалом для сравнения вех и разбора проблем с картинкой. Папка не
+   коммитится. Одиночный кадр в любой момент — клавиша **F12**.
+2. **Авторевью** — `/code-review xhigh --fix`. Повышенная тщательность, найденные проблемы
+   применяются к рабочей копии сразу.
+3. **Повторный прогон проверок** после правок ревью — `tools/check.ps1`.
+
+Только после этого открывается PR.
+
 ## Что запускать
 
 | Задача | Команда |
@@ -92,4 +105,6 @@ elaction/
 | Только формат | `.venv/Scripts/gdformat src tests tools` |
 | Только линт | `.venv/Scripts/gdlint src tests tools` |
 | Проверка движком | `python tools/godot_check.py` |
+| Тесты | `python tools/run_tests.py` |
+| Скриншоты вехи | `python tools/capture.py M1` |
 | Прогнать все хуки | `.venv/Scripts/pre-commit run --all-files` |
