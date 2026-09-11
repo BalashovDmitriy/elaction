@@ -50,3 +50,6 @@ jobs:
 
       - name: Импорт ресурсов и разбор скриптов
         run: python tools/godot_check.py
+
+      - name: Тесты GUT
+        run: python tools/run_tests.py
