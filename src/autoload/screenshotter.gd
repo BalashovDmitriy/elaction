@@ -75,6 +75,12 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "shot", "actions": ["move_left", "shoot"], "hold": 0.25},
 		{"label": "floor_goes_dark", "actions": [], "hold": 1.4},
 	],
+	"M5A":
+	[
+		{"label": "roof", "actions": [], "hold": 1.2},
+		{"label": "walking", "actions": ["move_right"], "hold": 1.5},
+		{"label": "settled", "actions": [], "hold": 1.5},
+	],
 }
 const DEFAULT_PLAN := "M1"
 
