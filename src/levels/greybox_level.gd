@@ -1,73 +1,47 @@
 class_name GreyboxLevel
 extends Node2D
 
-## Временный «серый ящик»: три этажа, шахта лифта, эскалатор.
+## Здание, собранное по [BuildingPlan].
 ##
-## Геометрия описывается прямоугольниками и собирается в рантайме. Настоящие
-## уровни на данных появятся в M5; до тех пор этого хватает, чтобы проверить
-## движение, лифт, эскалатор и падение в шахту.
+## Где что стоит, решает раскладка по правилам и сиду; уровень только расставляет
+## узлы и связывает их между собой. Геометрия — прямоугольники: настоящие ассеты
+## приходят в M7, свет — в M6.
 
 ## Otto вышел из здания, собрав все документы.
 signal building_cleared
 
 const SOLID_COLOR := Color(0.22, 0.24, 0.30)
 const EXIT_COLOR := Color(0.30, 0.52, 0.36)
+
+## Чем накрывается погашенный этаж до настоящего света в M6.
+const DARKNESS_COLOR := Color(0.02, 0.02, 0.05, 0.72)
+const DARKNESS_Z: int = 20
+
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 const ESCALATOR_SCENE := preload("res://src/systems/escalators/escalator.tscn")
 const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 const LAMP_SCENE := preload("res://src/systems/lighting/lamp.tscn")
 
-## Поверхности этажей сверху вниз. По ним же кабина выбирает остановки.
-const FLOOR_SURFACES: Array[float] = [100.0, 220.0, 340.0]
-const SLAB_HEIGHT: float = 20.0
-const LEVEL_WIDTH: float = 1280.0
-const LEVEL_HEIGHT: float = 360.0
 const WALL_WIDTH: float = 16.0
 
-## Проём шахты. Ширина совпадает с кабиной, чтобы по краям не оставалось щелей,
-## сквозь которые можно просочиться мимо неё.
-const SHAFT_LEFT: float = 560.0
+## Проём шахты равен ширине кабины, чтобы по краям не оставалось щелей.
 const SHAFT_WIDTH: float = 40.0
 
 ## Дно шахты: сюда падает тот, кто шагнул в пустой проём.
 const PIT_HEIGHT: float = 20.0
 
-## Эскалатор ведёт со среднего этажа на нижний сквозь проём в перекрытии.
-## Спускается влево, поэтому верхняя площадка справа от проёма: сойдя с неё,
-## Otto идёт к шахте, а не обратно в проём.
-const ESCALATOR_FLOOR: int = 1
-const ESCALATOR_GAP_LEFT: float = 380.0
+## Проём под эскалатор и то, как он разложен от верхней площадки.
 const ESCALATOR_GAP_WIDTH: float = 60.0
-const ESCALATOR_TOP_X: float = 448.0
-const ESCALATOR_BOTTOM_X: float = 372.0
+const ESCALATOR_GAP_OFFSET: float = 16.0
+const ESCALATOR_RUN: float = 96.0
 
-## Двери этажей: номер этажа, x и есть ли за ней документ.
-const DOORS: Array[Dictionary] = [
-	{"floor": 0, "x": 200.0, "document": true},
-	{"floor": 0, "x": 880.0, "document": false},
-	{"floor": 1, "x": 700.0, "document": false},
-	{"floor": 1, "x": 980.0, "document": true},
-	{"floor": 2, "x": 160.0, "document": true},
-	{"floor": 2, "x": 1000.0, "document": false},
-]
-
-## Лампы этажей: номер этажа и x. Шахту лампой не загораживаем: кабина ходит
-## в полосе SHAFT_LEFT..SHAFT_LEFT + SHAFT_WIDTH и проезжала бы сквозь подвес.
-const LAMPS: Array[Dictionary] = [
-	{"floor": 0, "x": 420.0},
-	{"floor": 1, "x": 850.0},
-	{"floor": 2, "x": 760.0},
-]
-
-## На сколько выше пола висит середина лампы, px. Стоя в лампу не попасть:
-## выстрел стоя идёт в 20 px над полом, а низ подвеса — в 48. Свою высоту и путь
-## до пола лампа знает сама — см. [method Lamp.hang].
+## На сколько выше пола висит середина лампы, px.
 const LAMP_HANG_HEIGHT: float = 60.0
 
-## Чем накрывается погашенный этаж до настоящего света в M6.
-const DARKNESS_COLOR := Color(0.02, 0.02, 0.05, 0.72)
-const DARKNESS_Z: int = 20
+## Выход из здания — на нижнем этаже.
+const EXIT_WIDTH: float = 64.0
+const EXIT_HEIGHT: float = 40.0
 
 ## Сколько дверь ждёт, прежде чем выпустить следующего агента, с.
 const AGENT_RESPAWN_DELAY: float = 3.0
@@ -75,63 +49,43 @@ const AGENT_RESPAWN_DELAY: float = 3.0
 ## Сколько Otto лежит, прежде чем вернуться в игру, с.
 const OTTO_RESPAWN_DELAY: float = 1.2
 
-## Куда Otto возвращается на своём этаже: слева, подальше от всех проёмов.
-const RESPAWN_X: float = 80.0
+## Правила здания. Пустые — значит берутся по умолчанию.
+@export var rules: BuildingRules
 
-## Выход из здания — на нижнем этаже справа.
-const EXIT_LEFT: float = 1180.0
-const EXIT_WIDTH: float = 64.0
-const EXIT_HEIGHT: float = 40.0
+## Сид здания. В M5b им станет номер здания.
+@export var building_seed: int = 1
 
-@export var camera_bounds := Rect2(0, 0, LEVEL_WIDTH, LEVEL_HEIGHT)
-
+var _plan: BuildingPlan
 var _doors: Array[Door] = []
 ## Обычные двери: из них выходят агенты. Красные документов не стерегут.
 var _agent_doors: Array[Door] = []
 var _lighting := FloorLighting.new()
-## Здание сдано. Otto может зайти в зону выхода снова, но событие однократное:
-## в M5 к нему прицепится переход к следующему зданию.
+## Здание сдано. Событие однократное: в M5b к нему прицепится переход дальше.
 var _cleared: bool = false
 
 @onready var otto: Otto = $Otto
+@onready var _background: ColorRect = $Background
 
 
 func _ready() -> void:
-	for rect in _building_solids():
-		_build_solid(rect)
-	_spawn_car()
-	_spawn_shaft_pit()
-	_spawn_escalator()
+	if rules == null:
+		rules = BuildingRules.new()
+	_plan = BuildingPlan.generate(rules, building_seed)
+
+	_background.size = Vector2(rules.width, rules.total_height())
+	_build_geometry()
+	_spawn_shafts()
+	_spawn_escalators()
 	_spawn_doors()
-	_spawn_exit()
 	_spawn_lamps()
+	_spawn_exit()
+
+	# Otto начинает с крыши, как в оригинале, и там, где нет проёмов.
+	otto.global_position = Vector2(_plan.safe_x(rules, 0), rules.floor_surface(0))
 	otto.died.connect(_on_otto_died)
 	for door in _agent_doors:
 		_release_agent(door)
-	otto.apply_camera_bounds(camera_bounds)
-
-
-## Геометрия здания: перекрытия с проёмами и стены по краям уровня.
-func _building_solids() -> Array[Rect2]:
-	var rects: Array[Rect2] = [
-		Rect2(0.0, 0.0, WALL_WIDTH, LEVEL_HEIGHT),
-		Rect2(LEVEL_WIDTH - WALL_WIDTH, 0.0, WALL_WIDTH, LEVEL_HEIGHT),
-	]
-	for index: int in FLOOR_SURFACES.size():
-		rects.append_array(slab_segments(FLOOR_SURFACES[index], _gaps_for(index)))
-	return rects
-
-
-## Проёмы в перекрытии этажа: пары «левый край, правый край», по возрастанию x.
-func _gaps_for(index: int) -> Array[Vector2]:
-	# Нижний этаж сплошной: это дно шахты, падать дальше некуда.
-	if index == FLOOR_SURFACES.size() - 1:
-		return []
-
-	var gaps: Array[Vector2] = [Vector2(SHAFT_LEFT, SHAFT_LEFT + SHAFT_WIDTH)]
-	if index == ESCALATOR_FLOOR:
-		gaps.append(Vector2(ESCALATOR_GAP_LEFT, ESCALATOR_GAP_LEFT + ESCALATOR_GAP_WIDTH))
-	return gaps
+	otto.apply_camera_bounds(Rect2(0.0, 0.0, rules.width, rules.total_height()))
 
 
 ## Режет перекрытие на куски между проёмами.
@@ -141,7 +95,9 @@ func _gaps_for(index: int) -> Array[Vector2]:
 ## выходит сплошным — проёма как не бывало.
 ##
 ## Статический, чтобы проверяться тестами без сцены.
-static func slab_segments(surface: float, gaps: Array[Vector2]) -> Array[Rect2]:
+static func slab_segments(
+	surface: float, gaps: Array[Vector2], width: float, thickness: float
+) -> Array[Rect2]:
 	var ordered := gaps.duplicate()
 	ordered.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
 
@@ -149,30 +105,65 @@ static func slab_segments(surface: float, gaps: Array[Vector2]) -> Array[Rect2]:
 	var cursor := 0.0
 	for gap in ordered:
 		if gap.x > cursor:
-			rects.append(Rect2(cursor, surface, gap.x - cursor, SLAB_HEIGHT))
+			rects.append(Rect2(cursor, surface, gap.x - cursor, thickness))
 		# maxf, чтобы вложенный проём не отматывал курсор назад.
 		cursor = maxf(cursor, gap.y)
-	if cursor < LEVEL_WIDTH:
-		rects.append(Rect2(cursor, surface, LEVEL_WIDTH - cursor, SLAB_HEIGHT))
+	if cursor < width:
+		rects.append(Rect2(cursor, surface, width - cursor, thickness))
 	return rects
 
 
-func _spawn_car() -> void:
-	var car := CAR_SCENE.instantiate() as ElevatorCar
-	car.position.x = SHAFT_LEFT + SHAFT_WIDTH * 0.5
-	add_child(car)
-	# Кабина ждёт на верхнем этаже: оттуда Otto и начинает спуск.
-	car.setup(PackedFloat32Array(FLOOR_SURFACES))
+func _build_geometry() -> void:
+	var height := rules.total_height()
+	_build_solid(Rect2(0.0, 0.0, WALL_WIDTH, height))
+	_build_solid(Rect2(rules.width - WALL_WIDTH, 0.0, WALL_WIDTH, height))
+
+	for index in rules.floors:
+		var surface := rules.floor_surface(index)
+		for rect in slab_segments(surface, _gaps_for(index), rules.width, rules.slab_height):
+			_build_solid(rect)
+
+
+## Проёмы в перекрытии этажа: пары «левый край, правый край».
+func _gaps_for(index: int) -> Array[Vector2]:
+	var gaps: Array[Vector2] = []
+
+	for shaft in _plan.shafts:
+		# Кабина проходит сквозь перекрытия своей полосы, кроме нижнего: там она
+		# встаёт на пол, и он же служит дном шахты.
+		if index >= shaft.top and index < shaft.bottom:
+			gaps.append(Vector2(shaft.x - SHAFT_WIDTH * 0.5, shaft.x + SHAFT_WIDTH * 0.5))
+
+	for escalator in _plan.escalators:
+		if index != escalator.floor_index:
+			continue
+		var near := escalator.x + escalator.towards * ESCALATOR_GAP_OFFSET
+		var far := near + escalator.towards * ESCALATOR_GAP_WIDTH
+		gaps.append(Vector2(minf(near, far), maxf(near, far)))
+
+	return gaps
+
+
+func _spawn_shafts() -> void:
+	for shaft in _plan.shafts:
+		var stops := PackedFloat32Array()
+		for index in range(shaft.top, shaft.bottom + 1):
+			stops.append(rules.floor_surface(index))
+
+		var car := CAR_SCENE.instantiate() as ElevatorCar
+		car.position.x = shaft.x
+		add_child(car)
+		car.setup(stops)
+		_spawn_shaft_pit(shaft)
 
 
 ## Дно шахты: упавший сюда разбивается, вошедший ногами с этажа — нет.
-func _spawn_shaft_pit() -> void:
+func _spawn_shaft_pit(shaft: BuildingPlan.ShaftSpot) -> void:
+	var surface := rules.floor_surface(shaft.bottom)
 	var pit := Area2D.new()
 	pit.collision_layer = 0
 	pit.collision_mask = 2
-	pit.position = Vector2(
-		SHAFT_LEFT + SHAFT_WIDTH * 0.5, FLOOR_SURFACES[FLOOR_SURFACES.size() - 1] - PIT_HEIGHT * 0.5
-	)
+	pit.position = Vector2(shaft.x, surface - PIT_HEIGHT * 0.5)
 
 	var shape := RectangleShape2D.new()
 	shape.size = Vector2(SHAFT_WIDTH, PIT_HEIGHT)
@@ -184,13 +175,20 @@ func _spawn_shaft_pit() -> void:
 	add_child(pit)
 
 
-func _spawn_escalator() -> void:
-	var escalator := ESCALATOR_SCENE.instantiate() as Escalator
-	var top := FLOOR_SURFACES[ESCALATOR_FLOOR]
-	var bottom := FLOOR_SURFACES[ESCALATOR_FLOOR + 1]
-	escalator.position = Vector2(ESCALATOR_TOP_X, top)
-	add_child(escalator)
-	escalator.setup(Vector2(ESCALATOR_BOTTOM_X - ESCALATOR_TOP_X, bottom - top))
+func _spawn_escalators() -> void:
+	for spot in _plan.escalators:
+		var escalator := ESCALATOR_SCENE.instantiate() as Escalator
+		escalator.position = Vector2(spot.x, rules.floor_surface(spot.floor_index))
+		add_child(escalator)
+
+		var descent := Vector2(spot.towards * ESCALATOR_RUN, rules.floor_height)
+		# Перегиб — в самом проёме: через него идут и полотно, и поездка, поэтому
+		# пассажир проходит сквозь дыру, а не сквозь плиту.
+		var bend := Vector2(
+			spot.towards * (ESCALATOR_GAP_OFFSET + ESCALATOR_GAP_WIDTH * 0.5),
+			rules.slab_height + 4.0
+		)
+		escalator.setup(descent, bend)
 
 
 func _spawn_doors() -> void:
@@ -198,12 +196,13 @@ func _spawn_doors() -> void:
 	# кто начинает партию. Здесь объявляется только, сколько здесь документов.
 	var game := GameState.instance()
 	var documents := 0
-	for entry: Dictionary in DOORS:
+	for spot in _plan.doors:
 		var door := DOOR_SCENE.instantiate() as Door
-		door.position = Vector2(entry["x"], FLOOR_SURFACES[entry["floor"]])
-		door.has_document = entry["document"]
+		door.position = Vector2(spot.x, rules.floor_surface(spot.floor_index))
+		door.has_document = spot.has_document
 		add_child(door)
 		_doors.append(door)
+
 		if not door.is_pending():
 			_agent_doors.append(door)
 			continue
@@ -212,26 +211,38 @@ func _spawn_doors() -> void:
 	game.start_building(documents)
 
 
+func _spawn_lamps() -> void:
+	for spot in _plan.lamps:
+		var lamp := LAMP_SCENE.instantiate() as Lamp
+		lamp.position = Vector2(spot.x, rules.floor_surface(spot.floor_index) - LAMP_HANG_HEIGHT)
+		lamp.crushed.connect(_on_lamp_crushed)
+		# Этаж лампы известен здесь, и обратно из координаты его выводить незачем.
+		lamp.fell.connect(_on_lamp_fell.bind(spot.floor_index))
+		add_child(lamp)
+		lamp.hang(LAMP_HANG_HEIGHT)
+
+
 ## Выход из здания. Не запирается: без всех документов он отправляет обратно
 ## наверх, к несобранной двери (ADR-0005, пункт 5).
 func _spawn_exit() -> void:
-	var bottom := FLOOR_SURFACES[FLOOR_SURFACES.size() - 1]
-	var area := Rect2(EXIT_LEFT, bottom - EXIT_HEIGHT, EXIT_WIDTH, EXIT_HEIGHT)
+	var bottom := rules.floors - 1
+	var surface := rules.floor_surface(bottom)
+	var centre := _plan.safe_x(rules, bottom)
+	var area := Rect2(centre - EXIT_WIDTH * 0.5, surface - EXIT_HEIGHT, EXIT_WIDTH, EXIT_HEIGHT)
 
 	var zone := Area2D.new()
 	zone.collision_layer = 0
 	zone.collision_mask = 2
 	zone.position = area.position + area.size * 0.5
+	zone.z_index = -1
 
 	var shape := RectangleShape2D.new()
 	shape.size = area.size
 	var collision := CollisionShape2D.new()
 	collision.shape = shape
 	zone.add_child(collision)
+	zone.add_child(_panel(area.size, -area.size * 0.5, EXIT_COLOR))
 
-	zone.add_child(_panel(EXIT_COLOR, area.size, -area.size * 0.5))
-
-	zone.z_index = -1
 	zone.body_entered.connect(_on_exit_entered)
 	add_child(zone)
 
@@ -251,37 +262,17 @@ func _on_exit_entered(body: Node2D) -> void:
 	_send_back_for_documents.call_deferred(runner)
 
 
-## Номер этажа, к которому ближе всего точка. Статический — чтобы проверяться
-## тестами без сцены.
-static func floor_index_near(y: float, surfaces: Array[float]) -> int:
-	var best := 0
-	for index: int in surfaces.size():
-		if absf(surfaces[index] - y) < absf(surfaces[best] - y):
-			best = index
-	return best
+## Возвращает Otto к самой верхней несобранной двери.
+func _send_back_for_documents(runner: Otto) -> void:
+	var pending := PackedVector2Array()
+	for door in _doors:
+		if door.is_pending():
+			pending.append(door.mat_position())
 
-
-## Этаж, на котором Otto погиб: ближайшая по вертикали поверхность.
-static func floor_surface_near(y: float, surfaces: Array[float]) -> float:
-	return surfaces[floor_index_near(y, surfaces)]
-
-
-## Потолок этажа: низ перекрытия сверху, а у верхнего — край уровня.
-static func story_top(index: int, surfaces: Array[float]) -> float:
-	return 0.0 if index == 0 else surfaces[index - 1] + SLAB_HEIGHT
-
-
-func _spawn_lamps() -> void:
-	for entry: Dictionary in LAMPS:
-		var index: int = entry["floor"]
-		var lamp := LAMP_SCENE.instantiate() as Lamp
-		lamp.position = Vector2(entry["x"], FLOOR_SURFACES[index] - LAMP_HANG_HEIGHT)
-		lamp.crushed.connect(_on_lamp_crushed)
-		# Этаж лампы известен здесь, и обратно из координаты его выводить незачем:
-		# упавшая лампа стоит на полу, но подвес мог бы висеть и ближе к чужому.
-		lamp.fell.connect(_on_lamp_fell.bind(index))
-		add_child(lamp)
-		lamp.hang(LAMP_HANG_HEIGHT)
+	var index := DocumentRoute.door_to_return_to(pending)
+	if index < 0:
+		return
+	runner.global_position = pending[index]
 
 
 ## Лампа накрыла агента по дороге вниз — самый дорогой способ убийства.
@@ -303,9 +294,9 @@ func _on_lamp_fell(index: int) -> void:
 
 
 func _cover_with_darkness(index: int) -> void:
-	var top := story_top(index, FLOOR_SURFACES)
-	var height := FLOOR_SURFACES[index] + SLAB_HEIGHT - top
-	var shade := _panel(DARKNESS_COLOR, Vector2(LEVEL_WIDTH, height), Vector2(0.0, top))
+	var top := rules.story_top(index)
+	var size := Vector2(rules.width, rules.floor_surface(index) + rules.slab_height - top)
+	var shade := _panel(size, Vector2(0.0, top), DARKNESS_COLOR)
 	shade.z_index = DARKNESS_Z
 	add_child(shade)
 
@@ -316,7 +307,7 @@ func _agents_on(index: int) -> Array[Enemy]:
 		var agent := child as Enemy
 		if agent == null:
 			continue
-		if floor_index_near(agent.global_position.y, FLOOR_SURFACES) == index:
+		if rules.floor_index_near(agent.global_position.y) == index:
 			found.append(agent)
 	return found
 
@@ -328,7 +319,7 @@ func _release_agent(door: Door) -> void:
 	add_child(agent)
 	agent.global_position = mat
 	agent.setup(otto, signf(otto.global_position.x - mat.x))
-	agent.set_in_the_dark(_lighting.is_dark(floor_index_near(mat.y, FLOOR_SURFACES)))
+	agent.set_in_the_dark(_lighting.is_dark(rules.floor_index_near(mat.y)))
 	agent.died.connect(_on_agent_died.bind(door))
 
 
@@ -346,22 +337,9 @@ func _on_otto_died() -> void:
 
 
 func _respawn_otto() -> void:
-	var surface := floor_surface_near(otto.global_position.y, FLOOR_SURFACES)
-	otto.global_position = Vector2(RESPAWN_X, surface)
+	var index := rules.floor_index_near(otto.global_position.y)
+	otto.global_position = Vector2(_plan.safe_x(rules, index), rules.floor_surface(index))
 	otto.revive()
-
-
-## Возвращает Otto к самой верхней несобранной двери.
-func _send_back_for_documents(runner: Otto) -> void:
-	var pending := PackedVector2Array()
-	for door in _doors:
-		if door.is_pending():
-			pending.append(door.mat_position())
-
-	var index := DocumentRoute.door_to_return_to(pending)
-	if index < 0:
-		return
-	runner.global_position = pending[index]
 
 
 func _on_pit_entered(body: Node2D) -> void:
@@ -387,17 +365,16 @@ func _build_solid(rect: Rect2) -> void:
 	var collision := CollisionShape2D.new()
 	collision.shape = shape
 	body.add_child(collision)
+	body.add_child(_panel(rect.size, -rect.size * 0.5, SOLID_COLOR))
 
-	body.add_child(_panel(SOLID_COLOR, rect.size, -rect.size * 0.5))
 	add_child(body)
 
 
-## Цветной прямоугольник грейбокса: перекрытие, зона выхода, тёмная полоса.
-## Мышь он не ловит — иначе перекрыл бы собой всё, что под ним.
-static func _panel(color: Color, size: Vector2, offset: Vector2) -> ColorRect:
-	var rect := ColorRect.new()
-	rect.color = color
-	rect.size = size
-	rect.position = offset
-	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return rect
+## Цветной прямоугольник — временная замена спрайтам до M7.
+func _panel(size: Vector2, offset: Vector2, color: Color) -> ColorRect:
+	var panel := ColorRect.new()
+	panel.color = color
+	panel.size = size
+	panel.position = offset
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return panel

@@ -80,6 +80,26 @@ func document_floors() -> Array[int]:
 	return found
 
 
+## Место на этаже, где нет ни шахты, ни эскалатора: там можно стоять, не провалившись.
+##
+## Нужно тем, кого ставят на этаж снаружи раскладки: Otto на старте и после смерти,
+## выход из здания. Двери и лампы дыр в полу не делают и потому не мешают.
+func safe_x(rules: BuildingRules, floor_index: int) -> float:
+	var busy: Dictionary = {}
+	for shaft in shafts:
+		if floor_index >= shaft.top and floor_index <= shaft.bottom:
+			busy[shaft.x] = true
+	for escalator in escalators:
+		if floor_index == escalator.floor_index or floor_index == escalator.floor_index + 1:
+			busy[escalator.x] = true
+
+	for slot in rules.slots:
+		var x := rules.slot_x(slot)
+		if not busy.has(x):
+			return x
+	return rules.slot_x(0)
+
+
 func _lay_shafts(rules: BuildingRules, rng: RandomNumberGenerator, taken: Dictionary) -> void:
 	var top := 0
 	var previous_slot := -1

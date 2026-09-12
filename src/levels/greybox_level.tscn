@@ -14,4 +14,3 @@ mouse_filter = 2
 color = Color(0.08, 0.09, 0.12, 1)
 
 [node name="Otto" parent="." instance=ExtResource("2_otto")]
-position = Vector2(520, 100)

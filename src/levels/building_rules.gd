@@ -53,3 +53,14 @@ func floor_surface(index: int) -> float:
 ## Высота здания целиком, px.
 func total_height() -> float:
 	return floor_surface(floors - 1) + slab_height
+
+
+## Ближайший этаж к точке по вертикали.
+func floor_index_near(y: float) -> int:
+	var raw := roundf((y - slab_height) / floor_height)
+	return clampi(int(raw), 0, floors - 1)
+
+
+## Потолок этажа: низ перекрытия сверху, у самого верхнего — край здания.
+func story_top(index: int) -> float:
+	return 0.0 if index <= 0 else floor_surface(index - 1) + slab_height
