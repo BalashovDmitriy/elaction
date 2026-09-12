@@ -19,6 +19,9 @@ var _states := OttoStateMachine.new()
 ## Один снимок ввода на всё время жизни: перечитывается, а не создаётся заново.
 var _snapshot := OttoInput.new()
 var _posed_state := OttoStateMachine.State.IDLE
+## Кабина, внутри которой сейчас Otto. На крыше кабины она не заполняется:
+## оттуда лифтом не управляют (ADR-0004, пункт 3).
+var _car: ElevatorCar = null
 
 @onready var _standing_shape: CollisionShape2D = $StandingShape
 @onready var _crouching_shape: CollisionShape2D = $CrouchingShape
@@ -28,6 +31,11 @@ var _posed_state := OttoStateMachine.State.IDLE
 
 func _physics_process(delta: float) -> void:
 	_snapshot.read_actions()
+	if _car != null:
+		# В кабине «вверх/вниз» ведут её, а присесть внутри нельзя.
+		_car.drive(_snapshot.vertical)
+		_snapshot.crouch = false
+
 	var state := _states.update(_snapshot, is_on_floor(), velocity.y)
 
 	# Импульс прыжка выдаётся в тот же кадр, пока тело ещё стоит на полу,
@@ -41,6 +49,22 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 	_apply_pose(state)
+
+
+## Otto вошёл в кабину и теперь ею управляет.
+func board(car: ElevatorCar) -> void:
+	_car = car
+
+
+## Otto вышел из кабины.
+func leave(car: ElevatorCar) -> void:
+	if _car == car:
+		_car = null
+
+
+## Едет ли Otto внутри кабины. Езда на крыше сюда не входит.
+func is_riding() -> bool:
+	return _car != null
 
 
 ## Текущее состояние. Нужно отладочному оверлею и будущим системам.

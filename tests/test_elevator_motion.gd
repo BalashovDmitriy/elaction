@@ -81,20 +81,27 @@ func test_occupied_car_does_not_move_on_its_own() -> void:
 	assert_almost_eq(_run(motion, 2.0, 0.0, true), TOP, 0.01)
 
 
+func test_car_waits_on_the_floor_it_starts_from() -> void:
+	var motion := _shaft(0)
+	assert_almost_eq(_run(motion, 0.5, 0.0, false), TOP, 0.01)
+	assert_true(motion.is_stopped(), "кабина стоит на этаже, прежде чем тронуться")
+
+
 func test_empty_car_travels_by_itself() -> void:
 	var motion := _shaft(0)
-	assert_almost_eq(_run(motion, 1.0, 0.0, false), MIDDLE, 0.01)
+	# Секунда стартовой паузы на этаже плюс секунда хода до среднего этажа.
+	assert_almost_eq(_run(motion, 2.5, 0.0, false), MIDDLE, 0.01)
 
 
 func test_empty_car_pauses_at_the_floor() -> void:
 	var motion := _shaft(0)
-	_run(motion, 1.0, 0.0, false)
-	assert_almost_eq(_run(motion, 0.5, 0.0, false), MIDDLE, 0.01)
+	_run(motion, 2.5, 0.0, false)
+	assert_almost_eq(_run(motion, 0.3, 0.0, false), MIDDLE, 0.01)
 
 
 func test_empty_car_reverses_at_the_end_of_the_shaft() -> void:
 	var motion := _shaft(0)
-	_run(motion, 4.5, 0.0, false)
+	_run(motion, 5.5, 0.0, false)
 	assert_eq(motion.direction, ElevatorMotion.UP, "с нижнего этажа кабина поехала вверх")
 	assert_lt(motion.position, BOTTOM)
 

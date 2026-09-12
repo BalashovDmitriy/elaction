@@ -53,9 +53,10 @@ func setup(stops: PackedFloat32Array, start_floor: int = 0) -> void:
 	floors.sort()
 	direction = 0.0
 	velocity = 0.0
-	_pause_left = 0.0
 	if not floors.is_empty():
 		position = floors[clampi(start_floor, 0, floors.size() - 1)]
+	# На этаже кабина стоит — в том числе на том, с которого начинает.
+	_pause_left = floor_pause
 
 
 ## Двигает кабину за кадр и возвращает новую координату.
