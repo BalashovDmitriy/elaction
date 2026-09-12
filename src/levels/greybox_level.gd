@@ -52,17 +52,18 @@ const DOORS: Array[Dictionary] = [
 	{"floor": 2, "x": 1000.0, "document": false},
 ]
 
-## Лампы этажей: номер этажа и x. Висят так, что стоя в них не попасть —
-## выстрел стоя идёт в 20 px над полом, а подвес начинается выше.
+## Лампы этажей: номер этажа и x. Шахту лампой не загораживаем: кабина ходит
+## в полосе SHAFT_LEFT..SHAFT_LEFT + SHAFT_WIDTH и проезжала бы сквозь подвес.
 const LAMPS: Array[Dictionary] = [
 	{"floor": 0, "x": 420.0},
 	{"floor": 1, "x": 850.0},
-	{"floor": 2, "x": 600.0},
+	{"floor": 2, "x": 760.0},
 ]
 
-## На сколько выше пола висит середина лампы и половина её высоты, px.
+## На сколько выше пола висит середина лампы, px. Стоя в лампу не попасть:
+## выстрел стоя идёт в 20 px над полом, а низ подвеса — в 48. Свою высоту и путь
+## до пола лампа знает сама — см. [method Lamp.hang].
 const LAMP_HANG_HEIGHT: float = 60.0
-const LAMP_HALF_HEIGHT: float = 20.0
 
 ## Чем накрывается погашенный этаж до настоящего света в M6.
 const DARKNESS_COLOR := Color(0.02, 0.02, 0.05, 0.72)
@@ -228,12 +229,7 @@ func _spawn_exit() -> void:
 	collision.shape = shape
 	zone.add_child(collision)
 
-	var visual := ColorRect.new()
-	visual.color = EXIT_COLOR
-	visual.size = area.size
-	visual.position = -area.size * 0.5
-	visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	zone.add_child(visual)
+	zone.add_child(_panel(EXIT_COLOR, area.size, -area.size * 0.5))
 
 	zone.z_index = -1
 	zone.body_entered.connect(_on_exit_entered)
@@ -271,8 +267,8 @@ static func floor_surface_near(y: float, surfaces: Array[float]) -> float:
 
 
 ## Потолок этажа: низ перекрытия сверху, а у верхнего — край уровня.
-static func story_top(index: int) -> float:
-	return 0.0 if index == 0 else FLOOR_SURFACES[index - 1] + SLAB_HEIGHT
+static func story_top(index: int, surfaces: Array[float]) -> float:
+	return 0.0 if index == 0 else surfaces[index - 1] + SLAB_HEIGHT
 
 
 func _spawn_lamps() -> void:
@@ -280,10 +276,12 @@ func _spawn_lamps() -> void:
 		var index: int = entry["floor"]
 		var lamp := LAMP_SCENE.instantiate() as Lamp
 		lamp.position = Vector2(entry["x"], FLOOR_SURFACES[index] - LAMP_HANG_HEIGHT)
-		lamp.fall_distance = LAMP_HANG_HEIGHT - LAMP_HALF_HEIGHT
 		lamp.crushed.connect(_on_lamp_crushed)
-		lamp.fell.connect(_on_lamp_fell)
+		# Этаж лампы известен здесь, и обратно из координаты его выводить незачем:
+		# упавшая лампа стоит на полу, но подвес мог бы висеть и ближе к чужому.
+		lamp.fell.connect(_on_lamp_fell.bind(index))
 		add_child(lamp)
+		lamp.hang(LAMP_HANG_HEIGHT)
 
 
 ## Лампа накрыла агента по дороге вниз — самый дорогой способ убийства.
@@ -296,8 +294,7 @@ func _on_lamp_crushed(agent: Enemy) -> void:
 
 
 ## Лампа долетела до пола: этаж гаснет и обратно уже не загорается.
-func _on_lamp_fell(lamp: Lamp) -> void:
-	var index := floor_index_near(lamp.global_position.y, FLOOR_SURFACES)
+func _on_lamp_fell(index: int) -> void:
 	if not _lighting.darken(index):
 		return
 	_cover_with_darkness(index)
@@ -306,12 +303,9 @@ func _on_lamp_fell(lamp: Lamp) -> void:
 
 
 func _cover_with_darkness(index: int) -> void:
-	var top := story_top(index)
-	var shade := ColorRect.new()
-	shade.color = DARKNESS_COLOR
-	shade.position = Vector2(0.0, top)
-	shade.size = Vector2(LEVEL_WIDTH, FLOOR_SURFACES[index] + SLAB_HEIGHT - top)
-	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var top := story_top(index, FLOOR_SURFACES)
+	var height := FLOOR_SURFACES[index] + SLAB_HEIGHT - top
+	var shade := _panel(DARKNESS_COLOR, Vector2(LEVEL_WIDTH, height), Vector2(0.0, top))
 	shade.z_index = DARKNESS_Z
 	add_child(shade)
 
@@ -394,11 +388,16 @@ func _build_solid(rect: Rect2) -> void:
 	collision.shape = shape
 	body.add_child(collision)
 
-	var visual := ColorRect.new()
-	visual.color = SOLID_COLOR
-	visual.size = rect.size
-	visual.position = -rect.size * 0.5
-	visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	body.add_child(visual)
-
+	body.add_child(_panel(SOLID_COLOR, rect.size, -rect.size * 0.5))
 	add_child(body)
+
+
+## Цветной прямоугольник грейбокса: перекрытие, зона выхода, тёмная полоса.
+## Мышь он не ловит — иначе перекрыл бы собой всё, что под ним.
+static func _panel(color: Color, size: Vector2, offset: Vector2) -> ColorRect:
+	var rect := ColorRect.new()
+	rect.color = color
+	rect.size = size
+	rect.position = offset
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return rect

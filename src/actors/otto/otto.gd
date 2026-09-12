@@ -241,7 +241,7 @@ func _fire() -> void:
 	var bullet := BULLET_SCENE.instantiate() as Bullet
 	bullet.direction = _facing
 	bullet.speed = bullet_speed
-	bullet.collision_mask = Bullet.HITS_ENEMIES
+	bullet.collision_mask = Bullet.FROM_OTTO
 	bullet.hit_target.connect(_on_bullet_hit)
 	# Счётчик ведёт сам ствол: пуля кончается и попаданием, и на дальности.
 	bullet.tree_exited.connect(_gun.bullet_spent)
@@ -251,7 +251,7 @@ func _fire() -> void:
 
 
 func _on_bullet_hit(target: Node2D) -> void:
-	# Лампа висит на том же слое, что и агенты: пуля не разбирает, во что попала.
+	# Пуля не разбирает, во что попала, — разбирает стрелявший.
 	var lamp := target as Lamp
 	if lamp != null:
 		lamp.shoot_down()

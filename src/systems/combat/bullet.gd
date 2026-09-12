@@ -15,9 +15,12 @@ extends Area2D
 ## это или чужие, и ему же идут очки.
 signal hit_target(target: Node2D)
 
-## Маски слоёв: 1 — геометрия, 2 — Otto, 4 — враги.
-const HITS_ENEMIES: int = 1 | 4
-const HITS_PLAYER: int = 1 | 2
+## Во что попадает пуля. Слои: 1 — геометрия, 2 — Otto, 4 — враги, 8 — лампы.
+##
+## Названы по стрелявшему, а не по мишени: пуля Otto бьёт и по агентам, и по
+## лампам, и одним словом это не назвать.
+const FROM_OTTO: int = 1 | 4 | 8
+const FROM_ENEMY: int = 1 | 2
 
 @export var speed: float = 220.0
 

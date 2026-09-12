@@ -25,3 +25,10 @@ func test_floor_index_matches_the_surface() -> void:
 	assert_eq(GreyboxLevel.floor_index_near(105.0, FLOORS), 0, "верхний этаж")
 	assert_eq(GreyboxLevel.floor_index_near(215.0, FLOORS), 1)
 	assert_eq(GreyboxLevel.floor_index_near(340.0, FLOORS), 2, "нижний этаж")
+
+
+func test_story_top_is_the_ceiling_of_the_floor() -> void:
+	# У верхнего этажа потолка нет — берётся край уровня.
+	assert_eq(GreyboxLevel.story_top(0, FLOORS), 0.0)
+	var second := FLOORS[0] + GreyboxLevel.SLAB_HEIGHT
+	assert_eq(GreyboxLevel.story_top(1, FLOORS), second, "низ перекрытия сверху")
