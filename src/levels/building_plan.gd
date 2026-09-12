@@ -92,6 +92,28 @@ func document_floors() -> Array[int]:
 	return found
 
 
+## Проёмы в перекрытии этажа: пары «левый край, правый край», по возрастанию x.
+##
+## Считается здесь, а не в уровне: по этим же дырам строится граф достижимости,
+## и разъехаться они не должны.
+func gaps_on(rules: BuildingRules, floor_index: int) -> Array[Vector2]:
+	var gaps: Array[Vector2] = []
+
+	for shaft in shafts:
+		# Кабина проходит сквозь перекрытия своей полосы, кроме нижнего: там она
+		# встаёт на пол, и он же служит дном шахты.
+		if floor_index >= shaft.top and floor_index < shaft.bottom:
+			var half := rules.shaft_width * 0.5
+			gaps.append(Vector2(shaft.x - half, shaft.x + half))
+
+	for escalator in escalators:
+		if floor_index == escalator.floor_index:
+			gaps.append(escalator.gap(rules))
+
+	gaps.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
+	return gaps
+
+
 ## Место на этаже, где можно стоять, не провалившись и ни во что не упёршись.
 ##
 ## Нужно тем, кого ставят на этаж снаружи раскладки: Otto на старте и после смерти.
@@ -212,14 +234,11 @@ func _lay_exit(rules: BuildingRules, rng: RandomNumberGenerator, taken: Dictiona
 
 
 func _lay_doors(rules: BuildingRules, rng: RandomNumberGenerator, taken: Dictionary) -> void:
-	var with_document := _document_floors(rules, rng)
-
-	# Красные кладутся первыми: на почти пустом этаже место им найдётся всегда.
-	# Иначе последняя дверь могла не поместиться, и здание оказалось бы молча
-	# с четырьмя документами вместо пяти — собрать его стало бы нельзя.
-	for index: int in with_document:
-		if not _lay_door(rules, rng, taken, index, true):
-			push_error("этаж %d остался без красной двери: свободных мест нет" % index)
+	# Красные кладутся первыми: на почти пустом этаже место им найдётся скорее.
+	#
+	# И только туда, куда ведёт маршрут: проём режет этаж надвое, и за дырой
+	# документ достаётся лишь прыжком через неё, а промах роняет этажом ниже.
+	var with_document := _lay_documents(rules, rng, taken)
 
 	for index in floors:
 		var already := 1 if with_document.has(index) else 0
@@ -234,11 +253,20 @@ func _lay_door(
 	rng: RandomNumberGenerator,
 	taken: Dictionary,
 	floor_index: int,
-	with_document: bool
+	with_document: bool,
+	routed: Dictionary = {}
 ) -> bool:
-	var slot := _free_slot(rng, rules.slots, taken, [floor_index] as Array[int])
-	if slot < 0:
+	var free := _free_slots(rules.slots, taken, [floor_index] as Array[int])
+	if not routed.is_empty():
+		free = free.filter(
+			func(candidate: int) -> bool:
+				var x := rules.slot_x(candidate)
+				return routed.has(BuildingRoute.node_at(self, rules, floor_index, x))
+		)
+	if free.is_empty():
 		return false
+
+	var slot: int = free[rng.randi_range(0, free.size() - 1)]
 
 	var door := DoorSpot.new()
 	door.floor_index = floor_index
@@ -265,9 +293,16 @@ func _lay_lamps(rules: BuildingRules, rng: RandomNumberGenerator, taken: Diction
 			lamps.append(lamp)
 
 
-## Этажи с документами: здание делится на полосы, и из каждой берётся один этаж.
-## Так документы разнесены по высоте и пройти приходится всё здание, а не верх.
-func _document_floors(rules: BuildingRules, rng: RandomNumberGenerator) -> Dictionary:
+## Раскладывает красные двери: здание делится на полосы, и из каждой берётся
+## один этаж. Так документы разнесены по высоте и пройти приходится всё здание.
+##
+## Внутри полосы этажи перебираются, пока дверь не встанет: на достижимой части
+## этажа может не остаться места, и тогда документ переезжает на соседний этаж,
+## а не пропадает — собрать четыре из пяти нельзя.
+func _lay_documents(
+	rules: BuildingRules, rng: RandomNumberGenerator, taken: Dictionary
+) -> Dictionary:
+	var routed := BuildingRoute.reachable(self, rules)
 	var chosen: Dictionary = {}
 	var wanted := mini(rules.documents, floors)
 	if wanted <= 0:
@@ -276,9 +311,35 @@ func _document_floors(rules: BuildingRules, rng: RandomNumberGenerator) -> Dicti
 	var band := float(floors) / float(wanted)
 	for number in wanted:
 		var from := int(floor(band * float(number)))
-		var to := int(floor(band * float(number + 1))) - 1
-		chosen[rng.randi_range(from, maxi(to, from))] = true
+		var to := maxi(int(floor(band * float(number + 1))) - 1, from)
+		var placed := false
+
+		for index: int in _shuffled_range(rng, from, to):
+			if chosen.has(index):
+				continue
+			if not _lay_door(rules, rng, taken, index, true, routed):
+				continue
+			chosen[index] = true
+			placed = true
+			break
+
+		if not placed:
+			push_error("в полосе %d..%d некуда положить документ" % [from, to])
 	return chosen
+
+
+## Этажи полосы в случайном порядке. Своя тасовка, а не [method Array.shuffle]:
+## та берёт глобальный генератор, и здание перестало бы повторяться по сиду.
+func _shuffled_range(rng: RandomNumberGenerator, from: int, to: int) -> Array[int]:
+	var order: Array[int] = []
+	for index in range(from, to + 1):
+		order.append(index)
+	for index in range(order.size() - 1, 0, -1):
+		var other := rng.randi_range(0, index)
+		var kept := order[index]
+		order[index] = order[other]
+		order[other] = kept
+	return order
 
 
 func _pick_slot(rng: RandomNumberGenerator, slots: int, avoid: Array[int]) -> int:

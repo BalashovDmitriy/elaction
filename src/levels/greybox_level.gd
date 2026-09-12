@@ -25,9 +25,6 @@ const LAMP_SCENE := preload("res://src/systems/lighting/lamp.tscn")
 
 const WALL_WIDTH: float = 16.0
 
-## Проём шахты равен ширине кабины, чтобы по краям не оставалось щелей.
-const SHAFT_WIDTH: float = 40.0
-
 ## Дно шахты: сюда падает тот, кто шагнул в пустой проём.
 const PIT_HEIGHT: float = 20.0
 
@@ -54,6 +51,10 @@ const OTTO_RESPAWN_DELAY: float = 1.2
 ## Сид здания. Им служит номер здания: раскладка меняется от здания к зданию.
 @export var building_seed: int = 1
 
+## Выпускать ли агентов из дверей. Выключается в тестах проходимости: они
+## проверяют, что здание проходится, а не что бой выигрывается.
+@export var spawn_agents: bool = true
+
 var _plan: BuildingPlan
 var _doors: Array[Door] = []
 ## Обычные двери: из них выходят агенты. Красные документов не стерегут.
@@ -62,6 +63,7 @@ var _cars: Array[ElevatorCar] = []
 var _lighting := FloorLighting.new()
 ## Здание сдано. Событие однократное: по нему main собирает следующее здание.
 var _cleared: bool = false
+var _exit_position := Vector2.ZERO
 
 @onready var otto: Otto = $Otto
 @onready var _background: ColorRect = $Background
@@ -87,9 +89,25 @@ func _ready() -> void:
 	if GameState.instance().alarm.raised:
 		# Здание заведено уже при включённой сирене — редкость, но бывает.
 		_on_alarm_raised()
-	for door in _agent_doors:
-		_release_agent(door)
+	if spawn_agents:
+		for door in _agent_doors:
+			_release_agent(door)
 	otto.apply_camera_bounds(Rect2(0.0, 0.0, rules.width, rules.total_height()))
+
+
+## Раскладка, по которой собрано здание.
+func plan() -> BuildingPlan:
+	return _plan
+
+
+## Двери здания: по ним видно, какие красные ещё не собраны.
+func doors() -> Array[Door]:
+	return _doors
+
+
+## Где стоит выход из здания.
+func exit_position() -> Vector2:
+	return _exit_position
 
 
 ## Режет перекрытие на куски между проёмами.
@@ -124,25 +142,9 @@ func _build_geometry() -> void:
 
 	for index in rules.floors:
 		var surface := rules.floor_surface(index)
-		for rect in slab_segments(surface, _gaps_for(index), rules.width, rules.slab_height):
+		var gaps := _plan.gaps_on(rules, index)
+		for rect in slab_segments(surface, gaps, rules.width, rules.slab_height):
 			_build_solid(rect)
-
-
-## Проёмы в перекрытии этажа: пары «левый край, правый край».
-func _gaps_for(index: int) -> Array[Vector2]:
-	var gaps: Array[Vector2] = []
-
-	for shaft in _plan.shafts:
-		# Кабина проходит сквозь перекрытия своей полосы, кроме нижнего: там она
-		# встаёт на пол, и он же служит дном шахты.
-		if index >= shaft.top and index < shaft.bottom:
-			gaps.append(Vector2(shaft.x - SHAFT_WIDTH * 0.5, shaft.x + SHAFT_WIDTH * 0.5))
-
-	for escalator in _plan.escalators:
-		if index == escalator.floor_index:
-			gaps.append(escalator.gap(rules))
-
-	return gaps
 
 
 func _spawn_shafts() -> void:
@@ -168,7 +170,7 @@ func _spawn_shaft_pit(shaft: BuildingPlan.ShaftSpot) -> void:
 	pit.position = Vector2(shaft.x, surface - PIT_HEIGHT * 0.5)
 
 	var shape := RectangleShape2D.new()
-	shape.size = Vector2(SHAFT_WIDTH, PIT_HEIGHT)
+	shape.size = Vector2(rules.shaft_width, PIT_HEIGHT)
 	var collision := CollisionShape2D.new()
 	collision.shape = shape
 	pit.add_child(collision)
@@ -245,6 +247,7 @@ func _spawn_exit() -> void:
 
 	zone.body_entered.connect(_on_exit_entered)
 	add_child(zone)
+	_exit_position = zone.global_position
 
 
 func _on_exit_entered(body: Node2D) -> void:

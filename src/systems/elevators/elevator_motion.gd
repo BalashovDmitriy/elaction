@@ -34,6 +34,13 @@ var floor_pause: float = 1.5
 ## При [code]false[/code] кабина доезжает до ближайшего этажа по ходу движения.
 var stops_between_floors: bool = true
 
+## Насколько близко к этажу кабина сама дотягивает, отпущенная, px.
+##
+## Без доводки выйти можно было только на краях шахты: «совпала с этажом» —
+## это полпикселя, а кабина проходит их за долю кадра, и попасть в такое окно
+## вручную нельзя. Промежуточные этажи были недостижимы.
+var settle_distance: float = 12.0
+
 ## Текущая координата кабины.
 var position: float = 0.0
 
@@ -120,7 +127,18 @@ func _drive(delta: float, command: float) -> void:
 
 	# Команда отпущена.
 	_held = 0.0
-	if stops_between_floors or is_aligned() or direction == 0.0:
+	if is_aligned() or direction == 0.0:
+		direction = 0.0
+		return
+
+	var nearest := _nearest_floor()
+	if absf(nearest - position) <= settle_distance:
+		# Остановились почти на этаже — дотягиваем, иначе с него не сойти.
+		if _move_towards(nearest, delta):
+			direction = 0.0
+		return
+
+	if stops_between_floors:
 		direction = 0.0
 		return
 
@@ -160,6 +178,15 @@ func _move_towards(target: float, delta: float) -> bool:
 		return true
 	position += signf(gap) * step
 	return false
+
+
+## Ближайший этаж, в любую сторону.
+func _nearest_floor() -> float:
+	var best := floors[0]
+	for stop: float in floors:
+		if absf(stop - position) < absf(best - position):
+			best = stop
+	return best
 
 
 ## Дальняя граница шахты по направлению движения.
