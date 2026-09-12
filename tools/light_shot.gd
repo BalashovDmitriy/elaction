@@ -20,6 +20,7 @@ extends Node2D
 ## замер из light_bench.gd меряет технику, а этот — игру.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
+const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 const FOLDER := "res://screens/M6"
 
 ## Сколько кадров дать камере доехать до Otto: сглаживание у неё 8.0, то есть
@@ -46,6 +47,9 @@ var _bench: bool = false
 func _ready() -> void:
 	_read_arguments()
 	DirAccess.make_dir_recursive_absolute(FOLDER)
+	# Без пометки Godot импортирует каждый снимок как текстуру проекта. Кладёт её
+	# скрипт снимков: папка у нас с ним общая, и правило про неё должно быть одно.
+	SCREENSHOTTER.mark_ignored_by_engine(ProjectSettings.globalize_path(FOLDER.get_base_dir()))
 	_run()
 
 

@@ -155,11 +155,14 @@ func _build_building() -> void:
 		_add_slab(Vector2(0.0, top), Vector2(float(VIEW.x), 16.0))
 		_add_room(Vector2(0.0, top + 16.0), Vector2(float(VIEW.x), height - 16.0))
 
+	# Порядок важен: [method _start_case] зажигает первые count источников, и при
+	# обходе этаж за этажом расклад на четыре лампы весь оседал бы на верхнем
+	# этаже — поверх одних и тех же окклюдеров. Меряли бы не то, что в игре.
 	var per_floor := int(ceil(float(COUNTS[COUNTS.size() - 1]) / float(floors)))
-	for index: int in floors:
-		var top := height * float(index) + 24.0
-		for slot: int in per_floor:
-			var step := float(VIEW.x) / float(per_floor + 1)
+	var step := float(VIEW.x) / float(per_floor + 1)
+	for slot: int in per_floor:
+		for index: int in floors:
+			var top := height * float(index) + 24.0
 			_lights.append(_add_light(Vector2(step * float(slot + 1), top)))
 
 

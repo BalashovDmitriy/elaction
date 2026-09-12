@@ -108,16 +108,22 @@ static func _made(key: String, plateau: float, kind: int) -> Texture2D:
 	return texture
 
 
+## Профиль берётся в середине текселя, а не в его углу: иначе левый край
+## текстуры попадал бы ровно на ноль, а правый — на [code]1 - 1/GRID[/code], то есть
+## оставался бы светить. Заливка от этого текла на этаж ниже, а сам свет
+## съезжал на полтекселя вбок. Радиальная ветка так считала с самого начала.
 static func _alpha(x: int, y: int, plateau: float, kind: int) -> float:
 	var side := float(GRID)
-	var across := falloff(float(x), side, plateau)
+	var centre_x := float(x) + 0.5
+	var centre_y := float(y) + 0.5
+	var across := falloff(centre_x, side, plateau)
 	if kind == KIND_COLUMN:
 		return across
 	if kind == KIND_RECTANGLE:
-		return across * falloff(float(y), side, plateau)
+		return across * falloff(centre_y, side, plateau)
 
 	# Круглое пятно считается по расстоянию от середины, иначе вышел бы
 	# скруглённый квадрат: произведение двух спадов в углах ещё не ноль.
 	var centre := Vector2(side, side) * 0.5
-	var reach := Vector2(float(x) + 0.5, float(y) + 0.5).distance_to(centre) / (side * 0.5)
+	var reach := Vector2(centre_x, centre_y).distance_to(centre) / (side * 0.5)
 	return profile(reach, plateau)

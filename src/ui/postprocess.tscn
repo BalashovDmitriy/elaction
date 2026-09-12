@@ -6,7 +6,10 @@
 shader = ExtResource("1_vignette")
 
 [sub_resource type="Environment" id="Environment_glow"]
-background_mode = 4
+; 3 — BG_CANVAS. Именно он включает пост-обработку в 2D: свечение берётся
+; с холста, а не с трёхмерного неба, которого здесь нет. С BG_KEEP (4)
+; кадр остаётся как есть и bloom не считается вовсе.
+background_mode = 3
 glow_enabled = true
 glow_intensity = 0.55
 glow_strength = 1.0

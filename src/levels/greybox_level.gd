@@ -41,8 +41,8 @@ const WINDOW_TOP: float = 14.0
 ## с перекрытиями ему нельзя, иначе этаж читается как сплошная плита.
 const BACK_WALL := Color(0.15, 0.16, 0.22)
 
-## Ночное небо за городом и сам город: силуэт и горящие окна.
-const SKY := Color(0.07, 0.08, 0.14)
+## Город за окнами: силуэт и горящие окна. Само небо — цвет узла Background
+## в сцене, там же, где сам узел.
 const CITY := Color(0.12, 0.14, 0.24)
 const CITY_WINDOW := Color(0.92, 0.83, 0.50)
 
@@ -106,6 +106,12 @@ var _shaft_lights: Array[AreaLight] = []
 var _lit_span := Vector2i(-1, -1)
 ## Дальний план: город за окнами. Двигается медленнее камеры.
 var _city: Node2D = null
+## Задние стены этажей. Их под три сотни, и держать их прямо в уровне значит
+## заставить каждый обход [method _agents] перебирать ещё и их.
+var _back_walls: Node2D = null
+## Лампы здания: их свет тоже гасится за пределами кадра. Упавшие лампы
+## убирают себя сами, поэтому перед обращением проверяется живость.
+var _lamps: Array[Lamp] = []
 ## Здание сдано. Событие однократное: по нему main собирает следующее здание.
 var _cleared: bool = false
 var _exit_position := Vector2.ZERO
@@ -167,6 +173,15 @@ func _process(_delta: float) -> void:
 		# и обещанная дюжина источников в кадре перестала бы быть правдой.
 		var shaft := _plan.shafts[index]
 		_shaft_lights[index].visible = shaft.top <= span.y and shaft.bottom >= span.x
+
+	# У этажа два источника (ADR-0010, пункт 3), и отбор нужен обоим: пятно
+	# лампы вдобавок кладёт тени, то есть стоит дороже заливки. Этаж лампы
+	# берётся из её же положения — так же, как его берёт tools/light_shot.gd.
+	for lamp: Lamp in _lamps:
+		if not is_instance_valid(lamp):
+			continue
+		var floor_index := rules.floor_index_near(lamp.global_position.y)
+		lamp.set_light_visible(VisibleFloors.covers(span, floor_index))
 
 
 ## Раскладка, по которой собрано здание.
@@ -293,6 +308,7 @@ func _spawn_lamps() -> void:
 		lamp.fell.connect(_on_lamp_fell.bind(spot.floor_index))
 		add_child(lamp)
 		lamp.hang(LAMP_HANG_HEIGHT)
+		_lamps.append(lamp)
 
 
 ## Выход из здания. Не запирается: без всех документов он отправляет обратно
@@ -452,7 +468,7 @@ func _build_solid(rect: Rect2) -> void:
 	var body := StaticBody2D.new()
 	body.position = rect.position + rect.size * 0.5
 	# Тела добавляются в дерево после Otto, то есть рисовались бы поверх него.
-	# Геометрия всегда за актёрами, но перед фоном (у фона z_index = -10).
+	# Геометрия всегда за актёрами, но перед фоном (у фона z_index = -12).
 	body.z_index = -1
 
 	var shape := RectangleShape2D.new()
@@ -490,8 +506,15 @@ static func window_gaps(width: float, count: int, window_width: float) -> Array[
 ## по горизонтали умеет [method BuildingPlan.spans_between] — та же функция,
 ## что режет перекрытия проёмами.
 func _build_back_walls() -> void:
+	_back_walls = Node2D.new()
+	_back_walls.z_index = -8
+	add_child(_back_walls)
+
 	var gaps := window_gaps(rules.width, WINDOWS_PER_FLOOR, WINDOW_SIZE.x)
-	for index: int in rules.floors:
+	# С первого этажа, а не с нулевого: нулевой — крыша, комнаты за ней нет.
+	# [method BuildingRules.story_top] отдаёт для неё верх здания, и стена вышла бы
+	# полосой в небе над тем местом, где Otto начинает, с обрезанными окнами.
+	for index: int in range(1, rules.floors):
 		var top := rules.story_top(index)
 		var surface := rules.floor_surface(index)
 		if surface - top <= 0.0:
@@ -510,9 +533,7 @@ func _build_back_walls() -> void:
 func _add_back_wall(rect: Rect2) -> void:
 	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
 		return
-	var wall := _panel(rect.size, rect.position, BACK_WALL)
-	wall.z_index = -8
-	add_child(wall)
+	_back_walls.add_child(_panel(rect.size, rect.position, BACK_WALL))
 
 
 ## Город за окнами. Свет здания на него не падает: он снаружи и далеко.

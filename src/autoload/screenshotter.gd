@@ -144,7 +144,7 @@ func capture(label: String, folder: String = "") -> void:
 	if error != OK and error != ERR_ALREADY_EXISTS:
 		push_error("Не удалось создать папку для снимков: %s (код %d)" % [absolute_folder, error])
 		return
-	_mark_ignored_by_engine(absolute_root)
+	mark_ignored_by_engine(absolute_root)
 
 	var absolute_path := _free_path(absolute_folder, label)
 	var image := get_viewport().get_texture().get_image()
@@ -209,7 +209,12 @@ func _free_path(folder: String, label: String) -> String:
 
 ## Кладёт .gdignore рядом со снимками: без него Godot импортирует каждый JPEG
 ## как ресурс проекта и засевает папку .import-файлами.
-func _mark_ignored_by_engine(root_folder: String) -> void:
+##
+## Публичный и статический: в ту же папку пишет tools/light_shot.gd, и своя
+## копия этой пометки у него разошлась бы с этой при первой же правке. Статический,
+## потому что звать его приходится по скрипту, а не по автолоаду: имя автолоада
+## видно только запущенной игре, а `godot_check.py` разбирает скрипты поодиночке.
+static func mark_ignored_by_engine(root_folder: String) -> void:
 	var marker := root_folder.path_join(".gdignore")
 	if FileAccess.file_exists(marker):
 		return

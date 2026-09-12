@@ -87,12 +87,17 @@ func test_scene_matches_the_plan() -> void:
 		_drop(level)
 
 
-## Сколько источников горит прямо сейчас.
+## Сколько источников горит прямо сейчас — все, а не только заливки.
+##
+## Считать одни [AreaLight] нельзя: у этажа их два (ADR-0010, пункт 3), и пятно
+## лампы висит ребёнком самой лампы. Пока счёт шёл по прямым детям уровня,
+## половина источников — та самая, что кладёт тени, — в бюджет не попадала,
+## и проверка проходила бы, даже если бы не гасла ни одна лампа в здании.
 func _lit(level: GreyboxLevel) -> int:
 	var count := 0
-	for child in level.get_children():
-		var light := child as AreaLight
-		if light != null and light.visible:
+	for node: Node in level.find_children("*", "Light2D", true, false):
+		var light := node as Light2D
+		if light != null and light.is_visible_in_tree():
 			count += 1
 	return count
 
@@ -106,12 +111,21 @@ func _tall(building_seed: int) -> GreyboxLevel:
 	return level
 
 
-func _lamp_in_sight(level: GreyboxLevel) -> Lamp:
+## Ближайшая лампа под Otto.
+##
+## Именно ближайшая, а не первая попавшаяся: этаж под ногами всегда в кадре,
+## а значит, и свет на нём горит. Лампа с произвольного этажа могла бы оказаться
+## за пределами отбора, где её этаж и так погашен, — и «источников стало меньше»
+## не выполнилось бы, хотя гасить нечего.
+func _nearest_lamp_below(level: GreyboxLevel) -> Lamp:
+	var found: Lamp = null
 	for child in level.get_children():
 		var lamp := child as Lamp
-		if lamp != null and lamp.global_position.y > level.otto.global_position.y:
-			return lamp
-	return null
+		if lamp == null or lamp.global_position.y <= level.otto.global_position.y:
+			continue
+		if found == null or lamp.global_position.y < found.global_position.y:
+			found = lamp
+	return found
 
 
 ## Источников в здании шестьдесят с лишним, а гореть должна горстка.
@@ -136,7 +150,7 @@ func test_a_fallen_lamp_puts_its_floor_out() -> void:
 	var level := _tall(1)
 	await wait_physics_frames(SETTLE_FRAMES)
 
-	var lamp := _lamp_in_sight(level)
+	var lamp := _nearest_lamp_below(level)
 	assert_not_null(lamp, "в здании должна быть лампа ниже Otto")
 	if lamp == null:
 		return
@@ -154,7 +168,9 @@ func test_a_fallen_lamp_puts_its_floor_out() -> void:
 
 	await wait_physics_frames(2)
 	assert_true(level.is_dark(index), "этаж %d погас" % index)
-	assert_eq(_lit(level), before - 1, "и ровно один источник перестал гореть")
+	# Источников на этаже два, и гаснут они разом (ADR-0010, пункт 3): заливку
+	# гасит уровень, а пятно уходит вместе с самой лампой.
+	assert_eq(_lit(level), before - 2, "и оба источника этажа перестали гореть")
 	_drop(level)
 
 
