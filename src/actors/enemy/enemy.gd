@@ -43,6 +43,8 @@ var _brain := EnemyBrain.new()
 var _target: Otto = null
 var _corpse_left: float = 0.0
 var _in_the_dark: bool = false
+## Насколько агент злее обычного: 1 — как в первом здании, больше — злее.
+var _menace: float = 1.0
 
 @onready var _body: ColorRect = $Body
 @onready var _floor_probe: RayCast2D = $FloorProbe
@@ -51,8 +53,7 @@ var _in_the_dark: bool = false
 func _ready() -> void:
 	_brain.emerge_time = emerge_time
 	_brain.same_line = same_line
-	_brain.fire_cooldown = fire_cooldown
-	_refresh_fire_range()
+	_refresh_brain()
 
 
 func _physics_process(delta: float) -> void:
@@ -87,7 +88,13 @@ func setup(target: Otto, towards: float) -> void:
 ## Сообщает агенту, что его этаж погас или снова освещён.
 func set_in_the_dark(value: bool) -> void:
 	_in_the_dark = value
-	_refresh_fire_range()
+	_refresh_brain()
+
+
+## Насколько агент злее обычного. Растёт от здания к зданию и по тревоге.
+func set_menace(value: float) -> void:
+	_menace = maxf(value, 0.1)
+	_refresh_brain()
 
 
 ## Стоит ли агент в темноте. По этому признаку считается надбавка за убийство.
@@ -127,11 +134,14 @@ func _floor_ahead() -> bool:
 	return _floor_probe.is_colliding()
 
 
-## Дальность стрельбы: на погашенном этаже она короче. Считается в одном месте,
-## чтобы порядок вызовов [method _ready] и [method set_in_the_dark] ничего не
-## решал — иначе настроенный до [method Node.add_child] агент прозревал бы обратно.
-func _refresh_fire_range() -> void:
-	_brain.fire_range = dark_fire_range if _in_the_dark else fire_range
+## Переносит в [EnemyBrain] числа, которые зависят от темноты и злости: дальность
+## стрельбы и паузу между выстрелами. Считается в одном месте, чтобы порядок вызовов
+## [method _ready], [method set_in_the_dark] и [method set_menace] ничего не решал —
+## иначе настроенный до [method Node.add_child] агент прозревал бы обратно.
+func _refresh_brain() -> void:
+	var base := dark_fire_range if _in_the_dark else fire_range
+	_brain.fire_range = base * _menace
+	_brain.fire_cooldown = fire_cooldown / _menace
 
 
 func _apply_gravity(delta: float) -> void:

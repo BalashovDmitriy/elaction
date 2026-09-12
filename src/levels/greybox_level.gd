@@ -38,6 +38,10 @@ const LAMP_HANG_HEIGHT: float = 60.0
 const EXIT_WIDTH: float = 64.0
 const EXIT_HEIGHT: float = 40.0
 
+## Насколько злее агенты и насколько хуже слушается кабина по тревоге.
+const ALARM_MENACE: float = 1.5
+const ALARM_CAR_DELAY: float = 0.6
+
 ## Сколько дверь ждёт, прежде чем выпустить следующего агента, с.
 const AGENT_RESPAWN_DELAY: float = 3.0
 
@@ -47,15 +51,16 @@ const OTTO_RESPAWN_DELAY: float = 1.2
 ## Правила здания. Пустые — значит берутся по умолчанию.
 @export var rules: BuildingRules
 
-## Сид здания. В M5b им станет номер здания.
+## Сид здания. Им служит номер здания: раскладка меняется от здания к зданию.
 @export var building_seed: int = 1
 
 var _plan: BuildingPlan
 var _doors: Array[Door] = []
 ## Обычные двери: из них выходят агенты. Красные документов не стерегут.
 var _agent_doors: Array[Door] = []
+var _cars: Array[ElevatorCar] = []
 var _lighting := FloorLighting.new()
-## Здание сдано. Событие однократное: в M5b к нему прицепится переход дальше.
+## Здание сдано. Событие однократное: по нему main собирает следующее здание.
 var _cleared: bool = false
 
 @onready var otto: Otto = $Otto
@@ -78,6 +83,10 @@ func _ready() -> void:
 	# Otto начинает с крыши, как в оригинале, и там, где нет проёмов.
 	otto.global_position = Vector2(_plan.safe_x(rules, 0), rules.floor_surface(0))
 	otto.died.connect(_on_otto_died)
+	GameState.instance().alarm_raised.connect(_on_alarm_raised)
+	if GameState.instance().alarm.raised:
+		# Здание заведено уже при включённой сирене — редкость, но бывает.
+		_on_alarm_raised()
 	for door in _agent_doors:
 		_release_agent(door)
 	otto.apply_camera_bounds(Rect2(0.0, 0.0, rules.width, rules.total_height()))
@@ -146,6 +155,7 @@ func _spawn_shafts() -> void:
 		car.position.x = shaft.x
 		add_child(car)
 		car.setup(stops)
+		_cars.append(car)
 		_spawn_shaft_pit(shaft)
 
 
@@ -310,11 +320,33 @@ func _release_agent(door: Door) -> void:
 	agent.global_position = mat
 	agent.setup(otto, signf(otto.global_position.x - mat.x))
 	agent.set_in_the_dark(_lighting.is_dark(rules.floor_index_near(mat.y)))
+	agent.set_menace(_menace())
 	agent.died.connect(_on_agent_died.bind(door))
 
 
+## Насколько злее агенты этого здания прямо сейчас: к росту от здания к зданию
+## добавляется тревога, если она уже включилась.
+func _menace() -> float:
+	var alarmed := GameState.instance().alarm.raised
+	# Нижняя граница та же, что у [method Enemy.set_menace]: на это число делится
+	# задержка смены агента, и ноль из инспектора оставил бы дверь запертой навсегда.
+	return maxf(rules.agent_menace, 0.1) * (ALARM_MENACE if alarmed else 1.0)
+
+
+## Сирена: агенты злеют, кабины начинают отвечать с задержкой.
+func _on_alarm_raised() -> void:
+	for car in _cars:
+		car.set_response_delay(ALARM_CAR_DELAY)
+	for child in get_children():
+		var agent := child as Enemy
+		if agent != null:
+			agent.set_menace(_menace())
+
+
 func _on_agent_died(_agent: Enemy, door: Door) -> void:
-	var timer := get_tree().create_timer(AGENT_RESPAWN_DELAY)
+	# process_always = false: на паузе здание замирает целиком, и смена агента
+	# не должна приходить, пока игра стоит.
+	var timer := get_tree().create_timer(AGENT_RESPAWN_DELAY / _menace(), false)
 	timer.timeout.connect(_release_agent.bind(door))
 
 
@@ -322,7 +354,8 @@ func _on_otto_died() -> void:
 	# Жизнь снимается сразу, чтобы счётчик не врал, пока тело лежит.
 	if not GameState.instance().lose_life():
 		return
-	var timer := get_tree().create_timer(OTTO_RESPAWN_DELAY)
+	# Как и смена агента, возвращение в игру не идёт на паузе.
+	var timer := get_tree().create_timer(OTTO_RESPAWN_DELAY, false)
 	timer.timeout.connect(_respawn_otto)
 
 
