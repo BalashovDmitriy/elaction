@@ -6,6 +6,7 @@ extends Node2D
 ## отладочный оверлей с состоянием Otto. Игровой цикл и меню — в M5 и M8.
 
 var _cleared: bool = false
+var _game_over: bool = false
 
 @onready var _level: GreyboxLevel = $GreyboxLevel
 @onready var _debug_label: Label = %DebugLabel
@@ -16,6 +17,8 @@ func _ready() -> void:
 	var game := GameState.instance()
 	game.score_changed.connect(_on_score_changed)
 	game.documents_changed.connect(_on_documents_changed)
+	game.lives_changed.connect(_on_lives_changed)
+	game.game_over.connect(_on_game_over)
 	_level.building_cleared.connect(_on_building_cleared)
 	# Уровень готов раньше main, поэтому счётчики уже заполнены: рисуем как есть.
 	_render_hud()
@@ -38,6 +41,15 @@ func _on_documents_changed(_collected: int, _total: int) -> void:
 	_render_hud()
 
 
+func _on_lives_changed(_value: int) -> void:
+	_render_hud()
+
+
+func _on_game_over() -> void:
+	_game_over = true
+	_render_hud()
+
+
 func _on_building_cleared() -> void:
 	_cleared = true
 	_render_hud()
@@ -46,11 +58,13 @@ func _on_building_cleared() -> void:
 func _render_hud() -> void:
 	var game := GameState.instance()
 	var text := (
-		"очки: %d\nдокументы: %d / %d"
-		% [game.score, game.documents_collected, game.documents_total]
+		"очки: %d\nжизни: %d\nдокументы: %d / %d"
+		% [game.score, game.lives, game.documents_collected, game.documents_total]
 	)
 	if _cleared:
 		text += "\nздание пройдено"
+	if _game_over:
+		text += "\nигра окончена"
 	_hud_label.text = text
 
 

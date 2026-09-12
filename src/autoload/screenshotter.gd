@@ -53,6 +53,13 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "to_escalator", "actions": ["move_left", "move_up"], "hold": 3.4},
 		{"label": "middle_floor", "actions": [], "hold": 1.0},
 	],
+	"M4A":
+	[
+		{"label": "agent_out", "actions": [], "hold": 0.8},
+		{"label": "otto_fires", "actions": ["shoot"], "hold": 0.2},
+		{"label": "after_the_shot", "actions": [], "hold": 1.5},
+		{"label": "under_fire", "actions": [], "hold": 7.0},
+	],
 	"M3":
 	[
 		{"label": "floor_top", "actions": [], "hold": 0.4},

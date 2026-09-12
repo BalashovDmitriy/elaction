@@ -21,6 +21,10 @@ var crouch: bool = false
 ## Нажат ли прыжок именно в этом кадре.
 var jump_pressed: bool = false
 
+## Нажат ли выстрел именно в этом кадре. Оружие Otto одиночное: удержание
+## очередью не стреляет.
+var shoot_pressed: bool = false
+
 
 ## Перечитывает снимок из карты действий проекта.
 ##
@@ -31,3 +35,4 @@ func read_actions() -> void:
 	vertical = Input.get_axis("move_up", "move_down")
 	crouch = Input.is_action_pressed("move_down")
 	jump_pressed = Input.is_action_just_pressed("jump")
+	shoot_pressed = Input.is_action_just_pressed("shoot")
