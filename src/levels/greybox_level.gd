@@ -249,10 +249,11 @@ static func floor_surface_near(y: float, surfaces: Array[float]) -> float:
 
 ## Выпускает агента из двери.
 func _release_agent(door: Door) -> void:
+	var mat := door.mat_position()
 	var agent := ENEMY_SCENE.instantiate() as Enemy
 	add_child(agent)
-	agent.global_position = door.mat_position()
-	agent.setup(otto, signf(otto.global_position.x - door.mat_position().x))
+	agent.global_position = mat
+	agent.setup(otto, signf(otto.global_position.x - mat.x))
 	agent.died.connect(_on_agent_died.bind(door))
 
 

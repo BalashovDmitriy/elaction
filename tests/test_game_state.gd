@@ -76,3 +76,14 @@ func test_last_life_ends_the_game() -> void:
 		game.lose_life()
 	assert_false(game.lose_life(), "жизни кончились")
 	assert_signal_emitted(game, "game_over")
+
+
+func test_game_over_comes_once() -> void:
+	var game := _state()
+	for _death: int in GameState.STARTING_LIVES:
+		game.lose_life()
+	watch_signals(game)
+	assert_false(game.lose_life(), "после конца партии жизнь снять нельзя")
+	assert_eq(game.lives, 0)
+	assert_signal_not_emitted(game, "game_over", "game_over сообщает о переходе, а не о состоянии")
+	assert_signal_not_emitted(game, "lives_changed")

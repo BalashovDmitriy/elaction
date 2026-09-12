@@ -127,10 +127,15 @@ func is_dead() -> bool:
 	return _states.is_dead()
 
 
-## Возвращает Otto в игру после смерти. Ставить его на место — дело уровня.
+## Возвращает Otto в игру после смерти. Ставить его на место — дело уровня,
+## поэтому зовут это уже после переноса: верхняя точка полёта берётся отсюда.
+##
+## Без сброса [member _apex_y] упавший в шахту возвращался бы с чужой глубиной
+## падения за спиной и разбивался бы на ровном месте.
 func revive() -> void:
 	_states.reset()
 	velocity = Vector2.ZERO
+	_apex_y = global_position.y
 	_repose()
 
 
@@ -226,11 +231,7 @@ func apply_camera_bounds(bounds: Rect2) -> void:
 	_camera.limit_bottom = int(bounds.end.y)
 
 
-## Есть ли над головой место, чтобы выпрямиться из приседа.
-##
-## Проверяется сидячей формой: если ею удаётся подняться на разницу высот,
-## то и стоячая поместится. Без этой проверки полная форма включалась бы
-## безусловно и выталкивала Otto сквозь перекрытие (долг M1).
+## Выпускает пулю. Высоту полёта задаёт поза: присев, Otto стреляет ниже.
 func _fire() -> void:
 	var crouching := _states.state == OttoStateMachine.State.CROUCH
 	var height := shot_height_crouching if crouching else shot_height_standing
@@ -265,6 +266,11 @@ func _kick_enemies() -> void:
 		GameState.instance().add_score(GameState.ENEMY_KICK_SCORE)
 
 
+## Есть ли над головой место, чтобы выпрямиться из приседа.
+##
+## Проверяется сидячей формой: если ею удаётся подняться на разницу высот,
+## то и стоячая поместится. Без этой проверки полная форма включалась бы
+## безусловно и выталкивала Otto сквозь перекрытие (долг M1).
 func _can_stand_up() -> bool:
 	if _states.state != OttoStateMachine.State.CROUCH:
 		return true

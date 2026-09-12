@@ -28,6 +28,8 @@ const HITS_PLAYER: int = 1 | 2
 var direction: float = 1.0
 
 var _travelled: float = 0.0
+## Пуля уже во что-то попала и доживает до конца кадра.
+var _spent: bool = false
 
 
 func _ready() -> void:
@@ -43,6 +45,12 @@ func _physics_process(delta: float) -> void:
 
 
 func _on_body_entered(body: Node2D) -> void:
+	# queue_free() убирает узел только в конце кадра, а тел за один кадр можно
+	# задеть несколько: без этой отметки одна пуля убивала бы двоих сразу и
+	# приносила очки за каждого.
+	if _spent:
+		return
+	_spent = true
 	# Геометрия просто гасит пулю, живых разбирает стрелявший.
 	hit_target.emit(body)
 	queue_free()

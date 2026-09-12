@@ -16,7 +16,8 @@ const MANUAL_FOLDER := "manual"
 
 ## Шаги автоматического прогона по вехам: что удерживать и сколько секунд.
 ##
-## План выбирается аргументом --capture=<веха>; для незнакомой берётся план M1.
+## План выбирается аргументом --capture=<веха>, регистр имени не важен; для
+## незнакомой вехи берётся план M1 и в лог идёт предупреждение.
 ##
 ## Выдержки M1 завязаны на время полёта Otto (2 · jump_speed / gravity ≈ 0.85 с):
 ## «jump» снимается около вершины, а «crouch» — уже после приземления.
@@ -53,19 +54,19 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "to_escalator", "actions": ["move_left", "move_up"], "hold": 3.4},
 		{"label": "middle_floor", "actions": [], "hold": 1.0},
 	],
-	"M4A":
-	[
-		{"label": "agent_out", "actions": [], "hold": 0.8},
-		{"label": "otto_fires", "actions": ["shoot"], "hold": 0.2},
-		{"label": "after_the_shot", "actions": [], "hold": 1.5},
-		{"label": "under_fire", "actions": [], "hold": 7.0},
-	],
 	"M3":
 	[
 		{"label": "floor_top", "actions": [], "hold": 0.4},
 		{"label": "at_red_door", "actions": ["move_left"], "hold": 3.55},
 		{"label": "inside", "actions": ["move_up"], "hold": 0.7},
 		{"label": "back_outside", "actions": ["move_right"], "hold": 0.6},
+	],
+	"M4A":
+	[
+		{"label": "agent_out", "actions": [], "hold": 0.8},
+		{"label": "otto_fires", "actions": ["shoot"], "hold": 0.2},
+		{"label": "after_the_shot", "actions": [], "hold": 1.5},
+		{"label": "under_fire", "actions": [], "hold": 7.0},
 	],
 }
 const DEFAULT_PLAN := "M1"
@@ -127,8 +128,7 @@ func _run_auto_plan() -> void:
 	# Даём сцене собраться и уровню построить геометрию.
 	await tree.process_frame
 
-	var plan: Array = AUTO_PLANS.get(_milestone, AUTO_PLANS[DEFAULT_PLAN])
-	for step: Dictionary in plan:
+	for step: Dictionary in _plan_for(_milestone):
 		var actions: Array = step.get("actions", [])
 		for action: String in actions:
 			Input.action_press(action)
@@ -140,6 +140,19 @@ func _run_auto_plan() -> void:
 			Input.action_release(action)
 
 	tree.quit()
+
+
+## Сценарий вехи. Регистр не важен: в документах веха зовётся `M4a`, а ключ
+## здесь один на оба написания.
+##
+## У незнакомой вехи плана нет, и молча снимать вместо неё M1 нельзя: кадры
+## легли бы в папку с её именем и сошли бы за её сценарий. Поэтому — предупреждение.
+func _plan_for(milestone: String) -> Array:
+	var key := milestone.to_upper()
+	if AUTO_PLANS.has(key):
+		return AUTO_PLANS[key]
+	push_warning("Нет плана съёмки для вехи «%s», снимается %s" % [milestone, DEFAULT_PLAN])
+	return AUTO_PLANS[DEFAULT_PLAN]
 
 
 func _milestone_from_cmdline() -> String:

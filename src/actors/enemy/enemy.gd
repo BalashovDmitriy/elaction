@@ -13,7 +13,7 @@ extends CharacterBody2D
 signal died(agent: Enemy)
 
 const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
-const ALIVE_COLOR := Color(0.78, 0.32, 0.30)
+## Живым агент покрашен в сцене; здесь — только цвет трупа.
 const DEAD_COLOR := Color(0.38, 0.20, 0.20)
 
 @export var walk_speed: float = 55.0
@@ -28,15 +28,33 @@ const DEAD_COLOR := Color(0.38, 0.20, 0.20)
 ## Сколько тело лежит, прежде чем исчезнуть, с.
 @export var corpse_time: float = 0.5
 
+## Настройки решений. Узел держит их у себя и отдаёт [EnemyBrain] — так же, как
+## дверь отдаёт свои [DoorVisit]: подкрутить агента можно в инспекторе.
+@export var emerge_time: float = 0.6
+@export var same_line: float = 10.0
+@export var fire_range: float = 200.0
+@export var fire_cooldown: float = 1.1
+
 var _brain := EnemyBrain.new()
 var _target: Otto = null
 var _corpse_left: float = 0.0
 
 @onready var _body: ColorRect = $Body
+@onready var _floor_probe: RayCast2D = $FloorProbe
+
+
+func _ready() -> void:
+	_brain.emerge_time = emerge_time
+	_brain.same_line = same_line
+	_brain.fire_range = fire_range
+	_brain.fire_cooldown = fire_cooldown
 
 
 func _physics_process(delta: float) -> void:
 	if _brain.is_dead():
+		# Тело доезжает до пола: убитый в прыжке не должен зависать в воздухе.
+		_apply_gravity(delta)
+		move_and_slide()
 		_rot(delta)
 		return
 
@@ -46,9 +64,12 @@ func _physics_process(delta: float) -> void:
 	if _brain.fired():
 		_fire()
 
-	velocity.x = walk_speed * _brain.facing if state == EnemyBrain.State.WALK else 0.0
-	if not is_on_floor():
-		velocity.y = minf(velocity.y + gravity * delta, max_fall_speed)
+	var walking := state == EnemyBrain.State.WALK
+	if walking and is_on_floor() and not _floor_ahead():
+		# Дальше пола нет: агент остаётся на своём этаже (ADR-0006, пункт 6).
+		walking = false
+	velocity.x = walk_speed * _brain.facing if walking else 0.0
+	_apply_gravity(delta)
 	move_and_slide()
 
 
@@ -76,6 +97,23 @@ func kill() -> void:
 
 func is_dead() -> bool:
 	return _brain.is_dead()
+
+
+## Есть ли пол там, куда агент собирается шагнуть.
+##
+## Без этой проверки он уходил бы с собственного этажа в проём шахты или
+## эскалатора: маска у него только на геометрию, а дыра в перекрытии для
+## него ничем не отличается от продолжения пола.
+func _floor_ahead() -> bool:
+	_floor_probe.position.x = absf(_floor_probe.position.x) * signf(_brain.facing)
+	# Луч обновляется в начале кадра, а мы только что его подвинули.
+	_floor_probe.force_raycast_update()
+	return _floor_probe.is_colliding()
+
+
+func _apply_gravity(delta: float) -> void:
+	if not is_on_floor():
+		velocity.y = minf(velocity.y + gravity * delta, max_fall_speed)
 
 
 ## Досчитывает время, которое тело лежит на полу, и убирает его.
