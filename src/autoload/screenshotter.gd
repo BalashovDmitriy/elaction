@@ -39,6 +39,9 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "ride_down", "actions": ["move_down"], "hold": 4.5},
 		{"label": "floor_bottom", "actions": [], "hold": 0.4},
 		{"label": "left_car", "actions": ["move_right"], "hold": 0.7},
+		{"label": "to_escalator", "actions": ["move_left", "move_up"], "hold": 3.4},
+		{"label": "middle_floor", "actions": [], "hold": 1.0},
+		{"label": "fell_into_shaft", "actions": ["move_right"], "hold": 2.5},
 	],
 }
 const DEFAULT_PLAN := "M1"

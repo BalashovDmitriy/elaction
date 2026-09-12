@@ -24,6 +24,7 @@ var _command: float = 0.0
 var _aligned_floor: int = -1
 
 @onready var _interior: Area2D = $Interior
+@onready var _crush_zone: Area2D = $CrushZone
 
 
 func _ready() -> void:
@@ -40,6 +41,8 @@ func _physics_process(delta: float) -> void:
 		_aligned_floor = reached
 		if reached >= 0:
 			floor_reached.emit(reached)
+
+	_crush_those_underneath()
 
 
 ## Задаёт шахту: координаты этажей-остановок и этаж, с которого кабина начинает.
@@ -71,6 +74,18 @@ func motion_speed() -> float:
 ## Совпал ли пол кабины с полом этажа.
 func is_aligned() -> bool:
 	return _motion.is_aligned()
+
+
+## Давит тех, кто оказался под днищем едущей вниз кабины.
+func _crush_those_underneath() -> void:
+	if _motion.velocity <= 0.0:
+		return
+	for body: Node2D in _crush_zone.get_overlapping_bodies():
+		var victim := body as Otto
+		if victim == null:
+			continue
+		if ShaftHazards.crushes(_motion.velocity, victim.is_grounded(), victim == _occupant):
+			victim.kill()
 
 
 func _on_body_entered(body: Node2D) -> void:

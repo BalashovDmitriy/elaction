@@ -6,6 +6,17 @@ extends CharacterBody2D
 ## Отвечает за физику, форму коллизии и вид. Решение о том, в каком он
 ## состоянии, принимает [OttoStateMachine].
 
+## Цвет коробки по состоянию: временная замена спрайтам, настоящие придут в M7.
+const IDLE_COLOR := Color(0.85, 0.78, 0.35)
+const STATE_COLORS: Dictionary = {
+	OttoStateMachine.State.WALK: Color(0.95, 0.85, 0.40),
+	OttoStateMachine.State.CROUCH: Color(0.70, 0.60, 0.30),
+	OttoStateMachine.State.JUMP: Color(0.60, 0.85, 0.95),
+	OttoStateMachine.State.FALL: Color(0.45, 0.65, 0.85),
+	OttoStateMachine.State.RIDE: Color(0.55, 0.80, 0.60),
+	OttoStateMachine.State.DEAD: Color(0.75, 0.25, 0.25),
+}
+
 @export var walk_speed: float = 90.0
 ## Высота прыжка = jump_speed² / (2 · gravity). При 380 и 900 это ~80 px:
 ## хватает на площадки greybox-уровня (нижние в 70 px от пола, верхняя — с них).
@@ -22,11 +33,19 @@ var _posed_state := OttoStateMachine.State.IDLE
 ## Кабина, внутри которой сейчас Otto. На крыше кабины она не заполняется:
 ## оттуда лифтом не управляют (ADR-0004, пункт 3).
 var _car: ElevatorCar = null
+## Разница высот стоячей и сидячей формы: столько места нужно над головой.
+var _headroom: float = 0.0
 
 @onready var _standing_shape: CollisionShape2D = $StandingShape
 @onready var _crouching_shape: CollisionShape2D = $CrouchingShape
 @onready var _body: ColorRect = $Body
 @onready var _camera: Camera2D = $Camera2D
+
+
+func _ready() -> void:
+	var standing := (_standing_shape.shape as RectangleShape2D).size.y
+	var crouching := (_crouching_shape.shape as RectangleShape2D).size.y
+	_headroom = standing - crouching
 
 
 func _physics_process(delta: float) -> void:
@@ -36,7 +55,13 @@ func _physics_process(delta: float) -> void:
 		_car.drive(_snapshot.vertical)
 		_snapshot.crouch = false
 
-	var state := _states.update(_snapshot, is_on_floor(), velocity.y)
+	var state := _states.update(_snapshot, is_on_floor(), velocity.y, _can_stand_up())
+
+	# Пока везёт эскалатор, физика молчит: координатой распоряжается он.
+	if state == OttoStateMachine.State.RIDE:
+		velocity = Vector2.ZERO
+		_apply_pose(state)
+		return
 
 	# Импульс прыжка выдаётся в тот же кадр, пока тело ещё стоит на полу,
 	# поэтому гравитация его в этом кадре не съедает.
@@ -48,7 +73,28 @@ func _physics_process(delta: float) -> void:
 		velocity.y = minf(velocity.y + gravity * delta, max_fall_speed)
 
 	move_and_slide()
-	_apply_pose(state)
+	_apply_pose(_states.state)
+
+
+## Убивает Otto: падение на дно шахты, сдавливание кабиной, в M4 — пуля.
+func kill() -> void:
+	_states.kill()
+
+
+## Намерение по вертикали за последний кадр. По нему кабина и эскалатор
+## понимают, куда их просят, не читая [Input] сами.
+func vertical_intent() -> float:
+	return _snapshot.vertical
+
+
+## Otto встал на эскалатор: до конца поездки ввод игрока не действует.
+func board_escalator() -> void:
+	_states.ride()
+
+
+## Эскалатор довёз и вернул управление.
+func leave_escalator() -> void:
+	_states.stop_riding()
 
 
 ## Otto вошёл в кабину и теперь ею управляет.
@@ -94,6 +140,17 @@ func apply_camera_bounds(bounds: Rect2) -> void:
 	_camera.limit_bottom = int(bounds.end.y)
 
 
+## Есть ли над головой место, чтобы выпрямиться из приседа.
+##
+## Проверяется сидячей формой: если ею удаётся подняться на разницу высот,
+## то и стоячая поместится. Без этой проверки полная форма включалась бы
+## безусловно и выталкивала Otto сквозь перекрытие (долг M1).
+func _can_stand_up() -> bool:
+	if _states.state != OttoStateMachine.State.CROUCH:
+		return true
+	return not test_move(global_transform, Vector2(0.0, -_headroom))
+
+
 func _horizontal_speed(input: OttoInput, state: OttoStateMachine.State) -> float:
 	if state == OttoStateMachine.State.DEAD:
 		return 0.0
@@ -126,16 +183,4 @@ func _apply_pose(state: OttoStateMachine.State) -> void:
 
 
 func _color_for(state: OttoStateMachine.State) -> Color:
-	match state:
-		OttoStateMachine.State.WALK:
-			return Color(0.95, 0.85, 0.40)
-		OttoStateMachine.State.CROUCH:
-			return Color(0.70, 0.60, 0.30)
-		OttoStateMachine.State.JUMP:
-			return Color(0.60, 0.85, 0.95)
-		OttoStateMachine.State.FALL:
-			return Color(0.45, 0.65, 0.85)
-		OttoStateMachine.State.DEAD:
-			return Color(0.75, 0.25, 0.25)
-		_:
-			return Color(0.85, 0.78, 0.35)
+	return STATE_COLORS.get(state, IDLE_COLOR)
