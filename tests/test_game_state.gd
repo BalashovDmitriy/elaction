@@ -87,3 +87,12 @@ func test_game_over_comes_once() -> void:
 	assert_eq(game.lives, 0)
 	assert_signal_not_emitted(game, "game_over", "game_over сообщает о переходе, а не о состоянии")
 	assert_signal_not_emitted(game, "lives_changed")
+
+
+func test_kill_in_the_light_costs_its_face_value() -> void:
+	assert_eq(GameState.kill_score(GameState.ENEMY_SHOT_SCORE, false), 100)
+
+
+func test_kill_in_the_dark_is_worth_more() -> void:
+	var dark := GameState.kill_score(GameState.ENEMY_SHOT_SCORE, true)
+	assert_eq(dark, GameState.ENEMY_SHOT_SCORE * GameState.DARK_KILL_MULTIPLIER)

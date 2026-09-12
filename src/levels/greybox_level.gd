@@ -16,6 +16,7 @@ const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 const ESCALATOR_SCENE := preload("res://src/systems/escalators/escalator.tscn")
 const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
+const LAMP_SCENE := preload("res://src/systems/lighting/lamp.tscn")
 
 ## Поверхности этажей сверху вниз. По ним же кабина выбирает остановки.
 const FLOOR_SURFACES: Array[float] = [100.0, 220.0, 340.0]
@@ -51,6 +52,22 @@ const DOORS: Array[Dictionary] = [
 	{"floor": 2, "x": 1000.0, "document": false},
 ]
 
+## Лампы этажей: номер этажа и x. Висят так, что стоя в них не попасть —
+## выстрел стоя идёт в 20 px над полом, а подвес начинается выше.
+const LAMPS: Array[Dictionary] = [
+	{"floor": 0, "x": 420.0},
+	{"floor": 1, "x": 850.0},
+	{"floor": 2, "x": 600.0},
+]
+
+## На сколько выше пола висит середина лампы и половина её высоты, px.
+const LAMP_HANG_HEIGHT: float = 60.0
+const LAMP_HALF_HEIGHT: float = 20.0
+
+## Чем накрывается погашенный этаж до настоящего света в M6.
+const DARKNESS_COLOR := Color(0.02, 0.02, 0.05, 0.72)
+const DARKNESS_Z: int = 20
+
 ## Сколько дверь ждёт, прежде чем выпустить следующего агента, с.
 const AGENT_RESPAWN_DELAY: float = 3.0
 
@@ -70,6 +87,7 @@ const EXIT_HEIGHT: float = 40.0
 var _doors: Array[Door] = []
 ## Обычные двери: из них выходят агенты. Красные документов не стерегут.
 var _agent_doors: Array[Door] = []
+var _lighting := FloorLighting.new()
 ## Здание сдано. Otto может зайти в зону выхода снова, но событие однократное:
 ## в M5 к нему прицепится переход к следующему зданию.
 var _cleared: bool = false
@@ -85,6 +103,7 @@ func _ready() -> void:
 	_spawn_escalator()
 	_spawn_doors()
 	_spawn_exit()
+	_spawn_lamps()
 	otto.died.connect(_on_otto_died)
 	for door in _agent_doors:
 		_release_agent(door)
@@ -236,15 +255,76 @@ func _on_exit_entered(body: Node2D) -> void:
 	_send_back_for_documents.call_deferred(runner)
 
 
-## Этаж, на котором Otto погиб: ближайшая по вертикали поверхность.
-##
-## Статический, чтобы проверяться тестами без сцены.
-static func floor_surface_near(y: float, surfaces: Array[float]) -> float:
-	var best := surfaces[0]
-	for surface in surfaces:
-		if absf(surface - y) < absf(best - y):
-			best = surface
+## Номер этажа, к которому ближе всего точка. Статический — чтобы проверяться
+## тестами без сцены.
+static func floor_index_near(y: float, surfaces: Array[float]) -> int:
+	var best := 0
+	for index: int in surfaces.size():
+		if absf(surfaces[index] - y) < absf(surfaces[best] - y):
+			best = index
 	return best
+
+
+## Этаж, на котором Otto погиб: ближайшая по вертикали поверхность.
+static func floor_surface_near(y: float, surfaces: Array[float]) -> float:
+	return surfaces[floor_index_near(y, surfaces)]
+
+
+## Потолок этажа: низ перекрытия сверху, а у верхнего — край уровня.
+static func story_top(index: int) -> float:
+	return 0.0 if index == 0 else FLOOR_SURFACES[index - 1] + SLAB_HEIGHT
+
+
+func _spawn_lamps() -> void:
+	for entry: Dictionary in LAMPS:
+		var index: int = entry["floor"]
+		var lamp := LAMP_SCENE.instantiate() as Lamp
+		lamp.position = Vector2(entry["x"], FLOOR_SURFACES[index] - LAMP_HANG_HEIGHT)
+		lamp.fall_distance = LAMP_HANG_HEIGHT - LAMP_HALF_HEIGHT
+		lamp.crushed.connect(_on_lamp_crushed)
+		lamp.fell.connect(_on_lamp_fell)
+		add_child(lamp)
+
+
+## Лампа накрыла агента по дороге вниз — самый дорогой способ убийства.
+func _on_lamp_crushed(agent: Enemy) -> void:
+	if agent.is_dead():
+		return
+	agent.kill()
+	var points := GameState.kill_score(GameState.LAMP_SCORE, agent.is_in_the_dark())
+	GameState.instance().add_score(points)
+
+
+## Лампа долетела до пола: этаж гаснет и обратно уже не загорается.
+func _on_lamp_fell(lamp: Lamp) -> void:
+	var index := floor_index_near(lamp.global_position.y, FLOOR_SURFACES)
+	if not _lighting.darken(index):
+		return
+	_cover_with_darkness(index)
+	for agent in _agents_on(index):
+		agent.set_in_the_dark(true)
+
+
+func _cover_with_darkness(index: int) -> void:
+	var top := story_top(index)
+	var shade := ColorRect.new()
+	shade.color = DARKNESS_COLOR
+	shade.position = Vector2(0.0, top)
+	shade.size = Vector2(LEVEL_WIDTH, FLOOR_SURFACES[index] + SLAB_HEIGHT - top)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shade.z_index = DARKNESS_Z
+	add_child(shade)
+
+
+func _agents_on(index: int) -> Array[Enemy]:
+	var found: Array[Enemy] = []
+	for child in get_children():
+		var agent := child as Enemy
+		if agent == null:
+			continue
+		if floor_index_near(agent.global_position.y, FLOOR_SURFACES) == index:
+			found.append(agent)
+	return found
 
 
 ## Выпускает агента из двери.
@@ -254,6 +334,7 @@ func _release_agent(door: Door) -> void:
 	add_child(agent)
 	agent.global_position = mat
 	agent.setup(otto, signf(otto.global_position.x - mat.x))
+	agent.set_in_the_dark(_lighting.is_dark(floor_index_near(mat.y, FLOOR_SURFACES)))
 	agent.died.connect(_on_agent_died.bind(door))
 
 

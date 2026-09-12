@@ -1,0 +1,32 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://src/systems/lighting/lamp.gd" id="1_lamp"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_lamp"]
+size = Vector2(16, 8)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_crush"]
+size = Vector2(20, 14)
+
+[node name="Lamp" type="StaticBody2D"]
+collision_layer = 4
+collision_mask = 0
+script = ExtResource("1_lamp")
+
+[node name="Shape" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_lamp")
+
+[node name="Visual" type="ColorRect" parent="."]
+offset_left = -8.0
+offset_top = -4.0
+offset_right = 8.0
+offset_bottom = 4.0
+mouse_filter = 2
+color = Color(0.95, 0.9, 0.55, 1)
+
+[node name="CrushZone" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 4
+
+[node name="CrushShape" type="CollisionShape2D" parent="CrushZone"]
+shape = SubResource("RectangleShape2D_crush")
