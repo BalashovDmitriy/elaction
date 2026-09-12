@@ -7,9 +7,14 @@ extends Node2D
 ## уровни на данных появятся в M5; до тех пор этого хватает, чтобы проверить
 ## движение, лифт, эскалатор и падение в шахту.
 
+## Otto вышел из здания, собрав все документы.
+signal building_cleared
+
 const SOLID_COLOR := Color(0.22, 0.24, 0.30)
+const EXIT_COLOR := Color(0.30, 0.52, 0.36)
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 const ESCALATOR_SCENE := preload("res://src/systems/escalators/escalator.tscn")
+const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
 
 ## Поверхности этажей сверху вниз. По ним же кабина выбирает остановки.
 const FLOOR_SURFACES: Array[float] = [100.0, 220.0, 340.0]
@@ -35,7 +40,22 @@ const ESCALATOR_GAP_WIDTH: float = 60.0
 const ESCALATOR_TOP_X: float = 448.0
 const ESCALATOR_BOTTOM_X: float = 372.0
 
+## Двери этажей: номер этажа, x и есть ли за ней документ.
+const DOORS: Array[Dictionary] = [
+	{"floor": 0, "x": 200.0, "document": true},
+	{"floor": 1, "x": 700.0, "document": false},
+	{"floor": 1, "x": 980.0, "document": true},
+	{"floor": 2, "x": 160.0, "document": true},
+]
+
+## Выход из здания — на нижнем этаже справа.
+const EXIT_LEFT: float = 1180.0
+const EXIT_WIDTH: float = 64.0
+const EXIT_HEIGHT: float = 40.0
+
 @export var camera_bounds := Rect2(0, 0, LEVEL_WIDTH, LEVEL_HEIGHT)
+
+var _doors: Array[Door] = []
 
 @onready var otto: Otto = $Otto
 
@@ -46,6 +66,8 @@ func _ready() -> void:
 	_spawn_car()
 	_spawn_shaft_pit()
 	_spawn_escalator()
+	_spawn_doors()
+	_spawn_exit()
 	otto.apply_camera_bounds(camera_bounds)
 
 
@@ -129,6 +151,75 @@ func _spawn_escalator() -> void:
 	escalator.position = Vector2(ESCALATOR_TOP_X, top)
 	add_child(escalator)
 	escalator.setup(Vector2(ESCALATOR_BOTTOM_X - ESCALATOR_TOP_X, bottom - top))
+
+
+func _spawn_doors() -> void:
+	var game := GameState.instance()
+	game.reset()
+	var documents := 0
+	for entry: Dictionary in DOORS:
+		var door := DOOR_SCENE.instantiate() as Door
+		door.position = Vector2(entry["x"], FLOOR_SURFACES[entry["floor"]])
+		door.has_document = entry["document"]
+		add_child(door)
+		_doors.append(door)
+		if not door.is_pending():
+			continue
+		documents += 1
+		door.document_taken.connect(game.collect_document)
+	game.start_building(documents)
+
+
+## Выход из здания. Не запирается: без всех документов он отправляет обратно
+## наверх, к несобранной двери (ADR-0005, пункт 5).
+func _spawn_exit() -> void:
+	var bottom := FLOOR_SURFACES[FLOOR_SURFACES.size() - 1]
+	var area := Rect2(EXIT_LEFT, bottom - EXIT_HEIGHT, EXIT_WIDTH, EXIT_HEIGHT)
+
+	var zone := Area2D.new()
+	zone.collision_layer = 0
+	zone.collision_mask = 2
+	zone.position = area.position + area.size * 0.5
+
+	var shape := RectangleShape2D.new()
+	shape.size = area.size
+	var collision := CollisionShape2D.new()
+	collision.shape = shape
+	zone.add_child(collision)
+
+	var visual := ColorRect.new()
+	visual.color = EXIT_COLOR
+	visual.size = area.size
+	visual.position = -area.size * 0.5
+	visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	zone.add_child(visual)
+
+	zone.z_index = -1
+	zone.body_entered.connect(_on_exit_entered)
+	add_child(zone)
+
+
+func _on_exit_entered(body: Node2D) -> void:
+	var runner := body as Otto
+	if runner == null:
+		return
+	if GameState.instance().all_documents_collected():
+		building_cleared.emit()
+		return
+	_send_back_for_documents(runner)
+
+
+## Возвращает Otto к самой верхней несобранной двери.
+func _send_back_for_documents(runner: Otto) -> void:
+	var pending := PackedVector2Array()
+	for door in _doors:
+		if door.is_pending():
+			pending.append(door.mat_position())
+
+	var index := DocumentRoute.door_to_return_to(pending)
+	if index < 0:
+		return
+	runner.global_position = pending[index]
 
 
 func _on_pit_entered(body: Node2D) -> void:

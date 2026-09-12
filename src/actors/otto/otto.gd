@@ -14,6 +14,7 @@ const STATE_COLORS: Dictionary = {
 	OttoStateMachine.State.JUMP: Color(0.60, 0.85, 0.95),
 	OttoStateMachine.State.FALL: Color(0.45, 0.65, 0.85),
 	OttoStateMachine.State.RIDE: Color(0.55, 0.80, 0.60),
+	OttoStateMachine.State.INDOORS: Color(0.40, 0.40, 0.45),
 	OttoStateMachine.State.DEAD: Color(0.75, 0.25, 0.25),
 }
 
@@ -60,10 +61,11 @@ func _physics_process(delta: float) -> void:
 
 	var state := _states.update(_snapshot, is_on_floor(), velocity.y, _can_stand_up())
 
-	# Пока везёт эскалатор, физика молчит: координатой распоряжается он.
-	if state == OttoStateMachine.State.RIDE:
+	# Пока Otto забрал кто-то другой — эскалатор везёт или дверь спрятала —
+	# физика молчит: координатой распоряжается он, а не она.
+	if state == OttoStateMachine.State.RIDE or state == OttoStateMachine.State.INDOORS:
 		velocity = Vector2.ZERO
-		# Эскалатор несёт, а не роняет: падение с его высоты не копится.
+		# Его несут, а не роняют: падение с этой высоты не копится.
 		_apex_y = global_position.y
 		_apply_pose(state)
 		return
@@ -104,6 +106,27 @@ func fall_height() -> float:
 ## На сколько поднимает прыжок: v² / (2 · g). Падение глубже — уже не свой прыжок.
 func jump_height() -> float:
 	return jump_speed * jump_speed / (2.0 * gravity)
+
+
+## Намерение по горизонтали за последний кадр. По нему дверь понимает, что
+## Otto просится наружу раньше срока.
+func horizontal_intent() -> float:
+	return 0.0 if _states.is_dead() else _snapshot.move
+
+
+## Otto скрылся за дверью: снаружи его нет, ввод игрока не действует.
+func enter_door() -> void:
+	_states.go_indoors()
+
+
+## Дверь выпустила Otto наружу — сам вышел или выставили через пять секунд.
+func leave_door() -> void:
+	_states.come_out()
+
+
+## Скрыт ли Otto за дверью.
+func is_indoors() -> bool:
+	return _states.state == OttoStateMachine.State.INDOORS
 
 
 ## Otto встал на эскалатор: до конца поездки ввод игрока не действует.
@@ -197,8 +220,11 @@ func _apply_pose(state: OttoStateMachine.State) -> void:
 	_posed_state = state
 
 	var crouching := state == OttoStateMachine.State.CROUCH
-	_standing_shape.set_deferred("disabled", crouching)
-	_crouching_shape.set_deferred("disabled", not crouching)
+	# За дверью Otto не только не виден, но и не задевается: он в комнате.
+	var hidden := state == OttoStateMachine.State.INDOORS
+	_standing_shape.set_deferred("disabled", crouching or hidden)
+	_crouching_shape.set_deferred("disabled", not crouching or hidden)
+	_body.visible = not hidden
 
 	# Размер и посадку коробки берём из самой формы коллизии, чтобы вид и
 	# хитбокс не разъезжались при правке сцены.

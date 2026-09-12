@@ -15,9 +15,9 @@ const FLOOR_EPSILON: float = 0.5
 ## Ниже этого порога команда игрока считается отпущенной.
 const COMMAND_THRESHOLD: float = 0.1
 
-## Вверх по экрану — это уменьшение y.
-const UP: float = -1.0
-const DOWN: float = 1.0
+## Направления те же, что у эскалатора и двери: одно место на проект.
+const UP := Intent.UP
+const DOWN := Intent.DOWN
 
 ## Этажи-остановки: координата кабины на каждом из них, по возрастанию.
 var floors: PackedFloat32Array = PackedFloat32Array()

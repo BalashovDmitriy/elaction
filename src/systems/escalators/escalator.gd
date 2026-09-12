@@ -9,11 +9,6 @@ extends Node2D
 ##
 ## Узел ставится на верхнюю площадку, нижняя задаётся смещением в [method setup].
 
-## Ниже этого порога наклон стика считается покоем.
-const INTENT_THRESHOLD: float = 0.5
-const UP: float = -1.0
-const DOWN: float = 1.0
-
 ## Сколько секунд занимает поездка между площадками.
 @export var travel_time: float = 1.1
 
@@ -32,8 +27,8 @@ func _physics_process(delta: float) -> void:
 		_carry(delta)
 		return
 	# Наверх зовут с нижней площадки, вниз — с верхней.
-	if not _try_board(_bottom_pad, _top_pad, UP):
-		_try_board(_top_pad, _bottom_pad, DOWN)
+	if not _try_board(_bottom_pad, _top_pad, Intent.UP):
+		_try_board(_top_pad, _bottom_pad, Intent.DOWN)
 
 
 ## Ставит нижнюю площадку со смещением от верхней и протягивает между ними полотно.
@@ -48,7 +43,7 @@ func _try_board(pad: Area2D, target: Area2D, towards: float) -> bool:
 		if rider == null or not rider.is_grounded():
 			continue
 		var intent := rider.vertical_intent()
-		if absf(intent) < INTENT_THRESHOLD or signf(intent) != towards:
+		if absf(intent) < Intent.PRESS or signf(intent) != towards:
 			continue
 		_passenger = rider
 		_from = pad.global_position

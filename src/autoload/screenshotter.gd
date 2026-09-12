@@ -38,6 +38,13 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "jump", "actions": ["move_right", "jump"], "hold": 0.42},
 		{"label": "crouch", "actions": ["move_down"], "hold": 0.9},
 	],
+	"M3":
+	[
+		{"label": "floor_top", "actions": [], "hold": 0.4},
+		{"label": "at_red_door", "actions": ["move_left", "move_up"], "hold": 3.8},
+		{"label": "inside", "actions": [], "hold": 0.6},
+		{"label": "back_outside", "actions": ["move_right"], "hold": 0.6},
+	],
 	"M2":
 	[
 		{"label": "floor_top", "actions": [], "hold": 0.4},
