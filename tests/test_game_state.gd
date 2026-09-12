@@ -57,3 +57,33 @@ func test_collecting_reports_both_changes() -> void:
 	game.collect_document()
 	assert_signal_emitted(game, "documents_changed")
 	assert_signal_emitted(game, "score_changed")
+
+
+func test_partie_starts_with_three_lives() -> void:
+	assert_eq(_state().lives, GameState.STARTING_LIVES)
+
+
+func test_losing_a_life_leaves_otto_in_the_game() -> void:
+	var game := _state()
+	assert_true(game.lose_life(), "после первой смерти партия продолжается")
+	assert_eq(game.lives, GameState.STARTING_LIVES - 1)
+
+
+func test_last_life_ends_the_game() -> void:
+	var game := _state()
+	watch_signals(game)
+	for _death: int in GameState.STARTING_LIVES - 1:
+		game.lose_life()
+	assert_false(game.lose_life(), "жизни кончились")
+	assert_signal_emitted(game, "game_over")
+
+
+func test_game_over_comes_once() -> void:
+	var game := _state()
+	for _death: int in GameState.STARTING_LIVES:
+		game.lose_life()
+	watch_signals(game)
+	assert_false(game.lose_life(), "после конца партии жизнь снять нельзя")
+	assert_eq(game.lives, 0)
+	assert_signal_not_emitted(game, "game_over", "game_over сообщает о переходе, а не о состоянии")
+	assert_signal_not_emitted(game, "lives_changed")

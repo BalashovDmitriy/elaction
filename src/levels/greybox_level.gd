@@ -15,6 +15,7 @@ const EXIT_COLOR := Color(0.30, 0.52, 0.36)
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 const ESCALATOR_SCENE := preload("res://src/systems/escalators/escalator.tscn")
 const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
+const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 
 ## Поверхности этажей сверху вниз. По ним же кабина выбирает остановки.
 const FLOOR_SURFACES: Array[float] = [100.0, 220.0, 340.0]
@@ -43,10 +44,21 @@ const ESCALATOR_BOTTOM_X: float = 372.0
 ## Двери этажей: номер этажа, x и есть ли за ней документ.
 const DOORS: Array[Dictionary] = [
 	{"floor": 0, "x": 200.0, "document": true},
+	{"floor": 0, "x": 880.0, "document": false},
 	{"floor": 1, "x": 700.0, "document": false},
 	{"floor": 1, "x": 980.0, "document": true},
 	{"floor": 2, "x": 160.0, "document": true},
+	{"floor": 2, "x": 1000.0, "document": false},
 ]
+
+## Сколько дверь ждёт, прежде чем выпустить следующего агента, с.
+const AGENT_RESPAWN_DELAY: float = 3.0
+
+## Сколько Otto лежит, прежде чем вернуться в игру, с.
+const OTTO_RESPAWN_DELAY: float = 1.2
+
+## Куда Otto возвращается на своём этаже: слева, подальше от всех проёмов.
+const RESPAWN_X: float = 80.0
 
 ## Выход из здания — на нижнем этаже справа.
 const EXIT_LEFT: float = 1180.0
@@ -56,6 +68,8 @@ const EXIT_HEIGHT: float = 40.0
 @export var camera_bounds := Rect2(0, 0, LEVEL_WIDTH, LEVEL_HEIGHT)
 
 var _doors: Array[Door] = []
+## Обычные двери: из них выходят агенты. Красные документов не стерегут.
+var _agent_doors: Array[Door] = []
 ## Здание сдано. Otto может зайти в зону выхода снова, но событие однократное:
 ## в M5 к нему прицепится переход к следующему зданию.
 var _cleared: bool = false
@@ -71,6 +85,9 @@ func _ready() -> void:
 	_spawn_escalator()
 	_spawn_doors()
 	_spawn_exit()
+	otto.died.connect(_on_otto_died)
+	for door in _agent_doors:
+		_release_agent(door)
 	otto.apply_camera_bounds(camera_bounds)
 
 
@@ -168,6 +185,7 @@ func _spawn_doors() -> void:
 		add_child(door)
 		_doors.append(door)
 		if not door.is_pending():
+			_agent_doors.append(door)
 			continue
 		documents += 1
 		door.document_taken.connect(game.collect_document)
@@ -216,6 +234,46 @@ func _on_exit_entered(body: Node2D) -> void:
 	# Перенос отложен: сигнал приходит посреди разбора перекрытий, и двигать
 	# тело прямо здесь движок просит не делать.
 	_send_back_for_documents.call_deferred(runner)
+
+
+## Этаж, на котором Otto погиб: ближайшая по вертикали поверхность.
+##
+## Статический, чтобы проверяться тестами без сцены.
+static func floor_surface_near(y: float, surfaces: Array[float]) -> float:
+	var best := surfaces[0]
+	for surface in surfaces:
+		if absf(surface - y) < absf(best - y):
+			best = surface
+	return best
+
+
+## Выпускает агента из двери.
+func _release_agent(door: Door) -> void:
+	var mat := door.mat_position()
+	var agent := ENEMY_SCENE.instantiate() as Enemy
+	add_child(agent)
+	agent.global_position = mat
+	agent.setup(otto, signf(otto.global_position.x - mat.x))
+	agent.died.connect(_on_agent_died.bind(door))
+
+
+func _on_agent_died(_agent: Enemy, door: Door) -> void:
+	var timer := get_tree().create_timer(AGENT_RESPAWN_DELAY)
+	timer.timeout.connect(_release_agent.bind(door))
+
+
+func _on_otto_died() -> void:
+	# Жизнь снимается сразу, чтобы счётчик не врал, пока тело лежит.
+	if not GameState.instance().lose_life():
+		return
+	var timer := get_tree().create_timer(OTTO_RESPAWN_DELAY)
+	timer.timeout.connect(_respawn_otto)
+
+
+func _respawn_otto() -> void:
+	var surface := floor_surface_near(otto.global_position.y, FLOOR_SURFACES)
+	otto.global_position = Vector2(RESPAWN_X, surface)
+	otto.revive()
 
 
 ## Возвращает Otto к самой верхней несобранной двери.

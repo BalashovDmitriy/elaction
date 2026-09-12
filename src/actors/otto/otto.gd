@@ -6,6 +6,11 @@ extends CharacterBody2D
 ## Отвечает за физику, форму коллизии и вид. Решение о том, в каком он
 ## состоянии, принимает [OttoStateMachine].
 
+## Otto погиб: пулей, падением в шахту или под кабиной.
+signal died
+
+const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
+
 ## Цвет коробки по состоянию: временная замена спрайтам, настоящие придут в M7.
 const IDLE_COLOR := Color(0.85, 0.78, 0.35)
 const STATE_COLORS: Dictionary = {
@@ -14,7 +19,9 @@ const STATE_COLORS: Dictionary = {
 	OttoStateMachine.State.JUMP: Color(0.60, 0.85, 0.95),
 	OttoStateMachine.State.FALL: Color(0.45, 0.65, 0.85),
 	OttoStateMachine.State.RIDE: Color(0.55, 0.80, 0.60),
-	OttoStateMachine.State.DEAD: Color(0.75, 0.25, 0.25),
+	# Тёмно-жёлтый, а не красный: в грейбоксе труп Otto не должен путаться
+	# с живым агентом, а тот красный.
+	OttoStateMachine.State.DEAD: Color(0.46, 0.36, 0.18),
 }
 
 @export var walk_speed: float = 90.0
@@ -22,6 +29,12 @@ const STATE_COLORS: Dictionary = {
 ## хватает на площадки greybox-уровня (нижние в 70 px от пола, верхняя — с них).
 @export var jump_speed: float = 380.0
 @export var gravity: float = 900.0
+@export var bullet_speed: float = 220.0
+## Откуда вылетает пуля, от ног. Присев, Otto стреляет ниже — и его выстрел
+## проходит там, где стоящий враг его не перепрыгнет.
+@export var shot_height_standing: float = -20.0
+@export var shot_height_crouching: float = -10.0
+@export var muzzle_offset: float = 9.0
 @export var max_fall_speed: float = 420.0
 ## В оригинале Otto приседает на месте. Оставлено переключателем для настройки.
 @export var can_move_while_crouching: bool = false
@@ -35,6 +48,9 @@ var _posed_state := OttoStateMachine.State.IDLE
 var _car: ElevatorCar = null
 ## Разница высот стоячей и сидячей формы: столько места нужно над головой.
 var _headroom: float = 0.0
+## Куда Otto смотрит: -1 влево, +1 вправо. Туда же летят его пули.
+var _facing: float = 1.0
+var _gun := Gun.new()
 ## Верхняя точка текущего полёта: от неё считается глубина падения.
 var _apex_y: float = 0.0
 
@@ -42,6 +58,7 @@ var _apex_y: float = 0.0
 @onready var _crouching_shape: CollisionShape2D = $CrouchingShape
 @onready var _body: ColorRect = $Body
 @onready var _camera: Camera2D = $Camera2D
+@onready var _kick_zone: Area2D = $KickZone
 
 
 func _ready() -> void:
@@ -69,6 +86,11 @@ func _physics_process(delta: float) -> void:
 		_apply_pose(state)
 		return
 
+	if absf(_snapshot.move) > OttoStateMachine.MOVE_THRESHOLD:
+		_facing = signf(_snapshot.move)
+	if _snapshot.shoot_pressed and state != OttoStateMachine.State.DEAD and _gun.can_fire():
+		_fire()
+
 	# Импульс прыжка выдаётся в тот же кадр, пока тело ещё стоит на полу,
 	# поэтому гравитация его в этом кадре не съедает.
 	if _states.just_entered(OttoStateMachine.State.JUMP) and is_on_floor():
@@ -79,13 +101,42 @@ func _physics_process(delta: float) -> void:
 		velocity.y = minf(velocity.y + gravity * delta, max_fall_speed)
 
 	move_and_slide()
+
+	# Удар ногой засчитывается только в полёте — стоя врага не бьют.
+	if state == OttoStateMachine.State.JUMP or state == OttoStateMachine.State.FALL:
+		_kick_enemies()
 	_track_fall()
 	_apply_pose(_states.state)
 
 
-## Убивает Otto: падение на дно шахты, сдавливание кабиной, в M4 — пуля.
+## Убивает Otto: пуля, падение на дно шахты, сдавливание кабиной.
 func kill() -> void:
+	if _states.is_dead():
+		return
 	_states.kill()
+	_repose()
+	died.emit()
+
+
+## Попадание вражеской пули.
+func take_bullet() -> void:
+	kill()
+
+
+func is_dead() -> bool:
+	return _states.is_dead()
+
+
+## Возвращает Otto в игру после смерти. Ставить его на место — дело уровня,
+## поэтому зовут это уже после переноса: верхняя точка полёта берётся отсюда.
+##
+## Без сброса [member _apex_y] упавший в шахту возвращался бы с чужой глубиной
+## падения за спиной и разбивался бы на ровном месте.
+func revive() -> void:
+	_states.reset()
+	velocity = Vector2.ZERO
+	_apex_y = global_position.y
+	_repose()
 
 
 ## Намерение по вертикали за последний кадр. По нему кабина, эскалатор и дверь
@@ -178,6 +229,41 @@ func apply_camera_bounds(bounds: Rect2) -> void:
 	_camera.limit_top = int(bounds.position.y)
 	_camera.limit_right = int(bounds.end.x)
 	_camera.limit_bottom = int(bounds.end.y)
+
+
+## Выпускает пулю. Высоту полёта задаёт поза: присев, Otto стреляет ниже.
+func _fire() -> void:
+	var crouching := _states.state == OttoStateMachine.State.CROUCH
+	var height := shot_height_crouching if crouching else shot_height_standing
+
+	var bullet := BULLET_SCENE.instantiate() as Bullet
+	bullet.direction = _facing
+	bullet.speed = bullet_speed
+	bullet.collision_mask = Bullet.HITS_ENEMIES
+	bullet.hit_target.connect(_on_bullet_hit)
+	# Счётчик ведёт сам ствол: пуля кончается и попаданием, и на дальности.
+	bullet.tree_exited.connect(_gun.bullet_spent)
+	get_parent().add_child(bullet)
+	bullet.global_position = global_position + Vector2(_facing * muzzle_offset, height)
+	_gun.fired()
+
+
+func _on_bullet_hit(target: Node2D) -> void:
+	var agent := target as Enemy
+	if agent == null or agent.is_dead():
+		return
+	agent.take_bullet()
+	GameState.instance().add_score(GameState.ENEMY_SHOT_SCORE)
+
+
+## Бьёт ногой всех, кого задел в полёте.
+func _kick_enemies() -> void:
+	for body: Node2D in _kick_zone.get_overlapping_bodies():
+		var agent := body as Enemy
+		if agent == null or agent.is_dead():
+			continue
+		agent.kill()
+		GameState.instance().add_score(GameState.ENEMY_KICK_SCORE)
 
 
 ## Есть ли над головой место, чтобы выпрямиться из приседа.

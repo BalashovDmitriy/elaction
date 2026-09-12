@@ -1,11 +1,11 @@
 class_name GameState
 extends Node
 
-## Состояние партии: счёт и прогресс по документам.
+## Состояние партии: счёт, жизни и прогресс по документам.
 ##
 ## Первый синглтон игрового состояния в проекте. Двери, HUD и выход не знают друг
 ## о друге и связываются через него сигналами — как предписывают соглашения.
-## В M4 сюда приедут жизни, в M5 — номер здания.
+## В M5 сюда приедет номер здания.
 ##
 ## В дерево его ставит автолоад `Game`, а код обращается через [method instance].
 ## Имя автолоада само по себе идентификатором не является: `--check-only` разбирает
@@ -14,13 +14,22 @@ extends Node
 
 signal score_changed(value: int)
 signal documents_changed(collected: int, total: int)
+signal lives_changed(value: int)
+## Жизни кончились. Партия окончена.
+signal game_over
 
-## Очки за документ — по таблице оригинала (ADR-0005, пункт 1).
+## Таблица очков оригинала (ADR-0005, пункт 1 и ADR-0006, пункт 5).
 const DOCUMENT_SCORE: int = 500
+const ENEMY_SHOT_SCORE: int = 100
+const ENEMY_KICK_SCORE: int = 150
+
+## Жизней на партию — три, как в оригинале (ADR-0006, пункт 4).
+const STARTING_LIVES: int = 3
 
 static var _instance: GameState = null
 
 var score: int = 0
+var lives: int = STARTING_LIVES
 var documents_collected: int = 0
 var documents_total: int = 0
 
@@ -51,9 +60,11 @@ func start_building(total_documents: int) -> void:
 ## Обнуляет всё, включая счёт.
 func reset() -> void:
 	score = 0
+	lives = STARTING_LIVES
 	documents_collected = 0
 	documents_total = 0
 	score_changed.emit(score)
+	lives_changed.emit(lives)
 	documents_changed.emit(documents_collected, documents_total)
 
 
@@ -62,6 +73,21 @@ func collect_document() -> void:
 	documents_collected += 1
 	documents_changed.emit(documents_collected, documents_total)
 	add_score(DOCUMENT_SCORE)
+
+
+## Снимает жизнь. Возвращает true, если Otto ещё может вернуться в игру.
+##
+## После конца партии ничего не делает: [signal game_over] сообщает о переходе,
+## а не о состоянии, и повторно он не приходит.
+func lose_life() -> bool:
+	if lives <= 0:
+		return false
+	lives -= 1
+	lives_changed.emit(lives)
+	if lives > 0:
+		return true
+	game_over.emit()
+	return false
 
 
 func add_score(points: int) -> void:
