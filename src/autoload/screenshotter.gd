@@ -31,6 +31,12 @@ const MANUAL_FOLDER := "manual"
 ## шаге не держится намеренно, иначе Otto успел бы зайти внутрь и кадр, обещающий
 ## его перед дверью, показал бы пустой проём.
 ##
+## Свет M6 этим сценарием не проверяется, и пытаться не стоит: тёмный этаж
+## получается только сбитой лампой, а попасть по ней выдержкой — ровно тот
+## случай, который здесь ломался четырежды. Свет снимает tools/light_shot.tscn:
+## он ждёт не секунды, а состояние. Отсюда нужен только вид настоящей игры —
+## с HUD, виньеткой и свечением, которых в том инструменте нет.
+##
 ## Гибели в сценарии нет намеренно. Упасть на дно шахты можно только со среднего
 ## этажа и только пока кабина выше: где она окажется к этому моменту, зависит от
 ## её расписания, а оно сдвигается от любой правки пауз. Такой шаг молча снимал бы
@@ -88,6 +94,13 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "still_paused", "actions": [], "hold": 0.4},
 		{"label": "resumed", "actions": ["pause"], "hold": 0.6},
 	],
+	"M6":
+	[
+		{"label": "roof", "actions": [], "hold": 0.8},
+		{"label": "muzzle_flash", "actions": ["shoot"], "hold": 0.08},
+		{"label": "walking", "actions": ["move_right"], "hold": 1.4},
+		{"label": "settled", "actions": [], "hold": 1.0},
+	],
 }
 const DEFAULT_PLAN := "M1"
 
@@ -131,7 +144,7 @@ func capture(label: String, folder: String = "") -> void:
 	if error != OK and error != ERR_ALREADY_EXISTS:
 		push_error("Не удалось создать папку для снимков: %s (код %d)" % [absolute_folder, error])
 		return
-	_mark_ignored_by_engine(absolute_root)
+	mark_ignored_by_engine(absolute_root)
 
 	var absolute_path := _free_path(absolute_folder, label)
 	var image := get_viewport().get_texture().get_image()
@@ -196,7 +209,12 @@ func _free_path(folder: String, label: String) -> String:
 
 ## Кладёт .gdignore рядом со снимками: без него Godot импортирует каждый JPEG
 ## как ресурс проекта и засевает папку .import-файлами.
-func _mark_ignored_by_engine(root_folder: String) -> void:
+##
+## Публичный и статический: в ту же папку пишет tools/light_shot.gd, и своя
+## копия этой пометки у него разошлась бы с этой при первой же правке. Статический,
+## потому что звать его приходится по скрипту, а не по автолоаду: имя автолоада
+## видно только запущенной игре, а `godot_check.py` разбирает скрипты поодиночке.
+static func mark_ignored_by_engine(root_folder: String) -> void:
 	var marker := root_folder.path_join(".gdignore")
 	if FileAccess.file_exists(marker):
 		return

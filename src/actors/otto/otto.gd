@@ -226,6 +226,16 @@ func is_grounded() -> bool:
 
 
 ## Ограничивает камеру прямоугольником уровня.
+## Что сейчас попадает в кадр, в координатах мира.
+##
+## Камера едет за Otto, но упирается в края здания, и приближение у неё своё.
+## Поэтому видимое место считает тот, у кого камера, а не тот, кому оно нужно:
+## снаружи пришлось бы спрашивать и середину, и приближение, и размер окна.
+func camera_view() -> Rect2:
+	var size := get_viewport_rect().size / _camera.zoom
+	return Rect2(_camera.get_screen_center_position() - size * 0.5, size)
+
+
 func apply_camera_bounds(bounds: Rect2) -> void:
 	_camera.limit_left = int(bounds.position.x)
 	_camera.limit_top = int(bounds.position.y)

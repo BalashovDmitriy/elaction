@@ -10,12 +10,49 @@ extends Node2D
 ## Otto вышел из здания, собрав все документы.
 signal building_cleared
 
-const SOLID_COLOR := Color(0.22, 0.24, 0.30)
+## Цвета геометрии заданы ярче, чем нужно на экране: с M6 всё, что рисуется,
+## множится на общий тон ([constant AMBIENT]), и прежние цвета ушли бы в чёрное.
+const SOLID_COLOR := Color(0.30, 0.32, 0.40)
 const EXIT_COLOR := Color(0.30, 0.52, 0.36)
 
-## Чем накрывается погашенный этаж до настоящего света в M6.
-const DARKNESS_COLOR := Color(0.02, 0.02, 0.05, 0.72)
-const DARKNESS_Z: int = 20
+## Общий тон здания — и он же тон погашенного этажа (ADR-0010, пункт 3).
+##
+## Не чёрный: в темноте агенты продолжают стрелять, у них лишь падает
+## дальность, и этаж, на котором врага не видно, был бы смертью ни за что.
+## Холодный оттенок отделяет погашенный этаж от горящего вернее яркости.
+const AMBIENT := Color(0.50, 0.54, 0.68)
+
+## Заливка горящего этажа: она возвращает ему обычную яркость.
+const FLOOR_LIGHT := Color(1.0, 0.95, 0.86)
+const FLOOR_ENERGY: float = 1.15
+
+## Столб света в шахте: кабина возит свой свет, и шахта видна как шахта.
+## Он не гаснет вместе с этажом — это освещение самой шахты, а не этажа.
+const SHAFT_LIGHT := Color(0.78, 0.86, 1.0)
+const SHAFT_ENERGY: float = 0.55
+
+## Окна в задней стене: сколько на этаже и какого размера.
+const WINDOWS_PER_FLOOR: int = 6
+const WINDOW_SIZE := Vector2(72.0, 40.0)
+## На сколько ниже потолка начинается окно, px.
+const WINDOW_TOP: float = 14.0
+
+## Задняя стена этажа. Светлее геометрии: это дальний план, и сливаться
+## с перекрытиями ему нельзя, иначе этаж читается как сплошная плита.
+const BACK_WALL := Color(0.15, 0.16, 0.22)
+
+## Город за окнами: силуэт и горящие окна. Само небо — цвет узла Background
+## в сцене, там же, где сам узел.
+const CITY := Color(0.12, 0.14, 0.24)
+const CITY_WINDOW := Color(0.92, 0.83, 0.50)
+
+## Насколько город отстаёт от камеры: 1 — бесконечно далёк и стоит на месте.
+## По вертикали больше, чем по горизонтали: здание высокое, и город, бегущий
+## вниз наравне со спуском, читался бы как соседняя стена, а не как даль.
+const CITY_PARALLAX := Vector2(0.86, 0.94)
+
+## Полоса, в которой стоит город, в координатах его собственного слоя.
+const CITY_AREA := Rect2(0.0, 40.0, 1280.0, 500.0)
 
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 const ESCALATOR_SCENE := preload("res://src/systems/escalators/escalator.tscn")
@@ -61,6 +98,20 @@ var _doors: Array[Door] = []
 var _agent_doors: Array[Door] = []
 var _cars: Array[ElevatorCar] = []
 var _lighting := FloorLighting.new()
+## Заливка по этажу. Гаснет, когда на этаже падает лампа.
+var _floor_lights: Array[AreaLight] = []
+## Столбы света в шахтах, по одному на шахту, в порядке раскладки.
+var _shaft_lights: Array[AreaLight] = []
+## Какие этажи горели в прошлом кадре: пересчитывать их каждый кадр незачем.
+var _lit_span := Vector2i(-1, -1)
+## Дальний план: город за окнами. Двигается медленнее камеры.
+var _city: Node2D = null
+## Задние стены этажей. Их под три сотни, и держать их прямо в уровне значит
+## заставить каждый обход [method _agents] перебирать ещё и их.
+var _back_walls: Node2D = null
+## Лампы здания: их свет тоже гасится за пределами кадра. Упавшие лампы
+## убирают себя сами, поэтому перед обращением проверяется живость.
+var _lamps: Array[Lamp] = []
 ## Здание сдано. Событие однократное: по нему main собирает следующее здание.
 var _cleared: bool = false
 var _exit_position := Vector2.ZERO
@@ -75,12 +126,15 @@ func _ready() -> void:
 	_plan = BuildingPlan.generate(rules, building_seed)
 
 	_background.size = Vector2(rules.width, rules.total_height())
+	_build_city()
+	_build_back_walls()
 	_build_geometry()
 	_spawn_shafts()
 	_spawn_escalators()
 	_spawn_doors()
 	_spawn_lamps()
 	_spawn_exit()
+	_light_building()
 
 	# Otto начинает с крыши, как в оригинале, и там, где нет проёмов.
 	otto.global_position = Vector2(_plan.safe_x(rules, 0), rules.floor_surface(0))
@@ -93,6 +147,41 @@ func _ready() -> void:
 		for door in _agent_doors:
 			_release_agent(door)
 	otto.apply_camera_bounds(Rect2(0.0, 0.0, rules.width, rules.total_height()))
+
+
+## Гасит всё, что уехало из кадра. Источников в здании шестьдесят, а в кадр
+## влезает два с половиной этажа — ADR-0010, пункт 8.
+func _process(_delta: float) -> void:
+	var view := otto.camera_view()
+	# Город отстаёт от камеры, оттого и кажется далёким.
+	_city.position = view.position * CITY_PARALLAX
+
+	var span := VisibleFloors.around(rules, view)
+	if span == _lit_span:
+		return
+
+	_lit_span = span
+	for index: int in _floor_lights.size():
+		var light := _floor_lights[index]
+		# Погашенный этаж остаётся погашенным: в кадре он или нет, лампы на нём
+		# больше нет. Поэтому видимость решает не только отбор.
+		light.visible = VisibleFloors.covers(span, index) and not _lighting.is_dark(index)
+
+	for index: int in _shaft_lights.size():
+		# Шахта тянется через много этажей, поэтому горит, если в кадр попал
+		# хоть один из них. Без этого в тридцатиэтажке горели бы все шахты разом,
+		# и обещанная дюжина источников в кадре перестала бы быть правдой.
+		var shaft := _plan.shafts[index]
+		_shaft_lights[index].visible = shaft.top <= span.y and shaft.bottom >= span.x
+
+	# У этажа два источника (ADR-0010, пункт 3), и отбор нужен обоим: пятно
+	# лампы вдобавок кладёт тени, то есть стоит дороже заливки. Этаж лампы
+	# берётся из её же положения — так же, как его берёт tools/light_shot.gd.
+	for lamp: Lamp in _lamps:
+		if not is_instance_valid(lamp):
+			continue
+		var floor_index := rules.floor_index_near(lamp.global_position.y)
+		lamp.set_light_visible(VisibleFloors.covers(span, floor_index))
 
 
 ## Раскладка, по которой собрано здание.
@@ -108,6 +197,11 @@ func doors() -> Array[Door]:
 ## Где стоит выход из здания.
 func exit_position() -> Vector2:
 	return _exit_position
+
+
+## Погашен ли этаж. Гаснет он навсегда: сбитая лампа обратно не загорается.
+func is_dark(floor_index: int) -> bool:
+	return _lighting.is_dark(floor_index)
 
 
 ## Режет перекрытие на куски между проёмами.
@@ -150,6 +244,7 @@ func _spawn_shafts() -> void:
 		car.setup(stops)
 		_cars.append(car)
 		_spawn_shaft_pit(shaft)
+		_light_shaft(shaft)
 
 
 ## Дно шахты: упавший сюда разбивается, вошедший ногами с этажа — нет.
@@ -213,6 +308,7 @@ func _spawn_lamps() -> void:
 		lamp.fell.connect(_on_lamp_fell.bind(spot.floor_index))
 		add_child(lamp)
 		lamp.hang(LAMP_HANG_HEIGHT)
+		_lamps.append(lamp)
 
 
 ## Выход из здания. Не запирается: без всех документов он отправляет обратно
@@ -282,17 +378,11 @@ func _on_lamp_crushed(agent: Enemy) -> void:
 func _on_lamp_fell(index: int) -> void:
 	if not _lighting.darken(index):
 		return
-	_cover_with_darkness(index)
+	# Этаж падает до общего тона здания: света на нём больше нет.
+	if index < _floor_lights.size():
+		_floor_lights[index].visible = false
 	for agent in _agents_on(index):
 		agent.set_in_the_dark(true)
-
-
-func _cover_with_darkness(index: int) -> void:
-	var top := rules.story_top(index)
-	var size := Vector2(rules.width, rules.floor_surface(index) + rules.slab_height - top)
-	var shade := _panel(size, Vector2(0.0, top), DARKNESS_COLOR)
-	shade.z_index = DARKNESS_Z
-	add_child(shade)
 
 
 ## Все агенты здания: они лежат прямо в уровне, рядом с геометрией.
@@ -378,7 +468,7 @@ func _build_solid(rect: Rect2) -> void:
 	var body := StaticBody2D.new()
 	body.position = rect.position + rect.size * 0.5
 	# Тела добавляются в дерево после Otto, то есть рисовались бы поверх него.
-	# Геометрия всегда за актёрами, но перед фоном (у фона z_index = -10).
+	# Геометрия всегда за актёрами, но перед фоном (у фона z_index = -12).
 	body.z_index = -1
 
 	var shape := RectangleShape2D.new()
@@ -387,8 +477,143 @@ func _build_solid(rect: Rect2) -> void:
 	collision.shape = shape
 	body.add_child(collision)
 	body.add_child(_panel(rect.size, -rect.size * 0.5, SOLID_COLOR))
+	body.add_child(_occluder(rect.size))
 
 	add_child(body)
+
+
+## Окна этажа: равные проёмы в задней стене, через которые виден город.
+##
+## Статический, чтобы проверяться без сцены, — как и [method slab_segments].
+static func window_gaps(width: float, count: int, window_width: float) -> Array[Vector2]:
+	var gaps: Array[Vector2] = []
+	if count <= 0 or window_width <= 0.0:
+		return gaps
+
+	var pitch := width / float(count)
+	for number: int in count:
+		# Окно стоит посередине своей доли стены: так они разнесены поровну
+		# и у стен здания остаётся полполосы, а не обрезанное окно.
+		var centre := pitch * (float(number) + 0.5)
+		var half := minf(window_width, pitch) * 0.5
+		gaps.append(Vector2(centre - half, centre + half))
+	return gaps
+
+
+## Задняя стена: сплошная, кроме окон. Через окна виден город.
+##
+## Стена кладётся тремя полосами: над окнами, по окнам и под ними. Резать её
+## по горизонтали умеет [method BuildingPlan.spans_between] — та же функция,
+## что режет перекрытия проёмами.
+func _build_back_walls() -> void:
+	_back_walls = Node2D.new()
+	_back_walls.z_index = -8
+	add_child(_back_walls)
+
+	var gaps := window_gaps(rules.width, WINDOWS_PER_FLOOR, WINDOW_SIZE.x)
+	# С первого этажа, а не с нулевого: нулевой — крыша, комнаты за ней нет.
+	# [method BuildingRules.story_top] отдаёт для неё верх здания, и стена вышла бы
+	# полосой в небе над тем местом, где Otto начинает, с обрезанными окнами.
+	for index: int in range(1, rules.floors):
+		var top := rules.story_top(index)
+		var surface := rules.floor_surface(index)
+		if surface - top <= 0.0:
+			continue
+
+		var window_top := minf(top + WINDOW_TOP, surface)
+		var window_bottom := minf(window_top + WINDOW_SIZE.y, surface)
+		_add_back_wall(Rect2(0.0, top, rules.width, window_top - top))
+		_add_back_wall(Rect2(0.0, window_bottom, rules.width, surface - window_bottom))
+
+		for span: Vector2 in BuildingPlan.spans_between(gaps, rules.width):
+			var strip := Rect2(span.x, window_top, span.y - span.x, window_bottom - window_top)
+			_add_back_wall(strip)
+
+
+func _add_back_wall(rect: Rect2) -> void:
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return
+	_back_walls.add_child(_panel(rect.size, rect.position, BACK_WALL))
+
+
+## Город за окнами. Свет здания на него не падает: он снаружи и далеко.
+func _build_city() -> void:
+	_city = Node2D.new()
+	_city.z_index = -9
+	add_child(_city)
+
+	for tower: Skyline.Tower in Skyline.generate(building_seed, CITY_AREA):
+		_add_city_panel(tower.rect, CITY)
+		for window: Rect2 in tower.windows:
+			_add_city_panel(window, CITY_WINDOW)
+
+
+## Кусок дальнего плана. Свет здания на него не падает.
+##
+## Маска гасится на каждой панели, а не на общем узле: [member CanvasItem.light_mask]
+## детям не передаётся, и город в окне разгорался вместе с этажом — окно читалось
+## как освещённая ниша, а не как улица.
+func _add_city_panel(rect: Rect2, color: Color) -> void:
+	var panel := _panel(rect.size, rect.position, color)
+	panel.light_mask = 0
+	_city.add_child(panel)
+
+
+## Столб света в шахте на всю её высоту.
+##
+## Шахта — единственное, что светится в погашенном здании само: она соединяет
+## этажи, и свет в ней показывает, куда идти, когда лампы сбиты. Гасить её вместе
+## с этажом нельзя — этажей у шахты много, а столб один.
+func _light_shaft(shaft: BuildingPlan.ShaftSpot) -> void:
+	var top := rules.story_top(shaft.top)
+	var bottom := rules.floor_surface(shaft.bottom)
+	var area := Rect2(shaft.x - rules.shaft_width * 0.5, top, rules.shaft_width, bottom - top)
+	var light := AreaLight.column(area, SHAFT_LIGHT, SHAFT_ENERGY)
+	add_child(light)
+	_shaft_lights.append(light)
+
+
+## Зажигает здание: общий тон и заливка на каждом этаже.
+##
+## Светлым этаж делает собственный источник, а не отсутствие темноты — вся
+## конструкция вехи держится на этом (ADR-0010, пункт 3).
+func _light_building() -> void:
+	var ambient := CanvasModulate.new()
+	ambient.color = AMBIENT
+	add_child(ambient)
+
+	for index: int in rules.floors:
+		var light := AreaLight.covering(_story_area(index), FLOOR_LIGHT, FLOOR_ENERGY)
+		add_child(light)
+		_floor_lights.append(light)
+
+
+## Пролёт этажа: от потолка до низа настила, на котором стоят.
+##
+## Настил включён нарочно: кончайся заливка ровно по полу, сам пол и ноги
+## стоящего на нём остались бы неосвещёнными.
+##
+## У крыши потолка нет, и лампы на ней тоже нет — вешать её там не на что.
+## Поэтому крыше полоса отмеряется вверх от настила: светит ей город, и
+## погасить этот свет нельзя.
+func _story_area(index: int) -> Rect2:
+	var surface := rules.floor_surface(index)
+	var top := surface - rules.floor_height if index <= 0 else rules.story_top(index)
+	return Rect2(0.0, top, rules.width, surface + rules.slab_height - top)
+
+
+## Перекрытия и стены не пропускают свет: иначе лампа светила бы сквозь пол
+## на соседние этажи, и погашенный этаж подсвечивался бы снизу.
+func _occluder(size: Vector2) -> LightOccluder2D:
+	var half := size * 0.5
+	var shape := OccluderPolygon2D.new()
+	shape.polygon = PackedVector2Array(
+		[-half, Vector2(half.x, -half.y), half, Vector2(-half.x, half.y)]
+	)
+
+	var occluder := LightOccluder2D.new()
+	occluder.occluder = shape
+	return occluder
 
 
 ## Цветной прямоугольник — временная замена спрайтам до M7.

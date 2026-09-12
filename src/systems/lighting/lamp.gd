@@ -22,9 +22,19 @@ signal fell
 const LIT_COLOR := Color(0.95, 0.90, 0.55)
 const FALLING_COLOR := Color(0.72, 0.66, 0.38)
 
+## Пятно света под лампой: радиус, цвет и сила.
+##
+## Свет — ребёнок лампы, поэтому падает вместе с ней и гаснет, когда её
+## убирают с пола. Этаж при этом гасит не он, а заливка (ADR-0010, пункт 3):
+## лампа светит собой, а «на этаже есть свет» — это отдельный источник.
+const LIGHT_RADIUS: float = 96.0
+const LIGHT_COLOR := Color(1.0, 0.93, 0.72)
+const LIGHT_ENERGY: float = 1.1
+
 @export var fall_speed: float = 260.0
 
 var _fall := LampFall.new()
+var _light: PointLight2D = null
 
 @onready var _crush_zone: Area2D = $CrushZone
 @onready var _visual: ColorRect = $Visual
@@ -34,6 +44,8 @@ var _fall := LampFall.new()
 func _ready() -> void:
 	_fall.speed = fall_speed
 	_visual.color = LIT_COLOR
+	_light = _make_light()
+	add_child(_light)
 
 
 func _physics_process(delta: float) -> void:
@@ -66,6 +78,25 @@ func shoot_down() -> void:
 	if not _fall.start():
 		return
 	_visual.color = FALLING_COLOR
+
+
+## Гасит или зажигает пятно лампы. Зовёт уровень, отбирая видимые этажи:
+## пятно кладёт тени и стоит дороже заливки, поэтому за кадром ему гореть
+## незачем (ADR-0010, пункт 8). Сама лампа при этом остаётся как была.
+func set_light_visible(on: bool) -> void:
+	_light.visible = on
+
+
+## Пятно под лампой. Тени включены: свет упирается в перекрытия и в стены
+## шахты, и именно это показывает, что светит лампа, а не воздух.
+func _make_light() -> PointLight2D:
+	var light := PointLight2D.new()
+	light.texture = LightTextures.spot()
+	light.color = LIGHT_COLOR
+	light.energy = LIGHT_ENERGY
+	light.shadow_enabled = true
+	light.scale = Vector2.ONE * (LIGHT_RADIUS * 2.0 / float(LightTextures.SIZE))
+	return light
 
 
 func _crush_agents() -> void:
