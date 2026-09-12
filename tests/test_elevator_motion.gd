@@ -126,6 +126,9 @@ func test_velocity_reports_real_movement() -> void:
 	var motion := _shaft(0)
 	motion.update(STEP, ElevatorMotion.DOWN, true)
 	assert_almost_eq(motion.velocity, 100.0, 0.5)
+
+	# Отъезжаем подальше: рядом с этажом кабина сама дотянет до него.
+	_run(motion, 0.4, ElevatorMotion.DOWN, true)
 	motion.update(STEP, 0.0, true)
 	assert_true(motion.is_stopped())
 

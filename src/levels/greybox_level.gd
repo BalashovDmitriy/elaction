@@ -25,9 +25,6 @@ const LAMP_SCENE := preload("res://src/systems/lighting/lamp.tscn")
 
 const WALL_WIDTH: float = 16.0
 
-## Проём шахты равен ширине кабины, чтобы по краям не оставалось щелей.
-const SHAFT_WIDTH: float = 40.0
-
 ## Дно шахты: сюда падает тот, кто шагнул в пустой проём.
 const PIT_HEIGHT: float = 20.0
 
@@ -54,6 +51,10 @@ const OTTO_RESPAWN_DELAY: float = 1.2
 ## Сид здания. Им служит номер здания: раскладка меняется от здания к зданию.
 @export var building_seed: int = 1
 
+## Выпускать ли агентов из дверей. Выключается в тестах проходимости: они
+## проверяют, что здание проходится, а не что бой выигрывается.
+@export var spawn_agents: bool = true
+
 var _plan: BuildingPlan
 var _doors: Array[Door] = []
 ## Обычные двери: из них выходят агенты. Красные документов не стерегут.
@@ -62,6 +63,7 @@ var _cars: Array[ElevatorCar] = []
 var _lighting := FloorLighting.new()
 ## Здание сдано. Событие однократное: по нему main собирает следующее здание.
 var _cleared: bool = false
+var _exit_position := Vector2.ZERO
 
 @onready var otto: Otto = $Otto
 @onready var _background: ColorRect = $Background
@@ -87,33 +89,40 @@ func _ready() -> void:
 	if GameState.instance().alarm.raised:
 		# Здание заведено уже при включённой сирене — редкость, но бывает.
 		_on_alarm_raised()
-	for door in _agent_doors:
-		_release_agent(door)
+	if spawn_agents:
+		for door in _agent_doors:
+			_release_agent(door)
 	otto.apply_camera_bounds(Rect2(0.0, 0.0, rules.width, rules.total_height()))
+
+
+## Раскладка, по которой собрано здание.
+func plan() -> BuildingPlan:
+	return _plan
+
+
+## Двери здания: по ним видно, какие красные ещё не собраны.
+func doors() -> Array[Door]:
+	return _doors
+
+
+## Где стоит выход из здания.
+func exit_position() -> Vector2:
+	return _exit_position
 
 
 ## Режет перекрытие на куски между проёмами.
 ##
-## Проёмы принимаются в любом порядке и сортируются здесь же. Порядок важен:
-## по несортированному списку куски накладываются друг на друга и перекрытие
-## выходит сплошным — проёма как не бывало.
+## Сам разрез — в [method BuildingPlan.spans_between]: по тем же кускам строится
+## граф достижимости, и второй такой же счёт рано или поздно разъехался бы с этим.
+## Проёмы принимаются в любом порядке.
 ##
 ## Статический, чтобы проверяться тестами без сцены.
 static func slab_segments(
 	surface: float, gaps: Array[Vector2], width: float, thickness: float
 ) -> Array[Rect2]:
-	var ordered := gaps.duplicate()
-	ordered.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
-
 	var rects: Array[Rect2] = []
-	var cursor := 0.0
-	for gap in ordered:
-		if gap.x > cursor:
-			rects.append(Rect2(cursor, surface, gap.x - cursor, thickness))
-		# maxf, чтобы вложенный проём не отматывал курсор назад.
-		cursor = maxf(cursor, gap.y)
-	if cursor < width:
-		rects.append(Rect2(cursor, surface, width - cursor, thickness))
+	for span in BuildingPlan.spans_between(gaps, width):
+		rects.append(Rect2(span.x, surface, span.y - span.x, thickness))
 	return rects
 
 
@@ -124,25 +133,9 @@ func _build_geometry() -> void:
 
 	for index in rules.floors:
 		var surface := rules.floor_surface(index)
-		for rect in slab_segments(surface, _gaps_for(index), rules.width, rules.slab_height):
+		var gaps := _plan.gaps_on(rules, index)
+		for rect in slab_segments(surface, gaps, rules.width, rules.slab_height):
 			_build_solid(rect)
-
-
-## Проёмы в перекрытии этажа: пары «левый край, правый край».
-func _gaps_for(index: int) -> Array[Vector2]:
-	var gaps: Array[Vector2] = []
-
-	for shaft in _plan.shafts:
-		# Кабина проходит сквозь перекрытия своей полосы, кроме нижнего: там она
-		# встаёт на пол, и он же служит дном шахты.
-		if index >= shaft.top and index < shaft.bottom:
-			gaps.append(Vector2(shaft.x - SHAFT_WIDTH * 0.5, shaft.x + SHAFT_WIDTH * 0.5))
-
-	for escalator in _plan.escalators:
-		if index == escalator.floor_index:
-			gaps.append(escalator.gap(rules))
-
-	return gaps
 
 
 func _spawn_shafts() -> void:
@@ -168,7 +161,7 @@ func _spawn_shaft_pit(shaft: BuildingPlan.ShaftSpot) -> void:
 	pit.position = Vector2(shaft.x, surface - PIT_HEIGHT * 0.5)
 
 	var shape := RectangleShape2D.new()
-	shape.size = Vector2(SHAFT_WIDTH, PIT_HEIGHT)
+	shape.size = Vector2(rules.shaft_width, PIT_HEIGHT)
 	var collision := CollisionShape2D.new()
 	collision.shape = shape
 	pit.add_child(collision)
@@ -245,6 +238,7 @@ func _spawn_exit() -> void:
 
 	zone.body_entered.connect(_on_exit_entered)
 	add_child(zone)
+	_exit_position = zone.global_position
 
 
 func _on_exit_entered(body: Node2D) -> void:
@@ -301,12 +295,19 @@ func _cover_with_darkness(index: int) -> void:
 	add_child(shade)
 
 
-func _agents_on(index: int) -> Array[Enemy]:
+## Все агенты здания: они лежат прямо в уровне, рядом с геометрией.
+func _agents() -> Array[Enemy]:
 	var found: Array[Enemy] = []
 	for child in get_children():
 		var agent := child as Enemy
-		if agent == null:
-			continue
+		if agent != null:
+			found.append(agent)
+	return found
+
+
+func _agents_on(index: int) -> Array[Enemy]:
+	var found: Array[Enemy] = []
+	for agent in _agents():
 		if rules.floor_index_near(agent.global_position.y) == index:
 			found.append(agent)
 	return found
@@ -325,22 +326,19 @@ func _release_agent(door: Door) -> void:
 
 
 ## Насколько злее агенты этого здания прямо сейчас: к росту от здания к зданию
-## добавляется тревога, если она уже включилась.
+## добавляется тревога, если она уже включилась. Сам счёт — в [BuildingRules],
+## там же общий на обе надбавки потолок.
 func _menace() -> float:
 	var alarmed := GameState.instance().alarm.raised
-	# Нижняя граница та же, что у [method Enemy.set_menace]: на это число делится
-	# задержка смены агента, и ноль из инспектора оставил бы дверь запертой навсегда.
-	return maxf(rules.agent_menace, 0.1) * (ALARM_MENACE if alarmed else 1.0)
+	return rules.menace_with(ALARM_MENACE if alarmed else 1.0)
 
 
 ## Сирена: агенты злеют, кабины начинают отвечать с задержкой.
 func _on_alarm_raised() -> void:
 	for car in _cars:
 		car.set_response_delay(ALARM_CAR_DELAY)
-	for child in get_children():
-		var agent := child as Enemy
-		if agent != null:
-			agent.set_menace(_menace())
+	for agent in _agents():
+		agent.set_menace(_menace())
 
 
 func _on_agent_died(_agent: Enemy, door: Door) -> void:

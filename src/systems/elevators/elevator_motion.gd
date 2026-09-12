@@ -32,7 +32,17 @@ var floor_pause: float = 1.5
 ##
 ## Единственное решение вехи, не подтверждённое сверкой (ADR-0004, пункт 6).
 ## При [code]false[/code] кабина доезжает до ближайшего этажа по ходу движения.
+##
+## И там, и там кабина дотягивает до этажа, к которому уже подошла ближе
+## [member settle_distance]: иначе с промежуточного этажа не сойти.
 var stops_between_floors: bool = true
+
+## Насколько близко к этажу кабина сама дотягивает, отпущенная, px.
+##
+## Без доводки выйти можно было только на краях шахты: «совпала с этажом» —
+## это полпикселя, а кабина проходит их за долю кадра, и попасть в такое окно
+## вручную нельзя. Промежуточные этажи были недостижимы.
+var settle_distance: float = 12.0
 
 ## Текущая координата кабины.
 var position: float = 0.0
@@ -104,6 +114,16 @@ func is_stopped() -> bool:
 	return is_zero_approx(velocity)
 
 
+## Забыть, сколько команда уже держится: ожидание считается заново.
+##
+## Нужно, когда [member response_delay] меняется на ходу — по тревоге. Otto
+## держит «вниз» всю поездку, счётчик к этому времени давно перевалил за новую
+## задержку, и начатая до сирены поездка доезжала бы по-старому: наказание
+## догоняло бы только следующее нажатие.
+func forget_command() -> void:
+	_held = 0.0
+
+
 func _drive(delta: float, command: float) -> void:
 	# Пассажиру кабина подчиняется без пауз, но держит счётчик полным: как только
 	# он выйдет, она постоит на месте, как любая пустая (ADR-0004, пункт 4).
@@ -120,7 +140,18 @@ func _drive(delta: float, command: float) -> void:
 
 	# Команда отпущена.
 	_held = 0.0
-	if stops_between_floors or is_aligned() or direction == 0.0:
+	if is_aligned() or direction == 0.0:
+		direction = 0.0
+		return
+
+	var nearest := _nearest_floor()
+	if absf(nearest - position) <= settle_distance:
+		# Остановились почти на этаже — дотягиваем, иначе с него не сойти.
+		if _move_towards(nearest, delta):
+			direction = 0.0
+		return
+
+	if stops_between_floors:
 		direction = 0.0
 		return
 
@@ -160,6 +191,15 @@ func _move_towards(target: float, delta: float) -> bool:
 		return true
 	position += signf(gap) * step
 	return false
+
+
+## Ближайший этаж, в любую сторону.
+func _nearest_floor() -> float:
+	var best := floors[0]
+	for stop: float in floors:
+		if absf(stop - position) < absf(best - position):
+			best = stop
+	return best
 
 
 ## Дальняя граница шахты по направлению движения.

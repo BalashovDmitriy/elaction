@@ -7,7 +7,10 @@ extends SceneTree
 ##
 ## Запуск:
 ##     godot --headless --script res://tools/dump_plan.gd -- 1
-## где 1 — сид здания.
+##     godot --headless --script res://tools/dump_plan.gd -- 3 --floors=4 --span=2
+##
+## Первое число — сид. Размеры здания можно переопределить: так смотрят те же
+## маленькие здания, на которых гоняются тесты прохождения.
 
 
 func _init() -> void:
@@ -18,6 +21,13 @@ func _init() -> void:
 			break
 
 	var rules := BuildingRules.new()
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--floors="):
+			rules.floors = argument.trim_prefix("--floors=").to_int()
+		elif argument.begins_with("--documents="):
+			rules.documents = argument.trim_prefix("--documents=").to_int()
+		elif argument.begins_with("--span="):
+			rules.shaft_span = argument.trim_prefix("--span=").to_int()
 	var plan := BuildingPlan.generate(rules, building_seed)
 
 	print("Здание по сиду %d: %d этажей" % [building_seed, plan.floors])
