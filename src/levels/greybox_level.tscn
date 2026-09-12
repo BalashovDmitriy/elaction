@@ -7,10 +7,10 @@
 script = ExtResource("1_level")
 
 [node name="Background" type="ColorRect" parent="."]
-z_index = -10
+z_index = -12
 offset_right = 1280.0
 offset_bottom = 360.0
 mouse_filter = 2
-color = Color(0.08, 0.09, 0.12, 1)
+color = Color(0.07, 0.08, 0.14, 1)
 
 [node name="Otto" parent="." instance=ExtResource("2_otto")]

@@ -1,0 +1,31 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Shader" path="res://src/ui/vignette.gdshader" id="1_vignette"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_vignette"]
+shader = ExtResource("1_vignette")
+
+[sub_resource type="Environment" id="Environment_glow"]
+background_mode = 4
+glow_enabled = true
+glow_intensity = 0.55
+glow_strength = 1.0
+glow_bloom = 0.05
+glow_blend_mode = 1
+glow_hdr_threshold = 0.82
+glow_hdr_scale = 2.0
+
+[node name="Postprocess" type="Node"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_glow")
+
+[node name="Screen" type="CanvasLayer" parent="."]
+layer = 2
+
+[node name="Vignette" type="ColorRect" parent="Screen"]
+material = SubResource("ShaderMaterial_vignette")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
