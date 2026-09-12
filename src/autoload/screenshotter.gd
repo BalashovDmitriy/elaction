@@ -81,6 +81,13 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "walking", "actions": ["move_right"], "hold": 1.5},
 		{"label": "settled", "actions": [], "hold": 1.5},
 	],
+	"M5B":
+	[
+		{"label": "playing", "actions": [], "hold": 0.8},
+		{"label": "paused", "actions": ["pause"], "hold": 0.6},
+		{"label": "still_paused", "actions": [], "hold": 0.4},
+		{"label": "resumed", "actions": ["pause"], "hold": 0.6},
+	],
 }
 const DEFAULT_PLAN := "M1"
 

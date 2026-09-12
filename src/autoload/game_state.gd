@@ -18,6 +18,12 @@ signal lives_changed(value: int)
 ## Жизни кончились. Партия окончена.
 signal game_over
 
+## Otto вошёл в новое здание.
+signal building_changed(number: int)
+
+## Провозились: агенты злеют, кабина отвечает с задержкой (ADR-0009).
+signal alarm_raised
+
 ## Таблица очков оригинала (ADR-0005, пункт 1 и ADR-0006, пункт 5).
 const DOCUMENT_SCORE: int = 500
 const ENEMY_SHOT_SCORE: int = 100
@@ -31,12 +37,22 @@ const DARK_KILL_MULTIPLIER: int = 2
 ## Жизней на партию — три, как в оригинале (ADR-0006, пункт 4).
 const STARTING_LIVES: int = 3
 
+## Бонус за сданное здание: 1000 × его номер. Источники расходятся, взят
+## вариант с множителем — ADR-0008, пункт 5. Не сверено.
+const BUILDING_BONUS: int = 1000
+
 static var _instance: GameState = null
 
 var score: int = 0
 var lives: int = STARTING_LIVES
 var documents_collected: int = 0
 var documents_total: int = 0
+## Номер здания, он же сид его раскладки.
+var building: int = 1
+var alarm := Alarm.new()
+
+## Идёт ли партия. На паузе и после Game Over время не тикает.
+var _running: bool = false
 
 
 ## Состояние партии. До входа автолоада в дерево — null.
@@ -55,9 +71,34 @@ func _enter_tree() -> void:
 		_instance = self
 
 
+func _process(delta: float) -> void:
+	if not _running:
+		return
+	if alarm.tick(delta):
+		alarm_raised.emit()
+
+
 func _exit_tree() -> void:
 	if _instance == self:
 		_instance = null
+
+
+## Начинает партию заново: счёт, жизни, первое здание.
+func start_game() -> void:
+	reset()
+	building = 1
+	_running = true
+	alarm.enter_building()
+	building_changed.emit(building)
+
+
+## Здание сдано: бонус за него и переход к следующему. Тревога снимается
+## только здесь — смерть её не снимала и не снимет.
+func finish_building() -> void:
+	add_score(BUILDING_BONUS * building)
+	building += 1
+	alarm.enter_building()
+	building_changed.emit(building)
 
 
 ## Начинает партию в здании с известным числом красных дверей.
@@ -96,6 +137,7 @@ func lose_life() -> bool:
 	lives_changed.emit(lives)
 	if lives > 0:
 		return true
+	_running = false
 	game_over.emit()
 	return false
 

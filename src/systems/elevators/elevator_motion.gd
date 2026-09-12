@@ -44,7 +44,12 @@ var direction: float = 0.0
 ## не намерение кабины, а то, сдвинулась ли она на самом деле.
 var velocity: float = 0.0
 
+## Задержка отклика на команду, с. По тревоге кабина слушается хуже, и это
+## прямо описано в оригинале (ADR-0009, пункт 1).
+var response_delay: float = 0.0
+
 var _pause_left: float = 0.0
+var _held: float = 0.0
 
 
 ## Задаёт остановки и ставит кабину на один из этажей.
@@ -101,11 +106,16 @@ func _drive(delta: float, command: float) -> void:
 	_pause_left = floor_pause
 
 	if absf(command) > COMMAND_THRESHOLD:
+		_held += delta
+		if _held < response_delay:
+			# Кабина ещё «думает»: команду слышит, но не трогается.
+			return
 		direction = signf(command)
 		_move_towards(_shaft_limit(direction), delta)
 		return
 
 	# Команда отпущена.
+	_held = 0.0
 	if stops_between_floors or is_aligned() or direction == 0.0:
 		direction = 0.0
 		return

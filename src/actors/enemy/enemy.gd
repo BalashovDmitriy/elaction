@@ -43,6 +43,8 @@ var _brain := EnemyBrain.new()
 var _target: Otto = null
 var _corpse_left: float = 0.0
 var _in_the_dark: bool = false
+## Насколько агент злее обычного: 1 — как в первом здании, больше — злее.
+var _menace: float = 1.0
 
 @onready var _body: ColorRect = $Body
 @onready var _floor_probe: RayCast2D = $FloorProbe
@@ -90,6 +92,12 @@ func set_in_the_dark(value: bool) -> void:
 	_refresh_fire_range()
 
 
+## Насколько агент злее обычного. Растёт от здания к зданию и по тревоге.
+func set_menace(value: float) -> void:
+	_menace = maxf(value, 0.1)
+	_refresh_fire_range()
+
+
 ## Стоит ли агент в темноте. По этому признаку считается надбавка за убийство.
 func is_in_the_dark() -> bool:
 	return _in_the_dark
@@ -131,7 +139,9 @@ func _floor_ahead() -> bool:
 ## чтобы порядок вызовов [method _ready] и [method set_in_the_dark] ничего не
 ## решал — иначе настроенный до [method Node.add_child] агент прозревал бы обратно.
 func _refresh_fire_range() -> void:
-	_brain.fire_range = dark_fire_range if _in_the_dark else fire_range
+	var base := dark_fire_range if _in_the_dark else fire_range
+	_brain.fire_range = base * _menace
+	_brain.fire_cooldown = fire_cooldown / _menace
 
 
 func _apply_gravity(delta: float) -> void:

@@ -55,6 +55,11 @@ func setup(stops: PackedFloat32Array, start_floor: int = 0) -> void:
 	_aligned_floor = _motion.aligned_floor()
 
 
+## Задержка отклика на команду, с. По тревоге кабина слушается хуже.
+func set_response_delay(value: float) -> void:
+	_motion.response_delay = maxf(value, 0.0)
+
+
 ## Команда от пассажира на этот кадр: -1 вверх, +1 вниз, 0 отпущено.
 ##
 ## Кабина её принимает, но выполняет только от того, кто внутри.

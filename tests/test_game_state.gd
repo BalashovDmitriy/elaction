@@ -96,3 +96,31 @@ func test_kill_in_the_light_costs_its_face_value() -> void:
 func test_kill_in_the_dark_is_worth_more() -> void:
 	var dark := GameState.kill_score(GameState.ENEMY_SHOT_SCORE, true)
 	assert_eq(dark, GameState.ENEMY_SHOT_SCORE * GameState.DARK_KILL_MULTIPLIER)
+
+
+func test_game_starts_in_the_first_building() -> void:
+	var game := _state()
+	game.start_game()
+	assert_eq(game.building, 1)
+	assert_eq(game.lives, GameState.STARTING_LIVES)
+
+
+func test_finished_building_pays_by_its_number() -> void:
+	var game := _state()
+	game.start_game()
+	game.finish_building()
+	assert_eq(game.score, GameState.BUILDING_BONUS, "первое здание — одна ставка")
+	game.finish_building()
+	assert_eq(game.score, GameState.BUILDING_BONUS * 3, "второе — двойная")
+
+
+func test_new_building_takes_the_alarm_off() -> void:
+	var game := _state()
+	game.start_game()
+	# Лимит меняется до того, как заводится отсчёт: иначе он останется прежним.
+	game.alarm.time_limit = 0.0
+	game.alarm.enter_building()
+	game.alarm.tick(0.1)
+	assert_true(game.alarm.raised)
+	game.finish_building()
+	assert_false(game.alarm.raised)
