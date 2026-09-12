@@ -22,6 +22,11 @@ signal game_over
 const DOCUMENT_SCORE: int = 500
 const ENEMY_SHOT_SCORE: int = 100
 const ENEMY_KICK_SCORE: int = 150
+const LAMP_SCORE: int = 300
+
+## Во сколько раз дороже убийство на погашенном этаже. Надбавка в оригинале
+## есть, но её размер не называет ни один источник — ADR-0007, пункт 5.
+const DARK_KILL_MULTIPLIER: int = 2
 
 ## Жизней на партию — три, как в оригинале (ADR-0006, пункт 4).
 const STARTING_LIVES: int = 3
@@ -37,6 +42,11 @@ var documents_total: int = 0
 ## Состояние партии. До входа автолоада в дерево — null.
 static func instance() -> GameState:
 	return _instance
+
+
+## Очки за убитого агента с учётом того, темно ли там, где его достали.
+static func kill_score(base: int, in_the_dark: bool) -> int:
+	return base * DARK_KILL_MULTIPLIER if in_the_dark else base
 
 
 func _enter_tree() -> void:

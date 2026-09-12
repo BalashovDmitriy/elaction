@@ -181,11 +181,13 @@ func leave_door() -> void:
 ## Otto встал на эскалатор: до конца поездки ввод игрока не действует.
 func board_escalator() -> void:
 	_states.ride()
+	_repose()
 
 
 ## Эскалатор довёз и вернул управление.
 func leave_escalator() -> void:
 	_states.stop_riding()
+	_repose()
 
 
 ## Otto вошёл в кабину и теперь ею управляет.
@@ -239,7 +241,7 @@ func _fire() -> void:
 	var bullet := BULLET_SCENE.instantiate() as Bullet
 	bullet.direction = _facing
 	bullet.speed = bullet_speed
-	bullet.collision_mask = Bullet.HITS_ENEMIES
+	bullet.collision_mask = Bullet.FROM_OTTO
 	bullet.hit_target.connect(_on_bullet_hit)
 	# Счётчик ведёт сам ствол: пуля кончается и попаданием, и на дальности.
 	bullet.tree_exited.connect(_gun.bullet_spent)
@@ -249,11 +251,22 @@ func _fire() -> void:
 
 
 func _on_bullet_hit(target: Node2D) -> void:
+	# Пуля не разбирает, во что попала, — разбирает стрелявший.
+	var lamp := target as Lamp
+	if lamp != null:
+		lamp.shoot_down()
+		return
+
 	var agent := target as Enemy
 	if agent == null or agent.is_dead():
 		return
 	agent.take_bullet()
-	GameState.instance().add_score(GameState.ENEMY_SHOT_SCORE)
+	_award_for(agent, GameState.ENEMY_SHOT_SCORE)
+
+
+## Начисляет очки за убитого агента: в темноте они дороже.
+func _award_for(agent: Enemy, base: int) -> void:
+	GameState.instance().add_score(GameState.kill_score(base, agent.is_in_the_dark()))
 
 
 ## Бьёт ногой всех, кого задел в полёте.
@@ -263,7 +276,7 @@ func _kick_enemies() -> void:
 		if agent == null or agent.is_dead():
 			continue
 		agent.kill()
-		GameState.instance().add_score(GameState.ENEMY_KICK_SCORE)
+		_award_for(agent, GameState.ENEMY_KICK_SCORE)
 
 
 ## Есть ли над головой место, чтобы выпрямиться из приседа.
@@ -313,10 +326,12 @@ func _apply_pose(state: OttoStateMachine.State) -> void:
 	_posed_state = state
 
 	var crouching := state == OttoStateMachine.State.CROUCH
-	# За дверью Otto не только не виден, но и не задевается: он в комнате.
+	# За дверью Otto нет вовсе, на эскалаторе он на виду — но достать нельзя
+	# ни там, ни там: «neither kill nor be killed» (ADR-0007, пункт 7).
 	var hidden := state == OttoStateMachine.State.INDOORS
-	_standing_shape.set_deferred("disabled", hidden or crouching)
-	_crouching_shape.set_deferred("disabled", hidden or not crouching)
+	var untouchable := hidden or state == OttoStateMachine.State.RIDE
+	_standing_shape.set_deferred("disabled", untouchable or crouching)
+	_crouching_shape.set_deferred("disabled", untouchable or not crouching)
 	_body.visible = not hidden
 
 	# Размер и посадку коробки берём из самой формы коллизии, чтобы вид и

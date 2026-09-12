@@ -16,6 +16,7 @@ const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 const ESCALATOR_SCENE := preload("res://src/systems/escalators/escalator.tscn")
 const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
+const LAMP_SCENE := preload("res://src/systems/lighting/lamp.tscn")
 
 ## Поверхности этажей сверху вниз. По ним же кабина выбирает остановки.
 const FLOOR_SURFACES: Array[float] = [100.0, 220.0, 340.0]
@@ -51,6 +52,23 @@ const DOORS: Array[Dictionary] = [
 	{"floor": 2, "x": 1000.0, "document": false},
 ]
 
+## Лампы этажей: номер этажа и x. Шахту лампой не загораживаем: кабина ходит
+## в полосе SHAFT_LEFT..SHAFT_LEFT + SHAFT_WIDTH и проезжала бы сквозь подвес.
+const LAMPS: Array[Dictionary] = [
+	{"floor": 0, "x": 420.0},
+	{"floor": 1, "x": 850.0},
+	{"floor": 2, "x": 760.0},
+]
+
+## На сколько выше пола висит середина лампы, px. Стоя в лампу не попасть:
+## выстрел стоя идёт в 20 px над полом, а низ подвеса — в 48. Свою высоту и путь
+## до пола лампа знает сама — см. [method Lamp.hang].
+const LAMP_HANG_HEIGHT: float = 60.0
+
+## Чем накрывается погашенный этаж до настоящего света в M6.
+const DARKNESS_COLOR := Color(0.02, 0.02, 0.05, 0.72)
+const DARKNESS_Z: int = 20
+
 ## Сколько дверь ждёт, прежде чем выпустить следующего агента, с.
 const AGENT_RESPAWN_DELAY: float = 3.0
 
@@ -70,6 +88,7 @@ const EXIT_HEIGHT: float = 40.0
 var _doors: Array[Door] = []
 ## Обычные двери: из них выходят агенты. Красные документов не стерегут.
 var _agent_doors: Array[Door] = []
+var _lighting := FloorLighting.new()
 ## Здание сдано. Otto может зайти в зону выхода снова, но событие однократное:
 ## в M5 к нему прицепится переход к следующему зданию.
 var _cleared: bool = false
@@ -85,6 +104,7 @@ func _ready() -> void:
 	_spawn_escalator()
 	_spawn_doors()
 	_spawn_exit()
+	_spawn_lamps()
 	otto.died.connect(_on_otto_died)
 	for door in _agent_doors:
 		_release_agent(door)
@@ -209,12 +229,7 @@ func _spawn_exit() -> void:
 	collision.shape = shape
 	zone.add_child(collision)
 
-	var visual := ColorRect.new()
-	visual.color = EXIT_COLOR
-	visual.size = area.size
-	visual.position = -area.size * 0.5
-	visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	zone.add_child(visual)
+	zone.add_child(_panel(EXIT_COLOR, area.size, -area.size * 0.5))
 
 	zone.z_index = -1
 	zone.body_entered.connect(_on_exit_entered)
@@ -236,15 +251,74 @@ func _on_exit_entered(body: Node2D) -> void:
 	_send_back_for_documents.call_deferred(runner)
 
 
-## Этаж, на котором Otto погиб: ближайшая по вертикали поверхность.
-##
-## Статический, чтобы проверяться тестами без сцены.
-static func floor_surface_near(y: float, surfaces: Array[float]) -> float:
-	var best := surfaces[0]
-	for surface in surfaces:
-		if absf(surface - y) < absf(best - y):
-			best = surface
+## Номер этажа, к которому ближе всего точка. Статический — чтобы проверяться
+## тестами без сцены.
+static func floor_index_near(y: float, surfaces: Array[float]) -> int:
+	var best := 0
+	for index: int in surfaces.size():
+		if absf(surfaces[index] - y) < absf(surfaces[best] - y):
+			best = index
 	return best
+
+
+## Этаж, на котором Otto погиб: ближайшая по вертикали поверхность.
+static func floor_surface_near(y: float, surfaces: Array[float]) -> float:
+	return surfaces[floor_index_near(y, surfaces)]
+
+
+## Потолок этажа: низ перекрытия сверху, а у верхнего — край уровня.
+static func story_top(index: int, surfaces: Array[float]) -> float:
+	return 0.0 if index == 0 else surfaces[index - 1] + SLAB_HEIGHT
+
+
+func _spawn_lamps() -> void:
+	for entry: Dictionary in LAMPS:
+		var index: int = entry["floor"]
+		var lamp := LAMP_SCENE.instantiate() as Lamp
+		lamp.position = Vector2(entry["x"], FLOOR_SURFACES[index] - LAMP_HANG_HEIGHT)
+		lamp.crushed.connect(_on_lamp_crushed)
+		# Этаж лампы известен здесь, и обратно из координаты его выводить незачем:
+		# упавшая лампа стоит на полу, но подвес мог бы висеть и ближе к чужому.
+		lamp.fell.connect(_on_lamp_fell.bind(index))
+		add_child(lamp)
+		lamp.hang(LAMP_HANG_HEIGHT)
+
+
+## Лампа накрыла агента по дороге вниз — самый дорогой способ убийства.
+func _on_lamp_crushed(agent: Enemy) -> void:
+	if agent.is_dead():
+		return
+	agent.kill()
+	var points := GameState.kill_score(GameState.LAMP_SCORE, agent.is_in_the_dark())
+	GameState.instance().add_score(points)
+
+
+## Лампа долетела до пола: этаж гаснет и обратно уже не загорается.
+func _on_lamp_fell(index: int) -> void:
+	if not _lighting.darken(index):
+		return
+	_cover_with_darkness(index)
+	for agent in _agents_on(index):
+		agent.set_in_the_dark(true)
+
+
+func _cover_with_darkness(index: int) -> void:
+	var top := story_top(index, FLOOR_SURFACES)
+	var height := FLOOR_SURFACES[index] + SLAB_HEIGHT - top
+	var shade := _panel(DARKNESS_COLOR, Vector2(LEVEL_WIDTH, height), Vector2(0.0, top))
+	shade.z_index = DARKNESS_Z
+	add_child(shade)
+
+
+func _agents_on(index: int) -> Array[Enemy]:
+	var found: Array[Enemy] = []
+	for child in get_children():
+		var agent := child as Enemy
+		if agent == null:
+			continue
+		if floor_index_near(agent.global_position.y, FLOOR_SURFACES) == index:
+			found.append(agent)
+	return found
 
 
 ## Выпускает агента из двери.
@@ -254,6 +328,7 @@ func _release_agent(door: Door) -> void:
 	add_child(agent)
 	agent.global_position = mat
 	agent.setup(otto, signf(otto.global_position.x - mat.x))
+	agent.set_in_the_dark(_lighting.is_dark(floor_index_near(mat.y, FLOOR_SURFACES)))
 	agent.died.connect(_on_agent_died.bind(door))
 
 
@@ -313,11 +388,16 @@ func _build_solid(rect: Rect2) -> void:
 	collision.shape = shape
 	body.add_child(collision)
 
-	var visual := ColorRect.new()
-	visual.color = SOLID_COLOR
-	visual.size = rect.size
-	visual.position = -rect.size * 0.5
-	visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	body.add_child(visual)
-
+	body.add_child(_panel(SOLID_COLOR, rect.size, -rect.size * 0.5))
 	add_child(body)
+
+
+## Цветной прямоугольник грейбокса: перекрытие, зона выхода, тёмная полоса.
+## Мышь он не ловит — иначе перекрыл бы собой всё, что под ним.
+static func _panel(color: Color, size: Vector2, offset: Vector2) -> ColorRect:
+	var rect := ColorRect.new()
+	rect.color = color
+	rect.size = size
+	rect.position = offset
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return rect

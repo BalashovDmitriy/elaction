@@ -35,9 +35,14 @@ const DEAD_COLOR := Color(0.38, 0.20, 0.20)
 @export var fire_range: float = 200.0
 @export var fire_cooldown: float = 1.1
 
+## Дальность стрельбы на погашенном этаже: в темноте агент замечает Otto только
+## вблизи. Это не слепота, а меньше огня — ADR-0007, пункт 4.
+@export var dark_fire_range: float = 60.0
+
 var _brain := EnemyBrain.new()
 var _target: Otto = null
 var _corpse_left: float = 0.0
+var _in_the_dark: bool = false
 
 @onready var _body: ColorRect = $Body
 @onready var _floor_probe: RayCast2D = $FloorProbe
@@ -46,8 +51,8 @@ var _corpse_left: float = 0.0
 func _ready() -> void:
 	_brain.emerge_time = emerge_time
 	_brain.same_line = same_line
-	_brain.fire_range = fire_range
 	_brain.fire_cooldown = fire_cooldown
+	_refresh_fire_range()
 
 
 func _physics_process(delta: float) -> void:
@@ -77,6 +82,17 @@ func _physics_process(delta: float) -> void:
 func setup(target: Otto, towards: float) -> void:
 	_target = target
 	_brain.start(towards)
+
+
+## Сообщает агенту, что его этаж погас или снова освещён.
+func set_in_the_dark(value: bool) -> void:
+	_in_the_dark = value
+	_refresh_fire_range()
+
+
+## Стоит ли агент в темноте. По этому признаку считается надбавка за убийство.
+func is_in_the_dark() -> bool:
+	return _in_the_dark
 
 
 ## Попадание пули. Кто стрелял, тот и получает очки — это решает он сам.
@@ -111,6 +127,13 @@ func _floor_ahead() -> bool:
 	return _floor_probe.is_colliding()
 
 
+## Дальность стрельбы: на погашенном этаже она короче. Считается в одном месте,
+## чтобы порядок вызовов [method _ready] и [method set_in_the_dark] ничего не
+## решал — иначе настроенный до [method Node.add_child] агент прозревал бы обратно.
+func _refresh_fire_range() -> void:
+	_brain.fire_range = dark_fire_range if _in_the_dark else fire_range
+
+
 func _apply_gravity(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y = minf(velocity.y + gravity * delta, max_fall_speed)
@@ -127,7 +150,7 @@ func _fire() -> void:
 	var bullet := BULLET_SCENE.instantiate() as Bullet
 	bullet.direction = _brain.facing
 	bullet.speed = bullet_speed
-	bullet.collision_mask = Bullet.HITS_PLAYER
+	bullet.collision_mask = Bullet.FROM_ENEMY
 	bullet.hit_target.connect(_on_bullet_hit)
 	get_parent().add_child(bullet)
 	bullet.global_position = global_position + Vector2(_brain.facing * muzzle_offset, shot_height)
