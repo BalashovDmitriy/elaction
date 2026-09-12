@@ -31,11 +31,6 @@ const SHAFT_WIDTH: float = 40.0
 ## Дно шахты: сюда падает тот, кто шагнул в пустой проём.
 const PIT_HEIGHT: float = 20.0
 
-## Проём под эскалатор и то, как он разложен от верхней площадки.
-const ESCALATOR_GAP_WIDTH: float = 60.0
-const ESCALATOR_GAP_OFFSET: float = 16.0
-const ESCALATOR_RUN: float = 96.0
-
 ## На сколько выше пола висит середина лампы, px.
 const LAMP_HANG_HEIGHT: float = 60.0
 
@@ -135,11 +130,8 @@ func _gaps_for(index: int) -> Array[Vector2]:
 			gaps.append(Vector2(shaft.x - SHAFT_WIDTH * 0.5, shaft.x + SHAFT_WIDTH * 0.5))
 
 	for escalator in _plan.escalators:
-		if index != escalator.floor_index:
-			continue
-		var near := escalator.x + escalator.towards * ESCALATOR_GAP_OFFSET
-		var far := near + escalator.towards * ESCALATOR_GAP_WIDTH
-		gaps.append(Vector2(minf(near, far), maxf(near, far)))
+		if index == escalator.floor_index:
+			gaps.append(escalator.gap(rules))
 
 	return gaps
 
@@ -181,13 +173,11 @@ func _spawn_escalators() -> void:
 		escalator.position = Vector2(spot.x, rules.floor_surface(spot.floor_index))
 		add_child(escalator)
 
-		var descent := Vector2(spot.towards * ESCALATOR_RUN, rules.floor_height)
+		var descent := Vector2(spot.towards * rules.escalator_run, rules.floor_height)
 		# Перегиб — в самом проёме: через него идут и полотно, и поездка, поэтому
 		# пассажир проходит сквозь дыру, а не сквозь плиту.
-		var bend := Vector2(
-			spot.towards * (ESCALATOR_GAP_OFFSET + ESCALATOR_GAP_WIDTH * 0.5),
-			rules.slab_height + 4.0
-		)
+		var gap := spot.gap(rules)
+		var bend := Vector2((gap.x + gap.y) * 0.5 - spot.x, rules.slab_height + 4.0)
 		escalator.setup(descent, bend)
 
 
@@ -227,7 +217,7 @@ func _spawn_lamps() -> void:
 func _spawn_exit() -> void:
 	var bottom := rules.floors - 1
 	var surface := rules.floor_surface(bottom)
-	var centre := _plan.safe_x(rules, bottom)
+	var centre := _plan.exit_x
 	var area := Rect2(centre - EXIT_WIDTH * 0.5, surface - EXIT_HEIGHT, EXIT_WIDTH, EXIT_HEIGHT)
 
 	var zone := Area2D.new()

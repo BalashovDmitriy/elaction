@@ -31,6 +31,15 @@ class EscalatorSpot:
 	## Куда спускается полотно: -1 влево, +1 вправо.
 	var towards: float = -1.0
 
+	## Проём в перекрытии под полотном: пара «левый край, правый край».
+	##
+	## Дыра не под площадкой, а сбоку от неё, по ходу спуска. Считается здесь,
+	## чтобы уровень и [method BuildingPlan.safe_x] видели один и тот же проём.
+	func gap(rules: BuildingRules) -> Vector2:
+		var near := x + towards * rules.escalator_gap_offset
+		var far := near + towards * rules.escalator_gap_width
+		return Vector2(minf(near, far), maxf(near, far))
+
 
 class DoorSpot:
 	extends RefCounted
@@ -50,6 +59,8 @@ var shafts: Array[ShaftSpot] = []
 var escalators: Array[EscalatorSpot] = []
 var doors: Array[DoorSpot] = []
 var lamps: Array[LampSpot] = []
+## Где на нижнем этаже стоит выход из здания.
+var exit_x: float = 0.0
 
 
 ## Собирает здание по правилам и сиду.
@@ -65,6 +76,7 @@ static func generate(rules: BuildingRules, seed_value: int) -> BuildingPlan:
 	var taken: Dictionary = {}
 	plan._lay_shafts(rules, rng, taken)
 	plan._lay_escalators(rules, rng, taken)
+	plan._lay_exit(rules, rng, taken)
 	plan._lay_doors(rules, rng, taken)
 	plan._lay_lamps(rules, rng, taken)
 	return plan
@@ -80,37 +92,53 @@ func document_floors() -> Array[int]:
 	return found
 
 
-## Место на этаже, где нет ни шахты, ни эскалатора: там можно стоять, не провалившись.
+## Место на этаже, где можно стоять, не провалившись и ни во что не упёршись.
 ##
-## Нужно тем, кого ставят на этаж снаружи раскладки: Otto на старте и после смерти,
-## выход из здания. Двери и лампы дыр в полу не делают и потому не мешают.
+## Нужно тем, кого ставят на этаж снаружи раскладки: Otto на старте и после смерти.
+## Двери и лампы дыр в полу не делают и потому не мешают, а выход — мешает: воскреснув
+## на нём, Otto вышел бы из здания, не сделав ни шага.
 func safe_x(rules: BuildingRules, floor_index: int) -> float:
-	var busy: Dictionary = {}
-	for shaft in shafts:
-		if floor_index >= shaft.top and floor_index <= shaft.bottom:
-			busy[shaft.x] = true
-	for escalator in escalators:
-		if floor_index == escalator.floor_index or floor_index == escalator.floor_index + 1:
-			busy[escalator.x] = true
-
 	for slot in rules.slots:
 		var x := rules.slot_x(slot)
-		if not busy.has(x):
+		if _is_clear(rules, floor_index, x):
 			return x
 	return rules.slot_x(0)
+
+
+func _is_clear(rules: BuildingRules, floor_index: int, x: float) -> bool:
+	if floor_index == floors - 1 and is_equal_approx(x, exit_x):
+		return false
+
+	for shaft in shafts:
+		if floor_index >= shaft.top and floor_index <= shaft.bottom and is_equal_approx(x, shaft.x):
+			return false
+
+	for escalator in escalators:
+		if floor_index != escalator.floor_index:
+			continue
+		if is_equal_approx(x, escalator.x):
+			return false
+		# Дыра под полотном сбоку от площадки, и провалиться можно именно в неё.
+		var gap := escalator.gap(rules)
+		if x >= gap.x and x <= gap.y:
+			return false
+
+	return true
 
 
 func _lay_shafts(rules: BuildingRules, rng: RandomNumberGenerator, taken: Dictionary) -> void:
 	var top := 0
 	var previous_slot := -1
+	# Не меньше этажа на шахту: нулевой span зациклил бы генерацию намертво.
+	var span := maxi(rules.shaft_span, 1)
 	while top < floors:
 		var shaft := ShaftSpot.new()
 		shaft.top = top
-		shaft.bottom = mini(top + rules.shaft_span - 1, floors - 1)
+		shaft.bottom = mini(top + span - 1, floors - 1)
 
 		# Соседние шахты не должны стоять в одном столбце: иначе спуск свёлся бы
 		# к «зажать вниз», а переход между полосами — весь смысл здания.
-		var slot := _pick_slot(rng, rules.slots, [previous_slot])
+		var slot := _pick_slot(rng, rules.slots, [previous_slot] as Array[int])
 		shaft.x = rules.slot_x(slot)
 		for index in range(shaft.top, shaft.bottom + 1):
 			_occupy(taken, index, slot)
@@ -124,40 +152,109 @@ func _lay_escalators(rules: BuildingRules, rng: RandomNumberGenerator, taken: Di
 	# Эскалатор нужен на стыке полос: с нижнего этажа шахты лифт дальше не идёт.
 	for index in shafts.size() - 1:
 		var upper := shafts[index].bottom
-		var slot := _free_slot(rng, rules.slots, taken, [upper, upper + 1])
-		if slot < 0:
+		var from_x := shafts[index].x
+		var free := _free_slots(rules.slots, taken, [upper, upper + 1] as Array[int])
+		if free.is_empty():
+			# Молча пропустить нельзя: без эскалатора полоса ниже недостижима.
+			push_error("этаж %d остался без эскалатора: свободных мест нет" % upper)
 			continue
 
+		var slot := _pick_escalator_slot(rules, rng, free, from_x)
 		var escalator := EscalatorSpot.new()
 		escalator.floor_index = upper
 		escalator.x = rules.slot_x(slot)
-		escalator.towards = -1.0 if slot > 0 else 1.0
+		escalator.towards = _descent_towards(rules, slot, from_x)
 		_occupy(taken, upper, slot)
 		_occupy(taken, upper + 1, slot)
 		escalators.append(escalator)
 
 
+## Место под эскалатор: из свободных берутся те, где площадка встаёт между шахтой
+## и проёмом. У стены полотно уводить некуда, и там проём ложится Otto под ноги на
+## полпути от лифта — такие места отбрасываем, пока есть из чего выбрать.
+func _pick_escalator_slot(
+	rules: BuildingRules, rng: RandomNumberGenerator, free: Array[int], from_x: float
+) -> int:
+	var fitting: Array[int] = []
+	for slot in free:
+		if is_equal_approx(_descent_towards(rules, slot, from_x), _away_from(rules, slot, from_x)):
+			fitting.append(slot)
+
+	var pool := free if fitting.is_empty() else fitting
+	return pool[rng.randi_range(0, pool.size() - 1)]
+
+
+## Куда проём должен смотреть: прочь от шахты, из которой Otto приходит.
+static func _away_from(rules: BuildingRules, slot: int, comes_from_x: float) -> float:
+	return 1.0 if rules.slot_x(slot) > comes_from_x else -1.0
+
+
+## Куда спускается полотно на самом деле. Это [method _away_from], если только
+## место не у стены: оттуда спуск возможен лишь внутрь здания.
+static func _descent_towards(rules: BuildingRules, slot: int, comes_from_x: float) -> float:
+	if slot <= 0:
+		return 1.0
+	if slot >= rules.slots - 1:
+		return -1.0
+	return _away_from(rules, slot, comes_from_x)
+
+
+## Выход из здания: своё место на нижнем этаже, чтобы на нём не оказались ни дверь,
+## ни лампа, ни точка возврата после смерти — иначе Otto выходил бы, едва воскреснув.
+func _lay_exit(rules: BuildingRules, rng: RandomNumberGenerator, taken: Dictionary) -> void:
+	var bottom := floors - 1
+	var slot := _free_slot(rng, rules.slots, taken, [bottom] as Array[int])
+	if slot < 0:
+		push_error("нижнему этажу не хватило места под выход")
+		slot = rules.slots - 1
+	exit_x = rules.slot_x(slot)
+	_occupy(taken, bottom, slot)
+
+
 func _lay_doors(rules: BuildingRules, rng: RandomNumberGenerator, taken: Dictionary) -> void:
 	var with_document := _document_floors(rules, rng)
+
+	# Красные кладутся первыми: на почти пустом этаже место им найдётся всегда.
+	# Иначе последняя дверь могла не поместиться, и здание оказалось бы молча
+	# с четырьмя документами вместо пяти — собрать его стало бы нельзя.
+	for index: int in with_document:
+		if not _lay_door(rules, rng, taken, index, true):
+			push_error("этаж %d остался без красной двери: свободных мест нет" % index)
+
 	for index in floors:
-		for number in rules.doors_per_floor:
-			var slot := _free_slot(rng, rules.slots, taken, [index])
-			if slot < 0:
+		var already := 1 if with_document.has(index) else 0
+		for _number in rules.doors_per_floor - already:
+			if not _lay_door(rules, rng, taken, index, false):
 				break
 
-			var door := DoorSpot.new()
-			door.floor_index = index
-			door.x = rules.slot_x(slot)
-			# Красная дверь на этаже одна: первая из его дверей.
-			door.has_document = number == 0 and with_document.has(index)
-			_occupy(taken, index, slot)
-			doors.append(door)
+
+## Ставит дверь на свободное место этажа. Возвращает false, если места не нашлось.
+func _lay_door(
+	rules: BuildingRules,
+	rng: RandomNumberGenerator,
+	taken: Dictionary,
+	floor_index: int,
+	with_document: bool
+) -> bool:
+	var slot := _free_slot(rng, rules.slots, taken, [floor_index] as Array[int])
+	if slot < 0:
+		return false
+
+	var door := DoorSpot.new()
+	door.floor_index = floor_index
+	door.x = rules.slot_x(slot)
+	door.has_document = with_document
+	_occupy(taken, floor_index, slot)
+	doors.append(door)
+	return true
 
 
 func _lay_lamps(rules: BuildingRules, rng: RandomNumberGenerator, taken: Dictionary) -> void:
-	for index in floors:
+	# С нулевого этажа лампу вешать не на что: крыша — верхний край здания,
+	# и подвес висел бы в небе над ним.
+	for index in range(1, floors):
 		for _number in rules.lamps_per_floor:
-			var slot := _free_slot(rng, rules.slots, taken, [index])
+			var slot := _free_slot(rng, rules.slots, taken, [index] as Array[int])
 			if slot < 0:
 				break
 
@@ -184,7 +281,7 @@ func _document_floors(rules: BuildingRules, rng: RandomNumberGenerator) -> Dicti
 	return chosen
 
 
-func _pick_slot(rng: RandomNumberGenerator, slots: int, avoid: Array) -> int:
+func _pick_slot(rng: RandomNumberGenerator, slots: int, avoid: Array[int]) -> int:
 	var slot := rng.randi_range(0, slots - 1)
 	if slots <= 1 or not avoid.has(slot):
 		return slot
@@ -192,20 +289,27 @@ func _pick_slot(rng: RandomNumberGenerator, slots: int, avoid: Array) -> int:
 
 
 ## Свободное место сразу на всех перечисленных этажах или -1.
-func _free_slot(rng: RandomNumberGenerator, slots: int, taken: Dictionary, on_floors: Array) -> int:
+func _free_slot(
+	rng: RandomNumberGenerator, slots: int, taken: Dictionary, on_floors: Array[int]
+) -> int:
+	var free := _free_slots(slots, taken, on_floors)
+	if free.is_empty():
+		return -1
+	return free[rng.randi_range(0, free.size() - 1)]
+
+
+## Все места, свободные сразу на всех перечисленных этажах.
+func _free_slots(slots: int, taken: Dictionary, on_floors: Array[int]) -> Array[int]:
 	var free: Array[int] = []
 	for slot in slots:
 		var busy := false
-		for index: int in on_floors:
+		for index in on_floors:
 			if _is_taken(taken, index, slot):
 				busy = true
 				break
 		if not busy:
 			free.append(slot)
-
-	if free.is_empty():
-		return -1
-	return free[rng.randi_range(0, free.size() - 1)]
+	return free
 
 
 func _occupy(taken: Dictionary, floor_index: int, slot: int) -> void:

@@ -12,7 +12,7 @@ extends Node2D
 ## начинается с того места, где пассажир стоял: иначе его дёргало бы к центру
 ## площадки, а полотно резало бы перекрытие мимо проёма (найдено авторевью M2).
 
-## Ниже этого порога наклон стика считается покоем.
+## Сколько секунд занимает поездка между площадками.
 @export var travel_time: float = 1.1
 
 var _passenger: Otto = null
@@ -64,9 +64,13 @@ func _try_board(pad: Area2D, target: Area2D, towards: float) -> bool:
 
 
 ## Путь поездки: от места, где пассажир стоял, через перегиб к дальней площадке.
+##
+## Перегиб берётся из полотна, поэтому едут ровно там, где нарисовано. Без
+## [method setup] полотна нет — тогда путь прямой, лишь бы не падать по индексу.
 func _route_from(start: Vector2, target: Area2D) -> PackedVector2Array:
-	var bend := _ramp.points[1] + global_position
-	return PackedVector2Array([start, bend, target.global_position])
+	if _ramp.points.size() < 3:
+		return PackedVector2Array([start, target.global_position])
+	return PackedVector2Array([start, to_global(_ramp.points[1]), target.global_position])
 
 
 func _carry(delta: float) -> void:

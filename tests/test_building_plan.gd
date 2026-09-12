@@ -101,10 +101,67 @@ func test_nothing_shares_a_place_on_a_floor() -> void:
 	for escalator in plan.escalators:
 		_claim(busy, escalator.floor_index, escalator.x)
 		_claim(busy, escalator.floor_index + 1, escalator.x)
+	_claim(busy, plan.floors - 1, plan.exit_x)
 	for door in plan.doors:
 		_claim(busy, door.floor_index, door.x)
 	for lamp in plan.lamps:
 		_claim(busy, lamp.floor_index, lamp.x)
+
+
+## Проём эскалатора лежит сбоку от площадки, и подойти к ней надо, не перейдя его.
+## Иначе Otto, идущий от лифта, проваливается на этаж ниже мимо эскалатора.
+func test_escalator_pad_shields_its_gap_from_the_shaft() -> void:
+	var rules := _rules()
+	for building_seed in range(1, 12):
+		var plan := BuildingPlan.generate(rules, building_seed)
+		for escalator in plan.escalators:
+			var from_x := _shaft_x_on(plan, escalator.floor_index)
+			var gap := escalator.gap(rules)
+			var near := minf(from_x, escalator.x)
+			var far := maxf(from_x, escalator.x)
+			assert_false(
+				near < gap.y and gap.x < far,
+				(
+					"сид %d, этаж %d: дыра между лифтом и площадкой"
+					% [building_seed, escalator.floor_index]
+				)
+			)
+
+
+## На месте возврата нельзя ставить выход: иначе Otto выходил бы из здания,
+## едва воскреснув, — а с последним документом это ещё и сдавало бы здание само.
+func test_otto_does_not_come_back_to_life_inside_the_exit() -> void:
+	var rules := _rules()
+	for building_seed in range(1, 12):
+		var plan := BuildingPlan.generate(rules, building_seed)
+		assert_ne(plan.safe_x(rules, plan.floors - 1), plan.exit_x, "сид %d" % building_seed)
+
+
+## Место возврата не должно попадать в проём: провалиться сразу после смерти — не то.
+func test_safe_spot_never_hangs_over_a_hole() -> void:
+	var rules := _rules()
+	var plan := BuildingPlan.generate(rules, 12)
+	for index in plan.floors:
+		var x := plan.safe_x(rules, index)
+		for escalator in plan.escalators:
+			if escalator.floor_index != index:
+				continue
+			var gap := escalator.gap(rules)
+			assert_false(x >= gap.x and x <= gap.y, "этаж %d стоит над проёмом" % index)
+
+
+## Крыша — верхний край здания, вешать лампу там не на что: она висела бы в небе.
+func test_no_lamp_hangs_over_the_roof() -> void:
+	var plan := BuildingPlan.generate(_rules(), 13)
+	for lamp in plan.lamps:
+		assert_gt(lamp.floor_index, 0, "на крыше нет потолка")
+
+
+func _shaft_x_on(plan: BuildingPlan, floor_index: int) -> float:
+	for shaft in plan.shafts:
+		if floor_index >= shaft.top and floor_index <= shaft.bottom:
+			return shaft.x
+	return 0.0
 
 
 func _claim(busy: Dictionary, floor_index: int, x: float) -> void:

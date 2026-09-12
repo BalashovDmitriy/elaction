@@ -15,6 +15,7 @@ func _init() -> void:
 	for argument in OS.get_cmdline_user_args():
 		if argument.is_valid_int():
 			building_seed = argument.to_int()
+			break
 
 	var rules := BuildingRules.new()
 	var plan := BuildingPlan.generate(rules, building_seed)
@@ -24,11 +25,15 @@ func _init() -> void:
 	for shaft in plan.shafts:
 		print("  %2d..%2d  x=%.0f" % [shaft.top, shaft.bottom, shaft.x])
 
-	print("\nЭскалаторы (с этажа, x, куда спускается):")
+	print("\nЭскалаторы (с этажа, x, куда спускается, проём):")
 	for escalator in plan.escalators:
-		print("  %2d  x=%.0f  %s" % [escalator.floor_index, escalator.x, escalator.towards])
+		var gap := escalator.gap(rules)
+		var side := "вправо" if escalator.towards > 0.0 else "влево"
+		var mark := [escalator.floor_index, escalator.x, side, gap.x, gap.y]
+		print("  %2d  x=%.0f  %s  проём %.0f..%.0f" % mark)
 
 	print("\nДокументы на этажах: %s" % str(plan.document_floors()))
+	print("Выход: x=%.0f" % plan.exit_x)
 	print("Дверей: %d, ламп: %d" % [plan.doors.size(), plan.lamps.size()])
 
 	quit()
