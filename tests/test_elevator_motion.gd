@@ -93,6 +93,14 @@ func test_empty_car_travels_by_itself() -> void:
 	assert_almost_eq(_run(motion, 2.5, 0.0, false), MIDDLE, 0.01)
 
 
+func test_car_left_by_passenger_waits_before_moving_on() -> void:
+	var motion := _shaft(0)
+	_run(motion, 0.5, 0.0, true)
+	# Пассажир вышел на этаже: кабина сначала стоит паузу, как любая пустая.
+	assert_almost_eq(_run(motion, 0.8, 0.0, false), TOP, 0.01)
+	assert_gt(_run(motion, 0.8, 0.0, false), TOP, "отстояв паузу, кабина поехала сама")
+
+
 func test_empty_car_pauses_at_the_floor() -> void:
 	var motion := _shaft(0)
 	_run(motion, 2.5, 0.0, false)

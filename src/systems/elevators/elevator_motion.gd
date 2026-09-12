@@ -96,7 +96,9 @@ func is_stopped() -> bool:
 
 
 func _drive(delta: float, command: float) -> void:
-	_pause_left = 0.0
+	# Пассажиру кабина подчиняется без пауз, но держит счётчик полным: как только
+	# он выйдет, она постоит на месте, как любая пустая (ADR-0004, пункт 4).
+	_pause_left = floor_pause
 
 	if absf(command) > COMMAND_THRESHOLD:
 		direction = signf(command)

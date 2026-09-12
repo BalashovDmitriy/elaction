@@ -35,6 +35,8 @@ var _posed_state := OttoStateMachine.State.IDLE
 var _car: ElevatorCar = null
 ## Разница высот стоячей и сидячей формы: столько места нужно над головой.
 var _headroom: float = 0.0
+## Верхняя точка текущего полёта: от неё считается глубина падения.
+var _apex_y: float = 0.0
 
 @onready var _standing_shape: CollisionShape2D = $StandingShape
 @onready var _crouching_shape: CollisionShape2D = $CrouchingShape
@@ -46,13 +48,14 @@ func _ready() -> void:
 	var standing := (_standing_shape.shape as RectangleShape2D).size.y
 	var crouching := (_crouching_shape.shape as RectangleShape2D).size.y
 	_headroom = standing - crouching
+	_apex_y = global_position.y
 
 
 func _physics_process(delta: float) -> void:
 	_snapshot.read_actions()
 	if _car != null:
 		# В кабине «вверх/вниз» ведут её, а присесть внутри нельзя.
-		_car.drive(_snapshot.vertical)
+		_car.drive(vertical_intent())
 		_snapshot.crouch = false
 
 	var state := _states.update(_snapshot, is_on_floor(), velocity.y, _can_stand_up())
@@ -60,6 +63,8 @@ func _physics_process(delta: float) -> void:
 	# Пока везёт эскалатор, физика молчит: координатой распоряжается он.
 	if state == OttoStateMachine.State.RIDE:
 		velocity = Vector2.ZERO
+		# Эскалатор несёт, а не роняет: падение с его высоты не копится.
+		_apex_y = global_position.y
 		_apply_pose(state)
 		return
 
@@ -73,6 +78,7 @@ func _physics_process(delta: float) -> void:
 		velocity.y = minf(velocity.y + gravity * delta, max_fall_speed)
 
 	move_and_slide()
+	_track_fall()
 	_apply_pose(_states.state)
 
 
@@ -83,8 +89,21 @@ func kill() -> void:
 
 ## Намерение по вертикали за последний кадр. По нему кабина и эскалатор
 ## понимают, куда их просят, не читая [Input] сами.
+##
+## Мёртвый не просит ничего: иначе он продолжал бы вести кабину и мог бы сесть
+## на эскалатор, а [constant OttoStateMachine.State.DEAD] — состояние конечное.
 func vertical_intent() -> float:
-	return _snapshot.vertical
+	return 0.0 if _states.is_dead() else _snapshot.vertical
+
+
+## Сколько Otto уже пролетел вниз от верхней точки полёта, px. На опоре — ноль.
+func fall_height() -> float:
+	return maxf(global_position.y - _apex_y, 0.0)
+
+
+## На сколько поднимает прыжок: v² / (2 · g). Падение глубже — уже не свой прыжок.
+func jump_height() -> float:
+	return jump_speed * jump_speed / (2.0 * gravity)
 
 
 ## Otto встал на эскалатор: до конца поездки ввод игрока не действует.
@@ -151,8 +170,16 @@ func _can_stand_up() -> bool:
 	return not test_move(global_transform, Vector2(0.0, -_headroom))
 
 
+## Запоминает верхнюю точку полёта: на опоре она сбрасывается, в воздухе ползёт вверх.
+func _track_fall() -> void:
+	_apex_y = global_position.y if is_on_floor() else minf(_apex_y, global_position.y)
+
+
 func _horizontal_speed(input: OttoInput, state: OttoStateMachine.State) -> float:
 	if state == OttoStateMachine.State.DEAD:
+		return 0.0
+	# Пол кабины не совпал с полом этажа — выходить некуда (ADR-0004, пункт 6).
+	if _car != null and not _car.is_aligned():
 		return 0.0
 	if state == OttoStateMachine.State.CROUCH and not can_move_while_crouching:
 		return 0.0

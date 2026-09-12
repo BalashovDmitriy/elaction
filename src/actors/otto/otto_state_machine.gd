@@ -29,7 +29,12 @@ func reset() -> void:
 
 
 ## Отдаёт Otto эскалатору: пока тот его не отпустит, ввод игрока не действует.
+##
+## Мёртвого эскалатор не поднимает: из [constant State.DEAD] выводит только
+## [method reset], иначе поездка воскрешала бы Otto.
 func ride() -> void:
+	if state == State.DEAD:
+		return
 	previous_state = state
 	state = State.RIDE
 

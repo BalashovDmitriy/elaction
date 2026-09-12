@@ -34,3 +34,10 @@ func test_stop_riding_does_nothing_when_not_riding() -> void:
 	machine.update(_snapshot(0.0, true), true, 0.0)
 	machine.stop_riding()
 	assert_eq(machine.state, OttoStateMachine.State.CROUCH)
+
+
+func test_escalator_does_not_revive_the_dead() -> void:
+	var machine := OttoStateMachine.new()
+	machine.kill()
+	machine.ride()
+	assert_eq(machine.state, OttoStateMachine.State.DEAD, "из DEAD выводит только reset")

@@ -42,11 +42,6 @@ func setup(descent: Vector2) -> void:
 	_ramp.points = PackedVector2Array([Vector2.ZERO, descent])
 
 
-## Везёт ли эскалатор кого-нибудь прямо сейчас.
-func is_busy() -> bool:
-	return _passenger != null
-
-
 func _try_board(pad: Area2D, target: Area2D, towards: float) -> bool:
 	for body: Node2D in pad.get_overlapping_bodies():
 		var rider := body as Otto

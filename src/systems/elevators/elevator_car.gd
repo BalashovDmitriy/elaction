@@ -62,15 +62,6 @@ func drive(command: float) -> void:
 	_command = command
 
 
-func is_occupied() -> bool:
-	return _occupant != null
-
-
-## Скорость кабины за последний кадр, px/с: больше нуля — едет вниз.
-func motion_speed() -> float:
-	return _motion.velocity
-
-
 ## Совпал ли пол кабины с полом этажа.
 func is_aligned() -> bool:
 	return _motion.is_aligned()

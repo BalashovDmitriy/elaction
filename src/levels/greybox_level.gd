@@ -135,7 +135,10 @@ func _on_pit_entered(body: Node2D) -> void:
 	var victim := body as Otto
 	if victim == null:
 		return
-	if ShaftHazards.is_deadly_fall(victim.is_grounded(), victim.is_riding()):
+	var deadly := ShaftHazards.is_deadly_fall(
+		victim.is_grounded(), victim.is_riding(), victim.fall_height(), victim.jump_height()
+	)
+	if deadly:
 		victim.kill()
 
 

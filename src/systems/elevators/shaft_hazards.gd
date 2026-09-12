@@ -9,10 +9,15 @@ extends RefCounted
 
 ## Смертельно ли попадание на дно шахты.
 ##
-## Упасть в открытый проём — смерть; войти на этаж ногами — нет. Различает их
-## факт опоры: падающий до дна не касается пола, вошедший — касается.
-static func is_deadly_fall(grounded: bool, riding: bool) -> bool:
-	return not grounded and not riding
+## Упасть в открытый проём — смерть; войти на этаж ногами или приехать в кабине —
+## нет. Одного факта опоры мало: нижний этаж сплошной, и собственный прыжок над
+## шахтой приземляется в ту же зону уже в воздухе. Поэтому смотрим и на глубину:
+## своим прыжком Otto поднимается на [param survivable_height], значит всё, что
+## глубже, — падение с этажа выше.
+static func is_deadly_fall(
+	grounded: bool, riding: bool, fall_height: float, survivable_height: float
+) -> bool:
+	return not grounded and not riding and fall_height > survivable_height
 
 
 ## Раздавит ли кабина того, кто попал ей под днище.
