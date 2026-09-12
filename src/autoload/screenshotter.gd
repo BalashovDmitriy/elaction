@@ -3,8 +3,8 @@ extends Node
 ## Снимки экрана для последующего анализа и оптимизации.
 ##
 ## Ручной режим: F12 сохраняет текущий кадр в `screens/manual/`.
-## Автоматический: запуск игры с аргументом `-- --capture=M1` прогоняет короткий
-## сценарий, сохраняет по кадру на каждый шаг и закрывает игру. Так снимки
+## Автоматический: запуск игры с аргументом `-- --capture=M2` прогоняет короткий
+## сценарий вехи, сохраняет по кадру на каждый шаг и закрывает игру. Так снимки
 ## снимаются после каждой играбельной вехи — см. tools/capture.py.
 ##
 ## Снимки пишутся в JPEG рядом с проектом: `screens/<веха>/<время>_<шаг>.jpg`.
@@ -14,17 +14,42 @@ const JPEG_QUALITY: float = 0.9
 const CAPTURE_ARG_PREFIX := "--capture="
 const MANUAL_FOLDER := "manual"
 
-## Шаги автоматического прогона: какие действия удерживать и сколько секунд.
+## Шаги автоматического прогона по вехам: что удерживать и сколько секунд.
 ##
-## Выдержки завязаны на время полёта Otto (2 · jump_speed / gravity ≈ 0.85 с):
-## «jump» снимается около вершины, а «crouch» — уже после приземления. Меняете
-## прыжок — пересчитайте и их, иначе кадр поймает не то состояние.
-const AUTO_PLAN: Array[Dictionary] = [
-	{"label": "idle", "actions": [], "hold": 0.7},
-	{"label": "walk", "actions": ["move_right"], "hold": 0.9},
-	{"label": "jump", "actions": ["move_right", "jump"], "hold": 0.42},
-	{"label": "crouch", "actions": ["move_down"], "hold": 0.9},
-]
+## План выбирается аргументом --capture=<веха>; для незнакомой берётся план M1.
+##
+## Выдержки M1 завязаны на время полёта Otto (2 · jump_speed / gravity ≈ 0.85 с):
+## «jump» снимается около вершины, а «crouch» — уже после приземления.
+##
+## Выдержки M2 намеренно не требуют точности: «ride_down» держит спуск дольше,
+## чем нужно на три этажа, и кабина упирается в низ шахты. Так кадр не зависит
+## от того, за сколько именно она едет.
+##
+## Гибели в сценарии нет намеренно. Упасть на дно шахты можно только со среднего
+## этажа и только пока кабина выше: где она окажется к этому моменту, зависит от
+## её расписания, а оно сдвигается от любой правки пауз. Такой шаг молча снимал бы
+## не то, что обещает подпись. Падение и сдавливание проверяются отдельным
+## прогоном вручную — как это делается, описано в docs/STATUS.md.
+const AUTO_PLANS: Dictionary = {
+	"M1":
+	[
+		{"label": "idle", "actions": [], "hold": 0.7},
+		{"label": "walk", "actions": ["move_right"], "hold": 0.9},
+		{"label": "jump", "actions": ["move_right", "jump"], "hold": 0.42},
+		{"label": "crouch", "actions": ["move_down"], "hold": 0.9},
+	],
+	"M2":
+	[
+		{"label": "floor_top", "actions": [], "hold": 0.4},
+		{"label": "in_car", "actions": ["move_right"], "hold": 0.55},
+		{"label": "ride_down", "actions": ["move_down"], "hold": 4.5},
+		{"label": "floor_bottom", "actions": [], "hold": 0.4},
+		{"label": "left_car", "actions": ["move_right"], "hold": 0.7},
+		{"label": "to_escalator", "actions": ["move_left", "move_up"], "hold": 3.4},
+		{"label": "middle_floor", "actions": [], "hold": 1.0},
+	],
+}
+const DEFAULT_PLAN := "M1"
 
 var _milestone: String = MANUAL_FOLDER
 
@@ -83,7 +108,8 @@ func _run_auto_plan() -> void:
 	# Даём сцене собраться и уровню построить геометрию.
 	await tree.process_frame
 
-	for step in AUTO_PLAN:
+	var plan: Array = AUTO_PLANS.get(_milestone, AUTO_PLANS[DEFAULT_PLAN])
+	for step: Dictionary in plan:
 		var actions: Array = step.get("actions", [])
 		for action: String in actions:
 			Input.action_press(action)

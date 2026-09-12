@@ -68,6 +68,13 @@ screenshot={
 "events": [Object(InputEventKey,"device":-1,"physical_keycode":4194343)]
 }
 
+[layer_names]
+
+; Слой 1 — геометрия здания и кабины, слой 2 — актёры. Маски в сценах и в коде
+; заданы числами; имена нужны, чтобы в инспекторе было видно, что именно выбрано.
+2d_physics/layer_1="geometry"
+2d_physics/layer_2="actors"
+
 [rendering]
 
 renderer/rendering_method="forward_plus"

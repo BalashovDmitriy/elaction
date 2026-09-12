@@ -16,6 +16,14 @@ from godot_bin import require_godot, run, use_utf8_output
 GUT_CMDLN = "addons/gut/gut_cmdln.gd"
 SUCCESS_MARKER = "All tests passed"
 
+# Скрипт, не прошедший разбор, молча выпадает из прогона: GUT считает тесты
+# остальных файлов и рапортует об успехе. Поэтому ищем следы поломки отдельно.
+BROKEN_SCRIPT_MARKERS = (
+    "Parse Error",
+    "Failed to load script",
+    "SCRIPT ERROR",
+)
+
 
 def main() -> int:
     use_utf8_output()
@@ -26,6 +34,12 @@ def main() -> int:
 
     if code != 0:
         print(f"\nТесты провалены (код возврата {code}).")
+        return 1
+
+    broken = [marker for marker in BROKEN_SCRIPT_MARKERS if marker in output]
+    if broken:
+        print(f"\nВ выводе есть {', '.join(broken)} — какой-то скрипт не разобрался.")
+        print("Такой файл выпадает из прогона незаметно, поэтому это провал.")
         return 1
 
     # GUT возвращает 0 и когда тесты не нашлись, поэтому сверяемся с итогом.

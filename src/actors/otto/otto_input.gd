@@ -9,6 +9,12 @@ extends RefCounted
 ## Направление по горизонтали: -1 влево, +1 вправо, 0 стоим.
 var move: float = 0.0
 
+## Направление по вертикали: -1 вверх, +1 вниз, 0 покой.
+##
+## На этаже «вниз» — это присед, в шахте — команда кабине. Разводит эти два
+## смысла тот, кто знает контекст: сам снимок про лифты не знает.
+var vertical: float = 0.0
+
 ## Удерживается ли приседание.
 var crouch: bool = false
 
@@ -22,5 +28,6 @@ var jump_pressed: bool = false
 ## выделять по объекту на каждый физический кадр.
 func read_actions() -> void:
 	move = Input.get_axis("move_left", "move_right")
+	vertical = Input.get_axis("move_up", "move_down")
 	crouch = Input.is_action_pressed("move_down")
 	jump_pressed = Input.is_action_just_pressed("jump")

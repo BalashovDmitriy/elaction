@@ -2,7 +2,7 @@ extends Node2D
 
 ## Точка входа проекта.
 ##
-## На этапе M1 грузит greybox-уровень и показывает отладочный оверлей
+## На этапе M2 грузит greybox-уровень и показывает отладочный оверлей
 ## с состоянием Otto. Настоящий игровой цикл и меню появятся в M5 и M8.
 
 @onready var _level: GreyboxLevel = $GreyboxLevel
@@ -22,12 +22,13 @@ func _debug_text() -> String:
 	var otto := _level.otto
 	var motion := otto.motion()
 	return (
-		"состояние: %s\nскорость: %.0f / %.0f\nна полу: %s\nFPS: %d"
+		"состояние: %s\nскорость: %.0f / %.0f\nна полу: %s\nв кабине: %s\nFPS: %d"
 		% [
 			OttoStateMachine.state_name(otto.current_state()),
 			motion.x,
 			motion.y,
 			"да" if otto.is_grounded() else "нет",
+			"да" if otto.is_riding() else "нет",
 			Engine.get_frames_per_second(),
 		]
 	)
