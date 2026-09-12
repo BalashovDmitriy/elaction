@@ -14,7 +14,6 @@ const STATE_COLORS: Dictionary = {
 	OttoStateMachine.State.JUMP: Color(0.60, 0.85, 0.95),
 	OttoStateMachine.State.FALL: Color(0.45, 0.65, 0.85),
 	OttoStateMachine.State.RIDE: Color(0.55, 0.80, 0.60),
-	OttoStateMachine.State.INDOORS: Color(0.40, 0.40, 0.45),
 	OttoStateMachine.State.DEAD: Color(0.75, 0.25, 0.25),
 }
 
@@ -89,13 +88,15 @@ func kill() -> void:
 	_states.kill()
 
 
-## Намерение по вертикали за последний кадр. По нему кабина и эскалатор
+## Намерение по вертикали за последний кадр. По нему кабина, эскалатор и дверь
 ## понимают, куда их просят, не читая [Input] сами.
 ##
-## Мёртвый не просит ничего: иначе он продолжал бы вести кабину и мог бы сесть
-## на эскалатор, а [constant OttoStateMachine.State.DEAD] — состояние конечное.
+## Пока Otto не свой — мёртв, едет на эскалаторе или сидит за дверью — он не
+## просит ничего: иначе он продолжал бы вести кабину и просился бы в дверь
+## оттуда, где его уже нет. Снять такое состояние может только тот, кто его
+## поставил, а не игрок.
 func vertical_intent() -> float:
-	return 0.0 if _states.is_dead() else _snapshot.vertical
+	return 0.0 if _states.is_world_driven() else _snapshot.vertical
 
 
 ## Сколько Otto уже пролетел вниз от верхней точки полёта, px. На опоре — ноль.
@@ -117,16 +118,13 @@ func horizontal_intent() -> float:
 ## Otto скрылся за дверью: снаружи его нет, ввод игрока не действует.
 func enter_door() -> void:
 	_states.go_indoors()
+	_repose()
 
 
 ## Дверь выпустила Otto наружу — сам вышел или выставили через пять секунд.
 func leave_door() -> void:
 	_states.come_out()
-
-
-## Скрыт ли Otto за дверью.
-func is_indoors() -> bool:
-	return _states.state == OttoStateMachine.State.INDOORS
+	_repose()
 
 
 ## Otto встал на эскалатор: до конца поездки ввод игрока не действует.
@@ -212,6 +210,15 @@ func _horizontal_speed(input: OttoInput, state: OttoStateMachine.State) -> float
 	return signf(input.move) * walk_speed
 
 
+## Пересобирает позу прямо сейчас, не дожидаясь следующего [method _physics_process].
+##
+## Нужно тем, кто меняет состояние Otto снаружи, посреди кадра: формы коллизии
+## включаются отложенно, и без этого первый кадр после двери Otto провёл бы
+## бестелесным — [method move_and_slide] не нашёл бы под ним пола.
+func _repose() -> void:
+	_apply_pose(_states.state)
+
+
 func _apply_pose(state: OttoStateMachine.State) -> void:
 	# Поза — функция от состояния: пересобираем её только на переходах, иначе
 	# каждый физический кадр сыпал бы по два отложенных вызова в очередь.
@@ -222,8 +229,8 @@ func _apply_pose(state: OttoStateMachine.State) -> void:
 	var crouching := state == OttoStateMachine.State.CROUCH
 	# За дверью Otto не только не виден, но и не задевается: он в комнате.
 	var hidden := state == OttoStateMachine.State.INDOORS
-	_standing_shape.set_deferred("disabled", crouching or hidden)
-	_crouching_shape.set_deferred("disabled", not crouching or hidden)
+	_standing_shape.set_deferred("disabled", hidden or crouching)
+	_crouching_shape.set_deferred("disabled", hidden or not crouching)
 	_body.visible = not hidden
 
 	# Размер и посадку коробки берём из самой формы коллизии, чтобы вид и

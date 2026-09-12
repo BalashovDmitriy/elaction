@@ -56,6 +56,9 @@ const EXIT_HEIGHT: float = 40.0
 @export var camera_bounds := Rect2(0, 0, LEVEL_WIDTH, LEVEL_HEIGHT)
 
 var _doors: Array[Door] = []
+## Здание сдано. Otto может зайти в зону выхода снова, но событие однократное:
+## в M5 к нему прицепится переход к следующему зданию.
+var _cleared: bool = false
 
 @onready var otto: Otto = $Otto
 
@@ -154,8 +157,9 @@ func _spawn_escalator() -> void:
 
 
 func _spawn_doors() -> void:
+	# Счёт уровень не трогает: он копится от здания к зданию, обнуляет его тот,
+	# кто начинает партию. Здесь объявляется только, сколько здесь документов.
 	var game := GameState.instance()
-	game.reset()
 	var documents := 0
 	for entry: Dictionary in DOORS:
 		var door := DOOR_SCENE.instantiate() as Door
@@ -204,9 +208,14 @@ func _on_exit_entered(body: Node2D) -> void:
 	if runner == null:
 		return
 	if GameState.instance().all_documents_collected():
-		building_cleared.emit()
+		if not _cleared:
+			_cleared = true
+			building_cleared.emit()
 		return
-	_send_back_for_documents(runner)
+
+	# Перенос отложен: сигнал приходит посреди разбора перекрытий, и двигать
+	# тело прямо здесь движок просит не делать.
+	_send_back_for_documents.call_deferred(runner)
 
 
 ## Возвращает Otto к самой верхней несобранной двери.
