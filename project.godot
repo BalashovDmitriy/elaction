@@ -26,6 +26,10 @@ window/stretch/aspect="keep"
 [autoload]
 
 Screenshotter="*res://src/autoload/screenshotter.gd"
+; Имя автолоада отличается от class_name скрипта (GameState) намеренно: Godot
+; не даёт глобальному классу и автолоаду называться одинаково, а код обращается
+; к состоянию через GameState.instance().
+Game="*res://src/autoload/game_state.gd"
 
 [editor_plugins]
 

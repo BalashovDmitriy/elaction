@@ -60,10 +60,11 @@ func _physics_process(delta: float) -> void:
 
 	var state := _states.update(_snapshot, is_on_floor(), velocity.y, _can_stand_up())
 
-	# Пока везёт эскалатор, физика молчит: координатой распоряжается он.
-	if state == OttoStateMachine.State.RIDE:
+	# Пока Otto забрал кто-то другой — эскалатор везёт или дверь спрятала —
+	# физика молчит: координатой распоряжается он, а не она.
+	if state == OttoStateMachine.State.RIDE or state == OttoStateMachine.State.INDOORS:
 		velocity = Vector2.ZERO
-		# Эскалатор несёт, а не роняет: падение с его высоты не копится.
+		# Его несут, а не роняют: падение с этой высоты не копится.
 		_apex_y = global_position.y
 		_apply_pose(state)
 		return
@@ -87,13 +88,15 @@ func kill() -> void:
 	_states.kill()
 
 
-## Намерение по вертикали за последний кадр. По нему кабина и эскалатор
+## Намерение по вертикали за последний кадр. По нему кабина, эскалатор и дверь
 ## понимают, куда их просят, не читая [Input] сами.
 ##
-## Мёртвый не просит ничего: иначе он продолжал бы вести кабину и мог бы сесть
-## на эскалатор, а [constant OttoStateMachine.State.DEAD] — состояние конечное.
+## Пока Otto не свой — мёртв, едет на эскалаторе или сидит за дверью — он не
+## просит ничего: иначе он продолжал бы вести кабину и просился бы в дверь
+## оттуда, где его уже нет. Снять такое состояние может только тот, кто его
+## поставил, а не игрок.
 func vertical_intent() -> float:
-	return 0.0 if _states.is_dead() else _snapshot.vertical
+	return 0.0 if _states.is_world_driven() else _snapshot.vertical
 
 
 ## Сколько Otto уже пролетел вниз от верхней точки полёта, px. На опоре — ноль.
@@ -104,6 +107,24 @@ func fall_height() -> float:
 ## На сколько поднимает прыжок: v² / (2 · g). Падение глубже — уже не свой прыжок.
 func jump_height() -> float:
 	return jump_speed * jump_speed / (2.0 * gravity)
+
+
+## Намерение по горизонтали за последний кадр. По нему дверь понимает, что
+## Otto просится наружу раньше срока.
+func horizontal_intent() -> float:
+	return 0.0 if _states.is_dead() else _snapshot.move
+
+
+## Otto скрылся за дверью: снаружи его нет, ввод игрока не действует.
+func enter_door() -> void:
+	_states.go_indoors()
+	_repose()
+
+
+## Дверь выпустила Otto наружу — сам вышел или выставили через пять секунд.
+func leave_door() -> void:
+	_states.come_out()
+	_repose()
 
 
 ## Otto встал на эскалатор: до конца поездки ввод игрока не действует.
@@ -189,6 +210,15 @@ func _horizontal_speed(input: OttoInput, state: OttoStateMachine.State) -> float
 	return signf(input.move) * walk_speed
 
 
+## Пересобирает позу прямо сейчас, не дожидаясь следующего [method _physics_process].
+##
+## Нужно тем, кто меняет состояние Otto снаружи, посреди кадра: формы коллизии
+## включаются отложенно, и без этого первый кадр после двери Otto провёл бы
+## бестелесным — [method move_and_slide] не нашёл бы под ним пола.
+func _repose() -> void:
+	_apply_pose(_states.state)
+
+
 func _apply_pose(state: OttoStateMachine.State) -> void:
 	# Поза — функция от состояния: пересобираем её только на переходах, иначе
 	# каждый физический кадр сыпал бы по два отложенных вызова в очередь.
@@ -197,8 +227,11 @@ func _apply_pose(state: OttoStateMachine.State) -> void:
 	_posed_state = state
 
 	var crouching := state == OttoStateMachine.State.CROUCH
-	_standing_shape.set_deferred("disabled", crouching)
-	_crouching_shape.set_deferred("disabled", not crouching)
+	# За дверью Otto не только не виден, но и не задевается: он в комнате.
+	var hidden := state == OttoStateMachine.State.INDOORS
+	_standing_shape.set_deferred("disabled", hidden or crouching)
+	_crouching_shape.set_deferred("disabled", hidden or not crouching)
+	_body.visible = not hidden
 
 	# Размер и посадку коробки берём из самой формы коллизии, чтобы вид и
 	# хитбокс не разъезжались при правке сцены.
