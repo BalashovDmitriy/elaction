@@ -15,7 +15,26 @@ extends RefCounted
 
 ## Узлы, куда можно добраться из точки старта. Ключ — «этаж:кусок».
 static func reachable(plan: BuildingPlan, rules: BuildingRules) -> Dictionary:
-	var floors := _floor_segments(plan, rules)
+	return reachable_in(plan, rules, _floor_segments(plan, rules))
+
+
+## Куски всех этажей: этаж -> пары «левый край, правый край».
+##
+## Отдаются наружу, чтобы считать узлы пачкой: [method node_in] по готовым кускам
+## стоит копейки, а сами куски — это перебор всей раскладки.
+static func segments(plan: BuildingPlan, rules: BuildingRules) -> Array:
+	return _floor_segments(plan, rules)
+
+
+## Узел точки этажа по готовым кускам из [method segments]. По нему проверяют,
+## ведёт ли туда маршрут: [method reachable] возвращает набор таких же узлов.
+static func node_in(floors: Array, floor_index: int, x: float) -> String:
+	return _node(floor_index, _segment_at(floors[floor_index], x))
+
+
+## Те же узлы, что и у [method reachable], но по готовым кускам из
+## [method segments]: кто их уже посчитал, второй раз за перебор не платит.
+static func reachable_in(plan: BuildingPlan, rules: BuildingRules, floors: Array) -> Dictionary:
 	var links := _links(plan, rules, floors)
 
 	var start := _node(0, _segment_at(floors[0], plan.safe_x(rules, 0)))
@@ -42,7 +61,7 @@ static func is_winnable(plan: BuildingPlan, rules: BuildingRules) -> bool:
 ## Возвращает описания, а не индексы, чтобы упавший тест сразу говорил, где дыра.
 static func unreachable_spots(plan: BuildingPlan, rules: BuildingRules) -> Array[String]:
 	var floors := _floor_segments(plan, rules)
-	var seen := reachable(plan, rules)
+	var seen := reachable_in(plan, rules, floors)
 	var missing: Array[String] = []
 
 	for door in plan.doors:
@@ -59,26 +78,11 @@ static func unreachable_spots(plan: BuildingPlan, rules: BuildingRules) -> Array
 	return missing
 
 
-## Узел, в котором оказывается точка этажа. По нему проверяют, ведёт ли туда
-## маршрут: [method reachable] возвращает набор таких же узлов.
-static func node_at(plan: BuildingPlan, rules: BuildingRules, floor_index: int, x: float) -> String:
-	var floors := _floor_segments(plan, rules)
-	return _node(floor_index, _segment_at(floors[floor_index], x))
-
-
 ## Куски каждого этажа: пары «левый край, правый край» между проёмами.
 static func _floor_segments(plan: BuildingPlan, rules: BuildingRules) -> Array:
 	var floors: Array = []
 	for index in plan.floors:
-		var pieces: Array[Vector2] = []
-		var cursor := 0.0
-		for gap in plan.gaps_on(rules, index):
-			if gap.x > cursor:
-				pieces.append(Vector2(cursor, gap.x))
-			cursor = maxf(cursor, gap.y)
-		if cursor < rules.width:
-			pieces.append(Vector2(cursor, rules.width))
-		floors.append(pieces)
+		floors.append(BuildingPlan.spans_between(plan.gaps_on(rules, index), rules.width))
 	return floors
 
 
@@ -100,6 +104,12 @@ static func _links(plan: BuildingPlan, rules: BuildingRules, floors: Array) -> D
 		var top_segment := _segment_at(floors[upper], escalator.x)
 		var landing := escalator.x + escalator.towards * rules.escalator_run
 		var bottom_segment := _segment_at(floors[upper + 1], landing)
+		# -1 — конец эскалатора попал в проём или за стену. Узла с таким номером
+		# на этаже нет, и связывать его нельзя: обход пометил бы его достижимым,
+		# а после этого достижимой считалась бы любая точка этажа внутри дыры.
+		if top_segment < 0 or bottom_segment < 0:
+			push_error("эскалатор на этаже %d упирается в проём" % upper)
+			continue
 		_connect_all(
 			links, [_node(upper, top_segment), _node(upper + 1, bottom_segment)] as Array[String]
 		)

@@ -112,26 +112,17 @@ func exit_position() -> Vector2:
 
 ## Режет перекрытие на куски между проёмами.
 ##
-## Проёмы принимаются в любом порядке и сортируются здесь же. Порядок важен:
-## по несортированному списку куски накладываются друг на друга и перекрытие
-## выходит сплошным — проёма как не бывало.
+## Сам разрез — в [method BuildingPlan.spans_between]: по тем же кускам строится
+## граф достижимости, и второй такой же счёт рано или поздно разъехался бы с этим.
+## Проёмы принимаются в любом порядке.
 ##
 ## Статический, чтобы проверяться тестами без сцены.
 static func slab_segments(
 	surface: float, gaps: Array[Vector2], width: float, thickness: float
 ) -> Array[Rect2]:
-	var ordered := gaps.duplicate()
-	ordered.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
-
 	var rects: Array[Rect2] = []
-	var cursor := 0.0
-	for gap in ordered:
-		if gap.x > cursor:
-			rects.append(Rect2(cursor, surface, gap.x - cursor, thickness))
-		# maxf, чтобы вложенный проём не отматывал курсор назад.
-		cursor = maxf(cursor, gap.y)
-	if cursor < width:
-		rects.append(Rect2(cursor, surface, width - cursor, thickness))
+	for span in BuildingPlan.spans_between(gaps, width):
+		rects.append(Rect2(span.x, surface, span.y - span.x, thickness))
 	return rects
 
 
@@ -304,12 +295,19 @@ func _cover_with_darkness(index: int) -> void:
 	add_child(shade)
 
 
-func _agents_on(index: int) -> Array[Enemy]:
+## Все агенты здания: они лежат прямо в уровне, рядом с геометрией.
+func _agents() -> Array[Enemy]:
 	var found: Array[Enemy] = []
 	for child in get_children():
 		var agent := child as Enemy
-		if agent == null:
-			continue
+		if agent != null:
+			found.append(agent)
+	return found
+
+
+func _agents_on(index: int) -> Array[Enemy]:
+	var found: Array[Enemy] = []
+	for agent in _agents():
 		if rules.floor_index_near(agent.global_position.y) == index:
 			found.append(agent)
 	return found
@@ -328,22 +326,19 @@ func _release_agent(door: Door) -> void:
 
 
 ## Насколько злее агенты этого здания прямо сейчас: к росту от здания к зданию
-## добавляется тревога, если она уже включилась.
+## добавляется тревога, если она уже включилась. Сам счёт — в [BuildingRules],
+## там же общий на обе надбавки потолок.
 func _menace() -> float:
 	var alarmed := GameState.instance().alarm.raised
-	# Нижняя граница та же, что у [method Enemy.set_menace]: на это число делится
-	# задержка смены агента, и ноль из инспектора оставил бы дверь запертой навсегда.
-	return maxf(rules.agent_menace, 0.1) * (ALARM_MENACE if alarmed else 1.0)
+	return rules.menace_with(ALARM_MENACE if alarmed else 1.0)
 
 
 ## Сирена: агенты злеют, кабины начинают отвечать с задержкой.
 func _on_alarm_raised() -> void:
 	for car in _cars:
 		car.set_response_delay(ALARM_CAR_DELAY)
-	for child in get_children():
-		var agent := child as Enemy
-		if agent != null:
-			agent.set_menace(_menace())
+	for agent in _agents():
+		agent.set_menace(_menace())
 
 
 func _on_agent_died(_agent: Enemy, door: Door) -> void:

@@ -4,7 +4,8 @@ extends GutTest
 ##
 ## Отсюда берётся вся вертикальная арифметика: где поверхность этажа, какой этаж
 ## ближе к точке, где потолок. По ним же считается место возврата после смерти
-## и геометрия затемняющей полосы.
+## и геометрия затемняющей полосы. И злость агентов — она растёт из двух мест
+## сразу, и потолок на ней держит игру проходимой.
 
 
 func _rules() -> BuildingRules:
@@ -51,3 +52,40 @@ func test_slots_spread_between_the_margins() -> void:
 	var rules := _rules()
 	assert_eq(rules.slot_x(0), rules.margin, "первое место — у левого отступа")
 	assert_eq(rules.slot_x(rules.slots - 1), rules.width - rules.margin)
+
+
+func test_agents_get_meaner_building_by_building() -> void:
+	var first := BuildingRules.for_building(1).agent_menace
+	var second := BuildingRules.for_building(2).agent_menace
+	assert_eq(first, 1.0, "первое здание — обычные агенты")
+	assert_almost_eq(second - first, BuildingRules.MENACE_PER_BUILDING, 0.001)
+
+
+func test_growth_by_building_leaves_room_for_the_alarm() -> void:
+	var far := BuildingRules.for_building(100).agent_menace
+	assert_eq(far, BuildingRules.MENACE_BY_BUILDING_CAP)
+	assert_lt(
+		far,
+		BuildingRules.MENACE_CAP,
+		"рост от зданий упирается ниже общего потолка, иначе сирене нечего добавить"
+	)
+
+
+## Потолок общий: пока он стоял только на росте от зданий, тревога множила уже
+## обрезанное число и уводила дальность выстрела на 900 px при этаже в 1120 px.
+func test_the_alarm_cannot_push_menace_past_the_cap() -> void:
+	var rules := BuildingRules.for_building(100)
+	assert_eq(rules.menace_with(1.5), BuildingRules.MENACE_CAP)
+	assert_eq(rules.menace_with(100.0), BuildingRules.MENACE_CAP, "и никакая другая")
+
+
+func test_the_alarm_still_bites_on_early_buildings() -> void:
+	var rules := BuildingRules.for_building(1)
+	assert_gt(rules.menace_with(1.5), rules.menace_with(1.0))
+
+
+## Ноль из инспектора делил бы на себя задержку смены агента и запер бы дверь.
+func test_menace_never_reaches_zero() -> void:
+	var rules := BuildingRules.new()
+	rules.agent_menace = 0.0
+	assert_gt(rules.menace_with(1.0), 0.0)

@@ -50,13 +50,15 @@ func _read_commands() -> void:
 	var restart_pressed := _just_pressed(&"restart")
 	var quit_pressed := _just_pressed(&"quit_game")
 
+	# Заново и выход — только из паузы или с экрана «игра окончена». Само нажатие
+	# паузы в этом кадре тоже считается: Esc и R, нажатые вместе, должны сработать
+	# оба — и когда Esc в паузу входит, и когда выходит из неё.
+	var on_the_overlay := _paused or _game_over or pause_pressed
+
 	if pause_pressed:
 		_toggle_pause()
 
-	# Заново и выход — только из паузы или с экрана «игра окончена». Проверяется
-	# после переключения, а не вместо него: нажатые в один кадр Esc и R должны
-	# сработать оба, а не потеряться вместе с фронтом.
-	if not _paused and not _game_over:
+	if not on_the_overlay:
 		return
 	if restart_pressed:
 		_restart()

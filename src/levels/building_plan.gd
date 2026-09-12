@@ -92,10 +92,34 @@ func document_floors() -> Array[int]:
 	return found
 
 
-## Проёмы в перекрытии этажа: пары «левый край, правый край», по возрастанию x.
+## Куски перекрытия между проёмами: пары «левый край, правый край».
+##
+## Единственное место, где этаж режется проёмами. По этим кускам строится и
+## геометрия ([method GreyboxLevel.slab_segments]), и граф достижимости
+## ([BuildingRoute]) — разъехаться они не должны, поэтому счёт один на всех.
+## Проёмы принимаются в любом порядке и сортируются здесь же: по несортированному
+## списку куски накладываются друг на друга и проёма как не бывало.
+static func spans_between(gaps: Array[Vector2], width: float) -> Array[Vector2]:
+	var ordered := gaps.duplicate()
+	ordered.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
+
+	var spans: Array[Vector2] = []
+	var cursor := 0.0
+	for gap: Vector2 in ordered:
+		if gap.x > cursor:
+			spans.append(Vector2(cursor, gap.x))
+		# maxf, чтобы вложенный проём не отматывал курсор назад.
+		cursor = maxf(cursor, gap.y)
+	if cursor < width:
+		spans.append(Vector2(cursor, width))
+	return spans
+
+
+## Проёмы в перекрытии этажа: пары «левый край, правый край», в любом порядке.
 ##
 ## Считается здесь, а не в уровне: по этим же дырам строится граф достижимости,
-## и разъехаться они не должны.
+## и разъехаться они не должны. Порядок не обещается намеренно: единственный
+## потребитель — [method spans_between], а он сортирует у себя.
 func gaps_on(rules: BuildingRules, floor_index: int) -> Array[Vector2]:
 	var gaps: Array[Vector2] = []
 
@@ -110,7 +134,6 @@ func gaps_on(rules: BuildingRules, floor_index: int) -> Array[Vector2]:
 		if floor_index == escalator.floor_index:
 			gaps.append(escalator.gap(rules))
 
-	gaps.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
 	return gaps
 
 
@@ -203,7 +226,7 @@ func _pick_escalator_slot(
 			fitting.append(slot)
 
 	var pool := free if fitting.is_empty() else fitting
-	return pool[rng.randi_range(0, pool.size() - 1)]
+	return _pick_any(rng, pool)
 
 
 ## Куда проём должен смотреть: прочь от шахты, из которой Otto приходит.
@@ -254,19 +277,20 @@ func _lay_door(
 	taken: Dictionary,
 	floor_index: int,
 	with_document: bool,
-	routed: Dictionary = {}
+	routed: Dictionary = {},
+	spans: Array = []
 ) -> bool:
 	var free := _free_slots(rules.slots, taken, [floor_index] as Array[int])
 	if not routed.is_empty():
 		free = free.filter(
 			func(candidate: int) -> bool:
 				var x := rules.slot_x(candidate)
-				return routed.has(BuildingRoute.node_at(self, rules, floor_index, x))
+				return routed.has(BuildingRoute.node_in(spans, floor_index, x))
 		)
 	if free.is_empty():
 		return false
 
-	var slot: int = free[rng.randi_range(0, free.size() - 1)]
+	var slot := _pick_any(rng, free)
 
 	var door := DoorSpot.new()
 	door.floor_index = floor_index
@@ -302,11 +326,17 @@ func _lay_lamps(rules: BuildingRules, rng: RandomNumberGenerator, taken: Diction
 func _lay_documents(
 	rules: BuildingRules, rng: RandomNumberGenerator, taken: Dictionary
 ) -> Dictionary:
-	var routed := BuildingRoute.reachable(self, rules)
 	var chosen: Dictionary = {}
 	var wanted := mini(rules.documents, floors)
 	if wanted <= 0:
+		# Раньше проверки: маршрут — перебор всей раскладки, а в здании без
+		# документов он никому не нужен. Да и на здании в ноль этажей он падает.
 		return chosen
+
+	# Куски этажей считаем один раз: сами по себе они — перебор всей раскладки,
+	# и маршруту нужны ровно те же самые.
+	var spans := BuildingRoute.segments(self, rules)
+	var routed := BuildingRoute.reachable_in(self, rules, spans)
 
 	var band := float(floors) / float(wanted)
 	for number in wanted:
@@ -317,7 +347,7 @@ func _lay_documents(
 		for index: int in _shuffled_range(rng, from, to):
 			if chosen.has(index):
 				continue
-			if not _lay_door(rules, rng, taken, index, true, routed):
+			if not _lay_door(rules, rng, taken, index, true, routed, spans):
 				continue
 			chosen[index] = true
 			placed = true
@@ -356,7 +386,13 @@ func _free_slot(
 	var free := _free_slots(slots, taken, on_floors)
 	if free.is_empty():
 		return -1
-	return free[rng.randi_range(0, free.size() - 1)]
+	return _pick_any(rng, free)
+
+
+## Любое место из набора. Счёт сида зависит от порядка обращений к генератору,
+## поэтому выбор — одной строкой на весь файл, а не переписанным трижды.
+static func _pick_any(rng: RandomNumberGenerator, pool: Array[int]) -> int:
+	return pool[rng.randi_range(0, pool.size() - 1)]
 
 
 ## Все места, свободные сразу на всех перечисленных этажах.

@@ -177,9 +177,15 @@ func _document_door_on(floor_index: int) -> BuildingPlan.DoorSpot:
 
 
 ## Дверь ещё красная: собранная перестаёт ею быть, и второй раз в неё не надо.
+##
+## Сверяется и этаж: места на этажах общие, и красная дверь сверху, стоящая в том
+## же столбце, выдавала бы уже собранную за несобранную — бот ходил бы к ней вечно.
 func _still_pending(spot: BuildingPlan.DoorSpot) -> bool:
 	for door in _level.doors():
-		if door.is_pending() and absf(door.mat_position().x - spot.x) <= REACHED:
+		if not door.is_pending():
+			continue
+		var mat := door.mat_position()
+		if absf(mat.x - spot.x) <= REACHED and _rules.floor_index_near(mat.y) == spot.floor_index:
 			return true
 	return false
 

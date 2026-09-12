@@ -30,6 +30,15 @@ func _build(building_seed: int) -> GreyboxLevel:
 	return level
 
 
+## Убирает здание из дерева сразу, не дожидаясь конца теста.
+##
+## [method GutTest.add_child_autofree] освобождает только после всего теста, а сиды
+## перебираются внутри одного: без этого здания стоят друг в друге в одном
+## физическом мире, со своими Otto и своими агентами. Освободит их всё равно GUT.
+func _drop(level: GreyboxLevel) -> void:
+	remove_child(level)
+
+
 func _count(level: GreyboxLevel, type: Variant) -> int:
 	var found := 0
 	for child in level.get_children():
@@ -47,6 +56,7 @@ func test_every_seed_assembles_and_holds_otto() -> void:
 			"сид %d: Otto не стоит на полу — провалился сквозь геометрию" % building_seed
 		)
 		assert_false(level.otto.is_dead(), "сид %d: Otto погиб на старте" % building_seed)
+		_drop(level)
 
 
 func test_scene_matches_the_plan() -> void:
@@ -63,6 +73,7 @@ func test_scene_matches_the_plan() -> void:
 		)
 		assert_eq(_count(level, Door), plan.doors.size(), "сид %d: дверей" % building_seed)
 		assert_eq(_count(level, Escalator), plan.escalators.size(), "сид %d" % building_seed)
+		_drop(level)
 
 
 func test_otto_starts_on_the_roof() -> void:

@@ -34,6 +34,17 @@ func _build(building_seed: int) -> GreyboxLevel:
 	return level
 
 
+## Убирает здание из дерева сразу, не дожидаясь конца теста.
+##
+## [method GutTest.add_child_autofree] освобождает только после всего теста, а сиды
+## перебираются внутри одного: без этого пять зданий стоят друг в друге в одном
+## физическом мире. Бот жмёт действия глобально, значит идут все пять Otto разом,
+## и красные двери прошлых зданий по-прежнему шлют документы в общий [GameState] —
+## проверка «документы собраны» проходила бы чужим трудом. Освободит их GUT.
+func _drop(level: GreyboxLevel) -> void:
+	remove_child(level)
+
+
 func before_all() -> void:
 	# Кадров у прогона мало, поэтому игровое время идёт быстрее реального.
 	Engine.time_scale = 4.0
@@ -41,6 +52,9 @@ func before_all() -> void:
 
 func after_all() -> void:
 	Engine.time_scale = 1.0
+	# Автолоад один на весь прогон: оставленная «в игре» партия досчитывала бы
+	# тревогу в чужих тестах. Возвращаем его в исходное.
+	GameState.instance().reset()
 
 
 func test_bot_finishes_every_building() -> void:
@@ -78,3 +92,5 @@ func test_bot_finishes_every_building() -> void:
 				]
 			)
 		)
+
+		_drop(level)
