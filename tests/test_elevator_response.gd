@@ -3,7 +3,9 @@ extends GutTest
 ## Тесты задержки отклика кабины.
 ##
 ## По тревоге кабина «слушается хуже» — это прямо описано в оригинале. Задержка
-## не копится между нажатиями: отпустил — считается заново (ADR-0009, пункт 1).
+## не копится между нажатиями: отпустил или вышел — считается заново (ADR-0009,
+## пункт 1). Про выход отдельный тест: пустая кабина в [method ElevatorMotion._drive]
+## не заходит, и без сброса задержка работала бы только на первую поездку.
 
 const TOP: float = 0.0
 const STEP: float = 0.1
@@ -36,3 +38,14 @@ func test_letting_go_makes_the_car_think_again() -> void:
 	_run(motion, 0.4, ElevatorMotion.DOWN)
 	_run(motion, 0.2, 0.0)
 	assert_almost_eq(_run(motion, 0.4, ElevatorMotion.DOWN), TOP, 0.01, "отсчёт заново")
+
+
+func test_leaving_the_car_makes_it_think_again() -> void:
+	var motion := _shaft()
+	_run(motion, 1.0, ElevatorMotion.DOWN)
+	# Пассажир вышел: кабина пустая и ещё стоит паузу этажа, то есть не едет сама.
+	motion.update(STEP, 0.0, false)
+	var boarded_at := motion.position
+	assert_almost_eq(
+		_run(motion, 0.4, ElevatorMotion.DOWN), boarded_at, 0.01, "новый пассажир ждёт так же"
+	)

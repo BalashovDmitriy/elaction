@@ -5,7 +5,7 @@ extends Node
 ##
 ## Первый синглтон игрового состояния в проекте. Двери, HUD и выход не знают друг
 ## о друге и связываются через него сигналами — как предписывают соглашения.
-## В M5 сюда приедет номер здания.
+## Здесь же живёт партия целиком: номер здания и тревога.
 ##
 ## В дерево его ставит автолоад `Game`, а код обращается через [method instance].
 ## Имя автолоада само по себе идентификатором не является: `--check-only` разбирает
@@ -86,9 +86,7 @@ func _exit_tree() -> void:
 ## Начинает партию заново: счёт, жизни, первое здание.
 func start_game() -> void:
 	reset()
-	building = 1
 	_running = true
-	alarm.enter_building()
 	building_changed.emit(building)
 
 
@@ -108,12 +106,14 @@ func start_building(total_documents: int) -> void:
 	documents_changed.emit(documents_collected, documents_total)
 
 
-## Обнуляет всё, включая счёт.
+## Обнуляет всё: счёт, жизни, документы, номер здания и тревогу.
 func reset() -> void:
 	score = 0
 	lives = STARTING_LIVES
 	documents_collected = 0
 	documents_total = 0
+	building = 1
+	alarm.enter_building()
 	score_changed.emit(score)
 	lives_changed.emit(lives)
 	documents_changed.emit(documents_collected, documents_total)

@@ -52,9 +52,10 @@ func _read_commands() -> void:
 
 	if pause_pressed:
 		_toggle_pause()
-		return
 
-	# Заново и выход — только из паузы или с экрана «игра окончена».
+	# Заново и выход — только из паузы или с экрана «игра окончена». Проверяется
+	# после переключения, а не вместо него: нажатые в один кадр Esc и R должны
+	# сработать оба, а не потеряться вместе с фронтом.
 	if not _paused and not _game_over:
 		return
 	if restart_pressed:
@@ -79,6 +80,10 @@ func _just_pressed(action: StringName) -> bool:
 ## партия живёт в [GameState], уровень — нет.
 func _enter_building() -> void:
 	if _level != null:
+		# Сначала из дерева, потом в утиль: [method Node.queue_free] убирает узел
+		# лишь в конце кадра, и старое здание досматривало бы его рядом с новым —
+		# два Otto, две кабины и вся геометрия дважды в одном физическом мире.
+		remove_child(_level)
 		_level.queue_free()
 
 	var game := GameState.instance()
@@ -137,6 +142,9 @@ func _on_alarm_raised() -> void:
 
 func _on_game_over() -> void:
 	_game_over = true
+	# Партия окончена — здание замирает, как на паузе. Иначе агенты продолжают
+	# приходить и стрелять под надписью «игра окончена». Снимает это только рестарт.
+	get_tree().paused = true
 	_render_hud()
 
 
@@ -155,6 +163,13 @@ func _render_hud() -> void:
 	_hud_label.text = text
 
 
+## Сколько осталось до сирены. Только для отладки: в оригинале таймер игроку
+## не показывают, и в HUD ему делать нечего.
+func _alarm_countdown() -> String:
+	var alarm := GameState.instance().alarm
+	return "сработала" if alarm.raised else "%.0f с" % alarm.time_left()
+
+
 func _debug_text() -> String:
 	if _level == null:
 		return ""
@@ -162,7 +177,10 @@ func _debug_text() -> String:
 	var otto := _level.otto
 	var motion := otto.motion()
 	return (
-		"состояние: %s\nскорость: %.0f / %.0f\nна полу: %s\nв кабине: %s\nпауза: %s\nFPS: %d"
+		(
+			"состояние: %s\nскорость: %.0f / %.0f\nна полу: %s\n"
+			+ "в кабине: %s\nпауза: %s\nдо тревоги: %s\nFPS: %d"
+		)
 		% [
 			OttoStateMachine.state_name(otto.current_state()),
 			motion.x,
@@ -170,6 +188,7 @@ func _debug_text() -> String:
 			"да" if otto.is_grounded() else "нет",
 			"да" if otto.is_riding() else "нет",
 			"да" if get_tree().paused else "нет",
+			_alarm_countdown(),
 			Engine.get_frames_per_second(),
 		]
 	)

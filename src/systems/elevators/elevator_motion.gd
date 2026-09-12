@@ -62,6 +62,7 @@ func setup(stops: PackedFloat32Array, start_floor: int = 0) -> void:
 		position = floors[clampi(start_floor, 0, floors.size() - 1)]
 	# На этаже кабина стоит — в том числе на том, с которого начинает.
 	_pause_left = floor_pause
+	_held = 0.0
 
 
 ## Двигает кабину за кадр и возвращает новую координату.
@@ -77,6 +78,9 @@ func update(delta: float, command: float, occupied: bool) -> float:
 	if occupied:
 		_drive(delta, command)
 	else:
+		# Пустая кабина ничего не обдумывает: вошедший начинает отсчёт заново,
+		# иначе задержка по тревоге работала бы только на первую поездку.
+		_held = 0.0
 		_run_on_its_own(delta)
 	velocity = (position - previous) / delta if delta > 0.0 else 0.0
 	return position
