@@ -41,10 +41,17 @@ const FRAME_MARGIN: float = 8.0
 ## Ассеты, которые кладутся девятикусочно, а не плиткой.
 const FRAMED: PackedStringArray = ["window_frame"]
 
-static var _cache := {}
+## Заглушка на месте ненарисованного ассета.
+const MISSING_COLOR := Color(1.0, 0.0, 0.9)
+const MISSING_SIDE: int = 8
+
+static var _cache: Dictionary = {}
 
 
-## Текстура ассета или null, если генератор её ещё не нарисовал.
+## Текстура ассета. Ассета нет — вернётся заглушка, но не null.
+##
+## Половина узлов молча оставалась бы невидимой, а другая половина подставляла
+## серую заливку, и ни то ни другое не показывает причину. Заглушка показывает.
 static func tile(name: String) -> CanvasTexture:
 	if _cache.has(name):
 		return _cache[name] as CanvasTexture
@@ -71,24 +78,34 @@ static func forget() -> void:
 
 
 static func _build(name: String) -> CanvasTexture:
-	var diffuse := _map(name)
+	# Пути берутся из [method paths_of], а не собираются заново: по ним же
+	# проверяет тест, и второй такой же счёт разъехался бы с этим.
+	var maps := paths_of(name)
+	var diffuse := _map(maps[0])
 	if diffuse == null:
-		# Не тихий null: без диффуза уровень остался бы без геометрии вовсе,
-		# а причина была бы не видна ни в кадре, ни в логе.
 		push_error("Нет диффузной карты ассета %s — запустите tools/render_env.py" % name)
-		return null
+		return _missing()
 
 	var texture := CanvasTexture.new()
 	texture.diffuse_texture = diffuse
-	texture.normal_texture = _map(name + NORMAL_SUFFIX)
-	texture.specular_texture = _map(name + SPECULAR_SUFFIX)
+	texture.normal_texture = _map(maps[1])
+	texture.specular_texture = _map(maps[2])
 	# Резкость блика лежит в альфе карты, поэтому множитель остаётся нейтральным.
 	texture.specular_shininess = 1.0
 	return texture
 
 
-static func _map(file: String) -> Texture2D:
-	var path := DIR + file + ".png"
+## Ядовитый квадрат вместо ассета: в кадре его видно сразу, и он не
+## притворяется картинкой, как притворялась бы серая заливка.
+static func _missing() -> CanvasTexture:
+	var image := Image.create_empty(MISSING_SIDE, MISSING_SIDE, false, Image.FORMAT_RGBA8)
+	image.fill(MISSING_COLOR)
+	var texture := CanvasTexture.new()
+	texture.diffuse_texture = ImageTexture.create_from_image(image)
+	return texture
+
+
+static func _map(path: String) -> Texture2D:
 	if not ResourceLoader.exists(path):
 		return null
 	return load(path) as Texture2D

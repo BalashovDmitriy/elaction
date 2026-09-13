@@ -4,16 +4,11 @@ extends Node2D
 ## Здание, собранное по [BuildingPlan].
 ##
 ## Где что стоит, решает раскладка по правилам и сиду; уровень только расставляет
-## узлы и связывает их между собой. Геометрия — прямоугольники: настоящие ассеты
-## приходят в M7, свет — в M6.
+## узлы и связывает их между собой. Геометрия собрана из ассетов окружения
+## ([EnvTextures], ADR-0011), свет к ним пришёл раньше — в M6.
 
 ## Otto вышел из здания, собрав все документы.
 signal building_cleared
-
-## Цвета геометрии заданы ярче, чем нужно на экране: с M6 всё, что рисуется,
-## множится на общий тон ([constant AMBIENT]), и прежние цвета ушли бы в чёрное.
-const SOLID_COLOR := Color(0.30, 0.32, 0.40)
-const EXIT_COLOR := Color(0.30, 0.52, 0.36)
 
 ## Общий тон здания — и он же тон погашенного этажа (ADR-0010, пункт 3).
 ##
@@ -36,10 +31,6 @@ const WINDOWS_PER_FLOOR: int = 6
 const WINDOW_SIZE := Vector2(72.0, 40.0)
 ## На сколько ниже потолка начинается окно, px.
 const WINDOW_TOP: float = 14.0
-
-## Задняя стена этажа. Светлее геометрии: это дальний план, и сливаться
-## с перекрытиями ему нельзя, иначе этаж читается как сплошная плита.
-const BACK_WALL := Color(0.15, 0.16, 0.22)
 
 ## Город за окнами: силуэт и горящие окна. Само небо — цвет узла Background
 ## в сцене, там же, где сам узел.
@@ -333,11 +324,7 @@ func _spawn_exit() -> void:
 	var collision := CollisionShape2D.new()
 	collision.shape = shape
 	zone.add_child(collision)
-	var way := EnvTextures.tile("exit_way")
-	if way == null:
-		zone.add_child(_panel(area.size, -area.size * 0.5, EXIT_COLOR))
-	else:
-		zone.add_child(_tiled(area.size, -area.size * 0.5, way))
+	zone.add_child(_tiled(area.size, -area.size * 0.5, EnvTextures.tile("exit_way")))
 
 	zone.body_entered.connect(_on_exit_entered)
 	add_child(zone)
@@ -471,7 +458,7 @@ func _on_pit_entered(body: Node2D) -> void:
 		victim.kill()
 
 
-func _build_solid(rect: Rect2, tile: CanvasTexture = null) -> void:
+func _build_solid(rect: Rect2, tile: CanvasTexture) -> void:
 	var body := StaticBody2D.new()
 	body.position = rect.position + rect.size * 0.5
 	# Тела добавляются в дерево после Otto, то есть рисовались бы поверх него.
@@ -483,10 +470,7 @@ func _build_solid(rect: Rect2, tile: CanvasTexture = null) -> void:
 	var collision := CollisionShape2D.new()
 	collision.shape = shape
 	body.add_child(collision)
-	if tile == null:
-		body.add_child(_panel(rect.size, -rect.size * 0.5, SOLID_COLOR))
-	else:
-		body.add_child(_tiled(rect.size, -rect.size * 0.5, tile))
+	body.add_child(_tiled(rect.size, -rect.size * 0.5, tile))
 	body.add_child(_occluder(rect.size))
 
 	add_child(body)
@@ -521,6 +505,9 @@ func _build_back_walls() -> void:
 	add_child(_back_walls)
 
 	var gaps := window_gaps(rules.width, WINDOWS_PER_FLOOR, WINDOW_SIZE.x)
+	# Тайлы берутся один раз на здание: полос и рам под три сотни, а текстур две.
+	var wall_tile := EnvTextures.tile("wall")
+	var frame_tile := EnvTextures.tile("window_frame")
 	# С первого этажа, а не с нулевого: нулевой — крыша, комнаты за ней нет.
 	# [method BuildingRules.story_top] отдаёт для неё верх здания, и стена вышла бы
 	# полосой в небе над тем местом, где Otto начинает, с обрезанными окнами.
@@ -532,26 +519,22 @@ func _build_back_walls() -> void:
 
 		var window_top := minf(top + WINDOW_TOP, surface)
 		var window_bottom := minf(window_top + WINDOW_SIZE.y, surface)
-		_add_back_wall(Rect2(0.0, top, rules.width, window_top - top))
-		_add_back_wall(Rect2(0.0, window_bottom, rules.width, surface - window_bottom))
+		_add_back_wall(Rect2(0.0, top, rules.width, window_top - top), wall_tile)
+		_add_back_wall(Rect2(0.0, window_bottom, rules.width, surface - window_bottom), wall_tile)
 
 		for span: Vector2 in BuildingPlan.spans_between(gaps, rules.width):
 			var strip := Rect2(span.x, window_top, span.y - span.x, window_bottom - window_top)
-			_add_back_wall(strip)
+			_add_back_wall(strip, wall_tile)
 
 		for gap: Vector2 in gaps:
 			var opening := Rect2(gap.x, window_top, gap.y - gap.x, window_bottom - window_top)
-			_add_window_frame(opening)
+			_add_window_frame(opening, frame_tile)
 
 
-func _add_back_wall(rect: Rect2) -> void:
+func _add_back_wall(rect: Rect2, tile: CanvasTexture) -> void:
 	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
 		return
 
-	var tile := EnvTextures.tile("wall")
-	if tile == null:
-		_back_walls.add_child(_panel(rect.size, rect.position, BACK_WALL))
-		return
 	_back_walls.add_child(_tiled(rect.size, rect.position, tile))
 
 
@@ -560,9 +543,8 @@ func _add_back_wall(rect: Rect2) -> void:
 ## Кладётся девятикусочно и наполовину заходит на стену: так проём получает
 ## откос, на котором играет свет этажа, а город в нём остаётся городом —
 ## середина рамы пустая, а не застеклённая.
-func _add_window_frame(opening: Rect2) -> void:
-	var tile := EnvTextures.tile("window_frame")
-	if tile == null or opening.size.x <= 0.0 or opening.size.y <= 0.0:
+func _add_window_frame(opening: Rect2, tile: CanvasTexture) -> void:
+	if opening.size.x <= 0.0 or opening.size.y <= 0.0:
 		return
 
 	var overlap := EnvTextures.FRAME_MARGIN * 0.5
@@ -598,6 +580,9 @@ func _build_city() -> void:
 ## Маска гасится на каждой панели, а не на общем узле: [member CanvasItem.light_mask]
 ## детям не передаётся, и город в окне разгорался вместе с этажом — окно читалось
 ## как освещённая ниша, а не как улица.
+## Кусок дальнего плана: башня с текстурой или окно, которое рисуется заливкой.
+## Окну рельеф ни к чему — оно источник, а не поверхность, поэтому [param tile]
+## у него пустой. Это единственное место, где заливка осталась намеренно.
 func _add_city_panel(rect: Rect2, color: Color, tile: CanvasTexture = null) -> void:
 	var panel: Control = (
 		_panel(rect.size, rect.position, color)
@@ -677,6 +662,11 @@ func _tiled(size: Vector2, offset: Vector2, tile: CanvasTexture) -> TextureRect:
 	# Повтор включается на самом узле: по умолчанию холст зажимает текстуру
 	# по краям, и плита в тридцать тайлов вышла бы одним растянутым.
 	rect.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	# Размер задаёт место, а не тайл. По умолчанию [TextureRect] объявляет
+	# минимальным размером размер текстуры, и [Control] поднимал до него всё,
+	# что меньше: полоса стены над окном (14 px при тайле 32 px) растягивалась
+	# до 32 px и закрывала город в верхней трети проёма.
+	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	rect.size = size
 	rect.position = offset
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE

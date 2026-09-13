@@ -17,7 +17,6 @@ ADR-0011, пункты 1 и 7: у окружения нет анимации, п
 from __future__ import annotations
 
 import argparse
-import sys
 from collections.abc import Callable
 from pathlib import Path
 
@@ -25,6 +24,7 @@ import numpy as np
 from PIL import Image
 
 import palette
+from godot_bin import use_utf8_output
 from palette import Material, Rgb
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -107,15 +107,12 @@ class Canvas:
     def roughen(self, seed: int, amount: float) -> None:
         """Мелкая шероховатость высоты: свет по такой стене идёт не стеклом.
 
-        Шум добавляется ко всей карте разом и повторяется по краям, поэтому
-        замкнутый тайл остаётся замкнутым.
+        Шум кладётся по всей карте без оглядки на швы: замкнутым тайл делает не
+        он, а [method normal_map] — на замкнутой оси наклон на краю считается по
+        соседу с другого края, и подгонять сами высоты незачем.
         """
         rng = np.random.default_rng(seed)
         noise = rng.uniform(-amount, amount, size=self.height_map.shape).astype(np.float32)
-        if self.wrap_x:
-            noise[:, -1] = noise[:, 0]
-        if self.wrap_y:
-            noise[-1, :] = noise[0, :]
         self.height_map = np.clip(self.height_map + noise, 0.0, 1.0)
 
     def normal_map(self) -> np.ndarray:
@@ -404,15 +401,26 @@ ASSETS: dict[str, Callable[[], Canvas]] = {
 }
 
 
+def _shown(path: Path) -> str:
+    """Путь для вывода: внутри проекта — относительный, снаружи — как есть.
+
+    `--out` умеет показывать куда угодно, и `relative_to` на такой путь падает.
+    """
+    try:
+        return path.relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
 def main() -> int:
+    # До разбора аргументов: подсказки и ошибки argparse тоже по-русски.
+    use_utf8_output()
+
     parser = argparse.ArgumentParser(description="Рендер ассетов окружения.")
     parser.add_argument("names", nargs="*", help="какие ассеты рисовать; по умолчанию все")
     parser.add_argument("--list", action="store_true", help="перечислить ассеты и выйти")
     parser.add_argument("--out", type=Path, default=OUT_DIR, help="куда писать PNG")
     arguments = parser.parse_args()
-
-    for stream in (sys.stdout, sys.stderr):
-        stream.reconfigure(encoding="utf-8", errors="replace")
 
     if arguments.list:
         for name in sorted(ASSETS):
@@ -429,7 +437,7 @@ def main() -> int:
     for name in names:
         canvas = ASSETS[name]()
         for path in canvas.save(arguments.out, name):
-            print(path.relative_to(PROJECT_ROOT).as_posix())
+            print(_shown(path))
     return 0
 
 

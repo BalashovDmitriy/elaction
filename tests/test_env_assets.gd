@@ -10,9 +10,27 @@ extends GutTest
 ## [constant EnvTextures.NAMES], и забытая нормаль падает сама, без правки теста.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
+const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
+const LAMP_SCENE := preload("res://src/systems/lighting/lamp.tscn")
+const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 
 ## Сколько кадров дать зданию собраться.
 const SETTLE_FRAMES: int = 5
+
+## Ассеты, которые кладутся в готовый узел сцены: ассет, сцена, имя узла.
+##
+## Размер места живёт в `.tscn`, размер картинки — в генераторе, и связаны они
+## только словом в комментарии. Здесь это слово проверяется.
+const FITTED: Array[Array] = [
+	["door", DOOR_SCENE, "Panel"],
+	["door_red", DOOR_SCENE, "Panel"],
+	["door_ajar", DOOR_SCENE, "Panel"],
+	["door_open", DOOR_SCENE, "Panel"],
+	["door_mat", DOOR_SCENE, "MatVisual"],
+	["lamp", LAMP_SCENE, "Visual"],
+	["car_slab", CAR_SCENE, "FloorVisual"],
+	["car_slab", CAR_SCENE, "RoofVisual"],
+]
 
 
 func before_each() -> void:
@@ -76,16 +94,87 @@ func test_a_framed_asset_is_three_margins_wide() -> void:
 		)
 
 
-func test_the_building_lays_the_tile_on_its_slabs() -> void:
+func test_the_side_wall_tile_is_as_wide_as_the_wall() -> void:
+	# Боковая стена не тайлится по горизонтали: тайл шире или уже стены — и она
+	# собирается из обрезков либо вылезает за свой габарит.
+	var tile := EnvTextures.tile("wall_side")
+	assert_not_null(tile)
+	if tile == null:
+		return
+	assert_eq(float(tile.diffuse_texture.get_width()), GreyboxLevel.WALL_WIDTH)
+
+
+func test_the_exit_asset_covers_the_whole_doorway() -> void:
+	# Выход — одна картинка, а не тайл: разойдётся с проёмом — вывеска повторится
+	# половинкой или обрежется.
+	var tile := EnvTextures.tile("exit_way")
+	assert_not_null(tile)
+	if tile == null:
+		return
+	assert_eq(
+		tile.diffuse_texture.get_size(), Vector2(GreyboxLevel.EXIT_WIDTH, GreyboxLevel.EXIT_HEIGHT)
+	)
+
+
+func test_an_asset_is_exactly_as_big_as_the_node_it_fills() -> void:
+	# У этих узлов растяжение по месту, и ассет не того размера молча растянется,
+	# а не упадёт. Размер места берётся из офсетов сцены, а не у живого узла: в
+	# дереве узел сам подтягивается под текстуру и о расхождении уже не скажет.
+	for row: Array in FITTED:
+		var asset := row[0] as String
+		var scene := row[1] as PackedScene
+		var node_name := row[2] as String
+
+		var blueprint := scene.instantiate()
+		var visual := blueprint.get_node(node_name) as TextureRect
+		var slot := Vector2(
+			visual.offset_right - visual.offset_left, visual.offset_bottom - visual.offset_top
+		)
+		blueprint.free()
+
+		var tile := EnvTextures.tile(asset)
+		assert_not_null(tile, "ассет %s собирается" % asset)
+		if tile == null:
+			continue
+		assert_eq(tile.diffuse_texture.get_size(), slot, "%s нарисован под %s" % [asset, node_name])
+
+
+func test_the_building_lays_the_tile_on_every_slab() -> void:
+	# Считать любой TextureRect в здании нельзя: их носят и кабина, и дверь, и
+	# лампа, и выход, — проверка проходила бы, даже если бы все перекрытия
+	# остались заливкой. Смотрим только на тела геометрии, и на все.
 	var level := await _building()
+	var solids := 0
 	var textured := 0
 	for body: Node in level.get_children():
+		# Ровно [StaticBody2D], а не «is»: кабина и лампа — [AnimatableBody2D],
+		# то есть тоже StaticBody2D, а их настил и абажур кладёт не уровень.
+		if body.get_class() != "StaticBody2D":
+			continue
+		solids += 1
 		for child: Node in body.get_children():
 			var panel := child as TextureRect
 			if panel != null and panel.texture is CanvasTexture:
 				textured += 1
 
-	assert_gt(textured, 0, "перекрытия собраны из ассета, а не из заливки")
+	assert_gt(solids, 0, "геометрия здания собрана")
+	assert_eq(textured, solids, "каждое тело геометрии закрыто ассетом, а не заливкой")
+
+
+func test_a_strip_thinner_than_its_tile_keeps_its_height() -> void:
+	# Полоса стены над окном тоньше своего тайла: 14 px против 32 px. По умолчанию
+	# [TextureRect] объявляет минимальным размером размер текстуры, и [Control]
+	# поднимал полосу до размера тайла — стена закрывала верхнюю треть проёма, и
+	# город в окне пропадал. Правило общее: место задаёт размер, а не картинка.
+	var level := await _building()
+	var found := false
+	for panel: TextureRect in _rects_of(level):
+		if not is_equal_approx(panel.size.x, level.rules.width):
+			continue
+		if is_equal_approx(panel.size.y, GreyboxLevel.WINDOW_TOP):
+			found = true
+
+	assert_true(found, "полоса стены над окном осталась во всю свою толщину")
 
 
 func test_every_light_stands_above_the_canvas() -> void:
@@ -99,7 +188,17 @@ func test_every_light_stands_above_the_canvas() -> void:
 		var spot := light as PointLight2D
 		if spot == null:
 			continue
-		assert_gt(spot.height, 0.0, "источник %s поднят над холстом" % spot.name)
+		# Проверяется не поле, а то, что дойдёт до шейдера: движок множит высоту
+		# на средний масштаб узла, а масштаб у наших источников любой.
+		var scaled := spot.height * (absf(spot.scale.x) + absf(spot.scale.y)) * 0.5
+		# В здании два вида источников: заливка этажа со столбом шахты и пятно
+		# лампы. Высота у них разная, поэтому ожидание выбирается по близости.
+		var wanted := (
+			LightTextures.SPOT_HEIGHT
+			if absf(scaled - LightTextures.SPOT_HEIGHT) < absf(scaled - LightTextures.FILL_HEIGHT)
+			else LightTextures.FILL_HEIGHT
+		)
+		assert_almost_eq(scaled, wanted, 1.0, "источник %s поднят на свою высоту" % spot.name)
 
 
 func _building() -> GreyboxLevel:
@@ -110,10 +209,23 @@ func _building() -> GreyboxLevel:
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
 	level.rules = rules
 	level.building_seed = 1
+	# Проверяется, что здание собрано из ассетов, а не что бой выигрывается:
+	# агенты и их пули здесь только добавляли бы кадров и случайности.
+	level.spawn_agents = false
 	add_child_autofree(level)
 	for _frame: int in SETTLE_FRAMES:
 		await get_tree().process_frame
 	return level
+
+
+func _rects_of(node: Node) -> Array[TextureRect]:
+	var found: Array[TextureRect] = []
+	var rect := node as TextureRect
+	if rect != null:
+		found.append(rect)
+	for child: Node in node.get_children():
+		found.append_array(_rects_of(child))
+	return found
 
 
 func _lights_of(node: Node) -> Array[Light2D]:

@@ -13,16 +13,15 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# Общее с поиском Godot не переписывается: код возврата таймаута, приведение
+# вывода к тексту и UTF-8 на выходе одинаковы для обоих инструментов, и свои
+# копии этих трёх разошлись бы с оригиналом при первой же правке.
+from godot_bin import TIMEOUT_EXIT_CODE, _as_text, use_utf8_output
 
 # Версия, на которой пайплайн собран и проверен (ADR-0011).
 EXPECTED_VERSION = "5.2"
-
-# Код возврата для «Blender не уложился в таймаут» — как у утилиты timeout(1).
-TIMEOUT_EXIT_CODE = 124
 
 
 def _program_files_candidates() -> list[Path]:
@@ -85,14 +84,6 @@ def require_blender() -> str:
     return blender
 
 
-def _as_text(value: str | bytes | None) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, bytes):
-        return value.decode("utf-8", errors="replace")
-    return value
-
-
 def run_script(blender: str, script: Path, args: list[str] | None = None, timeout: int = 600) -> tuple[int, str]:
     """Прогоняет скрипт в Blender без окна и возвращает (код возврата, вывод).
 
@@ -130,12 +121,6 @@ def version_of(blender: str) -> str:
     )
     first = (completed.stdout or "").strip().splitlines()
     return first[0].strip() if first else ""
-
-
-def use_utf8_output() -> None:
-    """Вывод в UTF-8 независимо от кодовой страницы консоли Windows."""
-    for stream in (sys.stdout, sys.stderr):
-        stream.reconfigure(encoding="utf-8", errors="replace")
 
 
 def main() -> int:

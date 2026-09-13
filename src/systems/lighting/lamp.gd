@@ -96,8 +96,8 @@ func _make_light() -> PointLight2D:
 	light.color = LIGHT_COLOR
 	light.energy = LIGHT_ENERGY
 	light.shadow_enabled = true
-	light.height = LightTextures.SPOT_HEIGHT
 	light.scale = Vector2.ONE * (LIGHT_RADIUS * 2.0 / float(LightTextures.SIZE))
+	LightTextures.raise(light, LightTextures.SPOT_HEIGHT)
 	return light
 
 

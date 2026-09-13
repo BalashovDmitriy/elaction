@@ -42,8 +42,9 @@ Blender — **5.2.1**, ставится `winget install --id BlenderFoundation.B
 `tools/blender_bin.py` по образцу `tools/godot_bin.py`. Рендер идёт headless:
 `blender --background --python tools/render_actors.py`.
 
-Процедурная половина живёт в `.venv` рядом с gdtoolkit: `Pillow` и `numpy` уезжают
-в `requirements-dev.txt`.
+Процедурная половина требует `Pillow` и `numpy`. Они уезжают в отдельный
+`requirements-assets.txt`, а не в `requirements-dev.txt`: последний ставит CI и каждый
+клон, а генератор им не нужен — в репозитории лежат готовые PNG.
 
 ### 2. Ассеты — производные, но версионируются
 
@@ -171,7 +172,8 @@ border включён, сжатие lossless. Иначе у каждого кл�
 
 - В проекте появляется **второй внешний инструмент** — Blender 5.2.1 рядом с Godot 4.7.2,
   и его версия попадает в README и в правила проекта.
-- `requirements-dev.txt` обрастает Pillow и numpy.
+- Появляется `requirements-assets.txt` с Pillow и numpy — отдельно от того, что
+  ставит CI.
 - `assets/sprites/` перестаёт быть пустой папкой: туда едут PNG и `.import`.
 - **ADR-0002 правится в двух местах:** пайплайн (вариант A → гибрид A и C) и нормал-мапы
   (Laigter → расчёт из геометрии). Сам визуальный ориентир — HD пиксель-арт с

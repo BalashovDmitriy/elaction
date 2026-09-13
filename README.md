@@ -54,15 +54,22 @@ M6 ложится на рельеф. Цветными прямоугольник
   winget install --id GodotEngine.GodotEngine
   ```
 
-- Python 3.12 или новее — для линтеров, хуков и генератора ассетов.
+- Python 3.12 или новее — для линтеров и хуков.
 
-Только для перерисовки ассетов — играть и проходить проверки можно без него, потому что
-готовые PNG лежат в репозитории ([ADR-0011](docs/adr/0011-asset-pipeline.md)):
+Играть, проходить проверки и собирать релиз можно только с этими двумя: готовые PNG
+лежат в репозитории ([ADR-0011](docs/adr/0011-asset-pipeline.md)). Ниже — то, что нужно
+только для **перерисовки** ассетов:
 
 - [Blender 5.2.1](https://www.blender.org/download/) — рендер актёров:
 
   ```powershell
   winget install --id BlenderFoundation.Blender
+  ```
+
+- Pillow и numpy — генератор окружения:
+
+  ```powershell
+  .venv/Scripts/pip install -r requirements-assets.txt
   ```
 
 ### Настройка окружения

@@ -28,7 +28,8 @@ static func _stretched(profile: Texture2D, area: Rect2, tint: Color, strength: f
 	light.color = tint
 	light.energy = strength
 	light.shadow_enabled = false
-	light.height = LightTextures.FILL_HEIGHT
 	light.position = area.position + area.size * 0.5
 	light.scale = area.size / float(LightTextures.SIZE)
+	# Высота ставится после масштаба: она в него и упирается.
+	LightTextures.raise(light, LightTextures.FILL_HEIGHT)
 	return light
