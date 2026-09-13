@@ -13,8 +13,11 @@ extends CharacterBody2D
 signal died(agent: Enemy)
 
 const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
-## Живым агент покрашен в сцене; здесь — только цвет трупа.
-const DEAD_COLOR := Color(0.38, 0.20, 0.20)
+## Сколько агент падает, прежде чем лечь: смерть — две позы (ADR-0011, п. 12).
+const FALLING_TIME: float = 0.25
+
+## Сколько держится поза выстрела, с.
+const SHOOT_POSE_TIME: float = 0.25
 
 @export var walk_speed: float = 55.0
 @export var gravity: float = 900.0
@@ -43,10 +46,16 @@ var _brain := EnemyBrain.new()
 var _target: Otto = null
 var _corpse_left: float = 0.0
 var _in_the_dark: bool = false
+## Фаза ходьбы, поза выстрела и падения, признак раздавленного — всё как у Otto.
+var _walk_phase: float = 0.0
+var _walking: bool = false
+var _shooting: float = 0.0
+var _falling_over: float = 0.0
+var _crushed: bool = false
 ## Насколько агент злее обычного: 1 — как в первом здании, больше — злее.
 var _menace: float = 1.0
 
-@onready var _body: ColorRect = $Body
+@onready var _body: Sprite2D = $Body
 @onready var _floor_probe: RayCast2D = $FloorProbe
 
 
@@ -61,7 +70,9 @@ func _physics_process(delta: float) -> void:
 		# Тело доезжает до пола: убитый в прыжке не должен зависать в воздухе.
 		_apply_gravity(delta)
 		move_and_slide()
+		_walking = false
 		_rot(delta)
+		_update_look(delta)
 		return
 
 	var alive_target := _target != null and not _target.is_dead()
@@ -77,6 +88,8 @@ func _physics_process(delta: float) -> void:
 	velocity.x = walk_speed * _brain.facing if walking else 0.0
 	_apply_gravity(delta)
 	move_and_slide()
+	_walking = walking
+	_update_look(delta)
 
 
 ## Выпускает агента из двери: он выходит в сторону [param towards].
@@ -108,13 +121,15 @@ func take_bullet() -> void:
 
 
 ## Убивает агента: пулей, ногой или упавшей лампой в M4b.
-func kill() -> void:
+## [param crushed] — придавило упавшей лампой: у такой смерти своя поза.
+func kill(crushed: bool = false) -> void:
 	if _brain.is_dead():
 		return
+	_crushed = crushed
 	_brain.kill()
 	velocity = Vector2.ZERO
 	_corpse_left = corpse_time
-	_body.color = DEAD_COLOR
+	_falling_over = FALLING_TIME
 	died.emit(self)
 
 
@@ -149,6 +164,26 @@ func _apply_gravity(delta: float) -> void:
 		velocity.y = minf(velocity.y + gravity * delta, max_fall_speed)
 
 
+## Картинка на этот кадр: поза, сторона и ход ходьбы. Устроено так же, как
+## у Otto, — разница только в наборе поз: агент не приседает и не прыгает.
+func _update_look(delta: float) -> void:
+	_shooting = maxf(_shooting - delta, 0.0)
+	_falling_over = maxf(_falling_over - delta, 0.0)
+	if _walking:
+		_walk_phase = ActorPose.advance(_walk_phase, delta)
+	else:
+		_walk_phase = 0.0
+
+	_body.texture = SpriteTextures.actor("agent", _pose())
+	_body.flip_h = _brain.facing < 0.0
+
+
+func _pose() -> String:
+	return ActorPose.of_agent(
+		_brain.is_dead(), _walking, _crushed, _falling_over > 0.0, _shooting > 0.0, _walk_phase
+	)
+
+
 ## Досчитывает время, которое тело лежит на полу, и убирает его.
 func _rot(delta: float) -> void:
 	_corpse_left -= delta
@@ -157,6 +192,7 @@ func _rot(delta: float) -> void:
 
 
 func _fire() -> void:
+	_shooting = SHOOT_POSE_TIME
 	var bullet := BULLET_SCENE.instantiate() as Bullet
 	bullet.direction = _brain.facing
 	bullet.speed = bullet_speed

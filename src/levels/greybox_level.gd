@@ -5,7 +5,7 @@ extends Node2D
 ##
 ## Где что стоит, решает раскладка по правилам и сиду; уровень только расставляет
 ## узлы и связывает их между собой. Геометрия собрана из ассетов окружения
-## ([EnvTextures], ADR-0011), свет к ним пришёл раньше — в M6.
+## ([SpriteTextures], ADR-0011), свет к ним пришёл раньше — в M6.
 
 ## Otto вышел из здания, собрав все документы.
 signal building_cleared
@@ -63,6 +63,16 @@ const LAMP_HANG_HEIGHT: float = 60.0
 const EXIT_WIDTH: float = 64.0
 const EXIT_HEIGHT: float = 40.0
 
+## Машина у выхода: ею оригинал заканчивает здание (ADR-0011, пункт 14).
+## Стоит рядом с проёмом и уезжает, увозя Otto; следующее здание собирается
+## после отъезда, а не в тот же кадр.
+##
+## Габарит нарочно не записан здесь второй раз: его знает сам ассет, а кадр ему
+## задаёт `tools/render_actors.py`. Своя копия числа разъехалась бы с кадром при
+## первой же правке машины, и та повисла бы над полом или утонула в нём.
+const CAR_GAP: float = 12.0
+const CAR_SPEED: float = 320.0
+
 ## Насколько злее агенты и насколько хуже слушается кабина по тревоге.
 const ALARM_MENACE: float = 1.5
 const ALARM_CAR_DELAY: float = 0.6
@@ -105,6 +115,11 @@ var _back_walls: Node2D = null
 var _lamps: Array[Lamp] = []
 ## Здание сдано. Событие однократное: по нему main собирает следующее здание.
 var _cleared: bool = false
+## Машина у выхода и её отъезд: пока она едет, здание ещё не сдано.
+var _car: Sprite2D = null
+var _car_leaving: bool = false
+## Куда машина уезжает: -1 влево, +1 вправо. Та же сторона, с которой она стоит.
+var _car_towards: float = 1.0
 var _exit_position := Vector2.ZERO
 
 @onready var otto: Otto = $Otto
@@ -142,8 +157,11 @@ func _ready() -> void:
 
 ## Гасит всё, что уехало из кадра. Источников в здании шестьдесят, а в кадр
 ## влезает два с половиной этажа — ADR-0010, пункт 8.
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	var view := otto.camera_view()
+	if _car_leaving:
+		_move_car(delta, view)
+
 	# Город отстаёт от камеры, оттого и кажется далёким.
 	_city.position = view.position * CITY_PARALLAX
 
@@ -213,12 +231,12 @@ static func slab_segments(
 
 func _build_geometry() -> void:
 	var height := rules.total_height()
-	var side_tile := EnvTextures.tile("wall_side")
+	var side_tile := SpriteTextures.tile("wall_side")
 	_build_solid(Rect2(0.0, 0.0, WALL_WIDTH, height), side_tile)
 	_build_solid(Rect2(rules.width - WALL_WIDTH, 0.0, WALL_WIDTH, height), side_tile)
 
 	# Тайл берётся один раз на здание: плит в нём под три сотни, а текстура одна.
-	var slab_tile := EnvTextures.tile("slab")
+	var slab_tile := SpriteTextures.tile("slab")
 	for index in rules.floors:
 		var surface := rules.floor_surface(index)
 		var gaps := _plan.gaps_on(rules, index)
@@ -324,11 +342,49 @@ func _spawn_exit() -> void:
 	var collision := CollisionShape2D.new()
 	collision.shape = shape
 	zone.add_child(collision)
-	zone.add_child(_tiled(area.size, -area.size * 0.5, EnvTextures.tile("exit_way")))
+	zone.add_child(_tiled(area.size, -area.size * 0.5, SpriteTextures.tile("exit_way")))
 
 	zone.body_entered.connect(_on_exit_entered)
 	add_child(zone)
 	_exit_position = zone.global_position
+	_spawn_car(area)
+
+
+## Машина у выхода. Стоит на полу нижнего этажа рядом с проёмом, за геометрией:
+## она снаружи здания, и заходить на неё Otto не может — это картинка, не тело.
+func _spawn_car(exit_area: Rect2) -> void:
+	var texture := SpriteTextures.actor("car", "parked")
+	var size := texture.get_size()
+	_car = Sprite2D.new()
+	_car.texture = texture
+	_car.centered = false
+	_car.z_index = -2
+	# Уезжает в ближнюю сторону: там же и стоит. В дальнюю машина ехала бы через
+	# всё здание, и «уехал» растянулось бы на пять секунд вместо одной.
+	_car_towards = -1.0 if exit_area.get_center().x < rules.width * 0.5 else 1.0
+	var x := exit_area.get_center().x + _car_towards * (EXIT_WIDTH * 0.5 + CAR_GAP)
+	_car.position = Vector2(x - size.x * 0.5, exit_area.end.y - size.y)
+	_car.flip_h = _car_towards < 0.0
+	add_child(_car)
+
+
+## Otto сел в машину: она уезжает, и только по её отъезду здание считается
+## сданным (ADR-0011, пункт 14). Otto на это время прячется, как за дверью.
+func _drive_away(runner: Otto) -> void:
+	_car_leaving = true
+	runner.enter_door()
+
+
+func _move_car(delta: float, view: Rect2) -> void:
+	_car.position.x += _car_towards * CAR_SPEED * delta
+
+	# Уехала — значит уехала из кадра, а не за границу здания: кадр и есть то,
+	# что видит игрок, а до границы машина ползла бы впятеро дольше.
+	var width := _car.texture.get_width()
+	var gone := _car.position.x + width < view.position.x or _car.position.x > view.end.x
+	if gone:
+		_car_leaving = false
+		building_cleared.emit()
 
 
 func _on_exit_entered(body: Node2D) -> void:
@@ -338,7 +394,7 @@ func _on_exit_entered(body: Node2D) -> void:
 	if GameState.instance().all_documents_collected():
 		if not _cleared:
 			_cleared = true
-			building_cleared.emit()
+			_drive_away(runner)
 		return
 
 	# Перенос отложен: сигнал приходит посреди разбора перекрытий, и двигать
@@ -363,7 +419,7 @@ func _send_back_for_documents(runner: Otto) -> void:
 func _on_lamp_crushed(agent: Enemy) -> void:
 	if agent.is_dead():
 		return
-	agent.kill()
+	agent.kill(true)
 	var points := GameState.kill_score(GameState.LAMP_SCORE, agent.is_in_the_dark())
 	GameState.instance().add_score(points)
 
@@ -506,8 +562,8 @@ func _build_back_walls() -> void:
 
 	var gaps := window_gaps(rules.width, WINDOWS_PER_FLOOR, WINDOW_SIZE.x)
 	# Тайлы берутся один раз на здание: полос и рам под три сотни, а текстур две.
-	var wall_tile := EnvTextures.tile("wall")
-	var frame_tile := EnvTextures.tile("window_frame")
+	var wall_tile := SpriteTextures.tile("wall")
+	var frame_tile := SpriteTextures.tile("window_frame")
 	# С первого этажа, а не с нулевого: нулевой — крыша, комнаты за ней нет.
 	# [method BuildingRules.story_top] отдаёт для неё верх здания, и стена вышла бы
 	# полосой в небе над тем местом, где Otto начинает, с обрезанными окнами.
@@ -547,14 +603,14 @@ func _add_window_frame(opening: Rect2, tile: CanvasTexture) -> void:
 	if opening.size.x <= 0.0 or opening.size.y <= 0.0:
 		return
 
-	var overlap := EnvTextures.FRAME_MARGIN * 0.5
+	var overlap := SpriteTextures.FRAME_MARGIN * 0.5
 	var frame := NinePatchRect.new()
 	frame.texture = tile
 	frame.draw_center = false
-	frame.patch_margin_left = int(EnvTextures.FRAME_MARGIN)
-	frame.patch_margin_top = int(EnvTextures.FRAME_MARGIN)
-	frame.patch_margin_right = int(EnvTextures.FRAME_MARGIN)
-	frame.patch_margin_bottom = int(EnvTextures.FRAME_MARGIN)
+	frame.patch_margin_left = int(SpriteTextures.FRAME_MARGIN)
+	frame.patch_margin_top = int(SpriteTextures.FRAME_MARGIN)
+	frame.patch_margin_right = int(SpriteTextures.FRAME_MARGIN)
+	frame.patch_margin_bottom = int(SpriteTextures.FRAME_MARGIN)
 	frame.position = opening.position - Vector2(overlap, overlap)
 	frame.size = opening.size + Vector2(overlap, overlap) * 2.0
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -567,7 +623,7 @@ func _build_city() -> void:
 	_city.z_index = -9
 	add_child(_city)
 
-	var stone := EnvTextures.tile("city_wall")
+	var stone := SpriteTextures.tile("city_wall")
 	for tower: Skyline.Tower in Skyline.generate(building_seed, CITY_AREA):
 		_add_city_panel(tower.rect, CITY, stone)
 		for window: Rect2 in tower.windows:

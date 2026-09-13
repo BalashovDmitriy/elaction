@@ -44,8 +44,39 @@ NORMAL_SUFFIX = "_n"
 SPECULAR_SUFFIX = "_s"
 
 # Ширина рамки девятикусочных ассетов. Та же величина стоит в
-# `EnvTextures.FRAME_MARGIN`, и тест следит, чтобы они не разошлись.
+# `SpriteTextures.FRAME_MARGIN`, и тест следит, чтобы они не разошлись.
 FRAME_MARGIN: int = 8
+
+
+def normals(
+    height_map: np.ndarray,
+    wrap_x: bool = False,
+    wrap_y: bool = False,
+    strength: float = NORMAL_STRENGTH,
+) -> np.ndarray:
+    """Карта нормалей из карты высот, готовая к записи в PNG.
+
+    Вынесена из [class Canvas] отдельно, потому что ей пользуется и генератор
+    актёров: у него высота приходит из рендера глубины в Blender, а соглашение
+    о каналах должно остаться одно на проект.
+    """
+    padded = np.pad(height_map, ((1, 1), (0, 0)), mode="wrap" if wrap_y else "edge")
+    padded = np.pad(padded, ((0, 0), (1, 1)), mode="wrap" if wrap_x else "edge")
+
+    gradient_x = (padded[1:-1, 2:] - padded[1:-1, :-2]) * 0.5
+    gradient_y = (padded[2:, 1:-1] - padded[:-2, 1:-1]) * 0.5
+
+    normal_x = -gradient_x * strength
+    # В картинке y растёт вниз, а в нормали зелёный смотрит вверх, поэтому
+    # знак меняется: склон, уходящий вниз по картинке, светится сверху.
+    normal_y = gradient_y * strength
+    if not NORMAL_GREEN_UP:
+        normal_y = -normal_y
+    normal_z = np.ones_like(normal_x)
+
+    length = np.sqrt(normal_x**2 + normal_y**2 + normal_z**2)
+    stacked = np.stack((normal_x / length, normal_y / length, normal_z / length), axis=-1)
+    return np.clip(np.rint((stacked * 0.5 + 0.5) * 255.0), 0, 255).astype(np.uint8)
 
 
 class Canvas:
@@ -117,23 +148,7 @@ class Canvas:
 
     def normal_map(self) -> np.ndarray:
         """Нормаль из карты высот: наклон поверхности, посчитанный, а не угаданный."""
-        padded = np.pad(self.height_map, ((1, 1), (0, 0)), mode="wrap" if self.wrap_y else "edge")
-        padded = np.pad(padded, ((0, 0), (1, 1)), mode="wrap" if self.wrap_x else "edge")
-
-        gradient_x = (padded[1:-1, 2:] - padded[1:-1, :-2]) * 0.5
-        gradient_y = (padded[2:, 1:-1] - padded[:-2, 1:-1]) * 0.5
-
-        normal_x = -gradient_x * NORMAL_STRENGTH
-        # В картинке y растёт вниз, а в нормали зелёный смотрит вверх, поэтому
-        # знак меняется: склон, уходящий вниз по картинке, светится сверху.
-        normal_y = gradient_y * NORMAL_STRENGTH
-        if not NORMAL_GREEN_UP:
-            normal_y = -normal_y
-        normal_z = np.ones_like(normal_x)
-
-        length = np.sqrt(normal_x**2 + normal_y**2 + normal_z**2)
-        stacked = np.stack((normal_x / length, normal_y / length, normal_z / length), axis=-1)
-        return np.clip(np.rint((stacked * 0.5 + 0.5) * 255.0), 0, 255).astype(np.uint8)
+        return normals(self.height_map, self.wrap_x, self.wrap_y)
 
     def specular_map(self) -> np.ndarray:
         """RGB — сила блика, альфа — его резкость: так карту читает CanvasTexture."""
@@ -374,6 +389,19 @@ def exit_way() -> Canvas:
     return canvas
 
 
+def bullet() -> Canvas:
+    """Пуля: 6×2, как коллизия в `bullet.tscn`. Горячая середина, тусклые концы.
+
+    Симметрично нарочно: `bullet.gd` не зеркалит спрайт, потому что направление
+    показывает сам полёт. Яркий конец вместо середины летел бы влево хвостом
+    вперёд — половину выстрелов в игре.
+    """
+    canvas = Canvas(6, 2)
+    canvas.rect(0, 0, 6, 2, palette.mix(palette.BULLET, palette.IMPACT, 0.5), 0.6, palette.PAINT)
+    canvas.rect(2, 0, 2, 2, palette.BULLET, 0.9, palette.PAINT)
+    return canvas
+
+
 def city_wall() -> Canvas:
     """Стена дальней башни. Света здания на неё не падает — рельеф ей ни к чему,
     но зерно нужно: ровная заливка на весь силуэт читается как дыра в кадре."""
@@ -397,6 +425,7 @@ ASSETS: dict[str, Callable[[], Canvas]] = {
     "escalator_belt": escalator_belt,
     "lamp": lamp,
     "exit_way": exit_way,
+    "bullet": bullet,
     "city_wall": city_wall,
 }
 

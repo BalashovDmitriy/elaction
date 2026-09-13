@@ -41,7 +41,7 @@ func setup(descent: Vector2, via: Vector2) -> void:
 	_ramp.points = PackedVector2Array([Vector2.ZERO, via, descent])
 	# Полотно тянется тайлом вдоль линии: ступени идут ровным шагом при любой
 	# длине пролёта, а растянутый на весь пролёт тайл шага бы не дал.
-	var belt := EnvTextures.tile("escalator_belt")
+	var belt := SpriteTextures.tile("escalator_belt")
 	if belt == null:
 		return
 	_ramp.texture = belt

@@ -110,6 +110,14 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "muzzle_flash", "actions": ["shoot"], "hold": 0.08},
 		{"label": "settled", "actions": [], "hold": 1.0},
 	],
+	"M7B":
+	[
+		{"label": "otto_stands", "actions": [], "hold": 0.8},
+		{"label": "otto_walks", "actions": ["move_right"], "hold": 1.2},
+		{"label": "otto_shoots", "actions": ["shoot"], "hold": 0.1},
+		{"label": "otto_jumps", "actions": ["move_right", "jump"], "hold": 0.35},
+		{"label": "otto_crouches", "actions": ["move_down"], "hold": 0.8},
+	],
 }
 const DEFAULT_PLAN := "M1"
 

@@ -44,7 +44,7 @@ var _light: PointLight2D = null
 
 func _ready() -> void:
 	_fall.speed = fall_speed
-	_visual.texture = EnvTextures.tile("lamp")
+	_visual.texture = SpriteTextures.tile("lamp")
 	_light = _make_light()
 	add_child(_light)
 

@@ -11,18 +11,11 @@ signal died
 
 const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
 
-## Цвет коробки по состоянию: временная замена спрайтам, настоящие придут в M7.
-const IDLE_COLOR := Color(0.85, 0.78, 0.35)
-const STATE_COLORS: Dictionary = {
-	OttoStateMachine.State.WALK: Color(0.95, 0.85, 0.40),
-	OttoStateMachine.State.CROUCH: Color(0.70, 0.60, 0.30),
-	OttoStateMachine.State.JUMP: Color(0.60, 0.85, 0.95),
-	OttoStateMachine.State.FALL: Color(0.45, 0.65, 0.85),
-	OttoStateMachine.State.RIDE: Color(0.55, 0.80, 0.60),
-	# Тёмно-жёлтый, а не красный: в грейбоксе труп Otto не должен путаться
-	# с живым агентом, а тот красный.
-	OttoStateMachine.State.DEAD: Color(0.46, 0.36, 0.18),
-}
+## Сколько держится поза выстрела, с. Выстрел мгновенный, а увидеть его надо.
+const SHOOT_POSE_TIME: float = 0.18
+
+## Сколько Otto падает, прежде чем лечь: смерть — две позы (ADR-0011, пункт 12).
+const FALLING_TIME: float = 0.3
 
 @export var walk_speed: float = 90.0
 ## Высота прыжка = jump_speed² / (2 · gravity). При 380 и 900 это ~80 px:
@@ -50,13 +43,20 @@ var _car: ElevatorCar = null
 var _headroom: float = 0.0
 ## Куда Otto смотрит: -1 влево, +1 вправо. Туда же летят его пули.
 var _facing: float = 1.0
+## Фаза ходьбы: целая часть — номер кадра из трёх.
+var _walk_phase: float = 0.0
+## Сколько ещё держать позу выстрела и позу падения, с.
+var _shooting: float = 0.0
+var _falling_over: float = 0.0
+## Придавлен кабиной: у такой смерти своя поза.
+var _crushed: bool = false
 var _gun := Gun.new()
 ## Верхняя точка текущего полёта: от неё считается глубина падения.
 var _apex_y: float = 0.0
 
 @onready var _standing_shape: CollisionShape2D = $StandingShape
 @onready var _crouching_shape: CollisionShape2D = $CrouchingShape
-@onready var _body: ColorRect = $Body
+@onready var _body: Sprite2D = $Body
 @onready var _camera: Camera2D = $Camera2D
 @onready var _kick_zone: Area2D = $KickZone
 
@@ -84,9 +84,14 @@ func _physics_process(delta: float) -> void:
 		# Его несут, а не роняют: падение с этой высоты не копится.
 		_apex_y = global_position.y
 		_apply_pose(state)
+		_update_look(delta)
 		return
 
-	if absf(_snapshot.move) > OttoStateMachine.MOVE_THRESHOLD:
+	# Мёртвый не поворачивается: труп лежит той стороной, которой упал. На цветной
+	# коробке этого было не видно, а спрайт зеркалится на глазах — и тыканье в
+	# стрелки крутило бы тело, пока идёт отсчёт до возвращения в игру.
+	var turning := absf(_snapshot.move) > OttoStateMachine.MOVE_THRESHOLD
+	if turning and state != OttoStateMachine.State.DEAD:
 		_facing = signf(_snapshot.move)
 	if _snapshot.shoot_pressed and state != OttoStateMachine.State.DEAD and _gun.can_fire():
 		_fire()
@@ -107,13 +112,18 @@ func _physics_process(delta: float) -> void:
 		_kick_enemies()
 	_track_fall()
 	_apply_pose(_states.state)
+	_update_look(delta)
 
 
 ## Убивает Otto: пуля, падение на дно шахты, сдавливание кабиной.
-func kill() -> void:
+## [param crushed] — придавило кабиной: у такой смерти своя поза, в оригинале
+## раздавленный показан отдельной картинкой (ADR-0011, пункт 12).
+func kill(crushed: bool = false) -> void:
 	if _states.is_dead():
 		return
+	_crushed = crushed
 	_states.kill()
+	_falling_over = FALLING_TIME
 	_repose()
 	died.emit()
 
@@ -133,6 +143,7 @@ func is_dead() -> bool:
 ## Без сброса [member _apex_y] упавший в шахту возвращался бы с чужой глубиной
 ## падения за спиной и разбивался бы на ровном месте.
 func revive() -> void:
+	_crushed = false
 	_states.reset()
 	velocity = Vector2.ZERO
 	_apex_y = global_position.y
@@ -245,6 +256,7 @@ func apply_camera_bounds(bounds: Rect2) -> void:
 
 ## Выпускает пулю. Высоту полёта задаёт поза: присев, Otto стреляет ниже.
 func _fire() -> void:
+	_shooting = SHOOT_POSE_TIME
 	var crouching := _states.state == OttoStateMachine.State.CROUCH
 	var height := shot_height_crouching if crouching else shot_height_standing
 
@@ -344,14 +356,24 @@ func _apply_pose(state: OttoStateMachine.State) -> void:
 	_crouching_shape.set_deferred("disabled", untouchable or not crouching)
 	_body.visible = not hidden
 
-	# Размер и посадку коробки берём из самой формы коллизии, чтобы вид и
-	# хитбокс не разъезжались при правке сцены.
-	var shape_node := _crouching_shape if crouching else _standing_shape
-	var box := shape_node.shape as RectangleShape2D
-	_body.size = box.size
-	_body.position = shape_node.position - box.size * 0.5
-	_body.color = _color_for(state)
+
+## Картинка на этот кадр: поза, сторона и ход ходьбы.
+##
+## Зовётся каждый кадр, а не на переходах, как [method _apply_pose]: ходьба
+## перебирает три кадра, а выстрел и падение держатся по таймеру.
+func _update_look(delta: float) -> void:
+	_shooting = maxf(_shooting - delta, 0.0)
+	_falling_over = maxf(_falling_over - delta, 0.0)
+	if _states.state == OttoStateMachine.State.WALK:
+		_walk_phase = ActorPose.advance(_walk_phase, delta)
+	else:
+		_walk_phase = 0.0
+
+	_body.texture = SpriteTextures.actor("otto", _pose())
+	_body.flip_h = _facing < 0.0
 
 
-func _color_for(state: OttoStateMachine.State) -> Color:
-	return STATE_COLORS.get(state, IDLE_COLOR)
+func _pose() -> String:
+	return ActorPose.of_otto(
+		_states.state, _crushed, _falling_over > 0.0, _shooting > 0.0, _walk_phase
+	)

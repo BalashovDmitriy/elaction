@@ -37,7 +37,7 @@ var _guest: Otto = null
 func _ready() -> void:
 	_visit.hide_time = hide_time
 	_visit.open_time = open_time
-	_mat_visual.texture = EnvTextures.tile("door_mat")
+	_mat_visual.texture = SpriteTextures.tile("door_mat")
 	_refresh_look()
 
 
@@ -96,7 +96,7 @@ func _release() -> void:
 
 
 func _refresh_look() -> void:
-	_panel.texture = EnvTextures.tile(_look())
+	_panel.texture = SpriteTextures.tile(_look())
 
 
 func _look() -> String:
