@@ -256,11 +256,147 @@ def window_frame() -> Canvas:
     return canvas
 
 
+## Размер створки двери: он же размер узла `Panel` в `door.tscn`.
+DOOR_SIZE = (24, 34)
+
+
+def _door(panel: Rgb, ajar: bool = False, opened: bool = False) -> Canvas:
+    """Створка двери: косяк, две филёнки и ручка.
+
+    Состояний у двери четыре, и они различаются не оттенком одного
+    прямоугольника, как было в greybox, а тем, что нарисовано внутри косяка.
+    """
+    width, height = DOOR_SIZE
+    canvas = Canvas(width, height)
+    canvas.rect(0, 0, width, height, palette.DOOR_FRAME, 0.7, palette.WOOD)
+
+    if opened:
+        # Открытая дверь — это не дверь, а проём: за ней темнота комнаты.
+        canvas.rect(2, 2, width - 4, height - 2, palette.SLAB_SHADOW, 0.15, palette.PLASTER)
+        return canvas
+
+    canvas.rect(2, 2, width - 4, height - 2, panel, 0.55, palette.WOOD)
+    shade = palette.mix(panel, palette.SLAB_SHADOW, 0.35)
+    canvas.rect(5, 5, width - 10, 11, shade, 0.42, palette.WOOD)
+    canvas.rect(5, 19, width - 10, 11, shade, 0.42, palette.WOOD)
+    canvas.rect(width - 6, height // 2 - 1, 2, 3, palette.METAL_TRIM, 0.95, palette.POLISHED_METAL)
+
+    if ajar:
+        # Приоткрытая: у косяка чёрная щель, и по ней видно, что створка пошла.
+        canvas.rect(2, 2, 4, height - 2, palette.SLAB_SHADOW, 0.2, palette.PLASTER)
+    return canvas
+
+
+def door() -> Canvas:
+    """Обычная дверь: из таких выходят агенты."""
+    return _door(palette.DOOR_PANEL)
+
+
+def door_red() -> Canvas:
+    """Красная дверь — за ней документ. Единственное красное в кадре."""
+    return _door(palette.DOOR_RED)
+
+
+def door_ajar() -> Canvas:
+    """Дверь пошла открываться."""
+    return _door(palette.DOOR_PANEL, ajar=True)
+
+
+def door_open() -> Canvas:
+    """Дверь открыта: за ней темнота комнаты."""
+    return _door(palette.DOOR_PANEL, opened=True)
+
+
+def door_mat() -> Canvas:
+    """Коврик у двери: по нему видно вход раньше, чем дверь откроется."""
+    canvas = Canvas(20, 3)
+    canvas.rect(0, 0, 20, 3, palette.MAT, 0.3, palette.FABRIC)
+    canvas.rect(0, 0, 20, 1, palette.mix(palette.MAT, palette.OTTO_SUIT, 0.3), 0.4, palette.FABRIC)
+    canvas.speckle(seed=1987, amount=6, area=(0, 0, 20, 3))
+    return canvas
+
+
+def car_slab() -> Canvas:
+    """Настил кабины: одна и та же плита идёт и на пол, и на крышу.
+
+    Размер — как у `RectangleShape2D_slab` в `elevator_car.tscn`. Металл
+    блестит заметно: по блику кабина и отличается от бетона перекрытия.
+    """
+    canvas = Canvas(40, 6)
+    canvas.rect(0, 0, 40, 6, palette.METAL, 0.7, palette.POLISHED_METAL)
+    canvas.rect(0, 0, 40, 1, palette.METAL_TRIM, 0.9, palette.POLISHED_METAL)
+    canvas.rect(0, 5, 40, 1, palette.METAL_SHADE, 0.5, palette.POLISHED_METAL)
+    for x in range(4, 40, 8):
+        canvas.rect(x, 2, 2, 2, palette.METAL_TRIM, 0.85, palette.POLISHED_METAL)
+    return canvas
+
+
+def escalator_belt() -> Canvas:
+    """Полотно эскалатора: тайл в одну ступень, тянется вдоль наклонной линии."""
+    canvas = Canvas(8, 6, wrap_x=True)
+    canvas.rect(0, 0, 8, 6, palette.METAL_SHADE, 0.6, palette.POLISHED_METAL)
+    canvas.rect(0, 0, 8, 1, palette.METAL_TRIM, 0.85, palette.POLISHED_METAL)
+    canvas.rect(0, 0, 1, 6, palette.SLAB_SHADOW, 0.35, palette.POLISHED_METAL)
+    return canvas
+
+
+def lamp() -> Canvas:
+    """Лампа под потолком: подвес, абажур и горящий низ.
+
+    Размер — как коллизия в `lamp.tscn`: она сбивается выстрелом в прыжке, и
+    менять её ради картинки нельзя (ADR-0011, пункт 4).
+    """
+    canvas = Canvas(16, 24)
+    canvas.rect(7, 0, 2, 8, palette.METAL_SHADE, 0.5, palette.POLISHED_METAL)
+    # Абажур расширяется книзу: строка за строкой, чтобы нормаль пошла конусом.
+    for row in range(8, 20):
+        half = 2 + (row - 8)
+        left = 8 - half
+        tone = palette.mix(palette.LAMP_SHADE, palette.METAL_SHADE, (19 - row) / 11.0 * 0.5)
+        canvas.rect(left, row, half * 2, 1, tone, 0.5 + (row - 8) * 0.03, palette.PAINT)
+    canvas.rect(2, 20, 12, 4, palette.LAMP_GLOW, 0.95, palette.PAINT)
+    return canvas
+
+
+def exit_way() -> Canvas:
+    """Выход на улицу: проём со светящейся вывеской над ним.
+
+    Размер — `GreyboxLevel.EXIT_WIDTH` на `EXIT_HEIGHT`. Зелёный тут
+    единственный: по нему выход виден с другого конца этажа.
+    """
+    canvas = Canvas(64, 40)
+    canvas.rect(0, 0, 64, 40, palette.WALL_SHADE, 0.6, palette.PLASTER)
+    canvas.rect(4, 10, 56, 30, palette.SLAB_SHADOW, 0.2, palette.PLASTER)
+    canvas.rect(2, 8, 60, 2, palette.METAL_TRIM, 0.8, palette.POLISHED_METAL)
+    canvas.rect(18, 1, 28, 7, palette.EXIT_SIGN, 0.9, palette.PAINT)
+    canvas.rect(20, 3, 24, 3, palette.mix(palette.EXIT_SIGN, palette.OTTO_SUIT, 0.7), 0.95, palette.PAINT)
+    return canvas
+
+
+def city_wall() -> Canvas:
+    """Стена дальней башни. Света здания на неё не падает — рельеф ей ни к чему,
+    но зерно нужно: ровная заливка на весь силуэт читается как дыра в кадре."""
+    canvas = Canvas(16, 16, wrap_x=True, wrap_y=True)
+    canvas.rect(0, 0, 16, 16, palette.CITY_BODY, 0.5, palette.CONCRETE)
+    canvas.speckle(seed=1988, amount=3, area=(0, 0, 16, 16))
+    return canvas
+
+
 ASSETS: dict[str, Callable[[], Canvas]] = {
     "slab": slab,
     "wall": wall,
     "wall_side": wall_side,
     "window_frame": window_frame,
+    "door": door,
+    "door_red": door_red,
+    "door_ajar": door_ajar,
+    "door_open": door_open,
+    "door_mat": door_mat,
+    "car_slab": car_slab,
+    "escalator_belt": escalator_belt,
+    "lamp": lamp,
+    "exit_way": exit_way,
+    "city_wall": city_wall,
 }
 
 

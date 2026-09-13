@@ -10,10 +10,12 @@ extends Node2D
 ## Документ взят, дверь перестала быть красной.
 signal document_taken
 
-const CLOSED_COLOR := Color(0.45, 0.42, 0.40)
-const DOCUMENT_COLOR := Color(0.72, 0.25, 0.25)
-const OPENING_COLOR := Color(0.62, 0.58, 0.54)
-const OPEN_COLOR := Color(0.09, 0.09, 0.12)
+## Ассеты створки: состояние двери — это не оттенок одного прямоугольника,
+## а разная картинка (ADR-0011).
+const CLOSED_ASSET := "door"
+const DOCUMENT_ASSET := "door_red"
+const OPENING_ASSET := "door_ajar"
+const OPEN_ASSET := "door_open"
 
 ## Сколько Otto может пересидеть внутри, с.
 @export var hide_time: float = 5.0
@@ -28,12 +30,14 @@ var _visit := DoorVisit.new()
 var _guest: Otto = null
 
 @onready var _mat: Area2D = $Mat
-@onready var _panel: ColorRect = $Panel
+@onready var _panel: TextureRect = $Panel
+@onready var _mat_visual: TextureRect = $MatVisual
 
 
 func _ready() -> void:
 	_visit.hide_time = hide_time
 	_visit.open_time = open_time
+	_mat_visual.texture = EnvTextures.tile("door_mat")
 	_refresh_look()
 
 
@@ -92,11 +96,12 @@ func _release() -> void:
 
 
 func _refresh_look() -> void:
+	_panel.texture = EnvTextures.tile(_look())
+
+
+func _look() -> String:
 	if _visit.phase == DoorVisit.Phase.OPEN:
-		_panel.color = OPEN_COLOR
-	elif _visit.phase == DoorVisit.Phase.OPENING:
-		_panel.color = OPENING_COLOR
-	elif has_document:
-		_panel.color = DOCUMENT_COLOR
-	else:
-		_panel.color = CLOSED_COLOR
+		return OPEN_ASSET
+	if _visit.phase == DoorVisit.Phase.OPENING:
+		return OPENING_ASSET
+	return DOCUMENT_ASSET if has_document else CLOSED_ASSET

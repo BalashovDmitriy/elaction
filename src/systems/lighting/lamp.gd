@@ -19,8 +19,9 @@ signal crushed(agent: Enemy)
 ## он знает сам — этаж привязан к обработчику, когда лампу вешали.
 signal fell
 
-const LIT_COLOR := Color(0.95, 0.90, 0.55)
-const FALLING_COLOR := Color(0.72, 0.66, 0.38)
+## Сбитая лампа гаснет: тем же ассетом, но притушенным. Отдельной картинки
+## на это не заводится — гаснет свет, а не меняется сама лампа.
+const FALLING_TINT := Color(0.5, 0.5, 0.56)
 
 ## Пятно света под лампой: радиус, цвет и сила.
 ##
@@ -37,13 +38,13 @@ var _fall := LampFall.new()
 var _light: PointLight2D = null
 
 @onready var _crush_zone: Area2D = $CrushZone
-@onready var _visual: ColorRect = $Visual
+@onready var _visual: TextureRect = $Visual
 @onready var _shape: CollisionShape2D = $Shape
 
 
 func _ready() -> void:
 	_fall.speed = fall_speed
-	_visual.color = LIT_COLOR
+	_visual.texture = EnvTextures.tile("lamp")
 	_light = _make_light()
 	add_child(_light)
 
@@ -77,7 +78,7 @@ func hang(hang_height: float) -> void:
 func shoot_down() -> void:
 	if not _fall.start():
 		return
-	_visual.color = FALLING_COLOR
+	_visual.modulate = FALLING_TINT
 
 
 ## Гасит или зажигает пятно лампы. Зовёт уровень, отбирая видимые этажи:

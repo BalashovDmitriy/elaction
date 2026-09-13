@@ -17,7 +17,22 @@ const SPECULAR_SUFFIX := "_s"
 
 ## Ассеты, которые просит уровень. По этому списку тест проверяет, что все три
 ## карты каждого ассета на месте и одного размера, — а не «вот этот спрайт есть».
-const NAMES: PackedStringArray = ["slab", "wall", "wall_side", "window_frame"]
+const NAMES: PackedStringArray = [
+	"slab",
+	"wall",
+	"wall_side",
+	"window_frame",
+	"door",
+	"door_red",
+	"door_ajar",
+	"door_open",
+	"door_mat",
+	"car_slab",
+	"escalator_belt",
+	"lamp",
+	"exit_way",
+	"city_wall",
+]
 
 ## Ширина рамки девятикусочных ассетов: та же величина стоит в
 ## `tools/render_env.py`, и тест следит, чтобы они не разошлись.

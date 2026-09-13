@@ -39,6 +39,11 @@ func _physics_process(delta: float) -> void:
 func setup(descent: Vector2, via: Vector2) -> void:
 	_bottom_pad.position = descent
 	_ramp.points = PackedVector2Array([Vector2.ZERO, via, descent])
+	# Полотно тянется тайлом вдоль линии: ступени идут ровным шагом при любой
+	# длине пролёта, а растянутый на весь пролёт тайл шага бы не дал.
+	_ramp.texture = EnvTextures.tile("escalator_belt")
+	_ramp.texture_mode = Line2D.LINE_TEXTURE_TILE
+	_ramp.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 
 
 ## Везёт ли эскалатор кого-нибудь прямо сейчас.

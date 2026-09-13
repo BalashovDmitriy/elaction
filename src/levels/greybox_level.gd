@@ -333,7 +333,11 @@ func _spawn_exit() -> void:
 	var collision := CollisionShape2D.new()
 	collision.shape = shape
 	zone.add_child(collision)
-	zone.add_child(_panel(area.size, -area.size * 0.5, EXIT_COLOR))
+	var way := EnvTextures.tile("exit_way")
+	if way == null:
+		zone.add_child(_panel(area.size, -area.size * 0.5, EXIT_COLOR))
+	else:
+		zone.add_child(_tiled(area.size, -area.size * 0.5, way))
 
 	zone.body_entered.connect(_on_exit_entered)
 	add_child(zone)
@@ -581,10 +585,12 @@ func _build_city() -> void:
 	_city.z_index = -9
 	add_child(_city)
 
+	var stone := EnvTextures.tile("city_wall")
 	for tower: Skyline.Tower in Skyline.generate(building_seed, CITY_AREA):
-		_add_city_panel(tower.rect, CITY)
+		_add_city_panel(tower.rect, CITY, stone)
 		for window: Rect2 in tower.windows:
-			_add_city_panel(window, CITY_WINDOW)
+			# Окно города — источник, а не поверхность: рельеф ему ни к чему.
+			_add_city_panel(window, CITY_WINDOW, null)
 
 
 ## Кусок дальнего плана. Свет здания на него не падает.
@@ -592,8 +598,12 @@ func _build_city() -> void:
 ## Маска гасится на каждой панели, а не на общем узле: [member CanvasItem.light_mask]
 ## детям не передаётся, и город в окне разгорался вместе с этажом — окно читалось
 ## как освещённая ниша, а не как улица.
-func _add_city_panel(rect: Rect2, color: Color) -> void:
-	var panel := _panel(rect.size, rect.position, color)
+func _add_city_panel(rect: Rect2, color: Color, tile: CanvasTexture = null) -> void:
+	var panel: Control = (
+		_panel(rect.size, rect.position, color)
+		if tile == null
+		else _tiled(rect.size, rect.position, tile)
+	)
 	panel.light_mask = 0
 	_city.add_child(panel)
 
