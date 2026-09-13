@@ -12,6 +12,9 @@ extends Node2D
 ## начинается с того места, где пассажир стоял: иначе его дёргало бы к центру
 ## площадки, а полотно резало бы перекрытие мимо проёма (найдено авторевью M2).
 
+## Докуда слышен стрёкот полотна, px.
+const HUM_REACH: float = 300.0
+
 ## Сколько секунд занимает поездка между площадками.
 @export var travel_time: float = 1.1
 
@@ -19,12 +22,21 @@ var _passenger: Otto = null
 var _path: PackedVector2Array = PackedVector2Array()
 var _progress: float = 0.0
 
+var _hum: AudioStreamPlayer2D = null
 @onready var _top_pad: Area2D = $TopPad
 @onready var _bottom_pad: Area2D = $BottomPad
 @onready var _ramp: Line2D = $Ramp
 
 
+func _ready() -> void:
+	_hum = Sounds.source(self, Sounds.ESCALATOR_HUM, HUM_REACH)
+
+
 func _physics_process(delta: float) -> void:
+	# Полотно слышно, только пока кто-то едет: в оригинале эскалатор тоже
+	# не гудит сам по себе, а здание и без того шумное.
+	Sounds.keep_playing(_hum, _passenger != null)
+
 	if _passenger != null:
 		_carry(delta)
 		return

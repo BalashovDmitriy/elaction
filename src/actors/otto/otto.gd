@@ -50,6 +50,8 @@ var _shooting: float = 0.0
 var _falling_over: float = 0.0
 ## Придавлен кабиной: у такой смерти своя поза.
 var _crushed: bool = false
+## На каком кадре ходьбы уже прозвучал шаг.
+var _stepped_on: int = -1
 var _gun := Gun.new()
 ## Верхняя точка текущего полёта: от неё считается глубина падения.
 var _apex_y: float = 0.0
@@ -124,6 +126,7 @@ func kill(crushed: bool = false) -> void:
 	_crushed = crushed
 	_states.kill()
 	_falling_over = FALLING_TIME
+	Sounds.play(Sounds.OTTO_DEATH)
 	_repose()
 	died.emit()
 
@@ -257,6 +260,7 @@ func apply_camera_bounds(bounds: Rect2) -> void:
 ## Выпускает пулю. Высоту полёта задаёт поза: присев, Otto стреляет ниже.
 func _fire() -> void:
 	_shooting = SHOOT_POSE_TIME
+	Sounds.play(Sounds.SHOT)
 	var crouching := _states.state == OttoStateMachine.State.CROUCH
 	var height := shot_height_crouching if crouching else shot_height_standing
 
@@ -293,12 +297,19 @@ func _award_for(agent: Enemy, base: int) -> void:
 
 ## Бьёт ногой всех, кого задел в полёте.
 func _kick_enemies() -> void:
+	# Удар один, сколько бы агентов он ни задел: звук на каждого съедал бы
+	# голоса пула и звучал бы вдвое громче самого себя.
+	var landed := false
 	for body: Node2D in _kick_zone.get_overlapping_bodies():
 		var agent := body as Enemy
 		if agent == null or agent.is_dead():
 			continue
 		agent.kill()
+		landed = true
 		_award_for(agent, GameState.ENEMY_KICK_SCORE)
+
+	if landed:
+		Sounds.play(Sounds.KICK)
 
 
 ## Есть ли над головой место, чтобы выпрямиться из приседа.
@@ -366,11 +377,25 @@ func _update_look(delta: float) -> void:
 	_falling_over = maxf(_falling_over - delta, 0.0)
 	if _states.state == OttoStateMachine.State.WALK:
 		_walk_phase = ActorPose.advance(_walk_phase, delta)
+		_step_sound()
 	else:
 		_walk_phase = 0.0
+		_stepped_on = -1
 
 	_body.texture = SpriteTextures.actor("otto", _pose())
 	_body.flip_h = _facing < 0.0
+
+
+## Шаг звучит на крайних кадрах ходьбы — тех, где нога ставится. На каждом
+## кадре цикла шагов выходило бы вдвое больше, чем делает Otto.
+func _step_sound() -> void:
+	var frame := int(_walk_phase)
+	# Кадр помечается пройденным только вместе со звуком: помеченный в воздухе
+	# терял бы шаг насовсем — нога встала, а слышно ничего.
+	if frame == _stepped_on or frame == 1 or not is_on_floor():
+		return
+	_stepped_on = frame
+	Sounds.play(Sounds.STEP)
 
 
 func _pose() -> String:

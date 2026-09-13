@@ -22,6 +22,9 @@ signal hit_target(target: Node2D)
 const FROM_OTTO: int = 1 | 4 | 8
 const FROM_ENEMY: int = 1 | 2
 
+## Слои, попадание в которые слышно ударом по телу, а не стуком по стене.
+const LIVING: int = 2 | 4
+
 ## Вспышка выстрела: пуля несёт свой свет и гасит его за первые пиксели полёта.
 ##
 ## Живёт здесь, а не у стрелков: пуля у Otto и у агентов одна и та же, и вспышка,
@@ -85,6 +88,11 @@ func _on_body_entered(body: Node2D) -> void:
 	if _spent:
 		return
 	_spent = true
+	# Слой, а не класс: [Otto] и [Enemy] сами грузят сцену пули, и ссылка отсюда
+	# на них замкнула бы загрузку в кольцо — сцена переставала бы читаться вовсе.
+	var target := body as CollisionObject2D
+	if target != null and (target.collision_layer & LIVING) != 0:
+		Sounds.play(Sounds.HIT)
 	# Геометрия просто гасит пулю, живых разбирает стрелявший.
 	hit_target.emit(body)
 	queue_free()

@@ -30,6 +30,8 @@ Screenshotter="*res://src/autoload/screenshotter.gd"
 ; не даёт глобальному классу и автолоаду называться одинаково, а код обращается
 ; к состоянию через GameState.instance().
 Game="*res://src/autoload/game_state.gd"
+; Звук: один автолоад на всю игру, чтобы источники не плодились по сценам.
+Sound="*res://src/autoload/audio.gd"
 
 [editor_plugins]
 
@@ -100,3 +102,7 @@ textures/canvas_textures/default_texture_filter=0
 2d/snap/snap_2d_transforms_to_pixel=true
 2d/snap/snap_2d_vertices_to_pixel=true
 anti_aliasing/quality/msaa_2d=0
+
+[audio]
+
+buses/default_bus_layout="res://assets/audio/buses.tres"

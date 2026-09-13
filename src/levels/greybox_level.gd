@@ -373,6 +373,7 @@ func _spawn_car(exit_area: Rect2) -> void:
 func _drive_away(runner: Otto) -> void:
 	_car_leaving = true
 	runner.enter_door()
+	Sounds.play(Sounds.CAR_AWAY)
 
 
 func _move_car(delta: float, view: Rect2) -> void:
@@ -475,6 +476,9 @@ func _menace() -> float:
 
 ## Сирена: агенты злеют, кабины начинают отвечать с задержкой.
 func _on_alarm_raised() -> void:
+	# Сирена работает с M5b, а звучать ей было нечем: теперь вместо темы здания
+	# идёт мотив тревоги, и снять его можно только новым зданием.
+	Sounds.play_music(Sounds.ALARM_THEME)
 	for car in _cars:
 		car.set_response_delay(ALARM_CAR_DELAY)
 	for agent in _agents():
