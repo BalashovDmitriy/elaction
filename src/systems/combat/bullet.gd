@@ -50,6 +50,9 @@ var _spent: bool = false
 
 func _ready() -> void:
 	body_entered.connect(_on_body_entered)
+	# Пуля летит всегда вправо-влево, и текстура у неё одна: направление
+	# показывает сам полёт, а не картинка.
+	($Visual as Sprite2D).texture = SpriteTextures.tile("bullet")
 	_flash = PointLight2D.new()
 	_flash.texture = LightTextures.spot()
 	_flash.color = FLASH_COLOR

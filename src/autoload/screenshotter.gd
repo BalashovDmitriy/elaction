@@ -103,6 +103,14 @@ const AUTO_PLANS: Dictionary = {
 	],
 	# Ни один шаг не обещает места: двери и лампы стоят по сиду, а выдержкой
 	# до них не дойти — этим занимается tools/light_shot.tscn, он ждёт состояние.
+	"M7B":
+	[
+		{"label": "otto_stands", "actions": [], "hold": 0.8},
+		{"label": "otto_walks", "actions": ["move_right"], "hold": 1.2},
+		{"label": "otto_shoots", "actions": ["shoot"], "hold": 0.1},
+		{"label": "otto_jumps", "actions": ["move_right", "jump"], "hold": 0.35},
+		{"label": "otto_crouches", "actions": ["move_down"], "hold": 0.8},
+	],
 	"M7A":
 	[
 		{"label": "roof", "actions": [], "hold": 0.8},

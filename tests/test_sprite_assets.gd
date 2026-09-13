@@ -7,9 +7,11 @@ extends GutTest
 ## размера, и здание действительно кладёт их на геометрию (ADR-0011, пункты 2 и 7).
 ##
 ## Так тест переживает добавление новых ассетов: список берётся из
-## [constant EnvTextures.NAMES], и забытая нормаль падает сама, без правки теста.
+## [constant SpriteTextures.NAMES], и забытая нормаль падает сама, без правки теста.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
+const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
+const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
 const LAMP_SCENE := preload("res://src/systems/lighting/lamp.tscn")
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
@@ -35,19 +37,19 @@ const FITTED: Array[Array] = [
 
 func before_each() -> void:
 	# Кэш общий на весь прогон, а тесты грузят текстуры в своём порядке.
-	EnvTextures.forget()
+	SpriteTextures.forget()
 
 
 func test_every_asset_has_all_three_maps() -> void:
-	for asset: String in EnvTextures.NAMES:
-		for path: String in EnvTextures.paths_of(asset):
+	for asset: String in SpriteTextures.NAMES:
+		for path: String in SpriteTextures.paths_of(asset):
 			assert_true(ResourceLoader.exists(path), "нарисована карта %s" % path)
 
 
 func test_maps_of_one_asset_are_the_same_size() -> void:
-	for asset: String in EnvTextures.NAMES:
+	for asset: String in SpriteTextures.NAMES:
 		var expected := Vector2.ZERO
-		for path: String in EnvTextures.paths_of(asset):
+		for path: String in SpriteTextures.paths_of(asset):
 			var texture := load(path) as Texture2D
 			assert_not_null(texture, "карта %s читается" % path)
 			if texture == null:
@@ -60,8 +62,8 @@ func test_maps_of_one_asset_are_the_same_size() -> void:
 
 
 func test_every_tile_carries_normal_and_specular() -> void:
-	for asset: String in EnvTextures.NAMES:
-		var tile := EnvTextures.tile(asset)
+	for asset: String in SpriteTextures.NAMES:
+		var tile := SpriteTextures.tile(asset)
 		assert_not_null(tile, "ассет %s собирается" % asset)
 		if tile == null:
 			continue
@@ -73,7 +75,7 @@ func test_the_slab_tile_is_as_thick_as_the_slab_it_covers() -> void:
 	# Толщина перекрытия — правило здания, а не число в ассете. Разойдутся —
 	# плита либо обрежется, либо повторится по вертикали половинкой.
 	var rules := BuildingRules.new()
-	var tile := EnvTextures.tile("slab")
+	var tile := SpriteTextures.tile("slab")
 	assert_not_null(tile)
 	if tile == null:
 		return
@@ -82,13 +84,13 @@ func test_the_slab_tile_is_as_thick_as_the_slab_it_covers() -> void:
 
 func test_a_framed_asset_is_three_margins_wide() -> void:
 	# Рамка нарезается девятикусочно, и ширина её полей записана дважды: в
-	# генераторе и в EnvTextures. Разойдутся — рама поедет углами внутрь.
-	for asset: String in EnvTextures.FRAMED:
-		var tile := EnvTextures.tile(asset)
+	# генераторе и в SpriteTextures. Разойдутся — рама поедет углами внутрь.
+	for asset: String in SpriteTextures.FRAMED:
+		var tile := SpriteTextures.tile(asset)
 		assert_not_null(tile, "ассет %s собирается" % asset)
 		if tile == null:
 			continue
-		var side := EnvTextures.FRAME_MARGIN * 3.0
+		var side := SpriteTextures.FRAME_MARGIN * 3.0
 		assert_eq(
 			tile.diffuse_texture.get_size(), Vector2(side, side), "%s нарезается по полям" % asset
 		)
@@ -97,7 +99,7 @@ func test_a_framed_asset_is_three_margins_wide() -> void:
 func test_the_side_wall_tile_is_as_wide_as_the_wall() -> void:
 	# Боковая стена не тайлится по горизонтали: тайл шире или уже стены — и она
 	# собирается из обрезков либо вылезает за свой габарит.
-	var tile := EnvTextures.tile("wall_side")
+	var tile := SpriteTextures.tile("wall_side")
 	assert_not_null(tile)
 	if tile == null:
 		return
@@ -107,7 +109,7 @@ func test_the_side_wall_tile_is_as_wide_as_the_wall() -> void:
 func test_the_exit_asset_covers_the_whole_doorway() -> void:
 	# Выход — одна картинка, а не тайл: разойдётся с проёмом — вывеска повторится
 	# половинкой или обрежется.
-	var tile := EnvTextures.tile("exit_way")
+	var tile := SpriteTextures.tile("exit_way")
 	assert_not_null(tile)
 	if tile == null:
 		return
@@ -132,7 +134,7 @@ func test_an_asset_is_exactly_as_big_as_the_node_it_fills() -> void:
 		)
 		blueprint.free()
 
-		var tile := EnvTextures.tile(asset)
+		var tile := SpriteTextures.tile(asset)
 		assert_not_null(tile, "ассет %s собирается" % asset)
 		if tile == null:
 			continue
@@ -236,3 +238,70 @@ func _lights_of(node: Node) -> Array[Light2D]:
 	for child: Node in node.get_children():
 		found.append_array(_lights_of(child))
 	return found
+
+
+## Актёры: кто и какими позами нарисован. Список берётся у [SpriteTextures],
+## поэтому забытая поза падает сама, без правки теста.
+func _actor_rows() -> Array[Array]:
+	return [
+		["otto", SpriteTextures.OTTO_POSES],
+		["agent", SpriteTextures.AGENT_POSES],
+		["car", SpriteTextures.CAR_POSES],
+	]
+
+
+func test_every_pose_has_all_three_maps() -> void:
+	for row: Array in _actor_rows():
+		var actor := row[0] as String
+		for pose: String in row[1] as PackedStringArray:
+			for path: String in SpriteTextures.actor_paths(actor, pose):
+				assert_true(ResourceLoader.exists(path), "нарисована карта %s" % path)
+
+
+func test_maps_of_one_pose_are_the_same_size() -> void:
+	for row: Array in _actor_rows():
+		var actor := row[0] as String
+		for pose: String in row[1] as PackedStringArray:
+			var expected := Vector2.ZERO
+			for path: String in SpriteTextures.actor_paths(actor, pose):
+				var texture := load(path) as Texture2D
+				assert_not_null(texture, "карта %s читается" % path)
+				if texture == null:
+					continue
+				if expected == Vector2.ZERO:
+					expected = texture.get_size()
+				assert_eq(texture.get_size(), expected, "%s того же размера" % path)
+
+
+func test_all_poses_of_an_actor_share_one_frame() -> void:
+	# Кадры разного размера съехали бы друг относительно друга при смене позы:
+	# привязка у спрайта одна на все, и она задана офсетом в сцене.
+	for row: Array in _actor_rows():
+		var actor := row[0] as String
+		var frame := Vector2.ZERO
+		for pose: String in row[1] as PackedStringArray:
+			var texture := SpriteTextures.actor(actor, pose)
+			assert_not_null(texture)
+			if texture == null:
+				continue
+			if frame == Vector2.ZERO:
+				frame = texture.diffuse_texture.get_size()
+			assert_eq(
+				texture.diffuse_texture.get_size(), frame, "%s_%s в общем кадре" % [actor, pose]
+			)
+
+
+func test_the_sprite_hangs_by_the_feet() -> void:
+	# Спрайт крупнее коллизии нарочно (ADR-0011, пункт 4), поэтому привязан не
+	# краем, а низом и серединой: иначе шляпа сдвинула бы фигуру над полом.
+	for row: Array in [["otto", OTTO_SCENE], ["agent", ENEMY_SCENE]]:
+		var actor := row[0] as String
+		var blueprint := (row[1] as PackedScene).instantiate()
+		var sprite := blueprint.get_node("Body") as Sprite2D
+		var offset := sprite.offset
+		var centered := sprite.centered
+		blueprint.free()
+
+		var frame := SpriteTextures.actor(actor, "idle").diffuse_texture.get_size()
+		assert_false(centered, "%s: кадр кладётся от угла" % actor)
+		assert_eq(offset, Vector2(-frame.x * 0.5, -frame.y), "%s: ноги на полу" % actor)
