@@ -350,9 +350,13 @@ def lamp() -> Canvas:
     canvas.rect(7, 0, 2, 8, palette.METAL_SHADE, 0.5, palette.POLISHED_METAL)
     # Абажур расширяется книзу: строка за строкой, чтобы нормаль пошла конусом.
     for row in range(8, 20):
-        half = 2 + (row - 8)
+        # Абажур расходится от 3 px до 8 px — до края холста, но не за него:
+        # вылезший конус обрезался бы прямоугольником и читался как коробка.
+        half = round(3 + 5 * (row - 8) / 11)
         left = 8 - half
-        tone = palette.mix(palette.LAMP_SHADE, palette.METAL_SHADE, (19 - row) / 11.0 * 0.5)
+        # Абажур тёмный: он стоит в своём же пятне света, и светлый выбеливался
+        # в белое пятно. Лампа читается силуэтом вокруг горящего низа.
+        tone = palette.mix(palette.SLAB_SHADOW, palette.LAMP_SHADE, (row - 8) / 11.0 * 0.45)
         canvas.rect(left, row, half * 2, 1, tone, 0.5 + (row - 8) * 0.03, palette.PAINT)
     canvas.rect(2, 20, 12, 4, palette.LAMP_GLOW, 0.95, palette.PAINT)
     return canvas

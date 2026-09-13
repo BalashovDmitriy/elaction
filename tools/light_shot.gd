@@ -21,7 +21,9 @@ extends Node2D
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
-const FOLDER := "res://screens/M6"
+## Куда ложатся кадры. Вехи сменяются, а инструмент остаётся, поэтому папка
+## задаётся ключом --folder=<веха>.
+const DEFAULT_FOLDER := "M7a"
 
 ## Сколько кадров дать камере доехать до Otto: сглаживание у неё 8.0, то есть
 ## на дорогу уходит доля секунды, а снимок раньше показал бы полпути.
@@ -42,21 +44,32 @@ var _level: GreyboxLevel = null
 var _seed: int = 1
 var _floor: int = 7
 var _bench: bool = false
+var _folder: String = DEFAULT_FOLDER
 
 
 func _ready() -> void:
 	_read_arguments()
-	DirAccess.make_dir_recursive_absolute(FOLDER)
+	DirAccess.make_dir_recursive_absolute(_folder_path())
 	# Без пометки Godot импортирует каждый снимок как текстуру проекта. Кладёт её
 	# скрипт снимков: папка у нас с ним общая, и правило про неё должно быть одно.
-	SCREENSHOTTER.mark_ignored_by_engine(ProjectSettings.globalize_path(FOLDER.get_base_dir()))
+	SCREENSHOTTER.mark_ignored_by_engine(
+		ProjectSettings.globalize_path(_folder_path().get_base_dir())
+	)
 	_run()
+
+
+## Папка кадров в res://. Пустое имя вехи вернуло бы путь в корень screens/,
+## поэтому пустое подменяется на вехин по умолчанию.
+func _folder_path() -> String:
+	return "res://screens/%s" % (_folder if not _folder.is_empty() else DEFAULT_FOLDER)
 
 
 func _read_arguments() -> void:
 	for argument: String in OS.get_cmdline_user_args():
 		if argument.begins_with("--seed="):
 			_seed = argument.trim_prefix("--seed=").to_int()
+		elif argument.begins_with("--folder="):
+			_folder = argument.trim_prefix("--folder=").strip_edges()
 		elif argument.begins_with("--floor="):
 			_floor = argument.trim_prefix("--floor=").to_int()
 		elif argument == "--bench":
@@ -171,6 +184,6 @@ func _measure() -> void:
 func _shoot(label: String) -> void:
 	await RenderingServer.frame_post_draw
 	var image := get_viewport().get_texture().get_image()
-	var path := "%s/%s_seed%d.png" % [FOLDER, label, _seed]
+	var path := "%s/%s_seed%d.png" % [_folder_path(), label, _seed]
 	image.save_png(path)
 	print("  %s" % path)
