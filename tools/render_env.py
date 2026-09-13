@@ -43,6 +43,10 @@ NORMAL_GREEN_UP: bool = True
 NORMAL_SUFFIX = "_n"
 SPECULAR_SUFFIX = "_s"
 
+# Ширина рамки девятикусочных ассетов. Та же величина стоит в
+# `EnvTextures.FRAME_MARGIN`, и тест следит, чтобы они не разошлись.
+FRAME_MARGIN: int = 8
+
 
 class Canvas:
     """Три карты одного ассета, которые рисуются вместе.
@@ -52,12 +56,14 @@ class Canvas:
     прямоугольниками, поэтому карты не могут разъехаться между собой.
     """
 
-    def __init__(self, width: int, height: int, wrap_x: bool = False) -> None:
+    def __init__(self, width: int, height: int, wrap_x: bool = False, wrap_y: bool = False) -> None:
         self.width = width
         self.height = height
-        # Тайл замыкается по горизонтали: у нормали на швах берётся сосед
+        # Тайл замыкается по своим осям: у нормали на швах берётся сосед
         # с другого края, иначе на стыке двух копий видна тёмная линия.
+        # Перекрытие повторяется только вбок, стена — во все стороны.
         self.wrap_x = wrap_x
+        self.wrap_y = wrap_y
         self.diffuse = np.zeros((height, width, 4), dtype=np.uint8)
         self.height_map = np.zeros((height, width), dtype=np.float32)
         self.specular = np.zeros((height, width, 2), dtype=np.float32)
@@ -98,11 +104,24 @@ class Canvas:
         patch += noise[:, :, None]
         self.diffuse[y : y + height, x : x + width, :3] = np.clip(patch, 0, 255).astype(np.uint8)
 
+    def roughen(self, seed: int, amount: float) -> None:
+        """Мелкая шероховатость высоты: свет по такой стене идёт не стеклом.
+
+        Шум добавляется ко всей карте разом и повторяется по краям, поэтому
+        замкнутый тайл остаётся замкнутым.
+        """
+        rng = np.random.default_rng(seed)
+        noise = rng.uniform(-amount, amount, size=self.height_map.shape).astype(np.float32)
+        if self.wrap_x:
+            noise[:, -1] = noise[:, 0]
+        if self.wrap_y:
+            noise[-1, :] = noise[0, :]
+        self.height_map = np.clip(self.height_map + noise, 0.0, 1.0)
+
     def normal_map(self) -> np.ndarray:
         """Нормаль из карты высот: наклон поверхности, посчитанный, а не угаданный."""
-        mode = "wrap" if self.wrap_x else "edge"
-        padded = np.pad(self.height_map, ((1, 1), (0, 0)), mode="edge")
-        padded = np.pad(padded, ((0, 0), (1, 1)), mode=mode)
+        padded = np.pad(self.height_map, ((1, 1), (0, 0)), mode="wrap" if self.wrap_y else "edge")
+        padded = np.pad(padded, ((0, 0), (1, 1)), mode="wrap" if self.wrap_x else "edge")
 
         gradient_x = (padded[1:-1, 2:] - padded[1:-1, :-2]) * 0.5
         gradient_y = (padded[2:, 1:-1] - padded[:-2, 1:-1]) * 0.5
@@ -172,8 +191,76 @@ def slab() -> Canvas:
     return canvas
 
 
+def wall() -> Canvas:
+    """Задняя стена комнаты: штукатурка, замкнутая во все стороны.
+
+    Ровный тон без рисунка: стена — дальний план, и любая полоска на ней
+    повторилась бы сеткой по всему зданию, потому что высота этажа (120 px)
+    на размер тайла не делится. Свету достаётся не рисунок, а шероховатость.
+    """
+    canvas = Canvas(32, 32, wrap_x=True, wrap_y=True)
+    canvas.rect(0, 0, 32, 32, palette.WALL_BASE, 0.5, palette.PLASTER)
+    canvas.speckle(seed=1983, amount=4, area=(0, 0, 32, 32))
+    canvas.roughen(seed=1984, amount=0.05)
+    return canvas
+
+
+def wall_side() -> Canvas:
+    """Боковая стена здания: та же штукатурка, но тайл в ширину стены.
+
+    Ширина — `GreyboxLevel.WALL_WIDTH`, иначе стена собиралась бы из обрезков.
+    Тёмная кромка внутрь: угол комнаты должен читаться как угол.
+    """
+    canvas = Canvas(16, 32, wrap_y=True)
+    canvas.rect(0, 0, 16, 32, palette.WALL_SHADE, 0.5, palette.PLASTER)
+    canvas.rect(0, 0, 3, 32, palette.mix(palette.WALL_SHADE, palette.WALL_BASE, 0.6), 0.62, palette.PLASTER)
+    canvas.rect(13, 0, 3, 32, palette.mix(palette.WALL_SHADE, palette.WALL_BASE, 0.6), 0.62, palette.PLASTER)
+    canvas.speckle(seed=1985, amount=3, area=(0, 0, 16, 32))
+    canvas.roughen(seed=1986, amount=0.04)
+    return canvas
+
+
+def window_frame() -> Canvas:
+    """Рама окна: девятикусочный ассет с пустой серединой.
+
+    Кладётся поверх проёма, в котором виден город, поэтому центр прозрачен.
+    Сторона — 3 × [constant FRAME_MARGIN]: угол, повторяемая середина, угол.
+    Внутренняя кромка приподнята — на ней и играет свет этажа.
+    """
+    side = FRAME_MARGIN * 3
+    canvas = Canvas(side, side)
+    canvas.rect(0, 0, side, side, palette.METAL_SHADE, 0.35, palette.PAINT)
+    canvas.rect(1, 1, side - 2, side - 2, palette.METAL, 0.75, palette.PAINT)
+    # Блестит только внутренняя кромка: рама целиком из полированного металла
+    # выбеливалась под заливкой этажа и спорила яркостью с красной дверью.
+    canvas.rect(
+        FRAME_MARGIN - 2,
+        FRAME_MARGIN - 2,
+        side - 2 * (FRAME_MARGIN - 2),
+        side - 2 * (FRAME_MARGIN - 2),
+        palette.mix(palette.METAL, palette.METAL_TRIM, 0.4),
+        0.95,
+        palette.POLISHED_METAL,
+    )
+    # Середина вырезается: в неё смотрит город, а не стена.
+    canvas.rect(
+        FRAME_MARGIN,
+        FRAME_MARGIN,
+        side - 2 * FRAME_MARGIN,
+        side - 2 * FRAME_MARGIN,
+        palette.GLASS,
+        0.0,
+        palette.WINDOW_GLASS,
+        alpha=0,
+    )
+    return canvas
+
+
 ASSETS: dict[str, Callable[[], Canvas]] = {
     "slab": slab,
+    "wall": wall,
+    "wall_side": wall_side,
+    "window_frame": window_frame,
 }
 
 

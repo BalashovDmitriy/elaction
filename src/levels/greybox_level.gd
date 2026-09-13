@@ -222,8 +222,9 @@ static func slab_segments(
 
 func _build_geometry() -> void:
 	var height := rules.total_height()
-	_build_solid(Rect2(0.0, 0.0, WALL_WIDTH, height))
-	_build_solid(Rect2(rules.width - WALL_WIDTH, 0.0, WALL_WIDTH, height))
+	var side_tile := EnvTextures.tile("wall_side")
+	_build_solid(Rect2(0.0, 0.0, WALL_WIDTH, height), side_tile)
+	_build_solid(Rect2(rules.width - WALL_WIDTH, 0.0, WALL_WIDTH, height), side_tile)
 
 	# Тайл берётся один раз на здание: плит в нём под три сотни, а текстура одна.
 	var slab_tile := EnvTextures.tile("slab")
@@ -534,11 +535,44 @@ func _build_back_walls() -> void:
 			var strip := Rect2(span.x, window_top, span.y - span.x, window_bottom - window_top)
 			_add_back_wall(strip)
 
+		for gap: Vector2 in gaps:
+			var opening := Rect2(gap.x, window_top, gap.y - gap.x, window_bottom - window_top)
+			_add_window_frame(opening)
+
 
 func _add_back_wall(rect: Rect2) -> void:
 	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
 		return
-	_back_walls.add_child(_panel(rect.size, rect.position, BACK_WALL))
+
+	var tile := EnvTextures.tile("wall")
+	if tile == null:
+		_back_walls.add_child(_panel(rect.size, rect.position, BACK_WALL))
+		return
+	_back_walls.add_child(_tiled(rect.size, rect.position, tile))
+
+
+## Рама вокруг проёма, в котором виден город.
+##
+## Кладётся девятикусочно и наполовину заходит на стену: так проём получает
+## откос, на котором играет свет этажа, а город в нём остаётся городом —
+## середина рамы пустая, а не застеклённая.
+func _add_window_frame(opening: Rect2) -> void:
+	var tile := EnvTextures.tile("window_frame")
+	if tile == null or opening.size.x <= 0.0 or opening.size.y <= 0.0:
+		return
+
+	var overlap := EnvTextures.FRAME_MARGIN * 0.5
+	var frame := NinePatchRect.new()
+	frame.texture = tile
+	frame.draw_center = false
+	frame.patch_margin_left = int(EnvTextures.FRAME_MARGIN)
+	frame.patch_margin_top = int(EnvTextures.FRAME_MARGIN)
+	frame.patch_margin_right = int(EnvTextures.FRAME_MARGIN)
+	frame.patch_margin_bottom = int(EnvTextures.FRAME_MARGIN)
+	frame.position = opening.position - Vector2(overlap, overlap)
+	frame.size = opening.size + Vector2(overlap, overlap) * 2.0
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_back_walls.add_child(frame)
 
 
 ## Город за окнами. Свет здания на него не падает: он снаружи и далеко.

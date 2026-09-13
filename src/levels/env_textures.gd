@@ -17,7 +17,14 @@ const SPECULAR_SUFFIX := "_s"
 
 ## Ассеты, которые просит уровень. По этому списку тест проверяет, что все три
 ## карты каждого ассета на месте и одного размера, — а не «вот этот спрайт есть».
-const NAMES: PackedStringArray = ["slab"]
+const NAMES: PackedStringArray = ["slab", "wall", "wall_side", "window_frame"]
+
+## Ширина рамки девятикусочных ассетов: та же величина стоит в
+## `tools/render_env.py`, и тест следит, чтобы они не разошлись.
+const FRAME_MARGIN: float = 8.0
+
+## Ассеты, которые кладутся девятикусочно, а не плиткой.
+const FRAMED: PackedStringArray = ["window_frame"]
 
 static var _cache := {}
 

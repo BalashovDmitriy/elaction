@@ -54,6 +54,7 @@ func _ready() -> void:
 	_flash.texture = LightTextures.spot()
 	_flash.color = FLASH_COLOR
 	_flash.energy = FLASH_ENERGY
+	_flash.height = LightTextures.FLASH_HEIGHT
 	_flash.scale = Vector2.ONE * (FLASH_RADIUS * 2.0 / float(LightTextures.SIZE))
 	add_child(_flash)
 
