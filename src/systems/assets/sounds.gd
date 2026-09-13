@@ -10,6 +10,12 @@ extends RefCounted
 
 const DIR := "res://assets/audio/"
 
+## Расширения, в которых может лежать звук. Короткое и частое пишется в WAV,
+## длинное и редкое — в OGG (`tools/render_audio.py`); какое именно у какого,
+## решает генератор, а игра просто берёт то, что нашла. Второй список тех же
+## имён разъехался бы с первым молча.
+const EXTENSIONS: PackedStringArray = [".wav", ".ogg"]
+
 const MUSIC_BUS := "Music"
 const SFX_BUS := "SFX"
 const MASTER_BUS := "Master"
@@ -73,9 +79,22 @@ static func names() -> PackedStringArray:
 	return all
 
 
-## Путь к файлу звука.
+## Путь к файлу звука или пустая строка, если его нет.
 static func path_of(name: String) -> String:
-	return DIR + name + ".wav"
+	for extension: String in EXTENSIONS:
+		var path := DIR + name + extension
+		if ResourceLoader.exists(path):
+			return path
+	return ""
+
+
+## Все места, где звук мог бы лежать. Нужны тесту: он следит, чтобы имя
+## находилось ровно в одном файле, а не в двух сразу и не ни в одном.
+static func candidates(name: String) -> PackedStringArray:
+	var paths := PackedStringArray()
+	for extension: String in EXTENSIONS:
+		paths.append(DIR + name + extension)
+	return paths
 
 
 ## Поток звука или null, если файла нет. Кэш общий: один и тот же выстрел
@@ -86,11 +105,11 @@ static func stream(name: String) -> AudioStream:
 
 	var path := path_of(name)
 	var loaded: AudioStream = null
-	if ResourceLoader.exists(path):
+	if path.is_empty():
+		push_error("Нет звука %s — запустите tools/render_audio.py" % name)
+	else:
 		loaded = load(path) as AudioStream
 		_set_looping(loaded, LOOPED.has(name))
-	else:
-		push_error("Нет звука %s — запустите tools/render_audio.py" % name)
 
 	_cache[name] = loaded
 	return loaded
@@ -99,23 +118,23 @@ static func stream(name: String) -> AudioStream:
 ## Зацикливание задаётся здесь, а не в настройках импорта.
 ##
 ## Настройки импорта — вторая копия того же списка, и разъезжаются они молча:
-## тема, у которой в `.import` сброшен цикл, играет пять секунд и замолкает
+## тема, у которой в `.import` сброшен цикл, играет двадцать секунд и замолкает
 ## до конца партии. Список [constant LOOPED] один, и он же проверяется тестом.
 static func _set_looping(stream: AudioStream, looping: bool) -> void:
 	var wav := stream as AudioStreamWAV
-	if wav == null:
+	if wav != null:
+		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD if looping else AudioStreamWAV.LOOP_DISABLED
+		if looping:
+			wav.loop_begin = 0
+			# Конец петли — последний кадр, а он считается из длины и частоты:
+			# делить размер данных на байты кадра нельзя, формат бывает сжатым.
+			wav.loop_end = int(round(wav.get_length() * float(wav.mix_rate)))
 		return
-	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD if looping else AudioStreamWAV.LOOP_DISABLED
-	if looping:
-		wav.loop_begin = 0
-		wav.loop_end = wav.data.size() / _bytes_per_frame(wav)
 
-
-## Сколько байт занимает один кадр звука: от этого зависит, где конец петли.
-static func _bytes_per_frame(wav: AudioStreamWAV) -> int:
-	var channels := 2 if wav.stereo else 1
-	var width := 2 if wav.format == AudioStreamWAV.FORMAT_16_BITS else 1
-	return maxi(channels * width, 1)
+	var vorbis := stream as AudioStreamOggVorbis
+	if vorbis != null:
+		vorbis.loop = looping
+		vorbis.loop_offset = 0.0
 
 
 ## Проигрывает эффект. Тихо ничего не делает, если автолоада ещё нет:

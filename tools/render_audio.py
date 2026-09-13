@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""Генератор звука: квадрат, шум и огибающие — словарь PSG 1983 года.
+"""Генератор звука: слоёные эффекты и тёмный synthwave.
 
-ADR-0012, пункт 1. В оригинале четыре чипа AY-3-8910 и отдельный Z80 под звук:
-сэмплов там нет и взяться им неоткуда, весь звук игры — это три голоса на чип,
-квадратная волна, шум и ступенчатая громкость. Ровно это и синтезируется здесь.
+Формула проекта — «механика 1983 года, картинка 2026 года», и звук на той же
+стороне, что картинка. Первая версия подражала чипу AY-3-8910 и звучала как
+чип — решение пересмотрено после прослушивания (ADR-0012, правка от 2026-09-13).
 
-Файлы коммитятся, как PNG у графики (ADR-0011, пункт 2): скрипт — инструмент
-разработчика, в CI он не вызывается.
+Каждый эффект собирается так же, как их собирают в современных играх: **атака**
+(щелчок, с которого всё начинается), **тело** (вес и высота) и **хвост** (комната
+вокруг). Музыка — восьмитактовая петля на живых слоях: бас, арпеджио, пад,
+барабаны, — сведённая и залимитированная.
+
+Синтез, а не сэмплы: причины те же, что у картинок (ADR-0011, пункт 2) —
+детерминированность, никаких чужих файлов и правка звука числом в коде.
 
     python tools/render_audio.py            # всё
     python tools/render_audio.py shot       # один звук
@@ -17,7 +22,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-import wave
 from collections.abc import Callable
 from pathlib import Path
 
@@ -27,335 +31,496 @@ TOOLS = Path(__file__).resolve().parent
 if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
 
+import audio_dsp as dsp
+from audio_dsp import Stereo
+
 PROJECT_ROOT = TOOLS.parent
 OUT_DIR = PROJECT_ROOT / "assets/audio"
-
-## Частота дискретизации. 22 050 Гц хватает с запасом: у квадратной волны всё
-## слышимое лежит ниже восьми килогерц, а файл выходит вдвое легче.
-RATE = 22050
-
-## PSG знает шестнадцать уровней громкости, а не плавную кривую. Огибающие
-## квантуются по ним — отсюда характерная «ступенька» затухания.
-PSG_LEVELS = 16
 
 ## Полутоновая сетка от ля первой октавы.
 A4 = 440.0
 NOTE_STEPS = {"C": -9, "D": -7, "E": -5, "F": -4, "G": -2, "A": 0, "B": 2}
 
 
-def frequency(note: str) -> float:
-    """Частота ноты по имени: `A4`, `C#5`, `Eb3`. Пауза — пустая строка."""
-    if not note:
-        return 0.0
-    step = NOTE_STEPS[note[0].upper()]
-    rest = note[1:]
+def note(name: str) -> float:
+    """Частота ноты: `A4`, `C#5`, `Eb2`."""
+    step = NOTE_STEPS[name[0].upper()]
+    rest = name[1:]
     if rest.startswith("#"):
         step += 1
         rest = rest[1:]
     elif rest.startswith("b"):
         step -= 1
         rest = rest[1:]
-    octave = int(rest)
-    return A4 * 2.0 ** ((step + (octave - 4) * 12) / 12.0)
+    return A4 * 2.0 ** ((step + (int(rest) - 4) * 12) / 12.0)
 
 
-def _samples(duration: float) -> int:
-    return max(int(RATE * duration), 1)
+# --- Комнаты -----------------------------------------------------------------
+#
+# Здание бетонное, и хвост у него короткий и тёмный — этим комната отличается от
+# зала. Шахта, наоборот, длинная труба, и всё, что в ней звучит, гуляет дольше.
+
+_ROOMS: dict[str, np.ndarray] = {}
 
 
-def square(
-    pitch: float, duration: float, duty: float = 0.5, to_pitch: float | None = None
-) -> np.ndarray:
-    """Квадратная волна, при желании с уводом высоты от [param pitch] к [param to_pitch]."""
-    count = _samples(duration)
-    if pitch <= 0.0:
-        return np.zeros(count, dtype=np.float32)
-
-    finish = pitch if to_pitch is None else to_pitch
-    # Фаза копится интегралом частоты: иначе при уводе высоты волна рвётся.
-    sweep = np.linspace(pitch, finish, count, dtype=np.float32)
-    phase = np.cumsum(sweep) / float(RATE)
-    return np.where(np.mod(phase, 1.0) < duty, 1.0, -1.0).astype(np.float32)
+def room(kind: str = "floor") -> np.ndarray:
+    if kind not in _ROOMS:
+        shapes = {
+            "tight": (0.22, 3200.0, 7001),
+            "floor": (0.55, 2600.0, 7002),
+            "shaft": (1.40, 1800.0, 7003),
+            "street": (0.90, 4200.0, 7004),
+        }
+        seconds, brightness, seed = shapes[kind]
+        _ROOMS[kind] = dsp.impulse_response(seconds, brightness, seed)
+    return _ROOMS[kind]
 
 
-def noise(duration: float, seed: int, colour: float = 1.0) -> np.ndarray:
-    """Шумовой канал. [param colour] < 1 приглушает верх — получается «глуше».
-
-    Сид фиксирован, поэтому повторный прогон даёт тот же файл.
-    """
-    count = _samples(duration)
-    rng = np.random.default_rng(seed)
-    raw = rng.uniform(-1.0, 1.0, count).astype(np.float32)
-    if colour >= 1.0:
-        return raw
-
-    # Однополюсный фильтр: дешёвый способ убрать песок и оставить рокот.
-    smoothed = np.empty_like(raw)
-    previous = 0.0
-    for index in range(count):
-        previous += (raw[index] - previous) * colour
-        smoothed[index] = previous
-    return smoothed
+def placed(signal: np.ndarray, kind: str = "floor", mix: float = 0.3, pan: float = 0.0) -> Stereo:
+    """Ставит моно-слой в комнату и разводит по панораме."""
+    return dsp.mono_to_stereo(dsp.reverb(signal, room(kind), mix=mix), pan)
 
 
-def envelope(
-    wave_in: np.ndarray, attack: float = 0.005, hold: float = 0.0, release: float = 0.05
-) -> np.ndarray:
-    """Огибающая по уровням PSG: атака, полка, затухание.
-
-    Ступеньки — не стилизация, а как есть: у AY-3-8910 громкость задаётся
-    четырьмя битами, и плавных затуханий он не умеет.
-    """
-    count = wave_in.size
-    attack_count = min(_samples(attack), count)
-    hold_count = min(_samples(hold), count - attack_count)
-    release_count = max(count - attack_count - hold_count, 0)
-
-    shape = np.concatenate(
-        [
-            np.linspace(0.0, 1.0, attack_count, endpoint=False, dtype=np.float32),
-            np.ones(hold_count, dtype=np.float32),
-            np.linspace(1.0, 0.0, release_count, dtype=np.float32),
-        ]
-    )[:count]
-    stepped = np.floor(shape * (PSG_LEVELS - 1) + 0.5) / float(PSG_LEVELS - 1)
-    return (wave_in * stepped).astype(np.float32)
+def stack(*parts: np.ndarray) -> np.ndarray:
+    """Складывает моно-слои разной длины."""
+    length = max(part.size for part in parts)
+    out = np.zeros(length, dtype=np.float32)
+    for part in parts:
+        out[: part.size] += part
+    return out
 
 
-def mix(*tracks: np.ndarray, gain: float = 1.0) -> np.ndarray:
-    """Складывает голоса и приводит пик ровно к [param gain].
-
-    Не подрезает: сумма двух голосов легко переваливает за единицу, и жёсткий
-    срез слышен как песок поверх звука. Тише — честнее, чем грязнее, а заодно
-    [param gain] означает ровно то, на что похоже: громкость этого звука
-    относительно остальных.
-    """
-    length = max((track.size for track in tracks), default=1)
-    total = np.zeros(length, dtype=np.float32)
-    for track in tracks:
-        total[: track.size] += track
-
-    peak = float(np.abs(total).max())
-    if peak <= 0.0:
-        return total
-    return (total * (gain / peak)).astype(np.float32)
-
-
-def sequence(*parts: np.ndarray) -> np.ndarray:
-    """Склеивает куски подряд — фраза из нот."""
-    return np.concatenate(parts).astype(np.float32) if parts else np.zeros(1, dtype=np.float32)
-
-
-def silence(duration: float) -> np.ndarray:
-    return np.zeros(_samples(duration), dtype=np.float32)
-
-
-def line(notes: list[tuple[str, float]], duty: float = 0.5, gap: float = 0.12) -> np.ndarray:
-    """Голос из нот: список пар «нота, длительность».
-
-    [param gap] — доля длительности, которая уходит в тишину перед следующей
-    нотой. Без неё две одинаковые ноты подряд сливаются в одну длинную.
-    """
-    parts: list[np.ndarray] = []
-    for note, duration in notes:
-        sound = duration * (1.0 - gap)
-        pitch = frequency(note)
-        if pitch <= 0.0:
-            parts.append(silence(duration))
-            continue
-        parts.append(envelope(square(pitch, sound, duty), attack=0.004, hold=sound * 0.6))
-        parts.append(silence(duration - sound))
-    return sequence(*parts)
-
-
-def drums(pattern: str, step: float, seed: int) -> np.ndarray:
-    """Шумовая перкуссия: `x` — удар, `.` — пауза. Третий голос у PSG чаще всего он."""
-    parts: list[np.ndarray] = []
-    for index, mark in enumerate(pattern):
-        if mark == "x":
-            hit = envelope(noise(step * 0.6, seed + index, colour=0.35), release=step * 0.5)
-            parts.append(sequence(hit, silence(step - step * 0.6)))
-        else:
-            parts.append(silence(step))
-    return sequence(*parts)
+def after(delay: float, signal: np.ndarray) -> np.ndarray:
+    """Сдвигает слой вперёд по времени: защёлка звучит позже хода двери."""
+    return np.concatenate([np.zeros(dsp.samples(delay), dtype=np.float32), signal]).astype(np.float32)
 
 
 # --- Эффекты -----------------------------------------------------------------
 
 
-def step_sound() -> np.ndarray:
-    """Шаг: короткий глухой щелчок. Он звучит чаще всех, поэтому тихий."""
-    return mix(envelope(noise(0.05, 11, colour=0.25), release=0.045), gain=0.25)
-
-
-def shot() -> np.ndarray:
-    """Выстрел: щелчок шума и уходящий вниз квадрат."""
-    crack = envelope(noise(0.06, 21, colour=0.8), release=0.055)
-    body = envelope(square(880.0, 0.09, duty=0.25, to_pitch=180.0), release=0.08)
-    return mix(crack, body, gain=0.62)
-
-
-def hit() -> np.ndarray:
-    """Попадание в тело: короткий низкий удар."""
-    return mix(envelope(square(220.0, 0.07, duty=0.3, to_pitch=90.0), release=0.06), gain=0.7)
-
-
-def kick() -> np.ndarray:
-    """Удар ногой: свист и глухой шлепок."""
-    swing = envelope(noise(0.08, 31, colour=0.5), attack=0.03, release=0.05)
-    thud = envelope(square(160.0, 0.1, duty=0.4, to_pitch=70.0), release=0.09)
-    return mix(swing, thud, gain=0.7)
-
-
-def lamp_break() -> np.ndarray:
-    """Лампа разбита: звон на верхах и осыпающийся шум."""
-    glass = envelope(square(1760.0, 0.12, duty=0.15, to_pitch=2200.0), release=0.11)
-    shards = envelope(noise(0.25, 41), attack=0.002, release=0.24)
-    return mix(glass, shards, gain=0.58)
-
-
-def lamp_crash() -> np.ndarray:
-    """Лампа долетела до пола: глухой удар, после которого этаж гаснет."""
-    return mix(
-        envelope(square(120.0, 0.2, duty=0.45, to_pitch=45.0), release=0.19),
-        envelope(noise(0.2, 51, colour=0.2), release=0.19),
-        gain=0.72,
+def shot() -> Stereo:
+    """Выстрел: щелчок, тело с уходом вниз, подхват снизу и хвост этажа."""
+    crack = dsp.decay(dsp.filtered(dsp.noise(0.05, 101), 2600.0, "high"), tau=0.006)
+    body = dsp.saturate(
+        dsp.decay(dsp.pulse(dsp.glide(520.0, 70.0, 0.16), 0.16, duty=0.35), tau=0.035), drive=3.0
     )
+    sub = dsp.decay(dsp.sine(dsp.glide(150.0, 42.0, 0.22), 0.22), tau=0.06)
+    dry = dsp.filtered(stack(crack * 0.9, body * 0.7, sub * 0.8), 9000.0, "low")
+    return dsp.master(dsp.widen(placed(dry, "floor", mix=0.32), amount=0.3), peak=0.85)
 
 
-def elevator_ding() -> np.ndarray:
+def hit() -> Stereo:
+    """Пуля в тело: глухо и коротко, почти без хвоста."""
+    thump = dsp.decay(dsp.sine(dsp.glide(180.0, 55.0, 0.18), 0.18), tau=0.05)
+    flesh = dsp.decay(dsp.filtered(dsp.noise(0.08, 111), 900.0, "low"), tau=0.02)
+    # Шлепок в середине: без него попадание — только глухой низ, и в общем
+    # шуме боя его не слышно вовсе (проверено спектром, а не на глаз).
+    slap = dsp.decay(dsp.filtered(dsp.noise(0.05, 112), 1800.0, "band"), tau=0.008)
+    return dsp.master(placed(stack(thump * 0.9, flesh * 0.6, slap * 0.5), "tight", mix=0.18), peak=0.7)
+
+
+def kick() -> Stereo:
+    """Удар ногой: свист по дуге и шлепок."""
+    arc = np.concatenate(
+        [
+            np.linspace(500.0, 4200.0, 32, dtype=np.float32),
+            np.linspace(4200.0, 700.0, 32, dtype=np.float32),
+        ]
+    )
+    swing = dsp.sweeping(dsp.noise(0.26, 121), cutoff=arc, kind="low", resonance=0.6, block=1024)
+    swing = dsp.adsr(swing, attack=0.05, hold=0.05, release=0.16) * 0.5
+    impact = dsp.decay(dsp.sine(dsp.glide(200.0, 60.0, 0.2), 0.2), tau=0.045)
+    return dsp.master(placed(stack(swing, impact * 0.9), "floor", mix=0.22), peak=0.75)
+
+
+def step_sound() -> Stereo:
+    """Шаг: мягкий щелчок по бетону. Звучит чаще всех, поэтому тихий."""
+    tap = dsp.decay(dsp.filtered(dsp.noise(0.04, 131), 1100.0, "low"), tau=0.008)
+    click = dsp.decay(dsp.filtered(dsp.noise(0.02, 132), 2600.0, "high"), tau=0.003) * 0.35
+    # Комната тесная и подмешана чуть-чуть: шаг звучит по пять раз в секунду,
+    # и длинный хвост у него слился бы в непрерывный шорох.
+    return dsp.master(placed(stack(tap, click), "tight", mix=0.15), peak=0.32)
+
+
+def lamp_break() -> Stereo:
+    """Лампа разбита: звон стекла и осыпающиеся осколки."""
+    rng = np.random.default_rng(141)
+    partials = np.zeros(dsp.samples(0.5), dtype=np.float32)
+    for pitch in (2480.0, 3310.0, 4120.0, 5230.0, 6710.0):
+        ring = dsp.decay(dsp.sine(pitch * rng.uniform(0.98, 1.02), 0.5), tau=rng.uniform(0.05, 0.18))
+        partials += ring * rng.uniform(0.15, 0.4)
+
+    shards = np.zeros(dsp.samples(0.6), dtype=np.float32)
+    for index in range(9):
+        piece = dsp.decay(dsp.filtered(dsp.noise(0.05, 150 + index), 3000.0, "high"), tau=0.008)
+        start = dsp.samples(rng.uniform(0.02, 0.42))
+        shards[start : start + piece.size] += piece * rng.uniform(0.2, 0.6)
+
+    burst = dsp.decay(dsp.filtered(dsp.noise(0.12, 149), 1800.0, "high"), tau=0.02)
+    return dsp.master(placed(stack(partials, shards, burst * 0.8), "floor", mix=0.4), peak=0.8)
+
+
+def lamp_crash() -> Stereo:
+    """Лампа долетела до пола: удар, после которого этаж гаснет."""
+    thud = dsp.decay(dsp.sine(dsp.glide(120.0, 38.0, 0.35), 0.35), tau=0.08)
+    body = dsp.saturate(dsp.decay(dsp.filtered(dsp.noise(0.3, 161), 700.0, "low"), tau=0.05), 2.0)
+
+    rng = np.random.default_rng(162)
+    debris = np.zeros(dsp.samples(0.5), dtype=np.float32)
+    for index in range(6):
+        piece = dsp.decay(dsp.filtered(dsp.noise(0.04, 170 + index), 2400.0, "high"), tau=0.006)
+        start = dsp.samples(rng.uniform(0.03, 0.3))
+        debris[start : start + piece.size] += piece * rng.uniform(0.1, 0.3)
+    return dsp.master(placed(stack(thud, body * 0.7, debris), "floor", mix=0.35), peak=0.85)
+
+
+def _bell(pitch: float, seconds: float) -> np.ndarray:
+    """Колокольчик: негармоничные обертоны, иначе это просто синус."""
+    out = np.zeros(dsp.samples(seconds), dtype=np.float32)
+    for ratio, share, tau in ((1.0, 1.0, 0.9), (2.76, 0.5, 0.45), (5.4, 0.25, 0.22)):
+        out += dsp.decay(dsp.sine(pitch * ratio, seconds), tau=tau) * share
+    return out
+
+
+def elevator_ding() -> Stereo:
     """«Динь» лифта — один из двух эффектов, которые источники называют прямо."""
-    first = envelope(square(1046.5, 0.18, duty=0.5), attack=0.002, hold=0.02, release=0.16)
-    second = sequence(silence(0.14), envelope(square(784.0, 0.3, duty=0.5), release=0.28))
-    return mix(first, second, gain=0.6)
+    both = stack(_bell(note("C6"), 1.2) * 0.6, after(0.16, _bell(note("G5"), 1.3) * 0.5))
+    return dsp.master(dsp.widen(placed(both, "shaft", mix=0.35)), peak=0.7)
 
 
-def elevator_hum() -> np.ndarray:
-    """Ход кабины: ровный гул, который зацикливается на время поездки."""
-    body = square(58.0, 0.5, duty=0.5)
-    rattle = noise(0.5, 61, colour=0.08)
-    return mix(body * 0.5, rattle * 0.5, gain=0.4)
+def elevator_hum() -> Stereo:
+    """Гул кабины: мотор и шум троса. Зацикливается на время поездки."""
+    seconds = 2.0
+    motor = dsp.filtered(dsp.saw(55.0, seconds), 380.0, "low", resonance=0.3)
+    harmonic = dsp.filtered(dsp.saw(110.0, seconds), 700.0, "low") * 0.3
+    rope = dsp.filtered(dsp.noise(seconds, 181), 1400.0, "low") * 0.25
+    wobble = 1.0 + 0.08 * dsp.sine(2.0, seconds)
+    return dsp.master(dsp.mono_to_stereo(dsp.saturate((motor * 0.6 + harmonic + rope) * wobble, 1.6)), peak=0.45)
 
 
-def escalator_hum() -> np.ndarray:
-    """Полотно эскалатора: механический стрёкот, тоже петлёй."""
-    return mix(
-        square(96.0, 0.4, duty=0.2) * 0.4,
-        envelope(noise(0.4, 71, colour=0.15), attack=0.1, release=0.1) * 0.5,
-        gain=0.35,
+def escalator_hum() -> Stereo:
+    """Стрёкот эскалатора: цепь, шагающая по звёздочке, и мотор под ней."""
+    seconds = 2.0
+    period = 0.125
+    motor = dsp.filtered(dsp.saw(74.0, seconds), 300.0, "low") * 0.4
+    chain = np.zeros(dsp.samples(seconds), dtype=np.float32)
+    for index in range(int(seconds / period)):
+        tick = dsp.decay(dsp.filtered(dsp.noise(0.05, 190 + index), 2200.0, "high"), tau=0.004)
+        start = dsp.samples(index * period)
+        chain[start : start + tick.size] += tick[: max(chain.size - start, 0)] * 0.5
+    return dsp.master(dsp.mono_to_stereo(motor + chain), peak=0.4)
+
+
+def door_open() -> Stereo:
+    """Дверь открывается: ручка и ход полотна."""
+    handle = dsp.decay(dsp.filtered(dsp.noise(0.05, 201), 2600.0, "high"), tau=0.007)
+    swing = dsp.sweeping(
+        dsp.noise(0.32, 202),
+        cutoff=np.linspace(320.0, 1400.0, 32, dtype=np.float32),
+        kind="low",
+        resonance=0.8,
+        block=1024,
     )
+    swing = dsp.adsr(swing, attack=0.04, hold=0.1, release=0.18) * 0.45
+    return dsp.master(placed(stack(handle * 0.8, swing), "floor", mix=0.3), peak=0.6)
 
 
-def door_open() -> np.ndarray:
-    """Дверь открывается: скрип вверх."""
-    return mix(envelope(square(300.0, 0.16, duty=0.12, to_pitch=520.0), release=0.14), gain=0.5)
+def door_close() -> Stereo:
+    """Дверь закрывается: ход полотна, защёлка и стук."""
+    swing = dsp.sweeping(
+        dsp.noise(0.26, 211),
+        cutoff=np.linspace(1400.0, 380.0, 32, dtype=np.float32),
+        kind="low",
+        resonance=0.7,
+        block=1024,
+    )
+    swing = dsp.adsr(swing, attack=0.02, hold=0.06, release=0.16) * 0.5
+    latch = after(0.24, dsp.decay(dsp.filtered(dsp.noise(0.12, 212), 1600.0, "low"), tau=0.012))
+    thud = after(0.24, dsp.decay(dsp.sine(dsp.glide(140.0, 60.0, 0.16), 0.16), tau=0.035))
+    return dsp.master(placed(stack(swing, latch * 0.7, thud * 0.6), "floor", mix=0.3), peak=0.65)
 
 
-def door_close() -> np.ndarray:
-    """Дверь закрывается: тот же скрип вниз и стук."""
-    creak = envelope(square(520.0, 0.14, duty=0.12, to_pitch=300.0), release=0.12)
-    knock = sequence(silence(0.12), envelope(noise(0.06, 81, colour=0.3), release=0.05))
-    return mix(creak, knock, gain=0.5)
+def document() -> Stereo:
+    """Документ взят: короткий светлый мотив с эхом. Единственная награда в игре."""
+    phrase = np.zeros(dsp.samples(1.3), dtype=np.float32)
+    for index, name in enumerate(("C5", "E5", "G5", "C6")):
+        voice = _bell(note(name), 0.9) * 0.5
+        start = dsp.samples(0.075 * index)
+        phrase[start : start + voice.size] += voice[: max(phrase.size - start, 0)]
+    delayed = dsp.echo(phrase, delay_time=0.19, feedback=0.4, mix=0.3)
+    return dsp.master(dsp.widen(placed(delayed, "floor", mix=0.3), amount=0.4), peak=0.7)
 
 
-def document() -> np.ndarray:
-    """Документ взят: арпеджио вверх. Единственный безусловно хороший звук в игре."""
-    return mix(line([("C5", 0.07), ("E5", 0.07), ("G5", 0.07), ("C6", 0.16)], gap=0.05), gain=0.6)
+def otto_death() -> Stereo:
+    """Смерть Otto: всё проваливается вниз, и остаётся гулкая пустота."""
+    fall = dsp.saturate(dsp.decay(dsp.saw(dsp.glide(330.0, 44.0, 1.0), 1.0), tau=0.3), 2.2)
+    fall = dsp.filtered(fall, 1400.0, "low", resonance=0.4)
+    air = dsp.sweeping(
+        dsp.noise(1.0, 221),
+        cutoff=np.linspace(3000.0, 200.0, 32, dtype=np.float32),
+        kind="low",
+        block=2048,
+    )
+    air = dsp.adsr(air, attack=0.02, hold=0.1, release=0.85) * 0.4
+    return dsp.master(dsp.widen(placed(stack(fall * 0.7, air), "shaft", mix=0.45)), peak=0.85)
 
 
-def otto_death() -> np.ndarray:
-    """Смерть Otto: длинный уход вниз."""
-    fall = envelope(square(440.0, 0.7, duty=0.35, to_pitch=60.0), release=0.65)
-    return mix(fall, envelope(noise(0.7, 91, colour=0.12), release=0.68) * 0.4, gain=0.8)
-
-
-def agent_death() -> np.ndarray:
+def agent_death() -> Stereo:
     """Смерть агента: короче и суше, чем у Otto, — их много."""
-    return mix(
-        envelope(square(300.0, 0.18, duty=0.3, to_pitch=80.0), release=0.17),
-        envelope(noise(0.18, 101, colour=0.25), release=0.17) * 0.5,
-        gain=0.6,
+    grunt = dsp.decay(dsp.filtered(dsp.saw(dsp.glide(240.0, 90.0, 0.2), 0.2), 1200.0, "low"), tau=0.06)
+    fall = after(0.18, dsp.decay(dsp.sine(dsp.glide(120.0, 48.0, 0.25), 0.25), tau=0.05))
+    cloth = after(0.16, dsp.decay(dsp.filtered(dsp.noise(0.2, 231), 1500.0, "low"), tau=0.04))
+    return dsp.master(placed(stack(grunt * 0.5, fall * 0.8, cloth * 0.5), "floor", mix=0.25), peak=0.7)
+
+
+def car_away() -> Stereo:
+    """Машина уезжает: мотор набирает обороты и уходит вбок."""
+    seconds = 1.8
+    revs = dsp.glide(60.0, 130.0, seconds, curve=0.6)
+    engine = dsp.saturate(dsp.saw(revs, seconds) * 0.6 + dsp.saw(revs * 2.02, seconds) * 0.3, 2.5)
+    engine = dsp.sweeping(
+        engine, cutoff=np.linspace(700.0, 2600.0, 32, dtype=np.float32), kind="low", resonance=0.4
     )
+    tyres = dsp.filtered(dsp.noise(seconds, 241), 1800.0, "low") * 0.25
+    body = dsp.adsr(stack(engine * 0.7, tyres), attack=0.08, hold=0.7, release=1.0)
+
+    wet = dsp.reverb(body, room("street"), mix=0.25)
+    # Машина уезжает вправо: панорама едет вместе с ней.
+    angle = (np.linspace(0.0, 0.9, wet.size, dtype=np.float32) + 1.0) * 0.25 * np.pi
+    moving = np.stack([wet * np.cos(angle), wet * np.sin(angle)], axis=1).astype(np.float32)
+    return dsp.master(moving, peak=0.75)
 
 
-def car_away() -> np.ndarray:
-    """Машина уезжает: мотор, уходящий вверх и вдаль."""
-    engine = envelope(square(70.0, 1.1, duty=0.35, to_pitch=150.0), attack=0.05, release=0.9)
-    smoke = envelope(noise(1.1, 111, colour=0.1), attack=0.05, release=0.9)
-    return mix(engine * 0.7, smoke * 0.5, gain=0.7)
-
-
-def building_bonus() -> np.ndarray:
-    """Бонус за здание: восходящая фраза, пока начисляются очки."""
-    return mix(
-        line(
-            [("G4", 0.09), ("C5", 0.09), ("E5", 0.09), ("G5", 0.09), ("C6", 0.22)],
-            duty=0.25,
-            gap=0.06,
-        ),
-        gain=0.6,
+def building_bonus() -> Stereo:
+    """Бонус за здание: аккорд с подъёмом фильтра — здание сдано."""
+    seconds = 1.6
+    chord = np.zeros(dsp.samples(seconds), dtype=np.float32)
+    for name in ("A3", "C4", "E4", "A4", "B4"):
+        chord += dsp.saw(note(name), seconds, detune=6.0) * 0.18
+        chord += dsp.saw(note(name), seconds, detune=-6.0) * 0.18
+    swept = dsp.sweeping(
+        chord, cutoff=np.linspace(400.0, 6000.0, 32, dtype=np.float32), kind="low", resonance=0.7
     )
+    swept = dsp.adsr(swept, attack=0.03, hold=0.5, release=1.0)
+    shimmer = dsp.echo(swept * 0.4, delay_time=0.16, feedback=0.45, mix=0.35)
+    return dsp.master(dsp.widen(placed(shimmer, "floor", mix=0.35), amount=0.45), peak=0.8)
 
 
-def game_over() -> np.ndarray:
-    """Game Over: то же, что смерть, но окончательно."""
-    return mix(
-        line([("C4", 0.25), ("G3", 0.25), ("E3", 0.25), ("C3", 0.7)], duty=0.4, gap=0.04),
-        gain=0.7,
+def game_over() -> Stereo:
+    """Game Over: тёмный аккорд и долгий хвост. Партия окончена."""
+    seconds = 2.6
+    chord = np.zeros(dsp.samples(seconds), dtype=np.float32)
+    for name, level in (("A1", 0.8), ("A2", 0.5), ("C3", 0.35), ("E3", 0.3), ("G3", 0.2)):
+        chord += dsp.saw(note(name), seconds, detune=4.0) * level * 0.3
+        chord += dsp.sine(note(name), seconds) * level * 0.3
+    shaped = dsp.adsr(
+        dsp.filtered(chord, 1200.0, "low", resonance=0.2), attack=0.08, hold=0.6, release=1.8
     )
+    sub = dsp.decay(dsp.sine(dsp.glide(90.0, 35.0, 2.0), 2.0), tau=0.7) * 0.5
+    return dsp.master(dsp.widen(placed(stack(shaped, sub), "shaft", mix=0.45)), peak=0.85)
 
 
 # --- Музыка ------------------------------------------------------------------
 
 
-def theme() -> np.ndarray:
-    """Тема здания: короткая петля на трёх голосах.
+def _kick_drum(seconds: float = 0.5) -> np.ndarray:
+    body = dsp.decay(dsp.sine(dsp.glide(140.0, 45.0, seconds, curve=4.0), seconds), tau=0.08)
+    click = dsp.decay(dsp.filtered(dsp.noise(0.02, 301), 1800.0, "high"), tau=0.004) * 0.4
+    return dsp.saturate(stack(body, click), 1.8)
 
-    Своя, а не из оригинала (ADR-0012, пункт 2): тема Taito — их собственность.
-    Идиома та же — простая тревожная мелодия, ровный бас, шум вместо барабанов.
+
+def _snare(seconds: float = 0.35) -> np.ndarray:
+    body = dsp.decay(dsp.sine(190.0, seconds), tau=0.05) * 0.4
+    rattle = dsp.decay(dsp.filtered(dsp.noise(seconds, 311), 1600.0, "high"), tau=0.07)
+    return dsp.reverb(stack(body, rattle * 0.8), room("tight"), mix=0.35)
+
+
+def _hat(seed: int) -> np.ndarray:
+    return dsp.decay(dsp.filtered(dsp.noise(0.12, seed), 6500.0, "high"), tau=0.012)
+
+
+def _place(track: np.ndarray, part: np.ndarray, at: float, level: float) -> None:
+    start = dsp.samples(at)
+    if start >= track.size:
+        return
+    end = min(start + part.size, track.size)
+    track[start:end] += part[: end - start] * level
+
+
+def _drums(length: float, beat: float, pattern: dict[str, str], seed: int) -> np.ndarray:
+    """Барабаны по сетке: `x` — удар, `.` — пауза. Шаг сетки — восьмая."""
+    track = np.zeros(dsp.samples(length + 1.0), dtype=np.float32)
+    rng = np.random.default_rng(seed)
+    step = beat * 0.5
+    for index, mark in enumerate(pattern["kick"]):
+        if mark == "x":
+            _place(track, _kick_drum(), index * step, 0.9)
+    for index, mark in enumerate(pattern["snare"]):
+        if mark == "x":
+            _place(track, _snare(), index * step, 0.8)
+    for index, mark in enumerate(pattern["hat"]):
+        if mark == "x":
+            _place(track, _hat(seed + index), index * step, float(rng.uniform(0.3, 0.5)))
+    return track
+
+
+def _bass(notes: list[tuple[str, float]], beat: float, length: float) -> np.ndarray:
+    """Бас: синус для веса и пила для зубов, оба через насыщение."""
+    track = np.zeros(dsp.samples(length + 1.0), dtype=np.float32)
+    at = 0.0
+    for name, beats in notes:
+        seconds = beats * beat
+        pitch = note(name)
+        # Синус даёт вес, пила — зубы. Подвал ниже 45 Гц срезан: он не слышен
+        # на обычных колонках, зато съедает весь запас громкости в миксе.
+        voice = dsp.sine(pitch, seconds * 1.1) * 0.55 + dsp.saw(pitch, seconds * 1.1) * 0.45
+        voice = dsp.filtered(dsp.filtered(voice, 1600.0, "low"), 45.0, "high", slope=18.0)
+        voice = dsp.adsr(voice, attack=0.006, hold=seconds * 0.5, release=seconds * 0.6)
+        _place(track, dsp.saturate(voice, 2.0), at, 0.5)
+        at += seconds
+    return track
+
+
+def _arpeggio(notes: list[str], beat: float, length: float) -> np.ndarray:
+    """Арпеджио шестнадцатыми через фильтр с движущимся срезом и эхом."""
+    step = beat * 0.25
+    track = np.zeros(dsp.samples(length + 1.0), dtype=np.float32)
+    for index in range(int(length / step)):
+        pitch = note(notes[index % len(notes)])
+        voice = dsp.saw(pitch, step * 2.0, detune=5.0) + dsp.saw(pitch, step * 2.0, detune=-5.0)
+        _place(track, dsp.decay(voice * 0.5, tau=step * 0.9), index * step, 0.3)
+
+    # Движение среза — половина звука synthwave: без него арпеджио плоское.
+    cutoff = 1500.0 + 4500.0 * (0.5 + 0.5 * np.sin(np.linspace(0.0, 4.0 * np.pi, 64, dtype=np.float32)))
+    swept = dsp.sweeping(track, cutoff=cutoff, kind="low", resonance=0.9)
+    return dsp.echo(swept, delay_time=beat * 0.75, feedback=0.35, mix=0.3)
+
+
+def _pad(chords: list[tuple[list[str], float]], beat: float, length: float) -> np.ndarray:
+    """Пад: расстроенные пилы, медленная атака, много комнаты."""
+    track = np.zeros(dsp.samples(length + 2.0), dtype=np.float32)
+    at = 0.0
+    for names, beats in chords:
+        seconds = beats * beat
+        chord = np.zeros(dsp.samples(seconds * 1.4), dtype=np.float32)
+        for name in names:
+            chord += dsp.saw(note(name), seconds * 1.4, detune=7.0) * 0.16
+            chord += dsp.saw(note(name), seconds * 1.4, detune=-7.0) * 0.16
+        shaped = dsp.adsr(
+            dsp.filtered(chord, 1600.0, "low", resonance=0.2),
+            attack=seconds * 0.35,
+            hold=seconds * 0.3,
+            release=seconds * 0.7,
+        )
+        _place(track, shaped, at, 0.5)
+        at += seconds
+    # Низ у пада срезан: там уже стоит бас, и вдвоём они забивают середину.
+    return dsp.reverb(dsp.filtered(track, 220.0, "high", slope=12.0), room("shaft"), mix=0.45)
+
+
+def theme() -> Stereo:
+    """Тема здания: тёмный synthwave, восемь тактов, ля минор.
+
+    Своя, а не из оригинала: тема Taito — их собственность (ADR-0012, пункт 2).
+    Ход Am–F–C–G держит половину жанра: он не отвлекает от игры и не приедается
+    за партию, а петля замкнута так, что шва не слышно.
     """
-    beat = 0.16
-    melody = line(
-        [
-            ("E5", beat), ("", beat), ("D5", beat), ("E5", beat),
-            ("G5", beat), ("", beat), ("E5", beat), ("D5", beat),
-            ("C5", beat), ("", beat), ("D5", beat), ("C5", beat),
-            ("A4", beat * 2), ("", beat * 2),
-            ("E5", beat), ("", beat), ("F5", beat), ("E5", beat),
-            ("D5", beat), ("", beat), ("C5", beat), ("D5", beat),
-            ("B4", beat), ("", beat), ("C5", beat), ("B4", beat),
-            ("A4", beat * 2), ("", beat * 2),
-        ],
-        duty=0.25,
+    beat = 60.0 / 92.0
+    length = beat * 32.0
+
+    drums = _drums(
+        length,
+        beat,
+        {
+            "kick": "x..x..x...x..x..x..x..x...x..x..",
+            "snare": "....x.......x.......x.......x...",
+            "hat": "..x...x...x...x...x...x...x...x.",
+        },
+        seed=331,
     )
-    bass = line(
+    bass = _bass(
         [
-            ("A2", beat * 2), ("A2", beat * 2), ("E2", beat * 2), ("E2", beat * 2),
-            ("F2", beat * 2), ("F2", beat * 2), ("E2", beat * 2), ("E2", beat * 2),
-            ("A2", beat * 2), ("A2", beat * 2), ("G2", beat * 2), ("G2", beat * 2),
-            ("F2", beat * 2), ("E2", beat * 2), ("A2", beat * 2), ("", beat * 2),
+            ("A2", 2.0), ("A2", 1.0), ("A3", 1.0), ("F2", 2.0), ("F2", 2.0),
+            ("C3", 2.0), ("C3", 2.0), ("G2", 2.0), ("G2", 1.0), ("G3", 1.0),
+            ("A2", 2.0), ("A2", 1.0), ("A3", 1.0), ("F2", 2.0), ("F2", 2.0),
+            ("C3", 2.0), ("C3", 2.0), ("G2", 4.0),
         ],
-        duty=0.5,
-        gap=0.06,
+        beat,
+        length,
     )
-    percussion = drums("x..x..x." * 4, beat, seed=201)
-    return mix(melody * 0.5, bass * 0.45, percussion * 0.3, gain=0.85)
+    arp = _arpeggio(["A4", "C5", "E5", "A5", "E5", "C5"], beat, length)
+    pad = _pad(
+        [
+            (["A3", "C4", "E4"], 4.0),
+            (["F3", "A3", "C4"], 4.0),
+            (["C4", "E4", "G4"], 4.0),
+            (["G3", "B3", "D4"], 4.0),
+        ]
+        * 2,
+        beat,
+        length,
+    )
+
+    # Баланс слоёв проверен спектром, а не на глаз: на первой версии бас
+    # занимал четыре пятых энергии, и арпеджио с падом были не слышны вовсе.
+    mixed = dsp.layer(
+        dsp.mono_to_stereo(dsp.compress(drums * 0.55, threshold=0.3, ratio=3.0)),
+        dsp.mono_to_stereo(dsp.shelf(bass, 900.0, 0.35) * 0.33),
+        dsp.widen(dsp.mono_to_stereo(dsp.shelf(arp, 2500.0, 0.6) * 1.1), amount=0.5),
+        dsp.widen(dsp.mono_to_stereo(dsp.shelf(pad, 2000.0, 0.5) * 0.9), amount=0.6, offset=0.02),
+    )
+    return dsp.master(dsp.loop_seamlessly(mixed, length), peak=0.82)
 
 
-def alarm_theme() -> np.ndarray:
-    """Мотив тревоги: сирена работает с M5b, а звучать ей было нечем.
+def alarm_theme() -> Stereo:
+    """Мотив тревоги: то же здание, но теперь оно против тебя.
 
-    Две ноты в терцию, качающиеся туда-обратно, — то же, что делает сирена,
-    и по ним слышно, что здание теперь против тебя.
+    Быстрее, жёстче, с сиреной поверх. Сирена работает в игре с M5b, и звучать
+    ей до сих пор было нечем.
     """
-    beat = 0.22
-    siren = line([("A4", beat), ("D5", beat)] * 8, duty=0.5, gap=0.02)
-    bass = line([("D2", beat * 2)] * 8, duty=0.5, gap=0.05)
-    percussion = drums("x.x.x.x." * 2, beat, seed=211)
-    return mix(siren * 0.5, bass * 0.5, percussion * 0.35, gain=0.82)
+    beat = 60.0 / 116.0
+    length = beat * 32.0
+
+    drums = _drums(
+        length,
+        beat,
+        {
+            "kick": "x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.x.",
+            "snare": "....x.......x.......x.......x...",
+            "hat": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        },
+        seed=351,
+    )
+    bass = _bass([("D2", 1.0), ("D2", 1.0), ("D2", 1.0), ("Eb2", 1.0)] * 8, beat, length)
+    arp = _arpeggio(["D4", "Eb4", "A4", "Eb4"], beat, length)
+
+    # Сирена: тритон, качающийся туда-обратно поверх всего остального.
+    siren = np.zeros(dsp.samples(length + 1.0), dtype=np.float32)
+    sweep = beat * 2.0
+    rising = dsp.glide(note("A4"), note("Eb5"), sweep, curve=1.0)
+    for index in range(int(length / sweep)):
+        pitch = rising if index % 2 == 0 else rising[::-1]
+        voice = dsp.adsr(
+            dsp.pulse(pitch, sweep, duty=0.35),
+            attack=0.05,
+            hold=sweep * 0.5,
+            release=sweep * 0.4,
+        )
+        _place(siren, dsp.filtered(voice, 2400.0, "low", resonance=0.5), index * sweep, 0.22)
+
+    mixed = dsp.layer(
+        dsp.mono_to_stereo(dsp.compress(drums * 0.6, threshold=0.28, ratio=3.5)),
+        dsp.mono_to_stereo(dsp.shelf(bass, 900.0, 0.35) * 0.335),
+        dsp.widen(dsp.mono_to_stereo(dsp.shelf(arp, 2500.0, 0.6) * 1.0), amount=0.5),
+        dsp.widen(
+            dsp.mono_to_stereo(dsp.shelf(dsp.reverb(siren, room("shaft"), mix=0.3), 2000.0, 0.4)),
+            amount=0.3,
+        ),
+    )
+    return dsp.master(dsp.loop_seamlessly(mixed, length), peak=0.85)
 
 
-SOUNDS: dict[str, Callable[[], np.ndarray]] = {
+EFFECTS: dict[str, Callable[[], Stereo]] = {
     "step": step_sound,
     "shot": shot,
     "hit": hit,
@@ -373,27 +538,58 @@ SOUNDS: dict[str, Callable[[], np.ndarray]] = {
     "car_away": car_away,
     "building_bonus": building_bonus,
     "game_over": game_over,
+}
+
+## Музыка пишется в OGG: двадцать секунд стерео в WAV весят три с половиной
+## мегабайта, а лежать им в репозитории вечно.
+MUSIC: dict[str, Callable[[], Stereo]] = {
     "theme": theme,
     "alarm_theme": alarm_theme,
 }
 
+## Длинные и редкие эффекты тоже уезжают в OGG. Частые и короткие остаются WAV:
+## шаг и выстрел звучат сотнями за партию, и распаковывать их каждый раз незачем.
+LONG: frozenset[str] = frozenset(
+    {"document", "elevator_ding", "building_bonus", "car_away", "game_over", "otto_death"}
+)
 
-def write_wav(path: Path, samples: np.ndarray) -> None:
-    """16 бит, моно. Стерео чипу неоткуда взять, да и незачем."""
+## Петли режутся ровно по длине, поэтому хвост у них не срезается.
+LOOPED: frozenset[str] = frozenset({"elevator_hum", "escalator_hum", "theme", "alarm_theme"})
+
+SOUNDS: dict[str, Callable[[], Stereo]] = {**EFFECTS, **MUSIC}
+
+
+def path_of(name: str, out_dir: Path) -> Path:
+    compressed = name in MUSIC or name in LONG
+    return out_dir / (f"{name}.ogg" if compressed else f"{name}.wav")
+
+
+## Кусок, которым пишется OGG. Кодировщик Vorbis в libsndfile 1.2.2 роняет
+## процесс без traceback, если отдать ему разом больше ~20 секунд стерео
+## (проверено: 15 с пишутся, 21 с убивает python). Поблочная запись это обходит.
+OGG_CHUNK = dsp.RATE
+
+
+def write(path: Path, audio: Stereo) -> None:
+    import soundfile
+
     path.parent.mkdir(parents=True, exist_ok=True)
-    clipped = np.clip(samples, -1.0, 1.0)
-    with wave.open(str(path), "wb") as handle:
-        handle.setnchannels(1)
-        handle.setsampwidth(2)
-        handle.setframerate(RATE)
-        handle.writeframes((clipped * 32767.0).astype("<i2").tobytes())
+    if path.suffix != ".ogg":
+        soundfile.write(path, audio, dsp.RATE, subtype="PCM_16")
+        return
+
+    with soundfile.SoundFile(
+        path, "w", samplerate=dsp.RATE, channels=2, format="OGG", subtype="VORBIS"
+    ) as handle:
+        for start in range(0, audio.shape[0], OGG_CHUNK):
+            handle.write(audio[start : start + OGG_CHUNK])
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Синтез звуков игры.")
-    parser.add_argument("names", nargs="*", help="какие звуки писать; по умолчанию все")
+    parser = argparse.ArgumentParser(description="Синтез звуков и музыки игры.")
+    parser.add_argument("names", nargs="*", help="что писать; по умолчанию всё")
     parser.add_argument("--list", action="store_true", help="перечислить и выйти")
-    parser.add_argument("--out", type=Path, default=OUT_DIR, help="куда писать WAV")
+    parser.add_argument("--out", type=Path, default=OUT_DIR, help="куда писать файлы")
     arguments = parser.parse_args()
 
     from godot_bin import use_utf8_output
@@ -413,15 +609,17 @@ def main() -> int:
         return 2
 
     for name in wanted:
-        samples = SOUNDS[name]()
-        path = arguments.out / f"{name}.wav"
-        write_wav(path, samples)
-        seconds = samples.size / float(RATE)
+        audio = SOUNDS[name]()
+        if name not in LOOPED:
+            audio = dsp.trim(audio)
+        path = path_of(name, arguments.out)
+        write(path, audio)
+        seconds = audio.shape[0] / float(dsp.RATE)
         try:
             shown = path.relative_to(PROJECT_ROOT).as_posix()
         except ValueError:
             shown = str(path)
-        print(f"{shown}  {seconds:.2f} с")
+        print(f"{shown}  {seconds:.2f} с  {path.stat().st_size / 1024:.0f} КБ")
     return 0
 
 

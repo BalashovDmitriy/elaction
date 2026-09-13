@@ -12,10 +12,15 @@ func before_each() -> void:
 	Sounds.forget()
 
 
-func test_every_sound_has_a_file() -> void:
+func test_every_sound_has_exactly_one_file() -> void:
+	# Имя может лежать и в WAV, и в OGG — формат выбирает генератор. Два файла
+	# с одним именем означали бы, что игра берёт один, а правят другой.
 	for name: String in Sounds.names():
-		var path := Sounds.path_of(name)
-		assert_true(ResourceLoader.exists(path), "синтезирован звук %s" % path)
+		var found := 0
+		for path: String in Sounds.candidates(name):
+			if ResourceLoader.exists(path):
+				found += 1
+		assert_eq(found, 1, "звук %s синтезирован ровно один раз" % name)
 
 
 func test_every_sound_loads() -> void:
@@ -36,31 +41,44 @@ func test_the_folder_holds_nothing_but_the_listed_sounds() -> void:
 
 	for file: String in folder.get_files():
 		# Godot в экспортированной сборке видит .import, в проекте — исходник.
-		if not file.ends_with(".wav"):
+		if not (file.ends_with(".wav") or file.ends_with(".ogg")):
 			continue
 		var name := file.get_basename()
 		assert_true(known.has(name), "звук %s кому-то нужен" % name)
 
 
 func test_sounds_that_should_loop_do_loop() -> void:
-	# Тема, оборвавшаяся через пять секунд, — это не «музыка тихая», это тишина
-	# до конца партии, и заметить её можно только на слух.
+	# Тема, оборвавшаяся через двадцать секунд, — это не «музыка тихая», это
+	# тишина до конца партии, и заметить её можно только на слух.
 	for name: String in Sounds.LOOPED:
-		var stream := Sounds.stream(name) as AudioStreamWAV
-		assert_not_null(stream, "звук %s читается как WAV" % name)
-		if stream == null:
-			continue
-		assert_ne(stream.loop_mode, AudioStreamWAV.LOOP_DISABLED, "%s зациклен" % name)
+		assert_true(_loops(Sounds.stream(name)), "%s зациклен" % name)
 
 
 func test_one_shot_sounds_do_not_loop() -> void:
 	for name: String in Sounds.EFFECTS:
 		if Sounds.LOOPED.has(name):
 			continue
-		var stream := Sounds.stream(name) as AudioStreamWAV
-		if stream == null:
+		assert_false(_loops(Sounds.stream(name)), "%s звучит один раз" % name)
+
+
+## Зациклен ли поток. Форматов два, и у каждого свой способ об этом сказать.
+func _loops(stream: AudioStream) -> bool:
+	var wav := stream as AudioStreamWAV
+	if wav != null:
+		return wav.loop_mode != AudioStreamWAV.LOOP_DISABLED
+	var vorbis := stream as AudioStreamOggVorbis
+	return vorbis != null and vorbis.loop
+
+
+func test_the_loop_covers_the_whole_sound() -> void:
+	# Конец петли считался делением размера данных на байты кадра, а формат
+	# бывает сжатым: петля обрывалась на четверти звука.
+	for name: String in Sounds.LOOPED:
+		var wav := Sounds.stream(name) as AudioStreamWAV
+		if wav == null:
 			continue
-		assert_eq(stream.loop_mode, AudioStreamWAV.LOOP_DISABLED, "%s звучит один раз" % name)
+		var frames := wav.get_length() * float(wav.mix_rate)
+		assert_almost_eq(float(wav.loop_end), frames, frames * 0.02, "%s зациклен целиком" % name)
 
 
 func test_the_mixer_has_its_three_buses() -> void:
