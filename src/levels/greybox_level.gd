@@ -225,11 +225,13 @@ func _build_geometry() -> void:
 	_build_solid(Rect2(0.0, 0.0, WALL_WIDTH, height))
 	_build_solid(Rect2(rules.width - WALL_WIDTH, 0.0, WALL_WIDTH, height))
 
+	# Тайл берётся один раз на здание: плит в нём под три сотни, а текстура одна.
+	var slab_tile := EnvTextures.tile("slab")
 	for index in rules.floors:
 		var surface := rules.floor_surface(index)
 		var gaps := _plan.gaps_on(rules, index)
 		for rect in slab_segments(surface, gaps, rules.width, rules.slab_height):
-			_build_solid(rect)
+			_build_solid(rect, slab_tile)
 
 
 func _spawn_shafts() -> void:
@@ -464,7 +466,7 @@ func _on_pit_entered(body: Node2D) -> void:
 		victim.kill()
 
 
-func _build_solid(rect: Rect2) -> void:
+func _build_solid(rect: Rect2, tile: CanvasTexture = null) -> void:
 	var body := StaticBody2D.new()
 	body.position = rect.position + rect.size * 0.5
 	# Тела добавляются в дерево после Otto, то есть рисовались бы поверх него.
@@ -476,7 +478,10 @@ func _build_solid(rect: Rect2) -> void:
 	var collision := CollisionShape2D.new()
 	collision.shape = shape
 	body.add_child(collision)
-	body.add_child(_panel(rect.size, -rect.size * 0.5, SOLID_COLOR))
+	if tile == null:
+		body.add_child(_panel(rect.size, -rect.size * 0.5, SOLID_COLOR))
+	else:
+		body.add_child(_tiled(rect.size, -rect.size * 0.5, tile))
 	body.add_child(_occluder(rect.size))
 
 	add_child(body)
@@ -614,6 +619,24 @@ func _occluder(size: Vector2) -> LightOccluder2D:
 	var occluder := LightOccluder2D.new()
 	occluder.occluder = shape
 	return occluder
+
+
+## Плитка из ассета: [CanvasTexture] повторяется по площади прямоугольника.
+##
+## Заменяет [method _panel] там, где генератор уже нарисовал ассет. Вместе с
+## цветом приходят нормаль и блик, поэтому свет из M6 ложится на рельеф, а не
+## на плоскость (ADR-0011, пункт 7).
+func _tiled(size: Vector2, offset: Vector2, tile: CanvasTexture) -> TextureRect:
+	var rect := TextureRect.new()
+	rect.texture = tile
+	rect.stretch_mode = TextureRect.STRETCH_TILE
+	# Повтор включается на самом узле: по умолчанию холст зажимает текстуру
+	# по краям, и плита в тридцать тайлов вышла бы одним растянутым.
+	rect.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	rect.size = size
+	rect.position = offset
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return rect
 
 
 ## Цветной прямоугольник — временная замена спрайтам до M7.

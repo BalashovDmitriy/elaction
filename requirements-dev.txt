@@ -3,3 +3,7 @@
 #   .venv/Scripts/pip install -r requirements-dev.txt   # Windows
 gdtoolkit==4.5.0
 pre-commit==4.6.2
+
+# Генератор ассетов окружения, tools/render_env.py (ADR-0011)
+Pillow==12.1.0
+numpy==2.4.1
