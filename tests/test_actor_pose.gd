@@ -40,6 +40,10 @@ func test_every_pose_of_otto_is_reachable() -> void:
 
 	for pose: String in SpriteTextures.OTTO_POSES:
 		assert_true(shown.has(pose), "поза %s кому-то нужна" % pose)
+	# И наоборот — как у агента: показать можно только нарисованное. Без этого
+	# опечатка в [ActorPose] дошла бы до игрока розовым квадратом заглушки.
+	for pose: String in shown:
+		assert_true(SpriteTextures.OTTO_POSES.has(pose), "поза %s нарисована" % pose)
 
 
 func test_every_pose_of_the_agent_is_reachable() -> void:
@@ -77,14 +81,27 @@ func test_the_dead_do_not_shoot() -> void:
 
 
 func test_walking_cycles_three_frames() -> void:
-	var frames: Array[String] = []
-	for step: int in 6:
-		frames.append(ActorPose.walk_frame(float(step) * 0.6))
 	# Фаза растёт дробно, кадр меняется на целых: цикл обязан замыкаться.
 	assert_eq(ActorPose.walk_frame(0.0), "walk_0")
+	assert_eq(ActorPose.walk_frame(0.9), "walk_0", "дробная часть кадр не меняет")
+	assert_eq(ActorPose.walk_frame(1.0), "walk_1")
 	assert_eq(ActorPose.walk_frame(2.9), "walk_2")
 	assert_eq(ActorPose.walk_frame(3.0), "walk_0", "цикл замыкается")
-	assert_gt(frames.size(), 0)
+
+
+func test_the_phase_never_skips_a_frame_of_the_cycle() -> void:
+	# Длину цикла знает один WALK_FRAMES, и продвижение фазы обязано считать её
+	# так же, как выбор кадра. Разойдутся — последний кадр ходьбы не покажется
+	# никогда, и заметить это на глаз нельзя: шаг просто станет короче.
+	var phase := 0.0
+	var seen: Array[String] = []
+	for _step: int in 120:
+		phase = ActorPose.advance(phase, 1.0 / 60.0)
+		assert_between(phase, 0.0, float(ActorPose.WALK_FRAMES), "фаза не уходит из цикла")
+		var frame := ActorPose.walk_frame(phase)
+		if not seen.has(frame):
+			seen.append(frame)
+	assert_eq(seen.size(), ActorPose.WALK_FRAMES, "за две секунды показаны все кадры")
 
 
 func test_a_broken_phase_does_not_break_the_frame() -> void:

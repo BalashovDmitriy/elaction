@@ -70,6 +70,7 @@ func _physics_process(delta: float) -> void:
 		# Тело доезжает до пола: убитый в прыжке не должен зависать в воздухе.
 		_apply_gravity(delta)
 		move_and_slide()
+		_walking = false
 		_rot(delta)
 		_update_look(delta)
 		return
@@ -163,14 +164,13 @@ func _apply_gravity(delta: float) -> void:
 		velocity.y = minf(velocity.y + gravity * delta, max_fall_speed)
 
 
-## Досчитывает время, которое тело лежит на полу, и убирает его.
 ## Картинка на этот кадр: поза, сторона и ход ходьбы. Устроено так же, как
 ## у Otto, — разница только в наборе поз: агент не приседает и не прыгает.
 func _update_look(delta: float) -> void:
 	_shooting = maxf(_shooting - delta, 0.0)
 	_falling_over = maxf(_falling_over - delta, 0.0)
 	if _walking:
-		_walk_phase = fmod(_walk_phase + delta * SpriteTextures.WALK_FPS, 3.0)
+		_walk_phase = ActorPose.advance(_walk_phase, delta)
 	else:
 		_walk_phase = 0.0
 
@@ -184,6 +184,7 @@ func _pose() -> String:
 	)
 
 
+## Досчитывает время, которое тело лежит на полу, и убирает его.
 func _rot(delta: float) -> void:
 	_corpse_left -= delta
 	if _corpse_left <= 0.0:

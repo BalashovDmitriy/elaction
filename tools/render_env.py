@@ -44,7 +44,7 @@ NORMAL_SUFFIX = "_n"
 SPECULAR_SUFFIX = "_s"
 
 # Ширина рамки девятикусочных ассетов. Та же величина стоит в
-# `EnvTextures.FRAME_MARGIN`, и тест следит, чтобы они не разошлись.
+# `SpriteTextures.FRAME_MARGIN`, и тест следит, чтобы они не разошлись.
 FRAME_MARGIN: int = 8
 
 
@@ -390,10 +390,15 @@ def exit_way() -> Canvas:
 
 
 def bullet() -> Canvas:
-    """Пуля: 6×2, как коллизия в `bullet.tscn`. Горячая середина, тусклый хвост."""
+    """Пуля: 6×2, как коллизия в `bullet.tscn`. Горячая середина, тусклые концы.
+
+    Симметрично нарочно: `bullet.gd` не зеркалит спрайт, потому что направление
+    показывает сам полёт. Яркий конец вместо середины летел бы влево хвостом
+    вперёд — половину выстрелов в игре.
+    """
     canvas = Canvas(6, 2)
     canvas.rect(0, 0, 6, 2, palette.mix(palette.BULLET, palette.IMPACT, 0.5), 0.6, palette.PAINT)
-    canvas.rect(3, 0, 3, 2, palette.BULLET, 0.9, palette.PAINT)
+    canvas.rect(2, 0, 2, 2, palette.BULLET, 0.9, palette.PAINT)
     return canvas
 
 

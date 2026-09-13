@@ -66,7 +66,10 @@ const EXIT_HEIGHT: float = 40.0
 ## Машина у выхода: ею оригинал заканчивает здание (ADR-0011, пункт 14).
 ## Стоит рядом с проёмом и уезжает, увозя Otto; следующее здание собирается
 ## после отъезда, а не в тот же кадр.
-const CAR_SIZE := Vector2(56.0, 26.0)
+##
+## Габарит нарочно не записан здесь второй раз: его знает сам ассет, а кадр ему
+## задаёт `tools/render_actors.py`. Своя копия числа разъехалась бы с кадром при
+## первой же правке машины, и та повисла бы над полом или утонула в нём.
 const CAR_GAP: float = 12.0
 const CAR_SPEED: float = 320.0
 
@@ -115,6 +118,8 @@ var _cleared: bool = false
 ## Машина у выхода и её отъезд: пока она едет, здание ещё не сдано.
 var _car: Sprite2D = null
 var _car_leaving: bool = false
+## Куда машина уезжает: -1 влево, +1 вправо. Та же сторона, с которой она стоит.
+var _car_towards: float = 1.0
 var _exit_position := Vector2.ZERO
 
 @onready var otto: Otto = $Otto
@@ -153,10 +158,10 @@ func _ready() -> void:
 ## Гасит всё, что уехало из кадра. Источников в здании шестьдесят, а в кадр
 ## влезает два с половиной этажа — ADR-0010, пункт 8.
 func _process(delta: float) -> void:
-	if _car_leaving:
-		_move_car(delta)
-
 	var view := otto.camera_view()
+	if _car_leaving:
+		_move_car(delta, view)
+
 	# Город отстаёт от камеры, оттого и кажется далёким.
 	_city.position = view.position * CITY_PARALLAX
 
@@ -349,17 +354,17 @@ func _spawn_exit() -> void:
 ## она снаружи здания, и заходить на неё Otto не может — это картинка, не тело.
 func _spawn_car(exit_area: Rect2) -> void:
 	var texture := SpriteTextures.actor("car", "parked")
+	var size := texture.get_size()
 	_car = Sprite2D.new()
 	_car.texture = texture
 	_car.centered = false
 	_car.z_index = -2
 	# Уезжает в ближнюю сторону: там же и стоит. В дальнюю машина ехала бы через
 	# всё здание, и «уехал» растянулось бы на пять секунд вместо одной.
-	var towards := -1.0 if exit_area.get_center().x < rules.width * 0.5 else 1.0
-	var x := exit_area.get_center().x + towards * (EXIT_WIDTH * 0.5 + CAR_GAP)
-	_car.position = Vector2(x - CAR_SIZE.x * 0.5, exit_area.end.y - CAR_SIZE.y)
-	_car.flip_h = towards < 0.0
-	_car.set_meta("towards", towards)
+	_car_towards = -1.0 if exit_area.get_center().x < rules.width * 0.5 else 1.0
+	var x := exit_area.get_center().x + _car_towards * (EXIT_WIDTH * 0.5 + CAR_GAP)
+	_car.position = Vector2(x - size.x * 0.5, exit_area.end.y - size.y)
+	_car.flip_h = _car_towards < 0.0
 	add_child(_car)
 
 
@@ -370,14 +375,13 @@ func _drive_away(runner: Otto) -> void:
 	runner.enter_door()
 
 
-func _move_car(delta: float) -> void:
-	var towards := float(_car.get_meta("towards", 1.0))
-	_car.position.x += towards * CAR_SPEED * delta
+func _move_car(delta: float, view: Rect2) -> void:
+	_car.position.x += _car_towards * CAR_SPEED * delta
 
 	# Уехала — значит уехала из кадра, а не за границу здания: кадр и есть то,
 	# что видит игрок, а до границы машина ползла бы впятеро дольше.
-	var view := otto.camera_view()
-	var gone := _car.position.x + CAR_SIZE.x < view.position.x or _car.position.x > view.end.x
+	var width := _car.texture.get_width()
+	var gone := _car.position.x + width < view.position.x or _car.position.x > view.end.x
 	if gone:
 		_car_leaving = false
 		building_cleared.emit()

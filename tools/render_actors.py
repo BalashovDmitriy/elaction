@@ -24,9 +24,9 @@ from __future__ import annotations
 
 import argparse
 import math
-import subprocess
 import sys
 import tempfile
+import warnings
 from pathlib import Path
 
 TOOLS = Path(__file__).resolve().parent
@@ -79,7 +79,9 @@ def _poses() -> dict[str, dict]:
         "walk_2": {"legs": (-26.0, 26.0), "arms": (20.0, -20.0)},
         "crouch": {"crouch": True, "arms": (14.0, -14.0)},
         "jump": {"legs": (20.0, -10.0), "arms": (-42.0, -48.0)},
-        "fall": {"legs": (-14.0, 20.0), "arms": (40.0, 46.0)},
+        # Отдельной позы падения нет нарочно: в воздухе Otto бьёт ногой всегда
+        # (ADR-0006, пункт 2), и State.FALL показывается тем же «kick». Своя
+        # «fall» лежала бы в репозитории ассетом, которого никто не грузит.
         # Удар ногой: нога уходит вперёд горизонтально, корпус отклоняется назад.
         "kick": {"legs": (-80.0, 18.0), "arms": (26.0, -16.0), "lean": 14.0},
         "shoot": {"legs": (0.0, 0.0), "arms": (6.0, -92.0), "gun": True},
@@ -104,7 +106,7 @@ def _actors() -> dict[str, dict]:
         for name, pose in otto_poses.items()
         # Агент не приседает, не прыгает и не бьёт ногой — ему этого не умеет
         # EnemyBrain, и кадры на несуществующие состояния были бы мусором.
-        if name not in ("crouch", "jump", "fall", "kick")
+        if name not in ("crouch", "jump", "kick")
     }
     return {
         "otto": {
@@ -438,7 +440,12 @@ def _fill_outside(height, mask, rounds: int = 4):
                 padded[1:-1, 2:],
             )
         )
-        with np.errstate(invalid="ignore"):
+        with warnings.catch_warnings():
+            # nanmean честно ругается на срез целиком из NaN, а в первых раундах
+            # такие есть: NaN там — ожидаемый ответ, и следующий раунд его
+            # заполнит. errstate этого предупреждения не глушит: оно приходит
+            # через warnings, а не через флаги плавающей точки.
+            warnings.simplefilter("ignore", RuntimeWarning)
             mean = np.nanmean(neighbours, axis=0)
         filled = np.where(np.isnan(filled), mean, filled)
     return np.nan_to_num(filled, nan=0.0).astype(np.float32)
@@ -446,6 +453,20 @@ def _fill_outside(height, mask, rounds: int = 4):
 
 def _names() -> list[str]:
     return [*_actors().keys(), "car"]
+
+
+def _frame_names(wanted: list[str]) -> list[str]:
+    """Какие кадры ждать от Blender. Считается по запросу, а не по содержимому
+    папки: с `--keep` в ней лежат кадры прошлых прогонов, и сборка по ним молча
+    перезаписывала бы ассеты, которых в этот раз не просили."""
+    actors = _actors()
+    names: list[str] = []
+    for actor_name in wanted:
+        if actor_name == "car":
+            names.append("car_parked")
+            continue
+        names.extend(f"{actor_name}_{pose}" for pose in actors[actor_name]["poses"])
+    return names
 
 
 def main() -> int:
@@ -486,9 +507,7 @@ def main() -> int:
             print(f"Blender вернул {code}")
             return code
 
-        for name in sorted(path.stem for path in work.glob("*.png")):
-            if name.endswith("_depth"):
-                continue
+        for name in _frame_names(wanted):
             for path in _assemble(work, arguments.out, name):
                 print(path.relative_to(PROJECT_ROOT).as_posix())
     return 0

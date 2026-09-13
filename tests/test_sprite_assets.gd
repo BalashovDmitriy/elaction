@@ -291,6 +291,26 @@ func test_all_poses_of_an_actor_share_one_frame() -> void:
 			)
 
 
+func test_the_actor_folder_holds_nothing_but_the_listed_poses() -> void:
+	# Обратная сторона [method test_every_pose_has_all_three_maps]: там список
+	# ищет файлы, здесь файлы ищут список. Без этой проверки поза, выпавшая из
+	# набора, остаётся в репозитории картинкой, которую никто не грузит, — а
+	# веха считает её сделанной работой.
+	var expected: Dictionary = {}
+	for row: Array in _actor_rows():
+		var actor := row[0] as String
+		for pose: String in row[1] as PackedStringArray:
+			for path: String in SpriteTextures.actor_paths(actor, pose):
+				expected[path.get_file()] = true
+
+	var files := DirAccess.get_files_at(SpriteTextures.ACTOR_DIR)
+	assert_gt(files.size(), 0, "папка актёров читается")
+	for file: String in files:
+		if not file.ends_with(".png"):
+			continue
+		assert_true(expected.has(file), "%s кому-то нужен" % file)
+
+
 func test_the_sprite_hangs_by_the_feet() -> void:
 	# Спрайт крупнее коллизии нарочно (ADR-0011, пункт 4), поэтому привязан не
 	# краем, а низом и серединой: иначе шляпа сдвинула бы фигуру над полом.

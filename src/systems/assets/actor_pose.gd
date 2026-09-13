@@ -11,6 +11,18 @@ extends RefCounted
 ## Кадров в цикле ходьбы (ADR-0011, пункт 5).
 const WALK_FRAMES: int = 3
 
+## Поза по состоянию для тех состояний, у которых она одна. Константа, а не
+## словарь на каждый вызов: поза пересчитывается каждый физический кадр и на
+## Otto, и на каждом агенте в кадре.
+##
+## В воздухе Otto бьёт ногой всегда (ADR-0006, пункт 2), поэтому падение и есть
+## тот самый удар с разбега — отдельной позы падения нет.
+const BY_STATE: Dictionary = {
+	OttoStateMachine.State.CROUCH: "crouch",
+	OttoStateMachine.State.JUMP: "jump",
+	OttoStateMachine.State.FALL: "kick",
+}
+
 
 ## Поза Otto.
 ##
@@ -28,17 +40,9 @@ static func of_otto(
 		return _death(crushed, falling_over)
 	if shooting:
 		return "shoot"
-
-	# В воздухе Otto бьёт ногой всегда (ADR-0006, пункт 2), поэтому падение и
-	# есть тот самый удар с разбега — отдельной позы падения нет.
-	var by_state: Dictionary = {
-		OttoStateMachine.State.CROUCH: "crouch",
-		OttoStateMachine.State.JUMP: "jump",
-		OttoStateMachine.State.FALL: "kick",
-	}
 	if state == OttoStateMachine.State.WALK:
 		return walk_frame(walk_phase)
-	return by_state.get(state, "idle")
+	return BY_STATE.get(state, "idle")
 
 
 ## Поза агента. Он не приседает, не прыгает и не бьёт ногой — этого не умеет
@@ -51,6 +55,15 @@ static func of_agent(
 	if shooting:
 		return "shoot"
 	return walk_frame(walk_phase) if walking else "idle"
+
+
+## Продвигает фазу ходьбы на один кадр времени.
+##
+## Живёт рядом с [method walk_frame] нарочно: длину цикла знает один
+## [constant WALK_FRAMES]. Со своим `fmod` в каждом актёре цикл замыкался бы не
+## там, где считается кадр, и последний кадр ходьбы просто не показывался бы.
+static func advance(walk_phase: float, delta: float) -> float:
+	return fmod(walk_phase + delta * SpriteTextures.WALK_FPS, float(WALK_FRAMES))
 
 
 ## Кадр ходьбы по фазе: целая часть фазы и есть номер кадра.

@@ -87,7 +87,11 @@ func _physics_process(delta: float) -> void:
 		_update_look(delta)
 		return
 
-	if absf(_snapshot.move) > OttoStateMachine.MOVE_THRESHOLD:
+	# Мёртвый не поворачивается: труп лежит той стороной, которой упал. На цветной
+	# коробке этого было не видно, а спрайт зеркалится на глазах — и тыканье в
+	# стрелки крутило бы тело, пока идёт отсчёт до возвращения в игру.
+	var turning := absf(_snapshot.move) > OttoStateMachine.MOVE_THRESHOLD
+	if turning and state != OttoStateMachine.State.DEAD:
 		_facing = signf(_snapshot.move)
 	if _snapshot.shoot_pressed and state != OttoStateMachine.State.DEAD and _gun.can_fire():
 		_fire()
@@ -352,9 +356,6 @@ func _apply_pose(state: OttoStateMachine.State) -> void:
 	_crouching_shape.set_deferred("disabled", untouchable or not crouching)
 	_body.visible = not hidden
 
-	# Размер и посадку коробки берём из самой формы коллизии, чтобы вид и
-	# хитбокс не разъезжались при правке сцены.
-
 
 ## Картинка на этот кадр: поза, сторона и ход ходьбы.
 ##
@@ -364,7 +365,7 @@ func _update_look(delta: float) -> void:
 	_shooting = maxf(_shooting - delta, 0.0)
 	_falling_over = maxf(_falling_over - delta, 0.0)
 	if _states.state == OttoStateMachine.State.WALK:
-		_walk_phase = fmod(_walk_phase + delta * SpriteTextures.WALK_FPS, 3.0)
+		_walk_phase = ActorPose.advance(_walk_phase, delta)
 	else:
 		_walk_phase = 0.0
 
