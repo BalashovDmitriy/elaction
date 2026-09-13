@@ -16,6 +16,11 @@ signal floor_reached(index: int)
 ## Докуда слышно гул кабины, px. Дальше по этажу он уже не мешает.
 const HUM_REACH: float = 360.0
 
+## Докуда слышно «динь», px. Шире гула, но всё же не на всё здание: пустые
+## кабины катаются сами, и каждая отбивает этажи — глобальный звонок из пяти
+## шахт звенел бы в ухо без остановки.
+const DING_REACH: float = 640.0
+
 @export var speed: float = 60.0
 @export var floor_pause: float = 1.5
 ## Встаёт ли кабина между этажами. Сверкой не подтверждено — см. ADR-0004.
@@ -27,6 +32,7 @@ var _command: float = 0.0
 var _aligned_floor: int = -1
 
 var _hum: AudioStreamPlayer2D = null
+var _ding: AudioStreamPlayer2D = null
 @onready var _interior: Area2D = $Interior
 @onready var _crush_zone: Area2D = $CrushZone
 
@@ -34,7 +40,8 @@ var _hum: AudioStreamPlayer2D = null
 func _ready() -> void:
 	_interior.body_entered.connect(_on_body_entered)
 	_interior.body_exited.connect(_on_body_exited)
-	_hum = _make_hum()
+	_hum = Sounds.source(self, Sounds.ELEVATOR_HUM, HUM_REACH)
+	_ding = Sounds.source(self, Sounds.ELEVATOR_DING, DING_REACH)
 	# Пол и крыша кабины — один и тот же настил, поэтому и ассет один.
 	var slab := SpriteTextures.tile("car_slab")
 	($FloorVisual as TextureRect).texture = slab
@@ -50,24 +57,14 @@ func _physics_process(delta: float) -> void:
 		_aligned_floor = reached
 		if reached >= 0:
 			# «Динь» — один из двух эффектов, которые источники называют прямо.
-			Sounds.play(Sounds.ELEVATOR_DING)
+			_ding.play()
 			floor_reached.emit(reached)
 
 	# Гул идёт, пока кабина едет. Источник позиционный: шахт в здании пять,
 	# и слышно должно быть только ту, рядом с которой стоишь.
-	_hum.playing = not is_zero_approx(_motion.velocity)
+	Sounds.keep_playing(_hum, not is_zero_approx(_motion.velocity))
 
 	_crush_those_underneath()
-
-
-## Гул кабины: позиционный источник, зацикленный на всё время поездки.
-func _make_hum() -> AudioStreamPlayer2D:
-	var player := AudioStreamPlayer2D.new()
-	player.stream = Sounds.stream(Sounds.ELEVATOR_HUM)
-	player.bus = Sounds.SFX_BUS
-	player.max_distance = HUM_REACH
-	add_child(player)
-	return player
 
 
 ## Задаёт шахту: координаты этажей-остановок и этаж, с которого кабина начинает.

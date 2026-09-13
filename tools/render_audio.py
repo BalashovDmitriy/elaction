@@ -195,7 +195,8 @@ def elevator_hum() -> Stereo:
     harmonic = dsp.filtered(dsp.saw(110.0, seconds), 700.0, "low") * 0.3
     rope = dsp.filtered(dsp.noise(seconds, 181), 1400.0, "low") * 0.25
     wobble = 1.0 + 0.08 * dsp.sine(2.0, seconds)
-    return dsp.master(dsp.mono_to_stereo(dsp.saturate((motor * 0.6 + harmonic + rope) * wobble, 1.6)), peak=0.45)
+    mixed = dsp.mono_to_stereo(dsp.saturate((motor * 0.6 + harmonic + rope) * wobble, 1.6))
+    return dsp.master(mixed, peak=0.45, edges=False)
 
 
 def escalator_hum() -> Stereo:
@@ -208,7 +209,7 @@ def escalator_hum() -> Stereo:
         tick = dsp.decay(dsp.filtered(dsp.noise(0.05, 190 + index), 2200.0, "high"), tau=0.004)
         start = dsp.samples(index * period)
         chain[start : start + tick.size] += tick[: max(chain.size - start, 0)] * 0.5
-    return dsp.master(dsp.mono_to_stereo(motor + chain), peak=0.4)
+    return dsp.master(dsp.mono_to_stereo(motor + chain), peak=0.4, edges=False)
 
 
 def door_open() -> Stereo:
@@ -347,20 +348,32 @@ def _place(track: np.ndarray, part: np.ndarray, at: float, level: float) -> None
     track[start:end] += part[: end - start] * level
 
 
+def _hits(row: str, index: int) -> bool:
+    """Есть ли удар на этом шаге сетки. Рисунок короче петли и повторяется."""
+    return row[index % len(row)] == "x"
+
+
 def _drums(length: float, beat: float, pattern: dict[str, str], seed: int) -> np.ndarray:
-    """Барабаны по сетке: `x` — удар, `.` — пауза. Шаг сетки — восьмая."""
+    """Барабаны по сетке: `x` — удар, `.` — пауза. Шаг сетки — восьмая.
+
+    Рисунок повторяется до конца петли: он задан на четыре такта, а петля
+    длиной восемь, и без повтора вторая половина темы шла бы без барабанов.
+    Бочка и рабочий синтезируются по разу: они одинаковы на каждом ударе, а
+    у рабочего внутри свёртка с откликом комнаты.
+    """
     track = np.zeros(dsp.samples(length + 1.0), dtype=np.float32)
     rng = np.random.default_rng(seed)
     step = beat * 0.5
-    for index, mark in enumerate(pattern["kick"]):
-        if mark == "x":
-            _place(track, _kick_drum(), index * step, 0.9)
-    for index, mark in enumerate(pattern["snare"]):
-        if mark == "x":
-            _place(track, _snare(), index * step, 0.8)
-    for index, mark in enumerate(pattern["hat"]):
-        if mark == "x":
-            _place(track, _hat(seed + index), index * step, float(rng.uniform(0.3, 0.5)))
+    kick_hit = _kick_drum()
+    snare_hit = _snare()
+    for index in range(int(round(length / step))):
+        at = index * step
+        if _hits(pattern["kick"], index):
+            _place(track, kick_hit, at, 0.9)
+        if _hits(pattern["snare"], index):
+            _place(track, snare_hit, at, 0.8)
+        if _hits(pattern["hat"], index):
+            _place(track, _hat(seed + index), at, float(rng.uniform(0.3, 0.5)))
     return track
 
 
@@ -469,7 +482,7 @@ def theme() -> Stereo:
         dsp.widen(dsp.mono_to_stereo(dsp.shelf(arp, 2500.0, 0.6) * 1.1), amount=0.5),
         dsp.widen(dsp.mono_to_stereo(dsp.shelf(pad, 2000.0, 0.5) * 0.9), amount=0.6, offset=0.02),
     )
-    return dsp.master(dsp.loop_seamlessly(mixed, length), peak=0.82)
+    return dsp.master(dsp.loop_seamlessly(mixed, length), peak=0.82, edges=False)
 
 
 def alarm_theme() -> Stereo:
@@ -517,7 +530,7 @@ def alarm_theme() -> Stereo:
             amount=0.3,
         ),
     )
-    return dsp.master(dsp.loop_seamlessly(mixed, length), peak=0.85)
+    return dsp.master(dsp.loop_seamlessly(mixed, length), peak=0.85, edges=False)
 
 
 EFFECTS: dict[str, Callable[[], Stereo]] = {
@@ -553,7 +566,9 @@ LONG: frozenset[str] = frozenset(
     {"document", "elevator_ding", "building_bonus", "car_away", "game_over", "otto_death"}
 )
 
-## Петли режутся ровно по длине, поэтому хвост у них не срезается.
+## Петли режутся ровно по длине, поэтому хвост у них не срезается. Сводятся они
+## через `dsp.master(..., edges=False)`: край петли — это её шов, и погашенный
+## край слышен дырой на каждом обороте.
 LOOPED: frozenset[str] = frozenset({"elevator_hum", "escalator_hum", "theme", "alarm_theme"})
 
 SOUNDS: dict[str, Callable[[], Stereo]] = {**EFFECTS, **MUSIC}

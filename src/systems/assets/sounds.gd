@@ -81,8 +81,7 @@ static func names() -> PackedStringArray:
 
 ## Путь к файлу звука или пустая строка, если его нет.
 static func path_of(name: String) -> String:
-	for extension: String in EXTENSIONS:
-		var path := DIR + name + extension
+	for path: String in candidates(name):
 		if ResourceLoader.exists(path):
 			return path
 	return ""
@@ -156,6 +155,36 @@ static func stop_music() -> void:
 	var director := AudioDirector.instance()
 	if director != null:
 		director.stop_music()
+
+
+## Позиционный источник на узле: его слышно только рядом с ним.
+##
+## Нужен тому, что звучит на своём месте, а не в партии целиком: шахт в здании
+## пять, и гудеть в ухо должна та, рядом с которой стоишь. Заводится здесь, а не
+## в узлах: лифт и эскалатор собирали его одинаково, слово в слово.
+## [param reach] — докуда слышно, px.
+static func source(host: Node, name: String, reach: float) -> AudioStreamPlayer2D:
+	var player := AudioStreamPlayer2D.new()
+	player.stream = stream(name)
+	player.bus = SFX_BUS
+	player.max_distance = reach
+	host.add_child(player)
+	return player
+
+
+## Держит петлю включённой или выключенной.
+##
+## Присваивать [member AudioStreamPlayer2D.playing] каждый кадр нельзя: сеттер
+## зовёт [method AudioStreamPlayer2D.play] заново, и от двухсекундного гула
+## слышно только первые три миллисекунды — вместо мотора выходит треск на
+## частоте кадров (проверено: позиция воспроизведения стоит на 0.003 с).
+static func keep_playing(player: AudioStreamPlayer2D, on: bool) -> void:
+	if on == player.playing:
+		return
+	if on:
+		player.play()
+	else:
+		player.stop()
 
 
 ## Сбрасывает кэш. Нужен тестам: они грузят звуки в своём порядке.

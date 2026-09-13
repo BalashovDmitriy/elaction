@@ -34,12 +34,15 @@ static func instance() -> AudioDirector:
 	return _instance
 
 
+## Источники заводятся здесь, а не в [method Node._ready], вместе с публикацией
+## экземпляра: между входом в дерево и готовностью [method instance] отдавал бы
+## директора с пустым пулом, и первый же [method play] уронил бы кадр обращением
+## за нулевым голосом.
 func _enter_tree() -> void:
-	if _instance == null:
-		_instance = self
+	if _instance != null:
+		return
+	_instance = self
 
-
-func _ready() -> void:
 	# Автолоад живёт и на паузе: иначе музыка обрывалась бы на каждом Esc.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
@@ -52,6 +55,13 @@ func _ready() -> void:
 	_music = AudioStreamPlayer.new()
 	_music.bus = Sounds.MUSIC_BUS
 	add_child(_music)
+
+
+## Как у [GameState]: без этого статическая ссылка переживала бы сам узел, и
+## [method Sounds.play] звал бы освобождённый объект.
+func _exit_tree() -> void:
+	if _instance == self:
+		_instance = null
 
 
 ## Проигрывает эффект. Голоса разбираются по кругу: самый старый затирается,
@@ -94,11 +104,13 @@ func music_name() -> String:
 
 ## Громкость шины, 0..1. Ноль — тишина, единица — как записано.
 func set_level(bus: String, level: float) -> void:
-	var value := clampf(level, 0.0, 1.0)
-	_levels[bus] = value
 	var index := AudioServer.get_bus_index(bus)
 	if index < 0:
 		return
+	# Уровень запоминается только применённый: иначе [method level_of] отдавал бы
+	# настройкам громкость шины, которой нет.
+	var value := clampf(level, 0.0, 1.0)
+	_levels[bus] = value
 	# Тишина — это не «минус восемьдесят децибел», а выключенная шина: на малых
 	# громкостях логарифм уходит в минус бесконечность и трещит по дороге.
 	AudioServer.set_bus_mute(index, is_zero_approx(value))

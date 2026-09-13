@@ -100,6 +100,26 @@ func test_music_starts_and_stops() -> void:
 	assert_eq(director.music_name(), "", "и замолкает")
 
 
+func test_a_loop_is_not_restarted_while_it_plays() -> void:
+	# Присваивание `playing = true` каждый физический кадр зовёт `play()` заново,
+	# и от двухсекундного гула кабины слышно первые три миллисекунды. Второй вызов
+	# [method Sounds.keep_playing] обязан оставить идущую петлю в покое — видно это
+	# по объекту воспроизведения: заведённая заново петля получила бы новый.
+	var host: Node2D = add_child_autofree(Node2D.new()) as Node2D
+	var player := Sounds.source(host, Sounds.ELEVATOR_HUM, 360.0)
+
+	Sounds.keep_playing(player, true)
+	assert_true(player.playing, "петля пошла")
+	var playback := player.get_stream_playback()
+	assert_not_null(playback, "воспроизведение началось")
+
+	Sounds.keep_playing(player, true)
+	assert_eq(player.get_stream_playback(), playback, "и не завелась заново")
+
+	Sounds.keep_playing(player, false)
+	assert_false(player.playing, "а выключается с одного слова")
+
+
 func test_silence_mutes_the_bus_instead_of_going_to_minus_infinity() -> void:
 	var director := AudioDirector.instance()
 	if director == null:

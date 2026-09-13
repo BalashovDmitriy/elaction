@@ -28,11 +28,14 @@ var _hum: AudioStreamPlayer2D = null
 @onready var _ramp: Line2D = $Ramp
 
 
+func _ready() -> void:
+	_hum = Sounds.source(self, Sounds.ESCALATOR_HUM, HUM_REACH)
+
+
 func _physics_process(delta: float) -> void:
 	# Полотно слышно, только пока кто-то едет: в оригинале эскалатор тоже
 	# не гудит сам по себе, а здание и без того шумное.
-	if _hum != null:
-		_hum.playing = _passenger != null
+	Sounds.keep_playing(_hum, _passenger != null)
 
 	if _passenger != null:
 		_carry(delta)
@@ -46,12 +49,6 @@ func _physics_process(delta: float) -> void:
 ## [param via] — точка перегиба в проёме перекрытия: через неё идут и полотно,
 ## и сама поездка, поэтому пассажир проходит сквозь дыру, а не сквозь плиту.
 func setup(descent: Vector2, via: Vector2) -> void:
-	_hum = AudioStreamPlayer2D.new()
-	_hum.stream = Sounds.stream(Sounds.ESCALATOR_HUM)
-	_hum.bus = Sounds.SFX_BUS
-	_hum.max_distance = HUM_REACH
-	add_child(_hum)
-
 	_bottom_pad.position = descent
 	_ramp.points = PackedVector2Array([Vector2.ZERO, via, descent])
 	# Полотно тянется тайлом вдоль линии: ступени идут ровным шагом при любой

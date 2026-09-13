@@ -297,13 +297,19 @@ func _award_for(agent: Enemy, base: int) -> void:
 
 ## Бьёт ногой всех, кого задел в полёте.
 func _kick_enemies() -> void:
+	# Удар один, сколько бы агентов он ни задел: звук на каждого съедал бы
+	# голоса пула и звучал бы вдвое громче самого себя.
+	var landed := false
 	for body: Node2D in _kick_zone.get_overlapping_bodies():
 		var agent := body as Enemy
 		if agent == null or agent.is_dead():
 			continue
 		agent.kill()
-		Sounds.play(Sounds.KICK)
+		landed = true
 		_award_for(agent, GameState.ENEMY_KICK_SCORE)
+
+	if landed:
+		Sounds.play(Sounds.KICK)
 
 
 ## Есть ли над головой место, чтобы выпрямиться из приседа.
@@ -384,11 +390,12 @@ func _update_look(delta: float) -> void:
 ## кадре цикла шагов выходило бы вдвое больше, чем делает Otto.
 func _step_sound() -> void:
 	var frame := int(_walk_phase)
-	if frame == _stepped_on or frame == 1:
+	# Кадр помечается пройденным только вместе со звуком: помеченный в воздухе
+	# терял бы шаг насовсем — нога встала, а слышно ничего.
+	if frame == _stepped_on or frame == 1 or not is_on_floor():
 		return
 	_stepped_on = frame
-	if is_on_floor():
-		Sounds.play(Sounds.STEP)
+	Sounds.play(Sounds.STEP)
 
 
 func _pose() -> String:

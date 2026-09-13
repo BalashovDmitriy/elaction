@@ -306,17 +306,27 @@ def limit(stereo: Stereo, ceiling: float = 0.92) -> Stereo:
     return (stereo * gain[:, None]).astype(np.float32)
 
 
-def master(stereo: Stereo, peak: float = 0.89) -> Stereo:
-    """Итоговая обработка: убрать постоянную составляющую, подрезать, выровнять."""
+def master(stereo: Stereo, peak: float = 0.89, edges: bool = True) -> Stereo:
+    """Итоговая обработка: убрать постоянную составляющую, подрезать, выровнять.
+
+    [param edges] — гасить ли края. Одноразовому звуку это нужно, иначе на старте
+    и в конце слышен щелчок. Петле — противопоказано: край петли и есть её шов,
+    и десять миллисекунд тишины там слышны как дыра на каждом обороте.
+    """
     out = stereo - np.mean(stereo, axis=0, keepdims=True)
     out = limit(out, ceiling=peak)
     top = float(np.abs(out).max())
     if top > 0.0:
         out = out * (peak / top)
+    if not edges:
+        return out.astype(np.float32)
+
     head = min(samples(0.003), out.shape[0] // 2)
     tail = min(samples(0.01), out.shape[0] // 2)
-    out[:head] *= np.linspace(0.0, 1.0, head, dtype=np.float32)[:, None]
-    out[-tail:] *= np.linspace(1.0, 0.0, tail, dtype=np.float32)[:, None]
+    if head > 0:
+        out[:head] *= np.linspace(0.0, 1.0, head, dtype=np.float32)[:, None]
+    if tail > 0:
+        out[-tail:] *= np.linspace(1.0, 0.0, tail, dtype=np.float32)[:, None]
     return out.astype(np.float32)
 
 
