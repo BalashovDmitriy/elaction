@@ -1,0 +1,32 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/ui/menu.gd" id="1_menu"]
+[ext_resource type="Theme" path="res://src/ui/ui_theme.tres" id="2_theme"]
+
+[node name="Menu" type="CanvasLayer"]
+layer = 5
+script = ExtResource("1_menu")
+
+[node name="Root" type="Control" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme = ExtResource("2_theme")
+
+[node name="Dim" type="ColorRect" parent="Root"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.02, 0.03, 0.05, 0.74)
+
+[node name="Center" type="CenterContainer" parent="Root"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Panel" type="PanelContainer" parent="Root/Center"]
+
+[node name="Page" type="VBoxContainer" parent="Root/Center/Panel"]
+unique_name_in_owner = true
+theme_override_constants/separation = 6

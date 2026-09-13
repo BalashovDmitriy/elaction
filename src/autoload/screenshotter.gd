@@ -141,6 +141,17 @@ func _ready() -> void:
 	_run_auto_plan.call_deferred()
 
 
+## Идёт ли автосъёмка. По этому [Main] понимает, что меню надо пропустить:
+## сценарий съёмки жмёт игровые действия, а до игры из меню он не доберётся —
+## кнопки меню он нажимать не умеет и уметь не должен.
+##
+## Статическая: имя автолоада не видно при разборе одного скрипта в отрыве от
+## проекта, поэтому зовут её через preload самого файла — как и соседнюю
+## [method mark_ignored_by_engine].
+static func capturing() -> bool:
+	return not _milestone_from_cmdline().is_empty()
+
+
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("screenshot"):
 		# Ручной кадр всегда в manual/, даже посреди автоматического прогона:
@@ -205,7 +216,7 @@ func _plan_for(milestone: String) -> Array:
 	return AUTO_PLANS[DEFAULT_PLAN]
 
 
-func _milestone_from_cmdline() -> String:
+static func _milestone_from_cmdline() -> String:
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with(CAPTURE_ARG_PREFIX):
 			return argument.trim_prefix(CAPTURE_ARG_PREFIX).strip_edges()

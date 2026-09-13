@@ -38,6 +38,7 @@ const OTTO_DEATH := "otto_death"
 const AGENT_DEATH := "agent_death"
 const CAR_AWAY := "car_away"
 const BUILDING_BONUS := "building_bonus"
+const EXTRA_LIFE := "extra_life"
 const GAME_OVER := "game_over"
 
 ## Музыка. Тема своя, а не из оригинала (ADR-0012, пункт 2); мотив тревоги
@@ -62,6 +63,7 @@ const EFFECTS: PackedStringArray = [
 	AGENT_DEATH,
 	CAR_AWAY,
 	BUILDING_BONUS,
+	EXTRA_LIFE,
 	GAME_OVER,
 ]
 const MUSIC: PackedStringArray = [THEME, ALARM_THEME]
@@ -155,6 +157,20 @@ static func stop_music() -> void:
 	var director := AudioDirector.instance()
 	if director != null:
 		director.stop_music()
+
+
+## Ставит громкость шины, 0..1. Настройки зовут её на каждый ползунок.
+static func set_level(bus: String, level: float) -> void:
+	var director := AudioDirector.instance()
+	if director != null:
+		director.set_level(bus, level)
+
+
+## Текущая громкость шины. Без автолоада — единица: тесты поднимают классы
+## и без дерева сцены, и молчаливый ноль там сбивал бы с толку.
+static func level_of(bus: String) -> float:
+	var director := AudioDirector.instance()
+	return director.level_of(bus) if director != null else 1.0
 
 
 ## Позиционный источник на узле: его слышно только рядом с ним.

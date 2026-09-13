@@ -1,0 +1,41 @@
+keys,en,ru
+UI_TITLE,ELACTION,ELACTION
+UI_SUBTITLE,a remake of Elevator Action,ремейк Elevator Action
+UI_PLAY,Play,Играть
+UI_RECORDS,High scores,Рекорды
+UI_SETTINGS,Settings,Настройки
+UI_CONTROLS,Controls,Управление
+UI_QUIT,Quit,Выход
+UI_BACK,Back,Назад
+UI_RESUME,Resume,Продолжить
+UI_RESTART,Start over,Начать заново
+UI_TO_MENU,Main menu,В меню
+UI_PAUSED,Paused,Пауза
+UI_GAME_OVER,Game over,Игра окончена
+UI_YOUR_SCORE,Your score,Ваш счёт
+UI_NEW_RECORD,New record!,Новый рекорд!
+UI_NO_RECORDS,No records yet,Рекордов пока нет
+UI_SCORE,Score,Очки
+UI_LIVES,Lives,Жизни
+UI_DOCUMENTS,Documents,Документы
+UI_BUILDING,Building,Здание
+UI_FLOOR,Floor,Этаж
+UI_ALARM,ALARM,ТРЕВОГА
+UI_EXTRA_LIFE,Extra life,Дополнительная жизнь
+UI_VOLUME_MASTER,Master volume,Общая громкость
+UI_VOLUME_MUSIC,Music,Музыка
+UI_VOLUME_SFX,Effects,Эффекты
+UI_LANGUAGE,Language,Язык
+UI_FULLSCREEN,Fullscreen,Полный экран
+UI_LANGUAGE_RU,Русский,Русский
+UI_LANGUAGE_EN,English,English
+UI_MOVE,Move,Движение
+UI_CROUCH,Crouch,Присед
+UI_JUMP,Jump,Прыжок
+UI_SHOOT,Shoot,Выстрел
+UI_PAUSE,Pause,Пауза
+UI_ACTION_HINT,"Up and down work by place: in a car they drive it, on an escalator pad they start the ride, on a doormat they open the door.","«Вверх» и «вниз» работают по месту: в кабине ведут её, на площадке эскалатора отправляют в поездку, на коврике открывают дверь."
+UI_REBIND_LATER,Rebinding comes later,Переназначение появится позже
+UI_KEYBOARD,Keyboard,Клавиатура
+UI_GAMEPAD,Gamepad,Геймпад
+UI_DPAD,D-pad,Крестовина

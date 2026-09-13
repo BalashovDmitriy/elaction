@@ -15,6 +15,10 @@ extends Node
 signal score_changed(value: int)
 signal documents_changed(collected: int, total: int)
 signal lives_changed(value: int)
+
+## Выдана дополнительная жизнь за очки. Отдельно от [signal lives_changed]:
+## HUD по нему показывает, за что жизнь прибавилась, а звук — что вообще.
+signal extra_life_awarded
 ## Жизни кончились. Партия окончена.
 signal game_over
 
@@ -38,6 +42,14 @@ const DARK_KILL_BONUS: int = 50
 ## Жизней на партию — три, как в оригинале (ADR-0006, пункт 4).
 const STARTING_LIVES: int = 3
 
+## Дополнительная жизнь за очки. Порог — минимальный из четырёх, которые
+## мануал Taito отдаёт DIP-переключателями (ADR-0012, пункт 5): 10 000.
+##
+## Выдаётся один раз за партию. Повтор каждые десять тысяч мануалом не
+## подтверждён, а на тёмном этаже с респавном агентов он превратился бы
+## в бесконечные жизни — эту ферму мы себе уже предсказывали в ADR-0010.
+const EXTRA_LIFE_SCORE: int = 10000
+
 ## Бонус за сданное здание: 1000 × его номер. Источники расходятся, взят
 ## вариант с множителем — ADR-0008, пункт 5. Не сверено.
 const BUILDING_BONUS: int = 1000
@@ -48,12 +60,16 @@ var score: int = 0
 var lives: int = STARTING_LIVES
 var documents_collected: int = 0
 var documents_total: int = 0
+
 ## Номер здания, он же сид его раскладки.
 var building: int = 1
 var alarm := Alarm.new()
 
 ## Идёт ли партия. На паузе и после Game Over время не тикает.
 var _running: bool = false
+
+## Выдана ли уже дополнительная жизнь в этой партии.
+var _extra_life_given: bool = false
 
 
 ## Состояние партии. До входа автолоада в дерево — null.
@@ -114,6 +130,7 @@ func reset() -> void:
 	documents_collected = 0
 	documents_total = 0
 	building = 1
+	_extra_life_given = false
 	alarm.enter_building()
 	score_changed.emit(score)
 	lives_changed.emit(lives)
@@ -146,6 +163,20 @@ func lose_life() -> bool:
 func add_score(points: int) -> void:
 	score += points
 	score_changed.emit(score)
+	_check_extra_life()
+
+
+## Дополнительная жизнь за очки — один раз за партию и только пока она идёт.
+##
+## После Game Over очки ещё начисляются (бонус за здание приходит отложенно),
+## и без этой проверки мёртвому выдавали бы жизнь, с которой он не оживёт.
+func _check_extra_life() -> void:
+	if _extra_life_given or score < EXTRA_LIFE_SCORE or lives <= 0:
+		return
+	_extra_life_given = true
+	lives += 1
+	lives_changed.emit(lives)
+	extra_life_awarded.emit()
 
 
 ## Собраны ли все документы здания. Здание без красных дверей считается собранным.
