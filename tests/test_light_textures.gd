@@ -48,3 +48,25 @@ func test_a_spot_starts_fading_at_once() -> void:
 func test_beyond_the_edge_there_is_no_light() -> void:
 	assert_eq(LightTextures.profile(2.0, PLATEAU), 0.0, "дальше края света не прибавляется")
 	assert_eq(LightTextures.falloff(0.0, 0.0, PLATEAU), 0.0, "полоса нулевой ширины не светит")
+
+
+func test_raise_gives_the_light_the_height_in_world_pixels() -> void:
+	# Движок множит height на средний масштаб узла, а у вспышки выстрела он
+	# около 0.2 — заявленные 24 px превращались в пять, то есть свет шёл почти
+	# вдоль стены. Проверяется поэтому не поле, а произведение.
+	var light := PointLight2D.new()
+	light.scale = Vector2.ONE * 0.2
+	LightTextures.raise(light, LightTextures.FLASH_HEIGHT)
+	var scaled := light.height * (absf(light.scale.x) + absf(light.scale.y)) * 0.5
+	assert_almost_eq(scaled, LightTextures.FLASH_HEIGHT, 0.001)
+	light.free()
+
+
+func test_raise_handles_a_light_squashed_to_nothing() -> void:
+	# Заливка этажа масштабируется прямоугольником, и здание в ноль этажей
+	# даёт нулевую высоту площади: делить на неё нельзя.
+	var light := PointLight2D.new()
+	light.scale = Vector2.ZERO
+	LightTextures.raise(light, LightTextures.FILL_HEIGHT)
+	assert_eq(light.height, LightTextures.FILL_HEIGHT)
+	light.free()

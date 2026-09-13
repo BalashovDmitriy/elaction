@@ -1,0 +1,5 @@
+# Только для перерисовки ассетов окружения: tools/render_env.py (ADR-0011).
+# В CI не ставится и на запуск игры не влияет — готовые PNG лежат в репозитории.
+#   .venv/Scripts/pip install -r requirements-assets.txt   # Windows
+Pillow==12.1.0
+numpy==2.4.1

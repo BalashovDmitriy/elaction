@@ -39,6 +39,18 @@ func _physics_process(delta: float) -> void:
 func setup(descent: Vector2, via: Vector2) -> void:
 	_bottom_pad.position = descent
 	_ramp.points = PackedVector2Array([Vector2.ZERO, via, descent])
+	# Полотно тянется тайлом вдоль линии: ступени идут ровным шагом при любой
+	# длине пролёта, а растянутый на весь пролёт тайл шага бы не дал.
+	var belt := EnvTextures.tile("escalator_belt")
+	if belt == null:
+		return
+	_ramp.texture = belt
+	_ramp.texture_mode = Line2D.LINE_TEXTURE_TILE
+	_ramp.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	# [member Line2D.default_color] уходит в цвет вершин и множится на текстуру.
+	# Зелёный цвет greybox-полотна красил металл ассета в свой оттенок, поэтому
+	# вместе с текстурой он снимается — но только вместе с ней.
+	_ramp.default_color = Color.WHITE
 
 
 ## Везёт ли эскалатор кого-нибудь прямо сейчас.

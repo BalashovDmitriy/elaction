@@ -23,20 +23,18 @@ shape = SubResource("RectangleShape2D_slab")
 position = Vector2(0, -37)
 shape = SubResource("RectangleShape2D_slab")
 
-[node name="FloorVisual" type="ColorRect" parent="."]
+[node name="FloorVisual" type="TextureRect" parent="."]
 offset_left = -20.0
 offset_right = 20.0
 offset_bottom = 6.0
 mouse_filter = 2
-color = Color(0.42, 0.45, 0.55, 1)
 
-[node name="RoofVisual" type="ColorRect" parent="."]
+[node name="RoofVisual" type="TextureRect" parent="."]
 offset_left = -20.0
 offset_top = -40.0
 offset_right = 20.0
 offset_bottom = -34.0
 mouse_filter = 2
-color = Color(0.42, 0.45, 0.55, 1)
 
 [node name="Interior" type="Area2D" parent="."]
 collision_layer = 0

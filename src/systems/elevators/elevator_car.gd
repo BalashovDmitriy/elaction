@@ -30,6 +30,10 @@ var _aligned_floor: int = -1
 func _ready() -> void:
 	_interior.body_entered.connect(_on_body_entered)
 	_interior.body_exited.connect(_on_body_exited)
+	# Пол и крыша кабины — один и тот же настил, поэтому и ассет один.
+	var slab := EnvTextures.tile("car_slab")
+	($FloorVisual as TextureRect).texture = slab
+	($RoofVisual as TextureRect).texture = slab
 
 
 func _physics_process(delta: float) -> void:

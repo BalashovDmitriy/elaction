@@ -101,6 +101,15 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "walking", "actions": ["move_right"], "hold": 1.4},
 		{"label": "settled", "actions": [], "hold": 1.0},
 	],
+	# Ни один шаг не обещает места: двери и лампы стоят по сиду, а выдержкой
+	# до них не дойти — этим занимается tools/light_shot.tscn, он ждёт состояние.
+	"M7A":
+	[
+		{"label": "roof", "actions": [], "hold": 0.8},
+		{"label": "walking", "actions": ["move_right"], "hold": 1.4},
+		{"label": "muzzle_flash", "actions": ["shoot"], "hold": 0.08},
+		{"label": "settled", "actions": [], "hold": 1.0},
+	],
 }
 const DEFAULT_PLAN := "M1"
 
