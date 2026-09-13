@@ -79,6 +79,7 @@ func shoot_down() -> void:
 	if not _fall.start():
 		return
 	_visual.modulate = FALLING_TINT
+	Sounds.play(Sounds.LAMP_BREAK)
 
 
 ## Гасит или зажигает пятно лампы. Зовёт уровень, отбирая видимые этажи:
@@ -110,6 +111,7 @@ func _crush_agents() -> void:
 
 
 func _land() -> void:
+	Sounds.play(Sounds.LAMP_CRASH)
 	fell.emit()
 	# Осколки не оставляем: тёмный этаж и так виден, а тело на полу ловило бы
 	# пули игрока, которым положено лететь дальше.

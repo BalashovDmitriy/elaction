@@ -97,9 +97,13 @@ func _enter_building() -> void:
 	_level.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(_level)
 	_level.building_cleared.connect(_on_building_cleared)
+	# Тема заводится на здание, а не на партию: после тревоги её надо вернуть,
+	# а сирена снимается только сменой здания (ADR-0009).
+	Sounds.play_music(Sounds.ALARM_THEME if game.alarm.raised else Sounds.THEME)
 
 
 func _on_building_cleared() -> void:
+	Sounds.play(Sounds.BUILDING_BONUS)
 	GameState.instance().finish_building()
 	# Отложенно: сигнал приходит из зоны выхода, посреди разбора перекрытий.
 	_enter_building.call_deferred()
@@ -144,6 +148,8 @@ func _on_alarm_raised() -> void:
 
 func _on_game_over() -> void:
 	_game_over = true
+	Sounds.stop_music()
+	Sounds.play(Sounds.GAME_OVER)
 	# Партия окончена — здание замирает, как на паузе. Иначе агенты продолжают
 	# приходить и стрелять под надписью «игра окончена». Снимает это только рестарт.
 	get_tree().paused = true

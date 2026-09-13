@@ -79,11 +79,13 @@ func _admit(visitor: Otto) -> void:
 	visitor.enter_door()
 	_visit.admit()
 	_refresh_look()
+	Sounds.play(Sounds.DOOR_OPEN)
 
 	if not has_document:
 		return
 	# Документ достаётся за вход, и дверь сразу перестаёт быть красной.
 	has_document = false
+	Sounds.play(Sounds.DOCUMENT)
 	document_taken.emit()
 
 
@@ -93,6 +95,7 @@ func _release() -> void:
 	_guest = null
 	_visit.release()
 	_refresh_look()
+	Sounds.play(Sounds.DOOR_CLOSE)
 
 
 func _refresh_look() -> void:

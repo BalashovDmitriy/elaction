@@ -130,6 +130,7 @@ func kill(crushed: bool = false) -> void:
 	velocity = Vector2.ZERO
 	_corpse_left = corpse_time
 	_falling_over = FALLING_TIME
+	Sounds.play(Sounds.AGENT_DEATH)
 	died.emit(self)
 
 
@@ -193,6 +194,7 @@ func _rot(delta: float) -> void:
 
 func _fire() -> void:
 	_shooting = SHOOT_POSE_TIME
+	Sounds.play(Sounds.SHOT)
 	var bullet := BULLET_SCENE.instantiate() as Bullet
 	bullet.direction = _brain.facing
 	bullet.speed = bullet_speed
