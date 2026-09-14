@@ -18,7 +18,7 @@ from pathlib import Path
 # Общее с поиском Godot не переписывается: код возврата таймаута, приведение
 # вывода к тексту и UTF-8 на выходе одинаковы для обоих инструментов, и свои
 # копии этих трёх разошлись бы с оригиналом при первой же правке.
-from godot_bin import TIMEOUT_EXIT_CODE, _as_text, use_utf8_output
+from godot_bin import TIMEOUT_EXIT_CODE, as_text, use_utf8_output
 
 # Версия, на которой пайплайн собран и проверен (ADR-0011).
 EXPECTED_VERSION = "5.2"
@@ -104,7 +104,7 @@ def run_script(blender: str, script: Path, args: list[str] | None = None, timeou
             check=False,
         )
     except subprocess.TimeoutExpired as expired:
-        output = _as_text(expired.stdout) + _as_text(expired.stderr)
+        output = as_text(expired.stdout) + as_text(expired.stderr)
         return TIMEOUT_EXIT_CODE, f"{output}\nBlender не ответил за {timeout} с и был снят."
     return completed.returncode, (completed.stdout or "") + (completed.stderr or "")
 

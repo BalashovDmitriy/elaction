@@ -1,0 +1,170 @@
+name: Релиз
+
+# Тег `v*` собирает архивы и публикует релиз. Запуск руками собирает то же самое
+# и прикладывает архивы к прогону, но ничего не публикует — так сборку можно
+# проверить, не заводя тег и не выпуская лишнего.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.7.2"
+
+jobs:
+  version:
+    name: Версия
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Тег и config/version обязаны сходиться, иначе архив назовётся одной
+      # версией, а игра в углу меню покажет другую. Падаем до сборки.
+      - name: Тег сходится с версией проекта
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: python tools/version.py --check "${{ github.ref_name }}"
+
+      # Без аргумента берётся версия из project.godot — значит, проверка есть
+      # и на ручном прогоне, ради которого он и заводился: заметки к релизу
+      # должны быть готовы до тега, а не сочиняться в вебе после него.
+      - name: Заметки к релизу есть в CHANGELOG
+        run: python tools/changelog.py ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+
+  build:
+    name: Сборка ${{ matrix.preset }}
+    needs: version
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            preset: linux
+          - os: windows-latest
+            preset: windows
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Шаблоны экспорта лежат в папке пользователя, и на разных ОС она разная.
+      # Считаем путь один раз: дальше на него смотрят и кэш, и установка.
+      - name: Путь к шаблонам экспорта
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            echo "TEMPLATES_DIR=$APPDATA/Godot/export_templates/${GODOT_VERSION}.stable" >> "$GITHUB_ENV"
+          else
+            echo "TEMPLATES_DIR=$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable" >> "$GITHUB_ENV"
+          fi
+
+      # Шаблоны весят сотни мегабайт и меняются только с версией движка.
+      - name: Кэш шаблонов экспорта
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TEMPLATES_DIR }}
+          key: godot-templates-${{ runner.os }}-${{ env.GODOT_VERSION }}
+
+      - name: Godot и шаблоны (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -sSL -o godot.zip "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          sudo mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          sudo chmod +x /usr/local/bin/godot
+          echo "GODOT_BIN=/usr/local/bin/godot" >> "$GITHUB_ENV"
+
+          if [ ! -d "$TEMPLATES_DIR" ]; then
+            curl -sSL -o templates.zip "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+            unzip -q templates.zip
+            mkdir -p "$TEMPLATES_DIR"
+            mv templates/* "$TEMPLATES_DIR/"
+          fi
+          godot --version
+
+      - name: Godot и шаблоны (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $base = "https://github.com/godotengine/godot/releases/download/$env:GODOT_VERSION-stable"
+          Invoke-WebRequest -Uri "$base/Godot_v$env:GODOT_VERSION-stable_win64.exe.zip" -OutFile godot.zip
+          Expand-Archive godot.zip -DestinationPath godot
+          # Обычная сборка не пишет в родительскую консоль — берём консольную,
+          # иначе вывод экспорта в логе будет пустым.
+          $exe = (Get-ChildItem godot -Recurse -Filter "*_console.exe" | Select-Object -First 1).FullName
+          "GODOT_BIN=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+          if (-not (Test-Path $env:TEMPLATES_DIR)) {
+            # .tpz — тот же zip, но Expand-Archive смотрит на расширение.
+            Invoke-WebRequest -Uri "$base/Godot_v$env:GODOT_VERSION-stable_export_templates.tpz" -OutFile templates.zip
+            Expand-Archive templates.zip -DestinationPath tpz
+            New-Item -ItemType Directory -Force -Path $env:TEMPLATES_DIR | Out-Null
+            Move-Item "tpz\templates\*" $env:TEMPLATES_DIR
+          }
+          & $exe --version
+
+      - name: Экспорт
+        run: python tools/export.py ${{ matrix.preset }}
+
+      - name: Архив
+        run: python tools/package.py ${{ matrix.preset }}
+
+      # Прогоняется распакованный архив, а не собранный файл: проверять надо то,
+      # что скачает игрок, — вместе с правом на запуск внутри zip (ADR-0013,
+      # пункт 6). Только Linux: у Windows-сборки нет консоли, она не пишет
+      # в родительский процесс, и маркер запуска читать неоткуда. Windows-архив
+      # проверяется руками — это «прогон на чистой машине» из DoD.
+      - name: Прогон распакованного архива
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          unzip -q -o dist/elaction-*-linux.zip -d smoke
+          binary="$(echo smoke/*/elaction.x86_64)"
+          if [ ! -x "$binary" ]; then
+            echo "В архиве $binary не помечен исполняемым — игрок его не запустит."
+            exit 1
+          fi
+          python tools/smoke.py "$binary"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: elaction-${{ matrix.preset }}
+          path: dist/*.zip
+          if-no-files-found: error
+
+  publish:
+    name: Публикация
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Заметки к релизу
+        run: python tools/changelog.py "${{ github.ref_name }}" > notes.md
+
+      - name: Релиз в GitHub
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist/*.zip \
+            --title "elaction ${{ github.ref_name }}" \
+            --notes-file notes.md

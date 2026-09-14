@@ -65,11 +65,14 @@ var _page: Page = Page.MAIN
 var _back_to: Page = Page.MAIN
 
 @onready var _column: VBoxContainer = %Page
+@onready var _version: Label = %Version
 
 
 func _ready() -> void:
 	# Меню живёт на паузе: под ней оно и открывается.
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# Версия в углу — чтобы игрок мог назвать её, не открывая свойства файла.
+	_version.text = Release.tag()
 
 
 ## Показывает страницу и забирает фокус на первую кнопку: иначе стрелками
