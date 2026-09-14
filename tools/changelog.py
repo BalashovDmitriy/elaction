@@ -14,6 +14,7 @@ Workflow релиза печатает их в описание на GitHub, ч�
 
 from __future__ import annotations
 
+import re
 import sys
 
 from godot_bin import PROJECT_ROOT, use_utf8_output
@@ -21,9 +22,14 @@ from version import read as project_version
 
 CHANGELOG = PROJECT_ROOT / "CHANGELOG.md"
 
+# Хвост файла по Keep a Changelog — определения ссылок вида `[0.9.0]: https://…`.
+# Секцию самой старой версии от них ничего не отделяет, а в заметках к релизу
+# им делать нечего.
+_LINK_DEFINITION = re.compile(r"^\[[^\]]+\]:\s")
+
 
 def section(version: str) -> str | None:
-    """Текст секции версии без её заголовка. None, если секции нет."""
+    """Текст секции версии без её заголовка. None, если секции нет или она пуста."""
     heading = f"## [{version}]"
     lines = CHANGELOG.read_text(encoding="utf-8").splitlines()
 
@@ -37,11 +43,13 @@ def section(version: str) -> str | None:
 
     end = len(lines)
     for number in range(start, len(lines)):
-        if lines[number].startswith("## "):
+        if lines[number].startswith("## ") or _LINK_DEFINITION.match(lines[number]):
             end = number
             break
 
-    return "\n".join(lines[start:end]).strip()
+    # Пустая секция — такой же провал, как отсутствующая: заголовок есть,
+    # а релиз всё равно выходит без описания.
+    return "\n".join(lines[start:end]).strip() or None
 
 
 def main(argv: list[str]) -> int:
@@ -51,7 +59,10 @@ def main(argv: list[str]) -> int:
 
     text = section(version)
     if text is None:
-        print(f"В CHANGELOG.md нет секции «## [{version}]» — заметки к релизу взять неоткуда.")
+        print(
+            f"В CHANGELOG.md нет заметок для {version}: секции «## [{version}]» "
+            "нет или она пуста, а релиз без описания выходит молча."
+        )
         return 1
 
     print(text)

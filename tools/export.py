@@ -21,15 +21,30 @@ from __future__ import annotations
 
 import configparser
 import sys
+from pathlib import Path
 
 from godot_bin import PROJECT_ROOT, require_godot, run, use_utf8_output
 from godot_check import find_errors, import_resources
-
-PRESETS_FILE = PROJECT_ROOT / "export_presets.cfg"
+from version import PRESETS_FILE, PROJECT_FILE
 
 # Сборка с вшитыми ресурсами весит десятки мегабайт. Всё, что заметно меньше, —
 # не игра, а огрызок, и до архива ему ехать незачем.
 MIN_SIZE_MB: int = 5
+
+# О провале экспорта Godot говорит своими словами, и ни один общий маркер
+# из godot_check.py их не ловит. Без этого списка второй признак успеха —
+# «маркеры ошибок в выводе» — на экспорте не работал бы вовсе.
+EXPORT_FAILURE_MARKERS: tuple[str, ...] = (
+    "Cannot export project",
+    "Project export for preset",
+    "No export template found",
+)
+
+# Экспорт и импорт движок гоняет в режиме редактора, а редактор на выходе
+# переписывает свои конфиги целиком: комментарии из них пропадают, а вместе
+# с ними — решения, на которые ссылаются ADR-0002 и ADR-0013 (пункт 8).
+# Сборка конфиги менять не должна, поэтому возвращаем их как были.
+GUARDED_FILES: tuple[Path, ...] = (PROJECT_FILE, PRESETS_FILE)
 
 
 class Preset:
@@ -46,9 +61,24 @@ class Preset:
         return self.platform.split()[0].lower()
 
 
+def snapshot() -> dict[Path, bytes]:
+    """Содержимое конфигов, которые движок норовит переписать под себя."""
+    return {path: path.read_bytes() for path in GUARDED_FILES if path.exists()}
+
+
+def restore(saved: dict[Path, bytes]) -> None:
+    """Возвращает переписанные движком конфиги как были."""
+    for path, before in saved.items():
+        if path.exists() and path.read_bytes() != before:
+            path.write_bytes(before)
+            print(f"  ..   {path.name} переписан движком — вернул как было")
+
+
 def read_presets() -> list[Preset]:
     """Разбирает export_presets.cfg. Значения там в кавычках, как в ini от Godot."""
-    config = configparser.ConfigParser()
+    # interpolation=None: в значениях пресета попадается «%», а ConfigParser
+    # по умолчанию принял бы его за подстановку и упал на разборе.
+    config = configparser.ConfigParser(interpolation=None)
     config.read(PRESETS_FILE, encoding="utf-8")
 
     def value(section: str, key: str) -> str:
@@ -77,8 +107,26 @@ def pick(presets: list[Preset], wanted: str) -> Preset | None:
     return None
 
 
+def export_failures(output: str) -> list[str]:
+    """Строки, которыми Godot сообщает о провале экспорта."""
+    return [
+        line.strip()
+        for line in output.splitlines()
+        if any(marker in line for marker in EXPORT_FAILURE_MARKERS)
+    ]
+
+
 def export(preset: Preset) -> int:
     """Собирает пресет. Возвращает код возврата для процесса."""
+    saved = snapshot()
+    try:
+        return _build(preset)
+    finally:
+        restore(saved)
+
+
+def _build(preset: Preset) -> int:
+    """Импорт и экспорт как есть, без присмотра за конфигами."""
     godot = require_godot()
 
     print("== импорт ресурсов перед сборкой ==", flush=True)
@@ -96,10 +144,12 @@ def export(preset: Preset) -> int:
         preset.path.unlink()
 
     print(f"== экспорт «{preset.name}» -> {preset.path.name} ==", flush=True)
-    code, output = run(godot, ["--export-release", preset.name, str(preset.path)])
+    # --headless обязателен: без него экспорт поднимает окно и рендерер целиком,
+    # а на runner'е нет ни дисплея, ни GPU — сборка падает на DisplayServer.
+    code, output = run(godot, ["--headless", "--export-release", preset.name, str(preset.path)])
     print(output.strip())
 
-    errors = find_errors(output)
+    errors = find_errors(output) + export_failures(output)
     if code != 0 or errors:
         print(f"\nЭкспорт провалился (код {code}).")
         for line in errors[:20]:

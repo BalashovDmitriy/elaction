@@ -23,7 +23,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from godot_bin import PROJECT_ROOT, use_utf8_output
+from godot_bin import PROJECT_ROOT, as_text, use_utf8_output
 from godot_check import find_errors
 from version import read as project_version
 
@@ -64,30 +64,51 @@ def launch(binary: Path, frames: int) -> tuple[str, bool]:
             check=False,
         )
     except subprocess.TimeoutExpired as expired:
-        output = (expired.stdout or "") + (expired.stderr or "")
-        if isinstance(output, bytes):
-            output = output.decode("utf-8", errors="replace")
+        # Потоки снятого процесса приезжают вразнобой — str, bytes или None,
+        # поэтому каждый приводится к строке отдельно (godot_bin.as_text).
+        output = as_text(expired.stdout) + as_text(expired.stderr)
         # Снят по таймауту — значит, всё это время был жив. Это успех, а не сбой.
         return output, True
     return (completed.stdout or "") + (completed.stderr or ""), completed.returncode == 0
 
 
+def parse(argv: list[str]) -> tuple[list[str], int] | None:
+    """Делит аргументы на пути и число кадров. None — если разобрать не вышло."""
+    paths: list[str] = []
+    frames = DEFAULT_FRAMES
+    index = 0
+    while index < len(argv):
+        if argv[index] != "--frames":
+            paths.append(argv[index])
+            index += 1
+            continue
+        # Без явной проверки «--frames» последним аргументом валит скрипт
+        # трассировкой вместо внятного сообщения.
+        if index + 1 >= len(argv) or not argv[index + 1].isdigit():
+            print("После --frames нужно число кадров: python tools/smoke.py <билд> --frames 600")
+            return None
+        frames = int(argv[index + 1])
+        index += 2
+    return paths, frames
+
+
 def main(argv: list[str]) -> int:
     use_utf8_output()
-    if not argv:
+    parsed = parse(argv)
+    if parsed is None:
+        return 2
+
+    paths, frames = parsed
+    if not paths:
         print("Нужен путь к собранному билду: python tools/smoke.py build/linux/elaction.x86_64")
         return 2
 
-    binary = Path(argv[0])
+    binary = Path(paths[0])
     if not binary.is_absolute():
         binary = PROJECT_ROOT / binary
     if not binary.exists():
         print(f"Нет такого файла: {binary}")
         return 2
-
-    frames = DEFAULT_FRAMES
-    if "--frames" in argv:
-        frames = int(argv[argv.index("--frames") + 1])
 
     print(f"Прогон {binary.name}: {frames} кадров, маркер «{marker()}»", flush=True)
     output, survived = launch(binary, frames)

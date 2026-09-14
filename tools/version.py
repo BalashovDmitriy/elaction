@@ -59,7 +59,14 @@ def write(version: str) -> list[str]:
 
     if PRESETS_FILE.exists():
         presets = PRESETS_FILE.read_text(encoding="utf-8")
-        patched = _PRESET_VERSION.sub(rf"\g<1>{windows_form(version)}\g<3>", presets)
+        patched, count = _PRESET_VERSION.subn(rf"\g<1>{windows_form(version)}\g<3>", presets)
+        # Молча пропустить пресет нельзя: на пустой версии rcedit падает, и
+        # сборка под Windows не соберётся вовсе — а скажет об этом только CI.
+        if count == 0:
+            raise SystemExit(
+                f"В {PRESETS_FILE.name} нет полей application/file_version "
+                "и application/product_version — Windows-сборка без них не собирается."
+            )
         if patched != presets:
             PRESETS_FILE.write_text(patched, encoding="utf-8", newline="\n")
             changed.append(PRESETS_FILE.name)

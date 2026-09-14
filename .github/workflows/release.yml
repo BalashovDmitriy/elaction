@@ -28,9 +28,11 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: python tools/version.py --check "${{ github.ref_name }}"
 
+      # Без аргумента берётся версия из project.godot — значит, проверка есть
+      # и на ручном прогоне, ради которого он и заводился: заметки к релизу
+      # должны быть готовы до тега, а не сочиняться в вебе после него.
       - name: Заметки к релизу есть в CHANGELOG
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: python tools/changelog.py "${{ github.ref_name }}"
+        run: python tools/changelog.py ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
 
   build:
     name: Сборка ${{ matrix.preset }}
@@ -111,15 +113,25 @@ jobs:
       - name: Экспорт
         run: python tools/export.py ${{ matrix.preset }}
 
-      # Прогоняем только Linux-сборку: у Windows-сборки нет консоли, она не
-      # пишет в родительский процесс, и маркер запуска читать неоткуда.
-      # Windows-архив проверяется руками — это «прогон на чистой машине» из DoD.
-      - name: Прогон собранного билда
-        if: runner.os == 'Linux'
-        run: python tools/smoke.py build/linux/elaction.x86_64
-
       - name: Архив
         run: python tools/package.py ${{ matrix.preset }}
+
+      # Прогоняется распакованный архив, а не собранный файл: проверять надо то,
+      # что скачает игрок, — вместе с правом на запуск внутри zip (ADR-0013,
+      # пункт 6). Только Linux: у Windows-сборки нет консоли, она не пишет
+      # в родительский процесс, и маркер запуска читать неоткуда. Windows-архив
+      # проверяется руками — это «прогон на чистой машине» из DoD.
+      - name: Прогон распакованного архива
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          unzip -q -o dist/elaction-*-linux.zip -d smoke
+          binary="$(echo smoke/*/elaction.x86_64)"
+          if [ ! -x "$binary" ]; then
+            echo "В архиве $binary не помечен исполняемым — игрок его не запустит."
+            exit 1
+          fi
+          python tools/smoke.py "$binary"
 
       - uses: actions/upload-artifact@v4
         with:

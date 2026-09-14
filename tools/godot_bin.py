@@ -58,7 +58,12 @@ def require_godot() -> str:
     return godot
 
 
-def _as_text(value: str | bytes | None) -> str:
+def as_text(value: str | bytes | None) -> str:
+    """Вывод снятого по таймауту процесса: он бывает str, bytes и None сразу.
+
+    На POSIX TimeoutExpired несёт то, что успело прочитаться, — байтами, а поток,
+    в который никто не написал, остаётся None. Складывать их напрямую нельзя.
+    """
     if value is None:
         return ""
     if isinstance(value, bytes):
@@ -83,7 +88,7 @@ def run(godot: str, args: list[str], timeout: int = 600) -> tuple[int, str]:
             check=False,
         )
     except subprocess.TimeoutExpired as expired:
-        output = _as_text(expired.stdout) + _as_text(expired.stderr)
+        output = as_text(expired.stdout) + as_text(expired.stderr)
         return TIMEOUT_EXIT_CODE, f"{output}\nGodot не ответил за {timeout} с и был снят."
     return completed.returncode, (completed.stdout or "") + (completed.stderr or "")
 

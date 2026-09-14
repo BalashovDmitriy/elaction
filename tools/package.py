@@ -45,6 +45,10 @@ def add(archive: zipfile.ZipFile, source: Path, name: str, executable: bool = Fa
     """Кладёт файл в архив, при надобности пометив его исполняемым."""
     info = zipfile.ZipInfo(name)
     info.compress_type = zipfile.ZIP_DEFLATED
+    # На Windows ZipInfo ставит create_system=0 (FAT), и распаковщик тогда права
+    # из external_attr не смотрит вовсе: собранный на Windows Linux-архив уехал
+    # бы без права на запуск. Говорим «Unix» явно, от системы сборки не завися.
+    info.create_system = 3
     info.external_attr = (EXECUTABLE_MODE if executable else 0o644) << 16
     archive.writestr(info, source.read_bytes())
 
@@ -55,6 +59,13 @@ def package(preset: Preset) -> int:
         print(f"Нет собранного билда {preset.path} — сначала python tools/export.py {preset.alias}")
         return 1
 
+    # Проверяем до того, как открыли архив: иначе на полпути в dist/ остаётся
+    # обрезанный zip, который со стороны не отличить от готового.
+    missing = [source for source in EXTRAS if not (PROJECT_ROOT / source).exists()]
+    if missing:
+        print(f"Не нашёл {', '.join(missing)} — архив без них не собираю.")
+        return 1
+
     DIST_DIR.mkdir(parents=True, exist_ok=True)
     name = archive_name(preset)
     target = DIST_DIR / f"{name}.zip"
@@ -63,11 +74,7 @@ def package(preset: Preset) -> int:
     with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as archive:
         add(archive, preset.path, f"{name}/{preset.path.name}", executable=True)
         for source, inside in EXTRAS.items():
-            path = PROJECT_ROOT / source
-            if not path.exists():
-                print(f"Не нашёл {source} — архив без него не собираю.")
-                return 1
-            add(archive, path, f"{name}/{inside}")
+            add(archive, PROJECT_ROOT / source, f"{name}/{inside}")
 
     size_mb = target.stat().st_size / (1024 * 1024)
     print(f"Архив: {target} ({size_mb:.1f} МБ)")
