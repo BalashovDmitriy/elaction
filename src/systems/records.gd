@@ -68,17 +68,22 @@ func save_to(path: String = PATH) -> void:
 
 ## Добавляет счёт и возвращает его место в таблице, считая с нуля.
 ## Не попал в десятку — вернётся -1.
+##
+## Место считается до вставки, а не поиском строки после неё: тот же счёт в тот
+## же день бывает дважды, и поиск по паре «счёт и дата» находил чужую строку —
+## счёт, не попавший в десятку, объявлялся бы рекордом.
 func submit(score: int, date: String = "") -> int:
 	var stamp := date if not date.is_empty() else today()
+	var place := 0
+	for row: Dictionary in rows:
+		if int(row[SCORE]) >= score:
+			place += 1
 	rows = sorted(rows + [{SCORE: score, DATE: stamp}])
-	for index: int in rows.size():
-		if rows[index][SCORE] == score and rows[index][DATE] == stamp:
-			return index if index < LIMIT else -1
-	return -1
+	return place if place < LIMIT else -1
 
 
 ## Лучший счёт таблицы. Пустая таблица — ноль, а не отсутствие значения:
-## HUD и меню показывают число, и особый случай им ни к чему.
+## тому, кто станет его показывать, особый случай ни к чему.
 func best() -> int:
 	return int(rows[0][SCORE]) if not rows.is_empty() else 0
 

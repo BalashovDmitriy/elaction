@@ -166,13 +166,6 @@ static func set_level(bus: String, level: float) -> void:
 		director.set_level(bus, level)
 
 
-## Текущая громкость шины. Без автолоада — единица: тесты поднимают классы
-## и без дерева сцены, и молчаливый ноль там сбивал бы с толку.
-static func level_of(bus: String) -> float:
-	var director := AudioDirector.instance()
-	return director.level_of(bus) if director != null else 1.0
-
-
 ## Позиционный источник на узле: его слышно только рядом с ним.
 ##
 ## Нужен тому, что звучит на своём месте, а не в партии целиком: шахт в здании

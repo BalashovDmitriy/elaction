@@ -59,6 +59,11 @@ var _last_place: int = -1
 
 var _page: Page = Page.MAIN
 
+## Страница, на которую вернёт «назад». Запоминается, а не угадывается по паузе:
+## после партии, попавшей в таблицу, дерево тоже стоит на паузе, и по одному
+## этому признаку «назад» из рекордов уводило с экрана конца партии в паузу.
+var _back_to: Page = Page.MAIN
+
 @onready var _column: VBoxContainer = %Page
 
 
@@ -71,8 +76,16 @@ func _ready() -> void:
 ## и геймпадом по меню не походить.
 func show_page(page: Page) -> void:
 	_page = page
+	if page == Page.MAIN or page == Page.PAUSE or page == Page.GAME_OVER:
+		# Корневые страницы — те, с которых уходят в подстраницы. Последняя из них
+		# и есть то, куда вернёт «назад».
+		_back_to = page
 	visible = true
 	for child: Node in _column.get_children():
+		# Сначала из колонки, потом в утиль: [method Node.queue_free] удаляет узел
+		# лишь в конце кадра, а отложенный [method _focus_first] успевает раньше —
+		# и фокус доставался кнопке прошлой страницы, которую тут же и удаляли.
+		_column.remove_child(child)
 		child.queue_free()
 
 	match page:
@@ -130,7 +143,7 @@ func _build_pause() -> void:
 
 func _build_game_over() -> void:
 	_title("UI_GAME_OVER")
-	_note("%s %s" % [tr("UI_YOUR_SCORE"), Hud.format_score(_last_score)])
+	_note_text("%s %s" % [tr("UI_YOUR_SCORE"), Hud.format_score(_last_score)])
 	if _last_place >= 0:
 		var record := Label.new()
 		record.text = "%s  #%d" % [tr("UI_NEW_RECORD"), _last_place + 1]
@@ -175,8 +188,8 @@ func _build_controls() -> void:
 	_title("UI_CONTROLS")
 	for row: Array in ACTIONS:
 		var actions: Array[StringName] = []
-		for name: Variant in row[1] as Array:
-			actions.append(StringName(name))
+		for action: Variant in row[1] as Array:
+			actions.append(StringName(action))
 		_two_columns(tr(String(row[0])), _keys_of(actions))
 
 	_note("UI_ACTION_HINT")
@@ -184,9 +197,13 @@ func _build_controls() -> void:
 	_button("UI_BACK", _go_back)
 
 
-## Куда возвращает «назад»: из паузы в паузу, иначе в главное меню.
+## Возвращает на страницу, с которой ушли, и записывает настройки на диск:
+## громкость меняется ползунком по шагу, и сохранять её на каждый шаг значило бы
+## писать файл двадцать раз за одно движение мышью.
 func _go_back() -> void:
-	show_page(Page.PAUSE if get_tree().paused and _last_place < 0 else Page.MAIN)
+	if settings != null:
+		settings.save_to()
+	show_page(_back_to)
 
 
 # --- Кирпичи -----------------------------------------------------------------
@@ -201,9 +218,16 @@ func _title(key: String) -> void:
 	_column.add_child(label)
 
 
+## Пояснение под заголовком по ключу перевода.
 func _note(key: String) -> void:
+	_note_text(tr(key))
+
+
+## То же, но готовой строкой: на экране конца партии подпись собрана из перевода
+## и счёта, и переводить её второй раз нечего.
+func _note_text(text: String) -> void:
 	var label := Label.new()
-	label.text = tr(key)
+	label.text = text
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.custom_minimum_size = Vector2(300.0, 0.0)
@@ -307,9 +331,9 @@ func _keys_of(actions: Array[StringName]) -> String:
 		for event: InputEvent in InputMap.action_get_events(action):
 			var key := event as InputEventKey
 			if key != null:
-				var name := OS.get_keycode_string(key.physical_keycode)
-				if not keys.has(name):
-					keys.append(name)
+				var label := OS.get_keycode_string(key.physical_keycode)
+				if not keys.has(label):
+					keys.append(label)
 				continue
 			var button := event as InputEventJoypadButton
 			if button != null:
@@ -327,17 +351,32 @@ func _keys_of(actions: Array[StringName]) -> String:
 	return "   ".join(parts)
 
 
+## Фокус на первый управляемый элемент страницы: иначе стрелками и геймпадом
+## по меню не походить.
+##
+## Обход вглубь и по любому фокусируемому [Control], а не по кнопкам верхнего
+## уровня: на настройках первым стоит ползунок, и лежит он внутри строки —
+## поиск одних кнопок перепрыгивал через полстраницы к «полному экрану».
 func _focus_first() -> void:
-	for child: Node in _column.get_children():
-		var button := child as Button
-		if button != null:
-			button.grab_focus()
-			return
+	_focus_within(_column)
 
 
+func _focus_within(parent: Node) -> bool:
+	for child: Node in parent.get_children():
+		var control := child as Control
+		if control != null and control.focus_mode != Control.FOCUS_NONE:
+			control.grab_focus()
+			return true
+		if _focus_within(child):
+			return true
+	return false
+
+
+## Громкость применяется сразу, а на диск уезжает при уходе со страницы:
+## ползунок шлёт значение на каждый шаг, и файл писался бы двадцать раз за
+## одно движение мышью.
 func _on_level_changed(bus: String, value: float) -> void:
 	settings.set_level(bus, value)
-	settings.save_to()
 
 
 func _on_language_selected(index: int) -> void:

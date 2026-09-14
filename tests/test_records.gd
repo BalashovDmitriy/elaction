@@ -52,6 +52,17 @@ func test_a_poor_score_does_not_make_the_table() -> void:
 	assert_eq(records.rows.size(), Records.LIMIT, "и таблицу не раздул")
 
 
+func test_a_repeated_score_does_not_fake_a_record() -> void:
+	# Тот же счёт в тот же день бывает дважды. Поиск строки по паре «счёт и дата»
+	# находил чужую — и счёт, не попавший в десятку, объявлялся рекордом.
+	var records := Records.new()
+	var many: Array[int] = []
+	for _index: int in Records.LIMIT:
+		many.append(7000)
+	records.rows = _rows(many)
+	assert_eq(records.submit(7000, "2026-09-13"), -1, "одиннадцатый такой же — мимо")
+
+
 func test_the_best_of_an_empty_table_is_zero() -> void:
 	# HUD и меню показывают число, и особый случай им ни к чему.
 	assert_eq(Records.new().best(), 0)

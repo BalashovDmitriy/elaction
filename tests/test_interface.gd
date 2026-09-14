@@ -121,9 +121,16 @@ func test_a_score_is_split_into_threes() -> void:
 # --- Дополнительная жизнь ----------------------------------------------------
 
 
-func test_an_extra_life_comes_once() -> void:
-	var game := GameState.instance()
+## Своя партия на тест, а не автолоад: глобальную трогать нельзя — её же смотрят
+## соседние тесты, и оставленные в ней жизни и очки утекли бы к ним.
+func _game() -> GameState:
+	var game := autofree(GameState.new()) as GameState
 	game.start_game()
+	return game
+
+
+func test_an_extra_life_comes_once() -> void:
+	var game := _game()
 	var lives := game.lives
 
 	game.add_score(GameState.EXTRA_LIFE_SCORE)
@@ -131,28 +138,23 @@ func test_an_extra_life_comes_once() -> void:
 
 	game.add_score(GameState.EXTRA_LIFE_SCORE)
 	assert_eq(game.lives, lives + 1, "а за двадцать — уже нет")
-	game.start_game()
 
 
 func test_a_new_game_brings_the_extra_life_back() -> void:
-	var game := GameState.instance()
-	game.start_game()
+	var game := _game()
 	game.add_score(GameState.EXTRA_LIFE_SCORE)
 	game.start_game()
 
 	var lives := game.lives
 	game.add_score(GameState.EXTRA_LIFE_SCORE)
 	assert_eq(game.lives, lives + 1, "в новой партии порог считается заново")
-	game.start_game()
 
 
 func test_the_dead_do_not_get_an_extra_life() -> void:
 	# После Game Over очки ещё начисляются — бонус за здание приходит отложенно.
-	var game := GameState.instance()
-	game.start_game()
+	var game := _game()
 	while game.lives > 0:
 		game.lose_life()
 
 	game.add_score(GameState.EXTRA_LIFE_SCORE)
 	assert_eq(game.lives, 0, "мёртвому жизнь не выдают")
-	game.start_game()

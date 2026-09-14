@@ -17,7 +17,8 @@ signal documents_changed(collected: int, total: int)
 signal lives_changed(value: int)
 
 ## Выдана дополнительная жизнь за очки. Отдельно от [signal lives_changed]:
-## HUD по нему показывает, за что жизнь прибавилась, а звук — что вообще.
+## тот говорит, сколько жизней стало, а этот — что одну только что подарили,
+## и по нему играет свой звук.
 signal extra_life_awarded
 ## Жизни кончились. Партия окончена.
 signal game_over
@@ -105,6 +106,12 @@ func start_game() -> void:
 	reset()
 	_running = true
 	building_changed.emit(building)
+
+
+## Останавливает партию, не трогая её итог. Нужно выходу в меню: здание там
+## выброшено, а таймер сирены без этого продолжал бы идти под главным меню.
+func stop_game() -> void:
+	_running = false
 
 
 ## Здание сдано: бонус за него и переход к следующему. Тревога снимается

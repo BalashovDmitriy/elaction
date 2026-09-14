@@ -80,6 +80,9 @@ func _just_pressed(action: StringName) -> bool:
 func _open_menu() -> void:
 	_playing = false
 	get_tree().paused = false
+	# Партия останавливается, а не просто прячется: без этого таймер сирены
+	# продолжал бы идти под главным меню, куда вышли с паузы.
+	GameState.instance().stop_game()
 	_drop_level()
 	_hud.visible = false
 	_menu.show_page(Menu.Page.MAIN)
@@ -92,8 +95,9 @@ func _start_game() -> void:
 	_menu.close()
 	_hud.visible = true
 	GameState.instance().start_game()
+	# HUD перерисовывать не надо: start_game и start_building внутри здания
+	# шлют все сигналы, на которые он подписан.
 	_enter_building()
-	_hud.refresh()
 
 
 func _pause() -> void:

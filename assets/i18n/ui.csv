@@ -19,9 +19,7 @@ UI_SCORE,Score,Очки
 UI_LIVES,Lives,Жизни
 UI_DOCUMENTS,Documents,Документы
 UI_BUILDING,Building,Здание
-UI_FLOOR,Floor,Этаж
 UI_ALARM,ALARM,ТРЕВОГА
-UI_EXTRA_LIFE,Extra life,Дополнительная жизнь
 UI_VOLUME_MASTER,Master volume,Общая громкость
 UI_VOLUME_MUSIC,Music,Музыка
 UI_VOLUME_SFX,Effects,Эффекты
