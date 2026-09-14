@@ -307,6 +307,21 @@ def building_bonus() -> Stereo:
     return dsp.master(dsp.widen(placed(shimmer, "floor", mix=0.35), amount=0.45), peak=0.8)
 
 
+def extra_life() -> Stereo:
+    """Дополнительная жизнь: короткий подъём, который слышно поверх боя.
+
+    Жизнь за очки — правка по мануалу Taito (ADR-0012, пункт 5), и звук ей нужен
+    свой: без него прибавка в углу экрана проходит незамеченной.
+    """
+    phrase = np.zeros(dsp.samples(1.2), dtype=np.float32)
+    for index, name in enumerate(("E5", "A5", "C6", "E6")):
+        voice = _bell(note(name), 0.8) * 0.45
+        start = dsp.samples(0.06 * index)
+        phrase[start : start + voice.size] += voice[: max(phrase.size - start, 0)]
+    shimmer = dsp.echo(phrase, delay_time=0.15, feedback=0.35, mix=0.3)
+    return dsp.master(dsp.widen(placed(shimmer, "floor", mix=0.32), amount=0.4), peak=0.72)
+
+
 def game_over() -> Stereo:
     """Game Over: тёмный аккорд и долгий хвост. Партия окончена."""
     seconds = 2.6
@@ -550,6 +565,7 @@ EFFECTS: dict[str, Callable[[], Stereo]] = {
     "agent_death": agent_death,
     "car_away": car_away,
     "building_bonus": building_bonus,
+    "extra_life": extra_life,
     "game_over": game_over,
 }
 
@@ -563,7 +579,15 @@ MUSIC: dict[str, Callable[[], Stereo]] = {
 ## Длинные и редкие эффекты тоже уезжают в OGG. Частые и короткие остаются WAV:
 ## шаг и выстрел звучат сотнями за партию, и распаковывать их каждый раз незачем.
 LONG: frozenset[str] = frozenset(
-    {"document", "elevator_ding", "building_bonus", "car_away", "game_over", "otto_death"}
+    {
+        "document",
+        "elevator_ding",
+        "building_bonus",
+        "extra_life",
+        "car_away",
+        "game_over",
+        "otto_death",
+    }
 )
 
 ## Петли режутся ровно по длине, поэтому хвост у них не срезается. Сводятся они

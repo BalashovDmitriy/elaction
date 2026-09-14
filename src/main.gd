@@ -1,21 +1,29 @@
 extends Node2D
 
-## Точка входа и игровой цикл.
+## Точка входа: меню, партия и переходы между ними.
 ##
-## Держит партию целиком: заводит здание, при сдаче начисляет бонус и собирает
-## следующее, показывает счёт и ведёт паузу. Настоящее меню придёт в M8 — здесь
-## только механика, чтобы не плодить UI, который будет выброшен (ADR-0009).
+## Держит три вещи и связывает их: [Menu] — экраны вне игры, [Hud] — то, что
+## видно в игре, и само здание. Партия живёт в [GameState], здание — нет:
+## оно собирается заново на каждое и выбрасывается целиком.
+##
+## Игра начинается с меню, а не со здания (DoD вехи M8b): до неё сюда попадали
+## сразу в партию, потому что меню ещё не было.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
+## Скрипт автолоада съёмки: имя автолоада при разборе одного файла не видно,
+## а статический вопрос «идёт ли съёмка» задать надо.
+const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 
 var _level: GreyboxLevel = null
-var _paused: bool = false
-var _game_over: bool = false
+var _settings: GameSettings = null
+var _records: Records = null
+## Идёт ли партия. На экранах меню — нет, даже пока здание висит в дереве.
+var _playing: bool = false
 ## Что удерживалось в прошлом кадре: по этому считается фронт нажатия.
 var _held: Dictionary = {}
 
-@onready var _debug_label: Label = %DebugLabel
-@onready var _hud_label: Label = %HudLabel
+@onready var _menu: Menu = $Menu
+@onready var _hud: Hud = $Hud
 
 
 func _ready() -> void:
@@ -23,47 +31,37 @@ func _ready() -> void:
 	# при этом обязано замирать — см. _enter_building.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
-	var game := GameState.instance()
-	game.score_changed.connect(_on_score_changed)
-	game.documents_changed.connect(_on_documents_changed)
-	game.lives_changed.connect(_on_lives_changed)
-	game.building_changed.connect(_on_building_changed)
-	game.alarm_raised.connect(_on_alarm_raised)
-	game.game_over.connect(_on_game_over)
+	_settings = GameSettings.load_from()
+	_settings.apply()
+	_records = Records.load_from()
 
-	game.start_game()
-	_enter_building()
-	_render_hud()
+	_menu.settings = _settings
+	_menu.records = _records
+	_menu.play_pressed.connect(_start_game)
+	_menu.resume_pressed.connect(_resume)
+	_menu.restart_pressed.connect(_start_game)
+	_menu.to_menu_pressed.connect(_open_menu)
+	_menu.quit_pressed.connect(_quit)
+
+	var game := GameState.instance()
+	game.game_over.connect(_on_game_over)
+	game.extra_life_awarded.connect(_on_extra_life)
+
+	# Автосъёмка начинает сразу с партии: она водит Otto игровыми действиями,
+	# а кнопки меню нажимать не умеет.
+	if SCREENSHOTTER.capturing():
+		_start_game()
+	else:
+		_open_menu()
 
 
 func _process(_delta: float) -> void:
-	_read_commands()
-	_debug_label.text = _debug_text()
-
-
-## Ввод партии читается опросом, а не событиями: так его видит и автосценарий
-## съёмки, который нажимает действия через [Input], не порождая событий.
-func _read_commands() -> void:
-	# Фронты считаются все сразу: иначе ранний выход оставил бы остальные
-	# действия «свежими» и они сработали бы позже сами собой.
-	var pause_pressed := _just_pressed(&"pause")
-	var restart_pressed := _just_pressed(&"restart")
-	var quit_pressed := _just_pressed(&"quit_game")
-
-	# Заново и выход — только из паузы или с экрана «игра окончена». Само нажатие
-	# паузы в этом кадре тоже считается: Esc и R, нажатые вместе, должны сработать
-	# оба — и когда Esc в паузу входит, и когда выходит из неё.
-	var on_the_overlay := _paused or _game_over or pause_pressed
-
-	if pause_pressed:
-		_toggle_pause()
-
-	if not on_the_overlay:
+	if not _just_pressed(&"pause"):
 		return
-	if restart_pressed:
-		_restart()
-	elif quit_pressed:
-		get_tree().quit()
+	if _playing:
+		_pause()
+	elif _menu.current_page() == Menu.Page.PAUSE:
+		_resume()
 
 
 ## Нажато ли действие именно в этом кадре.
@@ -78,15 +76,51 @@ func _just_pressed(action: StringName) -> bool:
 	return pressed and not was
 
 
+## Главное меню: здание выбрасывается, музыка остаётся.
+func _open_menu() -> void:
+	_playing = false
+	get_tree().paused = false
+	# Партия останавливается, а не просто прячется: без этого таймер сирены
+	# продолжал бы идти под главным меню, куда вышли с паузы.
+	GameState.instance().stop_game()
+	_drop_level()
+	_hud.visible = false
+	_menu.show_page(Menu.Page.MAIN)
+	Sounds.play_music(Sounds.THEME)
+
+
+func _start_game() -> void:
+	_playing = true
+	get_tree().paused = false
+	_menu.close()
+	_hud.visible = true
+	GameState.instance().start_game()
+	# HUD перерисовывать не надо: start_game и start_building внутри здания
+	# шлют все сигналы, на которые он подписан.
+	_enter_building()
+
+
+func _pause() -> void:
+	_playing = false
+	get_tree().paused = true
+	_menu.show_page(Menu.Page.PAUSE)
+
+
+func _resume() -> void:
+	_playing = true
+	get_tree().paused = false
+	_menu.close()
+
+
+func _quit() -> void:
+	_settings.save_to()
+	get_tree().quit()
+
+
 ## Собирает очередное здание. Старое выбрасывается целиком вместе с Otto:
 ## партия живёт в [GameState], уровень — нет.
 func _enter_building() -> void:
-	if _level != null:
-		# Сначала из дерева, потом в утиль: [method Node.queue_free] убирает узел
-		# лишь в конце кадра, и старое здание досматривало бы его рядом с новым —
-		# два Otto, две кабины и вся геометрия дважды в одном физическом мире.
-		remove_child(_level)
-		_level.queue_free()
+	_drop_level()
 
 	var game := GameState.instance()
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
@@ -102,6 +136,17 @@ func _enter_building() -> void:
 	Sounds.play_music(Sounds.ALARM_THEME if game.alarm.raised else Sounds.THEME)
 
 
+func _drop_level() -> void:
+	if _level == null:
+		return
+	# Сначала из дерева, потом в утиль: [method Node.queue_free] убирает узел
+	# лишь в конце кадра, и старое здание досматривало бы его рядом с новым —
+	# два Otto, две кабины и вся геометрия дважды в одном физическом мире.
+	remove_child(_level)
+	_level.queue_free()
+	_level = null
+
+
 func _on_building_cleared() -> void:
 	Sounds.play(Sounds.BUILDING_BONUS)
 	GameState.instance().finish_building()
@@ -109,94 +154,22 @@ func _on_building_cleared() -> void:
 	_enter_building.call_deferred()
 
 
-func _toggle_pause() -> void:
-	if _game_over:
-		return
-	_paused = not _paused
-	get_tree().paused = _paused
-	_render_hud()
-
-
-func _restart() -> void:
-	_paused = false
-	_game_over = false
-	get_tree().paused = false
-	GameState.instance().start_game()
-	_enter_building()
-	_render_hud()
-
-
-func _on_score_changed(_value: int) -> void:
-	_render_hud()
-
-
-func _on_documents_changed(_collected: int, _total: int) -> void:
-	_render_hud()
-
-
-func _on_lives_changed(_value: int) -> void:
-	_render_hud()
-
-
-func _on_building_changed(_number: int) -> void:
-	_render_hud()
-
-
-func _on_alarm_raised() -> void:
-	_render_hud()
+func _on_extra_life() -> void:
+	Sounds.play(Sounds.EXTRA_LIFE)
 
 
 func _on_game_over() -> void:
-	_game_over = true
+	_playing = false
 	Sounds.stop_music()
 	Sounds.play(Sounds.GAME_OVER)
+
+	var score := GameState.instance().score
+	var place := _records.submit(score)
+	if place >= 0:
+		_records.save_to()
+	_menu.remember(score, place)
+
 	# Партия окончена — здание замирает, как на паузе. Иначе агенты продолжают
-	# приходить и стрелять под надписью «игра окончена». Снимает это только рестарт.
+	# приходить и стрелять под надписью «игра окончена».
 	get_tree().paused = true
-	_render_hud()
-
-
-func _render_hud() -> void:
-	var game := GameState.instance()
-	var text := (
-		"здание: %d\nочки: %d\nжизни: %d\nдокументы: %d / %d"
-		% [game.building, game.score, game.lives, game.documents_collected, game.documents_total]
-	)
-	if game.alarm.raised:
-		text += "\nТРЕВОГА"
-	if _game_over:
-		text += "\nигра окончена\nR — заново, Q — выход"
-	elif _paused:
-		text += "\nпауза\nEsc — продолжить\nR — заново, Q — выход"
-	_hud_label.text = text
-
-
-## Сколько осталось до сирены. Только для отладки: в оригинале таймер игроку
-## не показывают, и в HUD ему делать нечего.
-func _alarm_countdown() -> String:
-	var alarm := GameState.instance().alarm
-	return "сработала" if alarm.raised else "%.0f с" % alarm.time_left()
-
-
-func _debug_text() -> String:
-	if _level == null:
-		return ""
-
-	var otto := _level.otto
-	var motion := otto.motion()
-	return (
-		(
-			"состояние: %s\nскорость: %.0f / %.0f\nна полу: %s\n"
-			+ "в кабине: %s\nпауза: %s\nдо тревоги: %s\nFPS: %d"
-		)
-		% [
-			OttoStateMachine.state_name(otto.current_state()),
-			motion.x,
-			motion.y,
-			"да" if otto.is_grounded() else "нет",
-			"да" if otto.is_riding() else "нет",
-			"да" if get_tree().paused else "нет",
-			_alarm_countdown(),
-			Engine.get_frames_per_second(),
-		]
-	)
+	_menu.show_page(Menu.Page.GAME_OVER)
