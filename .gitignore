@@ -5,6 +5,7 @@
 
 # Сборки и экспорт
 /build/
+/dist/
 /export/
 *.pck
 *.exe
