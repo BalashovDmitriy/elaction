@@ -296,13 +296,27 @@
 
 ### M9 · Релиз
 
-- [ ] Пресеты экспорта Windows и Linux
-- [ ] Release-workflow: тег `v*` собирает архивы в GitHub Releases
-- [ ] Иконка, метаданные, скриншоты, README для игроков
-- [ ] Страница на itch.io
-- [ ] Прогон на чистой машине
+Решения — [ADR-0013](adr/0013-release-and-versioning.md).
+
+- [ ] `export_presets.cfg`: Windows и Linux, ресурсы внутри исполняемого файла,
+      без `tests/`, `tools/` и `addons/`
+- [ ] `icon.ico` рисуется генератором из той же геометрии, что и `icon.svg`
+- [ ] `tools/version.py`: версия правится одной командой и проставляется
+      и в `project.godot`, и в пресеты; тег сверяется с ней
+- [ ] Версия видна не только в гите: строка в логе при запуске и угол главного меню
+- [ ] `release.yml`: тег `v*` → сверка версии → сборка на ubuntu и windows →
+      архивы в GitHub Releases, заметки из `CHANGELOG.md`
+- [ ] `tools/smoke.py`: собранный билд запускается headless, печатает маркер
+      и не пишет ни одного `SCRIPT ERROR`
+- [ ] `CHANGELOG.md` по Keep a Changelog
+- [ ] Тесты: версия semver и совпадает с пресетами, оба пресета на месте,
+      в экспорт не утекают `tests/` и `tools/`
+- [ ] Прогон Windows-архива на чистой машине
 
 **DoD:** скачанный из Releases архив запускается и играется.
+
+Страницы на itch.io и в Steam в вехе нет — сначала архив, который скачивается
+и запускается ([ADR-0013](adr/0013-release-and-versioning.md), пункт 1).
 
 ### M10 · Онлайн-лидерборд (опционально)
 
@@ -368,6 +382,6 @@ python tools/capture.py M1
 |---|---|---|---|
 | 1 | Визуальный ориентир | M6, M7 | ✅ HD пиксель-арт, [ADR-0002](adr/0002-visual-target.md) |
 | 2 | Кто и чем делает арт | M7 | ✅ Гибрид: актёры из Blender, окружение генератором на Python, [ADR-0011](adr/0011-asset-pipeline.md), [ADR-0012](adr/0012-sound-and-interface.md) |
-| 3 | Целевая площадка: itch.io, Steam или только сборки в Releases | M9 | Открыт |
+| 3 | Целевая площадка: itch.io, Steam или только сборки в Releases | M9 | ✅ Снят: только GitHub Releases, [ADR-0013](adr/0013-release-and-versioning.md), пункт 1 |
 | 4 | Сверка механики с оригиналом через MAME | M2–M5 | Частично: лифты и эскалаторы сверены в [ADR-0004](adr/0004-elevator-mechanics.md), двери и документы — в [ADR-0005](adr/0005-doors-and-documents.md), бой — в [ADR-0006](adr/0006-combat-and-enemies.md); несверенное перечислено там же |
 | 5 | Согласованность кадров анимации при генерации | M7 | ✅ Снят: кадры рендерятся из одной модели в Blender, [ADR-0011](adr/0011-asset-pipeline.md), пункт 1 |
