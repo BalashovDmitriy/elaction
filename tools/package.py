@@ -36,8 +36,16 @@ EXTRAS: dict[str, str] = {
 EXECUTABLE_MODE: int = 0o755
 
 
+# Папка внутри архива. Без неё `unzip` в Linux рассыпал бы файлы по текущему
+# каталогу, а называть её как сам архив нельзя: проводник Windows на «Извлечь
+# всё» и так заводит папку по имени архива, и путь выходил бы с удвоением —
+# elaction-v0.9.0-windows\elaction-v0.9.0-windows\elaction.exe. Версия и
+# платформа остаются в имени архива, внутри — просто игра.
+INNER_DIR: str = "elaction"
+
+
 def archive_name(preset: Preset) -> str:
-    """`elaction-v0.9.0-windows`."""
+    """Имя файла архива: `elaction-v0.9.0-windows`."""
     return f"elaction-v{project_version()}-{preset.alias}"
 
 
@@ -72,9 +80,9 @@ def package(preset: Preset) -> int:
     target.unlink(missing_ok=True)
 
     with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as archive:
-        add(archive, preset.path, f"{name}/{preset.path.name}", executable=True)
+        add(archive, preset.path, f"{INNER_DIR}/{preset.path.name}", executable=True)
         for source, inside in EXTRAS.items():
-            add(archive, PROJECT_ROOT / source, f"{name}/{inside}")
+            add(archive, PROJECT_ROOT / source, f"{INNER_DIR}/{inside}")
 
     size_mb = target.stat().st_size / (1024 * 1024)
     print(f"Архив: {target} ({size_mb:.1f} МБ)")
