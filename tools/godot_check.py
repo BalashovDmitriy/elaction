@@ -42,6 +42,26 @@ def find_errors(output: str) -> list[str]:
     ]
 
 
+def import_resources(godot: str) -> tuple[int, str]:
+    """Импортирует ресурсы. На чистом чекауте — в два прохода.
+
+    `project.godot` грузит `res://assets/i18n/*.translation` на старте движка,
+    а делает эти файлы тот же самый импорт — из `assets/i18n/ui.csv`. Файлы
+    генерируемые и в `.gitignore` (так предписывает стандартный Godot.gitignore),
+    поэтому на свежем клоне первый проход всегда ругается на их отсутствие,
+    хотя к концу прохода они уже лежат на месте.
+
+    Настоящая поломка ресурса никуда не девается и на втором проходе, так что
+    повтор ничего не прячет: судим по нему.
+    """
+    code, output = run(godot, ["--headless", "--import"])
+    if not find_errors(output):
+        return code, output
+
+    print("  ..   первый импорт с ошибками — повторяю на готовых ресурсах")
+    return run(godot, ["--headless", "--import"])
+
+
 def gd_scripts() -> list[Path]:
     scripts: list[Path] = []
     for directory in SCRIPT_DIRS:
@@ -71,7 +91,7 @@ def main(argv: list[str]) -> int:
     print(f"Godot: {godot}")
     ok = True
 
-    code, output = run(godot, ["--headless", "--import"])
+    code, output = import_resources(godot)
     ok &= report("импорт ресурсов (--import)", code, output)
 
     if "--no-scripts" not in argv:
