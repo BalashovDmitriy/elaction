@@ -54,11 +54,14 @@ func test_every_pose_of_the_agent_is_reachable() -> void:
 				for falling: bool in [false, true]:
 					for shooting: bool in [false, true]:
 						for phase: int in ActorPose.WALK_FRAMES:
-							var pose := ActorPose.of_agent(
-								dead, walking, crushed, falling, shooting, float(phase)
-							)
-							if not shown.has(pose):
-								shown.append(pose)
+							# Стойки перебираются наравне с остальным: с M11 агент
+							# уклоняется, и у колена с положением лёжа свои позы.
+							for stance: EnemyBrain.Stance in _stances():
+								var pose := ActorPose.of_agent(
+									dead, walking, crushed, falling, shooting, float(phase), stance
+								)
+								if not shown.has(pose):
+									shown.append(pose)
 
 	for pose: String in SpriteTextures.AGENT_POSES:
 		assert_true(shown.has(pose), "поза %s кому-то нужна" % pose)
@@ -108,3 +111,9 @@ func test_a_broken_phase_does_not_break_the_frame() -> void:
 	# Фаза приходит из накопителя времени, и отрицательной ей быть незачем —
 	# но кадр всё равно обязан остаться кадром, а не «walk_-1».
 	assert_eq(ActorPose.walk_frame(-1.0), "walk_0")
+
+
+## Все стойки агента. Перечислены руками: enum в GDScript не перебирается
+## значениями, а список из трёх строк честнее, чем обход Stance.keys().
+func _stances() -> Array[EnemyBrain.Stance]:
+	return [EnemyBrain.Stance.STAND, EnemyBrain.Stance.KNEEL, EnemyBrain.Stance.PRONE]
