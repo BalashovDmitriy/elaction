@@ -86,6 +86,14 @@ const AGENT_RESPAWN_DELAY: float = 3.0
 ## дверь отдаёт его за кромкой, и в кадр он уже входит своим ходом.
 const AGENT_SPAWN_MARGIN: int = 1
 
+## Ближе этого дверь агента не выпускает, px.
+##
+## Иначе агент появляется прямо на Otto: двери стоят на местах этажа, и стоящий
+## у двери получал выходящего в упор — на четыре пикселя, — а с такого
+## расстояния не помогают ни уклонение, ни выстрел первым. Дверь просто ждёт,
+## пока игрок отойдёт.
+const AGENT_SAFE_RELEASE: float = 96.0
+
 ## На сколько дальше того же запаса агент живёт, прежде чем его уберут.
 ##
 ## Больше запаса на выпуск нарочно: совпади они, агент у самой кромки то
@@ -548,8 +556,19 @@ func _tend_agents(span: Vector2i, delta: float) -> void:
 		# вчетверо более редких агентов, чем игрок.
 		post.agent = null
 		post.wait = maxf(post.wait - delta, 0.0)
-		if post.wait <= 0.0 and _within(span, post.floor_index, AGENT_SPAWN_MARGIN):
-			post.agent = _release_agent(post)
+		if post.wait > 0.0 or not _within(span, post.floor_index, AGENT_SPAWN_MARGIN):
+			continue
+		if _too_close_to_otto(post):
+			continue
+		post.agent = _release_agent(post)
+
+
+## Стоит ли Otto вплотную к двери. Считается по горизонтали: дверь и Otto на
+## разных этажах друг другу не мешают, а этаж двери уже проверен полосой.
+func _too_close_to_otto(post: AgentPost) -> bool:
+	if post.floor_index != rules.floor_index_near(otto.global_position.y):
+		return false
+	return absf(post.door.mat_position().x - otto.global_position.x) < AGENT_SAFE_RELEASE
 
 
 ## Попадает ли уровень в полосу [param span], растянутую на [param margin] этажей.

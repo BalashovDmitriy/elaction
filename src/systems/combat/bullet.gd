@@ -37,6 +37,10 @@ const FLASH_COLOR := Color(1.0, 0.86, 0.55)
 const FLASH_ENERGY: float = 2.4
 const FLASH_RANGE: float = 64.0
 
+## Группа пуль: по ней агент находит то, от чего уклоняется. Перебирать детей
+## уровня ему нельзя — их под три сотни, а пуль на экране от силы четыре.
+const GROUP := &"bullets"
+
 @export var speed: float = 220.0
 
 ## Дальше этого пуля гаснет сама, даже не встретив преграды.
@@ -52,6 +56,7 @@ var _spent: bool = false
 
 
 func _ready() -> void:
+	add_to_group(GROUP)
 	body_entered.connect(_on_body_entered)
 	# Пуля летит всегда вправо-влево, и текстура у неё одна: направление
 	# показывает сам полёт, а не картинка.

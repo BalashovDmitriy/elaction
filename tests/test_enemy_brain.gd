@@ -43,11 +43,33 @@ func test_agent_turns_towards_the_target() -> void:
 	assert_eq(brain.facing, -1.0)
 
 
+## Замах: первый выстрел по появившейся цели уходит не в тот же кадр.
+##
+## Без него у игрока не было хода вовсе — особенно в кабине лифта, где присед
+## выключен и уклоняться нечем (ADR-0016, пункт 1).
+func test_agent_takes_aim_before_the_first_shot() -> void:
+	var brain := _brain()
+	_run(brain, 0.4, FAR_ABOVE)
+	assert_eq(brain.update(STEP, IN_FRONT, true), EnemyBrain.State.SHOOT, "цель на линии")
+	assert_false(brain.fired(), "но выстрела в тот же кадр нет")
+
+
 func test_agent_shoots_along_the_line() -> void:
 	var brain := _brain()
 	_run(brain, 0.4, FAR_ABOVE)
-	assert_eq(brain.update(STEP, IN_FRONT, true), EnemyBrain.State.SHOOT)
-	assert_true(brain.fired())
+
+	# Ждём выстрела кадр за кадром, а не выдержкой: [method EnemyBrain.fired]
+	# говорит только про последний кадр, и пройти мимо него выдержкой легко.
+	var fired := false
+	var frames := 0
+	while not fired and frames < 120:
+		brain.update(STEP, IN_FRONT, true)
+		fired = brain.fired()
+		frames += 1
+
+	assert_true(fired, "агент выстрелил, отцелившись")
+	assert_eq(brain.state, EnemyBrain.State.SHOOT)
+	assert_gt(float(frames) * STEP, brain.aim_time, "и не раньше замаха")
 
 
 func test_agent_holds_fire_between_shots() -> void:
@@ -82,3 +104,79 @@ func test_dead_agent_stays_dead() -> void:
 	brain.kill()
 	assert_eq(brain.update(STEP, IN_FRONT, true), EnemyBrain.State.DEAD)
 	assert_false(brain.fired())
+
+
+## Уклонение: от высокой пули агент уходит на колено, от низкой ложится.
+## Считается ростом стойки против высоты пули, поэтому проверяется без сцены.
+func test_agent_kneels_under_a_high_bullet() -> void:
+	var brain := _brain()
+	brain.can_kneel = true
+	var high := brain.kneel_height + 4.0
+	assert_eq(brain.stance_against(high), EnemyBrain.Stance.KNEEL)
+
+
+func test_agent_goes_prone_under_a_bullet_a_knee_cannot_clear() -> void:
+	var brain := _brain()
+	brain.can_kneel = true
+	brain.can_go_prone = true
+	var low := brain.prone_height + 2.0
+	assert_lt(low, brain.kneel_height, "колено такую пулю не пропускает")
+	assert_eq(brain.stance_against(low), EnemyBrain.Stance.PRONE)
+
+
+## Самая высокая из годных, а не самая низкая: лёжа агент неподвижен, и ложиться
+## он должен только тогда, когда колено уже не спасает.
+func test_agent_prefers_the_knee_while_it_still_helps() -> void:
+	var brain := _brain()
+	brain.can_kneel = true
+	brain.can_go_prone = true
+	assert_eq(brain.stance_against(brain.kneel_height + 4.0), EnemyBrain.Stance.KNEEL)
+
+
+func test_agent_stands_when_nothing_flies() -> void:
+	var brain := _brain()
+	brain.can_kneel = true
+	brain.can_go_prone = true
+	assert_eq(brain.stance_against(-1.0), EnemyBrain.Stance.STAND)
+	assert_true(brain.is_standing())
+
+
+## Пуля ниже всех стоек: уклоняться нечем, и притворяться, что получилось,
+## нельзя — иначе агент считался бы неуязвимым, стоя во весь рост.
+func test_agent_stands_when_no_stance_clears_the_bullet() -> void:
+	var brain := _brain()
+	brain.can_kneel = true
+	brain.can_go_prone = true
+	assert_eq(brain.stance_against(1.0), EnemyBrain.Stance.STAND)
+
+
+## В первых зданиях агенты только стоят: уклонение включается злостью.
+func test_an_agent_that_may_not_kneel_stays_standing() -> void:
+	var brain := _brain()
+	assert_false(brain.can_kneel)
+	assert_eq(brain.stance_against(brain.kneel_height + 4.0), EnemyBrain.Stance.STAND)
+
+
+## Рост идёт за стойкой: по нему уровень подгоняет форму коллизии, и разъехаться
+## им нельзя — иначе лежачий агент ловил бы пули стоячим телом.
+func test_height_follows_the_stance() -> void:
+	var brain := _brain()
+	brain.can_kneel = true
+	brain.can_go_prone = true
+
+	brain.stance = EnemyBrain.Stance.STAND
+	assert_eq(brain.height(), brain.stand_height)
+	brain.stance = EnemyBrain.Stance.KNEEL
+	assert_eq(brain.height(), brain.kneel_height)
+	brain.stance = EnemyBrain.Stance.PRONE
+	assert_eq(brain.height(), brain.prone_height)
+	assert_false(brain.is_standing(), "лёжа агент не ходит")
+
+
+## Мёртвый не уклоняется: труп лежит как упал.
+func test_the_dead_do_not_dodge() -> void:
+	var brain := _brain()
+	brain.can_kneel = true
+	brain.stance = EnemyBrain.Stance.KNEEL
+	brain.kill()
+	assert_eq(brain.stance, EnemyBrain.Stance.STAND)

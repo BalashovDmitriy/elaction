@@ -45,13 +45,28 @@ static func of_otto(
 	return BY_STATE.get(state, "idle")
 
 
-## Поза агента. Он не приседает, не прыгает и не бьёт ногой — этого не умеет
-## [EnemyBrain], и кадры на несуществующие состояния были бы мусором.
+## Поза агента. Он не прыгает и не бьёт ногой — этого не умеет [EnemyBrain], и
+## кадры на несуществующие состояния были бы мусором. А уклоняться он умеет
+## с M11, и у колена с положением лёжа свои позы (ADR-0016, пункт 3).
+##
+## Стойка важнее выстрела: выстрел держится 0.18 с, а стойка — пока в агента
+## летит пуля, и подменять её позой выстрела значило бы показывать стоящего
+## там, где на самом деле лежит. Сам выстрел видно по вспышке пули.
 static func of_agent(
-	dead: bool, walking: bool, crushed: bool, falling_over: bool, shooting: bool, walk_phase: float
+	dead: bool,
+	walking: bool,
+	crushed: bool,
+	falling_over: bool,
+	shooting: bool,
+	walk_phase: float,
+	stance: EnemyBrain.Stance = EnemyBrain.Stance.STAND
 ) -> String:
 	if dead:
 		return _death(crushed, falling_over)
+	if stance == EnemyBrain.Stance.KNEEL:
+		return "crouch"
+	if stance == EnemyBrain.Stance.PRONE:
+		return "prone"
 	if shooting:
 		return "shoot"
 	return walk_frame(walk_phase) if walking else "idle"

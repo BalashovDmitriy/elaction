@@ -58,11 +58,16 @@ const OTTO_POSES: PackedStringArray = [
 ]
 ## Машина у выхода: одна поза, но ассет тот же по устройству (ADR-0011, п. 14).
 const CAR_POSES: PackedStringArray = ["parked"]
+## Агенту достались «crouch» и «prone»: с M11 он уклоняется от пуль — уходит
+## на колено от высокой и ложится от низкой (ADR-0016, пункт 2). «Crouch» —
+## та же поза, что у Otto, и рисуется тем же кодом; «prone» своя.
 const AGENT_POSES: PackedStringArray = [
 	"idle",
 	"walk_0",
 	"walk_1",
 	"walk_2",
+	"crouch",
+	"prone",
 	"shoot",
 	"dead_0",
 	"dead_1",

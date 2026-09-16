@@ -38,9 +38,29 @@ const SHOOT_POSE_TIME: float = 0.25
 @export var fire_range: float = 200.0
 @export var fire_cooldown: float = 1.1
 
+## Сколько агент целится, прежде чем выстрелить в появившуюся цель, с.
+@export var aim_time: float = 0.35
+
 ## Дальность стрельбы на погашенном этаже: в темноте агент замечает Otto только
 ## вблизи. Это не слепота, а меньше огня — ADR-0007, пункт 4.
 @export var dark_fire_range: float = 60.0
+
+## С какой злости агент начинает уходить на колено и ложиться.
+##
+## В первых зданиях он только стоит: уклонение — это третья ось сложности
+## оригинала, и включаться она должна не сразу (ADR-0016, пункт 2).
+@export var kneels_from_menace: float = 1.4
+@export var goes_prone_from_menace: float = 1.8
+
+## Рост в каждой стойке, px. Стоячий равен форме коллизии из сцены; остальные
+## ниже, и пуля выше их проходит мимо.
+@export var kneel_height: float = 17.0
+@export var prone_height: float = 8.0
+
+## Насколько далеко агент замечает летящую в него пулю, px. Дальше он её
+## игнорирует: уклоняться за секунду до попадания незачем, а стоять
+## пригнувшимся весь бой — значит не дойти до Otto никогда.
+@export var dodge_sight: float = 120.0
 
 var _brain := EnemyBrain.new()
 var _target: Otto = null
@@ -57,11 +77,18 @@ var _menace: float = 1.0
 
 @onready var _body: Sprite2D = $Body
 @onready var _floor_probe: RayCast2D = $FloorProbe
+@onready var _shape: CollisionShape2D = $Shape
 
 
 func _ready() -> void:
 	_brain.emerge_time = emerge_time
 	_brain.same_line = same_line
+	_brain.aim_time = aim_time
+	# Стоячий рост берётся у самой формы, а не записывается вторым числом:
+	# разъехавшись, они дали бы агента, который уклоняется не своим телом.
+	_brain.stand_height = (_shape.shape as RectangleShape2D).size.y
+	_brain.kneel_height = kneel_height
+	_brain.prone_height = prone_height
 	_refresh_brain()
 
 
@@ -77,11 +104,14 @@ func _physics_process(delta: float) -> void:
 
 	var alive_target := _target != null and not _target.is_dead()
 	var to_target := _target.global_position - global_position if alive_target else Vector2.ZERO
-	var state := _brain.update(delta, to_target, alive_target)
+	var state := _brain.update(delta, to_target, alive_target, _incoming_height())
+	_fit_shape()
 	if _brain.fired():
 		_fire()
 
-	var walking := state == EnemyBrain.State.WALK
+	# Приседая и лёжа агент не ходит: уклонение — это замереть, а не идти
+	# дальше пригнувшись.
+	var walking := state == EnemyBrain.State.WALK and _brain.is_standing()
 	if walking and is_on_floor() and not _floor_ahead():
 		# Дальше пола нет: агент остаётся на своём этаже (ADR-0006, пункт 6).
 		walking = false
@@ -138,6 +168,50 @@ func is_dead() -> bool:
 	return _brain.is_dead()
 
 
+## Высота ближайшей летящей в агента пули над его ногами, px, или -1, если
+## лететь нечему.
+##
+## Ищется по группе пуль, а не по детям уровня: детей под три сотни, а пуль на
+## экране от силы четыре. Своими пулями агент не интересуется — уклоняться от
+## них ему незачем, и маска у них та же на всех агентов.
+func _incoming_height() -> float:
+	var best := -1.0
+	var nearest := dodge_sight
+	for node in get_tree().get_nodes_in_group(Bullet.GROUP):
+		var bullet := node as Bullet
+		if bullet == null or bullet.collision_mask != Bullet.FROM_OTTO:
+			continue
+		var to_bullet := bullet.global_position - global_position
+		# Летит ли она в нас: направление пули должно смотреть в нашу сторону.
+		if not is_equal_approx(signf(to_bullet.x), -bullet.direction):
+			continue
+		var reach := absf(to_bullet.x)
+		if reach > nearest:
+			continue
+		nearest = reach
+		# Ноги агента — ноль, вверх положительно: у пули y отрицательный.
+		best = -to_bullet.y
+	return best
+
+
+## Подгоняет форму коллизии под стойку.
+##
+## Низ формы остаётся на полу, поэтому меняется и размер, и смещение: у
+## [CollisionShape2D] начало в середине, и одна лишь смена размера утопила бы
+## присевшего агента в перекрытие.
+func _fit_shape() -> void:
+	var box := _shape.shape as RectangleShape2D
+	var height := _brain.height()
+	if is_equal_approx(box.size.y, height):
+		return
+	# Форма приходит из сцены общей на всех агентов: правя её на месте, мы
+	# пригибали бы разом всех, кто её делит.
+	var own := box.duplicate() as RectangleShape2D
+	own.size = Vector2(box.size.x, height)
+	_shape.shape = own
+	_shape.position.y = -height * 0.5
+
+
 ## Есть ли пол там, куда агент собирается шагнуть.
 ##
 ## Без этой проверки он уходил бы с собственного этажа в проём шахты или
@@ -155,9 +229,22 @@ func _floor_ahead() -> bool:
 ## [method _ready], [method set_in_the_dark] и [method set_menace] ничего не решал —
 ## иначе настроенный до [method Node.add_child] агент прозревал бы обратно.
 func _refresh_brain() -> void:
-	var base := dark_fire_range if _in_the_dark else fire_range
-	_brain.fire_range = base * _menace
+	# Дальность не растёт со злостью: в оригинале сложность добавляют
+	# скорострельность, скорость пули и уклонение, а дальности среди них нет
+	# (ADR-0016, пункт 1). Пока она росла, к поздним зданиям агент простреливал
+	# этаж насквозь, и подойти к нему было нечем.
+	_brain.fire_range = dark_fire_range if _in_the_dark else fire_range
 	_brain.fire_cooldown = fire_cooldown / _menace
+	# Уклоняться агент учится не сразу: это третья ось сложности оригинала,
+	# и в первых зданиях его берут стоящим.
+	_brain.can_kneel = _menace >= kneels_from_menace
+	_brain.can_go_prone = _menace >= goes_prone_from_menace
+
+
+## Скорость пули этого агента: растёт со злостью, как в оригинале. Отбирает
+## время на реакцию, но не саму возможность подойти.
+func _bullet_speed() -> float:
+	return bullet_speed * _menace
 
 
 func _apply_gravity(delta: float) -> void:
@@ -181,7 +268,13 @@ func _update_look(delta: float) -> void:
 
 func _pose() -> String:
 	return ActorPose.of_agent(
-		_brain.is_dead(), _walking, _crushed, _falling_over > 0.0, _shooting > 0.0, _walk_phase
+		_brain.is_dead(),
+		_walking,
+		_crushed,
+		_falling_over > 0.0,
+		_shooting > 0.0,
+		_walk_phase,
+		_brain.stance
 	)
 
 
@@ -197,7 +290,7 @@ func _fire() -> void:
 	Sounds.play(Sounds.SHOT)
 	var bullet := BULLET_SCENE.instantiate() as Bullet
 	bullet.direction = _brain.facing
-	bullet.speed = bullet_speed
+	bullet.speed = _bullet_speed()
 	bullet.collision_mask = Bullet.FROM_ENEMY
 	bullet.hit_target.connect(_on_bullet_hit)
 	get_parent().add_child(bullet)
