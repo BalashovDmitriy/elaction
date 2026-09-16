@@ -35,7 +35,7 @@ func test_route_reaches_every_floor() -> void:
 	var floors_seen: Dictionary = {}
 	for node: String in seen:
 		floors_seen[node.split(":")[0]] = true
-	assert_eq(floors_seen.size(), rules.floors, "до каждого этажа можно добраться")
+	assert_eq(floors_seen.size(), rules.floors + 1, "до каждого уровня можно добраться")
 
 
 ## Если убрать эскалаторы, полосы шахт перестают соединяться — тест проверяет,

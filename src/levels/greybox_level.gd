@@ -80,6 +80,18 @@ const ALARM_CAR_DELAY: float = 0.6
 ## Сколько дверь ждёт, прежде чем выпустить следующего агента, с.
 const AGENT_RESPAWN_DELAY: float = 3.0
 
+## На сколько этажей дальше видимой полосы дверь ещё выпускает агентов.
+##
+## Запас нужен, чтобы агент не появлялся на глазах у игрока в середине кадра:
+## дверь отдаёт его за кромкой, и в кадр он уже входит своим ходом.
+const AGENT_SPAWN_MARGIN: int = 1
+
+## На сколько дальше того же запаса агент живёт, прежде чем его уберут.
+##
+## Больше запаса на выпуск нарочно: совпади они, агент у самой кромки то
+## появлялся бы, то исчезал на дрожании камеры.
+const AGENT_KEEP_MARGIN: int = 3
+
 ## Сколько Otto лежит, прежде чем вернуться в игру, с.
 const OTTO_RESPAWN_DELAY: float = 1.2
 
@@ -99,12 +111,15 @@ var _doors: Array[Door] = []
 var _agent_doors: Array[Door] = []
 var _cars: Array[ElevatorCar] = []
 var _lighting := FloorLighting.new()
-## Заливка по этажу. Гаснет, когда на этаже падает лампа.
-var _floor_lights: Array[AreaLight] = []
+## Заливка по уровню: ключ — номер уровня, крыша включая. Гаснет, когда на
+## этаже падает лампа. Словарь, а не список: уровни считаются от −1.
+var _floor_lights: Dictionary = {}
 ## Столбы света в шахтах, по одному на шахту, в порядке раскладки.
 var _shaft_lights: Array[AreaLight] = []
 ## Какие этажи горели в прошлом кадре: пересчитывать их каждый кадр незачем.
-var _lit_span := Vector2i(-1, -1)
+## Пустой полосой служит (0, -1): у неё конец раньше начала, а (-1, -1) теперь
+## означает «горит крыша» — это настоящий уровень, и совпадение молчало бы.
+var _lit_span := Vector2i(0, -1)
 ## Дальний план: город за окнами. Двигается медленнее камеры.
 var _city: Node2D = null
 ## Задние стены этажей. Их под три сотни, и держать их прямо в уровне значит
@@ -113,6 +128,12 @@ var _back_walls: Node2D = null
 ## Лампы здания: их свет тоже гасится за пределами кадра. Упавшие лампы
 ## убирают себя сами, поэтому перед обращением проверяется живость.
 var _lamps: Array[Lamp] = []
+## Кто стоит за каждой агентской дверью: дверь -> живой агент или null.
+## Двери здания не выпускают всех разом — только те, чей этаж рядом с игроком
+## (ADR-0014, пункт 4). Пустое значение значит «дверь свободна».
+var _behind_door: Dictionary = {}
+## Когда двери снова можно выпускать агента: дверь -> время по [method Time.get_ticks_msec].
+var _door_ready_at: Dictionary = {}
 ## Здание сдано. Событие однократное: по нему main собирает следующее здание.
 var _cleared: bool = false
 ## Машина у выхода и её отъезд: пока она едет, здание ещё не сдано.
@@ -142,16 +163,21 @@ func _ready() -> void:
 	_spawn_exit()
 	_light_building()
 
-	# Otto начинает с крыши, как в оригинале, и там, где нет проёмов.
-	otto.global_position = Vector2(_plan.safe_x(rules, 0), rules.floor_surface(0))
+	# Otto начинает с крыши, как в оригинале, и там, где нет проёмов. Крыша —
+	# свой уровень над зданием, а не нулевой этаж: ADR-0014, пункт 1.
+	var roof := BuildingRules.ROOF
+	otto.global_position = Vector2(_plan.safe_x(rules, roof), rules.floor_surface(roof))
 	otto.died.connect(_on_otto_died)
 	GameState.instance().alarm_raised.connect(_on_alarm_raised)
 	if GameState.instance().alarm.raised:
 		# Здание заведено уже при включённой сирене — редкость, но бывает.
 		_on_alarm_raised()
-	if spawn_agents:
-		for door in _agent_doors:
-			_release_agent(door)
+	# Агенты здесь не выпускаются: дверь отдаёт своего, когда её этаж подходит
+	# к игроку. Раньше здесь выходили все 55 разом, и двое из них стояли на
+	# крыше в зоне огня от точки старта — ADR-0014, пункт 4.
+	for door in _agent_doors:
+		_behind_door[door] = null
+		_door_ready_at[door] = 0
 	otto.apply_camera_bounds(Rect2(0.0, 0.0, rules.width, rules.total_height()))
 
 
@@ -166,12 +192,17 @@ func _process(delta: float) -> void:
 	_city.position = view.position * CITY_PARALLAX
 
 	var span := VisibleFloors.around(rules, view)
+	# Агенты пересчитываются каждый кадр, а не только на смене полосы: дверь ждёт
+	# своей паузы, и пропустив кадр смены, она не выпустила бы никого до следующей.
+	if spawn_agents:
+		_tend_agents(span)
+
 	if span == _lit_span:
 		return
 
 	_lit_span = span
-	for index: int in _floor_lights.size():
-		var light := _floor_lights[index]
+	for index: int in _floor_lights:
+		var light: AreaLight = _floor_lights[index]
 		# Погашенный этаж остаётся погашенным: в кадре он или нет, лампы на нём
 		# больше нет. Поэтому видимость решает не только отбор.
 		light.visible = VisibleFloors.covers(span, index) and not _lighting.is_dark(index)
@@ -220,28 +251,45 @@ func is_dark(floor_index: int) -> bool:
 ## Проёмы принимаются в любом порядке.
 ##
 ## Статический, чтобы проверяться тестами без сцены.
+## [param bounds] — левый и правый края уровня: здание расширяется книзу, и
+## перекрытие лежит не во всю ширину здания, а от стены до стены своего этажа.
 static func slab_segments(
-	surface: float, gaps: Array[Vector2], width: float, thickness: float
+	surface: float, gaps: Array[Vector2], bounds: Vector2, thickness: float
 ) -> Array[Rect2]:
 	var rects: Array[Rect2] = []
-	for span in BuildingPlan.spans_between(gaps, width):
+	for span in BuildingPlan.spans_between(gaps, bounds):
 		rects.append(Rect2(span.x, surface, span.y - span.x, thickness))
 	return rects
 
 
 func _build_geometry() -> void:
-	var height := rules.total_height()
+	# Тайлы берутся один раз на здание: плит и стен в нём под три сотни,
+	# а текстур две.
 	var side_tile := SpriteTextures.tile("wall_side")
-	_build_solid(Rect2(0.0, 0.0, WALL_WIDTH, height), side_tile)
-	_build_solid(Rect2(rules.width - WALL_WIDTH, 0.0, WALL_WIDTH, height), side_tile)
-
-	# Тайл берётся один раз на здание: плит в нём под три сотни, а текстура одна.
 	var slab_tile := SpriteTextures.tile("slab")
-	for index in rules.floors:
+
+	for index: int in rules.levels():
 		var surface := rules.floor_surface(index)
+		var bounds := rules.floor_span(index)
 		var gaps := _plan.gaps_on(rules, index)
-		for rect in slab_segments(surface, gaps, rules.width, rules.slab_height):
+		for rect in slab_segments(surface, gaps, bounds, rules.slab_height):
 			_build_solid(rect, slab_tile)
+		_build_side_walls(index, surface, bounds, side_tile)
+
+
+## Боковые стены уровня. Идут ступенями вслед за силуэтом, а не сплошными
+## столбцами во всю высоту: здание расширяется книзу (ADR-0014, пункт 3).
+##
+## У крыши стена доходит до верха мира: это парапет, и он же не даёт шагнуть
+## с крыши мимо здания. Прыжок берёт 80 px, и низкий бортик Otto перемахнул бы.
+func _build_side_walls(index: int, surface: float, bounds: Vector2, tile: CanvasTexture) -> void:
+	var top := rules.story_top(index)
+	var height := surface + rules.slab_height - top
+	if height <= 0.0:
+		return
+
+	_build_solid(Rect2(bounds.x, top, WALL_WIDTH, height), tile)
+	_build_solid(Rect2(bounds.y - WALL_WIDTH, top, WALL_WIDTH, height), tile)
 
 
 func _spawn_shafts() -> void:
@@ -430,7 +478,7 @@ func _on_lamp_fell(index: int) -> void:
 	if not _lighting.darken(index):
 		return
 	# Этаж падает до общего тона здания: света на нём больше нет.
-	if index < _floor_lights.size():
+	if _floor_lights.has(index):
 		_floor_lights[index].visible = false
 	for agent in _agents_on(index):
 		agent.set_in_the_dark(true)
@@ -454,8 +502,40 @@ func _agents_on(index: int) -> Array[Enemy]:
 	return found
 
 
-## Выпускает агента из двери.
-func _release_agent(door: Door) -> void:
+## Держит в здании ровно тех агентов, до которых игроку есть дело: выпускает
+## их у дверей рядом с кадром и убирает тех, кто остался далеко позади.
+##
+## Раньше все 55 выходили разом в [method _ready] и жили до конца здания. Это
+## и не давало играть — двое стояли на крыше в зоне огня от точки старта, — и
+## держало полсотни тел с физикой и ИИ на каждом кадре (ADR-0014, пункт 4).
+func _tend_agents(span: Vector2i) -> void:
+	var now := Time.get_ticks_msec()
+	for door: Door in _agent_doors:
+		var index := rules.floor_index_near(door.mat_position().y)
+		var agent: Enemy = _behind_door[door]
+		var alive := is_instance_valid(agent) and not agent.is_dead()
+
+		if alive:
+			if not _within(span, index, AGENT_KEEP_MARGIN):
+				agent.queue_free()
+				_behind_door[door] = null
+			continue
+
+		# Дверь, чей агент умер или уехал, ждёт свою паузу и только потом
+		# выпускает следующего.
+		_behind_door[door] = null
+		if _within(span, index, AGENT_SPAWN_MARGIN) and now >= int(_door_ready_at[door]):
+			_behind_door[door] = _release_agent(door)
+
+
+## Попадает ли уровень в полосу [param span], растянутую на [param margin] этажей.
+static func _within(span: Vector2i, index: int, margin: int) -> bool:
+	return index >= span.x - margin and index <= span.y + margin
+
+
+## Выпускает агента из двери и отдаёт его: дверь помнит своего, чтобы не
+## выпустить второго, пока первый жив.
+func _release_agent(door: Door) -> Enemy:
 	var mat := door.mat_position()
 	var agent := ENEMY_SCENE.instantiate() as Enemy
 	add_child(agent)
@@ -464,6 +544,7 @@ func _release_agent(door: Door) -> void:
 	agent.set_in_the_dark(_lighting.is_dark(rules.floor_index_near(mat.y)))
 	agent.set_menace(_menace())
 	agent.died.connect(_on_agent_died.bind(door))
+	return agent
 
 
 ## Насколько злее агенты этого здания прямо сейчас: к росту от здания к зданию
@@ -486,10 +567,11 @@ func _on_alarm_raised() -> void:
 
 
 func _on_agent_died(_agent: Enemy, door: Door) -> void:
-	# process_always = false: на паузе здание замирает целиком, и смена агента
-	# не должна приходить, пока игра стоит.
-	var timer := get_tree().create_timer(AGENT_RESPAWN_DELAY / _menace(), false)
-	timer.timeout.connect(_release_agent.bind(door))
+	# Смена не по таймеру, а по отметке времени: выпуском теперь заведует
+	# [method _tend_agents], и он же решает, подошёл ли этаж к игроку. Таймер
+	# выпустил бы агента у двери на другом конце здания, до которой нет дела.
+	var wait := AGENT_RESPAWN_DELAY / _menace()
+	_door_ready_at[door] = Time.get_ticks_msec() + int(wait * 1000.0)
 
 
 func _on_otto_died() -> void:
@@ -501,10 +583,36 @@ func _on_otto_died() -> void:
 	timer.timeout.connect(_respawn_otto)
 
 
+## Возвращает Otto в игру на том же этаже, но подальше от тех, кто его там убил.
+##
+## Место выбирается по живым агентам, а не по порядку мест: агент, убивший Otto,
+## никуда не делся, и возвращение на то же место — это смерть в петле. На пустом
+## этаже выбор вырождается в первое свободное место, как было раньше.
 func _respawn_otto() -> void:
 	var index := rules.floor_index_near(otto.global_position.y)
-	otto.global_position = Vector2(_plan.safe_x(rules, index), rules.floor_surface(index))
+	var surface := rules.floor_surface(index)
+	otto.global_position = Vector2(_safest_x(index), surface)
 	otto.revive()
+
+
+func _safest_x(index: int) -> float:
+	var spots := _plan.safe_spots(rules, index)
+	if spots.is_empty():
+		return _plan.safe_x(rules, index)
+
+	var agents := _agents_on(index)
+	var best := spots[0]
+	var best_gap := -1.0
+	for x: float in spots:
+		var gap := INF
+		for agent in agents:
+			if agent.is_dead():
+				continue
+			gap = minf(gap, absf(agent.global_position.x - x))
+		if gap > best_gap:
+			best_gap = gap
+			best = x
+	return best
 
 
 func _on_pit_entered(body: Node2D) -> void:
@@ -539,16 +647,18 @@ func _build_solid(rect: Rect2, tile: CanvasTexture) -> void:
 ## Окна этажа: равные проёмы в задней стене, через которые виден город.
 ##
 ## Статический, чтобы проверяться без сцены, — как и [method slab_segments].
-static func window_gaps(width: float, count: int, window_width: float) -> Array[Vector2]:
+## [param bounds] — внутренние края стены, между которыми раскладываются окна.
+static func window_gaps(bounds: Vector2, count: int, window_width: float) -> Array[Vector2]:
 	var gaps: Array[Vector2] = []
-	if count <= 0 or window_width <= 0.0:
+	var width := bounds.y - bounds.x
+	if count <= 0 or window_width <= 0.0 or width <= 0.0:
 		return gaps
 
 	var pitch := width / float(count)
 	for number: int in count:
 		# Окно стоит посередине своей доли стены: так они разнесены поровну
 		# и у стен здания остаётся полполосы, а не обрезанное окно.
-		var centre := pitch * (float(number) + 0.5)
+		var centre := bounds.x + pitch * (float(number) + 0.5)
 		var half := minf(window_width, pitch) * 0.5
 		gaps.append(Vector2(centre - half, centre + half))
 	return gaps
@@ -564,25 +674,30 @@ func _build_back_walls() -> void:
 	_back_walls.z_index = -8
 	add_child(_back_walls)
 
-	var gaps := window_gaps(rules.width, WINDOWS_PER_FLOOR, WINDOW_SIZE.x)
 	# Тайлы берутся один раз на здание: полос и рам под три сотни, а текстур две.
 	var wall_tile := SpriteTextures.tile("wall")
 	var frame_tile := SpriteTextures.tile("window_frame")
-	# С первого этажа, а не с нулевого: нулевой — крыша, комнаты за ней нет.
-	# [method BuildingRules.story_top] отдаёт для неё верх здания, и стена вышла бы
-	# полосой в небе над тем местом, где Otto начинает, с обрезанными окнами.
-	for index: int in range(1, rules.floors):
+	# Этажи, крыши среди них нет: она снаружи, комнаты за ней не бывает, и стена
+	# вышла бы полосой в небе над тем местом, где Otto начинает.
+	for index: int in rules.floors:
 		var top := rules.story_top(index)
 		var surface := rules.floor_surface(index)
 		if surface - top <= 0.0:
 			continue
 
+		# Окна режутся по ширине своего этажа: на узких этажах стена короче,
+		# и окна, разложенные по ширине здания, уехали бы за неё на улицу.
+		var bounds := rules.floor_span(index)
+		var inner := Vector2(bounds.x + WALL_WIDTH, bounds.y - WALL_WIDTH)
+		var gaps := window_gaps(inner, WINDOWS_PER_FLOOR, WINDOW_SIZE.x)
+
 		var window_top := minf(top + WINDOW_TOP, surface)
 		var window_bottom := minf(window_top + WINDOW_SIZE.y, surface)
-		_add_back_wall(Rect2(0.0, top, rules.width, window_top - top), wall_tile)
-		_add_back_wall(Rect2(0.0, window_bottom, rules.width, surface - window_bottom), wall_tile)
+		var width := inner.y - inner.x
+		_add_back_wall(Rect2(inner.x, top, width, window_top - top), wall_tile)
+		_add_back_wall(Rect2(inner.x, window_bottom, width, surface - window_bottom), wall_tile)
 
-		for span: Vector2 in BuildingPlan.spans_between(gaps, rules.width):
+		for span: Vector2 in BuildingPlan.spans_between(gaps, inner):
 			var strip := Rect2(span.x, window_top, span.y - span.x, window_bottom - window_top)
 			_add_back_wall(strip, wall_tile)
 
@@ -676,24 +791,25 @@ func _light_building() -> void:
 	ambient.color = AMBIENT
 	add_child(ambient)
 
-	for index: int in rules.floors:
+	for index: int in rules.levels():
 		var light := AreaLight.covering(_story_area(index), FLOOR_LIGHT, FLOOR_ENERGY)
 		add_child(light)
-		_floor_lights.append(light)
+		_floor_lights[index] = light
 
 
-## Пролёт этажа: от потолка до низа настила, на котором стоят.
+## Пролёт уровня: от потолка до низа настила, на котором стоят.
 ##
 ## Настил включён нарочно: кончайся заливка ровно по полу, сам пол и ноги
 ## стоящего на нём остались бы неосвещёнными.
 ##
-## У крыши потолка нет, и лампы на ней тоже нет — вешать её там не на что.
-## Поэтому крыше полоса отмеряется вверх от настила: светит ей город, и
-## погасить этот свет нельзя.
+## У крыши потолка нет — над ней небо, и [method BuildingRules.story_top] отдаёт
+## верх мира. Ламп на крыше тоже нет, поэтому погасить её свет нечем: светит ей
+## город, и это единственный уровень, который не гаснет никогда.
 func _story_area(index: int) -> Rect2:
 	var surface := rules.floor_surface(index)
-	var top := surface - rules.floor_height if index <= 0 else rules.story_top(index)
-	return Rect2(0.0, top, rules.width, surface + rules.slab_height - top)
+	var top := rules.story_top(index)
+	var bounds := rules.floor_span(index)
+	return Rect2(bounds.x, top, bounds.y - bounds.x, surface + rules.slab_height - top)
 
 
 ## Перекрытия и стены не пропускают свет: иначе лампа светила бы сквозь пол

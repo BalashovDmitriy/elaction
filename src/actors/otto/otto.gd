@@ -17,6 +17,17 @@ const SHOOT_POSE_TIME: float = 0.18
 ## Сколько Otto падает, прежде чем лечь: смерть — две позы (ADR-0011, пункт 12).
 const FALLING_TIME: float = 0.3
 
+## Сколько Otto неуязвим, вернувшись в игру, с.
+##
+## Возвращается он на этаж, где погиб, а агент, который его убил, никуда не делся
+## и стоит в своей зоне огня — без передышки вторая смерть приходит через четверть
+## секунды после первой, и три жизни сгорают на одном месте (ADR-0014, пункт 6).
+const RESPAWN_GRACE: float = 1.5
+
+## Как часто мигает неуязвимый Otto, раз в секунду. Мигание — единственное, чем
+## передышка себя показывает: без него игрок не знает, что она вообще была.
+const GRACE_BLINKS: float = 8.0
+
 @export var walk_speed: float = 90.0
 ## Высота прыжка = jump_speed² / (2 · gravity). При 380 и 900 это ~80 px:
 ## хватает на площадки greybox-уровня (нижние в 70 px от пола, верхняя — с них).
@@ -55,6 +66,8 @@ var _stepped_on: int = -1
 var _gun := Gun.new()
 ## Верхняя точка текущего полёта: от неё считается глубина падения.
 var _apex_y: float = 0.0
+## Сколько ещё держится передышка после возвращения в игру, с.
+var _grace: float = 0.0
 
 @onready var _standing_shape: CollisionShape2D = $StandingShape
 @onready var _crouching_shape: CollisionShape2D = $CrouchingShape
@@ -71,6 +84,7 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_grace = maxf(_grace - delta, 0.0)
 	_snapshot.read_actions()
 	if _car != null:
 		# В кабине «вверх/вниз» ведут её, а присесть внутри нельзя.
@@ -120,7 +134,13 @@ func _physics_process(delta: float) -> void:
 ## Убивает Otto: пуля, падение на дно шахты, сдавливание кабиной.
 ## [param crushed] — придавило кабиной: у такой смерти своя поза, в оригинале
 ## раздавленный показан отдельной картинкой (ADR-0011, пункт 12).
+## Убивает Otto. Во время передышки после возвращения в игру не делает ничего:
+## неуязвимость общая на все причины, а не только на пули — воскреснуть под
+## кабиной так же обидно, как под выстрелом.
 func kill(crushed: bool = false) -> void:
+	if _grace > 0.0:
+		return
+
 	if _states.is_dead():
 		return
 	_crushed = crushed
@@ -150,6 +170,7 @@ func revive() -> void:
 	_states.reset()
 	velocity = Vector2.ZERO
 	_apex_y = global_position.y
+	_grace = RESPAWN_GRACE
 	_repose()
 
 
@@ -220,11 +241,6 @@ func is_riding() -> bool:
 	return _car != null
 
 
-## Текущее состояние. Нужно отладочному оверлею и будущим системам.
-func current_state() -> OttoStateMachine.State:
-	return _states.state
-
-
 ## Текущая скорость тела.
 ##
 ## Вместе с [method is_grounded] образует публичный интерфейс для наблюдателей
@@ -248,6 +264,11 @@ func is_grounded() -> bool:
 func camera_view() -> Rect2:
 	var size := get_viewport_rect().size / _camera.zoom
 	return Rect2(_camera.get_screen_center_position() - size * 0.5, size)
+
+
+## Куда Otto смотрит: -1 влево, +1 вправо. Туда же уйдёт его следующая пуля.
+func facing() -> float:
+	return _facing
 
 
 func apply_camera_bounds(bounds: Rect2) -> void:
@@ -368,6 +389,14 @@ func _apply_pose(state: OttoStateMachine.State) -> void:
 	_body.visible = not hidden
 
 
+## Прозрачность тела: неуязвимый Otto мигает, остальные кадры он сплошной.
+func _grace_alpha() -> float:
+	if _grace <= 0.0:
+		return 1.0
+	var phase := fmod(_grace * GRACE_BLINKS, 1.0)
+	return 1.0 if phase < 0.5 else 0.25
+
+
 ## Картинка на этот кадр: поза, сторона и ход ходьбы.
 ##
 ## Зовётся каждый кадр, а не на переходах, как [method _apply_pose]: ходьба
@@ -384,6 +413,7 @@ func _update_look(delta: float) -> void:
 
 	_body.texture = SpriteTextures.actor("otto", _pose())
 	_body.flip_h = _facing < 0.0
+	_body.modulate.a = _grace_alpha()
 
 
 ## Шаг звучит на крайних кадрах ходьбы — тех, где нога ставится. На каждом

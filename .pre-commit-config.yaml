@@ -7,6 +7,13 @@
 # Прогнать всё вручную:
 #   .venv/Scripts/pre-commit run --all-files
 
+# Часть хуков зовётся через `python -m <модуль>`, а не своим именем. Причина
+# внешняя: pre-commit кладёт в окружение сгенерированные .exe-обёртки, и
+# управление приложениями в Windows блокирует их как файлы без репутации —
+# `[WinError 4551] Политика управления приложениями заблокировала этот файл`.
+# Сам python.exe в тех же окружениях не блокируется, поэтому вызов модулем
+# проходит. Проверка от этого не меняется, а запись переносима: в CI на Linux
+# она работает ровно так же. Если упрётся ещё один хук — лечится тем же приёмом.
 default_install_hook_types: [pre-commit, pre-push]
 exclude: '^(\.godot/|addons/|build/|export/)'
 
@@ -20,6 +27,7 @@ repos:
       - id: trailing-whitespace
         exclude: '\.(tscn|tres|import|godot)$'
       - id: end-of-file-fixer
+        entry: python -m pre_commit_hooks.end_of_file_fixer
         exclude: '\.(tscn|tres|import|godot)$'
       - id: check-yaml
       - id: check-merge-conflict
@@ -33,6 +41,7 @@ repos:
     hooks:
       - id: gdformat
       - id: gdlint
+        entry: python -m gdtoolkit.linter
 
   - repo: local
     hooks:

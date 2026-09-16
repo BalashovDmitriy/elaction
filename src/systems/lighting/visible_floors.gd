@@ -23,7 +23,9 @@ const MARGIN: int = 1
 static func around(rules: BuildingRules, view: Rect2) -> Vector2i:
 	var first := rules.floor_index_near(view.position.y) - MARGIN
 	var last := rules.floor_index_near(view.end.y) + MARGIN
-	return Vector2i(maxi(first, 0), mini(last, rules.floors - 1))
+	# Снизу полоса упирается в крышу, а не в нулевой этаж: крыша — такой же
+	# уровень со своим светом, просто лежит выше здания (ADR-0014, пункт 1).
+	return Vector2i(maxi(first, BuildingRules.ROOF), mini(last, rules.floors - 1))
 
 
 ## Попадает ли этаж в кадр. Тот же счёт, что у [method around], только ответ

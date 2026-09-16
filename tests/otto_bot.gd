@@ -10,9 +10,22 @@ extends RefCounted
 ##
 ## Спуск жадный, потому что генератор это гарантирует: на каждом этаже есть шахта
 ## своей полосы, а на каждом стыке полос — эскалатор.
+##
+## Отстреливаться бот умеет, а уклоняться — нет. Этого хватает: проверяется, что
+## по зданию можно спуститься, пока агенты живы, а не что бой выигрывается красиво.
 
 ## Насколько близко к цели по горизонтали считается «дошёл», px.
 const REACHED: float = 6.0
+
+## С какого расстояния бот открывает огонь, px.
+##
+## Больше, чем [member EnemyBrain.fire_range] (200 px): кто выстрелил первым,
+## тот и жив. Стреляет бот, только если агент уже на его линии.
+const ENGAGE: float = 240.0
+
+## Насколько агент должен совпадать с Otto по высоте, чтобы считаться целью, px.
+## Пуля летит по горизонтали, и агент этажом ниже — не цель, а трата патрона.
+const SAME_LINE: float = 24.0
 
 ## Где встать рядом с шахтой, ожидая кабину, px от её оси. У самого края проёма:
 ## кабина стоит на этаже недолго, и от дальней точки бот не успевал войти.
@@ -43,7 +56,20 @@ func step() -> void:
 		return
 
 	var floor_index := _rules.floor_index_near(_otto.global_position.y)
+	_advance(floor_index)
 
+	# Огонь идёт вдогонку плану, а не вместо него. Бой, который останавливает
+	# спуск, останавливает его навсегда: двери подсылают следующего каждые три
+	# секунды, и бот, который сперва «зачищает этаж», не уходит с него никогда.
+	# Разворачиваться к цели он тоже не станет — разворот спорил бы с шагом,
+	# и бот топтался бы на месте между двумя нажатиями.
+	var threat := _threat()
+	if threat != null and is_equal_approx(_otto.facing(), _side_of(threat)):
+		_press(&"shoot")
+
+
+## Шаг спуска: куда бот идёт на этом этаже.
+func _advance(floor_index: int) -> void:
 	if _riding_further(floor_index):
 		_ride_down()
 		return
@@ -63,6 +89,30 @@ func step() -> void:
 ## Отпускает всё, что держал: без этого Otto продолжал бы идти после смены решения.
 func release() -> void:
 	_release_all()
+
+
+## Ближайший живой агент на линии огня или null.
+func _threat() -> Enemy:
+	var here := _otto.global_position
+	var closest: Enemy = null
+	var nearest := ENGAGE
+	for child in _level.get_children():
+		var agent := child as Enemy
+		if agent == null or agent.is_dead():
+			continue
+		var to_agent := agent.global_position - here
+		if absf(to_agent.y) > SAME_LINE:
+			continue
+		if absf(to_agent.x) > nearest:
+			continue
+		nearest = absf(to_agent.x)
+		closest = agent
+	return closest
+
+
+## С какой стороны от Otto стоит агент: -1 слева, +1 справа.
+func _side_of(agent: Enemy) -> float:
+	return signf(agent.global_position.x - _otto.global_position.x)
 
 
 ## Везёт ли кабина дальше, или пора выходить и идти своим ходом.

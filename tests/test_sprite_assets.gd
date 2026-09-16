@@ -170,9 +170,9 @@ func test_a_strip_thinner_than_its_tile_keeps_its_height() -> void:
 	# город в окне пропадал. Правило общее: место задаёт размер, а не картинка.
 	var level := await _building()
 	var found := false
+	# Ширина полосы — не ширина здания: этаж уже него, и стена идёт между
+	# его собственными стенами (ADR-0014, пункт 3).
 	for panel: TextureRect in _rects_of(level):
-		if not is_equal_approx(panel.size.x, level.rules.width):
-			continue
 		if is_equal_approx(panel.size.y, GreyboxLevel.WINDOW_TOP):
 			found = true
 

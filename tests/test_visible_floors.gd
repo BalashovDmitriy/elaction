@@ -32,7 +32,8 @@ func test_span_covers_the_floors_in_frame() -> void:
 func test_distant_floors_stay_dark() -> void:
 	var rules := _rules()
 	var span := VisibleFloors.around(rules, _view_at(rules, 10))
-	assert_false(VisibleFloors.covers(span, 0), "крыша далеко")
+	assert_false(VisibleFloors.covers(span, BuildingRules.ROOF), "крыша далеко")
+	assert_false(VisibleFloors.covers(span, 0), "верхний этаж тоже")
 	assert_false(VisibleFloors.covers(span, 20), "низ далеко")
 	assert_false(VisibleFloors.covers(span, rules.floors - 1))
 
@@ -47,8 +48,8 @@ func test_span_reaches_past_the_frame() -> void:
 
 func test_span_never_leaves_the_building() -> void:
 	var rules := _rules()
-	var roof := VisibleFloors.around(rules, _view_at(rules, 0))
-	assert_eq(roof.x, 0, "выше крыши этажей нет")
+	var roof := VisibleFloors.around(rules, _view_at(rules, BuildingRules.ROOF))
+	assert_eq(roof.x, BuildingRules.ROOF, "выше крыши уровней нет")
 
 	var bottom := VisibleFloors.around(rules, _view_at(rules, rules.floors - 1))
 	assert_eq(bottom.y, rules.floors - 1, "ниже первого этажа тоже")
