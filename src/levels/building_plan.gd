@@ -160,8 +160,13 @@ func safe_x(rules: BuildingRules, floor_index: int) -> float:
 ## Нужны тому, кто выбирает между ними: возвращение в игру идёт не на первое
 ## попавшееся, а на самое дальнее от живых агентов — иначе Otto воскресает под
 ## тем же стволом, который его убил, и три жизни сгорают на одном месте.
-func safe_spots(rules: BuildingRules, floor_index: int) -> PackedFloat32Array:
-	var spots := PackedFloat32Array()
+##
+## Массив двойной точности, а не одинарной: места сравниваются с координатами
+## раскладки через [method @GlobalScope.is_equal_approx], и округление до float32
+## развело бы [method safe_x] с [method BuildingRules.slot_x] на любых правилах,
+## где шаг между местами не целый.
+func safe_spots(rules: BuildingRules, floor_index: int) -> PackedFloat64Array:
+	var spots := PackedFloat64Array()
 	var span := rules.slot_range(floor_index)
 	for slot in range(span.x, span.y + 1):
 		var x := rules.slot_x(slot)

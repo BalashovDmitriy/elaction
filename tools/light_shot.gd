@@ -181,9 +181,12 @@ func _measure() -> void:
 	print("Бюджет кадра при 60 FPS — 16.6 мс.")
 
 
+## Этаж входит в имя наравне с сидом: иначе два прогона по разным этажам одного
+## здания пишут в одни и те же файлы, и от первого не остаётся ничего. На узком
+## верхе и широком низе кадры разные, и смотреть надо оба.
 func _shoot(label: String) -> void:
 	await RenderingServer.frame_post_draw
 	var image := get_viewport().get_texture().get_image()
-	var path := "%s/%s_seed%d.png" % [_folder_path(), label, _seed]
+	var path := "%s/%s_seed%d_floor%d.png" % [_folder_path(), label, _seed, _floor]
 	image.save_png(path)
 	print("  %s" % path)

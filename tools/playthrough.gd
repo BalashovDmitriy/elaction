@@ -63,7 +63,11 @@ func _play(building_seed: int, agents: bool, endless: bool) -> bool:
 	var cleared := [false]
 	level.building_cleared.connect(func() -> void: cleared[0] = true)
 	var over := [false]
-	game.game_over.connect(func() -> void: over[0] = true)
+	# [GameState] — синглтон и переживает здание, поэтому связь снимается в конце
+	# прогона: иначе на третьем сиде по «партия окончена» срабатывали бы три
+	# замыкания подряд, и каждое держало бы своё уже убранное здание.
+	var on_game_over := func() -> void: over[0] = true
+	game.game_over.connect(on_game_over)
 
 	var bot := OttoBot.new(level)
 	var rules := level.rules
@@ -141,6 +145,7 @@ func _play(building_seed: int, agents: bool, endless: bool) -> bool:
 	if not ok:
 		print("  застрял на этаже %d, стоя там %d кадров" % [last_floor, stuck])
 
+	game.game_over.disconnect(on_game_over)
 	root.remove_child(level)
 	level.free()
 	return ok
@@ -152,11 +157,7 @@ func _play(building_seed: int, agents: bool, endless: bool) -> bool:
 ## смерти вырастает на весь экран. Интересны только те, кто до Otto достаёт.
 func _around(level: GreyboxLevel) -> String:
 	var here := level.otto.global_position
-	var near: Array[Enemy] = []
-	for child in level.get_children():
-		var agent := child as Enemy
-		if agent != null:
-			near.append(agent)
+	var near := level.agents()
 	near.sort_custom(
 		func(a: Enemy, b: Enemy) -> bool:
 			return here.distance_to(a.global_position) < here.distance_to(b.global_position)

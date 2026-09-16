@@ -72,6 +72,46 @@ func test_slots_outside_the_silhouette_are_not_available() -> void:
 	assert_true(rules.slot_available(0, rules.floors - 1), "внизу то же место — этаж")
 
 
+## Перекрытие — и пол своего уровня, и потолок нижнего. На ступени силуэта
+## нижний этаж шире, и без этого над его наружной полосой было бы открытое небо,
+## а лампа на крайнем месте висела бы не на чем.
+func test_a_slab_covers_the_floor_below_it_whole() -> void:
+	var rules := _rules()
+	for index: int in rules.levels():
+		if index >= rules.floors - 1:
+			continue
+		var slab := rules.slab_span(index)
+		var below := rules.floor_span(index + 1)
+		assert_true(
+			slab.x <= below.x and slab.y >= below.y,
+			"этаж %d остался без потолка по краям" % (index + 1)
+		)
+
+
+## Ниже собственных стен перекрытие не сужается: оно остаётся полом своего уровня.
+func test_a_slab_is_never_narrower_than_its_own_level() -> void:
+	var rules := _rules()
+	for index: int in rules.levels():
+		var slab := rules.slab_span(index)
+		var own := rules.floor_span(index)
+		assert_true(slab.x <= own.x and slab.y >= own.y, "этаж %d потерял свой пол" % index)
+
+
+## Каждое место уровня имеет над собой потолок: лампа вешается на перекрытие,
+## а его кладёт уровень выше.
+func test_every_slot_of_a_floor_has_a_ceiling_over_it() -> void:
+	var rules := _rules()
+	for index: int in rules.floors:
+		var ceiling := rules.slab_span(index - 1)
+		var span := rules.slot_range(index)
+		for slot: int in range(span.x, span.y + 1):
+			var x := rules.slot_x(slot)
+			assert_true(
+				x >= ceiling.x and x <= ceiling.y,
+				"место %d этажа %d висит под открытым небом" % [slot, index]
+			)
+
+
 ## Границы выводятся из крайних мест: место должно отстоять от своей стены
 ## ровно на margin, как и на этаже во всю ширину.
 func test_floor_span_keeps_the_margin_from_its_own_walls() -> void:
@@ -81,3 +121,21 @@ func test_floor_span_keeps_the_margin_from_its_own_walls() -> void:
 		var slots := rules.slot_range(index)
 		assert_eq(rules.slot_x(slots.x) - span.x, rules.margin, "слева, этаж %d" % index)
 		assert_eq(span.y - rules.slot_x(slots.y), rules.margin, "справа, этаж %d" % index)
+
+
+## Симметрия мест держится на нечётном их числе: у чётного набора середины нет,
+## крайний столбец пропадает на всех уровнях разом, а нижний этаж перестаёт быть
+## во всю ширину здания. Правило записано у самого поля, а стережётся здесь.
+func test_slot_count_is_odd() -> void:
+	var rules := _rules()
+	assert_eq(rules.slots % 2, 1, "чётное число мест ломает симметрию силуэта")
+	assert_eq(rules.top_slots % 2, 1, "и наверху тоже")
+
+
+## То же правило, но с обратной стороны: на нечётном наборе нижний этаж обязан
+## выходить на полную ширину здания, иначе силуэт не доходит до края.
+func test_the_bottom_floor_reaches_both_walls() -> void:
+	var rules := _rules()
+	var span := rules.floor_span(rules.floors - 1)
+	assert_eq(span.x, 0.0, "левая стена нижнего этажа — край здания")
+	assert_eq(span.y, rules.width, "и правая тоже")

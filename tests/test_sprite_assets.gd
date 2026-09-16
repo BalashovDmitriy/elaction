@@ -171,8 +171,13 @@ func test_a_strip_thinner_than_its_tile_keeps_its_height() -> void:
 	var level := await _building()
 	var found := false
 	# Ширина полосы — не ширина здания: этаж уже него, и стена идёт между
-	# его собственными стенами (ADR-0014, пункт 3).
+	# его собственными стенами (ADR-0014, пункт 3). Отбор по ширине всё равно
+	# нужен: без него тест поймал бы любой узел подходящей высоты и молчал бы
+	# о том, что задней стены не осталось вовсе.
+	var widths := _back_wall_widths(level.rules)
 	for panel: TextureRect in _rects_of(level):
+		if not widths.has(roundi(panel.size.x)):
+			continue
 		if is_equal_approx(panel.size.y, GreyboxLevel.WINDOW_TOP):
 			found = true
 
@@ -218,6 +223,17 @@ func _building() -> GreyboxLevel:
 	for _frame: int in SETTLE_FRAMES:
 		await get_tree().process_frame
 	return level
+
+
+## Ширины задних стен здания: у каждого этажа своя, по силуэту его уровня.
+## Стена идёт между внутренними краями боковых стен, отсюда двойной [constant
+## GreyboxLevel.WALL_WIDTH].
+func _back_wall_widths(rules: BuildingRules) -> Dictionary:
+	var widths: Dictionary = {}
+	for index: int in rules.floors:
+		var span := rules.floor_span(index)
+		widths[roundi(span.y - span.x - GreyboxLevel.WALL_WIDTH * 2.0)] = true
+	return widths
 
 
 func _rects_of(node: Node) -> Array[TextureRect]:
