@@ -6,6 +6,10 @@ extends GutTest
 ## напрямую. Главное, что здесь стережётся, — проходимость: шахты не сквозные,
 ## и если генератор забудет эскалатор на стыке полос, спуститься будет нельзя.
 
+## Сиды, на которых проверяются правила раскладки. Здание случайно, и одна
+## проверка на одном сиде подтверждает только его — а дыры вылезают на редких.
+const SEEDS: Array[int] = [1, 2, 3, 5, 8, 13, 21, 34]
+
 
 func _rules() -> BuildingRules:
 	return BuildingRules.new()
@@ -45,7 +49,8 @@ func test_shafts_cover_every_floor() -> void:
 		for index in range(shaft.top, shaft.bottom + 1):
 			assert_false(covered.has(index), "полосы шахт не налезают друг на друга")
 			covered[index] = true
-	assert_eq(covered.size(), rules.floors, "каждый этаж обслуживается шахтой")
+	assert_eq(covered.size(), rules.floors + 1, "каждый уровень обслуживается шахтой")
+	assert_true(covered.has(BuildingRules.ROOF), "верхняя шахта доходит до крыши")
 
 
 func test_neighbouring_shafts_stand_in_different_columns() -> void:
@@ -150,11 +155,67 @@ func test_safe_spot_never_hangs_over_a_hole() -> void:
 			assert_false(x >= gap.x and x <= gap.y, "этаж %d стоит над проёмом" % index)
 
 
-## Крыша — верхний край здания, вешать лампу там не на что: она висела бы в небе.
+## Над крышей небо, вешать лампу там не на что: она висела бы в воздухе.
 func test_no_lamp_hangs_over_the_roof() -> void:
 	var plan := BuildingPlan.generate(_rules(), 13)
 	for lamp in plan.lamps:
-		assert_gt(lamp.floor_index, 0, "на крыше нет потолка")
+		assert_gt(lamp.floor_index, BuildingRules.ROOF, "над крышей нет потолка")
+
+
+## Нулевой этаж перестал быть крышей и лампу наконец получает: потолок у него
+## появился, и до этого весь верх здания был единственным этажом без света.
+func test_the_top_floor_gets_a_lamp_now_that_it_has_a_ceiling() -> void:
+	var plan := BuildingPlan.generate(_rules(), 13)
+	var on_top := 0
+	for lamp in plan.lamps:
+		if lamp.floor_index == 0:
+			on_top += 1
+	assert_gt(on_top, 0, "у верхнего этажа есть потолок, значит есть и лампа")
+
+
+## Крыша — место, а не этаж: агенты на ней не появляются, потому что нет дверей.
+## Пока она была нулевым этажом, двое стояли в зоне огня от точки старта.
+func test_the_roof_carries_no_doors() -> void:
+	for building_seed: int in SEEDS:
+		var plan := BuildingPlan.generate(_rules(), building_seed)
+		for door in plan.doors:
+			assert_gt(door.floor_index, BuildingRules.ROOF, "сид %d" % building_seed)
+
+
+## Шахта проходит сквозь этажи разной ширины, и её столбец должен стоять
+## на каждом из них: здание расширяется книзу, самый тесный — верх полосы.
+func test_every_shaft_stands_on_a_slot_its_whole_band_offers() -> void:
+	var rules := _rules()
+	for building_seed: int in SEEDS:
+		var plan := BuildingPlan.generate(rules, building_seed)
+		for shaft in plan.shafts:
+			for index in range(shaft.top, shaft.bottom + 1):
+				var span := rules.floor_span(index)
+				var half := rules.shaft_width * 0.5
+				assert_true(
+					shaft.x - half >= span.x and shaft.x + half <= span.y,
+					"сид %d: шахта на этаже %d вышла за стену" % [building_seed, index]
+				)
+
+
+## Всё, что раскладка ставит, должно стоять внутри силуэта своего уровня:
+## за ним улица, и дверь там висела бы в воздухе.
+func test_nothing_is_placed_outside_its_own_floor() -> void:
+	var rules := _rules()
+	for building_seed: int in SEEDS:
+		var plan := BuildingPlan.generate(rules, building_seed)
+		for door in plan.doors:
+			var span := rules.floor_span(door.floor_index)
+			assert_true(
+				door.x > span.x and door.x < span.y,
+				"сид %d: дверь на этаже %d за стеной" % [building_seed, door.floor_index]
+			)
+		for lamp in plan.lamps:
+			var span := rules.floor_span(lamp.floor_index)
+			assert_true(
+				lamp.x > span.x and lamp.x < span.y,
+				"сид %d: лампа на этаже %d за стеной" % [building_seed, lamp.floor_index]
+			)
 
 
 func _shaft_x_on(plan: BuildingPlan, floor_index: int) -> float:

@@ -16,9 +16,40 @@ func _rules() -> BuildingRules:
 	return rules
 
 
-func test_top_floor_is_the_roof() -> void:
+func test_the_roof_lies_above_the_top_floor() -> void:
 	var rules := _rules()
-	assert_eq(rules.floor_surface(0), rules.slab_height, "нулевой этаж — самый верхний")
+	assert_lt(rules.floor_surface(BuildingRules.ROOF), rules.floor_surface(0))
+	assert_eq(
+		rules.floor_surface(0) - rules.floor_surface(BuildingRules.ROOF),
+		rules.floor_height,
+		"крыша отстоит от верхнего этажа на целый пролёт"
+	)
+
+
+## Из-за этого нулевой этаж и был неиграбельным: просвет 20 px против 100 px
+## у всех остальных, и макушка Otto уходила за верхний край кадра (ADR-0014).
+func test_every_level_has_the_same_headroom() -> void:
+	var rules := _rules()
+	var expected := rules.floor_height - rules.slab_height
+	for index: int in [0, 1, 7, rules.floors - 1]:
+		var headroom := rules.floor_surface(index) - rules.story_top(index)
+		assert_eq(headroom, expected, "этаж %d" % index)
+
+
+func test_the_roof_has_sky_above_it() -> void:
+	var rules := _rules()
+	var roof := BuildingRules.ROOF
+	assert_eq(rules.story_top(roof), 0.0, "над крышей край мира, а не перекрытие")
+	assert_eq(rules.floor_surface(roof) - rules.story_top(roof), rules.sky_height)
+
+
+## Прыжок Otto — 80 px. Если он не помещается над крышей, игрок улетает за кадр.
+func test_a_jump_from_the_roof_stays_inside_the_world() -> void:
+	var rules := _rules()
+	var otto := preload("res://src/actors/otto/otto.tscn").instantiate() as Otto
+	var apex := otto.jump_speed * otto.jump_speed / (2.0 * otto.gravity)
+	otto.free()
+	assert_gt(rules.sky_height, apex, "над крышей должно быть выше прыжка")
 
 
 func test_floors_go_down_by_their_height() -> void:
@@ -34,12 +65,15 @@ func test_nearest_floor_is_the_one_underfoot() -> void:
 
 func test_nearest_floor_never_leaves_the_building() -> void:
 	var rules := _rules()
-	assert_eq(rules.floor_index_near(-500.0), 0, "выше крыши этажей нет")
+	assert_eq(rules.floor_index_near(-500.0), BuildingRules.ROOF, "выше крыши уровней нет")
 	assert_eq(rules.floor_index_near(100000.0), rules.floors - 1)
 
 
-func test_top_floor_has_no_ceiling_above_it() -> void:
-	assert_eq(_rules().story_top(0), 0.0)
+func test_nearest_level_finds_the_roof() -> void:
+	var rules := _rules()
+	var roof := BuildingRules.ROOF
+	assert_eq(rules.floor_index_near(rules.floor_surface(roof)), roof)
+	assert_eq(rules.floor_index_near(rules.floor_surface(roof) + 10.0), roof, "чуть ниже — та же")
 
 
 func test_ceiling_is_the_underside_of_the_slab_above() -> void:

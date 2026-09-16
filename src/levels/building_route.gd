@@ -18,26 +18,35 @@ static func reachable(plan: BuildingPlan, rules: BuildingRules) -> Dictionary:
 	return reachable_in(plan, rules, _floor_segments(plan, rules))
 
 
-## Куски всех этажей: этаж -> пары «левый край, правый край».
+## Куски всех уровней: уровень -> пары «левый край, правый край».
 ##
 ## Отдаются наружу, чтобы считать узлы пачкой: [method node_in] по готовым кускам
 ## стоит копейки, а сами куски — это перебор всей раскладки.
-static func segments(plan: BuildingPlan, rules: BuildingRules) -> Array:
+##
+## Словарь, а не список: уровни считаются от [constant BuildingRules.ROOF], то есть
+## от −1, а [code]Array[-1][/code] в GDScript отдаёт последний элемент — крыша молча
+## притворялась бы первым этажом вместо того, чтобы уронить обход (ADR-0014).
+static func segments(plan: BuildingPlan, rules: BuildingRules) -> Dictionary:
 	return _floor_segments(plan, rules)
 
 
-## Узел точки этажа по готовым кускам из [method segments]. По нему проверяют,
+## Узел точки уровня по готовым кускам из [method segments]. По нему проверяют,
 ## ведёт ли туда маршрут: [method reachable] возвращает набор таких же узлов.
-static func node_in(floors: Array, floor_index: int, x: float) -> String:
+static func node_in(floors: Dictionary, floor_index: int, x: float) -> String:
 	return _node(floor_index, _segment_at(floors[floor_index], x))
 
 
 ## Те же узлы, что и у [method reachable], но по готовым кускам из
 ## [method segments]: кто их уже посчитал, второй раз за перебор не платит.
-static func reachable_in(plan: BuildingPlan, rules: BuildingRules, floors: Array) -> Dictionary:
+static func reachable_in(
+	plan: BuildingPlan, rules: BuildingRules, floors: Dictionary
+) -> Dictionary:
 	var links := _links(plan, rules, floors)
 
-	var start := _node(0, _segment_at(floors[0], plan.safe_x(rules, 0)))
+	# Спуск начинается с крыши, а не с верхнего этажа: туда Otto попадает лифтом,
+	# и здание, до которого от крыши не добраться, непроходимо.
+	var from := BuildingRules.ROOF
+	var start := _node(from, _segment_at(floors[from], plan.safe_x(rules, from)))
 	var seen := {start: true}
 	var queue: Array[String] = [start]
 
@@ -78,16 +87,20 @@ static func unreachable_spots(plan: BuildingPlan, rules: BuildingRules) -> Array
 	return missing
 
 
-## Куски каждого этажа: пары «левый край, правый край» между проёмами.
-static func _floor_segments(plan: BuildingPlan, rules: BuildingRules) -> Array:
-	var floors: Array = []
-	for index in plan.floors:
-		floors.append(BuildingPlan.spans_between(plan.gaps_on(rules, index), rules.width))
+## Куски каждого уровня: пары «левый край, правый край» между проёмами.
+##
+## Границы берутся у самого уровня: здание расширяется книзу, и кусок во всю
+## ширину здания вёл бы на узком этаже сквозь стену на улицу.
+static func _floor_segments(plan: BuildingPlan, rules: BuildingRules) -> Dictionary:
+	var floors: Dictionary = {}
+	for index in rules.levels():
+		var gaps := plan.gaps_on(rules, index)
+		floors[index] = BuildingPlan.spans_between(gaps, rules.floor_span(index))
 	return floors
 
 
 ## Куда можно шагнуть из каждого узла.
-static func _links(plan: BuildingPlan, rules: BuildingRules, floors: Array) -> Dictionary:
+static func _links(plan: BuildingPlan, rules: BuildingRules, floors: Dictionary) -> Dictionary:
 	var links: Dictionary = {}
 
 	for shaft in plan.shafts:

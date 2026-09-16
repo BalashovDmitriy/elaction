@@ -178,4 +178,8 @@ func test_otto_starts_on_the_roof() -> void:
 	var rules := _rules()
 	var level := _build(1)
 	await wait_physics_frames(SETTLE_FRAMES)
-	assert_eq(rules.floor_index_near(level.otto.global_position.y), 0, "Otto начинает с крыши")
+	assert_eq(
+		rules.floor_index_near(level.otto.global_position.y),
+		BuildingRules.ROOF,
+		"Otto начинает с крыши, а не с верхнего этажа"
+	)

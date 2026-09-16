@@ -23,20 +23,47 @@ const MENACE_CAP: float = 3.0
 ## оставлен тревоге, иначе на дальних зданиях сирена уже ничего не меняла бы.
 const MENACE_BY_BUILDING_CAP: float = 2.0
 
-## Этажей в здании. Нулевой — крыша, последний — первый этаж с выходом.
+## Крыша: уровень над зданием, с которого начинается спуск.
+##
+## Не этаж и потому не входит в [member floors]: на ней нет ни дверей, ни ламп,
+## ни агентов, а над ней небо вместо перекрытия. Отдельный индекс, а не нулевой
+## этаж, — ADR-0014, пункт 1: раньше нулевой был крышей и верхним этажом сразу,
+## и просвет у него выходил 20 px вместо 100.
+const ROOF: int = -1
+
+## Этажей в здании, не считая крыши. Нулевой — верхний, последний — с выходом.
 @export var floors: int = 30
 
 ## Высота этажа и толщина перекрытия, px.
 @export var floor_height: float = 120.0
 @export var slab_height: float = 20.0
 
+## Сколько открытого неба над настилом крыши, px.
+##
+## Больше, чем этаж: Otto прыгает на 80 px, и над макушкой в верхней точке
+## должно оставаться небо, а не кромка кадра. При 120 px он проходил впритык —
+## шесть пикселей до края, и прыжок читался как удар головой о край экрана.
+@export var sky_height: float = 160.0
+
 ## Ширина здания и отступ от стен, px.
 @export var width: float = 1280.0
 @export var margin: float = 80.0
 
-## Сколько мест по горизонтали. Всё, что стоит на этаже, занимает место целиком,
-## поэтому шахта, эскалатор, дверь и лампа не могут оказаться друг на друге.
+## Сколько мест по горизонтали на самом широком уровне. Всё, что стоит на этаже,
+## занимает место целиком, поэтому шахта, эскалатор, дверь и лампа не могут
+## оказаться друг на друге.
+##
+## Места нумеруются глобально и стоят по всей высоте на одних и тех же x. Иначе
+## шахта, проходящая сквозь этажи разной ширины, оказывалась бы на каждом из них
+## в своём столбце (ADR-0014, пункт 3).
 @export var slots: int = 9
+
+## Мест на самом узком уровне — наверху здания. Ступеней в силуэте — [member width_steps].
+##
+## Профиль задаётся местами, а ширина выводится из них, а не наоборот: от ширины
+## получались этажи, куда не влезало обязательное — шахта, две двери и лампа.
+@export var top_slots: int = 5
+@export var width_steps: int = 3
 
 ## Сколько этажей обслуживает одна шахта. Шахты не сквозные: доехал до предела —
 ## переходи к следующей, и в этом весь спуск (ADR-0008).
@@ -58,8 +85,15 @@ const MENACE_BY_BUILDING_CAP: float = 2.0
 ## источнику, который называет число. Не сверено.
 @export var documents: int = 5
 
-## Дверей на этаже, считая красную.
+## Дверей на этаже, считая красную, — на широких этажах внизу.
 @export var doors_per_floor: int = 2
+
+## Дверей на самых узких этажах, наверху здания.
+##
+## Источники описывают верх как редко заселённый, а низ — как тесный и злой.
+## Раньше двери стояли поровну по всей высоте, и спуск начинался с той же
+## плотности огня, какой он кончается (ADR-0014, пункт 3).
+@export var top_doors: int = 1
 
 ## Ламп на этаже.
 @export var lamps_per_floor: int = 1
@@ -97,22 +131,102 @@ func slot_x(slot: int) -> float:
 	return margin + usable * float(slot) / float(slots - 1)
 
 
-## Поверхность этажа: нулевой этаж — самый верхний.
+## Поверхность уровня, на которой стоят: [constant ROOF] — настил крыши,
+## нулевой — верхний этаж здания.
+##
+## Одна формула на крышу и на этажи: крыша — это [code]index = -1[/code], и
+## отдельного счёта ей не нужно. Так просвет у всех уровней выходит одинаковым,
+## чего не было, пока крышей работал нулевой этаж (ADR-0014, пункт 1).
 func floor_surface(index: int) -> float:
-	return slab_height + float(index) * floor_height
+	return sky_height + floor_height * float(index + 1)
 
 
-## Высота здания целиком, px.
+## Высота здания целиком, px. Небо над крышей входит: это часть мира,
+## по которой ходит камера.
 func total_height() -> float:
 	return floor_surface(floors - 1) + slab_height
 
 
-## Ближайший этаж к точке по вертикали.
+## Ближайший уровень к точке по вертикали. Может вернуть [constant ROOF].
 func floor_index_near(y: float) -> int:
-	var raw := roundf((y - slab_height) / floor_height)
-	return clampi(int(raw), 0, floors - 1)
+	var raw := roundf((y - sky_height) / floor_height) - 1.0
+	return clampi(int(raw), ROOF, floors - 1)
 
 
-## Потолок этажа: низ перекрытия сверху, у самого верхнего — край здания.
+## Потолок уровня: низ перекрытия сверху. У крыши потолка нет — над ней небо,
+## и полоса отмеряется от верха мира.
 func story_top(index: int) -> float:
-	return 0.0 if index <= 0 else floor_surface(index - 1) + slab_height
+	return 0.0 if index <= ROOF else floor_surface(index - 1) + slab_height
+
+
+## Все уровни сверху вниз, крышу включая. Один обход на весь проект: обойти
+## [code]range(floors)[/code] и забыть крышу — ровно та ошибка, из-за которой
+## на ней стояли двери.
+func levels() -> Array[int]:
+	var all: Array[int] = []
+	for index in range(ROOF, floors):
+		all.append(index)
+	return all
+
+
+## Ступень силуэта, на которой стоит уровень: 0 — самая узкая, наверху.
+func width_step(index: int) -> int:
+	var steps := maxi(width_steps, 1)
+	if steps <= 1:
+		return 0
+	# Считается по порядковому номеру уровня, а не по номеру этажа: крыша идёт
+	# нулевой, иначе она попадала бы на ступень ниже собственного верхнего этажа.
+	var ordinal := index - ROOF
+	var total := floors - ROOF
+	return clampi(int(float(ordinal) * float(steps) / float(maxi(total, 1))), 0, steps - 1)
+
+
+## Сколько мест вправо и влево от середины доступно на уровне.
+##
+## Счёт идёт полушириной, поэтому число мест всегда нечётное и они лежат
+## симметрично: этаж с чётным числом мест был бы сдвинут относительно
+## проходящей сквозь него шахты.
+func slot_reach(index: int) -> int:
+	var full := (slots - 1) / 2
+	var narrow := clampi((top_slots - 1) / 2, 0, full)
+	var steps := maxi(width_steps, 1)
+	if steps <= 1:
+		return full
+	var grown := float(narrow) + float(full - narrow) * float(width_step(index)) / float(steps - 1)
+	return clampi(int(roundf(grown)), narrow, full)
+
+
+## Первое и последнее доступное место уровня, включительно.
+func slot_range(index: int) -> Vector2i:
+	var middle := (slots - 1) / 2
+	var reach := slot_reach(index)
+	return Vector2i(maxi(middle - reach, 0), mini(middle + reach, slots - 1))
+
+
+## Стоит ли место на этом уровне. За границами силуэта места нет: там улица.
+func slot_available(slot: int, index: int) -> bool:
+	var span := slot_range(index)
+	return slot >= span.x and slot <= span.y
+
+
+## Границы уровня: внешние края стен, левый и правый.
+##
+## Выводятся из крайних доступных мест, а не из доли ширины: место должно
+## отстоять от стены на [member margin], как и на здании во всю ширину.
+func floor_span(index: int) -> Vector2:
+	var span := slot_range(index)
+	return Vector2(slot_x(span.x) - margin, slot_x(span.y) + margin)
+
+
+## Сколько дверей на этаже. Наверху реже, внизу плотнее — той же ступенью,
+## что и ширина: узкий этаж и заселён скупо.
+func doors_on(index: int) -> int:
+	var most := maxi(doors_per_floor, 0)
+	var fewest := clampi(top_doors, 0, most)
+	return clampi(fewest + width_step(index), fewest, most)
+
+
+## Ширина уровня, px.
+func floor_width(index: int) -> float:
+	var span := floor_span(index)
+	return span.y - span.x
