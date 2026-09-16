@@ -96,9 +96,8 @@ func _threat() -> Enemy:
 	var here := _otto.global_position
 	var closest: Enemy = null
 	var nearest := ENGAGE
-	for child in _level.get_children():
-		var agent := child as Enemy
-		if agent == null or agent.is_dead():
+	for agent in _level.agents():
+		if agent.is_dead():
 			continue
 		var to_agent := agent.global_position - here
 		if absf(to_agent.y) > SAME_LINE:

@@ -44,11 +44,12 @@ func _drop(level: GreyboxLevel) -> void:
 	remove_child(level)
 
 
+## Живые агенты здания. Перебор детей — дело самого уровня ([method
+## GreyboxLevel.agents]), здесь остаётся только отсев мёртвых.
 func _agents_in(level: GreyboxLevel) -> Array[Enemy]:
 	var found: Array[Enemy] = []
-	for child in level.get_children():
-		var agent := child as Enemy
-		if agent != null and not agent.is_dead():
+	for agent in level.agents():
+		if not agent.is_dead():
 			found.append(agent)
 	return found
 

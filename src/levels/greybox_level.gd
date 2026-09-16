@@ -95,6 +95,23 @@ const AGENT_KEEP_MARGIN: int = 3
 ## Сколько Otto лежит, прежде чем вернуться в игру, с.
 const OTTO_RESPAWN_DELAY: float = 1.2
 
+
+## Пост у агентской двери: сама дверь, её этаж и тот, кого она уже выпустила.
+##
+## Этаж считается один раз на здание: двери не ходят, а [method _tend_agents]
+## перебирает их каждый кадр — выводить этаж из координаты по шестьдесят раз
+## в секунду для полусотни дверей незачем.
+class AgentPost:
+	extends RefCounted
+
+	var door: Door = null
+	var floor_index: int = 0
+	## Кто стоит за дверью прямо сейчас. Пусто — дверь свободна.
+	var agent: Enemy = null
+	## Сколько двери ещё ждать, прежде чем выпустить следующего, с.
+	var wait: float = 0.0
+
+
 ## Правила здания. Пустые — значит берутся по умолчанию.
 @export var rules: BuildingRules
 
@@ -123,17 +140,14 @@ var _lit_span := Vector2i(0, -1)
 ## Дальний план: город за окнами. Двигается медленнее камеры.
 var _city: Node2D = null
 ## Задние стены этажей. Их под три сотни, и держать их прямо в уровне значит
-## заставить каждый обход [method _agents] перебирать ещё и их.
+## заставить каждый обход [method agents] перебирать ещё и их.
 var _back_walls: Node2D = null
 ## Лампы здания: их свет тоже гасится за пределами кадра. Упавшие лампы
 ## убирают себя сами, поэтому перед обращением проверяется живость.
 var _lamps: Array[Lamp] = []
-## Кто стоит за каждой агентской дверью: дверь -> живой агент или null.
-## Двери здания не выпускают всех разом — только те, чей этаж рядом с игроком
-## (ADR-0014, пункт 4). Пустое значение значит «дверь свободна».
-var _behind_door: Dictionary = {}
-## Когда двери снова можно выпускать агента: дверь -> время по [method Time.get_ticks_msec].
-var _door_ready_at: Dictionary = {}
+## Посты у агентских дверей, по одному на дверь. Двери здания не выпускают всех
+## разом — только те, чей этаж рядом с игроком (ADR-0014, пункт 4).
+var _posts: Array[AgentPost] = []
 ## Здание сдано. Событие однократное: по нему main собирает следующее здание.
 var _cleared: bool = false
 ## Машина у выхода и её отъезд: пока она едет, здание ещё не сдано.
@@ -176,8 +190,10 @@ func _ready() -> void:
 	# к игроку. Раньше здесь выходили все 55 разом, и двое из них стояли на
 	# крыше в зоне огня от точки старта — ADR-0014, пункт 4.
 	for door in _agent_doors:
-		_behind_door[door] = null
-		_door_ready_at[door] = 0
+		var post := AgentPost.new()
+		post.door = door
+		post.floor_index = rules.floor_index_near(door.mat_position().y)
+		_posts.append(post)
 	otto.apply_camera_bounds(Rect2(0.0, 0.0, rules.width, rules.total_height()))
 
 
@@ -195,7 +211,7 @@ func _process(delta: float) -> void:
 	# Агенты пересчитываются каждый кадр, а не только на смене полосы: дверь ждёт
 	# своей паузы, и пропустив кадр смены, она не выпустила бы никого до следующей.
 	if spawn_agents:
-		_tend_agents(span)
+		_tend_agents(span, delta)
 
 	if span == _lit_span:
 		return
@@ -251,8 +267,9 @@ func is_dark(floor_index: int) -> bool:
 ## Проёмы принимаются в любом порядке.
 ##
 ## Статический, чтобы проверяться тестами без сцены.
-## [param bounds] — левый и правый края уровня: здание расширяется книзу, и
-## перекрытие лежит не во всю ширину здания, а от стены до стены своего этажа.
+## [param bounds] — левый и правый края перекрытия ([method BuildingRules.slab_span]):
+## здание расширяется книзу, и перекрытие лежит не во всю ширину здания, а от стены
+## до стены — своего этажа или нижнего, смотря какой шире.
 static func slab_segments(
 	surface: float, gaps: Array[Vector2], bounds: Vector2, thickness: float
 ) -> Array[Rect2]:
@@ -272,7 +289,9 @@ func _build_geometry() -> void:
 		var surface := rules.floor_surface(index)
 		var bounds := rules.floor_span(index)
 		var gaps := _plan.gaps_on(rules, index)
-		for rect in slab_segments(surface, gaps, bounds, rules.slab_height):
+		# Перекрытие шире собственных стен там, где силуэт делает ступень: оно же
+		# потолок нижнего этажа, а тот шире своего верхнего соседа.
+		for rect in slab_segments(surface, gaps, rules.slab_span(index), rules.slab_height):
 			_build_solid(rect, slab_tile)
 		_build_side_walls(index, surface, bounds, side_tile)
 
@@ -485,7 +504,10 @@ func _on_lamp_fell(index: int) -> void:
 
 
 ## Все агенты здания: они лежат прямо в уровне, рядом с геометрией.
-func _agents() -> Array[Enemy]:
+##
+## Публичный: бот и прогон снаружи ищут ровно то же самое, и три копии одного
+## перебора детей разъехались бы при первой же правке дерева уровня.
+func agents() -> Array[Enemy]:
 	var found: Array[Enemy] = []
 	for child in get_children():
 		var agent := child as Enemy
@@ -496,7 +518,7 @@ func _agents() -> Array[Enemy]:
 
 func _agents_on(index: int) -> Array[Enemy]:
 	var found: Array[Enemy] = []
-	for agent in _agents():
+	for agent in agents():
 		if rules.floor_index_near(agent.global_position.y) == index:
 			found.append(agent)
 	return found
@@ -508,24 +530,26 @@ func _agents_on(index: int) -> Array[Enemy]:
 ## Раньше все 55 выходили разом в [method _ready] и жили до конца здания. Это
 ## и не давало играть — двое стояли на крыше в зоне огня от точки старта, — и
 ## держало полсотни тел с физикой и ИИ на каждом кадре (ADR-0014, пункт 4).
-func _tend_agents(span: Vector2i) -> void:
-	var now := Time.get_ticks_msec()
-	for door: Door in _agent_doors:
-		var index := rules.floor_index_near(door.mat_position().y)
-		var agent: Enemy = _behind_door[door]
-		var alive := is_instance_valid(agent) and not agent.is_dead()
-
-		if alive:
-			if not _within(span, index, AGENT_KEEP_MARGIN):
-				agent.queue_free()
-				_behind_door[door] = null
+func _tend_agents(span: Vector2i, delta: float) -> void:
+	for post: AgentPost in _posts:
+		# Живость проверяется прямо по полю: свой агент у двери один, а чужого
+		# сюда положить некому.
+		if is_instance_valid(post.agent) and not post.agent.is_dead():
+			if not _within(span, post.floor_index, AGENT_KEEP_MARGIN):
+				post.agent.queue_free()
+				post.agent = null
 			continue
 
 		# Дверь, чей агент умер или уехал, ждёт свою паузу и только потом
-		# выпускает следующего.
-		_behind_door[door] = null
-		if _within(span, index, AGENT_SPAWN_MARGIN) and now >= int(_door_ready_at[door]):
-			_behind_door[door] = _release_agent(door)
+		# выпускает следующего. Пауза идёт игровым временем, а не настенными
+		# часами: на паузе здание замирает целиком, и смена агента не должна
+		# приходить, пока игра стоит, — а под [member Engine.time_scale] она
+		# должна ускоряться вместе со всем остальным, иначе прогон ботом видит
+		# вчетверо более редких агентов, чем игрок.
+		post.agent = null
+		post.wait = maxf(post.wait - delta, 0.0)
+		if post.wait <= 0.0 and _within(span, post.floor_index, AGENT_SPAWN_MARGIN):
+			post.agent = _release_agent(post)
 
 
 ## Попадает ли уровень в полосу [param span], растянутую на [param margin] этажей.
@@ -535,15 +559,15 @@ static func _within(span: Vector2i, index: int, margin: int) -> bool:
 
 ## Выпускает агента из двери и отдаёт его: дверь помнит своего, чтобы не
 ## выпустить второго, пока первый жив.
-func _release_agent(door: Door) -> Enemy:
-	var mat := door.mat_position()
+func _release_agent(post: AgentPost) -> Enemy:
+	var mat := post.door.mat_position()
 	var agent := ENEMY_SCENE.instantiate() as Enemy
 	add_child(agent)
 	agent.global_position = mat
 	agent.setup(otto, signf(otto.global_position.x - mat.x))
-	agent.set_in_the_dark(_lighting.is_dark(rules.floor_index_near(mat.y)))
+	agent.set_in_the_dark(_lighting.is_dark(post.floor_index))
 	agent.set_menace(_menace())
-	agent.died.connect(_on_agent_died.bind(door))
+	agent.died.connect(_on_agent_died.bind(post))
 	return agent
 
 
@@ -562,16 +586,15 @@ func _on_alarm_raised() -> void:
 	Sounds.play_music(Sounds.ALARM_THEME)
 	for car in _cars:
 		car.set_response_delay(ALARM_CAR_DELAY)
-	for agent in _agents():
+	for agent in agents():
 		agent.set_menace(_menace())
 
 
-func _on_agent_died(_agent: Enemy, door: Door) -> void:
-	# Смена не по таймеру, а по отметке времени: выпуском теперь заведует
+func _on_agent_died(_agent: Enemy, post: AgentPost) -> void:
+	# Смена не по таймеру, а отсчётом у самой двери: выпуском теперь заведует
 	# [method _tend_agents], и он же решает, подошёл ли этаж к игроку. Таймер
 	# выпустил бы агента у двери на другом конце здания, до которой нет дела.
-	var wait := AGENT_RESPAWN_DELAY / _menace()
-	_door_ready_at[door] = Time.get_ticks_msec() + int(wait * 1000.0)
+	post.wait = AGENT_RESPAWN_DELAY / _menace()
 
 
 func _on_otto_died() -> void:
