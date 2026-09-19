@@ -3,14 +3,14 @@
 [ext_resource type="Script" path="res://src/systems/escalators/escalator.gd" id="1_escalator"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_pad"]
-size = Vector2(24, 10)
+size = Vector2(72, 30)
 
 [node name="Escalator" type="Node2D"]
 script = ExtResource("1_escalator")
 
 [node name="Ramp" type="Line2D" parent="."]
 z_index = -1
-width = 5.0
+width = 15
 default_color = Color(0.36, 0.44, 0.4, 1)
 
 [node name="TopPad" type="Area2D" parent="."]
@@ -18,7 +18,7 @@ collision_layer = 0
 collision_mask = 2
 
 [node name="TopPadShape" type="CollisionShape2D" parent="TopPad"]
-position = Vector2(0, -5)
+position = Vector2(0, -15)
 shape = SubResource("RectangleShape2D_pad")
 
 [node name="BottomPad" type="Area2D" parent="."]
@@ -26,5 +26,5 @@ collision_layer = 0
 collision_mask = 2
 
 [node name="BottomPadShape" type="CollisionShape2D" parent="BottomPad"]
-position = Vector2(0, -5)
+position = Vector2(0, -15)
 shape = SubResource("RectangleShape2D_pad")

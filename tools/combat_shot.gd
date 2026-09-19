@@ -33,7 +33,7 @@ const PATIENCE: int = 180
 
 ## Где стоит агент, px от Otto. Дальше приседа, но ближе дальности его огня:
 ## так в кадр влезают оба.
-const GAP: float = 150.0
+const GAP: float = 450.0
 
 var _level: GreyboxLevel = null
 var _agent: Enemy = null

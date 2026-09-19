@@ -12,7 +12,7 @@ const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
 
 ## Откуда летит пуля, px от агента. Меньше [member BuildingRules.agent_dodge_sight],
 ## иначе он её ещё не замечает.
-const BULLET_REACH: float = 50.0
+const BULLET_REACH: float = 150.0
 
 ## Правила, по которым живёт агент, — и по ним же тест отмеряет высоту пули.
 ## Один объект на обоих: с двумя тест мерил бы одним набором чисел, а агент
@@ -62,7 +62,7 @@ func test_agent_drops_prone_under_a_low_bullet() -> void:
 ## Своя пуля агента не повод ложиться: маска у неё другая, и летит она от него.
 func test_agent_ignores_bullets_that_are_not_his_problem() -> void:
 	var agent := _agent()
-	var bullet := _bullet_at(agent, 22.0)
+	var bullet := _bullet_at(agent, 66.0)
 	bullet.collision_mask = Bullet.FROM_ENEMY
 	await wait_physics_frames(2)
 	assert_eq(agent.stance(), EnemyBrain.Stance.STAND, "чужой выстрел агенту не страшен")
@@ -71,7 +71,7 @@ func test_agent_ignores_bullets_that_are_not_his_problem() -> void:
 ## Пуля, летящая прочь, тоже не повод: она уже прошла мимо.
 func test_agent_ignores_a_bullet_flying_away() -> void:
 	var agent := _agent()
-	var bullet := _bullet_at(agent, 22.0)
+	var bullet := _bullet_at(agent, 66.0)
 	bullet.direction = 1.0
 	await wait_physics_frames(2)
 	assert_eq(agent.stance(), EnemyBrain.Stance.STAND, "вслед ушедшей пуле не приседают")
@@ -88,17 +88,17 @@ func test_agent_stays_down_until_the_bullet_clears_his_body() -> void:
 	await wait_physics_frames(2)
 	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "сперва уходит с линии")
 
-	# Тело агента — 12 px шириной, и четыре пикселя за серединой всё ещё в нём.
-	bullet.global_position.x = agent.global_position.x - 4.0
+	# Тело агента — 36 px шириной, и дюжина пикселей за серединой всё ещё в нём.
+	bullet.global_position.x = agent.global_position.x - 12.0
 	await wait_physics_frames(2)
 	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "и не встаёт, пока она в габарите")
 
-	# Середина пули за габаритом тела, а хвост — ещё внутри: пуля 6 px длиной,
+	# Середина пули за габаритом тела, а хвост — ещё внутри: пуля 18 px длиной,
 	# и полширины тела ей не хватает, чтобы разминуться с грудью.
-	bullet.global_position.x = agent.global_position.x - 8.0
+	bullet.global_position.x = agent.global_position.x - 24.0
 	await wait_physics_frames(2)
 	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "и пока её держит хвост — тоже")
 
-	bullet.global_position.x = agent.global_position.x - 40.0
+	bullet.global_position.x = agent.global_position.x - 120.0
 	await wait_physics_frames(2)
 	assert_eq(agent.stance(), EnemyBrain.Stance.STAND, "ушедшая за спину больше не держит")

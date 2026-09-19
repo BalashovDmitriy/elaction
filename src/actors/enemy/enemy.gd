@@ -19,13 +19,19 @@ const FALLING_TIME: float = 0.25
 ## Сколько держится поза выстрела, с.
 const SHOOT_POSE_TIME: float = 0.25
 
-@export var walk_speed: float = 55.0
-@export var gravity: float = 900.0
-@export var max_fall_speed: float = 420.0
+@export var walk_speed: float = 165.0
+@export var gravity: float = 2700.0
+@export var max_fall_speed: float = 1260.0
 
 ## Высота выстрела от ног: попадает в стоящего Otto и проходит над присевшим.
-@export var shot_height: float = -20.0
-@export var muzzle_offset: float = 9.0
+##
+## Выше середины его роста нарочно (126 у Otto против 105 у пули). Пуля агента
+## обязана делать три вещи разом: брать стоящего, проходить над присевшим и
+## проходить над тем, кто стоит ниже этажа — в проёме шахты или в кабине,
+## вставшей между этажами. На M13, когда Otto вырос в полтора раза, пуля
+## перестала успевать за ним и начала снимать его в голову прямо в проёме.
+@export var shot_height: float = -105.0
+@export var muzzle_offset: float = 40.0
 
 ## Сколько тело лежит, прежде чем исчезнуть, с.
 @export var corpse_time: float = 0.5
@@ -38,7 +44,7 @@ const SHOOT_POSE_TIME: float = 0.25
 ## уклонения — приходят из [BuildingRules] ([method apply_rules]): их растит
 ## сложность, и лежать в сцене одного агента они не могут (ADR-0016, пункт 5).
 @export var emerge_time: float = 0.6
-@export var same_line: float = 10.0
+@export var same_line: float = 45.0
 
 ## Правила здания, из которого вышел агент. Пустых не бывает: без них он
 ## достаёт значения по умолчанию — те же, что у здания по умолчанию.

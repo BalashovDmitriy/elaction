@@ -42,19 +42,19 @@ const ROOF: int = -1
 @export var floors: int = 30
 
 ## Высота этажа и толщина перекрытия, px.
-@export var floor_height: float = 120.0
-@export var slab_height: float = 20.0
+@export var floor_height: float = 360.0
+@export var slab_height: float = 60.0
 
 ## Сколько открытого неба над настилом крыши, px.
 ##
 ## Больше, чем этаж: Otto прыгает на 80 px, и над макушкой в верхней точке
 ## должно оставаться небо, а не кромка кадра. При 120 px он проходил впритык —
 ## шесть пикселей до края, и прыжок читался как удар головой о край экрана.
-@export var sky_height: float = 160.0
+@export var sky_height: float = 480.0
 
 ## Ширина здания и отступ от стен, px.
-@export var width: float = 1280.0
-@export var margin: float = 80.0
+@export var width: float = 3840.0
+@export var margin: float = 240.0
 
 ## Сколько мест по горизонтали на самом широком уровне. Всё, что стоит на этаже,
 ## занимает место целиком, поэтому шахта, эскалатор, дверь и лампа не могут
@@ -82,16 +82,16 @@ const ROOF: int = -1
 @export var shaft_span: int = 6
 
 ## Ширина шахты, она же ширина кабины: по краям не должно остаться щелей.
-@export var shaft_width: float = 40.0
+@export var shaft_width: float = 120.0
 
 ## Проём под эскалатор: на сколько он отступает от площадки и какой он ширины, px.
 ## Лежит здесь, а не в уровне, потому что по нему раскладка узнаёт, где в полу дыра:
 ## иначе геометрия проёма была бы записана дважды и разъехалась бы.
-@export var escalator_gap_offset: float = 16.0
-@export var escalator_gap_width: float = 60.0
+@export var escalator_gap_offset: float = 48.0
+@export var escalator_gap_width: float = 180.0
 
 ## На сколько эскалатор уводит в сторону, спускаясь на этаж, px.
-@export var escalator_run: float = 96.0
+@export var escalator_run: float = 288.0
 
 ## Красных дверей на здание. Пять — по Hardcore Gaming 101, единственному
 ## источнику, который называет число. Не сверено.
@@ -118,8 +118,8 @@ const ROOF: int = -1
 
 ## Дальность стрельбы агента и она же на погашенном этаже, px. В темноте он
 ## замечает Otto только вблизи: это не слепота, а меньше огня (ADR-0007, пункт 4).
-@export var agent_fire_range: float = 200.0
-@export var agent_dark_fire_range: float = 60.0
+@export var agent_fire_range: float = 600.0
+@export var agent_dark_fire_range: float = 180.0
 
 ## Пауза между выстрелами и замах перед первым, с. Пауза делится на злость,
 ## замах — нет: он даёт игроку ход, и отнимать его ростом сложности нечестно.
@@ -127,12 +127,12 @@ const ROOF: int = -1
 @export var agent_aim_time: float = 0.35
 
 ## Скорость пули агента, px/с. Умножается на злость.
-@export var agent_bullet_speed: float = 180.0
+@export var agent_bullet_speed: float = 540.0
 
 ## Насколько далеко агент замечает летящую в него пулю, px. Дальше он её
 ## игнорирует: уклоняться за секунду до попадания незачем, а стоять
 ## пригнувшимся весь бой — значит не дойти до Otto никогда.
-@export var agent_dodge_sight: float = 120.0
+@export var agent_dodge_sight: float = 360.0
 
 ## С какой злости агент начинает уходить на колено и ложиться. В первых зданиях
 ## он только стоит: уклонение — третья ось сложности оригинала (ADR-0016, пункт 2).
@@ -140,8 +140,8 @@ const ROOF: int = -1
 @export var agent_goes_prone_from_menace: float = 1.8
 
 ## Рост агента на колене и лёжа, px. Стоячий берётся у формы коллизии из сцены.
-@export var agent_kneel_height: float = 17.0
-@export var agent_prone_height: float = 8.0
+@export var agent_kneel_height: float = 76.0
+@export var agent_prone_height: float = 36.0
 
 ## Сколько дверь ждёт, прежде чем выпустить следующего агента, с. Делится на
 ## злость: в поздних зданиях смена приходит быстрее.

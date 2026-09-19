@@ -181,3 +181,22 @@ func test_the_rope_lands_otto_on_the_roof() -> void:
 	Input.action_release(&"move_right")
 	assert_gt(level.otto.global_position.x, before, "и снова слушается игрока")
 	_drop(level)
+
+
+## У каждой шахты есть упоры сверху и снизу: по ним видно, где полоса кончается.
+func test_every_shaft_is_capped_at_both_ends() -> void:
+	var level := _build(1)
+	await wait_physics_frames(SETTLE_FRAMES)
+
+	var buffers := _parts(level, "shaft_buffer")
+	var shafts := level.plan().shafts.size()
+	assert_eq(buffers.size(), shafts * 2, "по упору на каждый конец каждой шахты")
+
+	for shaft: BuildingPlan.ShaftSpot in level.plan().shafts:
+		var mine := 0
+		for buffer: TextureRect in buffers:
+			var centre := buffer.position.x + buffer.size.x * 0.5
+			if absf(centre - shaft.x) <= TOLERANCE:
+				mine += 1
+		assert_eq(mine, 2, "у шахты на %.0f px оба конца отмечены" % shaft.x)
+	_drop(level)

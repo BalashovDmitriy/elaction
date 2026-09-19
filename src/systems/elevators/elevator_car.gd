@@ -14,14 +14,17 @@ extends AnimatableBody2D
 signal floor_reached(index: int)
 
 ## Докуда слышно гул кабины, px. Дальше по этажу он уже не мешает.
-const HUM_REACH: float = 360.0
+const HUM_REACH: float = 1080.0
 
 ## Докуда слышно «динь», px. Шире гула, но всё же не на всё здание: пустые
 ## кабины катаются сами, и каждая отбивает этажи — глобальный звонок из пяти
 ## шахт звенел бы в ухо без остановки.
-const DING_REACH: float = 640.0
+const DING_REACH: float = 1920.0
 
-@export var speed: float = 60.0
+## Насколько гаснет указатель, когда в эту сторону ходу нет.
+const ARROW_DIM: float = 0.18
+
+@export var speed: float = 180.0
 @export var floor_pause: float = 1.5
 ## Встаёт ли кабина между этажами. Сверкой не подтверждено — см. ADR-0004.
 @export var stops_between_floors: bool = true
@@ -35,6 +38,8 @@ var _hum: AudioStreamPlayer2D = null
 var _ding: AudioStreamPlayer2D = null
 @onready var _interior: Area2D = $Interior
 @onready var _crush_zone: Area2D = $CrushZone
+@onready var _up_arrow: Sprite2D = $UpArrow
+@onready var _down_arrow: Sprite2D = $DownArrow
 
 
 func _ready() -> void:
@@ -46,6 +51,10 @@ func _ready() -> void:
 	var slab := SpriteTextures.tile("car_slab")
 	($FloorVisual as TextureRect).texture = slab
 	($RoofVisual as TextureRect).texture = slab
+	# Указатели: стрелка одна, вниз она же перевёрнутая.
+	var arrow := SpriteTextures.tile("car_arrow")
+	_up_arrow.texture = arrow
+	_down_arrow.texture = arrow
 
 
 func _physics_process(delta: float) -> void:
@@ -63,6 +72,10 @@ func _physics_process(delta: float) -> void:
 	# Гул идёт, пока кабина едет. Источник позиционный: шахт в здании пять,
 	# и слышно должно быть только ту, рядом с которой стоишь.
 	Sounds.keep_playing(_hum, not is_zero_approx(_motion.velocity))
+
+	# Указатели: погасшая стрелка объясняет, почему кабина не идёт дальше.
+	_up_arrow.modulate.a = 1.0 if _motion.can_go(Intent.UP) else ARROW_DIM
+	_down_arrow.modulate.a = 1.0 if _motion.can_go(Intent.DOWN) else ARROW_DIM
 
 	_crush_those_underneath()
 
