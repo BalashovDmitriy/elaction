@@ -10,40 +10,32 @@ extends Node2D
 ## Otto вышел из здания, собрав все документы.
 signal building_cleared
 
-## Общий тон здания — и он же тон погашенного этажа (ADR-0010, пункт 3).
+## Сила заливки горящего этажа и столба света в шахте.
 ##
-## Не чёрный: в темноте агенты продолжают стрелять, у них лишь падает
-## дальность, и этаж, на котором врага не видно, был бы смертью ни за что.
-## Холодный оттенок отделяет погашенный этаж от горящего вернее яркости.
-const AMBIENT := Color(0.50, 0.54, 0.68)
-
-## Заливка горящего этажа: она возвращает ему обычную яркость.
-const FLOOR_LIGHT := Color(1.0, 0.95, 0.86)
+## Сами цвета живут в [BuildingPalette]: они меняются от раунда к раунду
+## (ADR-0017, решение 2), а сила — нет, она подобрана под ассеты.
 const FLOOR_ENERGY: float = 1.15
-
-## Столб света в шахте: кабина возит свой свет, и шахта видна как шахта.
-## Он не гаснет вместе с этажом — это освещение самой шахты, а не этажа.
-const SHAFT_LIGHT := Color(0.78, 0.86, 1.0)
 const SHAFT_ENERGY: float = 0.55
 
-## Окна в задней стене: сколько на этаже и какого размера.
-const WINDOWS_PER_FLOOR: int = 6
-const WINDOW_SIZE := Vector2(72.0, 40.0)
-## На сколько ниже потолка начинается окно, px.
-const WINDOW_TOP: float = 14.0
+## Ширина направляющей шахты, px. Стойка идёт по краю проёма во всю его высоту.
+const SHAFT_RAIL_WIDTH: float = 6.0
 
-## Город за окнами: силуэт и горящие окна. Само небо — цвет узла Background
-## в сцене, там же, где сам узел.
-const CITY := Color(0.12, 0.14, 0.24)
-const CITY_WINDOW := Color(0.92, 0.83, 0.50)
+## Высота створок шахты, px. Совпадает с ассетом `shaft_door`.
+const SHAFT_DOOR_HEIGHT: float = 34.0
 
-## Насколько город отстаёт от камеры: 1 — бесконечно далёк и стоит на месте.
-## По вертикали больше, чем по горизонтали: здание высокое, и город, бегущий
-## вниз наравне со спуском, читался бы как соседняя стена, а не как даль.
-const CITY_PARALLAX := Vector2(0.86, 0.94)
+## Надстройка машинного отделения на крыше, px. Совпадает с ассетом `machine_room`.
+const MACHINE_ROOM_SIZE := Vector2(72.0, 44.0)
 
-## Полоса, в которой стоит город, в координатах его собственного слоя.
-const CITY_AREA := Rect2(0.0, 40.0, 1280.0, 500.0)
+## Ширина троса, по которому Otto съезжает на крышу, px.
+const ROPE_WIDTH: float = 4.0
+
+## Сколько Otto висит над крышей в начале здания и как быстро съезжает.
+##
+## Выше собственного прыжка (80 px): он должен прийти сверху, а не подпрыгнуть.
+## Спуск занимает меньше секунды — это кадр вступления, а не механика
+## (ADR-0017, решение 4).
+const ROPE_DROP: float = 88.0
+const ROPE_SPEED: float = 140.0
 
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 const ESCALATOR_SCENE := preload("res://src/systems/escalators/escalator.tscn")
@@ -142,11 +134,9 @@ var _shaft_lights: Array[AreaLight] = []
 ## Пустой полосой служит (0, -1): у неё конец раньше начала, а (-1, -1) теперь
 ## означает «горит крыша» — это настоящий уровень, и совпадение молчало бы.
 var _lit_span := Vector2i(0, -1)
-## Дальний план: город за окнами. Двигается медленнее камеры.
-var _city: Node2D = null
-## Задние стены этажей. Их под три сотни, и держать их прямо в уровне значит
-## заставить каждый обход [method agents] перебирать ещё и их.
-var _back_walls: Node2D = null
+## Дальний план: задние стены с окнами и город за ними. Свой узел, потому что
+## их под три сотни, и каждый обход детей уровня перебирал бы ещё и их.
+var _backdrop: BuildingBackdrop = null
 ## Лампы здания: их свет тоже гасится за пределами кадра. Упавшие лампы
 ## убирают себя сами, поэтому перед обращением проверяется живость.
 var _lamps: Array[Lamp] = []
@@ -161,6 +151,10 @@ var _car_leaving: bool = false
 ## Куда машина уезжает: -1 влево, +1 вправо. Та же сторона, с которой она стоит.
 var _car_towards: float = 1.0
 var _exit_position := Vector2.ZERO
+## Трос вступления и докуда по нему ехать. Пока едет — Otto не слушается ввода.
+var _rope: TextureRect = null
+var _sliding: bool = false
+var _rope_target: float = 0.0
 
 @onready var otto: Otto = $Otto
 @onready var _background: ColorRect = $Background
@@ -172,8 +166,9 @@ func _ready() -> void:
 	_plan = BuildingPlan.generate(rules, building_seed)
 
 	_background.size = Vector2(rules.width, rules.total_height())
-	_build_city()
-	_build_back_walls()
+	_backdrop = BuildingBackdrop.new()
+	add_child(_backdrop)
+	_backdrop.build(rules, building_seed, WALL_WIDTH)
 	_build_geometry()
 	_spawn_shafts()
 	_spawn_escalators()
@@ -184,8 +179,11 @@ func _ready() -> void:
 
 	# Otto начинает с крыши, как в оригинале, и там, где нет проёмов. Крыша —
 	# свой уровень над зданием, а не нулевой этаж: ADR-0014, пункт 1.
+	# Спускается он туда по тросу — как в порте (ADR-0017, решение 4).
 	var roof := BuildingRules.ROOF
-	otto.global_position = Vector2(_plan.safe_x(rules, roof), rules.floor_surface(roof))
+	var landing := Vector2(_plan.safe_x(rules, roof), rules.floor_surface(roof))
+	otto.global_position = landing - Vector2(0.0, ROPE_DROP)
+	_start_the_slide(landing)
 	otto.died.connect(_on_otto_died)
 	GameState.instance().alarm_raised.connect(_on_alarm_raised)
 	if GameState.instance().alarm.raised:
@@ -210,7 +208,7 @@ func _process(delta: float) -> void:
 		_move_car(delta, view)
 
 	# Город отстаёт от камеры, оттого и кажется далёким.
-	_city.position = view.position * CITY_PARALLAX
+	_backdrop.follow(view)
 
 	var span := VisibleFloors.around(rules, view)
 	# Агенты пересчитываются каждый кадр, а не только на смене полосы: дверь ждёт
@@ -297,6 +295,8 @@ func _build_geometry() -> void:
 		# Перекрытие шире собственных стен там, где силуэт делает ступень: оно же
 		# потолок нижнего этажа, а тот шире своего верхнего соседа.
 		for rect in slab_segments(surface, gaps, rules.slab_span(index), rules.slab_height):
+			# Перекрытия тоном раунда не красятся: белый пол и потолок должны
+			# читаться одинаково в любом раунде — это опора, а не фон.
 			_build_solid(rect, slab_tile)
 		_build_side_walls(index, surface, bounds, side_tile)
 
@@ -312,11 +312,14 @@ func _build_side_walls(index: int, surface: float, bounds: Vector2, tile: Canvas
 	if height <= 0.0:
 		return
 
-	_build_solid(Rect2(bounds.x, top, WALL_WIDTH, height), tile)
-	_build_solid(Rect2(bounds.y - WALL_WIDTH, top, WALL_WIDTH, height), tile)
+	_build_solid(Rect2(bounds.x, top, WALL_WIDTH, height), tile, rules.palette.masonry)
+	_build_solid(Rect2(bounds.y - WALL_WIDTH, top, WALL_WIDTH, height), tile, rules.palette.masonry)
 
 
 func _spawn_shafts() -> void:
+	# Тайлы берутся один раз на здание: шахт в нём пять, а этажей у них тридцать.
+	var rail_tile := SpriteTextures.tile("shaft_rail")
+	var door_tile := SpriteTextures.tile("shaft_door")
 	for shaft in _plan.shafts:
 		var stops := PackedFloat32Array()
 		for index in range(shaft.top, shaft.bottom + 1):
@@ -328,7 +331,133 @@ func _spawn_shafts() -> void:
 		car.setup(stops)
 		_cars.append(car)
 		_spawn_shaft_pit(shaft)
+		_dress_shaft(shaft, rail_tile, door_tile)
 		_light_shaft(shaft)
+	_spawn_machine_room()
+
+
+## Одевает шахту: направляющие во всю её высоту и створки на каждом её этаже.
+##
+## До M12 шахта была дырой в перекрытии со столбом света — в кадре её почти не
+## было, хотя спуск по зданию и есть игра (ADR-0017, решение 3). Направляющие
+## дают ей края, створки — отметку этажа: по ним видно, где кабина встаёт.
+##
+## Рисуется позади перекрытий (`z_index` −2): стойка идёт сквозь всю шахту, и
+## на каждом этаже её перекрывает плита — ровно так, как она и шла бы внутри
+## шахты. Кабина идёт впереди и закрывает их собой, когда проходит мимо.
+func _dress_shaft(
+	shaft: BuildingPlan.ShaftSpot, rail_tile: CanvasTexture, door_tile: CanvasTexture
+) -> void:
+	var top := rules.story_top(shaft.top)
+	if shaft.top <= BuildingRules.ROOF:
+		# Над крышей потолка нет, и стойки ушли бы в небо. Верхняя шахта
+		# кончается внутри машинного отделения: оно и есть её верх.
+		top = rules.floor_surface(BuildingRules.ROOF) - MACHINE_ROOM_SIZE.y * 0.5
+	var bottom := rules.floor_surface(shaft.bottom)
+	var half := rules.shaft_width * 0.5
+	var tint := rules.palette.shaft
+
+	for side: float in [-1.0, 1.0]:
+		var x := shaft.x + half * side
+		var left := x if side < 0.0 else x - SHAFT_RAIL_WIDTH
+		_add_shaft_part(Rect2(left, top, SHAFT_RAIL_WIDTH, bottom - top), rail_tile, tint)
+
+	for index: int in range(shaft.top, shaft.bottom + 1):
+		var surface := rules.floor_surface(index)
+		var door := Rect2(
+			shaft.x - half, surface - SHAFT_DOOR_HEIGHT, rules.shaft_width, SHAFT_DOOR_HEIGHT
+		)
+		_add_shaft_part(door, door_tile, tint, true)
+
+
+## Кусок одежды шахты. Без тела: по направляющим не ходят, они только видны.
+##
+## [param whole] — ассет кладётся целиком, а не плиткой. Стойка тайлится: она
+## идёт на сотни пикселей, а тайл у неё в шестнадцать. Створки — одна картинка
+## шириной в шахту, и замостить её значило бы порезать их пополам, стоит
+## [member BuildingRules.shaft_width] разойтись с ассетом.
+func _add_shaft_part(rect: Rect2, tile: CanvasTexture, tint: Color, whole: bool = false) -> void:
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return
+
+	var part := (
+		TiledRect.stretched(rect.size, rect.position, tile, tint)
+		if whole
+		else TiledRect.make(rect.size, rect.position, tile, tint)
+	)
+	part.z_index = -2
+	add_child(part)
+
+
+## Надстройка машинного отделения над верхней шахтой.
+##
+## Тела у неё нет намеренно: под ней проём той самой шахты, с которой начинается
+## спуск, и сплошная надстройка заперла бы Otto на крыше. Стоит она позади него
+## (`z_index` −2), и он проходит перед ней.
+func _spawn_machine_room() -> void:
+	var shaft := _plan.roof_shaft()
+	if shaft == null:
+		return
+
+	var surface := rules.floor_surface(BuildingRules.ROOF)
+	var rect := Rect2(
+		Vector2(shaft.x - MACHINE_ROOM_SIZE.x * 0.5, surface - MACHINE_ROOM_SIZE.y),
+		MACHINE_ROOM_SIZE
+	)
+	# Не плиткой, а целиком: у домика рисунок цельный, и замостить его значило
+	# бы порезать крышу на четверти.
+	var room := TiledRect.stretched(
+		rect.size, rect.position, SpriteTextures.tile("machine_room"), rules.palette.masonry
+	)
+	room.z_index = -2
+	add_child(room)
+
+
+## Вступление: Otto съезжает по тросу на крышу.
+##
+## Пока едет, он «на эскалаторе» — ввод не действует, физика молчит, и коорди-
+## натой распоряжается уровень. Тот же приём, что у двери и эскалатора: своего
+## состояния ради одного кадра вступления заводить незачем.
+func _start_the_slide(landing: Vector2) -> void:
+	_rope_target = landing.y
+	_sliding = true
+	otto.board_escalator()
+	# Вступление длится полсекунды, а здание — минуты: держать ради него обход
+	# физики на всё здание незачем, [method _finish_the_slide] его и снимет.
+	set_physics_process(true)
+
+	_rope = TiledRect.make(
+		Vector2(ROPE_WIDTH, landing.y),
+		Vector2(landing.x - ROPE_WIDTH * 0.5, 0.0),
+		SpriteTextures.tile("rope")
+	)
+	_rope.z_index = -2
+	add_child(_rope)
+
+
+## Довозит Otto по тросу и убирает трос: он часть вступления, а не здания.
+##
+## Трос ведёт Otto, только пока тот выше крыши. Переставили ниже — вступление
+## кончилось само: так инструменты съёмки и тесты ставят его куда им надо,
+## не зная про трос вовсе.
+func _physics_process(delta: float) -> void:
+	if not _sliding:
+		return
+
+	if otto.global_position.y < _rope_target:
+		otto.global_position.y = minf(otto.global_position.y + ROPE_SPEED * delta, _rope_target)
+	if otto.global_position.y >= _rope_target:
+		_finish_the_slide()
+
+
+## Отдаёт управление игроку и убирает трос.
+func _finish_the_slide() -> void:
+	_sliding = false
+	set_physics_process(false)
+	otto.leave_escalator()
+	if _rope != null:
+		_rope.queue_free()
+		_rope = null
 
 
 ## Дно шахты: упавший сюда разбивается, вошедший ногами с этажа — нет.
@@ -414,7 +543,11 @@ func _spawn_exit() -> void:
 	var collision := CollisionShape2D.new()
 	collision.shape = shape
 	zone.add_child(collision)
-	zone.add_child(_tiled(area.size, -area.size * 0.5, SpriteTextures.tile("exit_way")))
+	# Вывеска — одна картинка на весь проём, а не тайл: замощённая, она повторилась
+	# бы половинкой, стоит проёму разойтись с ассетом.
+	zone.add_child(
+		TiledRect.stretched(area.size, -area.size * 0.5, SpriteTextures.tile("exit_way"))
+	)
 
 	zone.body_entered.connect(_on_exit_entered)
 	add_child(zone)
@@ -693,7 +826,7 @@ func _on_pit_entered(body: Node2D) -> void:
 		victim.kill()
 
 
-func _build_solid(rect: Rect2, tile: CanvasTexture) -> void:
+func _build_solid(rect: Rect2, tile: CanvasTexture, tint := Color.WHITE) -> void:
 	var body := StaticBody2D.new()
 	body.position = rect.position + rect.size * 0.5
 	# Тела добавляются в дерево после Otto, то есть рисовались бы поверх него.
@@ -705,134 +838,10 @@ func _build_solid(rect: Rect2, tile: CanvasTexture) -> void:
 	var collision := CollisionShape2D.new()
 	collision.shape = shape
 	body.add_child(collision)
-	body.add_child(_tiled(rect.size, -rect.size * 0.5, tile))
+	body.add_child(TiledRect.make(rect.size, -rect.size * 0.5, tile, tint))
 	body.add_child(_occluder(rect.size))
 
 	add_child(body)
-
-
-## Окна этажа: равные проёмы в задней стене, через которые виден город.
-##
-## Статический, чтобы проверяться без сцены, — как и [method slab_segments].
-## [param bounds] — внутренние края стены, между которыми раскладываются окна.
-static func window_gaps(bounds: Vector2, count: int, window_width: float) -> Array[Vector2]:
-	var gaps: Array[Vector2] = []
-	var width := bounds.y - bounds.x
-	if count <= 0 or window_width <= 0.0 or width <= 0.0:
-		return gaps
-
-	var pitch := width / float(count)
-	for number: int in count:
-		# Окно стоит посередине своей доли стены: так они разнесены поровну
-		# и у стен здания остаётся полполосы, а не обрезанное окно.
-		var centre := bounds.x + pitch * (float(number) + 0.5)
-		var half := minf(window_width, pitch) * 0.5
-		gaps.append(Vector2(centre - half, centre + half))
-	return gaps
-
-
-## Задняя стена: сплошная, кроме окон. Через окна виден город.
-##
-## Стена кладётся тремя полосами: над окнами, по окнам и под ними. Резать её
-## по горизонтали умеет [method BuildingPlan.spans_between] — та же функция,
-## что режет перекрытия проёмами.
-func _build_back_walls() -> void:
-	_back_walls = Node2D.new()
-	_back_walls.z_index = -8
-	add_child(_back_walls)
-
-	# Тайлы берутся один раз на здание: полос и рам под три сотни, а текстур две.
-	var wall_tile := SpriteTextures.tile("wall")
-	var frame_tile := SpriteTextures.tile("window_frame")
-	# Этажи, крыши среди них нет: она снаружи, комнаты за ней не бывает, и стена
-	# вышла бы полосой в небе над тем местом, где Otto начинает.
-	for index: int in rules.floors:
-		var top := rules.story_top(index)
-		var surface := rules.floor_surface(index)
-		if surface - top <= 0.0:
-			continue
-
-		# Окна режутся по ширине своего этажа: на узких этажах стена короче,
-		# и окна, разложенные по ширине здания, уехали бы за неё на улицу.
-		var bounds := rules.floor_span(index)
-		var inner := Vector2(bounds.x + WALL_WIDTH, bounds.y - WALL_WIDTH)
-		var gaps := window_gaps(inner, WINDOWS_PER_FLOOR, WINDOW_SIZE.x)
-
-		var window_top := minf(top + WINDOW_TOP, surface)
-		var window_bottom := minf(window_top + WINDOW_SIZE.y, surface)
-		var width := inner.y - inner.x
-		_add_back_wall(Rect2(inner.x, top, width, window_top - top), wall_tile)
-		_add_back_wall(Rect2(inner.x, window_bottom, width, surface - window_bottom), wall_tile)
-
-		for span: Vector2 in BuildingPlan.spans_between(gaps, inner):
-			var strip := Rect2(span.x, window_top, span.y - span.x, window_bottom - window_top)
-			_add_back_wall(strip, wall_tile)
-
-		for gap: Vector2 in gaps:
-			var opening := Rect2(gap.x, window_top, gap.y - gap.x, window_bottom - window_top)
-			_add_window_frame(opening, frame_tile)
-
-
-func _add_back_wall(rect: Rect2, tile: CanvasTexture) -> void:
-	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
-		return
-
-	_back_walls.add_child(_tiled(rect.size, rect.position, tile))
-
-
-## Рама вокруг проёма, в котором виден город.
-##
-## Кладётся девятикусочно и наполовину заходит на стену: так проём получает
-## откос, на котором играет свет этажа, а город в нём остаётся городом —
-## середина рамы пустая, а не застеклённая.
-func _add_window_frame(opening: Rect2, tile: CanvasTexture) -> void:
-	if opening.size.x <= 0.0 or opening.size.y <= 0.0:
-		return
-
-	var overlap := SpriteTextures.FRAME_MARGIN * 0.5
-	var frame := NinePatchRect.new()
-	frame.texture = tile
-	frame.draw_center = false
-	frame.patch_margin_left = int(SpriteTextures.FRAME_MARGIN)
-	frame.patch_margin_top = int(SpriteTextures.FRAME_MARGIN)
-	frame.patch_margin_right = int(SpriteTextures.FRAME_MARGIN)
-	frame.patch_margin_bottom = int(SpriteTextures.FRAME_MARGIN)
-	frame.position = opening.position - Vector2(overlap, overlap)
-	frame.size = opening.size + Vector2(overlap, overlap) * 2.0
-	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_back_walls.add_child(frame)
-
-
-## Город за окнами. Свет здания на него не падает: он снаружи и далеко.
-func _build_city() -> void:
-	_city = Node2D.new()
-	_city.z_index = -9
-	add_child(_city)
-
-	var stone := SpriteTextures.tile("city_wall")
-	for tower: Skyline.Tower in Skyline.generate(building_seed, CITY_AREA):
-		_add_city_panel(tower.rect, CITY, stone)
-		for window: Rect2 in tower.windows:
-			# Окно города — источник, а не поверхность: рельеф ему ни к чему.
-			_add_city_panel(window, CITY_WINDOW, null)
-
-
-## Кусок дальнего плана. Свет здания на него не падает.
-##
-## Маска гасится на каждой панели, а не на общем узле: [member CanvasItem.light_mask]
-## детям не передаётся, и город в окне разгорался вместе с этажом — окно читалось
-## как освещённая ниша, а не как улица.
-## Кусок дальнего плана: башня с текстурой или окно, которое рисуется заливкой.
-## Окну рельеф ни к чему — оно источник, а не поверхность, поэтому [param tile]
-## у него пустой. Это единственное место, где заливка осталась намеренно.
-func _add_city_panel(rect: Rect2, color: Color, tile: CanvasTexture = null) -> void:
-	var panel: Control = (
-		_panel(rect.size, rect.position, color)
-		if tile == null
-		else _tiled(rect.size, rect.position, tile)
-	)
-	panel.light_mask = 0
-	_city.add_child(panel)
 
 
 ## Столб света в шахте на всю её высоту.
@@ -844,7 +853,7 @@ func _light_shaft(shaft: BuildingPlan.ShaftSpot) -> void:
 	var top := rules.story_top(shaft.top)
 	var bottom := rules.floor_surface(shaft.bottom)
 	var area := Rect2(shaft.x - rules.shaft_width * 0.5, top, rules.shaft_width, bottom - top)
-	var light := AreaLight.column(area, SHAFT_LIGHT, SHAFT_ENERGY)
+	var light := AreaLight.column(area, rules.palette.shaft_light, SHAFT_ENERGY)
 	add_child(light)
 	_shaft_lights.append(light)
 
@@ -855,11 +864,11 @@ func _light_shaft(shaft: BuildingPlan.ShaftSpot) -> void:
 ## конструкция вехи держится на этом (ADR-0010, пункт 3).
 func _light_building() -> void:
 	var ambient := CanvasModulate.new()
-	ambient.color = AMBIENT
+	ambient.color = rules.palette.dark
 	add_child(ambient)
 
 	for index: int in rules.levels():
-		var light := AreaLight.covering(_story_area(index), FLOOR_LIGHT, FLOOR_ENERGY)
+		var light := AreaLight.covering(_story_area(index), rules.palette.lit, FLOOR_ENERGY)
 		add_child(light)
 		_floor_lights[index] = light
 
@@ -891,36 +900,3 @@ func _occluder(size: Vector2) -> LightOccluder2D:
 	var occluder := LightOccluder2D.new()
 	occluder.occluder = shape
 	return occluder
-
-
-## Плитка из ассета: [CanvasTexture] повторяется по площади прямоугольника.
-##
-## Заменяет [method _panel] там, где генератор уже нарисовал ассет. Вместе с
-## цветом приходят нормаль и блик, поэтому свет из M6 ложится на рельеф, а не
-## на плоскость (ADR-0011, пункт 7).
-func _tiled(size: Vector2, offset: Vector2, tile: CanvasTexture) -> TextureRect:
-	var rect := TextureRect.new()
-	rect.texture = tile
-	rect.stretch_mode = TextureRect.STRETCH_TILE
-	# Повтор включается на самом узле: по умолчанию холст зажимает текстуру
-	# по краям, и плита в тридцать тайлов вышла бы одним растянутым.
-	rect.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-	# Размер задаёт место, а не тайл. По умолчанию [TextureRect] объявляет
-	# минимальным размером размер текстуры, и [Control] поднимал до него всё,
-	# что меньше: полоса стены над окном (14 px при тайле 32 px) растягивалась
-	# до 32 px и закрывала город в верхней трети проёма.
-	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	rect.size = size
-	rect.position = offset
-	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return rect
-
-
-## Цветной прямоугольник — временная замена спрайтам до M7.
-func _panel(size: Vector2, offset: Vector2, color: Color) -> ColorRect:
-	var panel := ColorRect.new()
-	panel.color = color
-	panel.size = size
-	panel.position = offset
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return panel

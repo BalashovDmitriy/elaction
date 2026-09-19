@@ -18,7 +18,7 @@ UI_NO_RECORDS,No records yet,Рекордов пока нет
 UI_SCORE,Score,Очки
 UI_LIVES,Lives,Жизни
 UI_DOCUMENTS,Documents,Документы
-UI_BUILDING,Building,Здание
+UI_ROUND,Round,Раунд
 UI_ALARM,ALARM,ТРЕВОГА
 UI_VOLUME_MASTER,Master volume,Общая громкость
 UI_VOLUME_MUSIC,Music,Музыка

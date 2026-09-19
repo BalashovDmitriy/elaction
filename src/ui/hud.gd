@@ -51,7 +51,9 @@ func refresh() -> void:
 		"%s %d / %d" % [tr("UI_DOCUMENTS"), game.documents_collected, game.documents_total]
 	)
 	_lives.text = "%s %d" % [tr("UI_LIVES"), game.lives]
-	_place.text = "%s %d" % [tr("UI_BUILDING"), game.building]
+	# «Раунд», а не «здание»: так счётчик называется и в аркаде, и в порте
+	# (ADR-0017, решение 5).
+	_place.text = "%s %d" % [tr("UI_ROUND"), game.building]
 	_alarm.text = tr("UI_ALARM")
 	_alarm.visible = game.alarm.raised
 
