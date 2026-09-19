@@ -3,37 +3,37 @@
 [ext_resource type="Script" path="res://src/systems/elevators/elevator_car.gd" id="1_car"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_slab"]
-size = Vector2(40, 6)
+size = Vector2(120, 18)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_crush"]
-size = Vector2(36, 10)
+size = Vector2(108, 30)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_interior"]
-size = Vector2(36, 30)
+size = Vector2(108, 140)
 
 [node name="ElevatorCar" type="AnimatableBody2D"]
 sync_to_physics = true
 script = ExtResource("1_car")
 
 [node name="FloorShape" type="CollisionShape2D" parent="."]
-position = Vector2(0, 3)
+position = Vector2(0, 9)
 shape = SubResource("RectangleShape2D_slab")
 
 [node name="RoofShape" type="CollisionShape2D" parent="."]
-position = Vector2(0, -37)
+position = Vector2(0, -153)
 shape = SubResource("RectangleShape2D_slab")
 
 [node name="FloorVisual" type="TextureRect" parent="."]
-offset_left = -20.0
-offset_right = 20.0
-offset_bottom = 6.0
+offset_left = -60
+offset_right = 60
+offset_bottom = 18
 mouse_filter = 2
 
 [node name="RoofVisual" type="TextureRect" parent="."]
-offset_left = -20.0
-offset_top = -40.0
-offset_right = 20.0
-offset_bottom = -34.0
+offset_left = -60
+offset_top = -162
+offset_right = 60
+offset_bottom = -144
 mouse_filter = 2
 
 [node name="Interior" type="Area2D" parent="."]
@@ -41,13 +41,20 @@ collision_layer = 0
 collision_mask = 2
 
 [node name="InteriorShape" type="CollisionShape2D" parent="Interior"]
-position = Vector2(0, -18)
+position = Vector2(0, -72)
 shape = SubResource("RectangleShape2D_interior")
+
+[node name="UpArrow" type="Sprite2D" parent="."]
+position = Vector2(-33, -132)
+
+[node name="DownArrow" type="Sprite2D" parent="."]
+position = Vector2(33, -132)
+rotation = 3.14159
 
 [node name="CrushZone" type="Area2D" parent="."]
 collision_layer = 0
 collision_mask = 2
 
 [node name="CrushShape" type="CollisionShape2D" parent="CrushZone"]
-position = Vector2(0, 1)
+position = Vector2(0, 3)
 shape = SubResource("RectangleShape2D_crush")

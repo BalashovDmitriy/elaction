@@ -15,11 +15,12 @@ config/icon="res://icon.svg"
 
 [display]
 
-; Базовый вьюпорт 640x360 — ровно 1/3 от 1080p, даёт целочисленный скейл 3x.
-window/size/viewport_width=640
-window/size/viewport_height=360
-window/size/window_width_override=1280
-window/size/window_height_override=720
+; Базовый вьюпорт 1920x1080: картинка нативная, без скейла (ADR-0018).
+; Мир и ассеты измеряются в этих же пикселях, поэтому с M13 всё втрое крупнее.
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/window_width_override=1920
+window/size/window_height_override=1080
 window/stretch/mode="canvas_items"
 window/stretch/aspect="keep"
 

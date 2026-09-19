@@ -21,16 +21,16 @@ class Tower:
 
 
 ## Ширина башни и просвет между соседними, px.
-const WIDTH := Vector2(48.0, 130.0)
-const GAP := Vector2(6.0, 30.0)
+const WIDTH := Vector2(144.0, 390.0)
+const GAP := Vector2(18.0, 90.0)
 
 ## Высота башни в долях высоты отведённой полосы.
 const HEIGHT := Vector2(0.25, 1.0)
 
 ## Окно башни и отступ от её краёв, px.
-const WINDOW := Vector2(7.0, 10.0)
-const WINDOW_GAP: float = 9.0
-const WINDOW_MARGIN: float = 8.0
+const WINDOW := Vector2(21.0, 30.0)
+const WINDOW_GAP: float = 27.0
+const WINDOW_MARGIN: float = 24.0
 
 ## Какая доля окон горит.
 const WINDOWS_LIT: float = 0.40

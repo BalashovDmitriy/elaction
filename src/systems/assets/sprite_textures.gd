@@ -36,6 +36,8 @@ const NAMES: PackedStringArray = [
 	"escalator_belt",
 	"shaft_rail",
 	"shaft_door",
+	"shaft_buffer",
+	"car_arrow",
 	"machine_room",
 	"rope",
 	"lamp",
@@ -82,9 +84,10 @@ const AGENT_POSES: PackedStringArray = [
 ## (ADR-0011, пункт 5).
 const WALK_FPS: float = 10.0
 
-## Ширина рамки девятикусочных ассетов: та же величина стоит в
-## `tools/render_env.py`, и тест следит, чтобы они не разошлись.
-const FRAME_MARGIN: float = 8.0
+## Ширина рамки девятикусочных ассетов, px. В генераторе она записана в единицах
+## мира (`tools/render_env.py`, `FRAME_MARGIN` = 8) и умножается на масштаб
+## набора: 8 × 3. Тест следит, чтобы они не разошлись.
+const FRAME_MARGIN: float = 24.0
 
 ## Ассеты, которые кладутся девятикусочно, а не плиткой.
 const FRAMED: PackedStringArray = ["window_frame"]

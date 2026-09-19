@@ -28,18 +28,18 @@ const RESPAWN_GRACE: float = 1.5
 ## передышка себя показывает: без него игрок не знает, что она вообще была.
 const GRACE_BLINKS: float = 8.0
 
-@export var walk_speed: float = 90.0
-## Высота прыжка = jump_speed² / (2 · gravity). При 380 и 900 это ~80 px:
-## хватает на площадки greybox-уровня (нижние в 70 px от пола, верхняя — с них).
-@export var jump_speed: float = 380.0
-@export var gravity: float = 900.0
-@export var bullet_speed: float = 220.0
+@export var walk_speed: float = 270.0
+## Высота прыжка = jump_speed² / (2 · gravity). При 1140 и 2700 это ~240 px —
+## те же 80 единиц прежнего мира: с M13 мир втрое крупнее (ADR-0018).
+@export var jump_speed: float = 1140.0
+@export var gravity: float = 2700.0
+@export var bullet_speed: float = 660.0
 ## Откуда вылетает пуля, от ног. Присев, Otto стреляет ниже — и его выстрел
 ## проходит там, где стоящий враг его не перепрыгнет.
-@export var shot_height_standing: float = -20.0
-@export var shot_height_crouching: float = -10.0
-@export var muzzle_offset: float = 9.0
-@export var max_fall_speed: float = 420.0
+@export var shot_height_standing: float = -90.0
+@export var shot_height_crouching: float = -45.0
+@export var muzzle_offset: float = 40.0
+@export var max_fall_speed: float = 1260.0
 ## В оригинале Otto приседает на месте. Оставлено переключателем для настройки.
 @export var can_move_while_crouching: bool = false
 

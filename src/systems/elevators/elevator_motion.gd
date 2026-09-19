@@ -10,7 +10,7 @@ extends RefCounted
 ## Правила механики и цитаты источников — в ADR-0004.
 
 ## Допуск, внутри которого кабина считается совпавшей с этажом, px.
-const FLOOR_EPSILON: float = 0.5
+const FLOOR_EPSILON: float = 1.5
 
 ## Ниже этого порога команда игрока считается отпущенной.
 const COMMAND_THRESHOLD: float = 0.1
@@ -23,7 +23,7 @@ const DOWN := Intent.DOWN
 var floors: PackedFloat32Array = PackedFloat32Array()
 
 ## Скорость кабины, px/с.
-var speed: float = 60.0
+var speed: float = 180.0
 
 ## Пауза пустой кабины на этаже, с. В оригинале — от секунды до двух.
 var floor_pause: float = 1.5
@@ -42,7 +42,7 @@ var stops_between_floors: bool = true
 ## Без доводки выйти можно было только на краях шахты: «совпала с этажом» —
 ## это полпикселя, а кабина проходит их за долю кадра, и попасть в такое окно
 ## вручную нельзя. Промежуточные этажи были недостижимы.
-var settle_distance: float = 12.0
+var settle_distance: float = 36.0
 
 ## Текущая координата кабины.
 var position: float = 0.0
@@ -94,6 +94,17 @@ func update(delta: float, command: float, occupied: bool) -> float:
 		_run_on_its_own(delta)
 	velocity = (position - previous) / delta if delta > 0.0 else 0.0
 	return position
+
+
+## Может ли кабина ещё пойти в эту сторону: -1 вверх, +1 вниз.
+##
+## Шахты не сквозные (ADR-0008), и у полосы есть верх и низ. Доехавшая до края
+## кабина команду слышит, но стоит — и без этого вопроса игроку неоткуда узнать,
+## что дело в шахте, а не в игре.
+func can_go(towards: float) -> bool:
+	if floors.is_empty() or is_zero_approx(towards):
+		return false
+	return absf(_shaft_limit(towards) - position) > FLOOR_EPSILON
 
 
 ## Совпал ли пол кабины с полом этажа: только тогда из неё можно выйти.

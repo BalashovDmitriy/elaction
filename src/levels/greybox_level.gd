@@ -18,24 +18,27 @@ const FLOOR_ENERGY: float = 1.15
 const SHAFT_ENERGY: float = 0.55
 
 ## Ширина направляющей шахты, px. Стойка идёт по краю проёма во всю его высоту.
-const SHAFT_RAIL_WIDTH: float = 6.0
+const SHAFT_RAIL_WIDTH: float = 18.0
 
 ## Высота створок шахты, px. Совпадает с ассетом `shaft_door`.
-const SHAFT_DOOR_HEIGHT: float = 34.0
+const SHAFT_DOOR_HEIGHT: float = 102.0
+
+## Высота упора в конце полосы шахты, px. Совпадает с ассетом `shaft_buffer`.
+const SHAFT_BUFFER_HEIGHT: float = 24.0
 
 ## Надстройка машинного отделения на крыше, px. Совпадает с ассетом `machine_room`.
-const MACHINE_ROOM_SIZE := Vector2(72.0, 44.0)
+const MACHINE_ROOM_SIZE := Vector2(216.0, 132.0)
 
 ## Ширина троса, по которому Otto съезжает на крышу, px.
-const ROPE_WIDTH: float = 4.0
+const ROPE_WIDTH: float = 12.0
 
 ## Сколько Otto висит над крышей в начале здания и как быстро съезжает.
 ##
-## Выше собственного прыжка (80 px): он должен прийти сверху, а не подпрыгнуть.
+## Выше собственного прыжка (240 px с M13): он должен прийти сверху, а не подпрыгнуть.
 ## Спуск занимает меньше секунды — это кадр вступления, а не механика
 ## (ADR-0017, решение 4).
-const ROPE_DROP: float = 88.0
-const ROPE_SPEED: float = 140.0
+const ROPE_DROP: float = 264.0
+const ROPE_SPEED: float = 420.0
 
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 const ESCALATOR_SCENE := preload("res://src/systems/escalators/escalator.tscn")
@@ -43,17 +46,17 @@ const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 const LAMP_SCENE := preload("res://src/systems/lighting/lamp.tscn")
 
-const WALL_WIDTH: float = 16.0
+const WALL_WIDTH: float = 48.0
 
 ## Дно шахты: сюда падает тот, кто шагнул в пустой проём.
-const PIT_HEIGHT: float = 20.0
+const PIT_HEIGHT: float = 60.0
 
 ## На сколько выше пола висит середина лампы, px.
-const LAMP_HANG_HEIGHT: float = 60.0
+const LAMP_HANG_HEIGHT: float = 180.0
 
 ## Выход из здания — на нижнем этаже.
-const EXIT_WIDTH: float = 64.0
-const EXIT_HEIGHT: float = 40.0
+const EXIT_WIDTH: float = 192.0
+const EXIT_HEIGHT: float = 120.0
 
 ## Машина у выхода: ею оригинал заканчивает здание (ADR-0011, пункт 14).
 ## Стоит рядом с проёмом и уезжает, увозя Otto; следующее здание собирается
@@ -62,8 +65,8 @@ const EXIT_HEIGHT: float = 40.0
 ## Габарит нарочно не записан здесь второй раз: его знает сам ассет, а кадр ему
 ## задаёт `tools/render_actors.py`. Своя копия числа разъехалась бы с кадром при
 ## первой же правке машины, и та повисла бы над полом или утонула в нём.
-const CAR_GAP: float = 12.0
-const CAR_SPEED: float = 320.0
+const CAR_GAP: float = 36.0
+const CAR_SPEED: float = 960.0
 
 ## Насколько злее агенты и насколько хуже слушается кабина по тревоге.
 const ALARM_MENACE: float = 1.5
@@ -81,7 +84,7 @@ const AGENT_SPAWN_MARGIN: int = 1
 ## у двери получал выходящего в упор — на четыре пикселя, — а с такого
 ## расстояния не помогают ни уклонение, ни выстрел первым. Дверь просто ждёт,
 ## пока игрок отойдёт.
-const AGENT_SAFE_RELEASE: float = 96.0
+const AGENT_SAFE_RELEASE: float = 288.0
 
 ## На сколько дальше того же запаса агент живёт, прежде чем его уберут.
 ##
@@ -305,7 +308,7 @@ func _build_geometry() -> void:
 ## столбцами во всю высоту: здание расширяется книзу (ADR-0014, пункт 3).
 ##
 ## У крыши стена доходит до верха мира: это парапет, и он же не даёт шагнуть
-## с крыши мимо здания. Прыжок берёт 80 px, и низкий бортик Otto перемахнул бы.
+## с крыши мимо здания. Прыжок берёт 240 px, и низкий бортик Otto перемахнул бы.
 func _build_side_walls(index: int, surface: float, bounds: Vector2, tile: CanvasTexture) -> void:
 	var top := rules.story_top(index)
 	var height := surface + rules.slab_height - top
@@ -320,6 +323,7 @@ func _spawn_shafts() -> void:
 	# Тайлы берутся один раз на здание: шахт в нём пять, а этажей у них тридцать.
 	var rail_tile := SpriteTextures.tile("shaft_rail")
 	var door_tile := SpriteTextures.tile("shaft_door")
+	var buffer_tile := SpriteTextures.tile("shaft_buffer")
 	for shaft in _plan.shafts:
 		var stops := PackedFloat32Array()
 		for index in range(shaft.top, shaft.bottom + 1):
@@ -331,7 +335,7 @@ func _spawn_shafts() -> void:
 		car.setup(stops)
 		_cars.append(car)
 		_spawn_shaft_pit(shaft)
-		_dress_shaft(shaft, rail_tile, door_tile)
+		_dress_shaft(shaft, rail_tile, door_tile, buffer_tile)
 		_light_shaft(shaft)
 	_spawn_machine_room()
 
@@ -346,13 +350,13 @@ func _spawn_shafts() -> void:
 ## на каждом этаже её перекрывает плита — ровно так, как она и шла бы внутри
 ## шахты. Кабина идёт впереди и закрывает их собой, когда проходит мимо.
 func _dress_shaft(
-	shaft: BuildingPlan.ShaftSpot, rail_tile: CanvasTexture, door_tile: CanvasTexture
+	shaft: BuildingPlan.ShaftSpot,
+	rail_tile: CanvasTexture,
+	door_tile: CanvasTexture,
+	buffer_tile: CanvasTexture
 ) -> void:
-	var top := rules.story_top(shaft.top)
-	if shaft.top <= BuildingRules.ROOF:
-		# Над крышей потолка нет, и стойки ушли бы в небо. Верхняя шахта
-		# кончается внутри машинного отделения: оно и есть её верх.
-		top = rules.floor_surface(BuildingRules.ROOF) - MACHINE_ROOM_SIZE.y * 0.5
+	_mark_shaft_ends(shaft, buffer_tile)
+	var top := _shaft_top(shaft)
 	var bottom := rules.floor_surface(shaft.bottom)
 	var half := rules.shaft_width * 0.5
 	var tint := rules.palette.shaft
@@ -368,6 +372,46 @@ func _dress_shaft(
 			shaft.x - half, surface - SHAFT_DOOR_HEIGHT, rules.shaft_width, SHAFT_DOOR_HEIGHT
 		)
 		_add_shaft_part(door, door_tile, tint, true)
+
+
+## Упоры в концах полосы: дальше кабина не идёт, и это видно.
+##
+## Отзыв после игры: «лифт не слушается команд и стоит, а сошёл — уехал». Это
+## и был конец полосы — кабина слышала команду, но идти дальше ей некуда, а
+## пустая она тут же уезжала по своему расписанию. Упор объясняет предел без
+## единого слова; второй указатель — стрелки в самой кабине.
+##
+## Нижний упор лежит на дне шахты, то есть над полом нижнего её этажа, а не под
+## ним: перекрытие рисуется ближе к зрителю (`z_index` −1 против −2), и упор,
+## опущенный в толщу плиты, не виден вовсе — ровно там, где предел и надо
+## объяснить.
+func _mark_shaft_ends(shaft: BuildingPlan.ShaftSpot, tile: CanvasTexture) -> void:
+	var half := rules.shaft_width * 0.5
+	var top := _shaft_top(shaft)
+	var bottom := rules.floor_surface(shaft.bottom) - SHAFT_BUFFER_HEIGHT
+
+	_add_shaft_part(
+		Rect2(shaft.x - half, top, rules.shaft_width, SHAFT_BUFFER_HEIGHT), tile, Color.WHITE, true
+	)
+	_add_shaft_part(
+		Rect2(shaft.x - half, bottom, rules.shaft_width, SHAFT_BUFFER_HEIGHT),
+		tile,
+		Color.WHITE,
+		true
+	)
+
+
+## Верх шахты: докуда идут её стойки, упор и столб света.
+##
+## У шахты, доходящей до крыши, потолка нет — над ней небо, и [method
+## BuildingRules.story_top] отдаёт верх мира. Стойка, упор и свет ушли бы в
+## открытое небо над крышей; кончается такая шахта внутри машинного отделения,
+## оно и есть её верх. Считается в одном месте, потому что разъехавшись эти трое
+## дают шахту, которая светит выше, чем видна.
+func _shaft_top(shaft: BuildingPlan.ShaftSpot) -> float:
+	if shaft.top > BuildingRules.ROOF:
+		return rules.story_top(shaft.top)
+	return rules.floor_surface(BuildingRules.ROOF) - MACHINE_ROOM_SIZE.y * 0.5
 
 
 ## Кусок одежды шахты. Без тела: по направляющим не ходят, они только видны.
@@ -849,8 +893,12 @@ func _build_solid(rect: Rect2, tile: CanvasTexture, tint := Color.WHITE) -> void
 ## Шахта — единственное, что светится в погашенном здании само: она соединяет
 ## этажи, и свет в ней показывает, куда идти, когда лампы сбиты. Гасить её вместе
 ## с этажом нельзя — этажей у шахты много, а столб один.
+##
+## Верх берётся тот же, что у стоек ([method _shaft_top]): у шахты до крыши
+## потолка нет, и столб, отмеренный от верха мира, светил бы в открытом небе
+## над крышей — там, где Otto висит на тросе всё вступление.
 func _light_shaft(shaft: BuildingPlan.ShaftSpot) -> void:
-	var top := rules.story_top(shaft.top)
+	var top := _shaft_top(shaft)
 	var bottom := rules.floor_surface(shaft.bottom)
 	var area := Rect2(shaft.x - rules.shaft_width * 0.5, top, rules.shaft_width, bottom - top)
 	var light := AreaLight.column(area, rules.palette.shaft_light, SHAFT_ENERGY)

@@ -3,10 +3,10 @@
 [ext_resource type="Script" path="res://src/systems/lighting/lamp.gd" id="1_lamp"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_lamp"]
-size = Vector2(16, 24)
+size = Vector2(48, 72)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_crush"]
-size = Vector2(20, 26)
+size = Vector2(60, 78)
 
 [node name="Lamp" type="AnimatableBody2D"]
 collision_layer = 8
@@ -17,10 +17,10 @@ script = ExtResource("1_lamp")
 shape = SubResource("RectangleShape2D_lamp")
 
 [node name="Visual" type="TextureRect" parent="."]
-offset_left = -8.0
-offset_top = -12.0
-offset_right = 8.0
-offset_bottom = 12.0
+offset_left = -24
+offset_top = -36
+offset_right = 24
+offset_bottom = 36
 mouse_filter = 2
 
 [node name="CrushZone" type="Area2D" parent="."]

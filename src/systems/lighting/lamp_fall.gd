@@ -8,10 +8,10 @@ extends RefCounted
 ## как требуют соглашения проекта.
 
 ## Скорость падения, px/с.
-var speed: float = 260.0
+var speed: float = 780.0
 
 ## Сколько лететь до пола, px. Считается от формы самой лампы.
-var distance: float = 40.0
+var distance: float = 120.0
 
 var falling: bool = false
 

@@ -17,6 +17,11 @@ func _shaft(start_floor: int = 0) -> ElevatorMotion:
 	var motion := ElevatorMotion.new()
 	motion.speed = 100.0
 	motion.floor_pause = 1.0
+	# Шахта теста — свой маленький мир: этажи в ста единицах друг от друга.
+	# Доводка до этажа задаётся явно, иначе тест зависит от того, в каком
+	# масштабе нарисована игра: с M13 мир втрое крупнее, и умолчание класса
+	# (36) перекрыло бы весь пролёт между этажами этого теста.
+	motion.settle_distance = 12.0
 	motion.setup(PackedFloat32Array([TOP, MIDDLE, BOTTOM]), start_floor)
 	return motion
 

@@ -28,11 +28,11 @@ const FALLING_TINT := Color(0.5, 0.5, 0.56)
 ## Свет — ребёнок лампы, поэтому падает вместе с ней и гаснет, когда её
 ## убирают с пола. Этаж при этом гасит не он, а заливка (ADR-0010, пункт 3):
 ## лампа светит собой, а «на этаже есть свет» — это отдельный источник.
-const LIGHT_RADIUS: float = 96.0
+const LIGHT_RADIUS: float = 288.0
 const LIGHT_COLOR := Color(1.0, 0.93, 0.72)
 const LIGHT_ENERGY: float = 1.1
 
-@export var fall_speed: float = 260.0
+@export var fall_speed: float = 780.0
 
 var _fall := LampFall.new()
 var _light: PointLight2D = null

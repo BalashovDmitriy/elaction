@@ -14,9 +14,9 @@ extends Node2D
 
 ## Окна в задней стене: сколько на этаже и какого размера.
 const WINDOWS_PER_FLOOR: int = 6
-const WINDOW_SIZE := Vector2(72.0, 40.0)
+const WINDOW_SIZE := Vector2(150.0, 100.0)
 ## На сколько ниже потолка начинается окно, px.
-const WINDOW_TOP: float = 14.0
+const WINDOW_TOP: float = 42.0
 
 ## Город за окнами: силуэт и горящие окна. Само небо — цвет узла Background
 ## в сцене, там же, где сам узел.
@@ -29,7 +29,7 @@ const CITY_WINDOW := Color(0.92, 0.83, 0.50)
 const CITY_PARALLAX := Vector2(0.86, 0.94)
 
 ## Полоса, в которой стоит город, в координатах его собственного слоя.
-const CITY_AREA := Rect2(0.0, 40.0, 1280.0, 500.0)
+const CITY_AREA := Rect2(0.0, 120.0, 3840.0, 1500.0)
 
 ## Город: он один на здание и ездит за камерой медленнее неё.
 var _city: Node2D = null

@@ -37,9 +37,9 @@ const SIZE: int = 512
 ## Ставится не присваиванием, а через [method raise]: движок множит поле
 ## [member PointLight2D.height] на средний масштаб узла, а масштаб у наших
 ## источников любой — заливка растянута на весь этаж, пятно лампы на её радиус.
-const FILL_HEIGHT: float = 320.0
-const SPOT_HEIGHT: float = 80.0
-const FLASH_HEIGHT: float = 24.0
+const FILL_HEIGHT: float = 960.0
+const SPOT_HEIGHT: float = 240.0
+const FLASH_HEIGHT: float = 72.0
 
 ## На какой сетке профиль считается. Полмиллиона точек в GDScript — это
 ## заметная пауза на входе в здание, а увеличить готовую картинку движок

@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://src/actors/enemy/enemy.gd" id="1_enemy"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_enemy"]
-size = Vector2(12, 26)
+size = Vector2(54, 117)
 
 [node name="Enemy" type="CharacterBody2D"]
 collision_layer = 4
@@ -11,14 +11,14 @@ collision_mask = 1
 script = ExtResource("1_enemy")
 
 [node name="Shape" type="CollisionShape2D" parent="."]
-position = Vector2(0, -13)
+position = Vector2(0, -58.5)
 shape = SubResource("RectangleShape2D_enemy")
 
 [node name="Body" type="Sprite2D" parent="."]
 centered = false
-offset = Vector2(-16, -34)
+offset = Vector2(-72, -153)
 
 [node name="FloorProbe" type="RayCast2D" parent="."]
-position = Vector2(9, -4)
-target_position = Vector2(0, 12)
+position = Vector2(40.5, -18)
+target_position = Vector2(0, 54)
 collision_mask = 1

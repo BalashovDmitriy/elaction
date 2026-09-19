@@ -32,19 +32,19 @@ const LIVING: int = 2 | 4
 ##
 ## Гаснет по пройденному пути, а не по времени: так вспышка одинаковой длины
 ## у быстрой и медленной пули, и её не надо подбирать под каждую скорость.
-const FLASH_RADIUS: float = 52.0
+const FLASH_RADIUS: float = 156.0
 const FLASH_COLOR := Color(1.0, 0.86, 0.55)
 const FLASH_ENERGY: float = 2.4
-const FLASH_RANGE: float = 64.0
+const FLASH_RANGE: float = 192.0
 
 ## Группа пуль: по ней агент находит то, от чего уклоняется. Перебирать детей
 ## уровня ему нельзя — их под три сотни, а пуль на экране от силы четыре.
 const GROUP := &"bullets"
 
-@export var speed: float = 220.0
+@export var speed: float = 660.0
 
 ## Дальше этого пуля гаснет сама, даже не встретив преграды.
-@export var max_range: float = 480.0
+@export var max_range: float = 1440.0
 
 ## Куда летит: -1 влево, +1 вправо.
 var direction: float = 1.0

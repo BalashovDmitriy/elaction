@@ -19,10 +19,10 @@ enum Stance { STAND, KNEEL, PRONE }
 var emerge_time: float = 0.6
 
 ## Насколько близко по вертикали, чтобы считать, что Otto на той же линии, px.
-var same_line: float = 10.0
+var same_line: float = 45.0
 
 ## Дальше этого агент не стреляет, px.
-var fire_range: float = 200.0
+var fire_range: float = 600.0
 
 ## Пауза между выстрелами, с.
 var fire_cooldown: float = 1.1
@@ -41,9 +41,9 @@ var aim_time: float = 0.35
 
 ## Рост агента в каждой стойке, px. По ним и решается, пройдёт ли пуля мимо:
 ## стойка годится, если она ниже летящей пули.
-var stand_height: float = 26.0
-var kneel_height: float = 17.0
-var prone_height: float = 8.0
+var stand_height: float = 117.0
+var kneel_height: float = 76.0
+var prone_height: float = 36.0
 
 ## Что агенту разрешено. В первых зданиях он только стоит, дальше учится
 ## приседать, ещё дальше — ложиться. Разрешение даёт злость, см. [Enemy].

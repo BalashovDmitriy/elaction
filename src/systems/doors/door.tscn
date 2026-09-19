@@ -3,22 +3,22 @@
 [ext_resource type="Script" path="res://src/systems/doors/door.gd" id="1_door"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_mat"]
-size = Vector2(20, 10)
+size = Vector2(60, 30)
 
 [node name="Door" type="Node2D"]
 z_index = -1
 script = ExtResource("1_door")
 
 [node name="Panel" type="TextureRect" parent="."]
-offset_left = -12.0
-offset_top = -34.0
-offset_right = 12.0
+offset_left = -42
+offset_top = -171
+offset_right = 42
 mouse_filter = 2
 
 [node name="MatVisual" type="TextureRect" parent="."]
-offset_left = -10.0
-offset_top = -3.0
-offset_right = 10.0
+offset_left = -30
+offset_top = -9
+offset_right = 30
 mouse_filter = 2
 
 [node name="Mat" type="Area2D" parent="."]
@@ -26,5 +26,5 @@ collision_layer = 0
 collision_mask = 2
 
 [node name="MatShape" type="CollisionShape2D" parent="Mat"]
-position = Vector2(0, -5)
+position = Vector2(0, -15)
 shape = SubResource("RectangleShape2D_mat")
