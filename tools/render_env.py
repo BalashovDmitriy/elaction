@@ -12,6 +12,7 @@ ADR-0011, пункты 1 и 7: у окружения нет анимации, п
     python tools/render_env.py           # всё
     python tools/render_env.py slab      # только один ассет
     python tools/render_env.py --list
+    python tools/render_env.py --scale 3 --out assets/sprites/env3   # втрое крупнее
 """
 
 from __future__ import annotations
@@ -46,6 +47,12 @@ SPECULAR_SUFFIX = "_s"
 # Ширина рамки девятикусочных ассетов. Та же величина стоит в
 # `SpriteTextures.FRAME_MARGIN`, и тест следит, чтобы они не разошлись.
 FRAME_MARGIN: int = 8
+
+# Во сколько раз крупнее рисовать. Ассеты описаны в единицах мира, а не в
+# пикселях экрана: холст и каждый прямоугольник умножаются здесь, и ни один
+# ассет об этом не знает. Так набор перерисовывается под другое разрешение,
+# не переписываясь по числу в каждой функции.
+SCALE: int = 1
 
 
 def normals(
@@ -88,16 +95,21 @@ class Canvas:
     """
 
     def __init__(self, width: int, height: int, wrap_x: bool = False, wrap_y: bool = False) -> None:
-        self.width = width
-        self.height = height
+        # Размер приходит в единицах мира, холст живёт в пикселях: на масштабе 3
+        # тайл в 32 единицы становится 96 пикселями, а рисуется тем же кодом.
+        self.scale = SCALE
+        self.width = width * self.scale
+        self.height = height * self.scale
         # Тайл замыкается по своим осям: у нормали на швах берётся сосед
         # с другого края, иначе на стыке двух копий видна тёмная линия.
         # Перекрытие повторяется только вбок, стена — во все стороны.
         self.wrap_x = wrap_x
         self.wrap_y = wrap_y
-        self.diffuse = np.zeros((height, width, 4), dtype=np.uint8)
-        self.height_map = np.zeros((height, width), dtype=np.float32)
-        self.specular = np.zeros((height, width, 2), dtype=np.float32)
+        # Карты — в пикселях холста, а не в единицах мира: на масштабе 3
+        # тайл в 32 единицы занимает 96 пикселей.
+        self.diffuse = np.zeros((self.height, self.width, 4), dtype=np.uint8)
+        self.height_map = np.zeros((self.height, self.width), dtype=np.float32)
+        self.specular = np.zeros((self.height, self.width, 2), dtype=np.float32)
 
     def rect(
         self,
@@ -110,11 +122,15 @@ class Canvas:
         material: Material,
         alpha: int = 255,
     ) -> None:
-        """Прямоугольник во все три карты разом. Координаты — от левого верха."""
-        left = max(x, 0)
-        top = max(y, 0)
-        right = min(x + width, self.width)
-        bottom = min(y + height, self.height)
+        """Прямоугольник во все три карты разом. Координаты — от левого верха.
+
+        Координаты и размеры — в единицах мира; в пиксели их переводит масштаб
+        холста, поэтому ассет описывается один раз на любое разрешение.
+        """
+        left = max(x * self.scale, 0)
+        top = max(y * self.scale, 0)
+        right = min((x + width) * self.scale, self.width)
+        bottom = min((y + height) * self.scale, self.height)
         if right <= left or bottom <= top:
             return
 
@@ -129,7 +145,7 @@ class Canvas:
         пункт 2: ассеты производные, но воспроизводимые).
         """
         rng = np.random.default_rng(seed)
-        x, y, width, height = area
+        x, y, width, height = (side * self.scale for side in area)
         patch = self.diffuse[y : y + height, x : x + width, :3].astype(np.int16)
         noise = rng.integers(-amount, amount + 1, size=patch.shape[:2])
         patch += noise[:, :, None]
@@ -147,8 +163,15 @@ class Canvas:
         self.height_map = np.clip(self.height_map + noise, 0.0, 1.0)
 
     def normal_map(self) -> np.ndarray:
-        """Нормаль из карты высот: наклон поверхности, посчитанный, а не угаданный."""
-        return normals(self.height_map, self.wrap_x, self.wrap_y)
+        """Нормаль из карты высот: наклон поверхности, посчитанный, а не угаданный.
+
+        Сила наклона умножается на масштаб: на крупном холсте та же фаска
+        растянута втрое, перепад на пиксель втрое мельче — и без поправки
+        рельеф выглядел бы приглаженным ровно во столько же раз.
+        """
+        return normals(
+            self.height_map, self.wrap_x, self.wrap_y, NORMAL_STRENGTH * float(self.scale)
+        )
 
     def specular_map(self) -> np.ndarray:
         """RGB — сила блика, альфа — его резкость: так карту читает CanvasTexture."""
@@ -560,7 +583,16 @@ def main() -> int:
     parser.add_argument("names", nargs="*", help="какие ассеты рисовать; по умолчанию все")
     parser.add_argument("--list", action="store_true", help="перечислить ассеты и выйти")
     parser.add_argument("--out", type=Path, default=OUT_DIR, help="куда писать PNG")
+    parser.add_argument(
+        "--scale", type=int, default=1, help="во сколько раз крупнее рисовать (по умолчанию 1)"
+    )
     arguments = parser.parse_args()
+
+    global SCALE
+    if arguments.scale < 1:
+        print("Масштаб меньше единицы не бывает.")
+        return 2
+    SCALE = arguments.scale
 
     if arguments.list:
         for name in sorted(ASSETS):

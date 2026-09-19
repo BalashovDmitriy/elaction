@@ -54,6 +54,12 @@ OUT_DIR = PROJECT_ROOT / "assets/sprites/actors"
 FRAME = (32, 34)
 CAR_FRAME = (56, 26)
 
+# Во сколько раз плотнее рендерить кадр. Кадр задан в единицах мира, и масштаб
+# меняет только разрешение: камера остаётся на месте, модель занимает ту же
+# площадь, но пикселей на неё приходится втрое больше. Здесь — в отличие от
+# окружения — прибавка настоящая: это рендер 3D, а не набор прямоугольников.
+SCALE: int = 1
+
 # Камера стоит далеко и смотрит вдоль +Y; глубина модели укладывается в эту
 # полосу вокруг нуля. Из неё же получается карта высот для нормали.
 CAMERA_DISTANCE = 100.0
@@ -349,8 +355,8 @@ def _scene(frame: tuple[int, int]) -> None:
     # Плёнка без сглаживания: пиксель-арт, края обязаны быть краями.
     scene.cycles.pixel_filter_type = "BOX"
     scene.cycles.filter_width = 0.01
-    scene.render.resolution_x = width
-    scene.render.resolution_y = height
+    scene.render.resolution_x = width * SCALE
+    scene.render.resolution_y = height * SCALE
     scene.render.film_transparent = True
     scene.render.image_settings.file_format = "PNG"
     scene.render.image_settings.color_mode = "RGBA"
@@ -378,7 +384,9 @@ def _render(work: Path, name: str) -> None:
     bpy.ops.render.render(write_still=True)
 
 
-def _render_inside_blender(work: Path, wanted: list[str]) -> None:
+def _render_inside_blender(work: Path, scale: int, wanted: list[str]) -> None:
+    global SCALE
+    SCALE = max(scale, 1)
     actors = _actors()
     for actor_name in wanted:
         if actor_name == "car":
@@ -482,12 +490,27 @@ def _frame_names(wanted: list[str]) -> list[str]:
     return names
 
 
+def _shown(path: Path) -> str:
+    """Путь для вывода: внутри проекта — относительный, снаружи — как есть.
+
+    `--out` умеет показывать куда угодно, и `relative_to` на такой путь падает:
+    нашлось на пробе FullHD, где ассеты рендерились во временную папку.
+    """
+    try:
+        return path.relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Рендер актёров через Blender.")
     parser.add_argument("names", nargs="*", help="кого рисовать; по умолчанию всех")
     parser.add_argument("--list", action="store_true", help="перечислить и выйти")
     parser.add_argument("--out", type=Path, default=OUT_DIR, help="куда писать PNG")
     parser.add_argument("--keep", type=Path, default=None, help="куда сложить сырые кадры")
+    parser.add_argument(
+        "--scale", type=int, default=1, help="во сколько раз плотнее рендерить (по умолчанию 1)"
+    )
     arguments = parser.parse_args()
 
     from godot_bin import use_utf8_output
@@ -513,7 +536,10 @@ def main() -> int:
         work = arguments.keep or Path(temporary)
         work.mkdir(parents=True, exist_ok=True)
         code, output = blender_bin.run_script(
-            blender, Path(__file__), ["--inside", str(work), *wanted], timeout=900
+            blender,
+            Path(__file__),
+            ["--inside", str(work), str(arguments.scale), *wanted],
+            timeout=900,
         )
         if code != 0:
             print(output)
@@ -522,13 +548,13 @@ def main() -> int:
 
         for name in _frame_names(wanted):
             for path in _assemble(work, arguments.out, name):
-                print(path.relative_to(PROJECT_ROOT).as_posix())
+                print(_shown(path))
     return 0
 
 
 if __name__ == "__main__":
     if bpy is not None:
         arguments = sys.argv[sys.argv.index("--") + 1 :]
-        _render_inside_blender(Path(arguments[1]), arguments[2:])
+        _render_inside_blender(Path(arguments[1]), int(arguments[2]), arguments[3:])
     else:
         raise SystemExit(main())
