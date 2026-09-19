@@ -125,6 +125,10 @@ const AUTO_PLANS: Dictionary = {
 }
 const DEFAULT_PLAN := "M1"
 
+## Сколько кадров ждать конца вступления, прежде чем начинать сценарий.
+## Не наступившее состояние ждётся вечно, а инструмент должен сказать, а не висеть.
+const INTRO_PATIENCE: int = 240
+
 var _milestone: String = MANUAL_FOLDER
 
 
@@ -192,6 +196,7 @@ func _run_auto_plan() -> void:
 	var tree := get_tree()
 	# Даём сцене собраться и уровню построить геометрию.
 	await tree.process_frame
+	await _wait_for_the_player()
 
 	for step: Dictionary in _plan_for(_milestone):
 		var actions: Array = step.get("actions", [])
@@ -205,6 +210,39 @@ func _run_auto_plan() -> void:
 			Input.action_release(action)
 
 	tree.quit()
+
+
+## Ждёт, пока здание отдаст Otto игроку.
+##
+## Раунд начинается спуском по тросу, и первые полсекунды ввод не действует
+## (ADR-0017, решение 4). Шаги сценария отмеряются выдержкой от места появления
+## Otto, и начатые на тросе они теряют эти полсекунды ходьбы: кадр, обещающий
+## дверь, показал бы пустую стену. Ждём по состоянию, а не выдержкой — длина
+## вступления ещё поменяется, а «стоит на полу» не поменяется никогда.
+func _wait_for_the_player() -> void:
+	var level := _level_in_play()
+	if level == null:
+		return
+
+	var left := INTRO_PATIENCE
+	while not level.otto.is_grounded() and left > 0:
+		await get_tree().physics_frame
+		left -= 1
+	if left <= 0:
+		push_warning("Otto не встал на крышу за %d кадров, сценарий идёт как есть" % INTRO_PATIENCE)
+
+
+## Здание, в которое идёт съёмка. Лежит прямо в текущей сцене: его кладёт туда
+## [Main], и на съёмке оно там одно.
+func _level_in_play() -> GreyboxLevel:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return null
+	for child: Node in scene.get_children():
+		var level := child as GreyboxLevel
+		if level != null:
+			return level
+	return null
 
 
 ## Сценарий вехи. Регистр не важен: в документах веха зовётся `M4a`, а ключ

@@ -118,6 +118,52 @@ func test_the_exit_asset_covers_the_whole_doorway() -> void:
 	)
 
 
+func test_the_shaft_wears_assets_of_its_own_size() -> void:
+	# Одежда шахты подогнана под правила здания, а не наоборот, и связаны они
+	# только словом в комментарии генератора. Разойдутся — стойка соберётся из
+	# обрезков, а створки повторятся половинкой или обрежутся по шахте.
+	var rules := BuildingRules.new()
+	var rail := SpriteTextures.tile("shaft_rail")
+	assert_not_null(rail)
+	if rail != null:
+		assert_eq(
+			float(rail.diffuse_texture.get_width()),
+			GreyboxLevel.SHAFT_RAIL_WIDTH,
+			"стойка нарисована во всю свою ширину"
+		)
+
+	var door := SpriteTextures.tile("shaft_door")
+	assert_not_null(door)
+	if door != null:
+		assert_eq(
+			door.diffuse_texture.get_size(),
+			Vector2(rules.shaft_width, GreyboxLevel.SHAFT_DOOR_HEIGHT),
+			"створки нарисованы по проёму шахты"
+		)
+
+
+func test_the_roof_assets_match_their_places() -> void:
+	# Надстройка и трос кладутся целиком, а не плиткой: их размер задан
+	# константами уровня, и ассет не того размера молча растянется.
+	var room := SpriteTextures.tile("machine_room")
+	assert_not_null(room)
+	if room != null:
+		assert_eq(
+			room.diffuse_texture.get_size(),
+			GreyboxLevel.MACHINE_ROOM_SIZE,
+			"машинное отделение нарисовано под своё место"
+		)
+
+	var rope := SpriteTextures.tile("rope")
+	assert_not_null(rope)
+	if rope != null:
+		assert_eq(
+			float(rope.diffuse_texture.get_width()),
+			GreyboxLevel.ROPE_WIDTH,
+			"трос нарисован во всю свою ширину"
+		)
+
+
 func test_an_asset_is_exactly_as_big_as_the_node_it_fills() -> void:
 	# У этих узлов растяжение по месту, и ассет не того размера молча растянется,
 	# а не упадёт. Размер места берётся из офсетов сцены, а не у живого узла: в
@@ -178,7 +224,7 @@ func test_a_strip_thinner_than_its_tile_keeps_its_height() -> void:
 	for panel: TextureRect in _rects_of(level):
 		if not widths.has(roundi(panel.size.x)):
 			continue
-		if is_equal_approx(panel.size.y, GreyboxLevel.WINDOW_TOP):
+		if is_equal_approx(panel.size.y, BuildingBackdrop.WINDOW_TOP):
 			found = true
 
 	assert_true(found, "полоса стены над окном осталась во всю свою толщину")

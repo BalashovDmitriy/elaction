@@ -218,17 +218,124 @@ def wall() -> Canvas:
 
 
 def wall_side() -> Canvas:
-    """Боковая стена здания: та же штукатурка, но тайл в ширину стены.
+    """Боковая стена здания: кирпичная кладка в ширину стены.
 
     Ширина — `GreyboxLevel.WALL_WIDTH`, иначе стена собиралась бы из обрезков.
-    Тёмная кромка внутрь: угол комнаты должен читаться как угол.
+    В порте бока здания — красный кирпич с белым швом (ADR-0017); красным его
+    делает тон раунда, а здесь кладётся только рисунок: ряды со смещением
+    и светлый шов между ними.
+
+    Ряд — 8 px, и тайл в 32 px закрывает четыре ряда, замыкаясь по вертикали.
     """
     canvas = Canvas(16, 32, wrap_y=True)
-    canvas.rect(0, 0, 16, 32, palette.WALL_SHADE, 0.5, palette.PLASTER)
-    canvas.rect(0, 0, 3, 32, palette.mix(palette.WALL_SHADE, palette.WALL_BASE, 0.6), 0.62, palette.PLASTER)
-    canvas.rect(13, 0, 3, 32, palette.mix(palette.WALL_SHADE, palette.WALL_BASE, 0.6), 0.62, palette.PLASTER)
-    canvas.speckle(seed=1985, amount=3, area=(0, 0, 16, 32))
-    canvas.roughen(seed=1986, amount=0.04)
+    canvas.rect(0, 0, 16, 32, palette.BRICK_BASE, 0.5, palette.CONCRETE)
+
+    for row in range(4):
+        top = row * 8
+        # Горизонтальный шов: он же отделяет ряд от ряда.
+        canvas.rect(0, top, 16, 1, palette.BRICK_MORTAR, 0.75, palette.CONCRETE)
+        # Вертикальный шов: через ряд он сдвигается на полкирпича — иначе
+        # кладка читается сеткой, а не кладкой.
+        seam = 3 if row % 2 == 0 else 11
+        canvas.rect(seam, top + 1, 1, 7, palette.BRICK_MORTAR, 0.7, palette.CONCRETE)
+        # Тень под швом: кирпич должен быть телом, а не плоским прямоугольником.
+        canvas.rect(0, top + 6, 16, 2, palette.BRICK_SHADE, 0.42, palette.CONCRETE)
+
+    canvas.speckle(seed=1985, amount=4, area=(0, 0, 16, 32))
+    canvas.roughen(seed=1986, amount=0.05)
+    return canvas
+
+
+def shaft_rail() -> Canvas:
+    """Направляющая шахты: узкая стойка, идущая по краю проёма во всю высоту.
+
+    Шахта у нас была дырой в перекрытии со столбом света — в кадре её почти
+    не было, хотя спуск по зданию и есть игра (ADR-0017, решение 3). Стойка
+    даёт шахте край: по ней видно, где она начинается и докуда идёт.
+
+    Серая: цвет ей задаёт тон раунда. Тайл замкнут по вертикали, ширина —
+    `GreyboxLevel.SHAFT_RAIL_WIDTH`.
+    """
+    canvas = Canvas(6, 16, wrap_y=True)
+    canvas.rect(0, 0, 6, 16, palette.SHAFT_RAIL, 0.55, palette.POLISHED_METAL)
+    # Рисунок симметричен нарочно: тайл кладётся на оба края проёма одним и тем
+    # же узлом, без зеркала, и несимметричная стойка светилась бы справа не с той
+    # стороны, с которой слева.
+    canvas.rect(0, 0, 1, 16, palette.SHAFT_RAIL_SHADE, 0.4, palette.POLISHED_METAL)
+    canvas.rect(5, 0, 1, 16, palette.SHAFT_RAIL_SHADE, 0.4, palette.POLISHED_METAL)
+    canvas.rect(2, 0, 2, 16, palette.SHAFT_RAIL_TRIM, 0.9, palette.POLISHED_METAL)
+    # Стыки стойки: по ним видно движение кабины мимо.
+    canvas.rect(0, 0, 6, 1, palette.SHAFT_RAIL_SHADE, 0.45, palette.POLISHED_METAL)
+    return canvas
+
+
+def shaft_door() -> Canvas:
+    """Створки шахты на этаже: по ним видно, где кабина останавливается.
+
+    Размер — ширина шахты на `GreyboxLevel.SHAFT_DOOR_HEIGHT`. Две половинки
+    со швом посередине и светлая перемычка сверху — та самая, что в порте
+    отмечает этаж поперёк шахты. Серые: цвет даёт тон раунда.
+    """
+    canvas = Canvas(40, 34)
+    canvas.rect(0, 0, 40, 34, palette.SHAFT_RAIL_SHADE, 0.45, palette.POLISHED_METAL)
+    # Перемычка над проёмом.
+    canvas.rect(0, 0, 40, 5, palette.SHAFT_RAIL_TRIM, 0.85, palette.POLISHED_METAL)
+    canvas.rect(0, 5, 40, 1, palette.SHAFT_RAIL, 0.6, palette.POLISHED_METAL)
+    # Сами створки и шов между ними.
+    canvas.rect(2, 7, 36, 27, palette.SHAFT_RAIL, 0.6, palette.POLISHED_METAL)
+    canvas.rect(19, 7, 2, 27, palette.SHAFT_RAIL_SHADE, 0.35, palette.POLISHED_METAL)
+    # Кромки створок: свет цепляется за них и створки читаются створками.
+    canvas.rect(2, 7, 1, 27, palette.SHAFT_RAIL_TRIM, 0.8, palette.POLISHED_METAL)
+    canvas.rect(37, 7, 1, 27, palette.SHAFT_RAIL_TRIM, 0.8, palette.POLISHED_METAL)
+    return canvas
+
+
+def machine_room() -> Canvas:
+    """Надстройка машинного отделения над верхней шахтой.
+
+    В порте это домик на крыше со своей двускатной крышей и кирпичными боками
+    (ADR-0017, решение 4). Размер — `GreyboxLevel.MACHINE_ROOM_SIZE`.
+
+    Весь домик серый: уровень красит его тоном раунда целиком, одним
+    `modulate` на узел. Крыша поэтому не белая, а просто светлее боков —
+    отдельным белым она была бы, только если бы домик собирался из двух узлов,
+    а ради одной надстройки это лишний узел на здание.
+
+    Ряд кладки — 8 px, кирпич — 24 px: 72 делится на него нацело, и крайний
+    кирпич выходит такой же, как остальные. На 32 px последний шов ложился бы
+    за край холста, `Canvas.rect` молча его отбрасывал, и справа оставался
+    кирпич в полтора раза шире прочих.
+    """
+    canvas = Canvas(72, 44)
+    # Кирпичные бока.
+    canvas.rect(0, 10, 72, 34, palette.BRICK_BASE, 0.5, palette.CONCRETE)
+    for row in range(4):
+        top = 12 + row * 8
+        canvas.rect(0, top, 72, 1, palette.BRICK_MORTAR, 0.72, palette.CONCRETE)
+        seam = 6 if row % 2 == 0 else 18
+        for step in range(0, 72, 24):
+            canvas.rect(seam + step, top + 1, 1, 7, palette.BRICK_MORTAR, 0.68, palette.CONCRETE)
+
+    # Двускатная крыша: две плоскости и конёк между ними.
+    for step in range(6):
+        inset = step * 6
+        canvas.rect(inset, 10 - step * 2, 72 - inset * 2, 2, palette.SLAB_TOP, 0.9, palette.CONCRETE)
+    canvas.rect(30, 0, 12, 2, palette.SLAB_EDGE, 1.0, palette.CONCRETE)
+    # Проём, в котором ходит кабина: он же подсказывает, что домик над шахтой.
+    canvas.rect(26, 24, 20, 20, palette.SLAB_SHADOW, 0.2, palette.CONCRETE)
+    canvas.speckle(seed=1989, amount=4, area=(0, 10, 72, 34))
+    return canvas
+
+
+def rope() -> Canvas:
+    """Трос, по которому Otto съезжает на крышу: жёлтый пунктир до края кадра.
+
+    Тайл замкнут по вертикали и тянется вверх от места, где Otto встаёт.
+    Тоном раунда не красится: в порте трос жёлтый в любом кадре.
+    """
+    canvas = Canvas(4, 12, wrap_y=True)
+    canvas.rect(1, 0, 2, 7, palette.ROPE, 0.7, palette.POLISHED_METAL)
+    canvas.rect(1, 7, 2, 2, palette.ROPE_SHADE, 0.45, palette.POLISHED_METAL)
     return canvas
 
 
@@ -423,6 +530,10 @@ ASSETS: dict[str, Callable[[], Canvas]] = {
     "door_mat": door_mat,
     "car_slab": car_slab,
     "escalator_belt": escalator_belt,
+    "shaft_rail": shaft_rail,
+    "shaft_door": shaft_door,
+    "machine_room": machine_room,
+    "rope": rope,
     "lamp": lamp,
     "exit_way": exit_way,
     "bullet": bullet,

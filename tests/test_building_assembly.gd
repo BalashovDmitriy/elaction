@@ -14,6 +14,9 @@ const SEEDS: Array[int] = [1, 2, 3]
 ## Сколько кадров дать зданию устояться перед проверками.
 const SETTLE_FRAMES: int = 10
 
+## Сколько кадров ждать конца вступления: спуск по тросу занимает меньше секунды.
+const LANDING_FRAMES: int = 180
+
 ## Сколько источников света разрешено держать зажжёнными разом.
 ##
 ## Число художественное, а не техническое: замер (ADR-0010, пункт 1) показал,
@@ -61,7 +64,7 @@ func _count(level: GreyboxLevel, type: Variant) -> int:
 func test_every_seed_assembles_and_holds_otto() -> void:
 	for building_seed: int in SEEDS:
 		var level := _build(building_seed)
-		await wait_physics_frames(SETTLE_FRAMES)
+		await _wait_for_the_landing(level)
 		assert_true(
 			level.otto.is_grounded(),
 			"сид %d: Otto не стоит на полу — провалился сквозь геометрию" % building_seed
@@ -183,3 +186,16 @@ func test_otto_starts_on_the_roof() -> void:
 		BuildingRules.ROOF,
 		"Otto начинает с крыши, а не с верхнего этажа"
 	)
+
+
+## Ждёт, пока Otto съедет по тросу на крышу.
+##
+## Здание с M12 начинается вступлением: Otto приезжает сверху, и первые полсекунды
+## он не на полу и не слушается ввода (ADR-0017, решение 4). Ждать его надо по
+## состоянию, а не выдержкой: под [member Engine.time_scale] выдержка врёт.
+func _wait_for_the_landing(level: GreyboxLevel) -> void:
+	var left := LANDING_FRAMES
+	while not level.otto.is_grounded() and left > 0:
+		await wait_physics_frames(1)
+		left -= 1
+	assert_true(level.otto.is_grounded(), "Otto съехал по тросу и встал на крышу")

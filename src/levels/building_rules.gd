@@ -31,6 +31,13 @@ const MENACE_BY_BUILDING_CAP: float = 2.0
 ## и просвет у него выходил 20 px вместо 100.
 const ROOF: int = -1
 
+## Палитра раунда: чем красится здание и каким светом оно горит.
+##
+## Меняется от раунда к раунду, как цвета в оригинале, и набор зацикливается:
+## [method BuildingPalette.of_round], ADR-0017, решение 2. По умолчанию берётся
+## первая палитра набора — та самая, что на кадре порта.
+@export var palette: BuildingPalette = BuildingPalette.of_round(1)
+
 ## Этажей в здании, не считая крыши. Нулевой — верхний, последний — с выходом.
 @export var floors: int = 30
 
@@ -152,12 +159,15 @@ const ROOF: int = -1
 @export var agents_at_once: int = 8
 
 
-## Правила очередного здания: дальше — злее агенты. Остальные способы роста
-## сложности из оригинала отложены, см. ADR-0009, пункт 2.
+## Правила очередного здания: дальше — злее агенты и другая палитра. Остальные
+## способы роста сложности из оригинала отложены, см. ADR-0009, пункт 2.
 static func for_building(number: int) -> BuildingRules:
 	var rules := BuildingRules.new()
 	var grown := 1.0 + MENACE_PER_BUILDING * float(maxi(number, 1) - 1)
 	rules.agent_menace = minf(grown, MENACE_BY_BUILDING_CAP)
+	# Цвет — такое же правило здания, как злость: в оригинале планировка почти
+	# не меняется, а палитра меняется каждый раунд.
+	rules.palette = BuildingPalette.of_round(number)
 	return rules
 
 
