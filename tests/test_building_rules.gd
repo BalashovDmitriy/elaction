@@ -123,3 +123,49 @@ func test_menace_never_reaches_zero() -> void:
 	var rules := BuildingRules.new()
 	rules.agent_menace = 0.0
 	assert_gt(rules.menace_with(1.0), 0.0)
+
+
+## Числа боя лежат в правилах здания, а не в сцене агента: только так их можно
+## растить от здания к зданию (ADR-0016, пункт 5).
+func test_combat_numbers_hold_together() -> void:
+	var rules := BuildingRules.new()
+	assert_lt(rules.agent_dark_fire_range, rules.agent_fire_range, "в темноте агент замечает ближе")
+	assert_lt(rules.agent_prone_height, rules.agent_kneel_height, "лёжа ниже, чем на колене")
+	assert_lt(
+		rules.agent_kneels_from_menace,
+		rules.agent_goes_prone_from_menace,
+		"сперва агент учится приседать и только потом ложиться"
+	)
+	assert_gt(rules.agent_dodge_sight, 0.0, "не видя пули, уклоняться не от чего")
+	assert_gt(rules.agents_at_once, 0, "здание без агентов — не здание")
+
+
+## Дальность агента не должна простреливать этаж насквозь: иначе подойти к нему
+## нечем, и это ровно то, из-за чего в ADR-0006 пришлось заводить потолок злости.
+##
+## Считается по самому узкому этажу с дверями — верхнему: на широких нижних
+## запас только больше.
+func test_an_agent_cannot_cover_a_whole_floor() -> void:
+	var rules := BuildingRules.new()
+	assert_lt(
+		rules.agent_fire_range,
+		rules.floor_width(0) * 0.5,
+		"даже на самом узком этаже есть куда встать вне огня"
+	)
+
+
+## Ради чего стоит потолок злости: даже у самого злого агента пуля летит
+## дольше, чем игрок успевает нажать.
+##
+## Держит он теперь скорострельность и скорость пули, а не дальность (ADR-0016,
+## пункт 1), и проверять его надо по ним. Время на ход считается по пуле:
+## сколько она летит с дальнего края зоны огня. Пятая доля секунды — это уже
+## не реакция, а лотерея.
+func test_even_the_meanest_agent_leaves_time_to_react() -> void:
+	var rules := BuildingRules.for_building(99)
+	var menace := rules.menace_with(GreyboxLevel.ALARM_MENACE)
+	assert_eq(menace, BuildingRules.MENACE_CAP, "к девяносто девятому зданию злее уже некуда")
+
+	var flight := rules.agent_fire_range / (rules.agent_bullet_speed * menace)
+	assert_gt(flight, 0.2, "пуля с дальнего края летит дольше человеческой реакции")
+	assert_gt(rules.agent_aim_time, 0.0, "а первый выстрел не уходит в тот же кадр")

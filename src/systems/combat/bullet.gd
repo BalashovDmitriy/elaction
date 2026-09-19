@@ -70,6 +70,16 @@ func _ready() -> void:
 	add_child(_flash)
 
 
+## Половина длины пули, px.
+##
+## По ней считают, вышла ли пуля из габарита тела: миновав его середину, она
+## ещё перекрывает грудь на эту половину, и распрямившийся под ней всё равно
+## её ловит. Берётся у самой формы, а не записывается числом рядом, — иначе
+## правка сцены молча разошлась бы с теми, кто от неё уклоняется.
+func half_length() -> float:
+	return (($Shape as CollisionShape2D).shape as RectangleShape2D).size.x * 0.5
+
+
 func _physics_process(delta: float) -> void:
 	var step := speed * delta * signf(direction)
 	position.x += step
