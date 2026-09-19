@@ -42,10 +42,13 @@ func _drop(level: GreyboxLevel) -> void:
 func _parts(level: GreyboxLevel, asset: String) -> Array[TextureRect]:
 	var tile := SpriteTextures.tile(asset)
 	var found: Array[TextureRect] = []
-	for child: Node in level.get_children():
-		var rect := child as TextureRect
-		if rect != null and rect.texture == tile:
-			found.append(rect)
+	# Одежда шахт живёт своим узлом, а не прямыми детьми уровня: частей за
+	# полсотни на здание, и под каждый обход детей они попадать не должны.
+	for shafts: Node in level.find_children("*", "BuildingShafts", false, false):
+		for child: Node in shafts.get_children():
+			var rect := child as TextureRect
+			if rect != null and rect.texture == tile:
+				found.append(rect)
 	return found
 
 
@@ -69,9 +72,7 @@ func test_every_shaft_wears_both_rails() -> void:
 			var half := rules.shaft_width * 0.5
 			var bottom := rules.floor_surface(shaft.bottom)
 			var span := bottom - rules.floor_surface(shaft.top)
-			var sides: Array[float] = [
-				shaft.x - half, shaft.x + half - GreyboxLevel.SHAFT_RAIL_WIDTH
-			]
+			var sides: Array[float] = [shaft.x - half, shaft.x + half - BuildingShafts.RAIL_WIDTH]
 			for left: float in sides:
 				var found := false
 				for rail: TextureRect in rails:

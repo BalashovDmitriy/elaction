@@ -17,18 +17,6 @@ signal building_cleared
 const FLOOR_ENERGY: float = 1.15
 const SHAFT_ENERGY: float = 0.55
 
-## Ширина направляющей шахты, px. Стойка идёт по краю проёма во всю его высоту.
-const SHAFT_RAIL_WIDTH: float = 18.0
-
-## Высота створок шахты, px. Совпадает с ассетом `shaft_door`.
-const SHAFT_DOOR_HEIGHT: float = 102.0
-
-## Высота упора в конце полосы шахты, px. Совпадает с ассетом `shaft_buffer`.
-const SHAFT_BUFFER_HEIGHT: float = 24.0
-
-## Надстройка машинного отделения на крыше, px. Совпадает с ассетом `machine_room`.
-const MACHINE_ROOM_SIZE := Vector2(216.0, 132.0)
-
 ## Ширина троса, по которому Otto съезжает на крышу, px.
 const ROPE_WIDTH: float = 12.0
 
@@ -108,6 +96,12 @@ class AgentPost:
 	var floor_index: int = 0
 	## Кто стоит за дверью прямо сейчас. Пусто — дверь свободна.
 	var agent: Enemy = null
+	## Створка уже идёт под следующего агента, но сам он ещё не показался.
+	##
+	## Дверь в этом состоянии считается занятой и место под потолком живых
+	## занимает: иначе за время телеграфа успело бы открыться сколько угодно
+	## дверей, и агенты вывалились бы разом сверх потолка (ADR-0020).
+	var opening: bool = false
 	## Сколько двери ещё ждать, прежде чем выпустить следующего, с.
 	var wait: float = 0.0
 
@@ -127,6 +121,9 @@ var _doors: Array[Door] = []
 ## Обычные двери: из них выходят агенты. Красные документов не стерегут.
 var _agent_doors: Array[Door] = []
 var _cars: Array[ElevatorCar] = []
+## Одежда шахт отдельным узлом: полсотни частей на здание не должны попадать
+## под каждый обход детей уровня.
+var _shafts: BuildingShafts = null
 var _lighting := FloorLighting.new()
 ## Заливка по уровню: ключ — номер уровня, крыша включая. Гаснет, когда на
 ## этаже падает лампа. Словарь, а не список: уровни считаются от −1.
@@ -196,10 +193,7 @@ func _ready() -> void:
 	# к игроку. Раньше здесь выходили все 55 разом, и двое из них стояли на
 	# крыше в зоне огня от точки старта — ADR-0014, пункт 4.
 	for door in _agent_doors:
-		var post := AgentPost.new()
-		post.door = door
-		post.floor_index = rules.floor_index_near(door.mat_position().y)
-		_posts.append(post)
+		_enlist_door(door)
 	otto.apply_camera_bounds(Rect2(0.0, 0.0, rules.width, rules.total_height()))
 
 
@@ -254,6 +248,18 @@ func plan() -> BuildingPlan:
 ## Двери здания: по ним видно, какие красные ещё не собраны.
 func doors() -> Array[Door]:
 	return _doors
+
+
+## Двери, из которых выходят агенты.
+##
+## Не то же самое, что обычные двери здания: красная попадает сюда, когда из неё
+## забрали документ (ADR-0020, решение 6). Считается по постам, а не по списку
+## дверей, потому что пост — это и есть «дверь на довольствии».
+func agent_doors() -> Array[Door]:
+	var serving: Array[Door] = []
+	for post: AgentPost in _posts:
+		serving.append(post.door)
+	return serving
 
 
 ## Где стоит выход из здания.
@@ -320,10 +326,9 @@ func _build_side_walls(index: int, surface: float, bounds: Vector2, tile: Canvas
 
 
 func _spawn_shafts() -> void:
-	# Тайлы берутся один раз на здание: шахт в нём пять, а этажей у них тридцать.
-	var rail_tile := SpriteTextures.tile("shaft_rail")
-	var door_tile := SpriteTextures.tile("shaft_door")
-	var buffer_tile := SpriteTextures.tile("shaft_buffer")
+	_shafts = BuildingShafts.new()
+	add_child(_shafts)
+	_shafts.dress(rules, _plan)
 	for shaft in _plan.shafts:
 		var stops := PackedFloat32Array()
 		for index in range(shaft.top, shaft.bottom + 1):
@@ -335,126 +340,7 @@ func _spawn_shafts() -> void:
 		car.setup(stops)
 		_cars.append(car)
 		_spawn_shaft_pit(shaft)
-		_dress_shaft(shaft, rail_tile, door_tile, buffer_tile)
 		_light_shaft(shaft)
-	_spawn_machine_room()
-
-
-## Одевает шахту: направляющие во всю её высоту и створки на каждом её этаже.
-##
-## До M12 шахта была дырой в перекрытии со столбом света — в кадре её почти не
-## было, хотя спуск по зданию и есть игра (ADR-0017, решение 3). Направляющие
-## дают ей края, створки — отметку этажа: по ним видно, где кабина встаёт.
-##
-## Рисуется позади перекрытий (`z_index` −2): стойка идёт сквозь всю шахту, и
-## на каждом этаже её перекрывает плита — ровно так, как она и шла бы внутри
-## шахты. Кабина идёт впереди и закрывает их собой, когда проходит мимо.
-func _dress_shaft(
-	shaft: BuildingPlan.ShaftSpot,
-	rail_tile: CanvasTexture,
-	door_tile: CanvasTexture,
-	buffer_tile: CanvasTexture
-) -> void:
-	_mark_shaft_ends(shaft, buffer_tile)
-	var top := _shaft_top(shaft)
-	var bottom := rules.floor_surface(shaft.bottom)
-	var half := rules.shaft_width * 0.5
-	var tint := rules.palette.shaft
-
-	for side: float in [-1.0, 1.0]:
-		var x := shaft.x + half * side
-		var left := x if side < 0.0 else x - SHAFT_RAIL_WIDTH
-		_add_shaft_part(Rect2(left, top, SHAFT_RAIL_WIDTH, bottom - top), rail_tile, tint)
-
-	for index: int in range(shaft.top, shaft.bottom + 1):
-		var surface := rules.floor_surface(index)
-		var door := Rect2(
-			shaft.x - half, surface - SHAFT_DOOR_HEIGHT, rules.shaft_width, SHAFT_DOOR_HEIGHT
-		)
-		_add_shaft_part(door, door_tile, tint, true)
-
-
-## Упоры в концах полосы: дальше кабина не идёт, и это видно.
-##
-## Отзыв после игры: «лифт не слушается команд и стоит, а сошёл — уехал». Это
-## и был конец полосы — кабина слышала команду, но идти дальше ей некуда, а
-## пустая она тут же уезжала по своему расписанию. Упор объясняет предел без
-## единого слова; второй указатель — стрелки в самой кабине.
-##
-## Нижний упор лежит на дне шахты, то есть над полом нижнего её этажа, а не под
-## ним: перекрытие рисуется ближе к зрителю (`z_index` −1 против −2), и упор,
-## опущенный в толщу плиты, не виден вовсе — ровно там, где предел и надо
-## объяснить.
-func _mark_shaft_ends(shaft: BuildingPlan.ShaftSpot, tile: CanvasTexture) -> void:
-	var half := rules.shaft_width * 0.5
-	var top := _shaft_top(shaft)
-	var bottom := rules.floor_surface(shaft.bottom) - SHAFT_BUFFER_HEIGHT
-
-	_add_shaft_part(
-		Rect2(shaft.x - half, top, rules.shaft_width, SHAFT_BUFFER_HEIGHT), tile, Color.WHITE, true
-	)
-	_add_shaft_part(
-		Rect2(shaft.x - half, bottom, rules.shaft_width, SHAFT_BUFFER_HEIGHT),
-		tile,
-		Color.WHITE,
-		true
-	)
-
-
-## Верх шахты: докуда идут её стойки, упор и столб света.
-##
-## У шахты, доходящей до крыши, потолка нет — над ней небо, и [method
-## BuildingRules.story_top] отдаёт верх мира. Стойка, упор и свет ушли бы в
-## открытое небо над крышей; кончается такая шахта внутри машинного отделения,
-## оно и есть её верх. Считается в одном месте, потому что разъехавшись эти трое
-## дают шахту, которая светит выше, чем видна.
-func _shaft_top(shaft: BuildingPlan.ShaftSpot) -> float:
-	if shaft.top > BuildingRules.ROOF:
-		return rules.story_top(shaft.top)
-	return rules.floor_surface(BuildingRules.ROOF) - MACHINE_ROOM_SIZE.y * 0.5
-
-
-## Кусок одежды шахты. Без тела: по направляющим не ходят, они только видны.
-##
-## [param whole] — ассет кладётся целиком, а не плиткой. Стойка тайлится: она
-## идёт на сотни пикселей, а тайл у неё в шестнадцать. Створки — одна картинка
-## шириной в шахту, и замостить её значило бы порезать их пополам, стоит
-## [member BuildingRules.shaft_width] разойтись с ассетом.
-func _add_shaft_part(rect: Rect2, tile: CanvasTexture, tint: Color, whole: bool = false) -> void:
-	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
-		return
-
-	var part := (
-		TiledRect.stretched(rect.size, rect.position, tile, tint)
-		if whole
-		else TiledRect.make(rect.size, rect.position, tile, tint)
-	)
-	part.z_index = -2
-	add_child(part)
-
-
-## Надстройка машинного отделения над верхней шахтой.
-##
-## Тела у неё нет намеренно: под ней проём той самой шахты, с которой начинается
-## спуск, и сплошная надстройка заперла бы Otto на крыше. Стоит она позади него
-## (`z_index` −2), и он проходит перед ней.
-func _spawn_machine_room() -> void:
-	var shaft := _plan.roof_shaft()
-	if shaft == null:
-		return
-
-	var surface := rules.floor_surface(BuildingRules.ROOF)
-	var rect := Rect2(
-		Vector2(shaft.x - MACHINE_ROOM_SIZE.x * 0.5, surface - MACHINE_ROOM_SIZE.y),
-		MACHINE_ROOM_SIZE
-	)
-	# Не плиткой, а целиком: у домика рисунок цельный, и замостить его значило
-	# бы порезать крышу на четверти.
-	var room := TiledRect.stretched(
-		rect.size, rect.position, SpriteTextures.tile("machine_room"), rules.palette.masonry
-	)
-	room.z_index = -2
-	add_child(room)
 
 
 ## Вступление: Otto съезжает по тросу на крышу.
@@ -553,6 +439,10 @@ func _spawn_doors() -> void:
 			continue
 		documents += 1
 		door.document_taken.connect(game.collect_document)
+		# Опустевшая дверь становится обычной и начинает выпускать агентов:
+		# она и выглядит обычной (ADR-0020, решение 6). Раньше красная дверь
+		# оставалась вечным укрытием на всё здание.
+		door.document_taken.connect(_enlist_door.bind(door))
 	game.start_building(documents)
 
 
@@ -733,8 +623,27 @@ func _tend_agents(span: Vector2i, delta: float) -> void:
 			if not _within(span, post.floor_index, AGENT_KEEP_MARGIN):
 				post.agent.queue_free()
 				post.agent = null
+				post.door.dismiss_agent()
 				continue
 			live += 1
+			# Створка идёт обратно, как только агент освободил проём: открытая
+			# дверь в кадре значит «оттуда сейчас полезут», и держать её
+			# открытой при живом агенте — размывать знак (ADR-0020, решение 4).
+			if not post.agent.is_emerging():
+				post.door.dismiss_agent()
+			continue
+
+		# Створка уже идёт: ждём, пока откроется, и только тогда выпускаем.
+		# Место под потолком живых агент занимает уже сейчас.
+		if post.opening:
+			if not _within(span, post.floor_index, AGENT_SPAWN_MARGIN):
+				post.door.dismiss_agent()
+				post.opening = false
+				continue
+			live += 1
+			if post.door.agent_may_step_out():
+				post.agent = _release_agent(post)
+				post.opening = false
 			continue
 
 		# Дверь, чей агент умер или уехал, ждёт свою паузу и только потом
@@ -756,7 +665,19 @@ func _tend_agents(span: Vector2i, delta: float) -> void:
 			nearest_gap = gap
 
 	if nearest != null and live < rules.agents_at_once:
-		nearest.agent = _release_agent(nearest)
+		# Не агент, а просьба открыться: сам он покажется, когда створка дойдёт.
+		nearest.opening = nearest.door.summon_agent()
+
+
+## Ставит дверь на довольствие: с этой минуты она выпускает агентов.
+##
+## Этаж считается один раз: двери не ходят, а [method _tend_agents] перебирает
+## их каждый кадр.
+func _enlist_door(door: Door) -> void:
+	var post := AgentPost.new()
+	post.door = door
+	post.floor_index = rules.floor_index_near(door.mat_position().y)
+	_posts.append(post)
 
 
 ## Стоит ли Otto вплотную к двери. Считается по горизонтали: дверь и Otto на
@@ -775,8 +696,11 @@ static func _within(span: Vector2i, index: int, margin: int) -> bool:
 	return index >= span.x - margin and index <= span.y + margin
 
 
-## Выпускает агента из двери и отдаёт его: дверь помнит своего, чтобы не
+## Ставит агента в открытый проём и отдаёт его: дверь помнит своего, чтобы не
 ## выпустить второго, пока первый жив.
+##
+## Зовётся только тогда, когда створка уже открыта: до этого в двери нет проёма,
+## из которого можно выйти.
 func _release_agent(post: AgentPost) -> Enemy:
 	var mat := post.door.mat_position()
 	var agent := ENEMY_SCENE.instantiate() as Enemy
@@ -898,7 +822,7 @@ func _build_solid(rect: Rect2, tile: CanvasTexture, tint := Color.WHITE) -> void
 ## потолка нет, и столб, отмеренный от верха мира, светил бы в открытом небе
 ## над крышей — там, где Otto висит на тросе всё вступление.
 func _light_shaft(shaft: BuildingPlan.ShaftSpot) -> void:
-	var top := _shaft_top(shaft)
+	var top := _shafts.top_of(shaft)
 	var bottom := rules.floor_surface(shaft.bottom)
 	var area := Rect2(shaft.x - rules.shaft_width * 0.5, top, rules.shaft_width, bottom - top)
 	var light := AreaLight.column(area, rules.palette.shaft_light, SHAFT_ENERGY)

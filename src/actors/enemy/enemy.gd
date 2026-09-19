@@ -13,6 +13,8 @@ extends CharacterBody2D
 signal died(agent: Enemy)
 
 const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
+## Слой врагов в `project.godot`. Агент сходит с него, пока стоит в проёме.
+const ENEMY_LAYER: int = 3
 ## Сколько агент падает, прежде чем лечь: смерть — две позы (ADR-0011, п. 12).
 const FALLING_TIME: float = 0.25
 
@@ -94,9 +96,15 @@ func _physics_process(delta: float) -> void:
 	if _brain.fired():
 		_fire()
 
+	# Из проёма агент выходит шагом. EMERGING — это «выйти», а не «постоять»:
+	# раньше он эти доли секунды стоял на коврике перед закрытой створкой, и
+	# ровно это игрок и назвал «спавнится поверх двери» (ADR-0020).
+	var stepping_out := state == EnemyBrain.State.EMERGING
+	_shield(stepping_out)
+
 	# Приседая и лёжа агент не ходит: уклонение — это замереть, а не идти
 	# дальше пригнувшись.
-	var walking := state == EnemyBrain.State.WALK and _brain.is_standing()
+	var walking := (state == EnemyBrain.State.WALK or stepping_out) and _brain.is_standing()
 	if walking and is_on_floor() and not _floor_ahead():
 		# Дальше пола нет: агент остаётся на своём этаже (ADR-0006, пункт 6).
 		walking = false
@@ -154,7 +162,7 @@ func take_bullet() -> void:
 ## Убивает агента: пулей, ногой или упавшей лампой в M4b.
 ## [param crushed] — придавило упавшей лампой: у такой смерти своя поза.
 func kill(crushed: bool = false) -> void:
-	if _brain.is_dead():
+	if _brain.is_dead() or _brain.is_emerging():
 		return
 	_crushed = crushed
 	_brain.kill()
@@ -167,6 +175,20 @@ func kill(crushed: bool = false) -> void:
 
 func is_dead() -> bool:
 	return _brain.is_dead()
+
+
+## Вышел ли агент из проёма. Пока не вышел — он неуязвим.
+func is_emerging() -> bool:
+	return _brain.is_emerging()
+
+
+## Убирает агента со слоя врагов, пока он в проёме.
+##
+## Не «броня», а отсутствие цели: пуля проходит сквозь, не гаснет и не приносит
+## очков. Так неуязвимость видно глазом — выстрел просто пролетает мимо, — и
+## её не приходится объяснять правилом (ADR-0020, решение 3).
+func _shield(value: bool) -> void:
+	set_collision_layer_value(ENEMY_LAYER, not value)
 
 
 ## Высота ближайшей летящей в агента пули над его ногами, px, или -1, если

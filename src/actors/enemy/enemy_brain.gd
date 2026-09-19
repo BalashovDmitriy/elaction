@@ -164,5 +164,13 @@ func is_standing() -> bool:
 	return stance == Stance.STAND
 
 
+## Выходит ли агент ещё из проёма двери.
+##
+## Пока выходит — он неуязвим: иначе телеграф створки превращает дверь в тир,
+## и игрок снимает каждого на выходе (ADR-0020, решение 3).
+func is_emerging() -> bool:
+	return state == State.EMERGING
+
+
 func _on_the_same_line(to_target: Vector2) -> bool:
 	return absf(to_target.y) <= same_line and absf(to_target.x) <= fire_range

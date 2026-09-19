@@ -54,6 +54,21 @@ func _drop(level: GreyboxLevel) -> void:
 	remove_child(level)
 
 
+## Ждёт, пока двери выпустят хоть кого-нибудь.
+##
+## Дверь сперва открывается и только потом отдаёт агента (ADR-0020, решение 2),
+## и на телеграф уходит заметно больше, чем кадр-другой. Смотреть агентов сразу
+## после сборки значит не смотреть ничего: ровно так два теста здесь и стали
+## пустыми в первом же прогоне M14.
+func _wait_for_agents(level: GreyboxLevel) -> Array[Enemy]:
+	for _frame: int in CROWD_FRAMES:
+		await wait_physics_frames(1)
+		var found := _agents_in(level)
+		if not found.is_empty():
+			return found
+	return []
+
+
 ## Живые агенты здания. Перебор детей — дело самого уровня ([method
 ## GreyboxLevel.agents]), здесь остаётся только отсев мёртвых.
 ##
@@ -89,10 +104,11 @@ func test_otto_and_his_jump_fit_in_frame_on_the_roof() -> void:
 func test_the_roof_is_empty_when_the_game_starts() -> void:
 	for building_seed: int in [1, 2, 3]:
 		var level := _build(building_seed, true)
-		await wait_physics_frames(SETTLE_FRAMES)
+		var agents := await _wait_for_agents(level)
+		assert_false(agents.is_empty(), "сид %d: двери никого не выпустили" % building_seed)
 
 		var rules := level.rules
-		for agent in _agents_in(level):
+		for agent in agents:
 			assert_gt(
 				rules.floor_index_near(agent.global_position.y),
 				BuildingRules.ROOF,
@@ -137,11 +153,12 @@ func test_only_the_doors_near_otto_let_agents_out() -> void:
 ## Агент далеко внизу не нужен ни игроку, ни физике: этаж уехал из кадра.
 func test_no_agent_walks_a_floor_far_from_otto() -> void:
 	var level := _build(1, true)
-	await wait_physics_frames(SETTLE_FRAMES)
+	var agents := await _wait_for_agents(level)
+	assert_false(agents.is_empty(), "двери никого не выпустили")
 
 	var rules := level.rules
 	var here := rules.floor_index_near(level.otto.global_position.y)
-	for agent in _agents_in(level):
+	for agent in agents:
 		var floor_index := rules.floor_index_near(agent.global_position.y)
 		assert_lt(
 			absi(floor_index - here), 10, "агент на этаже %d, Otto на %d" % [floor_index, here]
