@@ -88,17 +88,29 @@ func test_agent_stays_down_until_the_bullet_clears_his_body() -> void:
 	await wait_physics_frames(2)
 	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "сперва уходит с линии")
 
-	# Тело агента — 36 px шириной, и дюжина пикселей за серединой всё ещё в нём.
-	bullet.global_position.x = agent.global_position.x - 12.0
+	# Шаги отмеряются от самого тела и самой пули, а не числами: агент и ассеты
+	# уже переезжали в другой масштаб, и записанные руками пиксели тогда молча
+	# перестали попадать в границу, ради которой этот тест и написан.
+	var body_half := _body_half_width(agent)
+	var tail := bullet.half_length()
+
+	# Пуля за серединой, но ещё в теле.
+	bullet.global_position.x = agent.global_position.x - body_half * 0.5
 	await wait_physics_frames(2)
 	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "и не встаёт, пока она в габарите")
 
-	# Середина пули за габаритом тела, а хвост — ещё внутри: пуля 18 px длиной,
-	# и полширины тела ей не хватает, чтобы разминуться с грудью.
-	bullet.global_position.x = agent.global_position.x - 24.0
+	# Середина пули за габаритом тела, а хвост — ещё внутри: полширины тела
+	# ей не хватает, чтобы разминуться с грудью.
+	bullet.global_position.x = agent.global_position.x - (body_half + tail * 0.5)
 	await wait_physics_frames(2)
 	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "и пока её держит хвост — тоже")
 
-	bullet.global_position.x = agent.global_position.x - 120.0
+	bullet.global_position.x = agent.global_position.x - (body_half + tail) * 2.0
 	await wait_physics_frames(2)
 	assert_eq(agent.stance(), EnemyBrain.Stance.STAND, "ушедшая за спину больше не держит")
+
+
+## Полширины тела агента, px. Берётся у формы, как её берёт сам агент.
+func _body_half_width(agent: Enemy) -> float:
+	var shape := agent.get_node("Shape") as CollisionShape2D
+	return (shape.shape as RectangleShape2D).size.x * 0.5

@@ -9,10 +9,10 @@ ADR-0011, пункты 1 и 7: у окружения нет анимации, п
 Ассеты коммитятся в репозиторий (ADR-0011, пункт 2): этот скрипт — инструмент
 разработчика, а не шаг сборки. В CI он не вызывается.
 
-    python tools/render_env.py           # всё
+    python tools/render_env.py           # всё, в масштабе набора
     python tools/render_env.py slab      # только один ассет
     python tools/render_env.py --list
-    python tools/render_env.py --scale 3 --out assets/sprites/env3   # втрое крупнее
+    python tools/render_env.py --scale 6 --out assets/sprites/env6   # проба под 4K
 """
 
 from __future__ import annotations
@@ -44,15 +44,22 @@ NORMAL_GREEN_UP: bool = True
 NORMAL_SUFFIX = "_n"
 SPECULAR_SUFFIX = "_s"
 
-# Ширина рамки девятикусочных ассетов. Та же величина стоит в
-# `SpriteTextures.FRAME_MARGIN`, и тест следит, чтобы они не разошлись.
+# Ширина рамки девятикусочных ассетов, в единицах мира. В пикселях она выходит
+# в `SCALE` раз больше, и ровно это число стоит в `SpriteTextures.FRAME_MARGIN`
+# (8 × 3 = 24); тест следит, чтобы они не разошлись.
 FRAME_MARGIN: int = 8
 
 # Во сколько раз крупнее рисовать. Ассеты описаны в единицах мира, а не в
 # пикселях экрана: холст и каждый прямоугольник умножаются здесь, и ни один
 # ассет об этом не знает. Так набор перерисовывается под другое разрешение,
 # не переписываясь по числу в каждой функции.
-SCALE: int = 1
+#
+# Умолчание — это масштаб набора, который лежит в репозитории (ADR-0018): запуск
+# без флага обязан перерисовать те же ассеты, что уже закоммичены. Тройка здесь,
+# а не в памяти запускающего: с умолчанием 1 обычный `python tools/render_env.py`
+# молча уменьшал весь набор втрое, и здание рассыпалось на обрезки.
+DEFAULT_SCALE: int = 3
+SCALE: int = DEFAULT_SCALE
 
 
 def normals(
@@ -802,7 +809,10 @@ def main() -> int:
     parser.add_argument("--list", action="store_true", help="перечислить ассеты и выйти")
     parser.add_argument("--out", type=Path, default=OUT_DIR, help="куда писать PNG")
     parser.add_argument(
-        "--scale", type=int, default=1, help="во сколько раз крупнее рисовать (по умолчанию 1)"
+        "--scale",
+        type=int,
+        default=DEFAULT_SCALE,
+        help="во сколько раз крупнее рисовать (по умолчанию %d — масштаб набора)" % DEFAULT_SCALE,
     )
     arguments = parser.parse_args()
 

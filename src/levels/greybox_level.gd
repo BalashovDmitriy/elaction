@@ -34,7 +34,7 @@ const ROPE_WIDTH: float = 12.0
 
 ## Сколько Otto висит над крышей в начале здания и как быстро съезжает.
 ##
-## Выше собственного прыжка (80 px): он должен прийти сверху, а не подпрыгнуть.
+## Выше собственного прыжка (240 px с M13): он должен прийти сверху, а не подпрыгнуть.
 ## Спуск занимает меньше секунды — это кадр вступления, а не механика
 ## (ADR-0017, решение 4).
 const ROPE_DROP: float = 264.0
@@ -308,7 +308,7 @@ func _build_geometry() -> void:
 ## столбцами во всю высоту: здание расширяется книзу (ADR-0014, пункт 3).
 ##
 ## У крыши стена доходит до верха мира: это парапет, и он же не даёт шагнуть
-## с крыши мимо здания. Прыжок берёт 80 px, и низкий бортик Otto перемахнул бы.
+## с крыши мимо здания. Прыжок берёт 240 px, и низкий бортик Otto перемахнул бы.
 func _build_side_walls(index: int, surface: float, bounds: Vector2, tile: CanvasTexture) -> void:
 	var top := rules.story_top(index)
 	var height := surface + rules.slab_height - top
@@ -323,6 +323,7 @@ func _spawn_shafts() -> void:
 	# Тайлы берутся один раз на здание: шахт в нём пять, а этажей у них тридцать.
 	var rail_tile := SpriteTextures.tile("shaft_rail")
 	var door_tile := SpriteTextures.tile("shaft_door")
+	var buffer_tile := SpriteTextures.tile("shaft_buffer")
 	for shaft in _plan.shafts:
 		var stops := PackedFloat32Array()
 		for index in range(shaft.top, shaft.bottom + 1):
@@ -334,7 +335,7 @@ func _spawn_shafts() -> void:
 		car.setup(stops)
 		_cars.append(car)
 		_spawn_shaft_pit(shaft)
-		_dress_shaft(shaft, rail_tile, door_tile)
+		_dress_shaft(shaft, rail_tile, door_tile, buffer_tile)
 		_light_shaft(shaft)
 	_spawn_machine_room()
 
@@ -349,14 +350,13 @@ func _spawn_shafts() -> void:
 ## на каждом этаже её перекрывает плита — ровно так, как она и шла бы внутри
 ## шахты. Кабина идёт впереди и закрывает их собой, когда проходит мимо.
 func _dress_shaft(
-	shaft: BuildingPlan.ShaftSpot, rail_tile: CanvasTexture, door_tile: CanvasTexture
+	shaft: BuildingPlan.ShaftSpot,
+	rail_tile: CanvasTexture,
+	door_tile: CanvasTexture,
+	buffer_tile: CanvasTexture
 ) -> void:
-	_mark_shaft_ends(shaft)
-	var top := rules.story_top(shaft.top)
-	if shaft.top <= BuildingRules.ROOF:
-		# Над крышей потолка нет, и стойки ушли бы в небо. Верхняя шахта
-		# кончается внутри машинного отделения: оно и есть её верх.
-		top = rules.floor_surface(BuildingRules.ROOF) - MACHINE_ROOM_SIZE.y * 0.5
+	_mark_shaft_ends(shaft, buffer_tile)
+	var top := _shaft_top(shaft)
 	var bottom := rules.floor_surface(shaft.bottom)
 	var half := rules.shaft_width * 0.5
 	var tint := rules.palette.shaft
@@ -380,13 +380,15 @@ func _dress_shaft(
 ## и был конец полосы — кабина слышала команду, но идти дальше ей некуда, а
 ## пустая она тут же уезжала по своему расписанию. Упор объясняет предел без
 ## единого слова; второй указатель — стрелки в самой кабине.
-func _mark_shaft_ends(shaft: BuildingPlan.ShaftSpot) -> void:
-	var tile := SpriteTextures.tile("shaft_buffer")
+##
+## Нижний упор лежит на дне шахты, то есть над полом нижнего её этажа, а не под
+## ним: перекрытие рисуется ближе к зрителю (`z_index` −1 против −2), и упор,
+## опущенный в толщу плиты, не виден вовсе — ровно там, где предел и надо
+## объяснить.
+func _mark_shaft_ends(shaft: BuildingPlan.ShaftSpot, tile: CanvasTexture) -> void:
 	var half := rules.shaft_width * 0.5
-	var top := rules.story_top(shaft.top)
-	if shaft.top <= BuildingRules.ROOF:
-		top = rules.floor_surface(BuildingRules.ROOF) - MACHINE_ROOM_SIZE.y * 0.5
-	var bottom := rules.floor_surface(shaft.bottom) + PIT_HEIGHT - SHAFT_BUFFER_HEIGHT
+	var top := _shaft_top(shaft)
+	var bottom := rules.floor_surface(shaft.bottom) - SHAFT_BUFFER_HEIGHT
 
 	_add_shaft_part(
 		Rect2(shaft.x - half, top, rules.shaft_width, SHAFT_BUFFER_HEIGHT), tile, Color.WHITE, true
@@ -397,6 +399,19 @@ func _mark_shaft_ends(shaft: BuildingPlan.ShaftSpot) -> void:
 		Color.WHITE,
 		true
 	)
+
+
+## Верх шахты: докуда идут её стойки, упор и столб света.
+##
+## У шахты, доходящей до крыши, потолка нет — над ней небо, и [method
+## BuildingRules.story_top] отдаёт верх мира. Стойка, упор и свет ушли бы в
+## открытое небо над крышей; кончается такая шахта внутри машинного отделения,
+## оно и есть её верх. Считается в одном месте, потому что разъехавшись эти трое
+## дают шахту, которая светит выше, чем видна.
+func _shaft_top(shaft: BuildingPlan.ShaftSpot) -> float:
+	if shaft.top > BuildingRules.ROOF:
+		return rules.story_top(shaft.top)
+	return rules.floor_surface(BuildingRules.ROOF) - MACHINE_ROOM_SIZE.y * 0.5
 
 
 ## Кусок одежды шахты. Без тела: по направляющим не ходят, они только видны.
@@ -878,8 +893,12 @@ func _build_solid(rect: Rect2, tile: CanvasTexture, tint := Color.WHITE) -> void
 ## Шахта — единственное, что светится в погашенном здании само: она соединяет
 ## этажи, и свет в ней показывает, куда идти, когда лампы сбиты. Гасить её вместе
 ## с этажом нельзя — этажей у шахты много, а столб один.
+##
+## Верх берётся тот же, что у стоек ([method _shaft_top]): у шахты до крыши
+## потолка нет, и столб, отмеренный от верха мира, светил бы в открытом небе
+## над крышей — там, где Otto висит на тросе всё вступление.
 func _light_shaft(shaft: BuildingPlan.ShaftSpot) -> void:
-	var top := rules.story_top(shaft.top)
+	var top := _shaft_top(shaft)
 	var bottom := rules.floor_surface(shaft.bottom)
 	var area := Rect2(shaft.x - rules.shaft_width * 0.5, top, rules.shaft_width, bottom - top)
 	var light := AreaLight.column(area, rules.palette.shaft_light, SHAFT_ENERGY)

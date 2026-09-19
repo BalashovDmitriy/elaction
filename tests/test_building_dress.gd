@@ -184,6 +184,10 @@ func test_the_rope_lands_otto_on_the_roof() -> void:
 
 
 ## У каждой шахты есть упоры сверху и снизу: по ним видно, где полоса кончается.
+##
+## Проверяется и место по вертикали, а не только счёт: нижний упор однажды уехал
+## в толщу перекрытия — считался он там же, где и раньше, но перекрытие рисуется
+## ближе к зрителю, и упора в кадре не было вовсе. Счёт этого не заметил.
 func test_every_shaft_is_capped_at_both_ends() -> void:
 	var level := _build(1)
 	await wait_physics_frames(SETTLE_FRAMES)
@@ -194,9 +198,21 @@ func test_every_shaft_is_capped_at_both_ends() -> void:
 
 	for shaft: BuildingPlan.ShaftSpot in level.plan().shafts:
 		var mine := 0
+		# Низ шахты — пол её нижнего этажа: упор стоит на нём, а не под ним.
+		var floor_surface := level.rules.floor_surface(shaft.bottom)
+		var capped_below := false
 		for buffer: TextureRect in buffers:
 			var centre := buffer.position.x + buffer.size.x * 0.5
-			if absf(centre - shaft.x) <= TOLERANCE:
-				mine += 1
+			if absf(centre - shaft.x) > TOLERANCE:
+				continue
+			mine += 1
+			assert_lte(
+				buffer.position.y + buffer.size.y,
+				floor_surface + TOLERANCE,
+				"упор шахты на %.0f px не утоплен в перекрытие" % shaft.x
+			)
+			if absf(buffer.position.y + buffer.size.y - floor_surface) <= TOLERANCE:
+				capped_below = true
 		assert_eq(mine, 2, "у шахты на %.0f px оба конца отмечены" % shaft.x)
+		assert_true(capped_below, "у шахты на %.0f px упор лежит на её дне" % shaft.x)
 	_drop(level)

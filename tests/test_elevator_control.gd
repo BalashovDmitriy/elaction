@@ -122,7 +122,6 @@ func test_car_at_the_end_of_its_band_still_goes_the_other_way() -> void:
 	var level := _build(1)
 	await wait_physics_frames(SETTLE_FRAMES)
 
-	var rules := level.rules
 	var shaft := level.plan().shafts[0]
 	var car := _cars(level)[0]
 	# Ставим кабину на нижний этаж её полосы и Otto в неё.

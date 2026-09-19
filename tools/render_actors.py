@@ -63,7 +63,12 @@ CAR_FRAME = (56, 26)
 # единица мира, и более плотный рендер делает Otto крупнее в самом мире. Игра,
 # сыгранная руками, показала, что человечек рядом с дверью слишком мал
 # (ADR-0018, решение 5).
-SCALE: float = 1.0
+#
+# Умолчание — это масштаб набора, который лежит в репозитории: запуск без флага
+# обязан перерисовать те же ассеты, что уже закоммичены. С умолчанием 1 обычный
+# `python tools/render_actors.py` молча уменьшал Otto вчетверо.
+DEFAULT_SCALE: float = 4.5
+SCALE: float = DEFAULT_SCALE
 
 # Камера стоит далеко и смотрит вдоль +Y; глубина модели укладывается в эту
 # полосу вокруг нуля. Из неё же получается карта высот для нормали.
@@ -514,7 +519,12 @@ def main() -> int:
     parser.add_argument("--out", type=Path, default=OUT_DIR, help="куда писать PNG")
     parser.add_argument("--keep", type=Path, default=None, help="куда сложить сырые кадры")
     parser.add_argument(
-        "--scale", type=float, default=1.0, help="во сколько раз плотнее рендерить (по умолчанию 1)"
+        "--scale",
+        type=float,
+        default=DEFAULT_SCALE,
+        help=(
+            "во сколько раз плотнее рендерить (по умолчанию %g — масштаб набора)" % DEFAULT_SCALE
+        ),
     )
     arguments = parser.parse_args()
 

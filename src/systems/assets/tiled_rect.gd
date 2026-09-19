@@ -29,8 +29,8 @@ static func make(
 	rect.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	# Размер задаёт место, а не тайл. По умолчанию [TextureRect] объявляет
 	# минимальным размером размер текстуры, и [Control] поднимал до него всё,
-	# что меньше: полоса стены над окном (14 px при тайле 32 px) растягивалась
-	# до 32 px и закрывала город в верхней трети проёма.
+	# что меньше: полоса стены над окном (42 px при тайле 96 px) растягивалась
+	# до 96 px и закрывала город в верхней трети проёма.
 	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	rect.size = size
 	rect.position = offset
