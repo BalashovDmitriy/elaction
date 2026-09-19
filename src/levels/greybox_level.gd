@@ -77,9 +77,6 @@ const CAR_SPEED: float = 320.0
 const ALARM_MENACE: float = 1.5
 const ALARM_CAR_DELAY: float = 0.6
 
-## Сколько дверь ждёт, прежде чем выпустить следующего агента, с.
-const AGENT_RESPAWN_DELAY: float = 3.0
-
 ## На сколько этажей дальше видимой полосы дверь ещё выпускает агентов.
 ##
 ## Запас нужен, чтобы агент не появлялся на глазах у игрока в середине кадра:
@@ -538,7 +535,20 @@ func _agents_on(index: int) -> Array[Enemy]:
 ## Раньше все 55 выходили разом в [method _ready] и жили до конца здания. Это
 ## и не давало играть — двое стояли на крыше в зоне огня от точки старта, — и
 ## держало полсотни тел с физикой и ИИ на каждом кадре (ADR-0014, пункт 4).
+##
+## Живых не больше, чем разрешают правила, и выпускается за кадр один — тот, чья
+## дверь ближе к игроку. Полоса выпуска шире кадра, и внизу здания на каждом её
+## этаже по две двери: без потолка живых набиралось до восемнадцати, и нижние
+## этажи выходили тиром (ADR-0016, пункт 6).
+##
+## Один за кадр — не бережливость, а та же мера: двери и так ждут свою паузу,
+## а вываливать пятерых разом на смене полосы незачем.
 func _tend_agents(span: Vector2i, delta: float) -> void:
+	var here := rules.floor_index_near(otto.global_position.y)
+	var live := 0
+	var nearest: AgentPost = null
+	var nearest_gap := 0
+
 	for post: AgentPost in _posts:
 		# Живость проверяется прямо по полю: свой агент у двери один, а чужого
 		# сюда положить некому.
@@ -546,6 +556,8 @@ func _tend_agents(span: Vector2i, delta: float) -> void:
 			if not _within(span, post.floor_index, AGENT_KEEP_MARGIN):
 				post.agent.queue_free()
 				post.agent = null
+				continue
+			live += 1
 			continue
 
 		# Дверь, чей агент умер или уехал, ждёт свою паузу и только потом
@@ -558,15 +570,25 @@ func _tend_agents(span: Vector2i, delta: float) -> void:
 		post.wait = maxf(post.wait - delta, 0.0)
 		if post.wait > 0.0 or not _within(span, post.floor_index, AGENT_SPAWN_MARGIN):
 			continue
-		if _too_close_to_otto(post):
+		if _too_close_to_otto(post, here):
 			continue
-		post.agent = _release_agent(post)
+
+		var gap := absi(post.floor_index - here)
+		if nearest == null or gap < nearest_gap:
+			nearest = post
+			nearest_gap = gap
+
+	if nearest != null and live < rules.agents_at_once:
+		nearest.agent = _release_agent(nearest)
 
 
 ## Стоит ли Otto вплотную к двери. Считается по горизонтали: дверь и Otto на
 ## разных этажах друг другу не мешают, а этаж двери уже проверен полосой.
-func _too_close_to_otto(post: AgentPost) -> bool:
-	if post.floor_index != rules.floor_index_near(otto.global_position.y):
+##
+## Этаж Otto ([param here]) приходит снаружи: дверей в здании полсотни, и выводить
+## его из координаты заново для каждой — полсотни одинаковых счётов за кадр.
+func _too_close_to_otto(post: AgentPost, here: int) -> bool:
+	if post.floor_index != here:
 		return false
 	return absf(post.door.mat_position().x - otto.global_position.x) < AGENT_SAFE_RELEASE
 
@@ -581,6 +603,9 @@ static func _within(span: Vector2i, index: int, margin: int) -> bool:
 func _release_agent(post: AgentPost) -> Enemy:
 	var mat := post.door.mat_position()
 	var agent := ENEMY_SCENE.instantiate() as Enemy
+	# Правила отдаются до дерева: так агент входит в него уже настроенным, и
+	# заводить себе значения по умолчанию ему не приходится.
+	agent.apply_rules(rules)
 	add_child(agent)
 	agent.global_position = mat
 	agent.setup(otto, signf(otto.global_position.x - mat.x))
@@ -613,7 +638,7 @@ func _on_agent_died(_agent: Enemy, post: AgentPost) -> void:
 	# Смена не по таймеру, а отсчётом у самой двери: выпуском теперь заведует
 	# [method _tend_agents], и он же решает, подошёл ли этаж к игроку. Таймер
 	# выпустил бы агента у двери на другом конце здания, до которой нет дела.
-	post.wait = AGENT_RESPAWN_DELAY / _menace()
+	post.wait = rules.agent_respawn_delay / _menace()
 
 
 func _on_otto_died() -> void:

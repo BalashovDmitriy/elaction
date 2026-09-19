@@ -22,7 +22,6 @@ const SHOOT_POSE_TIME: float = 0.25
 @export var walk_speed: float = 55.0
 @export var gravity: float = 900.0
 @export var max_fall_speed: float = 420.0
-@export var bullet_speed: float = 180.0
 
 ## Высота выстрела от ног: попадает в стоящего Otto и проходит над присевшим.
 @export var shot_height: float = -20.0
@@ -31,36 +30,19 @@ const SHOOT_POSE_TIME: float = 0.25
 ## Сколько тело лежит, прежде чем исчезнуть, с.
 @export var corpse_time: float = 0.5
 
-## Настройки решений. Узел держит их у себя и отдаёт [EnemyBrain] — так же, как
-## дверь отдаёт свои [DoorVisit]: подкрутить агента можно в инспекторе.
+## Настройки решений, которые не зависят от здания: сколько агент выбирается из
+## двери и какой разброс по высоте считается «на одной линии». Узел держит их у
+## себя и отдаёт [EnemyBrain] — так же, как дверь отдаёт свои [DoorVisit].
+##
+## Остальные числа боя — дальность, пауза, замах, скорость пули и пороги
+## уклонения — приходят из [BuildingRules] ([method apply_rules]): их растит
+## сложность, и лежать в сцене одного агента они не могут (ADR-0016, пункт 5).
 @export var emerge_time: float = 0.6
 @export var same_line: float = 10.0
-@export var fire_range: float = 200.0
-@export var fire_cooldown: float = 1.1
 
-## Сколько агент целится, прежде чем выстрелить в появившуюся цель, с.
-@export var aim_time: float = 0.35
-
-## Дальность стрельбы на погашенном этаже: в темноте агент замечает Otto только
-## вблизи. Это не слепота, а меньше огня — ADR-0007, пункт 4.
-@export var dark_fire_range: float = 60.0
-
-## С какой злости агент начинает уходить на колено и ложиться.
-##
-## В первых зданиях он только стоит: уклонение — это третья ось сложности
-## оригинала, и включаться она должна не сразу (ADR-0016, пункт 2).
-@export var kneels_from_menace: float = 1.4
-@export var goes_prone_from_menace: float = 1.8
-
-## Рост в каждой стойке, px. Стоячий равен форме коллизии из сцены; остальные
-## ниже, и пуля выше их проходит мимо.
-@export var kneel_height: float = 17.0
-@export var prone_height: float = 8.0
-
-## Насколько далеко агент замечает летящую в него пулю, px. Дальше он её
-## игнорирует: уклоняться за секунду до попадания незачем, а стоять
-## пригнувшимся весь бой — значит не дойти до Otto никогда.
-@export var dodge_sight: float = 120.0
+## Правила здания, из которого вышел агент. Пустых не бывает: без них он
+## достаёт значения по умолчанию — те же, что у здания по умолчанию.
+var _rules: BuildingRules = null
 
 var _brain := EnemyBrain.new()
 var _target: Otto = null
@@ -83,12 +65,9 @@ var _menace: float = 1.0
 func _ready() -> void:
 	_brain.emerge_time = emerge_time
 	_brain.same_line = same_line
-	_brain.aim_time = aim_time
 	# Стоячий рост берётся у самой формы, а не записывается вторым числом:
 	# разъехавшись, они дали бы агента, который уклоняется не своим телом.
 	_brain.stand_height = (_shape.shape as RectangleShape2D).size.y
-	_brain.kneel_height = kneel_height
-	_brain.prone_height = prone_height
 	_refresh_brain()
 
 
@@ -122,6 +101,15 @@ func _physics_process(delta: float) -> void:
 	_update_look(delta)
 
 
+## Отдаёт агенту правила здания: из них он берёт все числа боя.
+##
+## Зовётся до [method Node.add_child] и после — порядок не решает ничего, как и
+## у [method set_menace]: числа переносятся в [EnemyBrain] одним [method _refresh_brain].
+func apply_rules(rules: BuildingRules) -> void:
+	_rules = rules
+	_refresh_brain()
+
+
 ## Выпускает агента из двери: он выходит в сторону [param towards].
 func setup(target: Otto, towards: float) -> void:
 	_target = target
@@ -143,6 +131,13 @@ func set_menace(value: float) -> void:
 ## Стоит ли агент в темноте. По этому признаку считается надбавка за убийство.
 func is_in_the_dark() -> bool:
 	return _in_the_dark
+
+
+## В какой он стойке. Снаружи это видно и по форме коллизии, но выводить стойку
+## из высоты прямоугольника — значит повторять таблицу ростов в каждом, кому она
+## понадобилась.
+func stance() -> EnemyBrain.Stance:
+	return _brain.stance
 
 
 ## Попадание пули. Кто стрелял, тот и получает очки — это решает он сам.
@@ -176,14 +171,23 @@ func is_dead() -> bool:
 ## них ему незачем, и маска у них та же на всех агентов.
 func _incoming_height() -> float:
 	var best := -1.0
-	var nearest := dodge_sight
+	var nearest := _building_rules().agent_dodge_sight
 	for node in get_tree().get_nodes_in_group(Bullet.GROUP):
 		var bullet := node as Bullet
 		if bullet == null or bullet.collision_mask != Bullet.FROM_OTTO:
 			continue
 		var to_bullet := bullet.global_position - global_position
-		# Летит ли она в нас: направление пули должно смотреть в нашу сторону.
-		if not is_equal_approx(signf(to_bullet.x), -bullet.direction):
+		# Летит ли она в нас — и не ушла ли уже за спину.
+		#
+		# Мерка не «с какой стороны», а «сколько ей до нас осталось»: пуля,
+		# миновавшая середину, но не вышедшая из габарита, опаснее всех. Пока
+		# считалось по стороне, агент в этот самый миг распрямлялся и ловил её
+		# собственной грудью — уклонение кончалось смертью от той же пули.
+		#
+		# Габарит — полширины тела и вся длина пули: середину она минует хвостом
+		# вперёд, и пока хвост перекрывает грудь, вставать по-прежнему нельзя.
+		var closing := -to_bullet.x * bullet.direction
+		if closing < -(_body_half_width() + bullet.half_length()):
 			continue
 		var reach := absf(to_bullet.x)
 		if reach > nearest:
@@ -192,6 +196,12 @@ func _incoming_height() -> float:
 		# Ноги агента — ноль, вверх положительно: у пули y отрицательный.
 		best = -to_bullet.y
 	return best
+
+
+## Половина ширины тела, px. Вместе с длиной пули ([method Bullet.half_length])
+## даёт габарит, из которого пуля должна выйти, прежде чем агент распрямится.
+func _body_half_width() -> float:
+	return (_shape.shape as RectangleShape2D).size.x * 0.5
 
 
 ## Подгоняет форму коллизии под стойку.
@@ -224,27 +234,41 @@ func _floor_ahead() -> bool:
 	return _floor_probe.is_colliding()
 
 
-## Переносит в [EnemyBrain] числа, которые зависят от темноты и злости: дальность
-## стрельбы и паузу между выстрелами. Считается в одном месте, чтобы порядок вызовов
-## [method _ready], [method set_in_the_dark] и [method set_menace] ничего не решал —
-## иначе настроенный до [method Node.add_child] агент прозревал бы обратно.
+## Переносит в [EnemyBrain] все числа боя: и те, что приходят из правил здания,
+## и те, что зависят от темноты и злости. Считается в одном месте, чтобы порядок
+## вызовов [method _ready], [method apply_rules], [method set_in_the_dark] и
+## [method set_menace] ничего не решал — иначе настроенный до
+## [method Node.add_child] агент прозревал бы обратно.
 func _refresh_brain() -> void:
+	var rules := _building_rules()
 	# Дальность не растёт со злостью: в оригинале сложность добавляют
 	# скорострельность, скорость пули и уклонение, а дальности среди них нет
 	# (ADR-0016, пункт 1). Пока она росла, к поздним зданиям агент простреливал
 	# этаж насквозь, и подойти к нему было нечем.
-	_brain.fire_range = dark_fire_range if _in_the_dark else fire_range
-	_brain.fire_cooldown = fire_cooldown / _menace
+	_brain.fire_range = rules.agent_dark_fire_range if _in_the_dark else rules.agent_fire_range
+	_brain.fire_cooldown = rules.agent_fire_cooldown / _menace
+	_brain.aim_time = rules.agent_aim_time
+	_brain.kneel_height = rules.agent_kneel_height
+	_brain.prone_height = rules.agent_prone_height
 	# Уклоняться агент учится не сразу: это третья ось сложности оригинала,
 	# и в первых зданиях его берут стоящим.
-	_brain.can_kneel = _menace >= kneels_from_menace
-	_brain.can_go_prone = _menace >= goes_prone_from_menace
+	_brain.can_kneel = _menace >= rules.agent_kneels_from_menace
+	_brain.can_go_prone = _menace >= rules.agent_goes_prone_from_menace
+
+
+## Правила, по которым живёт агент. Выпущенному уровнем их отдали, а
+## поставленному руками — в тесте или в редакторе — достаются значения
+## по умолчанию, те же, что у здания по умолчанию.
+func _building_rules() -> BuildingRules:
+	if _rules == null:
+		_rules = BuildingRules.new()
+	return _rules
 
 
 ## Скорость пули этого агента: растёт со злостью, как в оригинале. Отбирает
 ## время на реакцию, но не саму возможность подойти.
 func _bullet_speed() -> float:
-	return bullet_speed * _menace
+	return _building_rules().agent_bullet_speed * _menace
 
 
 func _apply_gravity(delta: float) -> void:

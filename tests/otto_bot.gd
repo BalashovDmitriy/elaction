@@ -15,6 +15,10 @@ extends RefCounted
 ## прыгает. Без этого он мерил бы не игру, а себя — в оригинале присед и прыжок и
 ## есть защита от огня (ADR-0006, пункт 3), и стоящий под выстрелом бот доказывал
 ## бы только то, что стоять под выстрелом нельзя.
+##
+## Подошедшего вплотную агента бот не обходит, а встречает: приседает, поворачивается
+## и стреляет. Пока он проходил мимо, размен на трёх-четырёх пикселях был мгновенным
+## и уклонение там не помогало — этим и кончались все замеры M11.
 
 ## Насколько близко к цели по горизонтали считается «дошёл», px.
 const REACHED: float = 6.0
@@ -29,11 +33,26 @@ const ENGAGE: float = 240.0
 ## Пуля летит по горизонтали, и агент этажом ниже — не цель, а трата патрона.
 const SAME_LINE: float = 24.0
 
+## Сколько бот готов драться, не сходя с места, с игрового времени.
+##
+## Отсчёт идёт, пока рядом вообще кто-то есть, и обнуляется, только когда линия
+## чиста. Дальше бот идёт напролом: агент бывает и недосягаем — за проёмом, на
+## кабине, в глухом углу, — а двери подсылают следующего каждые три секунды.
+## Бот, который стоит до победы, не уходит с этажа никогда.
+const DUEL_PATIENCE: float = 2.0
+
 ## За сколько пикселей до попадания бот начинает уклоняться.
 ##
 ## Присед мгновенный, но прыжок — нет: чтобы тело успело подняться над низкой
 ## пулей, прыгать надо заранее. Отсюда запас, а не «в последний кадр».
 const DODGE_SIGHT: float = 96.0
+
+## Половина ширины тела Otto, px.
+##
+## Вместе с длиной пули ([method Bullet.half_length]) даёт габарит, из которого
+## она должна выйти, прежде чем вставать. Агент на этом попадался —
+## распрямлялся ровно под пулей и ловил её грудью, — и Otto попадался бы так же.
+const BODY_HALF_WIDTH: float = 6.0
 
 ## Выше этой высоты над ногами пуля считается высокой: от неё приседают.
 ## Сидячая форма Otto — 18 px, и пуля выше неё проходит над головой.
@@ -46,6 +65,15 @@ const WAIT_ASIDE: float = 32.0
 ## Насколько кабина считается пришедшей на этаж, px.
 const CAR_ALIGNED: float = 4.0
 
+## Действия, которые Otto читает по фронту нажатия, а не по удержанию.
+##
+## Их нельзя отпустить и нажать заново в одном кадре: движок такого фронта не
+## видит, и нажатие пропадает целиком. Бот так и делал — и за всю веху не
+## выстрелил ни разу и ни разу не прыгнул, а замеры показывали один присед.
+## Поэтому одиночное действие держится кадр, следующий кадр отдыхает и только
+## потом нажимается снова.
+const TAPS: Array[StringName] = [&"jump", &"shoot"]
+
 var _level: GreyboxLevel
 var _rules: BuildingRules
 var _otto: Otto
@@ -53,6 +81,12 @@ var _pressed: Array[StringName] = []
 ## Была ли кабина на этаже в прошлом кадре и идём ли мы в неё.
 var _car_was_here: bool = false
 var _boarding: bool = false
+## Сколько бот уже дерётся не сходя с места, с. Считается игровым временем, а не
+## кадрами: замер идёт под [member Engine.time_scale], и кадр там вчетверо длиннее.
+var _duel_time: float = 0.0
+## Одиночные действия, отпущенные в этом кадре: нажать их снова можно только
+## со следующего.
+var _resting: Array[StringName] = []
 
 
 func _init(level: GreyboxLevel) -> void:
@@ -65,27 +99,39 @@ func _init(level: GreyboxLevel) -> void:
 func step() -> void:
 	_release_all()
 	if _otto.is_dead():
+		_duel_time = 0.0
 		return
 
 	var floor_index := _rules.floor_index_near(_otto.global_position.y)
+	var threat := _threat()
+	if threat == null:
+		_duel_time = 0.0
+	else:
+		_duel_time += _otto.get_physics_process_delta_time()
 
 	# Уклонение идёт вместо шага, но не вместо выстрела: чужая пуля важнее
 	# спуска, а вот стрелять она не мешает. Бот, который на время уклонения
 	# переставал делать всё остальное, вставал намертво — двери подсылают
 	# агентов без перерыва, и пуля в воздухе есть почти всегда.
 	var bullet_height := _incoming_height()
-	if bullet_height >= 0.0:
+	# Уклонение отменяет дуэль: нажата будет не сторона, а присед или прыжок.
+	# В кабине уклонения нет вовсе — там от пули не уйти, и остаётся стрелять.
+	var dodging := bullet_height >= 0.0 and not _otto.is_riding()
+	# Повёрнут ли ствол к цели этим же кадром: в дуэли бот сам нажимает сторону,
+	# и целиться отдельным кадром не надо.
+	var aiming := not dodging and _duelling(threat)
+	if dodging:
 		_dodge(bullet_height)
+	elif aiming:
+		_hold_the_line(threat)
 	else:
 		_advance(floor_index)
 
 	# Огонь идёт вдогонку плану, а не вместо него. Бой, который останавливает
 	# спуск, останавливает его навсегда: двери подсылают следующего каждые три
 	# секунды, и бот, который сперва «зачищает этаж», не уходит с него никогда.
-	# Разворачиваться к цели он тоже не станет — разворот спорил бы с шагом,
-	# и бот топтался бы на месте между двумя нажатиями.
-	var threat := _threat()
-	if threat != null and is_equal_approx(_otto.facing(), _side_of(threat)):
+	# Поэтому на ходу бот стреляет только вперёд: разворот спорил бы с шагом.
+	if threat != null and (aiming or is_equal_approx(_otto.facing(), _side_of(threat))):
 		_press(&"shoot")
 
 
@@ -140,8 +186,10 @@ func _incoming_height() -> float:
 		if bullet == null or bullet.collision_mask != Bullet.FROM_ENEMY:
 			continue
 		var to_bullet := bullet.global_position - _otto.global_position
-		# Летит ли она в нас: пуля должна смотреть в нашу сторону.
-		if not is_equal_approx(signf(to_bullet.x), -bullet.direction):
+		# Летит ли она в нас — и не ушла ли уже за спину. Мерка не «с какой
+		# стороны», а «сколько ей до нас осталось»: пуля, миновавшая середину,
+		# но не вышедшая из габарита хвостом, всё ещё попадает.
+		if -to_bullet.x * bullet.direction < -(BODY_HALF_WIDTH + bullet.half_length()):
 			continue
 		var reach := absf(to_bullet.x)
 		if reach > nearest:
@@ -155,12 +203,15 @@ func _incoming_height() -> float:
 ##
 ## Прыгать можно только с пола: в воздухе нажатие пропадёт впустую, и бот
 ## встретит пулю стоя. С пола не получилось — приседаем, это хоть что-то.
+##
+## «Не получилось» — это и кадр отдыха: прыжок одиночный, и на таком кадре
+## [method _press] его не нажимает. Пустой кадр под пулей дороже неидеального
+## уклонения, поэтому ответ проверяется, а не предполагается.
 func _dodge(bullet_height: float) -> void:
 	if bullet_height > HIGH_BULLET:
 		_press(&"move_down")
 		return
-	if _otto.is_grounded():
-		_press(&"jump")
+	if _otto.is_grounded() and _press(&"jump"):
 		return
 	_press(&"move_down")
 
@@ -168,6 +219,72 @@ func _dodge(bullet_height: float) -> void:
 ## С какой стороны от Otto стоит агент: -1 слева, +1 справа.
 func _side_of(agent: Enemy) -> float:
 	return signf(agent.global_position.x - _otto.global_position.x)
+
+
+## Пора ли драться, а не идти дальше.
+##
+## Пройти мимо агента, который держит тебя на мушке, нельзя: на трёх-четырёх
+## пикселях размен мгновенный, и уклонение там уже ничего не решает — именно
+## этим кончались все замеры вехи (ADR-0016, «Чем веха кончилась»).
+func _duelling(threat: Enemy) -> bool:
+	if threat == null:
+		return false
+	# Дуэль — это присесть и повернуться, а в кабине нельзя ни того, ни другого:
+	# присед там выключен (ADR-0004, пункт 3), а шаг вбок в пути уводит в пустую
+	# шахту. Пока кабина не встала у этажа, бот просто едет.
+	var riding := _otto.is_riding()
+	if riding and not _car_aligned():
+		return false
+	if _duel_time > DUEL_PATIENCE:
+		return false
+	return absf(threat.global_position.x - _otto.global_position.x) <= _duel_reach()
+
+
+## Ближе какого расстояния бот не проходит мимо агента, а дерётся, px.
+##
+## На ногах это дальность огня самого агента: драться стоит ровно с теми, кто
+## может попасть. Того, кто дальше, бот обстреливает на ходу — останавливаться,
+## пока размен идёт в его пользу, незачем.
+##
+## В кабине мерка шире, вся [constant ENGAGE]: там нельзя ни присесть, ни
+## отпрыгнуть (ADR-0004, пункт 3), и единственная защита — выстрелить первым.
+func _duel_reach() -> float:
+	return ENGAGE if _otto.is_riding() else _rules.agent_fire_range
+
+
+## Дуэль: присесть, повернуться к агенту и держать его под огнём.
+##
+## Присед здесь не отступление, а лучшая позиция из всех: пуля агента летит в
+## 20 px над полом и проходит над присевшим (его форма — 18 px), а сам Otto из
+## приседа бьёт ниже — и достаёт и стоящего, и вставшего на колено. Ходить
+## присев нельзя, но в дуэли и не надо.
+##
+## Сторона нажимается этим же кадром, и выстрел уйдёт уже в неё: Otto берёт
+## направление огня из того же нажатия, которым поворачивается.
+func _hold_the_line(threat: Enemy) -> void:
+	if not _otto.is_riding():
+		_press(&"move_down")
+	_press(&"move_right" if _side_of(threat) > 0.0 else &"move_left")
+
+
+## Стоит ли кабина, в которой едет бот, у этажа.
+##
+## Пока она в пути, шаг вбок — это шаг в пустую шахту, а падение в неё
+## смертельно. У этажа выйти можно: под ногами пол.
+func _car_aligned() -> bool:
+	for child in _level.get_children():
+		var car := child as ElevatorCar
+		if car == null:
+			continue
+		# Мерка вширь узкая нарочно, хотя Otto и едет где встал, а не на оси:
+		# на всю ширину кабины дуэль в ней включается почти всегда, а из неё бот
+		# выходит боком на этаж — и до низа здания не доезжает (ADR-0016).
+		if absf(car.global_position.x - _otto.global_position.x) > CAR_ALIGNED:
+			continue
+		if absf(car.global_position.y - _otto.global_position.y) > CAR_ALIGNED:
+			continue
+		return car.is_aligned()
+	return false
 
 
 ## Везёт ли кабина дальше, или пора выходить и идти своим ходом.
@@ -309,12 +426,21 @@ func _escalator_on(floor_index: int) -> BuildingPlan.EscalatorSpot:
 	return null
 
 
-func _press(action: StringName) -> void:
+## Нажимает действие. Возвращает, нажалось ли: одиночное действие, отпущенное
+## этим же кадром, нажать нельзя — фронта не выйдет, кадр пропускается, и на
+## следующем нажатие уходит.
+func _press(action: StringName) -> bool:
+	if _resting.has(action):
+		return false
 	Input.action_press(action)
 	_pressed.append(action)
+	return true
 
 
 func _release_all() -> void:
+	_resting.clear()
 	for action in _pressed:
 		Input.action_release(action)
+		if TAPS.has(action):
+			_resting.append(action)
 	_pressed.clear()

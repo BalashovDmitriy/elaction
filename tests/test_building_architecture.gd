@@ -13,6 +13,13 @@ const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 ## Сколько кадров даётся геометрии и агентам, чтобы встать на места.
 const SETTLE_FRAMES: int = 4
 
+## Сколько кадров дверям даётся на то, чтобы выпустить всех, кого они могут.
+##
+## Дверь выпускает следующего не раньше чем через свою паузу, а уровень отдаёт
+## не больше одного за кадр: чтобы толпа собралась целиком, нужны секунды, а не
+## кадр-другой.
+const CROWD_FRAMES: int = 240
+
 ## Сколько кадров Otto стоит на крыше, ничего не делая.
 ##
 ## Именно так игрок и начинает партию: кадр появился, он ещё не взялся за
@@ -30,10 +37,10 @@ func after_all() -> void:
 
 
 ## Правила настоящие: тридцать этажей, пять документов, агенты на месте.
-func _build(building_seed: int, agents: bool) -> GreyboxLevel:
+func _build(building_seed: int, agents: bool, rules: BuildingRules = null) -> GreyboxLevel:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
-	level.rules = BuildingRules.new()
+	level.rules = rules if rules != null else BuildingRules.new()
 	level.building_seed = building_seed
 	level.spawn_agents = agents
 	add_child_autofree(level)
@@ -46,10 +53,14 @@ func _drop(level: GreyboxLevel) -> void:
 
 ## Живые агенты здания. Перебор детей — дело самого уровня ([method
 ## GreyboxLevel.agents]), здесь остаётся только отсев мёртвых.
+##
+## И тех, кого уже убрали за кромку кадра: [method Node.queue_free] освобождает
+## узел лишь в конце кадра, а угрозой он перестал быть сразу — без этого отсева
+## потолок живых считался бы с лишним телом и тест падал бы на ровном месте.
 func _agents_in(level: GreyboxLevel) -> Array[Enemy]:
 	var found: Array[Enemy] = []
 	for agent in level.agents():
-		if not agent.is_dead():
+		if not agent.is_dead() and not agent.is_queued_for_deletion():
 			found.append(agent)
 	return found
 
@@ -182,3 +193,78 @@ func test_otto_is_untouchable_right_after_coming_back() -> void:
 	level.otto.kill()
 	assert_false(level.otto.is_dead(), "и сразу второй раз его не убить")
 	_drop(level)
+
+
+## Внизу здания тесно: там на каждом этаже по две двери, а полоса выпуска — девять
+## этажей. Без потолка живых набиралось до восемнадцати, и нижние этажи выходили
+## тиром, где стреляют со всех сторон разом (ADR-0016, пункт 6).
+func test_no_more_live_agents_than_the_rules_allow() -> void:
+	for building_seed: int in [1, 2, 3]:
+		var level := _build(building_seed, true)
+		var rules := level.rules
+		_stand_on(level, rules.floors - 2)
+
+		var most := 0
+		for _frame in CROWD_FRAMES:
+			await wait_physics_frames(1)
+			most = maxi(most, _agents_in(level).size())
+
+		assert_gt(most, 0, "сид %d: двери на нижних этажах никого не выпустили" % building_seed)
+		assert_lte(
+			most,
+			rules.agents_at_once,
+			(
+				"сид %d: живых агентов разом %d при потолке %d"
+				% [building_seed, most, rules.agents_at_once]
+			)
+		)
+		_drop(level)
+
+
+## Числа боя доезжают из правил до самого агента.
+##
+## Проверяется дальностью: с нулевой агент не стреляет вовсе, и это видно по
+## пулям и по тому, что Otto жив. Пока числа лежали в сцене агента, здание не
+## могло подкрутить их ничем (ADR-0016, пункт 5).
+func test_agents_take_their_combat_numbers_from_the_rules() -> void:
+	var toothless := BuildingRules.new()
+	toothless.agent_fire_range = 0.0
+	toothless.agent_dark_fire_range = 0.0
+	var harmless := _build(1, true, toothless)
+	_stand_on(harmless, harmless.rules.floors - 2)
+	var quiet := await _worst_moment(harmless)
+	assert_gt(_agents_in(harmless).size(), 0, "агенты вышли")
+	assert_eq(quiet, 0, "но стрелять им нечем: дальность нулевая")
+	assert_false(harmless.otto.is_dead(), "и Otto цел, простояв среди них столбом")
+	_drop(harmless)
+
+	var armed := _build(1, true)
+	_stand_on(armed, armed.rules.floors - 2)
+	var shots := await _worst_moment(armed)
+	assert_gt(shots, 0, "с обычной дальностью те же агенты стреляют")
+	_drop(armed)
+
+
+## Ставит Otto посреди этажа: туда, где стоял бы игрок, а не в проём.
+func _stand_on(level: GreyboxLevel, index: int) -> void:
+	var rules := level.rules
+	level.otto.global_position = Vector2(
+		level.plan().safe_x(rules, index), rules.floor_surface(index)
+	)
+
+
+## Сколько вражеских пуль оказалось в воздухе разом за [constant CROWD_FRAMES].
+##
+## Не «сколько их сейчас»: пуля живёт доли секунды, и один замер попал бы
+## в промежуток между выстрелами.
+func _worst_moment(level: GreyboxLevel) -> int:
+	var most := 0
+	for _frame in CROWD_FRAMES:
+		await wait_physics_frames(1)
+		var flying := 0
+		for node in level.get_tree().get_nodes_in_group(Bullet.GROUP):
+			var bullet := node as Bullet
+			if bullet != null and bullet.collision_mask == Bullet.FROM_ENEMY:
+				flying += 1
+		most = maxi(most, flying)
+	return most
