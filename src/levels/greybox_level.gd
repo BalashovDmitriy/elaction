@@ -26,6 +26,7 @@ const ROPE_DROP: float = 2.64
 const ROPE_SPEED: float = 4.2
 
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
+const EXIT_CAR_MODEL := preload("res://assets/models/car.glb")
 const ESCALATOR_SCENE := preload("res://src/systems/escalators/escalator.tscn")
 const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
@@ -47,8 +48,8 @@ const EXIT_HEIGHT: float = 1.2
 ## Стоит рядом с проёмом и уезжает, увозя Otto; следующее здание собирается
 ## после отъезда, а не в тот же кадр.
 ##
-## Габарит записан здесь: в греев-боксе машина — коробка, и другого источника
-## размера у неё нет. Модель M16 принесёт свой, и число уйдёт вместе с коробкой.
+## Габарит модели `car.glb`, м: по нему машина ставится в зазор от проёма и
+## считается уехавшей из кадра. `tools/build_actors.py` строит её ровно такой.
 const CAR_SIZE := Vector3(2.4, 0.9, 1.0)
 const CAR_GAP: float = 0.36
 const CAR_SPEED: float = 9.6
@@ -150,7 +151,7 @@ var _posts: Array[AgentPost] = []
 ## Здание сдано. Событие однократное: по нему main собирает следующее здание.
 var _cleared: bool = false
 ## Машина у выхода и её отъезд: пока она едет, здание ещё не сдано.
-var _car: MeshInstance3D = null
+var _car: Node3D = null
 var _car_leaving: bool = false
 ## Куда машина уезжает: -1 влево, +1 вправо. Та же сторона, с которой она стоит.
 var _car_towards: float = 1.0
@@ -511,15 +512,20 @@ func _spawn_exit() -> void:
 ## Машина у выхода. Стоит на полу нижнего этажа рядом с проёмом, за плоскостью
 ## игры: она снаружи здания, и заходить на неё Otto не может — это вид, не тело.
 func _spawn_car(exit_area: Rect2) -> void:
-	_car = GreyboxLook.box(CAR_SIZE, GreyboxLook.marker(GreyboxLook.CAR))
+	_car = EXIT_CAR_MODEL.instantiate() as Node3D
+	_car.name = "ExitCar"
 	# Уезжает в ближнюю сторону: там же и стоит. В дальнюю машина ехала бы через
 	# всё здание, и «уехал» растянулось бы на пять секунд вместо одной.
 	_car_towards = -1.0 if exit_area.get_center().x < rules.width * 0.5 else 1.0
 	var x := (
 		exit_area.get_center().x + _car_towards * (EXIT_WIDTH * 0.5 + CAR_GAP + CAR_SIZE.x * 0.5)
 	)
-	_car.position = WorldSpace.to_scene(Vector2(x, exit_area.end.y - CAR_SIZE.y * 0.5))
+	# Модель стоит колёсами в своём нуле, капотом в +X; в другую сторону она
+	# разворачивается целиком.
+	_car.position = WorldSpace.to_scene(Vector2(x, exit_area.end.y))
 	_car.position.z = CAR_Z
+	if _car_towards < 0.0:
+		_car.rotation.y = PI
 	add_child(_car)
 
 

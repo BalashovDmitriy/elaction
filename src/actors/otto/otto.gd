@@ -76,7 +76,7 @@ var _grace: float = 0.0
 
 @onready var _standing_shape: CollisionShape3D = $StandingShape
 @onready var _crouching_shape: CollisionShape3D = $CrouchingShape
-@onready var _body: ActorBox = $Body
+@onready var _body: FigureRig = $Body
 @onready var _camera: SideCamera = $Camera
 @onready var _kick_zone: Area3D = $KickZone
 
@@ -88,9 +88,6 @@ func _ready() -> void:
 	_apex_y = global_position.y
 	# Коробка тела повторяет форму коллизии: разойдясь, они дали бы Otto,
 	# которого бьют не там, где он нарисован.
-	_body.standing = standing
-	_body.crouching = crouching
-	_body.material_override = GreyboxLook.marker(GreyboxLook.OTTO)
 	_camera.follow(self)
 	_repose()
 
@@ -417,9 +414,8 @@ func _apply_pose(state: OttoStateMachine.State) -> void:
 
 ## Поза, которую Otto отыгрывает прямо сейчас.
 ##
-## В M16 её заберёт [AnimationTree]. Пока анимаций нет, по ней [ActorBox]
-## выбирает габарит коробки — и [ActorPose] остаётся при работе, а не ждёт
-## следующей вехи мёртвым грузом.
+## Выбирает её [ActorPose] — тот же, что выбирал спрайт, — а исполняет [FigureRig]
+## на скелете: между позами он интерполирует сам (ADR-0022, решение 2).
 func _pose() -> String:
 	return ActorPose.of_otto(
 		_states.state, _crushed, _falling_over > 0.0, _shooting > 0.0, _walk_phase
@@ -447,8 +443,9 @@ func _update_look(delta: float) -> void:
 		_stepped_on = -1
 
 	_body.show_pose(_pose())
+	_body.set_walk_phase(_walk_phase)
 	_body.face(_facing)
-	_body.transparency = 1.0 - _grace_alpha()
+	_body.set_transparency(1.0 - _grace_alpha())
 
 
 ## Шаг звучит на крайних кадрах ходьбы — тех, где нога ставится. На каждом

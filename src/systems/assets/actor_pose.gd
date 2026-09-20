@@ -144,6 +144,14 @@ static func walk_frame(walk_phase: float) -> String:
 	return "walk_%d" % maxi(frame, 0)
 
 
+## Номер кадра ходьбы из имени позы: обратное к [method walk_frame]. Нужен
+## ригу, которому имя кадра приходит строкой, а цикл ходьбы идёт по фазе.
+static func walk_frame_index(pose: String) -> int:
+	if not pose.begins_with("walk_"):
+		return 0
+	return clampi(pose.trim_prefix("walk_").to_int(), 0, WALK_FRAMES - 1)
+
+
 ## Как именно убили: раздавленный показан своей картинкой, а падение и лежащее
 ## тело — двумя разными.
 static func _death(crushed: bool, falling_over: bool) -> String:

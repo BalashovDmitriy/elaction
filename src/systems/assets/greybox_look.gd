@@ -24,14 +24,18 @@ const SKY_WALL := Color(0.11, 0.12, 0.16)
 const SHAFT := Color(0.24, 0.27, 0.34)
 const ESCALATOR := Color(0.33, 0.31, 0.29)
 
-## Тона игровых объектов. Светятся сами.
-const OTTO := Color(0.85, 0.87, 0.90)
-const AGENT := Color(0.24, 0.26, 0.34)
+## Тона игровых объектов. Светятся сами. Актёры и машина у выхода с M16 —
+## модели со своими материалами; их читаемость держит [method outline].
 const DOOR := Color(0.78, 0.66, 0.30)
 const DOOR_RED := Color(0.76, 0.24, 0.22)
 const LAMP := Color(1.0, 0.93, 0.72)
 const BULLET := Color(1.0, 0.88, 0.60)
 const CAR := Color(0.70, 0.22, 0.20)
+
+## Обводка актёров: светлый кант и его толщина, м. Силу и цвет подберёт M17
+## вместе со светом; здесь она держит читаемость.
+const OUTLINE := Color(0.92, 0.94, 1.0)
+const OUTLINE_WIDTH: float = 0.018
 
 ## Насколько ярко светятся игровые объекты. Не «фонарь», а ровно столько, чтобы
 ## силуэт читался на погашенном этаже: выше — и кадр превращается в гирлянду.
@@ -86,6 +90,26 @@ static func box(size: Vector3, material: StandardMaterial3D) -> MeshInstance3D:
 	part.mesh = mesh
 	part.material_override = material
 	return part
+
+
+## Обводка актёра: инвертированная оболочка вторым проходом.
+##
+## Лицевые грани отсечены, без затенения, чуть шире тела — рисуется задняя
+## сторона раздутого меша, и по контуру фигуры остаётся кант. Свету он не
+## подчиняется, поэтому виден и на погашенном этаже (ADR-0022, решение 4).
+## Rim-свет для этого не годится: он слагаемое освещения и гаснет вместе с ним.
+static func outline() -> StandardMaterial3D:
+	var found: Variant = _cache.get("outline")
+	if found != null:
+		return found as StandardMaterial3D
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.cull_mode = BaseMaterial3D.CULL_FRONT
+	material.grow = true
+	material.grow_amount = OUTLINE_WIDTH
+	material.albedo_color = OUTLINE
+	_cache["outline"] = material
+	return material
 
 
 ## Сбрасывает кэш. Нужен тестам: материалы живут в статике, а она переживает
