@@ -58,6 +58,9 @@ var _brain := EnemyBrain.new()
 var _target: Otto = null
 var _corpse_left: float = 0.0
 var _in_the_dark: bool = false
+## Стоит ли Otto в темноте. От этого, а не от собственной тени агента, зависит,
+## видит ли он Otto: из тени освещённого видно, освещённый в тень не видит.
+var _target_in_the_dark: bool = false
 ## Фаза ходьбы, поза выстрела и падения, признак раздавленного — всё как у Otto.
 var _walk_phase: float = 0.0
 var _walking: bool = false
@@ -98,7 +101,10 @@ func _physics_process(delta: float) -> void:
 	var to_target := Vector2.ZERO
 	if alive_target:
 		to_target = WorldSpace.direction_to_plane(_target.global_position - global_position)
-	var state := _brain.update(delta, to_target, alive_target, _incoming_height())
+	# Невидимый Otto для мозга — не цель: он не поворачивается к нему и не
+	# стреляет, а идёт, куда шёл (ADR-0023, решение 8).
+	var sees_target := alive_target and _sees(to_target)
+	var state := _brain.update(delta, to_target, sees_target, _incoming_height())
 	_fit_shape()
 	if _brain.fired():
 		_fire()
@@ -112,9 +118,14 @@ func _physics_process(delta: float) -> void:
 	# Приседая и лёжа агент не ходит: уклонение — это замереть, а не идти
 	# дальше пригнувшись.
 	var walking := (state == EnemyBrain.State.WALK or stepping_out) and _brain.is_standing()
-	if walking and is_on_floor() and not _floor_ahead():
-		# Дальше пола нет: агент остаётся на своём этаже (ADR-0006, пункт 6).
-		walking = false
+	if walking and is_on_floor() and _blocked_ahead():
+		# Дальше пола нет или стена: агент остаётся на своём этаже (ADR-0006,
+		# пункт 6). Видя Otto, он встаёт у края; потеряв — разворачивается и идёт
+		# обратно: слепой агент патрулирует этаж, а не караулит проём (ADR-0023).
+		if sees_target or stepping_out:
+			walking = false
+		else:
+			_brain.turn_around()
 	velocity.x = walk_speed * _brain.facing if walking else 0.0
 	_apply_gravity(delta)
 	move_and_slide()
@@ -143,10 +154,23 @@ func setup(target: Otto, towards: float) -> void:
 	_shield(true)
 
 
-## Сообщает агенту, что его этаж погас или снова освещён.
+## Сообщает агенту, что под ним темно. От этого зависит только цена его смерти:
+## убийство в темноте дороже (ADR-0010, пункт 6). Решений боя темнота под агентом
+## больше не меняет — их решает тень Otto (ADR-0023, решение 8), — поэтому здесь
+## присваивание и ничего больше: зовут это каждый кадр на каждого живого.
 func set_in_the_dark(value: bool) -> void:
 	_in_the_dark = value
-	_refresh_brain()
+
+
+## Сообщает агенту, что Otto стоит в темноте. Такого он замечает лишь вблизи —
+## [member BuildingRules.agent_dark_fire_range] — а дальше не видит вовсе.
+func set_target_in_the_dark(value: bool) -> void:
+	_target_in_the_dark = value
+
+
+## Куда агент смотрит: -1 влево, +1 вправо.
+func facing() -> float:
+	return _brain.facing
 
 
 ## Насколько агент злее обычного. Растёт от здания к зданию и по тревоге.
@@ -207,6 +231,20 @@ func _shield(value: bool) -> void:
 	if get_collision_layer_value(ENEMY_LAYER) == on_layer:
 		return
 	set_collision_layer_value(ENEMY_LAYER, on_layer)
+
+
+## Видит ли агент Otto. За дверью его нет; в темноте он заметен только ближе
+## [member BuildingRules.agent_dark_fire_range]; освещённого видно как обычно.
+##
+## Мерится по горизонтали, как и дальность огня в [EnemyBrain]: иначе «1.8 м —
+## треть от шести» сравнивало бы разные вещи, и агент этажом ниже считался бы
+## слепым там, где стоящий на той же линии видит.
+func _sees(to_target: Vector2) -> bool:
+	if _target.is_hidden():
+		return false
+	if not _target_in_the_dark:
+		return true
+	return absf(to_target.x) <= _building_rules().agent_dark_fire_range
 
 
 ## Возвращает тело в плоскость игры — по той же причине, что у [Otto].
@@ -276,6 +314,15 @@ func _fit_shape() -> void:
 	_shape.position.y = height * 0.5
 
 
+## Некуда ли шагать: впереди проём или стена, в которую агент уже упёрся.
+##
+## Стена берётся с прошлого шага [method CharacterBody3D.move_and_slide]:
+## развернувшись, агент уходит от неё, и на следующем кадре она уже не в счёт,
+## так что у стены он не дёргается.
+func _blocked_ahead() -> bool:
+	return not _floor_ahead() or is_on_wall()
+
+
 ## Есть ли пол там, куда агент собирается шагнуть.
 ##
 ## Без этой проверки он уходил бы с собственного этажа в проём шахты или
@@ -289,17 +336,16 @@ func _floor_ahead() -> bool:
 
 
 ## Переносит в [EnemyBrain] все числа боя: и те, что приходят из правил здания,
-## и те, что зависят от темноты и злости. Считается в одном месте, чтобы порядок
-## вызовов [method _ready], [method apply_rules], [method set_in_the_dark] и
-## [method set_menace] ничего не решал — иначе настроенный до
-## [method Node.add_child] агент прозревал бы обратно.
+## и те, что зависят от злости. Считается в одном месте, чтобы порядок вызовов
+## [method _ready], [method apply_rules] и [method set_menace] ничего не решал —
+## иначе настроенный до [method Node.add_child] агент терял бы половину чисел.
 func _refresh_brain() -> void:
 	var rules := _building_rules()
 	# Дальность не растёт со злостью: в оригинале сложность добавляют
 	# скорострельность, скорость пули и уклонение, а дальности среди них нет
 	# (ADR-0016, пункт 1). Пока она росла, к поздним зданиям агент простреливал
 	# этаж насквозь, и подойти к нему было нечем.
-	_brain.fire_range = rules.agent_dark_fire_range if _in_the_dark else rules.agent_fire_range
+	_brain.fire_range = rules.agent_fire_range
 	_brain.fire_cooldown = rules.agent_fire_cooldown / _menace
 	_brain.aim_time = rules.agent_aim_time
 	_brain.kneel_height = rules.agent_kneel_height
@@ -383,4 +429,4 @@ func _on_bullet_hit(target: Node3D) -> void:
 	var victim := target as Otto
 	if victim == null:
 		return
-	victim.take_bullet()
+	victim.kill()

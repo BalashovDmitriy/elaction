@@ -181,3 +181,30 @@ func test_the_dead_do_not_dodge() -> void:
 	brain.stance = EnemyBrain.Stance.KNEEL
 	brain.kill()
 	assert_eq(brain.stance, EnemyBrain.Stance.STAND)
+
+
+## Невидимого Otto мозг не преследует: не поворачивается к нему и не стреляет.
+## «Виден ли» решает узел — по тени и двери (ADR-0023, решение 8), — мозгу
+## приходит одно слово вместе с «жив ли».
+func test_an_unseen_target_is_neither_tracked_nor_shot() -> void:
+	var brain := _brain()
+	_run(brain, 0.4, FAR_ABOVE)
+	var behind := Vector2(-IN_FRONT.x, 0.0)
+	var state := EnemyBrain.State.WALK
+	for _frame: int in 10:
+		state = brain.update(STEP, behind, false)
+		assert_false(brain.fired(), "по невидимому не стреляют")
+	assert_eq(state, EnemyBrain.State.WALK, "невидимая цель — не цель")
+	assert_eq(brain.facing, 1.0, "к невидимой не поворачивается")
+	# Та же цель, но видимая: мозг разворачивается и берёт её на мушку.
+	assert_eq(brain.update(STEP, behind, true), EnemyBrain.State.SHOOT)
+	assert_eq(brain.facing, -1.0)
+
+
+func test_turning_around_flips_the_facing() -> void:
+	var brain := _brain()
+	assert_eq(brain.facing, 1.0)
+	brain.turn_around()
+	assert_eq(brain.facing, -1.0)
+	brain.turn_around()
+	assert_eq(brain.facing, 1.0)

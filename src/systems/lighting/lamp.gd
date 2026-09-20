@@ -12,8 +12,9 @@ extends AnimatableBody3D
 ## Узел двигает себя сам, поэтому [AnimatableBody3D], а не [StaticBody3D] — как и
 ## кабина лифта. Само падение считает [LampFall], без узлов и физики.
 ##
-## С M15 лампа — единственный источник света на этаже (ADR-0021, решение 4):
-## заливки этажа больше нет, и «этаж горит» значит ровно «лампа висит».
+## Лампа — единственный источник света своей зоны (ADR-0021, решение 4;
+## ADR-0023, решение 3): конус вниз с мягкой тенью и слабая заливка вокруг,
+## оба её дети. «Зона горит» значит ровно «лампа висит».
 
 ## Лампа задела агента по дороге вниз. Убивает его и считает очки уровень.
 signal crushed(agent: Enemy)
@@ -22,14 +23,30 @@ signal crushed(agent: Enemy)
 ## он знает сам — этаж привязан к обработчику, когда лампу вешали.
 signal fell
 
-## Свет лампы: докуда достаёт, цвет и сила.
+## Конус вниз: даёт пятно на полу и рёбра теней, как светильники на референсе.
+## Тени мягкие: свет упирается в перекрытия и стены, и именно это показывает,
+## что светит лампа, а не воздух.
+const SPOT_RANGE: float = 6.0
+const SPOT_ANGLE: float = 60.0
+const SPOT_ENERGY: float = 9.0
+const SPOT_BLUR: float = 1.6
+
+## Заливка вокруг: слабая и широкая. Один конус оставлял бы между лампами
+## черноту при всех горящих — а зона считается освещённой целиком.
 ##
-## Свет — ребёнок лампы, поэтому падает вместе с ней и гаснет, когда её
-## убирают с пола. Тени включены: свет упирается в перекрытия и стены, и
-## именно это показывает, что светит лампа, а не воздух.
-const LIGHT_RANGE: float = 2.88
-const LIGHT_COLOR := Color(1.0, 0.93, 0.72)
-const LIGHT_ENERGY: float = 1.1
+## С тенью, хотя тень на второй источник каждой лампы и стоит денег. Без неё
+## заливка радиусом больше высоты этажа (3 м) светит сквозь перекрытия: на
+## кадре погашенного этажа его пол подсвечивали лампы этажа снизу, и темнота
+## переставала быть темнотой (авторевью M17). Резать радиус нельзя — он и
+## нужен, чтобы дотянуться до краёв зоны.
+const FILL_RANGE: float = 7.0
+const FILL_ENERGY: float = 1.5
+
+## Тёплый цвет лампы против холодного общего тона палитры (ADR-0023, решение 3).
+const LIGHT_COLOR := Color(1.0, 0.9, 0.7)
+
+## Шнур подвеса, м: толщина. Длина — от патрона до потолка, и её знает уровень.
+const CORD_WIDTH: float = 0.03
 
 @export var fall_speed: float = 7.8
 
@@ -42,7 +59,9 @@ const LIGHT_ENERGY: float = 1.1
 var floor_index: int = 0
 
 var _fall := LampFall.new()
-var _light: OmniLight3D = null
+var _spot: SpotLight3D = null
+var _fill: OmniLight3D = null
+var _cord: MeshInstance3D = null
 
 @onready var _crush_zone: Area3D = $CrushZone
 @onready var _visual: MeshInstance3D = $Visual
@@ -51,9 +70,12 @@ var _light: OmniLight3D = null
 
 func _ready() -> void:
 	_fall.speed = fall_speed
+	# Светильник и есть источник: он светится сам и виден с любого этажа.
 	_visual.material_override = GreyboxLook.marker(GreyboxLook.LAMP)
-	_light = _make_light()
-	add_child(_light)
+	_spot = _make_spot()
+	add_child(_spot)
+	_fill = _make_fill()
+	add_child(_fill)
 
 
 func _physics_process(delta: float) -> void:
@@ -70,14 +92,29 @@ func _physics_process(delta: float) -> void:
 		_land()
 
 
-## Вешает лампу: [param hang_height] — на сколько её середина выше пола этажа.
+## Вешает лампу: [param hang_height] — на сколько её середина выше пола этажа,
+## [param headroom] — высота этажа от пола до потолка: до него идёт шнур.
 ##
 ## Сколько лететь, лампа считает по своей же высоте: иначе уровню пришлось бы
 ## держать копию размера из lamp.tscn и следить, чтобы та не разъехалась.
 ## Звать после добавления в дерево — форма берётся из узла.
-func hang(hang_height: float) -> void:
+func hang(hang_height: float, headroom: float = 0.0) -> void:
 	var box := _shape.shape as BoxShape3D
 	_fall.distance = maxf(hang_height - box.size.y * 0.5, 0.0)
+
+	# Прежний шнур снимается до проверки длины: перевешенная лампа не должна
+	# оставлять на себе обрывок от прошлой высоты.
+	if _cord != null:
+		_cord.queue_free()
+		_cord = null
+	var cord_length := headroom - hang_height - box.size.y * 0.5
+	if cord_length <= 0.0:
+		return
+	_cord = GreyboxLook.box(
+		Vector3(CORD_WIDTH, cord_length, CORD_WIDTH), GreyboxLook.surface(GreyboxLook.WALL)
+	)
+	_cord.position = Vector3(0.0, box.size.y * 0.5 + cord_length * 0.5, 0.0)
+	add_child(_cord)
 
 
 ## Сбита выстрелом. Повторные попадания ничего не меняют, в том числе и по уже
@@ -87,22 +124,40 @@ func shoot_down() -> void:
 	if not _fall.start():
 		return
 	# Сбитая лампа перестаёт светиться сама: корпус тот же, но уже не светильник.
+	# Шнур остаётся на потолке — оборванный, — а не падает и не исчезает с ней.
 	_visual.material_override = GreyboxLook.surface(GreyboxLook.LAMP)
+	if _cord != null:
+		_cord.reparent(get_parent())
+		_cord = null
 	Sounds.play(Sounds.LAMP_BREAK)
 
 
-## Гасит или зажигает свет лампы. Зовёт уровень, отбирая видимые этажи: свет
+## Гасит или зажигает свет лампы. Зовёт уровень, отбирая видимые этажи: конус
 ## кладёт тени и стоит дорого, поэтому за кадром ему гореть незачем
 ## (ADR-0010, пункт 8). Сама лампа при этом остаётся как была.
 func set_light_visible(on: bool) -> void:
-	_light.visible = on
+	_spot.visible = on
+	_fill.visible = on
 
 
-func _make_light() -> OmniLight3D:
+func _make_spot() -> SpotLight3D:
+	var light := SpotLight3D.new()
+	light.light_color = LIGHT_COLOR
+	light.light_energy = SPOT_ENERGY
+	light.spot_range = SPOT_RANGE
+	light.spot_angle = SPOT_ANGLE
+	light.shadow_enabled = true
+	light.shadow_blur = SPOT_BLUR
+	# Конус смотрит вниз: свет у Godot идёт вдоль -Z источника.
+	light.rotation.x = -PI * 0.5
+	return light
+
+
+func _make_fill() -> OmniLight3D:
 	var light := OmniLight3D.new()
 	light.light_color = LIGHT_COLOR
-	light.light_energy = LIGHT_ENERGY
-	light.omni_range = LIGHT_RANGE
+	light.light_energy = FILL_ENERGY
+	light.omni_range = FILL_RANGE
 	light.shadow_enabled = true
 	return light
 

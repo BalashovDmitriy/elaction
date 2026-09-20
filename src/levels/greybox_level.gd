@@ -62,14 +62,16 @@ const CAR_Z: float = -0.6
 ## комнаты и перемычек над дверями. Тел у них нет — по Z никто не ходит.
 const PANEL_THICKNESS: float = 0.1
 
-## Свет греев-бокса (ADR-0021, решение 4): общий тон, при котором погашенный
-## этаж виден, но тёмен, и одна лампа над крышей — у крыши ламп нет, а гаснуть
-## она не должна никогда: ей светит город.
-const AMBIENT_ENERGY: float = 0.35
-const SKY := Color(0.03, 0.04, 0.07)
+## Вывеска над выходом: габарит и на сколько выше проёма стены висит её
+## середина, м (ADR-0023, решение 6).
+const EXIT_SIGN_SIZE := Vector3(1.2, 0.18, 0.06)
+const EXIT_SIGN_RISE: float = 0.3
+
+## Лампа над крышей — у крыши ламп нет, а гаснуть она не должна никогда: ей
+## светит город. Общий тон и воздух здания — [Atmosphere].
 const ROOF_LIGHT_COLOR := Color(0.72, 0.78, 0.95)
-const ROOF_LIGHT_ENERGY: float = 0.9
-const ROOF_LIGHT_RANGE: float = 12.0
+const ROOF_LIGHT_ENERGY: float = 2.4
+const ROOF_LIGHT_RANGE: float = 14.0
 const ROOF_LIGHT_HEIGHT: float = 4.0
 
 ## Насколько злее агенты и насколько хуже слушается кабина по тревоге.
@@ -138,6 +140,8 @@ var _cars: Array[ElevatorCar] = []
 ## под каждый обход детей уровня. Стены комнаты — там же и по той же причине.
 var _shafts: BuildingShafts = null
 var _walls: Node3D = null
+## Рёбра — торцы плит, плинтус, пилястры — тоже своим узлом (ADR-0023, решение 4).
+var _ribs: BuildingRibs = null
 var _lighting := FloorLighting.new()
 ## Какие этажи горели в прошлом кадре: пересчитывать их каждый кадр незачем.
 ## Пустой полосой служит (0, -1): у неё конец раньше начала, а (-1, -1) теперь
@@ -174,6 +178,10 @@ func _ready() -> void:
 	_walls = Node3D.new()
 	_walls.name = "Walls"
 	add_child(_walls)
+	_ribs = BuildingRibs.new()
+	_ribs.name = "Ribs"
+	_ribs.setup(rules, _plan)
+	add_child(_ribs)
 	_build_geometry()
 	_build_room()
 	_spawn_shafts()
@@ -206,6 +214,7 @@ func _process(delta: float) -> void:
 		_move_car(delta, view)
 
 	var span := VisibleFloors.around(rules, view)
+	_shroud_agents()
 	# Агенты пересчитываются каждый кадр, а не только на смене полосы: дверь ждёт
 	# своей паузы, и пропустив кадр смены, она не выпустила бы никого до следующей.
 	if spawn_agents:
@@ -249,9 +258,15 @@ func exit_position() -> Vector2:
 	return _exit_position
 
 
-## Погашен ли этаж. Гаснет он навсегда: сбитая лампа обратно не загорается.
+## Погашен ли этаж целиком — все его зоны. Гаснут они навсегда: сбитая лампа
+## обратно не загорается.
 func is_dark(floor_index: int) -> bool:
 	return _lighting.is_dark(floor_index)
+
+
+## Темно ли в точке этажа: погашена ли зона ближайшей к ней лампы (ADR-0023).
+func is_dark_at(floor_index: int, x: float) -> bool:
+	return _lighting.is_dark_at(floor_index, x)
 
 
 ## Режет перекрытие на куски между проёмами.
@@ -274,7 +289,8 @@ static func slab_segments(
 
 
 func _build_geometry() -> void:
-	var slab := GreyboxLook.surface(GreyboxLook.SLAB)
+	# Перекрытие — пол: полированный, в него ложатся отражения (ADR-0023, решение 5).
+	var slab := GreyboxLook.polished(GreyboxLook.SLAB)
 	var wall := GreyboxLook.surface(GreyboxLook.WALL)
 
 	for index: int in rules.levels():
@@ -285,6 +301,7 @@ func _build_geometry() -> void:
 		# потолок нижнего этажа, а тот шире своего верхнего соседа.
 		for rect in slab_segments(surface, gaps, rules.slab_span(index), rules.slab_height):
 			_build_solid(rect, slab)
+			_ribs.edge_of(rect)
 		_build_side_walls(index, surface, bounds, wall)
 
 
@@ -336,6 +353,7 @@ func _build_room() -> void:
 			_build_panel(
 				Rect2(opening.x, top, opening.y - opening.x, lintel_top - top), back, back_z
 			)
+		_ribs.line_the_wall(index, inner, openings)
 
 		_build_panel(Rect2(inner.x, top, inner.y - inner.x, surface - top), far, far_z)
 
@@ -477,19 +495,22 @@ func _spawn_lamps() -> void:
 		# Этаж лампы известен здесь, и обратно из координаты его не выводят: она
 		# висит ровно на середине пролёта, где округление решает случай.
 		lamp.floor_index = spot.floor_index
+		# Зона лампы считается от того, что висит: правило темноты узнаёт о
+		# лампе здесь же, где она вешается.
+		_lighting.hang(spot.floor_index, spot.x)
 		lamp.crushed.connect(_on_lamp_crushed)
-		lamp.fell.connect(_on_lamp_fell.bind(lamp.floor_index))
+		lamp.fell.connect(_on_lamp_fell.bind(lamp.floor_index, spot.x))
 		add_child(lamp)
-		lamp.hang(LAMP_HANG_HEIGHT)
+		lamp.hang(LAMP_HANG_HEIGHT, rules.floor_height - rules.slab_height)
 		_lamps.append(lamp)
 
 
 ## Выход из здания. Не запирается: без всех документов он отправляет обратно
 ## наверх, к несобранной двери (ADR-0005, пункт 5).
 ##
-## Сам проём вырезан в задней стене ([method _build_room]); здесь — зона, порог
-## и машина. Порог светится: выход — цель, и читаться он обязан на погашенном
-## этаже (ADR-0019, решение 5).
+## Сам проём вырезан в задней стене ([method _build_room]); здесь — зона, порог,
+## вывеска и машина. Вывеска горит своим светом: выход — цель, и читаться он
+## обязан на погашенном этаже (ADR-0019, решение 5; ADR-0023, решение 6).
 func _spawn_exit() -> void:
 	var bottom := rules.floors - 1
 	var surface := rules.floor_surface(bottom)
@@ -502,11 +523,20 @@ func _spawn_exit() -> void:
 	_exit_position = area.get_center()
 
 	var threshold := GreyboxLook.box(
-		Vector3(EXIT_WIDTH, 0.05, PANEL_THICKNESS), GreyboxLook.marker(GreyboxLook.DOOR)
+		Vector3(EXIT_WIDTH, 0.05, PANEL_THICKNESS), GreyboxLook.metal(GreyboxLook.TRIM)
 	)
 	threshold.position = WorldSpace.to_scene(Vector2(centre, surface - 0.025))
 	threshold.position.z = WorldSpace.BACK_WALL_Z + PANEL_THICKNESS
 	add_child(threshold)
+
+	# Не `sign`: так зовут встроенную функцию, и местная переменная её заслонила бы.
+	var board := GreyboxLook.box(EXIT_SIGN_SIZE, GreyboxLook.light(GreyboxLook.SIGN_GREEN))
+	board.name = "ExitSign"
+	board.position = WorldSpace.to_scene(
+		Vector2(centre, surface - Door.LEAF_SIZE.y - EXIT_SIGN_RISE)
+	)
+	board.position.z = WorldSpace.BACK_WALL_Z + EXIT_SIGN_SIZE.z * 0.5
+	add_child(board)
 	_spawn_car(area)
 
 
@@ -587,15 +617,30 @@ func _on_lamp_crushed(agent: Enemy) -> void:
 	GameState.instance().add_score(points)
 
 
-## Лампа долетела до пола: этаж гаснет и обратно уже не загорается.
+## Лампа долетела до пола: её зона гаснет и обратно уже не загорается.
 ##
-## Гасить нечего: лампа была единственным источником этажа и ушла вместе со
-## своим светом. Здесь остаётся правило — запомнить темноту и сказать агентам.
-func _on_lamp_fell(index: int) -> void:
-	if not _lighting.darken(index):
-		return
-	for agent in _agents_on(index):
-		agent.set_in_the_dark(true)
+## Гасить нечего: свет лампы ушёл вместе с ней. Здесь остаётся правило —
+## запомнить темноту; кто в ней стоит, пересчитает [method _shroud_agents].
+func _on_lamp_fell(index: int, x: float) -> void:
+	_lighting.darken(index, x)
+	_shroud_agents()
+
+
+## Раздаёт агентам темноту: свою — за неё дороже убийство — и тень Otto, от
+## которой зависит, видят ли они его вовсе (ADR-0023, решение 8).
+##
+## Каждый кадр, а не по событию: агенты ходят по этажу, и зона под ними
+## меняется на ходу. Живых в здании не больше восьми, но ищет их [method agents]
+## перебором всех детей уровня, а их под три сотни: если кадр когда-нибудь упрётся
+## в это, агентов надо держать списком, а не искать заново.
+func _shroud_agents() -> void:
+	var here := _floor_of(otto)
+	var otto_in_the_dark := _lighting.is_dark_at(here, otto.global_position.x)
+	for agent in agents():
+		if agent.is_dead():
+			continue
+		agent.set_in_the_dark(_lighting.is_dark_at(_floor_of(agent), agent.global_position.x))
+		agent.set_target_in_the_dark(otto_in_the_dark)
 
 
 ## Все агенты здания: они лежат прямо в уровне, рядом с геометрией.
@@ -755,7 +800,10 @@ func _release_agent(post: AgentPost) -> Enemy:
 	add_child(agent)
 	agent.global_position = WorldSpace.to_scene(mat)
 	agent.setup(otto, signf(otto.global_position.x - mat.x))
-	agent.set_in_the_dark(_lighting.is_dark(post.floor_index))
+	agent.set_in_the_dark(_lighting.is_dark_at(post.floor_index, mat.x))
+	# Тень Otto отдаётся сразу, не дожидаясь кадра: иначе первый шаг агент делал
+	# бы, видя Otto там, где его не видно.
+	agent.set_target_in_the_dark(_lighting.is_dark_at(_floor_of(otto), otto.global_position.x))
 	agent.set_menace(_menace())
 	agent.died.connect(_on_agent_died.bind(post))
 	return agent
@@ -890,24 +938,17 @@ func _zone(rect: Rect2) -> Area3D:
 	return zone
 
 
-## Зажигает здание: общий тон и лампа над крышей.
+## Зажигает здание: воздух с общим тоном палитры и лампа над крышей.
 ##
-## Светлым этаж делает собственный источник — лампа, — а не отсутствие темноты:
-## на этом держится правило темноты (ADR-0010, пункт 3). Общий тон низкий и
-## нужен только затем, чтобы погашенный этаж был тёмен, а не чёрен: агенты в
-## темноте продолжают стрелять, и игрок обязан видеть, во что стрелять в ответ.
+## Светлой зону делает собственный источник — лампа, — а не отсутствие темноты:
+## на этом держится правило темноты (ADR-0010, пункт 3). Воздух — [Atmosphere]:
+## отражения, туман, свечение и тон числами пробы (ADR-0023, решение 7).
 ##
 ## Крыша ламп не имеет и не гаснет никогда: ей светит город. Пока города нет
 ## (M19), его заменяет один источник над крышей.
 func _light_building() -> void:
-	var environment := Environment.new()
-	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = SKY
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = rules.palette.dark
-	environment.ambient_light_energy = AMBIENT_ENERGY
 	var world := WorldEnvironment.new()
-	world.environment = environment
+	world.environment = Atmosphere.environment(rules.palette.dark)
 	add_child(world)
 
 	var roof_span := rules.floor_span(BuildingRules.ROOF)

@@ -122,6 +122,15 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "otto_jumps", "actions": ["move_right", "jump"], "hold": 0.35},
 		{"label": "otto_crouches", "actions": ["move_down"], "hold": 0.8},
 	],
+	# Свет M17: крыша и два этажа под ней с лампами, рёбрами и огоньками. Тёмную
+	# зону здесь не снять — лампа стоит по сиду; её снимает F12 по ходу игры.
+	"M17":
+	[
+		{"label": "roof", "actions": [], "hold": 1.0},
+		{"label": "walking", "actions": ["move_right"], "hold": 1.5},
+		{"label": "muzzle_flash", "actions": ["shoot"], "hold": 0.08},
+		{"label": "settled", "actions": [], "hold": 1.0},
+	],
 }
 const DEFAULT_PLAN := "M1"
 
