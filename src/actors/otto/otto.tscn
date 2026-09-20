@@ -1,8 +1,9 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://src/actors/otto/otto.gd" id="1_otto"]
 [ext_resource type="Script" path="res://src/systems/side_camera.gd" id="2_camera"]
-[ext_resource type="Script" path="res://src/systems/assets/actor_box.gd" id="3_box"]
+[ext_resource type="Script" path="res://src/systems/assets/figure_rig.gd" id="3_rig"]
+[ext_resource type="PackedScene" path="res://assets/models/otto.glb" id="4_model"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_stand"]
 size = Vector3(0.54, 1.26, 0.4)
@@ -27,8 +28,9 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.405, 0)
 shape = SubResource("BoxShape3D_crouch")
 disabled = true
 
-[node name="Body" type="MeshInstance3D" parent="."]
-script = ExtResource("3_box")
+[node name="Body" type="Node3D" parent="."]
+script = ExtResource("3_rig")
+model = ExtResource("4_model")
 
 [node name="Camera" type="Camera3D" parent="."]
 top_level = true

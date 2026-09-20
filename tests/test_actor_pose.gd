@@ -120,8 +120,7 @@ func _stances() -> Array[EnemyBrain.Stance]:
 
 
 func test_every_way_of_dying_counts_as_down() -> void:
-	# Греев-бокс кладёт по этому вопросу коробку набок, а в M16 на нём будет
-	# выбираться анимация: промах здесь оставит труп стоять.
+	# Промах здесь оставит труп стоять — у того, кто когда-нибудь спросит.
 	for crushed in [true, false]:
 		for falling in [true, false]:
 			var pose := ActorPose.of_otto(OttoStateMachine.State.DEAD, crushed, falling, false, 0.0)

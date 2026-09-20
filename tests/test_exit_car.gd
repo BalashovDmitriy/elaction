@@ -44,16 +44,9 @@ func _building() -> GreyboxLevel:
 	return level
 
 
-## Машина — единственная коробка своего габарита среди детей уровня.
-func _car_of(level: GreyboxLevel) -> MeshInstance3D:
-	for child: Node in level.get_children():
-		var visual := child as MeshInstance3D
-		if visual == null:
-			continue
-		var box := visual.mesh as BoxMesh
-		if box != null and box.size.is_equal_approx(GreyboxLevel.CAR_SIZE):
-			return visual
-	return null
+## Машина у выхода — модель под своим именем среди детей уровня.
+func _car_of(level: GreyboxLevel) -> Node3D:
+	return level.get_node_or_null("ExitCar") as Node3D
 
 
 func test_the_exit_has_a_car() -> void:
@@ -68,9 +61,9 @@ func test_the_exit_has_a_car() -> void:
 	var exit_at := level.exit_position()
 	var surface := exit_at.y + GreyboxLevel.EXIT_HEIGHT * 0.5
 	var at := WorldSpace.to_plane(car.global_position)
-	assert_almost_eq(at.y + GreyboxLevel.CAR_SIZE.y * 0.5, surface, TOLERANCE, "колёсами на полу")
+	assert_almost_eq(at.y, surface, TOLERANCE, "колёсами на полу")
 
-	var gap := GreyboxLevel.EXIT_WIDTH * 0.5 + GreyboxLevel.CAR_GAP + GreyboxLevel.CAR_SIZE.x * 0.5
+	var gap := GreyboxLevel.EXIT_WIDTH * 0.5 + GreyboxLevel.CAR_GAP + GreyboxLevel.CAR_LENGTH * 0.5
 	assert_almost_eq(
 		absf(at.x - exit_at.x), gap, TOLERANCE, "машина стоит в зазоре от проёма, а не в нём"
 	)
