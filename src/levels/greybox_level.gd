@@ -380,11 +380,9 @@ func _start_the_slide(landing: Vector2) -> void:
 	# физики на всё здание незачем, [method _finish_the_slide] его и снимет.
 	set_physics_process(true)
 
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(ROPE_WIDTH, landing.y, ROPE_WIDTH)
-	_rope = MeshInstance3D.new()
-	_rope.mesh = mesh
-	_rope.material_override = GreyboxLook.surface(GreyboxLook.WALL)
+	_rope = GreyboxLook.box(
+		Vector3(ROPE_WIDTH, landing.y, ROPE_WIDTH), GreyboxLook.surface(GreyboxLook.WALL)
+	)
 	_rope.position = WorldSpace.to_scene(Vector2(landing.x, landing.y * 0.5))
 	_rope.position.z = -0.3
 	add_child(_rope)
@@ -478,7 +476,7 @@ func _spawn_lamps() -> void:
 		# висит ровно на середине пролёта, где округление решает случай.
 		lamp.floor_index = spot.floor_index
 		lamp.crushed.connect(_on_lamp_crushed)
-		lamp.fell.connect(_on_lamp_fell.bind(spot.floor_index))
+		lamp.fell.connect(_on_lamp_fell.bind(lamp.floor_index))
 		add_child(lamp)
 		lamp.hang(LAMP_HANG_HEIGHT)
 		_lamps.append(lamp)
@@ -501,11 +499,9 @@ func _spawn_exit() -> void:
 	add_child(zone)
 	_exit_position = area.get_center()
 
-	var sill := BoxMesh.new()
-	sill.size = Vector3(EXIT_WIDTH, 0.05, PANEL_THICKNESS)
-	var threshold := MeshInstance3D.new()
-	threshold.mesh = sill
-	threshold.material_override = GreyboxLook.marker(GreyboxLook.DOOR)
+	var threshold := GreyboxLook.box(
+		Vector3(EXIT_WIDTH, 0.05, PANEL_THICKNESS), GreyboxLook.marker(GreyboxLook.DOOR)
+	)
 	threshold.position = WorldSpace.to_scene(Vector2(centre, surface - 0.025))
 	threshold.position.z = WorldSpace.BACK_WALL_Z + PANEL_THICKNESS
 	add_child(threshold)
@@ -515,11 +511,7 @@ func _spawn_exit() -> void:
 ## Машина у выхода. Стоит на полу нижнего этажа рядом с проёмом, за плоскостью
 ## игры: она снаружи здания, и заходить на неё Otto не может — это вид, не тело.
 func _spawn_car(exit_area: Rect2) -> void:
-	var mesh := BoxMesh.new()
-	mesh.size = CAR_SIZE
-	_car = MeshInstance3D.new()
-	_car.mesh = mesh
-	_car.material_override = GreyboxLook.marker(GreyboxLook.CAR)
+	_car = GreyboxLook.box(CAR_SIZE, GreyboxLook.marker(GreyboxLook.CAR))
 	# Уезжает в ближнюю сторону: там же и стоит. В дальнюю машина ехала бы через
 	# всё здание, и «уехал» растянулось бы на пять секунд вместо одной.
 	_car_towards = -1.0 if exit_area.get_center().x < rules.width * 0.5 else 1.0
@@ -859,13 +851,7 @@ func _build_solid(rect: Rect2, material: StandardMaterial3D) -> void:
 	var collision := CollisionShape3D.new()
 	collision.shape = shape
 	body.add_child(collision)
-
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	var visual := MeshInstance3D.new()
-	visual.mesh = mesh
-	visual.material_override = material
-	body.add_child(visual)
+	body.add_child(GreyboxLook.box(size, material))
 
 	add_child(body)
 
@@ -875,11 +861,7 @@ func _build_solid(rect: Rect2, material: StandardMaterial3D) -> void:
 func _build_panel(rect: Rect2, material: StandardMaterial3D, z: float) -> void:
 	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
 		return
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(rect.size.x, rect.size.y, PANEL_THICKNESS)
-	var panel := MeshInstance3D.new()
-	panel.mesh = mesh
-	panel.material_override = material
+	var panel := GreyboxLook.box(Vector3(rect.size.x, rect.size.y, PANEL_THICKNESS), material)
 	panel.position = WorldSpace.to_scene(rect.get_center())
 	panel.position.z = z
 	_walls.add_child(panel)

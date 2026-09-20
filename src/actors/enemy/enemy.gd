@@ -77,10 +77,7 @@ func _ready() -> void:
 	_brain.same_line = same_line
 	# Стоячий рост берётся у самой формы, а не записывается вторым числом:
 	# разъехавшись, они дали бы агента, который уклоняется не своим телом.
-	var standing := (_shape.shape as BoxShape3D).size
-	_brain.stand_height = standing.y
-	_body.standing = standing
-	_body.crouching = Vector3(standing.x, _brain.kneel_height, standing.z)
+	_brain.stand_height = (_shape.shape as BoxShape3D).size.y
 	_body.material_override = GreyboxLook.marker(GreyboxLook.AGENT)
 	_refresh_brain()
 
@@ -312,6 +309,23 @@ func _refresh_brain() -> void:
 	# и в первых зданиях его берут стоящим.
 	_brain.can_kneel = _menace >= rules.agent_kneels_from_menace
 	_brain.can_go_prone = _menace >= rules.agent_goes_prone_from_menace
+	# До дерева коробки ещё нет; в дереве она повторяет новые ростá сразу.
+	if _body != null:
+		_size_the_body()
+
+
+## Коробка тела повторяет форму коллизии в каждой стойке: стоя — саму форму из
+## сцены, на колене и лёжа — те же ростá, под которые [method _fit_shape] режет
+## форму. Считается здесь, а не в [method Node._ready], потому что ростá приходят
+## из правил здания и могут смениться после него ([method apply_rules]); коробка,
+## снятая один раз при рождении, дальше била бы не там, где нарисована.
+func _size_the_body() -> void:
+	var standing := (_shape.shape as BoxShape3D).size
+	standing.y = _brain.stand_height
+	_body.standing = standing
+	_body.crouching = Vector3(standing.x, _brain.kneel_height, standing.z)
+	_body.lying = Vector3(standing.y, _brain.prone_height, standing.z)
+	_body.refresh()
 
 
 ## Правила, по которым живёт агент. Выпущенному уровнем их отдали, а

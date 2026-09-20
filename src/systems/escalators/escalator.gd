@@ -139,11 +139,9 @@ func _lay_belt(from: Vector3, to: Vector3) -> void:
 	if is_zero_approx(length):
 		return
 
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(length, BELT_THICKNESS, BELT_DEPTH)
-	var belt := MeshInstance3D.new()
-	belt.mesh = mesh
-	belt.material_override = GreyboxLook.surface(GreyboxLook.ESCALATOR)
+	var belt := GreyboxLook.box(
+		Vector3(length, BELT_THICKNESS, BELT_DEPTH), GreyboxLook.surface(GreyboxLook.ESCALATOR)
+	)
 	belt.position = (from + to) * 0.5 + Vector3(0.0, 0.0, BELT_Z)
 	belt.rotation.z = atan2(span.y, span.x)
 	_ramp.add_child(belt)

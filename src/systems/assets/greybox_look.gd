@@ -74,6 +74,20 @@ static func _made(key: String, color: Color, glowing: bool) -> StandardMaterial3
 	return material
 
 
+## Коробка без тела: меш нужного габарита с материалом, готовый встать в сцену.
+##
+## Собирается в одном месте. Уровень, одежда шахт и эскалатор клали её каждый
+## своими пятью строками — семь копий одного и того же, и первая же правка
+## (слой, тень, материал) разошлась бы между ними (авторевью M15).
+static func box(size: Vector3, material: StandardMaterial3D) -> MeshInstance3D:
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	var part := MeshInstance3D.new()
+	part.mesh = mesh
+	part.material_override = material
+	return part
+
+
 ## Сбрасывает кэш. Нужен тестам: материалы живут в статике, а она переживает
 ## смену сцены, и накопленное из одного теста утекало бы в следующий.
 static func forget() -> void:

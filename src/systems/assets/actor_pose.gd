@@ -52,12 +52,16 @@ const AGENT_POSES: PackedStringArray = [
 ## Поза приседа. Одна на Otto и на агента: у агента это «на колене».
 const CROUCH := "crouch"
 
+## Поза агента лёжа. Единственная лежащая поза живого: у неё свой рост, и
+## коробка греев-бокса берёт его у формы коллизии, а не кладёт стоячего набок.
+const PRONE := "prone"
+
 ## Позы, в которых актёр лежит, — все три вида смерти и уклонение лёжа.
 ##
 ## Спрашивают об этом снаружи: греев-бокс кладёт коробку набок, а в M16 на том
 ## же вопросе будет выбираться анимация. Перечислять их у каждого, кто спросит,
 ## значит разойтись при первой же новой позе.
-const DOWN: PackedStringArray = ["dead_0", "dead_1", "crushed", "prone"]
+const DOWN: PackedStringArray = ["dead_0", "dead_1", "crushed", PRONE]
 
 ## Поза по состоянию для тех состояний, у которых она одна. Константа, а не
 ## словарь на каждый вызов: поза пересчитывается каждый физический кадр и на
@@ -114,7 +118,7 @@ static func of_agent(
 	if stance == EnemyBrain.Stance.KNEEL:
 		return CROUCH
 	if stance == EnemyBrain.Stance.PRONE:
-		return "prone"
+		return PRONE
 	if shooting:
 		return "shoot"
 	return walk_frame(walk_phase) if walking else "idle"

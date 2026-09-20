@@ -17,8 +17,13 @@ extends Node3D
 signal document_taken
 
 ## Габарит створки, м. Те же 84×171 прежних пикселя; уровень режет по нему проём
-## в задней стене, поэтому число живёт здесь, а не в двух местах.
+## в задней стене, поэтому число живёт здесь, а не в двух местах — и коробка
+## створки собирается из него же в [method Node._ready], а не лежит в сцене
+## вторым числом.
 const LEAF_SIZE := Vector2(0.84, 1.71)
+
+## Толщина створки, м.
+const LEAF_THICKNESS: float = 0.08
 
 ## На сколько створка отстоит от стены. Чуть больше нуля: лежащая в одной
 ## плоскости со стеной, она мерцала бы с ней на каждом кадре.
@@ -63,6 +68,9 @@ var _shown_red: bool = false
 func _ready() -> void:
 	_visit.hide_time = hide_time
 	_mat_visual.material_override = GreyboxLook.surface(GreyboxLook.SLAB)
+	var leaf := BoxMesh.new()
+	leaf.size = Vector3(LEAF_SIZE.x, LEAF_SIZE.y, LEAF_THICKNESS)
+	_leaf.mesh = leaf
 	_leaf.position = Vector3(0.0, LEAF_SIZE.y * 0.5, WorldSpace.BACK_WALL_Z + LEAF_STANDOFF)
 	_refresh_look()
 

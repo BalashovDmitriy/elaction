@@ -30,8 +30,12 @@ const RAIL_Z: float = -0.45
 
 ## Толщина створок шахты и машинного отделения. Створки висят на задней стене,
 ## как и двери этажей; домик стоит на крыше у той же стены.
+##
+## Домик не доходит до плоскости игры: его передняя грань кончается за спиной
+## Otto (тело толщиной [constant WorldSpace.BODY_DEPTH] вокруг нуля), иначе он
+## проходил бы сквозь стену домика, а не перед ней (авторевью M15).
 const PANEL_THICKNESS: float = 0.08
-const MACHINE_ROOM_DEPTH: float = 1.0
+const MACHINE_ROOM_DEPTH: float = 0.7
 
 var _rules: BuildingRules
 var _plan: BuildingPlan
@@ -111,11 +115,7 @@ func _add_part(rect: Rect2, material: StandardMaterial3D, z: float, depth: float
 	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
 		return
 
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(rect.size.x, rect.size.y, depth)
-	var part := MeshInstance3D.new()
-	part.mesh = mesh
-	part.material_override = material
+	var part := GreyboxLook.box(Vector3(rect.size.x, rect.size.y, depth), material)
 	part.position = WorldSpace.to_scene(rect.get_center())
 	part.position.z = z
 	add_child(part)

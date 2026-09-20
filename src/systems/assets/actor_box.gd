@@ -16,6 +16,11 @@ extends MeshInstance3D
 ## разошёлся бы с телом, которым актёр на самом деле ловит пули.
 var standing := Vector3.ONE
 var crouching := Vector3.ONE
+## Габарит лёжа, м. Нулевой — лежащий занимает столько же, сколько стоял, но
+## поперёк: так ложатся мёртвые, у которых своей формы коллизии нет. Живой
+## лёжа — агент — отдаёт свой: его рост лёжа вдвое меньше ширины стоячего, и
+## коробка выше тела показывала бы пулю, прошедшую сквозь него (авторевью M15).
+var lying := Vector3.ZERO
 
 var _shown := ""
 var _mesh := BoxMesh.new()
@@ -28,16 +33,30 @@ func _ready() -> void:
 ## Собирает коробку под позу. Пересобирает только на смене: [BoxMesh]
 ## пересчитывает вершины на каждую запись размера, а поз за секунду меняются
 ## единицы, кадров же — шестьдесят.
+##
+## Габариты могут прийти после первой позы — актёр узнаёт их у правил здания.
+## Тогда зовут [method refresh], и коробка пересобирается под ту же позу.
 func show_pose(pose: String) -> void:
 	if pose == _shown:
 		return
 	_shown = pose
+	_rebuild()
 
+
+## Пересобирает коробку под текущую позу заново: габарит сменился.
+func refresh() -> void:
+	if _shown.is_empty():
+		return
+	_rebuild()
+
+
+func _rebuild() -> void:
 	var size := standing
-	if pose == ActorPose.CROUCH:
+	if _shown == ActorPose.CROUCH:
 		size = crouching
-	elif ActorPose.is_down(pose):
-		# Лежащий занимает столько же, сколько стоял, но поперёк.
+	elif _shown == ActorPose.PRONE and lying != Vector3.ZERO:
+		size = lying
+	elif ActorPose.is_down(_shown):
 		size = Vector3(standing.y, standing.x, standing.z)
 	_mesh.size = size
 	# Начало актёра — в ногах, начало коробки — в её середине.

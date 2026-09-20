@@ -195,7 +195,8 @@ func test_the_door_shuts_behind_the_agent_that_left_it() -> void:
 			if agent.is_emerging():
 				continue
 			var door := _door_behind(level, agent)
-			if door == null or absf(door.mat_position().x - agent.global_position.x) > 0.01:
+			var at := WorldSpace.to_plane(agent.global_position)
+			if door == null or absf(door.mat_position().x - at.x) > 0.01:
 				continue
 			# Агент ещё стоит на самом коврике, но проём уже освободил: створка
 			# обязана идти обратно, а не стоять нараспашку (ADR-0020, решение 4).
