@@ -13,6 +13,11 @@ const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const SETTLE_FRAMES: int = 5
 const PATIENCE: int = 240
 
+## Допуск на положение машины, м: полсантиметра. Машина стоит колёсами ровно на
+## полу и ровно в зазоре от проёма; широкий допуск пропускал бы и машину,
+## утонувшую в перекрытии по крышу.
+const TOLERANCE: float = 0.005
+
 
 func before_each() -> void:
 	GameState.instance().start_game()
@@ -39,12 +44,15 @@ func _building() -> GreyboxLevel:
 	return level
 
 
-func _car_of(level: GreyboxLevel) -> Sprite2D:
-	var parked := SpriteTextures.actor("car", "parked")
+## Машина — единственная коробка своего габарита среди детей уровня.
+func _car_of(level: GreyboxLevel) -> MeshInstance3D:
 	for child: Node in level.get_children():
-		var sprite := child as Sprite2D
-		if sprite != null and sprite.texture == parked:
-			return sprite
+		var visual := child as MeshInstance3D
+		if visual == null:
+			continue
+		var box := visual.mesh as BoxMesh
+		if box != null and box.size.is_equal_approx(GreyboxLevel.CAR_SIZE):
+			return visual
 	return null
 
 
@@ -55,16 +63,17 @@ func test_the_exit_has_a_car() -> void:
 	if car == null:
 		return
 
-	# Числа берутся у здания, а не выписываются в тест: допуск в полпикселя,
-	# потому что машина стоит колёсами ровно на полу и ровно в зазоре от проёма.
-	# Широкий допуск пропускал бы и машину, утонувшую в перекрытии по крышу.
+	# Числа берутся у здания, а не выписываются в тест. Машина стоит в сцене, а
+	# выход задан в плоскости правил — сравниваем в плоскости правил.
 	var exit_at := level.exit_position()
 	var surface := exit_at.y + GreyboxLevel.EXIT_HEIGHT * 0.5
-	assert_almost_eq(car.position.y + car.texture.get_height(), surface, 0.5, "колёсами на полу")
+	var at := WorldSpace.to_plane(car.global_position)
+	assert_almost_eq(at.y + GreyboxLevel.CAR_SIZE.y * 0.5, surface, TOLERANCE, "колёсами на полу")
 
-	var gap := GreyboxLevel.EXIT_WIDTH * 0.5 + GreyboxLevel.CAR_GAP
-	var from_exit := absf(car.position.x + car.texture.get_width() * 0.5 - exit_at.x)
-	assert_almost_eq(from_exit, gap, 0.5, "машина стоит в зазоре от проёма, а не в нём")
+	var gap := GreyboxLevel.EXIT_WIDTH * 0.5 + GreyboxLevel.CAR_GAP + GreyboxLevel.CAR_SIZE.x * 0.5
+	assert_almost_eq(
+		absf(at.x - exit_at.x), gap, TOLERANCE, "машина стоит в зазоре от проёма, а не в нём"
+	)
 
 
 func test_the_building_is_cleared_only_after_the_car_leaves() -> void:
@@ -78,7 +87,7 @@ func test_the_building_is_cleared_only_after_the_car_leaves() -> void:
 	level.building_cleared.connect(func() -> void: cleared[0] = true)
 
 	var parked_at := car.position.x
-	level.otto.global_position = level.exit_position()
+	level.otto.global_position = WorldSpace.to_scene(level.exit_position())
 	# Ждём не выдержку, а состояние: зона выхода замечает тело на своём шаге
 	# физики, и ждать «один кадр» здесь — та же ошибка, что водить съёмку
 	# секундомером (docs/testing.md).

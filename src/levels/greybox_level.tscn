@@ -3,18 +3,7 @@
 [ext_resource type="Script" path="res://src/levels/greybox_level.gd" id="1_level"]
 [ext_resource type="PackedScene" path="res://src/actors/otto/otto.tscn" id="2_otto"]
 
-[node name="GreyboxLevel" type="Node2D"]
+[node name="GreyboxLevel" type="Node3D"]
 script = ExtResource("1_level")
-
-[node name="Background" type="ColorRect" parent="."]
-z_index = -12
-offset_right = 1280.0
-offset_bottom = 360.0
-; Небо снаружи, и свет здания на него не падает — как и на город.
-; Без этого заливка этажа разгоралась бы в проёмах окон, и окно
-; читалось бы как освещённая ниша.
-light_mask = 0
-mouse_filter = 2
-color = Color(0.07, 0.08, 0.14, 1)
 
 [node name="Otto" parent="." instance=ExtResource("2_otto")]

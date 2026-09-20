@@ -7,8 +7,9 @@ extends GutTest
 ## линии — уклонения и лифты отложены (ADR-0006, пункт 6).
 
 const STEP: float = 0.1
-const FAR_ABOVE := Vector2(40.0, -120.0)
-const IN_FRONT := Vector2(60.0, 0.0)
+## Векторы до цели — в метрах, как и всё в правилах с M15.
+const FAR_ABOVE := Vector2(0.4, -1.2)
+const IN_FRONT := Vector2(0.6, 0.0)
 
 
 func _brain() -> EnemyBrain:
@@ -39,7 +40,7 @@ func test_agent_walks_once_it_is_out() -> void:
 
 func test_agent_turns_towards_the_target() -> void:
 	var brain := _brain()
-	_run(brain, 0.4, Vector2(-200.0, -120.0))
+	_run(brain, 0.4, Vector2(-2.0, -1.2))
 	assert_eq(brain.facing, -1.0)
 
 
@@ -88,7 +89,7 @@ func test_agent_does_not_shoot_another_floor() -> void:
 
 func test_agent_does_not_shoot_out_of_range() -> void:
 	var brain := _brain()
-	var far := Vector2(brain.fire_range + 50.0, 0.0)
+	var far := Vector2(brain.fire_range + 0.5, 0.0)
 	assert_eq(_run(brain, 0.6, far), EnemyBrain.State.WALK)
 
 
@@ -111,7 +112,7 @@ func test_dead_agent_stays_dead() -> void:
 func test_agent_kneels_under_a_high_bullet() -> void:
 	var brain := _brain()
 	brain.can_kneel = true
-	var high := brain.kneel_height + 4.0
+	var high := brain.kneel_height + 0.04
 	assert_eq(brain.stance_against(high), EnemyBrain.Stance.KNEEL)
 
 
@@ -119,7 +120,7 @@ func test_agent_goes_prone_under_a_bullet_a_knee_cannot_clear() -> void:
 	var brain := _brain()
 	brain.can_kneel = true
 	brain.can_go_prone = true
-	var low := brain.prone_height + 2.0
+	var low := brain.prone_height + 0.02
 	assert_lt(low, brain.kneel_height, "колено такую пулю не пропускает")
 	assert_eq(brain.stance_against(low), EnemyBrain.Stance.PRONE)
 
@@ -130,7 +131,7 @@ func test_agent_prefers_the_knee_while_it_still_helps() -> void:
 	var brain := _brain()
 	brain.can_kneel = true
 	brain.can_go_prone = true
-	assert_eq(brain.stance_against(brain.kneel_height + 4.0), EnemyBrain.Stance.KNEEL)
+	assert_eq(brain.stance_against(brain.kneel_height + 0.04), EnemyBrain.Stance.KNEEL)
 
 
 func test_agent_stands_when_nothing_flies() -> void:
@@ -147,14 +148,14 @@ func test_agent_stands_when_no_stance_clears_the_bullet() -> void:
 	var brain := _brain()
 	brain.can_kneel = true
 	brain.can_go_prone = true
-	assert_eq(brain.stance_against(1.0), EnemyBrain.Stance.STAND)
+	assert_eq(brain.stance_against(0.01), EnemyBrain.Stance.STAND)
 
 
 ## В первых зданиях агенты только стоят: уклонение включается злостью.
 func test_an_agent_that_may_not_kneel_stays_standing() -> void:
 	var brain := _brain()
 	assert_false(brain.can_kneel)
-	assert_eq(brain.stance_against(brain.kneel_height + 4.0), EnemyBrain.Stance.STAND)
+	assert_eq(brain.stance_against(brain.kneel_height + 0.04), EnemyBrain.Stance.STAND)
 
 
 ## Рост идёт за стойкой: по нему уровень подгоняет форму коллизии, и разъехаться

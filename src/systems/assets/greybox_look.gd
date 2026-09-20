@@ -19,6 +19,8 @@ extends RefCounted
 const SLAB := Color(0.38, 0.39, 0.42)
 const WALL := Color(0.28, 0.29, 0.32)
 const BACK_WALL := Color(0.19, 0.20, 0.23)
+## Дальняя стена комнаты: темнее задней, чтобы проём читался глубиной.
+const SKY_WALL := Color(0.11, 0.12, 0.16)
 const SHAFT := Color(0.24, 0.27, 0.34)
 const ESCALATOR := Color(0.33, 0.31, 0.29)
 

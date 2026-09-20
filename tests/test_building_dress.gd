@@ -1,6 +1,14 @@
 extends GutTest
 
 ## Одежда здания: шахта, машинное отделение и трос вступления.
+##
+## Части одежды — коробки без тела, и тест узнаёт их по габариту: тому же, каким
+## их собирают [BuildingShafts] и [GreyboxLevel]. Другого признака у серой коробки
+## нет, а материал у створок шахты и у домика один и тот же.
+##
+## Мерит тест в плоскости правил: каждая коробка переводится в [Rect2] с началом
+## в левом верхнем углу — так считала раскладка, и так считал этот же тест до
+## переезда в 3D. Утверждения при переезде не менялись (ADR-0021).
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
@@ -10,8 +18,8 @@ const SETTLE_FRAMES: int = 4
 ## Сколько кадров ждать спуска по тросу, прежде чем сдаться.
 const PATIENCE: int = 240
 
-## Насколько ассет считается стоящим на своём месте, px.
-const TOLERANCE: float = 1.0
+## Насколько часть считается стоящей на своём месте, м: сантиметр.
+const TOLERANCE: float = 0.01
 
 
 func before_all() -> void:
@@ -38,32 +46,61 @@ func _drop(level: GreyboxLevel) -> void:
 	remove_child(level)
 
 
-## Куски одежды с нужным ассетом.
+## Части одежды нужного вида, прямоугольниками в плоскости правил.
 ##
 ## Ищутся и в самом уровне, и в [BuildingShafts]: одежда шахт живёт своим узлом
 ## (частей за полсотни на здание, и под каждый обход детей они попадать не
 ## должны), а трос вступления — по-прежнему прямой ребёнок уровня. Смотреть
 ## только в шахты значит не видеть троса вовсе, и проверка на него, ничего не
 ## находя, проходила бы всегда.
-func _parts(level: GreyboxLevel, asset: String) -> Array[TextureRect]:
-	var tile := SpriteTextures.tile(asset)
-	var found: Array[TextureRect] = []
+func _parts(level: GreyboxLevel, kind: String) -> Array[Rect2]:
+	var found: Array[Rect2] = []
 	var hosts: Array[Node] = [level]
 	hosts.append_array(level.find_children("*", "BuildingShafts", false, false))
 	for host: Node in hosts:
 		for child: Node in host.get_children():
-			var rect := child as TextureRect
-			if rect != null and rect.texture == tile:
-				found.append(rect)
+			var part := child as MeshInstance3D
+			if part == null:
+				continue
+			var box := part.mesh as BoxMesh
+			if box == null or not _is_a(kind, box.size):
+				continue
+			var size := Vector2(box.size.x, box.size.y)
+			var centre := WorldSpace.to_plane(part.global_position)
+			found.append(Rect2(centre - size * 0.5, size))
 	return found
+
+
+## Узнаёт часть по габариту — тому же, которым её собирали.
+static func _is_a(kind: String, size: Vector3) -> bool:
+	match kind:
+		"shaft_rail":
+			return is_equal_approx(size.x, BuildingShafts.RAIL_WIDTH)
+		"shaft_door":
+			return is_equal_approx(size.y, BuildingShafts.DOOR_HEIGHT)
+		"shaft_buffer":
+			return is_equal_approx(size.y, BuildingShafts.BUFFER_HEIGHT)
+		"machine_room":
+			return (
+				is_equal_approx(size.x, BuildingShafts.MACHINE_ROOM_SIZE.x)
+				and is_equal_approx(size.y, BuildingShafts.MACHINE_ROOM_SIZE.y)
+			)
+		"rope":
+			return is_equal_approx(size.x, GreyboxLevel.ROPE_WIDTH)
+	return false
+
+
+## Где Otto стоит в плоскости правил.
+func _otto_at(level: GreyboxLevel) -> Vector2:
+	return WorldSpace.to_plane(level.otto.global_position)
 
 
 ## У каждой шахты есть обе направляющие во всю её высоту.
 ##
-## Шахта была дырой в перекрытии со столбом света, и в кадре её почти не было
-## (ADR-0017, решение 3). Проверяется не «есть хоть что-то», а что стойки идут
-## по краям проёма и кончаются вместе с шахтой: короткая стойка обманет глаз
-## сильнее, чем её отсутствие.
+## Шахта была дырой в перекрытии, и в кадре её почти не было (ADR-0017,
+## решение 3). Проверяется не «есть хоть что-то», а что стойки идут по краям
+## проёма и кончаются вместе с шахтой: короткая стойка обманет глаз сильнее,
+## чем её отсутствие.
 ##
 ## Стойка ищется сразу по краю и по низу: шахты не сквозные, и в одном столбце
 ## их стоит несколько — одна под другой.
@@ -81,10 +118,10 @@ func test_every_shaft_wears_both_rails() -> void:
 			var sides: Array[float] = [shaft.x - half, shaft.x + half - BuildingShafts.RAIL_WIDTH]
 			for left: float in sides:
 				var found := false
-				for rail: TextureRect in rails:
+				for rail: Rect2 in rails:
 					if absf(rail.position.x - left) > TOLERANCE:
 						continue
-					if absf(rail.position.y + rail.size.y - bottom) > TOLERANCE:
+					if absf(rail.end.y - bottom) > TOLERANCE:
 						continue
 					# Стойка идёт от потолка верхнего этажа шахты, то есть выше
 					# его пола: ниже пролёта она не бывает.
@@ -95,7 +132,7 @@ func test_every_shaft_wears_both_rails() -> void:
 				assert_true(
 					found,
 					(
-						"сид %d: у шахты %d–%d на %.0f px нет стойки на %.0f px"
+						"сид %d: у шахты %d–%d на %.2f м нет стойки на %.2f м"
 						% [building_seed, shaft.top, shaft.bottom, shaft.x, left]
 					)
 				)
@@ -116,13 +153,12 @@ func test_shaft_doors_stand_on_every_floor_it_serves() -> void:
 		for index: int in range(shaft.top, shaft.bottom + 1):
 			var surface := rules.floor_surface(index)
 			var found := false
-			for door: TextureRect in doors:
-				var centre := door.position.x + door.size.x * 0.5
-				if absf(centre - shaft.x) > TOLERANCE:
+			for door: Rect2 in doors:
+				if absf(door.get_center().x - shaft.x) > TOLERANCE:
 					continue
-				if absf(door.position.y + door.size.y - surface) <= TOLERANCE:
+				if absf(door.end.y - surface) <= TOLERANCE:
 					found = true
-			assert_true(found, "на этаже %d нет створок шахты на %.0f px" % [index, shaft.x])
+			assert_true(found, "на этаже %d нет створок шахты на %.2f м" % [index, shaft.x])
 
 	assert_eq(doors.size(), served, "створок ровно столько, сколько этажей у шахт")
 	_drop(level)
@@ -145,7 +181,7 @@ func test_machine_room_stands_over_the_top_shaft() -> void:
 			continue
 
 		var room := rooms[0]
-		var centre := room.position.x + room.size.x * 0.5
+		var centre := room.get_center().x
 		var top_shaft := level.plan().roof_shaft()
 		assert_not_null(top_shaft, "сид %d: в здании есть шахта до крыши" % building_seed)
 		assert_eq(
@@ -160,7 +196,7 @@ func test_machine_room_stands_over_the_top_shaft() -> void:
 		assert_gt(
 			gap,
 			room.size.x * 0.5,
-			"сид %d: Otto появляется внутри домика (%.0f px от его середины)" % [building_seed, gap]
+			"сид %d: Otto появляется внутри домика (%.2f м от его середины)" % [building_seed, gap]
 		)
 		_drop(level)
 
@@ -170,7 +206,7 @@ func test_the_rope_lands_otto_on_the_roof() -> void:
 	var level := _build(1)
 	var rules := level.rules
 	var surface := rules.floor_surface(BuildingRules.ROOF)
-	assert_lt(level.otto.global_position.y, surface, "начинает он над крышей, на тросе")
+	assert_lt(_otto_at(level).y, surface, "начинает он над крышей, на тросе")
 	# Трос сперва обязан найтись: иначе проверка «ушёл» ничего не значит — она
 	# прошла бы и на поиске, который троса вообще не видит.
 	assert_eq(_parts(level, "rope").size(), 1, "трос в кадре, пока Otto по нему едет")
@@ -180,24 +216,24 @@ func test_the_rope_lands_otto_on_the_roof() -> void:
 		await wait_physics_frames(1)
 		left -= 1
 
-	assert_almost_eq(level.otto.global_position.y, surface, 1.0, "съехал ровно на крышу")
+	assert_almost_eq(_otto_at(level).y, surface, TOLERANCE, "съехал ровно на крышу")
 	assert_eq(_parts(level, "rope").size(), 0, "трос ушёл вместе с вступлением")
 
 	# Управляем: до M12 ввод на спуске не действовал, и «приехал» не означало
 	# «отпустили». Проверяется не состоянием, а тем, что Otto пошёл.
-	var before := level.otto.global_position.x
+	var before := _otto_at(level).x
 	Input.action_press(&"move_right")
 	await wait_physics_frames(6)
 	Input.action_release(&"move_right")
-	assert_gt(level.otto.global_position.x, before, "и снова слушается игрока")
+	assert_gt(_otto_at(level).x, before, "и снова слушается игрока")
 	_drop(level)
 
 
 ## У каждой шахты есть упоры сверху и снизу: по ним видно, где полоса кончается.
 ##
 ## Проверяется и место по вертикали, а не только счёт: нижний упор однажды уехал
-## в толщу перекрытия — считался он там же, где и раньше, но перекрытие рисуется
-## ближе к зрителю, и упора в кадре не было вовсе. Счёт этого не заметил.
+## в толщу перекрытия — считался он там же, где и раньше, но в кадре его не было
+## вовсе. Счёт этого не заметил.
 func test_every_shaft_is_capped_at_both_ends() -> void:
 	var level := _build(1)
 	await wait_physics_frames(SETTLE_FRAMES)
@@ -211,18 +247,17 @@ func test_every_shaft_is_capped_at_both_ends() -> void:
 		# Низ шахты — пол её нижнего этажа: упор стоит на нём, а не под ним.
 		var floor_surface := level.rules.floor_surface(shaft.bottom)
 		var capped_below := false
-		for buffer: TextureRect in buffers:
-			var centre := buffer.position.x + buffer.size.x * 0.5
-			if absf(centre - shaft.x) > TOLERANCE:
+		for buffer: Rect2 in buffers:
+			if absf(buffer.get_center().x - shaft.x) > TOLERANCE:
 				continue
 			mine += 1
 			assert_lte(
-				buffer.position.y + buffer.size.y,
+				buffer.end.y,
 				floor_surface + TOLERANCE,
-				"упор шахты на %.0f px не утоплен в перекрытие" % shaft.x
+				"упор шахты на %.2f м не утоплен в перекрытие" % shaft.x
 			)
-			if absf(buffer.position.y + buffer.size.y - floor_surface) <= TOLERANCE:
+			if absf(buffer.end.y - floor_surface) <= TOLERANCE:
 				capped_below = true
-		assert_eq(mine, 2, "у шахты на %.0f px оба конца отмечены" % shaft.x)
-		assert_true(capped_below, "у шахты на %.0f px упор лежит на её дне" % shaft.x)
+		assert_eq(mine, 2, "у шахты на %.2f м оба конца отмечены" % shaft.x)
+		assert_true(capped_below, "у шахты на %.2f м упор лежит на её дне" % shaft.x)
 	_drop(level)

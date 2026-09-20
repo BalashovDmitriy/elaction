@@ -113,7 +113,7 @@ func test_bot_finishes_every_building() -> void:
 				% [
 					building_seed,
 					FRAME_BUDGET,
-					level.rules.floor_index_near(level.otto.global_position.y),
+					level.rules.floor_index_near(WorldSpace.to_plane(level.otto.global_position).y),
 					GameState.instance().lives,
 					level.otto.is_dead()
 				]
@@ -142,7 +142,10 @@ func test_bot_finishes_the_real_building() -> void:
 			bot.step()
 			await wait_physics_frames(1)
 			frames += 1
-			deepest = maxi(deepest, level.rules.floor_index_near(level.otto.global_position.y))
+			deepest = maxi(
+				deepest,
+				level.rules.floor_index_near(WorldSpace.to_plane(level.otto.global_position).y)
+			)
 		bot.release()
 
 		var game := GameState.instance()
@@ -187,7 +190,10 @@ func test_bot_survives_the_real_building_with_agents() -> void:
 			bot.step()
 			await wait_physics_frames(1)
 			frames += 1
-			deepest = maxi(deepest, level.rules.floor_index_near(level.otto.global_position.y))
+			deepest = maxi(
+				deepest,
+				level.rules.floor_index_near(WorldSpace.to_plane(level.otto.global_position).y)
+			)
 			if level.otto.is_dead() and not was_dead:
 				deaths += 1
 			was_dead = level.otto.is_dead()

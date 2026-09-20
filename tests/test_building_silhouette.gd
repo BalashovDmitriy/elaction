@@ -10,8 +10,16 @@ extends GutTest
 func _rules() -> BuildingRules:
 	var rules := BuildingRules.new()
 	rules.floors = 30
+	# Здание теста — свой маленький мир в целых числах, и задаётся он целиком:
+	# все длины, от которых зависят проверки ниже. Пока часть бралась из
+	# умолчаний, тест держался на том, что 480 и 3840 точны в любом float; с
+	# M15 умолчания метрические — 4.8 и 38.4, — и точные равенства поплыли на
+	# последнем бите дроби ([Vector2] к тому же хранит float32).
 	rules.floor_height = 120.0
 	rules.slab_height = 20.0
+	rules.sky_height = 160.0
+	rules.width = 3840.0
+	rules.margin = 240.0
 	return rules
 
 

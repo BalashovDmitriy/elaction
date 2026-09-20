@@ -90,16 +90,14 @@ func test_scene_matches_the_plan() -> void:
 		_drop(level)
 
 
-## Сколько источников горит прямо сейчас — все, а не только заливки.
-##
-## Считать одни [AreaLight] нельзя: у этажа их два (ADR-0010, пункт 3), и пятно
-## лампы висит ребёнком самой лампы. Пока счёт шёл по прямым детям уровня,
-## половина источников — та самая, что кладёт тени, — в бюджет не попадала,
-## и проверка проходила бы, даже если бы не гасла ни одна лампа в здании.
+## Сколько источников горит прямо сейчас — по всему дереву уровня, не только
+## среди прямых детей: свет лампы висит ребёнком самой лампы, и счёт по детям
+## уровня его не видел бы вовсе — проверка проходила бы, даже если бы не гасла
+## ни одна лампа в здании.
 func _lit(level: GreyboxLevel) -> int:
 	var count := 0
-	for node: Node in level.find_children("*", "Light2D", true, false):
-		var light := node as Light2D
+	for node: Node in level.find_children("*", "Light3D", true, false):
+		var light := node as Light3D
 		if light != null and light.is_visible_in_tree():
 			count += 1
 	return count
@@ -121,13 +119,20 @@ func _tall(building_seed: int) -> GreyboxLevel:
 ## за пределами отбора, где её этаж и так погашен, — и «источников стало меньше»
 ## не выполнилось бы, хотя гасить нечего.
 func _nearest_lamp_below(level: GreyboxLevel) -> Lamp:
+	# «Ниже» — в плоскости правил, где вниз это рост Y.
+	var otto_y := WorldSpace.to_plane(level.otto.global_position).y
 	var found: Lamp = null
+	var found_y := INF
 	for child in level.get_children():
 		var lamp := child as Lamp
-		if lamp == null or lamp.global_position.y <= level.otto.global_position.y:
+		if lamp == null:
 			continue
-		if found == null or lamp.global_position.y < found.global_position.y:
+		var lamp_y := WorldSpace.to_plane(lamp.global_position).y
+		if lamp_y <= otto_y:
+			continue
+		if lamp_y < found_y:
 			found = lamp
+			found_y = lamp_y
 	return found
 
 
@@ -158,7 +163,7 @@ func test_a_fallen_lamp_puts_its_floor_out() -> void:
 	if lamp == null:
 		return
 
-	var index := level.rules.floor_index_near(lamp.global_position.y)
+	var index := lamp.floor_index
 	assert_false(level.is_dark(index), "до выстрела этаж горит")
 	var before := _lit(level)
 
@@ -171,9 +176,9 @@ func test_a_fallen_lamp_puts_its_floor_out() -> void:
 
 	await wait_physics_frames(2)
 	assert_true(level.is_dark(index), "этаж %d погас" % index)
-	# Источников на этаже два, и гаснут они разом (ADR-0010, пункт 3): заливку
-	# гасит уровень, а пятно уходит вместе с самой лампой.
-	assert_eq(_lit(level), before - 2, "и оба источника этажа перестали гореть")
+	# Источник у этажа один — лампа (ADR-0021, решение 4), и он уходит вместе с
+	# ней: «этаж горит» и «лампа висит» — с M15 одно и то же.
+	assert_eq(_lit(level), before - 1, "и источник этажа перестал гореть")
 	_drop(level)
 
 
@@ -182,7 +187,7 @@ func test_otto_starts_on_the_roof() -> void:
 	var level := _build(1)
 	await wait_physics_frames(SETTLE_FRAMES)
 	assert_eq(
-		rules.floor_index_near(level.otto.global_position.y),
+		rules.floor_index_near(WorldSpace.to_plane(level.otto.global_position).y),
 		BuildingRules.ROOF,
 		"Otto начинает с крыши, а не с верхнего этажа"
 	)

@@ -3,7 +3,7 @@ extends RefCounted
 
 ## Звуки игры: имена событий и загрузка файлов.
 ##
-## Устроено как [SpriteTextures] у картинок: имя — это имя файла, список один
+## Устроено как у прежних спрайтов: имя — это имя файла, список один
 ## на проект, и тест ходит по нему в обе стороны — у каждого имени есть файл,
 ## у каждого файла есть имя. Иначе синтезированный, но никому не нужный звук
 ## копится в репозитории, а забытое событие молчит (ADR-0012, пункт 1).
@@ -171,9 +171,9 @@ static func set_level(bus: String, level: float) -> void:
 ## Нужен тому, что звучит на своём месте, а не в партии целиком: шахт в здании
 ## пять, и гудеть в ухо должна та, рядом с которой стоишь. Заводится здесь, а не
 ## в узлах: лифт и эскалатор собирали его одинаково, слово в слово.
-## [param reach] — докуда слышно, px.
-static func source(host: Node, name: String, reach: float) -> AudioStreamPlayer2D:
-	var player := AudioStreamPlayer2D.new()
+## [param reach] — докуда слышно, м.
+static func source(host: Node, name: String, reach: float) -> AudioStreamPlayer3D:
+	var player := AudioStreamPlayer3D.new()
 	player.stream = stream(name)
 	player.bus = SFX_BUS
 	player.max_distance = reach
@@ -183,11 +183,11 @@ static func source(host: Node, name: String, reach: float) -> AudioStreamPlayer2
 
 ## Держит петлю включённой или выключенной.
 ##
-## Присваивать [member AudioStreamPlayer2D.playing] каждый кадр нельзя: сеттер
-## зовёт [method AudioStreamPlayer2D.play] заново, и от двухсекундного гула
+## Присваивать [member AudioStreamPlayer3D.playing] каждый кадр нельзя: сеттер
+## зовёт [method AudioStreamPlayer3D.play] заново, и от двухсекундного гула
 ## слышно только первые три миллисекунды — вместо мотора выходит треск на
 ## частоте кадров (проверено: позиция воспроизведения стоит на 0.003 с).
-static func keep_playing(player: AudioStreamPlayer2D, on: bool) -> void:
+static func keep_playing(player: AudioStreamPlayer3D, on: bool) -> void:
 	if on == player.playing:
 		return
 	if on:

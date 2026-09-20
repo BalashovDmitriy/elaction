@@ -51,8 +51,6 @@ var _states := OttoStateMachine.new()
 ## Один снимок ввода на всё время жизни: перечитывается, а не создаётся заново.
 var _snapshot := OttoInput.new()
 var _posed_state := OttoStateMachine.State.IDLE
-## Поза, под которую уже собрана коробка тела.
-var _posed_look := ""
 ## Кабина, внутри которой сейчас Otto. На крыше кабины она не заполняется:
 ## оттуда лифтом не управляют (ADR-0004, пункт 3).
 var _car: ElevatorCar = null
@@ -75,13 +73,10 @@ var _gun := Gun.new()
 var _apex_y: float = 0.0
 ## Сколько ещё держится передышка после возвращения в игру, с.
 var _grace: float = 0.0
-## Меш тела. В греев-боксе это коробка, меняющая габарит с позой; модель придёт
-## в M16 и встанет на это же место.
-var _mesh := BoxMesh.new()
 
 @onready var _standing_shape: CollisionShape3D = $StandingShape
 @onready var _crouching_shape: CollisionShape3D = $CrouchingShape
-@onready var _body: MeshInstance3D = $Body
+@onready var _body: ActorBox = $Body
 @onready var _camera: SideCamera = $Camera
 @onready var _kick_zone: Area3D = $KickZone
 
@@ -91,7 +86,10 @@ func _ready() -> void:
 	var crouching := _shape_size(_crouching_shape)
 	_headroom = standing.y - crouching.y
 	_apex_y = global_position.y
-	_body.mesh = _mesh
+	# Коробка тела повторяет форму коллизии: разойдясь, они дали бы Otto,
+	# которого бьют не там, где он нарисован.
+	_body.standing = standing
+	_body.crouching = crouching
 	_body.material_override = GreyboxLook.marker(GreyboxLook.OTTO)
 	_camera.follow(self)
 	_repose()
@@ -419,33 +417,13 @@ func _apply_pose(state: OttoStateMachine.State) -> void:
 
 ## Поза, которую Otto отыгрывает прямо сейчас.
 ##
-## В M16 её заберёт [AnimationTree]. Пока анимаций нет, поза задаёт габарит
-## коробки: это единственное, чем греев-бокс показывает состояние, — и заодно
-## [ActorPose] остаётся при работе, а не ждёт следующей вехи мёртвым грузом.
+## В M16 её заберёт [AnimationTree]. Пока анимаций нет, по ней [ActorBox]
+## выбирает габарит коробки — и [ActorPose] остаётся при работе, а не ждёт
+## следующей вехи мёртвым грузом.
 func _pose() -> String:
 	return ActorPose.of_otto(
 		_states.state, _crushed, _falling_over > 0.0, _shooting > 0.0, _walk_phase
 	)
-
-
-## Габарит коробки под позу: присевший ниже, мёртвый лежит.
-##
-## Пересобирается только на смене позы: [BoxMesh] пересчитывает вершины на
-## каждую запись размера, а поз за секунду меняется единицы.
-func _reshape_body(pose: String) -> void:
-	if pose == _posed_look:
-		return
-	_posed_look = pose
-
-	var standing := _shape_size(_standing_shape)
-	var size := standing
-	if pose == ActorPose.CROUCH:
-		size = _shape_size(_crouching_shape)
-	elif ActorPose.is_down(pose):
-		# Лежащий занимает столько же, сколько стоял, но поперёк.
-		size = Vector3(standing.y, standing.x, standing.z)
-	_mesh.size = size
-	_body.position = Vector3(0.0, size.y * 0.5, 0.0)
 
 
 ## Прозрачность тела: неуязвимый Otto мигает, остальные кадры он сплошной.
@@ -468,9 +446,8 @@ func _update_look(delta: float) -> void:
 		_walk_phase = 0.0
 		_stepped_on = -1
 
-	_reshape_body(_pose())
-	# Поворот показан разворотом коробки: зеркалить нечего, пока нет модели.
-	_body.rotation.y = 0.0 if _facing >= 0.0 else PI
+	_body.show_pose(_pose())
+	_body.face(_facing)
 	_body.transparency = 1.0 - _grace_alpha()
 
 

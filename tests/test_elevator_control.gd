@@ -6,18 +6,21 @@ extends GutTest
 ## не слушалась команд и стояла, а стоило сойти, как она уезжала». Проверка
 ## поэтому не про одну кабину из сцены, а про все, какие соберёт генератор:
 ## баг был не у всех.
+##
+## Высоты сравниваются в плоскости правил, где вниз — это рост Y: так считала
+## кабина в 2D, и так утверждения ниже остались нетронутыми при переезде.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
 ## Сколько кадров даётся зданию, чтобы встать на места.
 const SETTLE_FRAMES: int = 4
 
-## Сколько кадров держать команду. Кабина идёт 180 px/с, этаж — 360 px:
+## Сколько кадров держать команду. Кабина идёт 1.8 м/с, этаж — 3.6 м:
 ## за полсекунды она обязана сдвинуться заметно.
 const DRIVE_FRAMES: int = 30
 
-## Насколько кабина должна уехать, чтобы это считалось «слушается», px.
-const MOVED: float = 20.0
+## Насколько кабина должна уехать, чтобы это считалось «слушается», м.
+const MOVED: float = 0.2
 
 
 func before_all() -> void:
@@ -47,10 +50,20 @@ func _cars(level: GreyboxLevel) -> Array[ElevatorCar]:
 	return found
 
 
+## Высота кабины в плоскости правил.
+func _height(car: ElevatorCar) -> float:
+	return WorldSpace.to_plane(car.global_position).y
+
+
+## Насколько виден указатель: коробка гасится прозрачностью.
+func _alpha(arrow: MeshInstance3D) -> float:
+	return 1.0 - arrow.transparency
+
+
 ## Ставит Otto внутрь кабины и ждёт, пока она его заметит.
 func _get_in(level: GreyboxLevel, car: ElevatorCar) -> void:
 	level.otto.global_position = car.global_position
-	level.otto.velocity = Vector2.ZERO
+	level.otto.velocity = Vector3.ZERO
 	await wait_physics_frames(SETTLE_FRAMES)
 
 
@@ -94,14 +107,14 @@ func test_every_car_obeys_the_player() -> void:
 				)
 			)
 
-			var before := car.global_position.y
+			var before := _height(car)
 			await _drive(&"move_down")
-			var moved := car.global_position.y - before
+			var moved := _height(car) - before
 			assert_gt(
 				moved,
 				MOVED,
 				(
-					"сид %d, кабина %d на %.0f: не поехала вниз по команде (сдвинулась на %.0f px)"
+					"сид %d, кабина %d на %.2f: не поехала вниз по команде (сдвинулась на %.2f м)"
 					% [building_seed, number, before, moved]
 				)
 			)
@@ -128,12 +141,12 @@ func test_car_at_the_end_of_its_band_still_goes_the_other_way() -> void:
 	await _park(level, car, shaft, shaft.bottom)
 	await _get_in(level, car)
 
-	var before := car.global_position.y
+	var before := _height(car)
 	await _drive(&"move_down")
-	assert_almost_eq(car.global_position.y, before, MOVED, "ниже своей полосы кабина не идёт")
+	assert_almost_eq(_height(car), before, MOVED, "ниже своей полосы кабина не идёт")
 
 	await _drive(&"move_up")
-	assert_lt(car.global_position.y, before - MOVED, "а вверх — идёт")
+	assert_lt(_height(car), before - MOVED, "а вверх — идёт")
 	_drop(level)
 
 
@@ -152,7 +165,7 @@ func test_car_obeys_after_otto_walks_in() -> void:
 	var index := maxi(shaft.top, 0)
 	var surface := rules.floor_surface(index)
 	await _park(level, car, shaft, index)
-	level.otto.global_position = Vector2(shaft.x - rules.shaft_width, surface)
+	level.otto.global_position = WorldSpace.to_scene(Vector2(shaft.x - rules.shaft_width, surface))
 	await wait_physics_frames(SETTLE_FRAMES)
 
 	# Идём вправо, пока не окажемся в кабине.
@@ -165,9 +178,9 @@ func test_car_obeys_after_otto_walks_in() -> void:
 	await wait_physics_frames(1)
 	assert_true(level.otto.is_riding(), "Otto вошёл в кабину шагом")
 
-	var before := car.global_position.y
+	var before := _height(car)
 	await _drive(&"move_down")
-	assert_gt(car.global_position.y - before, MOVED, "вошедшего шагом кабина слушается так же")
+	assert_gt(_height(car) - before, MOVED, "вошедшего шагом кабина слушается так же")
 	_drop(level)
 
 
@@ -181,16 +194,16 @@ func test_car_arrow_goes_dark_at_the_end_of_the_band() -> void:
 
 	var shaft := level.plan().shafts[0]
 	var car := _cars(level)[0]
-	var down := car.get_node("DownArrow") as Sprite2D
-	var up := car.get_node("UpArrow") as Sprite2D
+	var down := car.get_node("DownArrow") as MeshInstance3D
+	var up := car.get_node("UpArrow") as MeshInstance3D
 
 	await _park(level, car, shaft, shaft.bottom)
 	await wait_physics_frames(1)
-	assert_lt(down.modulate.a, 0.5, "внизу полосы стрелка вниз погасла")
-	assert_almost_eq(up.modulate.a, 1.0, 0.01, "а вверх — горит")
+	assert_lt(_alpha(down), 0.5, "внизу полосы стрелка вниз погасла")
+	assert_almost_eq(_alpha(up), 1.0, 0.01, "а вверх — горит")
 
 	await _park(level, car, shaft, shaft.top)
 	await wait_physics_frames(1)
-	assert_lt(up.modulate.a, 0.5, "наверху полосы гаснет стрелка вверх")
-	assert_almost_eq(down.modulate.a, 1.0, 0.01, "а вниз — горит")
+	assert_lt(_alpha(up), 0.5, "наверху полосы гаснет стрелка вверх")
+	assert_almost_eq(_alpha(down), 1.0, 0.01, "а вниз — горит")
 	_drop(level)

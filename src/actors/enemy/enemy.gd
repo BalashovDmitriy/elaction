@@ -1,5 +1,5 @@
 class_name Enemy
-extends CharacterBody2D
+extends CharacterBody3D
 
 ## Враг-агент.
 ##
@@ -8,6 +8,8 @@ extends CharacterBody2D
 ##
 ## Телом агент не вредит: в оригинале жизнь снимает только выстрел (ADR-0006,
 ## пункт 4), поэтому зоны урона у него нет — только оружие.
+##
+## Как и Otto, живёт в плоскости игры: Z заперт (ADR-0021, решение 1).
 
 ## Агент убит. Передаёт себя, чтобы дверь знала, кого выпускать заново.
 signal died(agent: Enemy)
@@ -21,19 +23,19 @@ const FALLING_TIME: float = 0.25
 ## Сколько держится поза выстрела, с.
 const SHOOT_POSE_TIME: float = 0.25
 
-@export var walk_speed: float = 165.0
-@export var gravity: float = 2700.0
-@export var max_fall_speed: float = 1260.0
+@export var walk_speed: float = 1.65
+@export var gravity: float = 27.0
+@export var max_fall_speed: float = 12.6
 
 ## Высота выстрела от ног: попадает в стоящего Otto и проходит над присевшим.
 ##
-## Выше середины его роста нарочно (126 у Otto против 105 у пули). Пуля агента
+## Выше середины его роста нарочно (1.26 у Otto против 1.05 у пули). Пуля агента
 ## обязана делать три вещи разом: брать стоящего, проходить над присевшим и
 ## проходить над тем, кто стоит ниже этажа — в проёме шахты или в кабине,
 ## вставшей между этажами. На M13, когда Otto вырос в полтора раза, пуля
 ## перестала успевать за ним и начала снимать его в голову прямо в проёме.
-@export var shot_height: float = -105.0
-@export var muzzle_offset: float = 40.0
+@export var shot_height: float = 1.05
+@export var muzzle_offset: float = 0.4
 
 ## Сколько тело лежит, прежде чем исчезнуть, с.
 @export var corpse_time: float = 0.5
@@ -46,7 +48,7 @@ const SHOOT_POSE_TIME: float = 0.25
 ## уклонения — приходят из [BuildingRules] ([method apply_rules]): их растит
 ## сложность, и лежать в сцене одного агента они не могут (ADR-0016, пункт 5).
 @export var emerge_time: float = 0.6
-@export var same_line: float = 45.0
+@export var same_line: float = 0.45
 
 ## Правила здания, из которого вышел агент. Пустых не бывает: без них он
 ## достаёт значения по умолчанию — те же, что у здания по умолчанию.
@@ -65,9 +67,9 @@ var _crushed: bool = false
 ## Насколько агент злее обычного: 1 — как в первом здании, больше — злее.
 var _menace: float = 1.0
 
-@onready var _body: Sprite2D = $Body
-@onready var _floor_probe: RayCast2D = $FloorProbe
-@onready var _shape: CollisionShape2D = $Shape
+@onready var _body: ActorBox = $Body
+@onready var _floor_probe: RayCast3D = $FloorProbe
+@onready var _shape: CollisionShape3D = $Shape
 
 
 func _ready() -> void:
@@ -75,7 +77,11 @@ func _ready() -> void:
 	_brain.same_line = same_line
 	# Стоячий рост берётся у самой формы, а не записывается вторым числом:
 	# разъехавшись, они дали бы агента, который уклоняется не своим телом.
-	_brain.stand_height = (_shape.shape as RectangleShape2D).size.y
+	var standing := (_shape.shape as BoxShape3D).size
+	_brain.stand_height = standing.y
+	_body.standing = standing
+	_body.crouching = Vector3(standing.x, _brain.kneel_height, standing.z)
+	_body.material_override = GreyboxLook.marker(GreyboxLook.AGENT)
 	_refresh_brain()
 
 
@@ -84,13 +90,18 @@ func _physics_process(delta: float) -> void:
 		# Тело доезжает до пола: убитый в прыжке не должен зависать в воздухе.
 		_apply_gravity(delta)
 		move_and_slide()
+		_hold_the_plane()
 		_walking = false
 		_rot(delta)
 		_update_look(delta)
 		return
 
 	var alive_target := _target != null and not _target.is_dead()
-	var to_target := _target.global_position - global_position if alive_target else Vector2.ZERO
+	# Мозгу вектор до цели нужен в координатах правил: там Y растёт вниз, и
+	# «на одной линии» он считает так же, как считал в 2D.
+	var to_target := Vector2.ZERO
+	if alive_target:
+		to_target = WorldSpace.direction_to_plane(_target.global_position - global_position)
 	var state := _brain.update(delta, to_target, alive_target, _incoming_height())
 	_fit_shape()
 	if _brain.fired():
@@ -111,6 +122,7 @@ func _physics_process(delta: float) -> void:
 	velocity.x = walk_speed * _brain.facing if walking else 0.0
 	_apply_gravity(delta)
 	move_and_slide()
+	_hold_the_plane()
 	_walking = walking
 	_update_look(delta)
 
@@ -153,7 +165,7 @@ func is_in_the_dark() -> bool:
 
 
 ## В какой он стойке. Снаружи это видно и по форме коллизии, но выводить стойку
-## из высоты прямоугольника — значит повторять таблицу ростов в каждом, кому она
+## из высоты коробки — значит повторять таблицу ростов в каждом, кому она
 ## понадобилась.
 func stance() -> EnemyBrain.Stance:
 	return _brain.stance
@@ -171,7 +183,7 @@ func kill(crushed: bool = false) -> void:
 		return
 	_crushed = crushed
 	_brain.kill()
-	velocity = Vector2.ZERO
+	velocity = Vector3.ZERO
 	_corpse_left = corpse_time
 	_falling_over = FALLING_TIME
 	Sounds.play(Sounds.AGENT_DEATH)
@@ -201,7 +213,13 @@ func _shield(value: bool) -> void:
 	set_collision_layer_value(ENEMY_LAYER, on_layer)
 
 
-## Высота ближайшей летящей в агента пули над его ногами, px, или -1, если
+## Возвращает тело в плоскость игры — по той же причине, что у [Otto].
+func _hold_the_plane() -> void:
+	velocity.z = 0.0
+	global_position.z = WorldSpace.PLAY_Z
+
+
+## Высота ближайшей летящей в агента пули над его ногами, м, или -1, если
 ## лететь нечему.
 ##
 ## Ищется по группе пуль, а не по детям уровня: детей под три сотни, а пуль на
@@ -214,7 +232,9 @@ func _incoming_height() -> float:
 		var bullet := node as Bullet
 		if bullet == null or bullet.collision_mask != Bullet.FROM_OTTO:
 			continue
-		var to_bullet := bullet.global_position - global_position
+		# В координатах правил, чтобы вся мерка ниже осталась ровно той, что
+		# была выверена в 2D: там у пули над ногами y отрицательный.
+		var to_bullet := WorldSpace.direction_to_plane(bullet.global_position - global_position)
 		# Летит ли она в нас — и не ушла ли уже за спину.
 		#
 		# Мерка не «с какой стороны», а «сколько ей до нас осталось»: пуля,
@@ -236,28 +256,28 @@ func _incoming_height() -> float:
 	return best
 
 
-## Половина ширины тела, px. Вместе с длиной пули ([method Bullet.half_length])
+## Половина ширины тела, м. Вместе с длиной пули ([method Bullet.half_length])
 ## даёт габарит, из которого пуля должна выйти, прежде чем агент распрямится.
 func _body_half_width() -> float:
-	return (_shape.shape as RectangleShape2D).size.x * 0.5
+	return (_shape.shape as BoxShape3D).size.x * 0.5
 
 
 ## Подгоняет форму коллизии под стойку.
 ##
 ## Низ формы остаётся на полу, поэтому меняется и размер, и смещение: у
-## [CollisionShape2D] начало в середине, и одна лишь смена размера утопила бы
+## [CollisionShape3D] начало в середине, и одна лишь смена размера утопила бы
 ## присевшего агента в перекрытие.
 func _fit_shape() -> void:
-	var box := _shape.shape as RectangleShape2D
+	var box := _shape.shape as BoxShape3D
 	var height := _brain.height()
 	if is_equal_approx(box.size.y, height):
 		return
 	# Форма приходит из сцены общей на всех агентов: правя её на месте, мы
 	# пригибали бы разом всех, кто её делит.
-	var own := box.duplicate() as RectangleShape2D
-	own.size = Vector2(box.size.x, height)
+	var own := box.duplicate() as BoxShape3D
+	own.size = Vector3(box.size.x, height, box.size.z)
 	_shape.shape = own
-	_shape.position.y = -height * 0.5
+	_shape.position.y = height * 0.5
 
 
 ## Есть ли пол там, куда агент собирается шагнуть.
@@ -311,11 +331,11 @@ func _bullet_speed() -> float:
 
 func _apply_gravity(delta: float) -> void:
 	if not is_on_floor():
-		velocity.y = minf(velocity.y + gravity * delta, max_fall_speed)
+		velocity.y = maxf(velocity.y - gravity * delta, -max_fall_speed)
 
 
-## Картинка на этот кадр: поза, сторона и ход ходьбы. Устроено так же, как
-## у Otto, — разница только в наборе поз: агент не приседает и не прыгает.
+## Вид на этот кадр: поза, сторона и ход ходьбы. Устроено так же, как у Otto, —
+## разница только в наборе поз: агент не приседает и не прыгает, зато ложится.
 func _update_look(delta: float) -> void:
 	_shooting = maxf(_shooting - delta, 0.0)
 	_falling_over = maxf(_falling_over - delta, 0.0)
@@ -324,8 +344,8 @@ func _update_look(delta: float) -> void:
 	else:
 		_walk_phase = 0.0
 
-	_body.texture = SpriteTextures.actor("agent", _pose())
-	_body.flip_h = _brain.facing < 0.0
+	_body.show_pose(_pose())
+	_body.face(_brain.facing)
 
 
 func _pose() -> String:
@@ -356,11 +376,13 @@ func _fire() -> void:
 	bullet.collision_mask = Bullet.FROM_ENEMY
 	bullet.hit_target.connect(_on_bullet_hit)
 	get_parent().add_child(bullet)
-	bullet.global_position = global_position + Vector2(_brain.facing * muzzle_offset, shot_height)
+	bullet.global_position = (
+		global_position + Vector3(_brain.facing * muzzle_offset, shot_height, 0.0)
+	)
 
 
 ## Попадание своей пули. Очков за Otto никто не получает — он просто гибнет.
-func _on_bullet_hit(target: Node2D) -> void:
+func _on_bullet_hit(target: Node3D) -> void:
 	var victim := target as Otto
 	if victim == null:
 		return

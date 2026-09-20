@@ -5,11 +5,49 @@ extends RefCounted
 ##
 ## Вынесена из узлов по той же причине, что [OttoStateMachine] и
 ## [ElevatorMotion]: набор поз обязан покрывать все состояния, и проверять это
-## надо без сцены, физики и отрисованного кадра. Имена поз — те же, что в
-## [constant SpriteTextures.OTTO_POSES], и тест следит, чтобы они не разошлись.
+## надо без сцены, физики и отрисованного кадра. Списки поз лежат здесь же, и
+## тест следит, чтобы выбор позы не выходил за них.
+##
+## До M15 списки жили у спрайтов: поза и была картинкой. Теперь позу отыгрывает
+## коробка, а в M16 — [AnimationTree], и место списка — рядом с правилом, которое
+## позу выбирает, а не рядом с тем, кто её показывает.
 
 ## Кадров в цикле ходьбы (ADR-0011, пункт 5).
 const WALK_FRAMES: int = 3
+
+## Кадров ходьбы в секунду. На двенадцати шаг читается как бег, а Otto ходит
+## (ADR-0011, пункт 5).
+const WALK_FPS: float = 10.0
+
+## Позы Otto.
+const OTTO_POSES: PackedStringArray = [
+	"idle",
+	"walk_0",
+	"walk_1",
+	"walk_2",
+	"crouch",
+	"jump",
+	"kick",
+	"shoot",
+	"dead_0",
+	"dead_1",
+	"crushed",
+]
+
+## Позы агента. Он не прыгает и не бьёт ногой — этого не умеет [EnemyBrain].
+## «Crouch» служит ему позой «на колене», «prone» — своя (ADR-0016, пункт 3).
+const AGENT_POSES: PackedStringArray = [
+	"idle",
+	"walk_0",
+	"walk_1",
+	"walk_2",
+	"crouch",
+	"prone",
+	"shoot",
+	"dead_0",
+	"dead_1",
+	"crushed",
+]
 
 ## Поза приседа. Одна на Otto и на агента: у агента это «на колене».
 const CROUCH := "crouch"
@@ -88,7 +126,7 @@ static func of_agent(
 ## [constant WALK_FRAMES]. Со своим `fmod` в каждом актёре цикл замыкался бы не
 ## там, где считается кадр, и последний кадр ходьбы просто не показывался бы.
 static func advance(walk_phase: float, delta: float) -> float:
-	return fmod(walk_phase + delta * SpriteTextures.WALK_FPS, float(WALK_FRAMES))
+	return fmod(walk_phase + delta * WALK_FPS, float(WALK_FRAMES))
 
 
 ## Лежит ли актёр в этой позе.

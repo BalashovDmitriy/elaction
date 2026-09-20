@@ -105,7 +105,7 @@ func test_a_loop_is_not_restarted_while_it_plays() -> void:
 	# и от двухсекундного гула кабины слышно первые три миллисекунды. Второй вызов
 	# [method Sounds.keep_playing] обязан оставить идущую петлю в покое — видно это
 	# по объекту воспроизведения: заведённая заново петля получила бы новый.
-	var host: Node2D = add_child_autofree(Node2D.new()) as Node2D
+	var host: Node3D = add_child_autofree(Node3D.new()) as Node3D
 	var player := Sounds.source(host, Sounds.ELEVATOR_HUM, 360.0)
 
 	Sounds.keep_playing(player, true)

@@ -1,5 +1,5 @@
 class_name Door
-extends Node2D
+extends Node3D
 
 ## Дверь этажа.
 ##
@@ -9,20 +9,24 @@ extends Node2D
 ## Дверью пользуются двое, и по-разному. Otto стучится сам и сидит внутри, пока
 ## не выйдет время. Агента дверь выпускает по просьбе уровня, и открывается перед
 ## ним заметно дольше: створка — это предупреждение (ADR-0020, решение 2).
+##
+## Створка висит в задней стене коридора, порог — в плоскости игры (ADR-0021,
+## решение 1). Проём в стене за створкой режет сам уровень.
 
 ## Документ взят, дверь перестала быть красной.
 signal document_taken
 
-## Ассеты створки по ходу: закрыта, приоткрыта, открыта. Состояние двери — это
-## не оттенок одного прямоугольника, а разная картинка (ADR-0011).
-const CLOSED_ASSET := "door"
-const DOCUMENT_ASSET := "door_red"
-const OPENING_ASSET := "door_ajar"
-const OPEN_ASSET := "door_open"
+## Габарит створки, м. Те же 84×171 прежних пикселя; уровень режет по нему проём
+## в задней стене, поэтому число живёт здесь, а не в двух местах.
+const LEAF_SIZE := Vector2(0.84, 1.71)
 
-## Докуда слышно створку, px. Дверей в здании полсотни, и хлопок каждой на всё
+## На сколько створка отстоит от стены. Чуть больше нуля: лежащая в одной
+## плоскости со стеной, она мерцала бы с ней на каждом кадре.
+const LEAF_STANDOFF: float = 0.05
+
+## Докуда слышно створку, м. Дверей в здании полсотни, и хлопок каждой на всё
 ## здание превратился бы в стук без остановки: слышно только ближние.
-const DOOR_REACH: float = 1440.0
+const DOOR_REACH: float = 14.4
 
 ## Сколько Otto может пересидеть внутри, с.
 @export var hide_time: float = 5.0
@@ -44,25 +48,22 @@ var _cycle := DoorCycle.new()
 var _guest: Otto = null
 ## Дверь открыта под агента: занята, пока он не выйдет.
 var _expecting_agent: bool = false
-var _voice: AudioStreamPlayer2D = null
-## Что уже нарисовано: ход створки и ассет закрытой двери. Дверей в здании
-## полсотни, и почти всё время все они стоят закрытыми — перерисовывать их
-## каждый кадр значит звать сервер отрисовки полсотни раз на ровном месте.
-##
-## Ассет в паре с ходом, потому что красная дверь, отдавшая документ, меняет
-## картинку, не двинув створкой.
+var _voice: AudioStreamPlayer3D = null
+## Что уже показано: ход створки и красная ли дверь. Дверей в здании полсотни,
+## и почти всё время все они стоят закрытыми — двигать их каждый кадр значит
+## трогать трансформ полсотни раз на ровном месте.
 var _shown: float = -1.0
-var _shown_closed: String = ""
+var _shown_red: bool = false
 
-@onready var _mat: Area2D = $Mat
-@onready var _panel: TextureRect = $Panel
-@onready var _next_panel: TextureRect = $NextPanel
-@onready var _mat_visual: TextureRect = $MatVisual
+@onready var _mat: Area3D = $Mat
+@onready var _leaf: MeshInstance3D = $Leaf
+@onready var _mat_visual: MeshInstance3D = $MatVisual
 
 
 func _ready() -> void:
 	_visit.hide_time = hide_time
-	_mat_visual.texture = SpriteTextures.tile("door_mat")
+	_mat_visual.material_override = GreyboxLook.surface(GreyboxLook.SLAB)
+	_leaf.position = Vector3(0.0, LEAF_SIZE.y * 0.5, WorldSpace.BACK_WALL_Z + LEAF_STANDOFF)
 	_refresh_look()
 
 
@@ -83,9 +84,10 @@ func is_pending() -> bool:
 	return has_document
 
 
-## Точка, где Otto стоит перед дверью: сюда же его возвращают за документом.
+## Точка, где Otto стоит перед дверью, в координатах правил: сюда же его
+## возвращают за документом.
 func mat_position() -> Vector2:
-	return _mat.global_position
+	return WorldSpace.to_plane(_mat.global_position)
 
 
 ## Свободна ли дверь под агента: внутри никого, и створка стоит закрытой.
@@ -141,7 +143,7 @@ func _look_for_visitor() -> void:
 		# dismiss_agent]), а отсидка гостя идёт только при открытой двери —
 		# пущенный сюда Otto остался бы внутри навсегда.
 		return
-	for body: Node2D in _mat.get_overlapping_bodies():
+	for body: Node3D in _mat.get_overlapping_bodies():
 		var visitor := body as Otto
 		if visitor == null:
 			continue
@@ -177,33 +179,23 @@ func _release() -> void:
 	Sounds.play(Sounds.DOOR_CLOSE)
 
 
-## Ведёт картинку створки по ходу [DoorCycle].
+## Ведёт створку по ходу [DoorCycle].
 ##
-## Кадра три, а ход непрерывный, поэтому показываются два соседних и между ними
-## перегоняется прозрачность. Новых кадров не рисуем: набор уходит вместе с 2D
-## (ADR-0020, решение 7).
+## В греев-боксе створка сдвигается вбок, в стену, — на всю свою ширину при
+## полном ходе. Не кадры и не поворот: коробке без петель уходить в карман
+## стены честнее всего, а модель с петлями придёт в M16.
 ##
-## Стоящая створка не перерисовывается: зовут отсюда каждый кадр и из каждой
-## двери здания, а меняется картинка только пока дверь ходит.
+## Стоящая створка не трогается: зовут отсюда каждый кадр и из каждой двери
+## здания, а меняется положение только пока дверь ходит.
 func _refresh_look() -> void:
-	var along := _cycle.openness() * 2.0
-	var closed := _frame_asset(0)
-	if is_equal_approx(along, _shown) and closed == _shown_closed:
+	var along := _cycle.openness()
+	if is_equal_approx(along, _shown) and has_document == _shown_red:
 		return
 	_shown = along
-	_shown_closed = closed
-	var frame := clampi(int(along), 0, 1)
-	_panel.texture = SpriteTextures.tile(_frame_asset(frame))
-	_next_panel.texture = SpriteTextures.tile(_frame_asset(frame + 1))
-	_next_panel.modulate.a = along - frame
-
-
-func _frame_asset(frame: int) -> String:
-	if frame >= 2:
-		return OPEN_ASSET
-	if frame == 1:
-		return OPENING_ASSET
-	return DOCUMENT_ASSET if has_document else CLOSED_ASSET
+	_shown_red = has_document
+	_leaf.position.x = -along * LEAF_SIZE.x
+	var tone := GreyboxLook.DOOR_RED if has_document else GreyboxLook.DOOR
+	_leaf.material_override = GreyboxLook.marker(tone)
 
 
 ## Подаёт голос двери. Источник позиционный и один на дверь: поток подменяется,

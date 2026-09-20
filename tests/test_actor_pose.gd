@@ -18,7 +18,7 @@ func test_every_state_of_otto_has_a_pose() -> void:
 	for state: OttoStateMachine.State in _every_state():
 		var pose := ActorPose.of_otto(state, false, false, false, 0.0)
 		assert_true(
-			SpriteTextures.OTTO_POSES.has(pose),
+			ActorPose.OTTO_POSES.has(pose),
 			"состояние %s показывается позой %s" % [OttoStateMachine.state_name(state), pose]
 		)
 
@@ -38,12 +38,12 @@ func test_every_pose_of_otto_is_reachable() -> void:
 						if not shown.has(pose):
 							shown.append(pose)
 
-	for pose: String in SpriteTextures.OTTO_POSES:
+	for pose: String in ActorPose.OTTO_POSES:
 		assert_true(shown.has(pose), "поза %s кому-то нужна" % pose)
 	# И наоборот — как у агента: показать можно только нарисованное. Без этого
 	# опечатка в [ActorPose] дошла бы до игрока розовым квадратом заглушки.
 	for pose: String in shown:
-		assert_true(SpriteTextures.OTTO_POSES.has(pose), "поза %s нарисована" % pose)
+		assert_true(ActorPose.OTTO_POSES.has(pose), "поза %s нарисована" % pose)
 
 
 func test_every_pose_of_the_agent_is_reachable() -> void:
@@ -63,10 +63,10 @@ func test_every_pose_of_the_agent_is_reachable() -> void:
 								if not shown.has(pose):
 									shown.append(pose)
 
-	for pose: String in SpriteTextures.AGENT_POSES:
+	for pose: String in ActorPose.AGENT_POSES:
 		assert_true(shown.has(pose), "поза %s кому-то нужна" % pose)
 	for pose: String in shown:
-		assert_true(SpriteTextures.AGENT_POSES.has(pose), "поза %s нарисована" % pose)
+		assert_true(ActorPose.AGENT_POSES.has(pose), "поза %s нарисована" % pose)
 
 
 func test_death_tells_how_it_happened() -> void:

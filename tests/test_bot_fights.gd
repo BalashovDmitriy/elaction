@@ -12,8 +12,8 @@ extends GutTest
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 
-## Сколько кадров даётся на дуэль. Пуля летит 220 px/с, агент стоит в паре сотен
-## пикселей — это доля секунды; остальное запас на замах и на промах.
+## Сколько кадров даётся на дуэль. Пуля летит 6.6 м/с, агент стоит в паре
+## метров — это доля секунды; остальное запас на замах и на промах.
 const DUEL_FRAMES: int = 300
 
 ## Сколько кадров даётся зданию, чтобы встать на места.
@@ -60,10 +60,10 @@ func test_the_bot_shoots_the_agent_in_its_way() -> void:
 	assert_lt(gap, OttoBot.ENGAGE, "агент стоит в поле зрения бота")
 
 	var surface := rules.floor_surface(FLOOR)
-	level.otto.global_position = Vector2(pair.x, surface)
+	level.otto.global_position = WorldSpace.to_scene(Vector2(pair.x, surface))
 	var agent := ENEMY_SCENE.instantiate() as Enemy
 	level.add_child(agent)
-	agent.global_position = Vector2(pair.y, surface)
+	agent.global_position = WorldSpace.to_scene(Vector2(pair.y, surface))
 	agent.apply_rules(rules)
 	agent.setup(level.otto, -1.0)
 	await wait_physics_frames(SETTLE_FRAMES)
@@ -76,7 +76,7 @@ func test_the_bot_shoots_the_agent_in_its_way() -> void:
 		frames += 1
 	bot.release()
 
-	assert_true(agent.is_dead(), "бот не достал агента в %.0f px за %d кадров" % [gap, DUEL_FRAMES])
+	assert_true(agent.is_dead(), "бот не достал агента в %.2f м за %d кадров" % [gap, DUEL_FRAMES])
 	assert_false(level.otto.is_dead(), "и сам при этом остался жив")
 	remove_child(level)
 
