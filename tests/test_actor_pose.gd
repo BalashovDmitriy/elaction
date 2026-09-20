@@ -117,3 +117,32 @@ func test_a_broken_phase_does_not_break_the_frame() -> void:
 ## значениями, а список из трёх строк честнее, чем обход Stance.keys().
 func _stances() -> Array[EnemyBrain.Stance]:
 	return [EnemyBrain.Stance.STAND, EnemyBrain.Stance.KNEEL, EnemyBrain.Stance.PRONE]
+
+
+func test_every_way_of_dying_counts_as_down() -> void:
+	# Греев-бокс кладёт по этому вопросу коробку набок, а в M16 на нём будет
+	# выбираться анимация: промах здесь оставит труп стоять.
+	for crushed in [true, false]:
+		for falling in [true, false]:
+			var pose := ActorPose.of_otto(OttoStateMachine.State.DEAD, crushed, falling, false, 0.0)
+			assert_true(ActorPose.is_down(pose), "%s — это лежащий" % pose)
+
+
+func test_an_agent_dodging_prone_counts_as_down() -> void:
+	var pose := ActorPose.of_agent(false, false, false, false, false, 0.0, EnemyBrain.Stance.PRONE)
+	assert_true(ActorPose.is_down(pose))
+
+
+func test_the_living_and_upright_are_not_down() -> void:
+	for pose in ["idle", "walk_0", "walk_1", "walk_2", "jump", "kick", "shoot", ActorPose.CROUCH]:
+		assert_false(ActorPose.is_down(pose), "%s — это не лежащий" % pose)
+
+
+func test_the_knee_and_the_crouch_are_one_pose() -> void:
+	# Агент на колене и присевший Otto показываются одинаково — так было и в 2D.
+	var kneeling := ActorPose.of_agent(
+		false, false, false, false, false, 0.0, EnemyBrain.Stance.KNEEL
+	)
+	var crouching := ActorPose.of_otto(OttoStateMachine.State.CROUCH, false, false, false, 0.0)
+	assert_eq(kneeling, crouching)
+	assert_eq(kneeling, ActorPose.CROUCH)

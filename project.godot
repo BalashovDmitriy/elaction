@@ -1,6 +1,7 @@
 ; Файл конфигурации движка.
 ; Обычно правится через UI редактора Godot, но базовые решения зафиксированы
-; здесь осознанно — см. docs/adr/0002-visual-target.md.
+; здесь осознанно — см. docs/adr/0019-3d-pivot.md и docs/adr/0021-3d-greybox.md.
+; ADR-0002 (HD пиксель-арт) отменён: сцена стала трёхмерной.
 
 config_version=5
 
@@ -15,8 +16,10 @@ config/icon="res://icon.svg"
 
 [display]
 
-; Базовый вьюпорт 1920x1080: картинка нативная, без скейла (ADR-0018).
-; Мир и ассеты измеряются в этих же пикселях, поэтому с M13 всё втрое крупнее.
+; Базовый вьюпорт 1920x1080 (ADR-0018 в части разрешения остаётся в силе).
+; Мир больше не измеряется в пикселях: с M15 он метрический, 100 прежних
+; пикселей = 1 м (ADR-0019, решение 3). Растяжение canvas_items оставлено —
+; оно теперь обслуживает только HUD и меню, 3D рисуется в разрешении окна.
 window/size/viewport_width=1920
 window/size/viewport_height=1080
 window/size/window_width_override=1920
@@ -90,18 +93,24 @@ screenshot={
 ; Otto, враги и лампы разведены по слоям, чтобы пуля знала, во что ей можно
 ; попасть, а зоны удара не находили посторонних: лампа на слое врагов заставляла
 ; и удар ногой, и её собственную зону разбирать чужаков.
+; С M15 те же четыре слоя живут в 3D-физике; 2D-имена оставлены до M20, пока
+; из проекта не вычищены последние 2D-системы (ADR-0021, решение 6).
 2d_physics/layer_1="geometry"
 2d_physics/layer_2="player"
 2d_physics/layer_3="enemies"
 2d_physics/layer_4="lamps"
+3d_physics/layer_1="geometry"
+3d_physics/layer_2="player"
+3d_physics/layer_3="enemies"
+3d_physics/layer_4="lamps"
 
 [rendering]
 
 renderer/rendering_method="forward_plus"
-; Пиксель-арт: без сглаживания при масштабировании.
-textures/canvas_textures/default_texture_filter=0
-2d/snap/snap_2d_transforms_to_pixel=true
-2d/snap/snap_2d_vertices_to_pixel=true
+; Пиксельная привязка и фильтр ближайшего соседа убраны вместе с ADR-0002:
+; сцена трёхмерная, привязывать к пикселю нечего, а nearest на 3D-текстурах
+; даёт только грязь. Настройки объёмного света, SSR и грейдинга сюда не
+; добавляются — они выбираются на готовой сцене в M17, а не вслепую.
 anti_aliasing/quality/msaa_2d=0
 
 [audio]

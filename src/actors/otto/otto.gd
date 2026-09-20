@@ -1,10 +1,14 @@
 class_name Otto
-extends CharacterBody2D
+extends CharacterBody3D
 
 ## Игрок — агент Otto.
 ##
 ## Отвечает за физику, форму коллизии и вид. Решение о том, в каком он
 ## состоянии, принимает [OttoStateMachine].
+##
+## Живёт в плоскости игры: Z заперт на [constant WorldSpace.PLAY_Z] и
+## возвращается туда после каждого шага физики (ADR-0021, решение 1). Ходить
+## вглубь Otto не будет — глубина это свойство картинки, а не движения.
 
 ## Otto погиб: пулей, падением в шахту или под кабиной.
 signal died
@@ -28,18 +32,18 @@ const RESPAWN_GRACE: float = 1.5
 ## передышка себя показывает: без него игрок не знает, что она вообще была.
 const GRACE_BLINKS: float = 8.0
 
-@export var walk_speed: float = 270.0
-## Высота прыжка = jump_speed² / (2 · gravity). При 1140 и 2700 это ~240 px —
-## те же 80 единиц прежнего мира: с M13 мир втрое крупнее (ADR-0018).
-@export var jump_speed: float = 1140.0
-@export var gravity: float = 2700.0
-@export var bullet_speed: float = 660.0
+@export var walk_speed: float = 2.7
+## Высота прыжка = jump_speed в квадрате, делённая на 2 · gravity. При 11.4 и 27
+## это ~2.4 м — те же 240 прежних пикселей: мир стал метрическим (ADR-0019).
+@export var jump_speed: float = 11.4
+@export var gravity: float = 27.0
+@export var bullet_speed: float = 6.6
 ## Откуда вылетает пуля, от ног. Присев, Otto стреляет ниже — и его выстрел
 ## проходит там, где стоящий враг его не перепрыгнет.
-@export var shot_height_standing: float = -90.0
-@export var shot_height_crouching: float = -45.0
-@export var muzzle_offset: float = 40.0
-@export var max_fall_speed: float = 1260.0
+@export var shot_height_standing: float = 0.9
+@export var shot_height_crouching: float = 0.45
+@export var muzzle_offset: float = 0.4
+@export var max_fall_speed: float = 12.6
 ## В оригинале Otto приседает на месте. Оставлено переключателем для настройки.
 @export var can_move_while_crouching: bool = false
 
@@ -47,6 +51,8 @@ var _states := OttoStateMachine.new()
 ## Один снимок ввода на всё время жизни: перечитывается, а не создаётся заново.
 var _snapshot := OttoInput.new()
 var _posed_state := OttoStateMachine.State.IDLE
+## Поза, под которую уже собрана коробка тела.
+var _posed_look := ""
 ## Кабина, внутри которой сейчас Otto. На крыше кабины она не заполняется:
 ## оттуда лифтом не управляют (ADR-0004, пункт 3).
 var _car: ElevatorCar = null
@@ -64,23 +70,31 @@ var _crushed: bool = false
 ## На каком кадре ходьбы уже прозвучал шаг.
 var _stepped_on: int = -1
 var _gun := Gun.new()
-## Верхняя точка текущего полёта: от неё считается глубина падения.
+## Верхняя точка текущего полёта: от неё считается глубина падения. В сцене Y
+## растёт вверх, поэтому верхняя точка — это наибольший Y, а не наименьший.
 var _apex_y: float = 0.0
 ## Сколько ещё держится передышка после возвращения в игру, с.
 var _grace: float = 0.0
+## Меш тела. В греев-боксе это коробка, меняющая габарит с позой; модель придёт
+## в M16 и встанет на это же место.
+var _mesh := BoxMesh.new()
 
-@onready var _standing_shape: CollisionShape2D = $StandingShape
-@onready var _crouching_shape: CollisionShape2D = $CrouchingShape
-@onready var _body: Sprite2D = $Body
-@onready var _camera: Camera2D = $Camera2D
-@onready var _kick_zone: Area2D = $KickZone
+@onready var _standing_shape: CollisionShape3D = $StandingShape
+@onready var _crouching_shape: CollisionShape3D = $CrouchingShape
+@onready var _body: MeshInstance3D = $Body
+@onready var _camera: SideCamera = $Camera
+@onready var _kick_zone: Area3D = $KickZone
 
 
 func _ready() -> void:
-	var standing := (_standing_shape.shape as RectangleShape2D).size.y
-	var crouching := (_crouching_shape.shape as RectangleShape2D).size.y
-	_headroom = standing - crouching
+	var standing := _shape_size(_standing_shape)
+	var crouching := _shape_size(_crouching_shape)
+	_headroom = standing.y - crouching.y
 	_apex_y = global_position.y
+	_body.mesh = _mesh
+	_body.material_override = GreyboxLook.marker(GreyboxLook.OTTO)
+	_camera.follow(self)
+	_repose()
 
 
 func _physics_process(delta: float) -> void:
@@ -91,12 +105,14 @@ func _physics_process(delta: float) -> void:
 		_car.drive(vertical_intent())
 		_snapshot.crouch = false
 
-	var state := _states.update(_snapshot, is_on_floor(), velocity.y, _can_stand_up())
+	# Машине состояний нужна скорость в координатах правил, где Y вниз:
+	# падение для неё положительно, как было в 2D.
+	var state := _states.update(_snapshot, is_on_floor(), -velocity.y, _can_stand_up())
 
 	# Пока Otto забрал кто-то другой — эскалатор везёт или дверь спрятала —
 	# физика молчит: координатой распоряжается он, а не она.
 	if state == OttoStateMachine.State.RIDE or state == OttoStateMachine.State.INDOORS:
-		velocity = Vector2.ZERO
+		velocity = Vector3.ZERO
 		# Его несут, а не роняют: падение с этой высоты не копится.
 		_apex_y = global_position.y
 		_apply_pose(state)
@@ -104,8 +120,8 @@ func _physics_process(delta: float) -> void:
 		return
 
 	# Мёртвый не поворачивается: труп лежит той стороной, которой упал. На цветной
-	# коробке этого было не видно, а спрайт зеркалится на глазах — и тыканье в
-	# стрелки крутило бы тело, пока идёт отсчёт до возвращения в игру.
+	# коробке этого было не видно, а модель разворачивается на глазах — и тыканье
+	# в стрелки крутило бы тело, пока идёт отсчёт до возвращения в игру.
 	var turning := absf(_snapshot.move) > OttoStateMachine.MOVE_THRESHOLD
 	if turning and state != OttoStateMachine.State.DEAD:
 		_facing = signf(_snapshot.move)
@@ -115,13 +131,14 @@ func _physics_process(delta: float) -> void:
 	# Импульс прыжка выдаётся в тот же кадр, пока тело ещё стоит на полу,
 	# поэтому гравитация его в этом кадре не съедает.
 	if _states.just_entered(OttoStateMachine.State.JUMP) and is_on_floor():
-		velocity.y = -jump_speed
+		velocity.y = jump_speed
 
 	velocity.x = _horizontal_speed(_snapshot, state)
 	if not is_on_floor():
-		velocity.y = minf(velocity.y + gravity * delta, max_fall_speed)
+		velocity.y = maxf(velocity.y - gravity * delta, -max_fall_speed)
 
 	move_and_slide()
+	_hold_the_plane()
 
 	# Удар ногой засчитывается только в полёте — стоя врага не бьют.
 	if state == OttoStateMachine.State.JUMP or state == OttoStateMachine.State.FALL:
@@ -170,9 +187,12 @@ func is_dead() -> bool:
 func revive() -> void:
 	_crushed = false
 	_states.reset()
-	velocity = Vector2.ZERO
+	velocity = Vector3.ZERO
 	_apex_y = global_position.y
 	_grace = RESPAWN_GRACE
+	# Камера приезжает к воскресшему сразу: иначе полсекунды сглаживания игрок
+	# смотрит туда, где его убили.
+	_camera.snap_to(Vector2(global_position.x, global_position.y))
 	_repose()
 
 
@@ -187,12 +207,12 @@ func vertical_intent() -> float:
 	return 0.0 if _states.is_world_driven() else _snapshot.vertical
 
 
-## Сколько Otto уже пролетел вниз от верхней точки полёта, px. На опоре — ноль.
+## Сколько Otto уже пролетел вниз от верхней точки полёта, м. На опоре — ноль.
 func fall_height() -> float:
-	return maxf(global_position.y - _apex_y, 0.0)
+	return maxf(_apex_y - global_position.y, 0.0)
 
 
-## На сколько поднимает прыжок: v² / (2 · g). Падение глубже — уже не свой прыжок.
+## На сколько поднимает прыжок. Падение глубже — уже не свой прыжок.
 func jump_height() -> float:
 	return jump_speed * jump_speed / (2.0 * gravity)
 
@@ -243,13 +263,13 @@ func is_riding() -> bool:
 	return _car != null
 
 
-## Текущая скорость тела.
+## Текущая скорость тела, в координатах правил.
 ##
-## Вместе с [method is_grounded] образует публичный интерфейс для наблюдателей
-## вроде отладочного оверлея: они зависят от API Otto, а не от того, что внутри
-## он именно [CharacterBody2D].
+## Вместе с [method is_grounded] образует публичный интерфейс для наблюдателей:
+## они зависят от API Otto, а не от того, что внутри он [CharacterBody3D] и что
+## у сцены Y смотрит вверх.
 func motion() -> Vector2:
-	return velocity
+	return WorldSpace.direction_to_plane(velocity)
 
 
 ## Стоит ли Otto на поверхности.
@@ -257,15 +277,13 @@ func is_grounded() -> bool:
 	return is_on_floor()
 
 
-## Ограничивает камеру прямоугольником уровня.
-## Что сейчас попадает в кадр, в координатах мира.
+## Что сейчас попадает в кадр, в координатах правил.
 ##
-## Камера едет за Otto, но упирается в края здания, и приближение у неё своё.
-## Поэтому видимое место считает тот, у кого камера, а не тот, кому оно нужно:
-## снаружи пришлось бы спрашивать и середину, и приближение, и размер окна.
+## Камера едет за Otto, но упирается в края здания. Поэтому видимое место
+## считает тот, у кого камера, а не тот, кому оно нужно: снаружи пришлось бы
+## спрашивать и середину, и размер кадра, и размер окна.
 func camera_view() -> Rect2:
-	var size := get_viewport_rect().size / _camera.zoom
-	return Rect2(_camera.get_screen_center_position() - size * 0.5, size)
+	return _camera.view()
 
 
 ## Куда Otto смотрит: -1 влево, +1 вправо. Туда же уйдёт его следующая пуля.
@@ -274,10 +292,17 @@ func facing() -> float:
 
 
 func apply_camera_bounds(bounds: Rect2) -> void:
-	_camera.limit_left = int(bounds.position.x)
-	_camera.limit_top = int(bounds.position.y)
-	_camera.limit_right = int(bounds.end.x)
-	_camera.limit_bottom = int(bounds.end.y)
+	_camera.apply_bounds(bounds)
+
+
+## Возвращает тело в плоскость игры.
+##
+## [method move_and_slide] умеет вытолкнуть тело по Z, если оно хоть краем
+## задело грань под углом, и такой сдвиг не виден в боковом кадре вовсе:
+## Otto просто перестаёт доставать до того, до чего доставал.
+func _hold_the_plane() -> void:
+	velocity.z = 0.0
+	global_position.z = WorldSpace.PLAY_Z
 
 
 ## Выпускает пулю. Высоту полёта задаёт поза: присев, Otto стреляет ниже.
@@ -295,11 +320,11 @@ func _fire() -> void:
 	# Счётчик ведёт сам ствол: пуля кончается и попаданием, и на дальности.
 	bullet.tree_exited.connect(_gun.bullet_spent)
 	get_parent().add_child(bullet)
-	bullet.global_position = global_position + Vector2(_facing * muzzle_offset, height)
+	bullet.global_position = global_position + Vector3(_facing * muzzle_offset, height, 0.0)
 	_gun.fired()
 
 
-func _on_bullet_hit(target: Node2D) -> void:
+func _on_bullet_hit(target: Node3D) -> void:
 	# Пуля не разбирает, во что попала, — разбирает стрелявший.
 	var lamp := target as Lamp
 	if lamp != null:
@@ -323,7 +348,7 @@ func _kick_enemies() -> void:
 	# Удар один, сколько бы агентов он ни задел: звук на каждого съедал бы
 	# голоса пула и звучал бы вдвое громче самого себя.
 	var landed := false
-	for body: Node2D in _kick_zone.get_overlapping_bodies():
+	for body: Node3D in _kick_zone.get_overlapping_bodies():
 		var agent := body as Enemy
 		if agent == null or agent.is_dead():
 			continue
@@ -343,12 +368,13 @@ func _kick_enemies() -> void:
 func _can_stand_up() -> bool:
 	if _states.state != OttoStateMachine.State.CROUCH:
 		return true
-	return not test_move(global_transform, Vector2(0.0, -_headroom))
+	return not test_move(global_transform, Vector3(0.0, _headroom, 0.0))
 
 
-## Запоминает верхнюю точку полёта: на опоре она сбрасывается, в воздухе ползёт вверх.
+## Запоминает верхнюю точку полёта: на опоре она сбрасывается, в воздухе ползёт
+## вверх. Вверх — это рост Y: сцена считает не так, как правила.
 func _track_fall() -> void:
-	_apex_y = global_position.y if is_on_floor() else minf(_apex_y, global_position.y)
+	_apex_y = global_position.y if is_on_floor() else maxf(_apex_y, global_position.y)
 
 
 func _horizontal_speed(input: OttoInput, state: OttoStateMachine.State) -> float:
@@ -391,6 +417,37 @@ func _apply_pose(state: OttoStateMachine.State) -> void:
 	_body.visible = not hidden
 
 
+## Поза, которую Otto отыгрывает прямо сейчас.
+##
+## В M16 её заберёт [AnimationTree]. Пока анимаций нет, поза задаёт габарит
+## коробки: это единственное, чем греев-бокс показывает состояние, — и заодно
+## [ActorPose] остаётся при работе, а не ждёт следующей вехи мёртвым грузом.
+func _pose() -> String:
+	return ActorPose.of_otto(
+		_states.state, _crushed, _falling_over > 0.0, _shooting > 0.0, _walk_phase
+	)
+
+
+## Габарит коробки под позу: присевший ниже, мёртвый лежит.
+##
+## Пересобирается только на смене позы: [BoxMesh] пересчитывает вершины на
+## каждую запись размера, а поз за секунду меняется единицы.
+func _reshape_body(pose: String) -> void:
+	if pose == _posed_look:
+		return
+	_posed_look = pose
+
+	var standing := _shape_size(_standing_shape)
+	var size := standing
+	if pose == ActorPose.CROUCH:
+		size = _shape_size(_crouching_shape)
+	elif ActorPose.is_down(pose):
+		# Лежащий занимает столько же, сколько стоял, но поперёк.
+		size = Vector3(standing.y, standing.x, standing.z)
+	_mesh.size = size
+	_body.position = Vector3(0.0, size.y * 0.5, 0.0)
+
+
 ## Прозрачность тела: неуязвимый Otto мигает, остальные кадры он сплошной.
 func _grace_alpha() -> float:
 	if _grace <= 0.0:
@@ -399,10 +456,8 @@ func _grace_alpha() -> float:
 	return 1.0 if phase < 0.5 else 0.25
 
 
-## Картинка на этот кадр: поза, сторона и ход ходьбы.
-##
-## Зовётся каждый кадр, а не на переходах, как [method _apply_pose]: ходьба
-## перебирает три кадра, а выстрел и падение держатся по таймеру.
+## Что меняется каждый кадр, а не на переходах: ход ходьбы, таймеры поз и
+## мигание передышки.
 func _update_look(delta: float) -> void:
 	_shooting = maxf(_shooting - delta, 0.0)
 	_falling_over = maxf(_falling_over - delta, 0.0)
@@ -413,9 +468,10 @@ func _update_look(delta: float) -> void:
 		_walk_phase = 0.0
 		_stepped_on = -1
 
-	_body.texture = SpriteTextures.actor("otto", _pose())
-	_body.flip_h = _facing < 0.0
-	_body.modulate.a = _grace_alpha()
+	_reshape_body(_pose())
+	# Поворот показан разворотом коробки: зеркалить нечего, пока нет модели.
+	_body.rotation.y = 0.0 if _facing >= 0.0 else PI
+	_body.transparency = 1.0 - _grace_alpha()
 
 
 ## Шаг звучит на крайних кадрах ходьбы — тех, где нога ставится. На каждом
@@ -430,7 +486,5 @@ func _step_sound() -> void:
 	Sounds.play(Sounds.STEP)
 
 
-func _pose() -> String:
-	return ActorPose.of_otto(
-		_states.state, _crushed, _falling_over > 0.0, _shooting > 0.0, _walk_phase
-	)
+static func _shape_size(shape: CollisionShape3D) -> Vector3:
+	return (shape.shape as BoxShape3D).size

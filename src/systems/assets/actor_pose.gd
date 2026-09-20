@@ -11,6 +11,16 @@ extends RefCounted
 ## Кадров в цикле ходьбы (ADR-0011, пункт 5).
 const WALK_FRAMES: int = 3
 
+## Поза приседа. Одна на Otto и на агента: у агента это «на колене».
+const CROUCH := "crouch"
+
+## Позы, в которых актёр лежит, — все три вида смерти и уклонение лёжа.
+##
+## Спрашивают об этом снаружи: греев-бокс кладёт коробку набок, а в M16 на том
+## же вопросе будет выбираться анимация. Перечислять их у каждого, кто спросит,
+## значит разойтись при первой же новой позе.
+const DOWN: PackedStringArray = ["dead_0", "dead_1", "crushed", "prone"]
+
 ## Поза по состоянию для тех состояний, у которых она одна. Константа, а не
 ## словарь на каждый вызов: поза пересчитывается каждый физический кадр и на
 ## Otto, и на каждом агенте в кадре.
@@ -18,7 +28,7 @@ const WALK_FRAMES: int = 3
 ## В воздухе Otto бьёт ногой всегда (ADR-0006, пункт 2), поэтому падение и есть
 ## тот самый удар с разбега — отдельной позы падения нет.
 const BY_STATE: Dictionary = {
-	OttoStateMachine.State.CROUCH: "crouch",
+	OttoStateMachine.State.CROUCH: CROUCH,
 	OttoStateMachine.State.JUMP: "jump",
 	OttoStateMachine.State.FALL: "kick",
 }
@@ -64,7 +74,7 @@ static func of_agent(
 	if dead:
 		return _death(crushed, falling_over)
 	if stance == EnemyBrain.Stance.KNEEL:
-		return "crouch"
+		return CROUCH
 	if stance == EnemyBrain.Stance.PRONE:
 		return "prone"
 	if shooting:
@@ -79,6 +89,11 @@ static func of_agent(
 ## там, где считается кадр, и последний кадр ходьбы просто не показывался бы.
 static func advance(walk_phase: float, delta: float) -> float:
 	return fmod(walk_phase + delta * SpriteTextures.WALK_FPS, float(WALK_FRAMES))
+
+
+## Лежит ли актёр в этой позе.
+static func is_down(pose: String) -> bool:
+	return DOWN.has(pose)
 
 
 ## Кадр ходьбы по фазе: целая часть фазы и есть номер кадра.
