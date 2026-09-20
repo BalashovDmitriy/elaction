@@ -219,8 +219,8 @@ func _refresh_look() -> void:
 	_leaf.position.x = -along * LEAF_SIZE.x
 	var tone := GreyboxLook.DOOR_RED if has_document else GreyboxLook.DOOR
 	_leaf.material_override = GreyboxLook.surface(tone)
-	var sign := GreyboxLook.SIGN_RED if has_document else GreyboxLook.SIGN_WARM
-	_sign.material_override = GreyboxLook.light(sign)
+	var glow := GreyboxLook.SIGN_RED if has_document else GreyboxLook.SIGN_WARM
+	_sign.material_override = GreyboxLook.light(glow)
 
 
 ## Подаёт голос двери. Источник позиционный и один на дверь: поток подменяется,

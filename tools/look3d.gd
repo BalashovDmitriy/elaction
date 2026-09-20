@@ -274,35 +274,19 @@ func _lights(base: float, height: float) -> void:
 	add_child(shaft_light)
 
 
+## Воздух пробы — тот же [Atmosphere], что и в здании: отражения, SSAO, туман,
+## свечение и тонмаппинг пришли отсюда, и держать их вторым списком значит
+## подбирать числа не на том кадре, на котором они потом работают.
+##
+## Своего у пробы два: чернее небо — здания вокруг нет, и фон не должен спорить
+## со стендом, — и общий тон выше, потому что палитры раунда здесь нет.
 func _environment() -> void:
-	var environment := Environment.new()
-	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color(0.008, 0.01, 0.016)
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color(0.09, 0.11, 0.16)
-	environment.ambient_light_energy = 0.8
-	# Отражения в полу и воздух: два приёма, которых в 2D у нас нет вовсе.
-	environment.ssr_enabled = true
-	environment.ssr_max_steps = 96
-	environment.ssr_fade_in = 0.2
-	environment.ssao_enabled = true
-	environment.ssao_intensity = 2.0
-	environment.ssao_radius = 0.6
-	# Туман здесь — намёк, а не молоко: на 0.015 конусы ламп съедали весь кадр.
-	environment.volumetric_fog_enabled = true
-	environment.volumetric_fog_density = 0.0035
-	environment.volumetric_fog_emission = Color(0.03, 0.04, 0.06)
-	# Свечение только с того, что ярче кадра: иначе блум растит каждую лампу
-	# в белый столб и съедает деталь, ради которой всё и затевалось.
-	environment.glow_enabled = true
-	environment.glow_intensity = 0.45
-	environment.glow_bloom = 0.0
-	environment.glow_hdr_threshold = 1.0
-	environment.tonemap_mode = Environment.TONE_MAPPER_ACES
-	environment.tonemap_exposure = 1.15
+	var air := Atmosphere.environment(Color(0.09, 0.11, 0.16))
+	air.background_color = Color(0.008, 0.01, 0.016)
+	air.ambient_light_energy = 0.8
 
 	var world := WorldEnvironment.new()
-	world.environment = environment
+	world.environment = air
 	add_child(world)
 
 

@@ -14,7 +14,12 @@ extends RefCounted
 ## Класс только помнит, где лампы и какие погашены. Картинку и поведение агентов
 ## по нему настраивает уровень, поэтому проверяется без сцены.
 
-## Лампы по этажам: этаж → x ламп по возрастанию.
+## Лампы по этажам: этаж → x ламп в порядке развески.
+##
+## Порядок не трогается после добавления нарочно: номер лампы в этом списке —
+## ключ её темноты в [member _dark], и пересортировка списка переставляла бы
+## темноту с одной зоны на другую. Кто левее, решает [method _nearest] по x,
+## а не по месту в списке.
 var _lamps: Dictionary = {}
 ## Погашенные лампы: этаж → {номер лампы в списке этажа: true}.
 var _dark: Dictionary = {}
@@ -27,7 +32,6 @@ func hang(floor_index: int, x: float) -> void:
 		_lamps[floor_index] = PackedFloat64Array()
 	var xs: PackedFloat64Array = _lamps[floor_index]
 	xs.append(x)
-	xs.sort()
 	_lamps[floor_index] = xs
 
 
@@ -72,16 +76,9 @@ func zone_of(floor_index: int, x: float) -> float:
 	return (_lamps[floor_index] as PackedFloat64Array)[index]
 
 
-## Сколько зон уже погашено во всём здании.
-func dark_zones() -> int:
-	var total := 0
-	for floor_index: int in _dark:
-		total += (_dark[floor_index] as Dictionary).size()
-	return total
-
-
 ## Номер ближайшей к точке лампы этажа или -1. При равном расстоянии — левая:
-## граница зон принадлежит той лампе, что ближе к началу этажа.
+## граница зон принадлежит той лампе, что ближе к началу этажа. Сравнивается по
+## x, а не по месту в списке: порядок развески ответ решать не должен.
 func _nearest(floor_index: int, x: float) -> int:
 	if not _lamps.has(floor_index):
 		return -1
@@ -90,7 +87,8 @@ func _nearest(floor_index: int, x: float) -> int:
 	var best_gap := INF
 	for index in xs.size():
 		var gap := absf(xs[index] - x)
-		if gap < best_gap:
+		var tied := best >= 0 and is_equal_approx(gap, best_gap)
+		if gap < best_gap or (tied and xs[index] < xs[best]):
 			best_gap = gap
 			best = index
 	return best

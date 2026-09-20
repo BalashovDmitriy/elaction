@@ -31,8 +31,14 @@ const SPOT_ANGLE: float = 60.0
 const SPOT_ENERGY: float = 9.0
 const SPOT_BLUR: float = 1.6
 
-## Заливка вокруг: слабая, широкая, без тени. Один конус оставлял бы между
-## лампами черноту при всех горящих — а зона считается освещённой целиком.
+## Заливка вокруг: слабая и широкая. Один конус оставлял бы между лампами
+## черноту при всех горящих — а зона считается освещённой целиком.
+##
+## С тенью, хотя тень на второй источник каждой лампы и стоит денег. Без неё
+## заливка радиусом больше высоты этажа (3 м) светит сквозь перекрытия: на
+## кадре погашенного этажа его пол подсвечивали лампы этажа снизу, и темнота
+## переставала быть темнотой (авторевью M17). Резать радиус нельзя — он и
+## нужен, чтобы дотянуться до краёв зоны.
 const FILL_RANGE: float = 7.0
 const FILL_ENERGY: float = 1.5
 
@@ -96,11 +102,14 @@ func hang(hang_height: float, headroom: float = 0.0) -> void:
 	var box := _shape.shape as BoxShape3D
 	_fall.distance = maxf(hang_height - box.size.y * 0.5, 0.0)
 
+	# Прежний шнур снимается до проверки длины: перевешенная лампа не должна
+	# оставлять на себе обрывок от прошлой высоты.
+	if _cord != null:
+		_cord.queue_free()
+		_cord = null
 	var cord_length := headroom - hang_height - box.size.y * 0.5
 	if cord_length <= 0.0:
 		return
-	if _cord != null:
-		_cord.queue_free()
 	_cord = GreyboxLook.box(
 		Vector3(CORD_WIDTH, cord_length, CORD_WIDTH), GreyboxLook.surface(GreyboxLook.WALL)
 	)
@@ -149,7 +158,7 @@ func _make_fill() -> OmniLight3D:
 	light.light_color = LIGHT_COLOR
 	light.light_energy = FILL_ENERGY
 	light.omni_range = FILL_RANGE
-	light.shadow_enabled = false
+	light.shadow_enabled = true
 	return light
 
 

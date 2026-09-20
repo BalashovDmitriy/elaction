@@ -36,28 +36,28 @@ const EXPOSURE: float = 1.15
 
 ## Воздух здания с общим тоном [param ambient] — цветом палитры раунда.
 static func environment(ambient: Color) -> Environment:
-	var environment := Environment.new()
-	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = SKY
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = ambient
-	environment.ambient_light_energy = AMBIENT_ENERGY
+	var air := Environment.new()
+	air.background_mode = Environment.BG_COLOR
+	air.background_color = SKY
+	air.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	air.ambient_light_color = ambient
+	air.ambient_light_energy = AMBIENT_ENERGY
 
-	environment.ssr_enabled = true
-	environment.ssr_max_steps = SSR_STEPS
-	environment.ssr_fade_in = SSR_FADE_IN
-	environment.ssao_enabled = true
-	environment.ssao_intensity = SSAO_INTENSITY
-	environment.ssao_radius = SSAO_RADIUS
+	air.ssr_enabled = true
+	air.ssr_max_steps = SSR_STEPS
+	air.ssr_fade_in = SSR_FADE_IN
+	air.ssao_enabled = true
+	air.ssao_intensity = SSAO_INTENSITY
+	air.ssao_radius = SSAO_RADIUS
 
-	environment.volumetric_fog_enabled = true
-	environment.volumetric_fog_density = FOG_DENSITY
-	environment.volumetric_fog_emission = FOG_EMISSION
+	air.volumetric_fog_enabled = true
+	air.volumetric_fog_density = FOG_DENSITY
+	air.volumetric_fog_emission = FOG_EMISSION
 
-	environment.glow_enabled = true
-	environment.glow_intensity = GLOW_INTENSITY
-	environment.glow_bloom = 0.0
-	environment.glow_hdr_threshold = GLOW_THRESHOLD
-	environment.tonemap_mode = Environment.TONE_MAPPER_ACES
-	environment.tonemap_exposure = EXPOSURE
-	return environment
+	air.glow_enabled = true
+	air.glow_intensity = GLOW_INTENSITY
+	air.glow_bloom = 0.0
+	air.glow_hdr_threshold = GLOW_THRESHOLD
+	air.tonemap_mode = Environment.TONE_MAPPER_ACES
+	air.tonemap_exposure = EXPOSURE
+	return air

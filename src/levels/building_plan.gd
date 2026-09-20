@@ -373,8 +373,16 @@ func _lay_door(
 ## Не случайно, как остальное: зона лампы — единица темноты (ADR-0023), и лампы,
 ## сбившиеся в один край, оставили бы другой край этажа тёмным при всех горящих.
 ## Этаж делится на столько зон, сколько ламп, и каждая встаёт в ближайшее к
-## середине своей зоны свободное место. Лампы кладутся последними, поэтому
-## свободного места может не хватить — тогда ламп меньше, но не ноль.
+## середине своей зоны свободное место.
+##
+## Лампы кладутся последними и уступают шахтам, эскалаторам и дверям, поэтому
+## свободного места может не хватить — тогда ламп меньше. **Но не ноль:** этаж
+## без единой лампы не светел и погасить его нечем — для правила темноты он
+## навсегда освещённый, хотя в кадре он чёрный. Когда свободных мест не
+## осталось, лампа делит место с дверью: дверь стоит у задней стены, лампа
+## висит под потолком, и мешают друг другу они только на плане. С правилами по
+## умолчанию до этого не доходит — 12000 этажей на 400 сидах получили хотя бы
+## одну, — но запас нужен тем правилам, которых ещё нет.
 func _lay_lamps(rules: BuildingRules, taken: Dictionary) -> void:
 	for index in floors:
 		var span := rules.slot_range(index)
@@ -382,6 +390,8 @@ func _lay_lamps(rules: BuildingRules, taken: Dictionary) -> void:
 		for slot in range(span.x, span.y + 1):
 			if not _is_taken(taken, index, slot):
 				free.append(slot)
+		if free.is_empty():
+			free = _slots_beside_the_openings(rules, index)
 
 		var wanted := rules.lamps_on(index)
 		for number in wanted:
@@ -399,6 +409,18 @@ func _lay_lamps(rules: BuildingRules, taken: Dictionary) -> void:
 			lamp.x = rules.slot_x(slot)
 			_occupy(taken, index, slot)
 			lamps.append(lamp)
+
+
+## Места этажа, куда лампу повесить всё-таки можно, когда свободных не осталось:
+## всё, кроме проёмов — шахт, эскалаторов и выхода. Над проёмом лампы не будет
+## никогда: там ездит кабина и падать лампе некуда.
+func _slots_beside_the_openings(rules: BuildingRules, floor_index: int) -> Array[int]:
+	var free: Array[int] = []
+	var span := rules.slot_range(floor_index)
+	for slot in range(span.x, span.y + 1):
+		if _is_clear(rules, floor_index, rules.slot_x(slot)):
+			free.append(slot)
+	return free
 
 
 ## Свободное место, ближайшее к желаемому. При равном расстоянии — левое.

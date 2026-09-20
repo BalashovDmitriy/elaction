@@ -159,6 +159,9 @@ func test_an_agent_in_the_dark_still_sees_a_lit_otto() -> void:
 	var pair := _spot_pair(level)
 	_place_otto(level, pair.y)
 	await _put_out(_lamp_near(level, _floor(level), pair.x))
+	# Дуэль ставится на том, что Otto остался под горящей лампой: зоны узкие, и
+	# второе место могло попасть в ту же погашенную — тогда проверялось бы не то.
+	assert_false(level.is_dark_at(_floor(level), pair.y), "Otto стоит в освещённой зоне")
 	var agent := _agent_at(level, pair.x, signf(pair.y - pair.x))
 	var shots := await _shots_within(level, WATCH_FRAMES)
 	assert_true(agent.is_in_the_dark(), "агент стоит в тени")

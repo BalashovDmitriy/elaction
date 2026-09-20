@@ -529,13 +529,14 @@ func _spawn_exit() -> void:
 	threshold.position.z = WorldSpace.BACK_WALL_Z + PANEL_THICKNESS
 	add_child(threshold)
 
-	var sign := GreyboxLook.box(EXIT_SIGN_SIZE, GreyboxLook.light(GreyboxLook.SIGN_GREEN))
-	sign.name = "ExitSign"
-	sign.position = WorldSpace.to_scene(
+	# Не `sign`: так зовут встроенную функцию, и местная переменная её заслонила бы.
+	var board := GreyboxLook.box(EXIT_SIGN_SIZE, GreyboxLook.light(GreyboxLook.SIGN_GREEN))
+	board.name = "ExitSign"
+	board.position = WorldSpace.to_scene(
 		Vector2(centre, surface - Door.LEAF_SIZE.y - EXIT_SIGN_RISE)
 	)
-	sign.position.z = WorldSpace.BACK_WALL_Z + EXIT_SIGN_SIZE.z * 0.5
-	add_child(sign)
+	board.position.z = WorldSpace.BACK_WALL_Z + EXIT_SIGN_SIZE.z * 0.5
+	add_child(board)
 	_spawn_car(area)
 
 
@@ -629,7 +630,9 @@ func _on_lamp_fell(index: int, x: float) -> void:
 ## которой зависит, видят ли они его вовсе (ADR-0023, решение 8).
 ##
 ## Каждый кадр, а не по событию: агенты ходят по этажу, и зона под ними
-## меняется на ходу. Живых в здании не больше восьми, счёт дешёвый.
+## меняется на ходу. Живых в здании не больше восьми, но ищет их [method agents]
+## перебором всех детей уровня, а их под три сотни: если кадр когда-нибудь упрётся
+## в это, агентов надо держать списком, а не искать заново.
 func _shroud_agents() -> void:
 	var here := _floor_of(otto)
 	var otto_in_the_dark := _lighting.is_dark_at(here, otto.global_position.x)

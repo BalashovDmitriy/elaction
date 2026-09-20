@@ -316,9 +316,16 @@ func doors_on(index: int) -> int:
 	return clampi(fewest + width_step(index), fewest, most)
 
 
-## Сколько ламп вешать на этаж: по одной на каждые [constant LAMP_EVERY_SLOTS]
+## Сколько ламп вешать на уровень: по одной на каждые [constant LAMP_EVERY_SLOTS]
 ## места, но не меньше одной и не больше [member lamps_per_floor].
+##
+## У крыши — ноль: над ней небо, подвес держать не на чем, и ей светит город
+## (ADR-0014). Отвечать «одна» значило бы обещать лампу тому, кто спросит по
+## всем уровням разом: раскладка крышу пропускает, а правило подтверждало бы
+## обратное.
 func lamps_on(index: int) -> int:
+	if index <= ROOF:
+		return 0
 	var span := slot_range(index)
 	var places := span.y - span.x + 1
 	return clampi(places / LAMP_EVERY_SLOTS, 1, maxi(lamps_per_floor, 1))

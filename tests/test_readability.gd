@@ -116,13 +116,13 @@ func test_the_exit_wears_a_green_sign() -> void:
 	for building_seed: int in SEEDS:
 		var level := _build(building_seed)
 		await wait_physics_frames(SETTLE_FRAMES)
-		var sign := level.get_node_or_null("ExitSign")
-		assert_not_null(sign, "сид %d: над выходом вывеска" % building_seed)
-		if sign != null:
+		var board := level.get_node_or_null("ExitSign")
+		assert_not_null(board, "сид %d: над выходом вывеска" % building_seed)
+		if board != null:
 			assert_eq(
-				_glow_of(sign), GreyboxLook.SIGN_GREEN, "сид %d: и она зелёная" % building_seed
+				_glow_of(board), GreyboxLook.SIGN_GREEN, "сид %d: и она зелёная" % building_seed
 			)
-			var at := WorldSpace.to_plane((sign as Node3D).global_position)
+			var at := WorldSpace.to_plane((board as Node3D).global_position)
 			var bottom := level.rules.floors - 1
 			assert_between(
 				at.y,

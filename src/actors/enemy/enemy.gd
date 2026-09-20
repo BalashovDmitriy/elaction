@@ -155,13 +155,11 @@ func setup(target: Otto, towards: float) -> void:
 
 
 ## Сообщает агенту, что под ним темно. От этого зависит только цена его смерти:
-## убийство в темноте дороже (ADR-0010, пункт 6). Зовут каждый кадр, поэтому
-## без перемены ничего не пересчитывается.
+## убийство в темноте дороже (ADR-0010, пункт 6). Решений боя темнота под агентом
+## больше не меняет — их решает тень Otto (ADR-0023, решение 8), — поэтому здесь
+## присваивание и ничего больше: зовут это каждый кадр на каждого живого.
 func set_in_the_dark(value: bool) -> void:
-	if value == _in_the_dark:
-		return
 	_in_the_dark = value
-	_refresh_brain()
 
 
 ## Сообщает агенту, что Otto стоит в темноте. Такого он замечает лишь вблизи —
@@ -237,12 +235,16 @@ func _shield(value: bool) -> void:
 
 ## Видит ли агент Otto. За дверью его нет; в темноте он заметен только ближе
 ## [member BuildingRules.agent_dark_fire_range]; освещённого видно как обычно.
+##
+## Мерится по горизонтали, как и дальность огня в [EnemyBrain]: иначе «1.8 м —
+## треть от шести» сравнивало бы разные вещи, и агент этажом ниже считался бы
+## слепым там, где стоящий на той же линии видит.
 func _sees(to_target: Vector2) -> bool:
 	if _target.is_hidden():
 		return false
 	if not _target_in_the_dark:
 		return true
-	return to_target.length() <= _building_rules().agent_dark_fire_range
+	return absf(to_target.x) <= _building_rules().agent_dark_fire_range
 
 
 ## Возвращает тело в плоскость игры — по той же причине, что у [Otto].
@@ -334,10 +336,9 @@ func _floor_ahead() -> bool:
 
 
 ## Переносит в [EnemyBrain] все числа боя: и те, что приходят из правил здания,
-## и те, что зависят от темноты и злости. Считается в одном месте, чтобы порядок
-## вызовов [method _ready], [method apply_rules], [method set_in_the_dark] и
-## [method set_menace] ничего не решал — иначе настроенный до
-## [method Node.add_child] агент прозревал бы обратно.
+## и те, что зависят от злости. Считается в одном месте, чтобы порядок вызовов
+## [method _ready], [method apply_rules] и [method set_menace] ничего не решал —
+## иначе настроенный до [method Node.add_child] агент терял бы половину чисел.
 func _refresh_brain() -> void:
 	var rules := _building_rules()
 	# Дальность не растёт со злостью: в оригинале сложность добавляют

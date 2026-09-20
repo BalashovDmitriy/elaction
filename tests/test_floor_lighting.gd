@@ -51,7 +51,7 @@ func test_the_floor_is_dark_once_every_zone_is() -> void:
 	lighting.darken(1, 5.0)
 	lighting.darken(1, 15.0)
 	assert_true(lighting.is_dark(1), "обе лампы сбиты — этаж тёмен")
-	assert_eq(lighting.dark_zones(), 2)
+	assert_true(lighting.is_dark_at(1, 5.0) and lighting.is_dark_at(1, 15.0))
 
 
 func test_neighbouring_floors_stay_lit() -> void:
@@ -65,7 +65,7 @@ func test_a_second_shot_at_the_same_zone_changes_nothing() -> void:
 	var lighting := _two_lamps()
 	lighting.darken(1, 5.0)
 	assert_false(lighting.darken(1, 6.0), "гасить погашенное незачем")
-	assert_eq(lighting.dark_zones(), 1)
+	assert_false(lighting.is_dark_at(1, 15.0), "и соседнюю это не гасит")
 
 
 func test_a_floor_without_lamps_never_goes_dark() -> void:

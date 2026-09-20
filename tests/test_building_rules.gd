@@ -185,8 +185,9 @@ func test_wider_floors_hang_more_lamps() -> void:
 	var rules := _rules()
 	assert_eq(rules.lamps_on(0), 1, "наверху одна лампа")
 	assert_eq(rules.lamps_on(rules.floors - 1), 3, "внизу три")
+	assert_eq(rules.lamps_on(BuildingRules.ROOF), 0, "у крыши ламп нет: ей светит город")
 	var previous := 0
-	for index: int in rules.levels():
+	for index: int in rules.floors:
 		var count := rules.lamps_on(index)
 		assert_gte(count, 1, "этаж %d без ламп" % index)
 		assert_lte(count, rules.lamps_per_floor, "этаж %d выше потолка" % index)

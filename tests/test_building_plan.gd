@@ -225,6 +225,44 @@ func test_lamps_are_spread_along_the_floor() -> void:
 			)
 
 
+## Тесное здание: этажи, на которых шахте, эскалаторам и дверям не оставить
+## лампе ни одного свободного места. Такой этаж всё равно обязан получить
+## лампу — иначе он не светел и погасить его нечем, а правило темноты считает
+## его горящим навсегда.
+##
+## Проверяются вырожденные правила, а не сид: с правилами по умолчанию такого
+## этажа не встретилось ни на одном из 400 сидов, и запасная ветка раскладки
+## не исполнялась бы никогда. Тест сторожит и её саму — хотя бы одна лампа
+## обязана оказаться над дверью, иначе здание вышло просторным и проверять
+## тут нечего.
+func test_a_crowded_floor_still_gets_a_lamp() -> void:
+	var rules := _rules()
+	rules.slots = 5
+	rules.width = 16.8
+	rules.floors = 6
+	rules.width_steps = 1
+	rules.documents = 1
+	rules.doors_per_floor = 3
+	rules.top_doors = 3
+	var shared := 0
+	for building_seed: int in SEEDS:
+		var plan := BuildingPlan.generate(rules, building_seed)
+		for index: int in rules.floors:
+			var on_floor := _lamps_on(plan, index)
+			assert_gte(
+				on_floor.size(),
+				1,
+				"сид %d: этаж %d остался без единой лампы" % [building_seed, index]
+			)
+			for door in plan.doors:
+				if door.floor_index != index:
+					continue
+				for x: float in on_floor:
+					if is_equal_approx(door.x, x):
+						shared += 1
+	assert_gt(shared, 0, "здание оказалось просторным — запасная ветка не сработала")
+
+
 func _lamps_on(plan: BuildingPlan, floor_index: int) -> PackedFloat64Array:
 	var xs := PackedFloat64Array()
 	for lamp in plan.lamps:
