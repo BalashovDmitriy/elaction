@@ -119,14 +119,20 @@ Windows при первом запуске покажет предупрежде
 
 - Python 3.12 или новее — для линтеров и хуков.
 
-Играть, проходить проверки и собирать релиз можно только с этими двумя: модели
-лежат в репозитории готовыми ([ADR-0022](docs/adr/0022-actors-rig.md)). Ниже — то,
-что нужно только для **пересборки** моделей актёров:
+Играть, проходить проверки и собирать релиз можно только с этими двумя: модели,
+звук и иконка лежат в репозитории готовыми ([ADR-0022](docs/adr/0022-actors-rig.md)).
+Ниже — то, что нужно только для их **пересборки**:
 
-- [Blender 5.2.1](https://www.blender.org/download/):
+- [Blender 5.2.1](https://www.blender.org/download/) — модели актёров:
 
   ```powershell
   winget install --id BlenderFoundation.Blender
+  ```
+
+- Pillow, numpy и soundfile — генераторы звука и иконки:
+
+  ```powershell
+  .venv/Scripts/pip install -r requirements-assets.txt
   ```
 
 ### Настройка окружения

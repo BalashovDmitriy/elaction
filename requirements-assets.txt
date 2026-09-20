@@ -1,0 +1,9 @@
+# Только для перерисовки ассетов: tools/render_audio.py (ADR-0012) и
+# tools/render_icon.py (ADR-0013). Модели актёров собирает Blender
+# (tools/build_actors.py, ADR-0022), pip ему не нужен.
+# В CI не ставится и на запуск игры не влияет — готовые WAV, OGG и ICO
+# лежат в репозитории.
+#   .venv/Scripts/pip install -r requirements-assets.txt   # Windows
+Pillow==12.1.0
+numpy==2.4.1
+soundfile==0.14.0

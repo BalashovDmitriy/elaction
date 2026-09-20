@@ -63,7 +63,7 @@ func test_the_exit_has_a_car() -> void:
 	var at := WorldSpace.to_plane(car.global_position)
 	assert_almost_eq(at.y, surface, TOLERANCE, "колёсами на полу")
 
-	var gap := GreyboxLevel.EXIT_WIDTH * 0.5 + GreyboxLevel.CAR_GAP + GreyboxLevel.CAR_SIZE.x * 0.5
+	var gap := GreyboxLevel.EXIT_WIDTH * 0.5 + GreyboxLevel.CAR_GAP + GreyboxLevel.CAR_LENGTH * 0.5
 	assert_almost_eq(
 		absf(at.x - exit_at.x), gap, TOLERANCE, "машина стоит в зазоре от проёма, а не в нём"
 	)

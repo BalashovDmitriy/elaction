@@ -48,9 +48,10 @@ const EXIT_HEIGHT: float = 1.2
 ## Стоит рядом с проёмом и уезжает, увозя Otto; следующее здание собирается
 ## после отъезда, а не в тот же кадр.
 ##
-## Габарит модели `car.glb`, м: по нему машина ставится в зазор от проёма и
-## считается уехавшей из кадра. `tools/build_actors.py` строит её ровно такой.
-const CAR_SIZE := Vector3(2.4, 0.9, 1.0)
+## Длина модели `car.glb`, м: по ней машина ставится в зазор от проёма и
+## считается уехавшей из кадра. `tools/build_actors.py` строит кузов ровно такой
+## длины; высота и ширина у модели свои, и здесь они никому не нужны.
+const CAR_LENGTH: float = 2.4
 const CAR_GAP: float = 0.36
 const CAR_SPEED: float = 9.6
 ## Машина стоит снаружи здания: за плоскостью игры, но перед стеной, чтобы
@@ -518,7 +519,7 @@ func _spawn_car(exit_area: Rect2) -> void:
 	# всё здание, и «уехал» растянулось бы на пять секунд вместо одной.
 	_car_towards = -1.0 if exit_area.get_center().x < rules.width * 0.5 else 1.0
 	var x := (
-		exit_area.get_center().x + _car_towards * (EXIT_WIDTH * 0.5 + CAR_GAP + CAR_SIZE.x * 0.5)
+		exit_area.get_center().x + _car_towards * (EXIT_WIDTH * 0.5 + CAR_GAP + CAR_LENGTH * 0.5)
 	)
 	# Модель стоит колёсами в своём нуле, капотом в +X; в другую сторону она
 	# разворачивается целиком.
@@ -542,8 +543,8 @@ func _move_car(delta: float, view: Rect2) -> void:
 
 	# Уехала — значит уехала из кадра, а не за границу здания: кадр и есть то,
 	# что видит игрок, а до границы машина ползла бы впятеро дольше.
-	var left := _car.position.x - CAR_SIZE.x * 0.5
-	var gone := left + CAR_SIZE.x < view.position.x or left > view.end.x
+	var left := _car.position.x - CAR_LENGTH * 0.5
+	var gone := left + CAR_LENGTH < view.position.x or left > view.end.x
 	if gone:
 		_car_leaving = false
 		building_cleared.emit()

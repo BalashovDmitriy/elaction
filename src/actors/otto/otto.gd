@@ -86,8 +86,6 @@ func _ready() -> void:
 	var crouching := _shape_size(_crouching_shape)
 	_headroom = standing.y - crouching.y
 	_apex_y = global_position.y
-	# Коробка тела повторяет форму коллизии: разойдясь, они дали бы Otto,
-	# которого бьют не там, где он нарисован.
 	_camera.follow(self)
 	_repose()
 

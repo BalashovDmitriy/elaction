@@ -68,6 +68,10 @@ class Pose:
 		squash = height_squash
 		return self
 
+	## Своя копия: таблица поз общая, а актёр работает со своей.
+	func copy() -> Pose:
+		return blend(self, 0.0)
+
 	## Смесь двух поз: [param weight] 0 — эта, 1 — [param other].
 	func blend(other: Pose, weight: float) -> Pose:
 		var t := clampf(weight, 0.0, 1.0)
@@ -104,11 +108,13 @@ const STEP_LIFT: float = 0.02
 
 ## Присед: бёдра проседают наполовину, ноги уходят вперёд, корпус складывается,
 ## голова смотрит вперёд из-под него. Подобрано так, чтобы фигура улеглась в
-## коллизию приседа — 0.81 м у Otto против 1.26 стоя; держит это тест по
-## габариту скелета, а не глаз.
+## коллизию приседа — 0.81 м у Otto против 1.26 стоя — и чтобы агент на колене
+## (та же поза) целиком ушёл под пулю стоящего Otto, 0.9 м: при наклоне 64°
+## макушка шляпы была 0.88, и пуля резала её край. Держит это тест по габариту
+## скелета, а не глаз.
 const CROUCH_LEGS: float = 62.0
 const CROUCH_DROP: float = 0.5
-const CROUCH_LEAN: float = 64.0
+const CROUCH_LEAN: float = 70.0
 const CROUCH_HEAD: float = -14.0
 
 static var _table: Dictionary = _build_table()
@@ -116,11 +122,14 @@ static var _table: Dictionary = _build_table()
 
 ## Поза по имени из [ActorPose]. Неизвестное имя — «idle», а не падение:
 ## актёр без позы в кадре хуже, чем актёр в неверной.
+##
+## Отдаёт копию: методы сборки ([method Pose.bent] и остальные) правят позу на
+## месте, и запись таблицы, ушедшая наружу, менялась бы у всех актёров разом.
 static func of(pose_name: String) -> Pose:
 	if pose_name.begins_with("walk_"):
 		return walking(float(ActorPose.walk_frame_index(pose_name)))
-	var found: Variant = _table.get(pose_name)
-	return found as Pose if found != null else _table["idle"] as Pose
+	var found: Variant = _table.get(pose_name, _table["idle"])
+	return (found as Pose).copy()
 
 
 ## Есть ли у позы запись. По этому тест сверяет таблицу со списками [ActorPose].
@@ -164,9 +173,13 @@ static func _build_table() -> Dictionary:
 	table["dead_1"] = Pose.make(Vector2(-10.0, 8.0), Vector2(40.0, -30.0)).tilted(-90.0)
 	# Раздавленный кабиной или лампой: та же фигура, сплющенная по высоте.
 	table["crushed"] = Pose.make(Vector2(-30.0, 30.0), Vector2(60.0, -60.0)).squashed(0.3)
-	# Залёгший под пулю агент (ADR-0016, пункт 2). От трупа отличается тем,
-	# ради чего и ложится: голова поднята, ствол смотрит вперёд.
-	table["prone"] = Pose.make(Vector2(-6.0, 6.0), Vector2(-10.0, 90.0)).bent(0.0, -60.0).tilted(
-		78.0
+	# Залёгший под пулю агент (ADR-0016, пункт 2). Лежит лицом вниз, руки со
+	# стволом вытянуты вперёд по полу — от трупа на спине отличается сразу.
+	# Угол рук — наклон тела плюс 90: так рука ложится вдоль пола. Меньше — и
+	# она втыкается в пол, а заземление поднимает на ней всё тело: с рукой на
+	# 90° залёгший стоял на ней почти в метр ростом. Голова вдоль тела: поднятая
+	# ставит поля шляпы вертикально, и фигура растёт с каждым градусом.
+	table["prone"] = Pose.make(Vector2(-6.0, 6.0), Vector2(174.0, 180.0)).bent(0.0, -8.0).tilted(
+		90.0
 	)
 	return table

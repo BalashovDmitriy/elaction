@@ -308,7 +308,6 @@ func _refresh_brain() -> void:
 	# и в первых зданиях его берут стоящим.
 	_brain.can_kneel = _menace >= rules.agent_kneels_from_menace
 	_brain.can_go_prone = _menace >= rules.agent_goes_prone_from_menace
-	# До дерева коробки ещё нет; в дереве она повторяет новые ростá сразу.
 
 
 ## Правила, по которым живёт агент. Выпущенному уровнем их отдали, а

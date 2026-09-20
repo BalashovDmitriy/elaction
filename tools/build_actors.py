@@ -310,7 +310,8 @@ def _figure(actor: dict) -> None:
 
 def _car() -> None:
     """Красная машина у выхода: ею оригинал заканчивает здание. Без скелета —
-    у неё одна поза. Габарит — GreyboxLevel.CAR_SIZE: 2.4 × 0.9 × 1.0 м."""
+    у неё одна поза. Длина — GreyboxLevel.CAR_LENGTH, 2.4 м; по ней уровень ставит
+    машину в зазор от проёма. Высота выходит 0.95 м, ширина 0.6 — они ничьи."""
     unit = 2.4 / 52.0
     body = _material("car_body", palette.CAR_BODY)
     glass = _material("car_glass", palette.GLASS)
@@ -364,12 +365,18 @@ def _names() -> list[str]:
     return [*_actors().keys(), "car"]
 
 
-def main() -> int:
+def _parser() -> argparse.ArgumentParser:
+    """Один разбор на обе половины: снаружи — вся командная строка, внутри
+    Blender — то, что осталось после `--`."""
     parser = argparse.ArgumentParser(description="Сборка моделей актёров через Blender.")
     parser.add_argument("names", nargs="*", help="кого собирать; по умолчанию всех")
     parser.add_argument("--list", action="store_true", help="перечислить и выйти")
     parser.add_argument("--out", type=Path, default=OUT_DIR, help="куда писать .glb")
-    arguments = parser.parse_args()
+    return parser
+
+
+def main() -> int:
+    arguments = _parser().parse_args()
 
     from blender_bin import require_blender, run_script
     from godot_bin import use_utf8_output
@@ -387,31 +394,30 @@ def main() -> int:
         return 2
 
     blender = require_blender()
-    code, output = run_script(blender, Path(__file__), ["--out", str(arguments.out), *wanted])
-    # Blender болтлив: печатаем только своё и ошибки.
+    out_dir = arguments.out.resolve()
+    code, output = run_script(blender, Path(__file__), ["--out", str(out_dir), *wanted])
+    # Blender болтлив: печатаем только имена собранных моделей и ошибки.
     for line in output.splitlines():
-        if line.startswith("  ") or "Error" in line or "Traceback" in line or "rror:" in line:
+        if line.strip().endswith(".glb") or "Error" in line or "Traceback" in line or "rror:" in line:
             print(line)
     if code != 0:
         print(f"Blender завершился с кодом {code}")
         return 1
-    print(f"Модели в {arguments.out.relative_to(PROJECT_ROOT).as_posix()}/")
+    # Папка вне проекта (`--out` в temp) печатается как есть: relative_to на ней падает.
+    shown = (
+        out_dir.relative_to(PROJECT_ROOT).as_posix()
+        if out_dir.is_relative_to(PROJECT_ROOT)
+        else str(out_dir)
+    )
+    print(f"Модели в {shown}/")
     return 0
 
 
 def _main_inside_blender() -> None:
+    # Blender разбирает командную строку до `--` сам; скрипту достаётся остаток.
     argv = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
-    out_dir = OUT_DIR
-    wanted: list[str] = []
-    index = 0
-    while index < len(argv):
-        if argv[index] == "--out":
-            out_dir = Path(argv[index + 1])
-            index += 2
-            continue
-        wanted.append(argv[index])
-        index += 1
-    _build_inside_blender(out_dir, wanted or _names())
+    arguments = _parser().parse_args(argv)
+    _build_inside_blender(arguments.out, arguments.names or _names())
 
 
 if __name__ == "__main__":

@@ -90,10 +90,10 @@ Rim-свет для этого не годится, хотя первым при
 ### 5. Что уходит
 
 Со спрайтовым пайплайном покончено: `tools/render_actors.py`,
-`tools/render_env.py`, `assets/sprites/` целиком, `requirements-assets.txt`
-(Pillow и numpy больше не нужны никому). `ActorBox` греев-бокса заменяется
+`tools/render_env.py`, `assets/sprites/` целиком. `ActorBox` греев-бокса заменяется
 `FigureRig`. `tools/palette.py` остаётся — это источник цветов и для новых
-материалов.
+материалов. `requirements-assets.txt` тоже остаётся: Pillow, numpy и soundfile
+нужны не спрайтам, а генераторам звука и иконки (`render_audio.py`, `render_icon.py`).
 
 [ADR-0011](0011-asset-pipeline.md) при этом отменяется в части «рендер в
 спрайты» и остаётся в части ролей: Blender — актёрам, код — всему остальному.

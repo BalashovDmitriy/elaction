@@ -9,6 +9,7 @@ const OTTO_MODEL := preload("res://assets/models/otto.glb")
 const AGENT_MODEL := preload("res://assets/models/agent.glb")
 const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
+const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
 
 ## Кадр в 60 Гц: за него сглаживание обязано сдвинуть кости, но не долететь.
 const FRAME: float = 1.0 / 60.0
@@ -19,6 +20,22 @@ func _rig(model: PackedScene) -> FigureRig:
 	rig.model = model
 	add_child_autofree(rig)
 	return rig
+
+
+## Otto из сцены: высоты его выстрелов и коллизий берутся у него, а не
+## переписываются в тест числами.
+func _otto() -> Otto:
+	var otto := OTTO_SCENE.instantiate() as Otto
+	autofree(otto)
+	return otto
+
+
+## Пуля — коробка, и мимо фигуры она проходит краем, а не осью.
+func _bullet_half_height() -> float:
+	var bullet := BULLET_SCENE.instantiate()
+	var shape := (bullet.get_node("Shape") as CollisionShape3D).shape as BoxShape3D
+	bullet.free()
+	return shape.size.y * 0.5
 
 
 func test_both_models_carry_every_bone() -> void:
@@ -70,6 +87,39 @@ func test_a_crouching_figure_ducks_under_the_agent_bullet() -> void:
 		crouching * 1.1,
 		"и укладывается в коллизию приседа %.2f с запасом на голову" % crouching
 	)
+
+
+## Зеркально к Otto (ADR-0016): на колене агент уходит под пулю стоящего
+## Otto, залёгши — под пулю присевшего. В M15 это держала коробка, резавшаяся по
+## ростам из правил здания; у фигуры рост свой, и сверять его надо с пулей.
+func test_a_kneeling_agent_ducks_under_the_standing_shot() -> void:
+	var rig := _rig(AGENT_MODEL)
+	var shot := _otto().shot_height_standing
+	rig.show_pose(ActorPose.CROUCH)
+	rig.snap()
+	var top := rig.skinned_aabb().end.y
+	assert_lt(
+		top, shot - _bullet_half_height(), "шляпа на колене ниже нижнего края пули (%.2f)" % shot
+	)
+
+
+func test_a_prone_agent_lies_under_the_crouching_shot() -> void:
+	var rig := _rig(AGENT_MODEL)
+	var shot := _otto().shot_height_crouching
+	rig.show_pose(ActorPose.PRONE)
+	rig.snap()
+	var lying := rig.skinned_aabb()
+	# Лицом вниз поля шляпы встают вертикально, и ниже их диаметра фигура не
+	# ляжет: макушка залёгшего — это кромка полей, 0.46 м против пули на 0.45.
+	# Поэтому мерка — верхний край пули, не нижний: тело под ней целиком, задеть
+	# она может только кромку. Опустить ниже можно только другой моделью шляпы.
+	assert_lt(
+		lying.end.y, shot + _bullet_half_height(), "залёгший ниже верхнего края пули (%.2f)" % shot
+	)
+	assert_gt(lying.size.z, rig.height() * 0.9, "и вытянут вдоль пола: руки со стволом вперёд")
+	rig.show_pose(ActorPose.CROUCH)
+	rig.snap()
+	assert_lt(lying.end.y, rig.skinned_aabb().end.y, "и ниже, чем на колене")
 
 
 func test_the_kick_puts_the_foot_forward() -> void:

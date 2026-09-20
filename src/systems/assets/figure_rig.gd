@@ -24,6 +24,40 @@ const LEG_L := "leg_l"
 const LEG_R := "leg_r"
 const BONES: PackedStringArray = [HIPS, TORSO, HEAD, ARM_L, ARM_R, LEG_L, LEG_R]
 
+
+## Поверхность меша, снятая один раз: вершины, привязка к костям и веса.
+##
+## [method Mesh.surface_get_arrays] копирует все массивы поверхности — нормали,
+## касательные, развёртку — на каждый вызов, а габарит по вершинам нужен на
+## каждом кадре перехода между позами. Снятое при рождении копируется один раз.
+class SkinnedSurface:
+	extends RefCounted
+
+	var mesh_instance: MeshInstance3D
+	var vertices := PackedVector3Array()
+	var bone_ids := PackedInt32Array()
+	var weights := PackedFloat32Array()
+	## Костей на вершину: 0 у поверхности без привязки — она стоит как есть.
+	var per_vertex: int = 0
+
+	static func of(instance: MeshInstance3D, surface: int) -> SkinnedSurface:
+		var made := SkinnedSurface.new()
+		made.mesh_instance = instance
+		var arrays := instance.mesh.surface_get_arrays(surface)
+		made.vertices = arrays[Mesh.ARRAY_VERTEX]
+		# У поверхности без скина костей и весов нет вовсе — там null, не пустой
+		# массив, и в типизированное поле его не положить.
+		var bones: Variant = arrays[Mesh.ARRAY_BONES]
+		var bone_weights: Variant = arrays[Mesh.ARRAY_WEIGHTS]
+		if instance.skin == null or bones == null or bone_weights == null:
+			return made
+		# Индексы костей движок отдаёт целыми либо вещественными — как лёг импорт.
+		made.bone_ids = bones if bones is PackedInt32Array else PackedInt32Array(Array(bones))
+		made.weights = bone_weights
+		made.per_vertex = made.bone_ids.size() / maxi(made.vertices.size(), 1)
+		return made
+
+
 ## Скорость сглаживания, 1/с. Переход между позами укладывается в несколько
 ## кадров: медленнее — и удар ногой опаздывает к удару, быстрее — и это уже
 ## подмена картинки.
@@ -37,6 +71,7 @@ const BONES: PackedStringArray = [HIPS, TORSO, HEAD, ARM_L, ARM_R, LEG_L, LEG_R]
 var _instance: Node3D = null
 var _skeleton: Skeleton3D = null
 var _meshes: Array[MeshInstance3D] = []
+var _surfaces: Array[SkinnedSurface] = []
 var _bones: Dictionary = {}
 var _rest: Dictionary = {}
 ## Высота бёдер и рост в покое, м: доли позы переводятся в метры ими.
@@ -47,6 +82,10 @@ var _pose_name := "idle"
 var _target: FigurePoses.Pose = FigurePoses.of("idle")
 var _current: FigurePoses.Pose = FigurePoses.of("idle")
 var _walk_phase: float = 0.0
+## Кости уже стоят в целевой позе: пока цель не сменится, раскладывать нечего.
+## Стоящих и лежащих в кадре больше, чем идущих, и без этого каждый из них
+## перебирал бы все вершины меша каждый кадр ради нулевого сдвига.
+var _settled: bool = false
 
 
 func _ready() -> void:
@@ -73,6 +112,8 @@ func _ready() -> void:
 		var mesh_instance := node as MeshInstance3D
 		mesh_instance.material_overlay = GreyboxLook.outline()
 		_meshes.append(mesh_instance)
+		for surface in mesh_instance.mesh.get_surface_count():
+			_surfaces.append(SkinnedSurface.of(mesh_instance, surface))
 
 	_hip_height = (_rest[HIPS] as Transform3D).origin.y if _rest.has(HIPS) else 0.0
 	_height = skinned_aabb().end.y
@@ -90,7 +131,14 @@ func advance(delta: float) -> void:
 	if _skeleton == null:
 		return
 	var wanted := _wanted()
+	if _settled and _current.is_close_to(wanted):
+		return
 	_current = _current.blend(wanted, 1.0 - exp(-smoothing * delta))
+	# Долетев с точностью до долей градуса, риг встаёт в цель ровно и замирает:
+	# экспоненциальное сглаживание само по себе не доходит никогда.
+	_settled = _current.is_close_to(wanted)
+	if _settled:
+		_current = wanted
 	_apply(_current)
 
 
@@ -124,7 +172,10 @@ func set_transparency(value: float) -> void:
 ## Доводит риг до целевой позы сразу, без сглаживания. Нужно тестам и съёмке:
 ## кадр должен показывать позу, а не путь к ней.
 func snap() -> void:
+	if _skeleton == null:
+		return
 	_current = _wanted()
+	_settled = true
 	_apply(_current)
 
 
@@ -146,52 +197,50 @@ func height() -> float:
 func skinned_aabb() -> AABB:
 	var box := AABB()
 	var first := true
-	for mesh_instance in _meshes:
-		var skin := mesh_instance.skin
-		var to_rig := global_transform.affine_inverse() * mesh_instance.global_transform
-		for surface in mesh_instance.mesh.get_surface_count():
-			var arrays := mesh_instance.mesh.surface_get_arrays(surface)
-			var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-			var bone_ids: PackedInt32Array = arrays[Mesh.ARRAY_BONES]
-			var weights: PackedFloat32Array = arrays[Mesh.ARRAY_WEIGHTS]
-			var per_vertex := bone_ids.size() / maxi(vertices.size(), 1)
-			for index in vertices.size():
-				var vertex := vertices[index]
-				if skin != null and per_vertex > 0:
-					vertex = _skinned(vertex, index, per_vertex, bone_ids, weights, skin)
-				var placed := to_rig * vertex
-				if first:
-					box = AABB(placed, Vector3.ZERO)
-					first = false
-				else:
-					box = box.expand(placed)
+	for surface in _surfaces:
+		var to_rig := global_transform.affine_inverse() * surface.mesh_instance.global_transform
+		var binds: Array[Transform3D] = []
+		if surface.per_vertex > 0:
+			binds = _bind_poses(surface.mesh_instance.skin)
+		for index in surface.vertices.size():
+			var vertex := surface.vertices[index]
+			if surface.per_vertex > 0:
+				vertex = _skinned(vertex, index, surface, binds)
+			var placed := to_rig * vertex
+			if first:
+				box = AABB(placed, Vector3.ZERO)
+				first = false
+			else:
+				box = box.expand(placed)
 	return box
+
+
+## Матрицы скина на этот кадр: поза кости × привязка, по одной на привязку.
+## Считаются раз на поверхность, а не на каждую из сотен её вершин.
+func _bind_poses(skin: Skin) -> Array[Transform3D]:
+	var poses: Array[Transform3D] = []
+	for bind in skin.get_bind_count():
+		# Импорт glTF привязывает по индексу кости; имя — запасной путь для
+		# скина, собранного руками. Привязка без кости оставляет вершину в покое.
+		var bone := skin.get_bind_bone(bind)
+		if bone < 0:
+			bone = _skeleton.find_bone(skin.get_bind_name(bind))
+		var pose := _skeleton.get_bone_global_pose(bone) if bone >= 0 else Transform3D.IDENTITY
+		poses.append(pose * skin.get_bind_pose(bind))
+	return poses
 
 
 ## Вершина, прогнанная через скелет: сумма по костям веса × (поза × привязка).
 func _skinned(
-	vertex: Vector3,
-	index: int,
-	per_vertex: int,
-	bone_ids: PackedInt32Array,
-	weights: PackedFloat32Array,
-	skin: Skin
+	vertex: Vector3, index: int, surface: SkinnedSurface, binds: Array[Transform3D]
 ) -> Vector3:
 	var result := Vector3.ZERO
+	var per_vertex := surface.per_vertex
 	for slot in per_vertex:
-		var weight := weights[index * per_vertex + slot]
+		var weight := surface.weights[index * per_vertex + slot]
 		if weight <= 0.0:
 			continue
-		var bind := bone_ids[index * per_vertex + slot]
-		# Импорт glTF привязывает по индексу кости; имя — запасной путь для
-		# скина, собранного руками.
-		var bone := skin.get_bind_bone(bind)
-		if bone < 0:
-			bone = _skeleton.find_bone(skin.get_bind_name(bind))
-		if bone < 0:
-			continue
-		var pose := _skeleton.get_bone_global_pose(bone) * skin.get_bind_pose(bind)
-		result += (pose * vertex) * weight
+		result += (binds[surface.bone_ids[index * per_vertex + slot]] * vertex) * weight
 	return result
 
 
