@@ -15,6 +15,12 @@ offset_top = -171
 offset_right = 42
 mouse_filter = 2
 
+[node name="NextPanel" type="TextureRect" parent="."]
+offset_left = -42
+offset_top = -171
+offset_right = 42
+mouse_filter = 2
+
 [node name="MatVisual" type="TextureRect" parent="."]
 offset_left = -30
 offset_top = -9

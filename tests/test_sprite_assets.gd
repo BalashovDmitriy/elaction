@@ -128,7 +128,7 @@ func test_the_shaft_wears_assets_of_its_own_size() -> void:
 	if rail != null:
 		assert_eq(
 			float(rail.diffuse_texture.get_width()),
-			GreyboxLevel.SHAFT_RAIL_WIDTH,
+			BuildingShafts.RAIL_WIDTH,
 			"стойка нарисована во всю свою ширину"
 		)
 
@@ -137,7 +137,7 @@ func test_the_shaft_wears_assets_of_its_own_size() -> void:
 	if door != null:
 		assert_eq(
 			door.diffuse_texture.get_size(),
-			Vector2(rules.shaft_width, GreyboxLevel.SHAFT_DOOR_HEIGHT),
+			Vector2(rules.shaft_width, BuildingShafts.DOOR_HEIGHT),
 			"створки нарисованы по проёму шахты"
 		)
 
@@ -150,7 +150,7 @@ func test_the_roof_assets_match_their_places() -> void:
 	if room != null:
 		assert_eq(
 			room.diffuse_texture.get_size(),
-			GreyboxLevel.MACHINE_ROOM_SIZE,
+			BuildingShafts.MACHINE_ROOM_SIZE,
 			"машинное отделение нарисовано под своё место"
 		)
 

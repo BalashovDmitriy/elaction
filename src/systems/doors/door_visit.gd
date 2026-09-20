@@ -6,16 +6,13 @@ extends RefCounted
 ## Ни узлов, ни физики: узел двери подставляет факты о госте и исполняет решение,
 ## а решает этот класс. Поэтому правила проверяются без сцены — тем же приёмом,
 ## что [OttoStateMachine] и [ElevatorMotion]. Основания — ADR-0005, пункты 2-3.
-
-enum Phase { CLOSED, OPENING, OPEN }
-
-## Сколько открывается створка, с.
-var open_time: float = 0.25
+##
+## Створку он не ведёт: это дело [DoorCycle]. Раньше оба жили здесь и делили один
+## таймер, из-за чего дверь агента нельзя было открыть, не заведя гостя
+## (ADR-0020, решение 1).
 
 ## Сколько гость может пересидеть внутри, с. Ровно ли пять — ждёт сверки в MAME.
 var hide_time: float = 5.0
-
-var phase: Phase = Phase.CLOSED
 
 var _timer: float = 0.0
 ## Отпустил ли гость «вверх» после того, как дверь его выпустила. Без этого та же
@@ -35,31 +32,28 @@ func knock(grounded: bool, vertical: float) -> bool:
 	return _entry_armed and grounded
 
 
-## Впускает гостя: створка пошла открываться.
+## Впускает гостя: дальше он сидит внутри, пока не выйдет время или не попросится.
 func admit() -> void:
-	phase = Phase.OPENING
-	_timer = open_time
+	_timer = hide_time
 	_exit_armed = false
 
 
 ## Шаг двери с гостем внутри. Возвращает true, когда его пора выпустить.
-func tick(delta: float, horizontal: float) -> bool:
+##
+## [param door_open] — открылась ли створка. Пока она идёт, гость ещё входит:
+## время отсидки не течёт и наружу не просятся.
+func tick(delta: float, horizontal: float, door_open: bool) -> bool:
 	var pressed := absf(horizontal) >= Intent.PRESS
 	if not pressed:
 		_exit_armed = true
 
-	_timer -= delta
-	if phase == Phase.OPENING:
-		# Пока створка открывается, наружу не просятся: гость ещё входит.
-		if _timer <= 0.0:
-			phase = Phase.OPEN
-			_timer = hide_time
+	if not door_open:
 		return false
 
+	_timer -= delta
 	return _timer <= 0.0 or (pressed and _exit_armed)
 
 
 ## Выпускает гостя наружу.
 func release() -> void:
-	phase = Phase.CLOSED
 	_entry_armed = false
