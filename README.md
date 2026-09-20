@@ -193,7 +193,7 @@ tools/check.ps1
 ```powershell
 python tools/run_tests.py     # тесты GUT
 python tools/godot_check.py   # импорт и разбор скриптов
-python tools/capture.py M8b   # скриншоты вехи в screens/M8b/
+python tools/capture.py M17   # скриншоты вехи в screens/M17/
 python tools/clean_check.py   # импорт и тесты на чистой копии — как на свежем клоне
 ```
 
@@ -227,7 +227,15 @@ godot --headless --script res://tools/dump_model.gd -- res://assets/models/otto.
 ```powershell
 godot --path . res://tools/ui_shot.tscn -- --folder=M8b --locale=en   # экраны меню
 godot --path . res://tools/combat_shot.tscn           # стойки агента под огнём
+godot --path . res://tools/dark_shot.tscn             # этаж горит, зона погашена, этаж погашен
 godot --path . res://tools/look3d.tscn                # проба 3D-вида, с которой начался пивот
+```
+
+Цена кадра меряется отдельно — на настоящем здании с агентами, по времени GPU,
+а не по частоте кадров:
+
+```powershell
+godot --path . res://tools/light_bench.tscn           # 2.0 мс из 16.6 на M17
 ```
 
 Здание собирается из сида, поэтому проверяется на трёх уровнях сразу: правила без сцены,
