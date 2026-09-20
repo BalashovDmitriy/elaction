@@ -1,23 +1,31 @@
 class_name SideCamera
 extends Camera3D
 
-## Ортографическая камера сбоку — тот же кадр, что давал [Camera2D] в 2D.
+## Ортографическая камера сбоку, наклонённая чуть сверху.
 ##
 ## Держит только то, что обязано быть в узле: читает размер окна, двигает
 ## трансформ, зовёт правило. Само правило — [CameraBounds], и оно без сцены.
 ##
-## Камера строго боковая. Наклонять её, чтобы стало видно пол и появились
-## отражения, — открытый вопрос вехи света (ADR-0019, решение 6): в греев-боксе
-## наклонять нечего, пол пустой.
+## Наклон — свойство камеры, а не мира (ADR-0023, решение 1). Плоскость игры,
+## попадания и полоса видимых этажей считаются как считались: камера лишь стоит
+## выше цели, чтобы её ось прошла через точку плоскости игры, и видит по
+## вертикали чуть больше. Строго сбоку верх перекрытия — полоска нулевой
+## толщины, и отражений в полу не было бы никогда.
 
 ## Половина высоты кадра, м. Прежний кадр — 1080 px при 100 px в метре.
 const DEFAULT_HALF_HEIGHT: float = 5.4
 
-## Насколько камера отодвинута от плоскости игры, м.
+## Насколько камера отодвинута от плоскости игры вдоль своей оси, м.
 ##
 ## Ортокамере расстояние безразлично для масштаба, но не для отсечения: всё,
 ## что ближе [member near], не рисуется, а коридор и актёры стоят на Z = 0.
 const DISTANCE: float = 20.0
+
+## Наклон сверху, градусы. Десять открывают пол коридора полосой в треть метра —
+## в неё ложатся отражения и пятна ламп, — а этажи остаются параллельными
+## полосами кадра. Перспектива отвергнута: у неё верх и низ кадра в разном
+## масштабе, и правило «этаж — полоса кадра» пришлось бы пересчитывать.
+const TILT_DEGREES: float = 10.0
 
 ## Скорость сглаживания. Число то же, что стояло у [Camera2D] в 2D-сцене.
 @export var smoothing_speed: float = 8.0
@@ -39,8 +47,9 @@ var _listener: AudioListener3D = null
 
 func _ready() -> void:
 	projection = PROJECTION_ORTHOGONAL
-	# Ортокамера смотрит вдоль -Z, стоя перед плоскостью игры.
-	rotation = Vector3.ZERO
+	# Камера смотрит вдоль -Z, стоя перед плоскостью игры; отрицательный поворот
+	# вокруг X опускает взгляд.
+	rotation = Vector3(-_tilt(), 0.0, 0.0)
 	size = DEFAULT_HALF_HEIGHT * 2.0
 	near = 0.05
 	far = DISTANCE * 2.0
@@ -48,7 +57,8 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_read_frame)
 
 	_listener = AudioListener3D.new()
-	_listener.position = Vector3(0.0, 0.0, -DISTANCE)
+	# По оси камеры до плоскости игры: с наклоном это дальше, чем [constant DISTANCE].
+	_listener.position = Vector3(0.0, 0.0, -DISTANCE / cos(_tilt()))
 	add_child(_listener)
 	_listener.make_current()
 
@@ -58,7 +68,7 @@ func _process(delta: float) -> void:
 		return
 	var wanted := _bounds.clamp_centre(_target_point())
 	_centre = CameraBounds.smoothed(_centre, wanted, smoothing_speed, delta)
-	global_position = Vector3(_centre.x, _centre.y, DISTANCE)
+	global_position = _perch(_centre)
 
 
 ## За кем ехать. Обычно это Otto.
@@ -75,7 +85,7 @@ func follow(target: Node3D) -> void:
 ## где его убили.
 func snap_to(point: Vector2) -> void:
 	_centre = _bounds.clamp_centre(point)
-	global_position = Vector3(_centre.x, _centre.y, DISTANCE)
+	global_position = _perch(_centre)
 
 
 ## Границы, за которые камере нельзя выходить. Приходят в координатах правил
@@ -106,10 +116,23 @@ func _target_point() -> Vector2:
 	return Vector2(_target.global_position.x, _target.global_position.y)
 
 
+## Где стоит камера, чтобы её ось прошла через [param centre] в плоскости игры:
+## выше на «расстояние × tg(наклон)», иначе наклон смотрел бы под ноги цели.
+func _perch(centre: Vector2) -> Vector3:
+	return Vector3(centre.x, centre.y + DISTANCE * tan(_tilt()), DISTANCE)
+
+
+func _tilt() -> float:
+	return deg_to_rad(TILT_DEGREES)
+
+
 ## Пересчитывает половины кадра по размеру окна: ширина кадра зависит от
 ## соотношения сторон, и на другом окне она другая.
+##
+## По вертикали наклонённая камера накрывает в плоскости игры чуть больше своего
+## размера — на 1/cos(наклон): кадр режет плоскость под углом.
 func _read_frame() -> void:
 	var window := get_viewport().get_visible_rect().size
 	var aspect := window.x / maxf(window.y, 1.0)
-	_bounds.half_height = size * 0.5
+	_bounds.half_height = size * 0.5 / cos(_tilt())
 	_bounds.half_width = size * 0.5 * aspect

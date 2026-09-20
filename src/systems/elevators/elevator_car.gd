@@ -28,6 +28,13 @@ const DING_REACH: float = 19.2
 ## Насколько гаснет указатель, когда в эту сторону ходу нет.
 const ARROW_DIM: float = 0.18
 
+## Индикаторы на крыше кабины: габарит, разнос от середины и на сколько их
+## середина выше крыши, м. Два красных огонька — читаемость кабины на
+## погашенном этаже (ADR-0023, решение 6); стрелки — как были.
+const INDICATOR_SIZE := Vector3(0.1, 0.06, 0.1)
+const INDICATOR_SPREAD: float = 0.42
+const INDICATOR_RISE: float = 0.03
+
 @export var speed: float = 1.8
 @export var floor_pause: float = 1.5
 ## Встаёт ли кабина между этажами. Сверкой не подтверждено — см. ADR-0004.
@@ -52,13 +59,23 @@ func _ready() -> void:
 	_hum = Sounds.source(self, Sounds.ELEVATOR_HUM, HUM_REACH)
 	_ding = Sounds.source(self, Sounds.ELEVATOR_DING, DING_REACH)
 	# Кабина — то, на чём стоят и в чём едут: читаться она обязана и на
-	# погашенном этаже (ADR-0019, решение 5).
-	var slab := GreyboxLook.marker(GreyboxLook.CAR)
+	# погашенном этаже (ADR-0019, решение 5). Держат это два индикатора на
+	# крыше, а сама кабина — металл, как шахта.
+	var slab := GreyboxLook.metal(GreyboxLook.CAR)
+	var roof := $RoofVisual as MeshInstance3D
 	($FloorVisual as MeshInstance3D).material_override = slab
-	($RoofVisual as MeshInstance3D).material_override = slab
+	roof.material_override = slab
 	var arrow := GreyboxLook.marker(GreyboxLook.DOOR)
 	_up_arrow.material_override = arrow
 	_down_arrow.material_override = arrow
+
+	var roof_top := roof.position.y + (roof.mesh as BoxMesh).size.y * 0.5
+	for side: float in [-1.0, 1.0]:
+		var indicator := GreyboxLook.box(INDICATOR_SIZE, GreyboxLook.light(GreyboxLook.INDICATOR))
+		indicator.position = Vector3(
+			side * INDICATOR_SPREAD, roof_top + INDICATOR_RISE + INDICATOR_SIZE.y * 0.5, 0.3
+		)
+		add_child(indicator)
 
 
 func _physics_process(delta: float) -> void:

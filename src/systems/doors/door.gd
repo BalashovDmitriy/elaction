@@ -12,6 +12,10 @@ extends Node3D
 ##
 ## Створка висит в задней стене коридора, порог — в плоскости игры (ADR-0021,
 ## решение 1). Проём в стене за створкой режет сам уровень.
+##
+## Над створкой табло: красное у красной двери, тёплое у обычной. Это и есть
+## читаемость двери на погашенном этаже — сама створка больше не светится
+## (ADR-0023, решение 6).
 
 ## Документ взят, дверь перестала быть красной.
 signal document_taken
@@ -32,6 +36,10 @@ const LEAF_STANDOFF: float = 0.05
 ## Докуда слышно створку, м. Дверей в здании полсотни, и хлопок каждой на всё
 ## здание превратился бы в стук без остановки: слышно только ближние.
 const DOOR_REACH: float = 14.4
+
+## Табло над створкой: габарит и на сколько его середина выше верха створки, м.
+const SIGN_SIZE := Vector3(0.4, 0.13, 0.04)
+const SIGN_RISE: float = 0.2
 
 ## Сколько Otto может пересидеть внутри, с.
 @export var hide_time: float = 5.0
@@ -59,6 +67,7 @@ var _voice: AudioStreamPlayer3D = null
 ## трогать трансформ полсотни раз на ровном месте.
 var _shown: float = -1.0
 var _shown_red: bool = false
+var _sign: MeshInstance3D = null
 
 @onready var _mat: Area3D = $Mat
 @onready var _leaf: MeshInstance3D = $Leaf
@@ -72,6 +81,12 @@ func _ready() -> void:
 	leaf.size = Vector3(LEAF_SIZE.x, LEAF_SIZE.y, LEAF_THICKNESS)
 	_leaf.mesh = leaf
 	_leaf.position = Vector3(0.0, LEAF_SIZE.y * 0.5, WorldSpace.BACK_WALL_Z + LEAF_STANDOFF)
+	_sign = GreyboxLook.box(SIGN_SIZE, GreyboxLook.light(GreyboxLook.SIGN_WARM))
+	_sign.name = "Sign"
+	_sign.position = Vector3(
+		0.0, LEAF_SIZE.y + SIGN_RISE, WorldSpace.BACK_WALL_Z + SIGN_SIZE.z * 0.5
+	)
+	add_child(_sign)
 	_refresh_look()
 
 
@@ -203,7 +218,9 @@ func _refresh_look() -> void:
 	_shown_red = has_document
 	_leaf.position.x = -along * LEAF_SIZE.x
 	var tone := GreyboxLook.DOOR_RED if has_document else GreyboxLook.DOOR
-	_leaf.material_override = GreyboxLook.marker(tone)
+	_leaf.material_override = GreyboxLook.surface(tone)
+	var sign := GreyboxLook.SIGN_RED if has_document else GreyboxLook.SIGN_WARM
+	_sign.material_override = GreyboxLook.light(sign)
 
 
 ## Подаёт голос двери. Источник позиционный и один на дверь: поток подменяется,

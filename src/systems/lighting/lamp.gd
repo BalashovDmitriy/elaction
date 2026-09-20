@@ -26,15 +26,15 @@ signal fell
 ## Конус вниз: даёт пятно на полу и рёбра теней, как светильники на референсе.
 ## Тени мягкие: свет упирается в перекрытия и стены, и именно это показывает,
 ## что светит лампа, а не воздух.
-const SPOT_RANGE: float = 3.6
-const SPOT_ANGLE: float = 52.0
-const SPOT_ENERGY: float = 3.2
+const SPOT_RANGE: float = 6.0
+const SPOT_ANGLE: float = 60.0
+const SPOT_ENERGY: float = 9.0
 const SPOT_BLUR: float = 1.6
 
 ## Заливка вокруг: слабая, широкая, без тени. Один конус оставлял бы между
 ## лампами черноту при всех горящих — а зона считается освещённой целиком.
-const FILL_RANGE: float = 6.0
-const FILL_ENERGY: float = 0.45
+const FILL_RANGE: float = 7.0
+const FILL_ENERGY: float = 1.5
 
 ## Тёплый цвет лампы против холодного общего тона палитры (ADR-0023, решение 3).
 const LIGHT_COLOR := Color(1.0, 0.9, 0.7)

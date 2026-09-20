@@ -72,7 +72,8 @@ func _dress_shaft(shaft: BuildingPlan.ShaftSpot) -> void:
 	var top := top_of(shaft)
 	var bottom := _rules.floor_surface(shaft.bottom)
 	var half := _rules.shaft_width * 0.5
-	var rail := GreyboxLook.surface(GreyboxLook.SHAFT)
+	# Шахта — металл (ADR-0023, решение 5): направляющие ловят блик ламп.
+	var rail := GreyboxLook.metal(GreyboxLook.SHAFT)
 
 	for side: float in [-1.0, 1.0]:
 		var x := shaft.x + half * side
