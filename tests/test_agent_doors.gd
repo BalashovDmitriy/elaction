@@ -10,13 +10,18 @@ extends GutTest
 ## уменьшенные здания уже один раз скрыли от нас нерабочий выпуск агентов.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
-const ENEMY_LAYER: int = 3
+const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
+const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
 
 ## Сколько кадров ждать конца вступления: спуск по тросу занимает меньше секунды.
 const LANDING_FRAMES: int = 180
 
 ## Сколько кадров дать дверям, чтобы кто-нибудь успел выйти.
 const CROWD_FRAMES: int = 240
+
+## Сколько кадров держать «вверх» у одинокой двери: хватает и на створку, и на
+## то, чтобы Otto успел зайти, если дверь его берёт.
+const KNOCK_FRAMES: int = 30
 
 
 func before_all() -> void:
@@ -70,6 +75,64 @@ func _door_behind(level: GreyboxLevel, agent: Enemy) -> Door:
 	return nearest
 
 
+## Одинокая дверь на твёрдом полу: здание для неё поднимать незачем.
+func _bare_door() -> Door:
+	var ground := StaticBody2D.new()
+	var shape := CollisionShape2D.new()
+	var box := RectangleShape2D.new()
+	box.size = Vector2(600.0, 40.0)
+	shape.shape = box
+	shape.position = Vector2(0.0, 20.0)
+	ground.add_child(shape)
+	add_child_autofree(ground)
+
+	var door := DOOR_SCENE.instantiate() as Door
+	add_child_autofree(door)
+	return door
+
+
+## Ставит Otto на коврик двери.
+func _guest_at(door: Door) -> Otto:
+	var otto := OTTO_SCENE.instantiate() as Otto
+	add_child_autofree(otto)
+	otto.global_position = door.mat_position()
+	return otto
+
+
+## Зашёл ли Otto за дверь. Снаружи это видно по вводу: спрятанный дверью, он
+## ввода не слышит вовсе, и зажатое «вверх» до него не доходит.
+func _is_indoors(otto: Otto) -> bool:
+	return is_zero_approx(otto.vertical_intent())
+
+
+## Otto не заходит в дверь, которая открывается под агента.
+##
+## Пустить его туда значило бы запереть навсегда: створку за вышедшим агентом
+## закрывает уровень, а отсидка гостя идёт только при открытой двери — за
+## закрытой она не кончается никогда.
+func test_a_door_opening_for_an_agent_does_not_take_otto_in() -> void:
+	var door := _bare_door()
+	var otto := _guest_at(door)
+	assert_true(door.summon_agent(), "свободная дверь открывается под агента")
+
+	Input.action_press(&"move_up")
+	await wait_physics_frames(KNOCK_FRAMES)
+	Input.action_release(&"move_up")
+	assert_false(_is_indoors(otto), "дверь занята агентом и Otto внутрь не пустила")
+
+
+## А свободная пускает: иначе прошлая проверка прошла бы и на двери, которая
+## не пускает никого и никогда.
+func test_a_free_door_still_takes_otto_in() -> void:
+	var door := _bare_door()
+	var otto := _guest_at(door)
+
+	Input.action_press(&"move_up")
+	await wait_physics_frames(KNOCK_FRAMES)
+	Input.action_release(&"move_up")
+	assert_true(_is_indoors(otto), "в свободную дверь Otto заходит как прежде")
+
+
 func test_no_agent_ever_shows_up_in_front_of_a_shut_door() -> void:
 	var level := _build(3)
 	await _wait_for_the_landing(level)
@@ -98,7 +161,7 @@ func test_an_agent_in_the_doorway_is_not_a_target() -> void:
 				continue
 			seen += 1
 			assert_false(
-				agent.get_collision_layer_value(ENEMY_LAYER),
+				agent.get_collision_layer_value(Enemy.ENEMY_LAYER),
 				"пока агент в проёме, пуле не во что попадать"
 			)
 	assert_gt(seen, 0, "ни один агент не выходил — проверять было нечего")
@@ -115,7 +178,7 @@ func test_an_agent_out_of_the_doorway_becomes_a_target() -> void:
 				continue
 			seen += 1
 			assert_true(
-				agent.get_collision_layer_value(ENEMY_LAYER),
+				agent.get_collision_layer_value(Enemy.ENEMY_LAYER),
 				"вышедший агент — обычный противник, и его берёт пуля"
 			)
 	assert_gt(seen, 0, "ни один агент так и не вышел из проёма")
@@ -138,6 +201,36 @@ func test_the_door_shuts_behind_the_agent_that_left_it() -> void:
 			if door.openness() < 1.0:
 				closed_behind += 1
 	assert_gt(closed_behind, 0, "ни одна дверь за вышедшим не закрывалась")
+
+
+## Дверь закрывается и за агентом, которого сняли сразу, как он вышел.
+##
+## Проём свободен одинаково — ушёл агент своим ходом или его убили, — и створка
+## обязана вернуться в обоих случаях (ADR-0020, решение 4). Закрыть её некому,
+## кроме уровня, а тот перебирает посты: пост, оставшийся без живого агента,
+## обязан отпускать дверь, иначе она стоит открытой навсегда и, что хуже,
+## навсегда занятой — [method Door.summon_agent] больше её не откроет.
+func test_a_door_shuts_even_when_its_agent_is_killed_on_the_spot() -> void:
+	var level := _build(3)
+	await _wait_for_the_landing(level)
+
+	var emptied: Door = null
+	for _frame: int in CROWD_FRAMES:
+		await wait_physics_frames(1)
+		if emptied != null:
+			if emptied.openness() <= 0.0:
+				pass_test("створка вернулась и за убитым")
+				return
+			continue
+		for agent in _live_agents(level):
+			if agent.is_emerging():
+				continue
+			emptied = _door_behind(level, agent)
+			agent.kill()
+			break
+
+	assert_not_null(emptied, "из дверей никто не вышел — убивать было некого")
+	fail_test("дверь так и осталась открытой за убитым агентом")
 
 
 func test_an_emptied_red_door_starts_letting_agents_out() -> void:

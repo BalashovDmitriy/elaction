@@ -118,8 +118,6 @@ class AgentPost:
 
 var _plan: BuildingPlan
 var _doors: Array[Door] = []
-## Обычные двери: из них выходят агенты. Красные документов не стерегут.
-var _agent_doors: Array[Door] = []
 var _cars: Array[ElevatorCar] = []
 ## Одежда шахт отдельным узлом: полсотни частей на здание не должны попадать
 ## под каждый обход детей уровня.
@@ -189,11 +187,6 @@ func _ready() -> void:
 	if GameState.instance().alarm.raised:
 		# Здание заведено уже при включённой сирене — редкость, но бывает.
 		_on_alarm_raised()
-	# Агенты здесь не выпускаются: дверь отдаёт своего, когда её этаж подходит
-	# к игроку. Раньше здесь выходили все 55 разом, и двое из них стояли на
-	# крыше в зоне огня от точки старта — ADR-0014, пункт 4.
-	for door in _agent_doors:
-		_enlist_door(door)
 	otto.apply_camera_bounds(Rect2(0.0, 0.0, rules.width, rules.total_height()))
 
 
@@ -435,7 +428,7 @@ func _spawn_doors() -> void:
 		_doors.append(door)
 
 		if not door.is_pending():
-			_agent_doors.append(door)
+			_enlist_door(door)
 			continue
 		documents += 1
 		door.document_taken.connect(game.collect_document)
@@ -646,6 +639,13 @@ func _tend_agents(span: Vector2i, delta: float) -> void:
 				post.opening = false
 			continue
 
+		# Проём свободен: агента убили или он уехал из полосы. Створка идёт
+		# обратно и отсюда тоже — убитый ровно в тот кадр, когда перестал быть
+		# неуязвимым, до ветки живых не доживает, и дверь, которой об этом не
+		# сказали, осталась бы стоять открытой навсегда: занятую [method
+		# Door.summon_agent] больше не откроет. Вызов у закрытой — пустышка.
+		post.door.dismiss_agent()
+
 		# Дверь, чей агент умер или уехал, ждёт свою паузу и только потом
 		# выпускает следующего. Пауза идёт игровым временем, а не настенными
 		# часами: на паузе здание замирает целиком, и смена агента не должна
@@ -657,6 +657,11 @@ func _tend_agents(span: Vector2i, delta: float) -> void:
 		if post.wait > 0.0 or not _within(span, post.floor_index, AGENT_SPAWN_MARGIN):
 			continue
 		if _too_close_to_otto(post, here):
+			continue
+		# Створка ещё идёт за прошлым агентом — дверь не в счёт. Иначе она,
+		# будучи ближайшей, забирала бы кадр себе и не выпускала никого: за
+		# кадр выпускается один, и берётся он у ближайшей двери.
+		if not post.door.can_summon():
 			continue
 
 		var gap := absi(post.floor_index - here)
@@ -670,6 +675,10 @@ func _tend_agents(span: Vector2i, delta: float) -> void:
 
 
 ## Ставит дверь на довольствие: с этой минуты она выпускает агентов.
+##
+## Агента при этом никто не выпускает: дверь отдаёт своего, когда её этаж
+## подходит к игроку. Раньше на сборке здания выходили все 55 разом, и двое из
+## них стояли на крыше в зоне огня от точки старта — ADR-0014, пункт 4.
 ##
 ## Этаж считается один раз: двери не ходят, а [method _tend_agents] перебирает
 ## их каждый кадр.
@@ -818,7 +827,7 @@ func _build_solid(rect: Rect2, tile: CanvasTexture, tint := Color.WHITE) -> void
 ## этажи, и свет в ней показывает, куда идти, когда лампы сбиты. Гасить её вместе
 ## с этажом нельзя — этажей у шахты много, а столб один.
 ##
-## Верх берётся тот же, что у стоек ([method _shaft_top]): у шахты до крыши
+## Верх берётся тот же, что у стоек ([method BuildingShafts.top_of]): у шахты до крыши
 ## потолка нет, и столб, отмеренный от верха мира, светил бы в открытом небе
 ## над крышей — там, где Otto висит на тросе всё вступление.
 func _light_shaft(shaft: BuildingPlan.ShaftSpot) -> void:

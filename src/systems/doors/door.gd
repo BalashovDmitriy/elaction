@@ -45,6 +45,14 @@ var _guest: Otto = null
 ## Дверь открыта под агента: занята, пока он не выйдет.
 var _expecting_agent: bool = false
 var _voice: AudioStreamPlayer2D = null
+## Что уже нарисовано: ход створки и ассет закрытой двери. Дверей в здании
+## полсотни, и почти всё время все они стоят закрытыми — перерисовывать их
+## каждый кадр значит звать сервер отрисовки полсотни раз на ровном месте.
+##
+## Ассет в паре с ходом, потому что красная дверь, отдавшая документ, меняет
+## картинку, не двинув створкой.
+var _shown: float = -1.0
+var _shown_closed: String = ""
 
 @onready var _mat: Area2D = $Mat
 @onready var _panel: TextureRect = $Panel
@@ -80,12 +88,21 @@ func mat_position() -> Vector2:
 	return _mat.global_position
 
 
+## Свободна ли дверь под агента: внутри никого, и створка стоит закрытой.
+##
+## Спрашивают до выбора двери, а не после: уровень выпускает одного за кадр и
+## берёт ближайшую дверь. Ближайшая, ещё закрывающаяся за прошлым агентом,
+## забирала бы этот кадр себе — и не выпускала никого, пока не дойдёт створка.
+func can_summon() -> bool:
+	return _guest == null and not _expecting_agent and _cycle.is_shut()
+
+
 ## Просит дверь открыться, чтобы выпустить агента.
 ##
 ## Возвращает false, если дверь занята: внутри гость или створка ещё ходит после
 ## прошлого. Уровень в этом случае просто попробует в следующий раз.
 func summon_agent() -> bool:
-	if _guest != null or _expecting_agent or not _cycle.is_shut():
+	if not can_summon():
 		return false
 	_expecting_agent = true
 	_cycle.travel_time = agent_open_time
@@ -118,6 +135,12 @@ func dismiss_agent() -> void:
 
 
 func _look_for_visitor() -> void:
+	if _expecting_agent:
+		# Дверь занята выходом агента, и Otto в неё не пускают. Дело не в
+		# вежливости: створку за агентом закрывает уровень ([method
+		# dismiss_agent]), а отсидка гостя идёт только при открытой двери —
+		# пущенный сюда Otto остался бы внутри навсегда.
+		return
 	for body: Node2D in _mat.get_overlapping_bodies():
 		var visitor := body as Otto
 		if visitor == null:
@@ -159,8 +182,16 @@ func _release() -> void:
 ## Кадра три, а ход непрерывный, поэтому показываются два соседних и между ними
 ## перегоняется прозрачность. Новых кадров не рисуем: набор уходит вместе с 2D
 ## (ADR-0020, решение 7).
+##
+## Стоящая створка не перерисовывается: зовут отсюда каждый кадр и из каждой
+## двери здания, а меняется картинка только пока дверь ходит.
 func _refresh_look() -> void:
 	var along := _cycle.openness() * 2.0
+	var closed := _frame_asset(0)
+	if is_equal_approx(along, _shown) and closed == _shown_closed:
+		return
+	_shown = along
+	_shown_closed = closed
 	var frame := clampi(int(along), 0, 1)
 	_panel.texture = SpriteTextures.tile(_frame_asset(frame))
 	_next_panel.texture = SpriteTextures.tile(_frame_asset(frame + 1))
@@ -177,9 +208,12 @@ func _frame_asset(frame: int) -> String:
 
 ## Подаёт голос двери. Источник позиционный и один на дверь: поток подменяется,
 ## потому что открыться и закрыться разом она всё равно не может.
-func _say(name: String) -> void:
+##
+## Звук зовётся [param effect], а не `name`: у [Node] поле с таким именем своё,
+## и параметр его заслонял бы.
+func _say(effect: String) -> void:
 	if _voice == null:
-		_voice = Sounds.source(self, name, DOOR_REACH)
+		_voice = Sounds.source(self, effect, DOOR_REACH)
 	else:
-		_voice.stream = Sounds.stream(name)
+		_voice.stream = Sounds.stream(effect)
 	_voice.play()

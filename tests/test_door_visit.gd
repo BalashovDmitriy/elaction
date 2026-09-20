@@ -62,12 +62,10 @@ func test_held_up_does_not_pull_back_after_release() -> void:
 
 func test_the_guest_is_not_let_out_while_the_door_is_still_opening() -> void:
 	var visit := _visit()
-	var cycle := _cycle()
 	visit.admit()
 	# Времени хватило бы и на открывание, и на всю отсидку, но створка стоит.
 	for _frame: int in 40:
 		assert_false(visit.tick(STEP, RELEASED, false), "закрытая дверь никого не выпускает")
-	assert_false(cycle.is_open(), "створку никто не вёл, она и не открылась")
 
 
 func test_the_hiding_time_starts_only_once_the_door_is_open() -> void:

@@ -38,14 +38,20 @@ func _drop(level: GreyboxLevel) -> void:
 	remove_child(level)
 
 
-## Куски одежды с нужным ассетом: они лежат прямо в уровне, детьми.
+## Куски одежды с нужным ассетом.
+##
+## Ищутся и в самом уровне, и в [BuildingShafts]: одежда шахт живёт своим узлом
+## (частей за полсотни на здание, и под каждый обход детей они попадать не
+## должны), а трос вступления — по-прежнему прямой ребёнок уровня. Смотреть
+## только в шахты значит не видеть троса вовсе, и проверка на него, ничего не
+## находя, проходила бы всегда.
 func _parts(level: GreyboxLevel, asset: String) -> Array[TextureRect]:
 	var tile := SpriteTextures.tile(asset)
 	var found: Array[TextureRect] = []
-	# Одежда шахт живёт своим узлом, а не прямыми детьми уровня: частей за
-	# полсотни на здание, и под каждый обход детей они попадать не должны.
-	for shafts: Node in level.find_children("*", "BuildingShafts", false, false):
-		for child: Node in shafts.get_children():
+	var hosts: Array[Node] = [level]
+	hosts.append_array(level.find_children("*", "BuildingShafts", false, false))
+	for host: Node in hosts:
+		for child: Node in host.get_children():
 			var rect := child as TextureRect
 			if rect != null and rect.texture == tile:
 				found.append(rect)
@@ -165,6 +171,9 @@ func test_the_rope_lands_otto_on_the_roof() -> void:
 	var rules := level.rules
 	var surface := rules.floor_surface(BuildingRules.ROOF)
 	assert_lt(level.otto.global_position.y, surface, "начинает он над крышей, на тросе")
+	# Трос сперва обязан найтись: иначе проверка «ушёл» ничего не значит — она
+	# прошла бы и на поиске, который троса вообще не видит.
+	assert_eq(_parts(level, "rope").size(), 1, "трос в кадре, пока Otto по нему едет")
 
 	var left := PATIENCE
 	while not level.otto.is_grounded() and left > 0:

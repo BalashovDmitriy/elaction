@@ -128,6 +128,11 @@ func apply_rules(rules: BuildingRules) -> void:
 func setup(target: Otto, towards: float) -> void:
 	_target = target
 	_brain.start(towards)
+	# Щит ставится здесь, а не первым кадром физики: иначе между постановкой
+	# в проём и первым [method _physics_process] остаётся шаг, на котором
+	# агент — обычная мишень, и пуля с пинком забирают за него очки, ничего
+	# при этом не убив (ADR-0020, решение 3).
+	_shield(true)
 
 
 ## Сообщает агенту, что его этаж погас или снова освещён.
@@ -188,7 +193,12 @@ func is_emerging() -> bool:
 ## очков. Так неуязвимость видно глазом — выстрел просто пролетает мимо, — и
 ## её не приходится объяснять правилом (ADR-0020, решение 3).
 func _shield(value: bool) -> void:
-	set_collision_layer_value(ENEMY_LAYER, not value)
+	# Зовут каждый кадр, а меняется это дважды за жизнь агента: лишнее
+	# присваивание — это обращение к серверу физики на каждого живого.
+	var on_layer := not value
+	if get_collision_layer_value(ENEMY_LAYER) == on_layer:
+		return
+	set_collision_layer_value(ENEMY_LAYER, on_layer)
 
 
 ## Высота ближайшей летящей в агента пули над его ногами, px, или -1, если
