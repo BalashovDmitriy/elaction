@@ -1,0 +1,202 @@
+extends GutTest
+
+## Темнота по правилам ADR-0023: решает тень Otto, слепой агент патрулирует,
+## за дверью Otto невидим. Со сценой: здание настоящее по правилам, агент
+## ставится руками — в кадре должен быть ровно один, и известно где.
+
+const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
+const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
+
+## Сколько кадров даётся агенту на выстрел. Замах 0.35 с, пауза 1.1 с — двух
+## секунд игрового времени хватает и на выстрел, и на то, чтобы убедиться, что
+## его нет.
+const WATCH_FRAMES: int = 120
+
+## Сколько кадров ждать падения лампы.
+const FALL_FRAMES: int = 240
+
+
+func before_all() -> void:
+	Engine.time_scale = 4.0
+
+
+func after_all() -> void:
+	Engine.time_scale = 1.0
+	GameState.instance().reset()
+
+
+func _build() -> GreyboxLevel:
+	GameState.instance().start_game()
+	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
+	level.rules = BuildingRules.new()
+	level.building_seed = 1
+	level.spawn_agents = false
+	add_child_autofree(level)
+	return level
+
+
+## Этаж дуэли: широкий, в полный размах здания — на нём три лампы и места на
+## любую дальность, — и не нижний, где стоит выход.
+func _floor(level: GreyboxLevel) -> int:
+	return level.rules.floors - 3
+
+
+## Лампа этажа, ближайшая к точке.
+func _lamp_near(level: GreyboxLevel, floor_index: int, x: float) -> Lamp:
+	var found: Lamp = null
+	var gap := INF
+	for child in level.get_children():
+		var lamp := child as Lamp
+		if lamp == null or lamp.floor_index != floor_index:
+			continue
+		var distance := absf(WorldSpace.to_plane(lamp.global_position).x - x)
+		if distance < gap:
+			gap = distance
+			found = lamp
+	return found
+
+
+## Гасит зону лампы и ждёт, пока она долетит.
+func _put_out(lamp: Lamp) -> void:
+	lamp.shoot_down()
+	var left := FALL_FRAMES
+	while is_instance_valid(lamp) and left > 0:
+		left -= 1
+		await wait_physics_frames(1)
+	await wait_physics_frames(2)
+
+
+## Ставит Otto на этаж в точку x.
+func _place_otto(level: GreyboxLevel, x: float) -> void:
+	level.otto.global_position = WorldSpace.to_scene(
+		Vector2(x, level.rules.floor_surface(_floor(level)))
+	)
+	level.otto.velocity = Vector3.ZERO
+
+
+## Агент на месте, смотрящий в сторону Otto. Стоит: у него нет хода, чтобы
+## дуэль зависела только от того, видит ли он.
+func _agent_at(level: GreyboxLevel, x: float, towards: float, walks: bool = false) -> Enemy:
+	var agent := ENEMY_SCENE.instantiate() as Enemy
+	agent.apply_rules(level.rules)
+	if not walks:
+		agent.walk_speed = 0.0
+	level.add_child(agent)
+	agent.global_position = WorldSpace.to_scene(
+		Vector2(x, level.rules.floor_surface(_floor(level)))
+	)
+	agent.setup(level.otto, towards)
+	return agent
+
+
+## Сколько вражеских пуль появилось за время наблюдения.
+func _shots_within(level: GreyboxLevel, frames: int) -> int:
+	var seen: Dictionary = {}
+	for _frame in frames:
+		await wait_physics_frames(1)
+		for node in level.get_tree().get_nodes_in_group(Bullet.GROUP):
+			var bullet := node as Bullet
+			if bullet != null and bullet.collision_mask == Bullet.FROM_ENEMY:
+				seen[bullet.get_instance_id()] = true
+	return seen.size()
+
+
+## Место под лампой и ещё одно на дальности выстрела, но дальше дальности в темноте.
+func _spot_pair(level: GreyboxLevel) -> Vector2:
+	var rules := level.rules
+	var spots := level.plan().safe_spots(rules, _floor(level))
+	var lamp := _lamp_near(level, _floor(level), spots[0])
+	var under := spots[0]
+	var lamp_x := WorldSpace.to_plane(lamp.global_position).x
+	for x in spots:
+		if absf(x - lamp_x) < absf(under - lamp_x):
+			under = x
+	var far := under
+	for x in spots:
+		var gap := absf(x - under)
+		if gap > rules.agent_dark_fire_range * 1.5 and gap < rules.agent_fire_range * 0.9:
+			far = x
+			break
+	return Vector2(under, far)
+
+
+## Освещённого Otto агент берёт с полной дальности — так было и так остаётся.
+func test_a_lit_otto_is_shot_from_afar() -> void:
+	var level := _build()
+	await wait_physics_frames(4)
+	var pair := _spot_pair(level)
+	assert_ne(pair.x, pair.y, "на этаже есть два места на дальности выстрела")
+	_place_otto(level, pair.x)
+	_agent_at(level, pair.y, signf(pair.x - pair.y))
+	assert_gt(await _shots_within(level, WATCH_FRAMES), 0, "освещённого Otto обстреливают")
+	remove_child(level)
+
+
+## Otto в тени агент издалека не видит и не стреляет; подошёл ближе — видит.
+func test_an_otto_in_the_dark_is_seen_only_up_close() -> void:
+	var level := _build()
+	await wait_physics_frames(4)
+	var pair := _spot_pair(level)
+	_place_otto(level, pair.x)
+	await _put_out(_lamp_near(level, _floor(level), pair.x))
+	assert_true(level.is_dark_at(_floor(level), pair.x), "зона под Otto погасла")
+
+	var agent := _agent_at(level, pair.y, signf(pair.x - pair.y))
+	assert_eq(await _shots_within(level, WATCH_FRAMES), 0, "Otto в тени с этой дальности не виден")
+
+	# Otto подходит к агенту на дальность, с которой видно и в темноте.
+	var close := pair.y + signf(pair.x - pair.y) * level.rules.agent_dark_fire_range * 0.6
+	_place_otto(level, close)
+	assert_gt(await _shots_within(level, WATCH_FRAMES), 0, "вплотную его видно и в тени")
+	assert_false(agent.is_dead())
+	remove_child(level)
+
+
+## Тень агента ничего не решает: из тени освещённого Otto видно.
+func test_an_agent_in_the_dark_still_sees_a_lit_otto() -> void:
+	var level := _build()
+	await wait_physics_frames(4)
+	var pair := _spot_pair(level)
+	_place_otto(level, pair.y)
+	await _put_out(_lamp_near(level, _floor(level), pair.x))
+	var agent := _agent_at(level, pair.x, signf(pair.y - pair.x))
+	var shots := await _shots_within(level, WATCH_FRAMES)
+	assert_true(agent.is_in_the_dark(), "агент стоит в тени")
+	assert_gt(shots, 0, "и всё равно видит освещённого Otto")
+	remove_child(level)
+
+
+## За дверью Otto нет: агенты теряют его, как в оригинале (долг M14).
+func test_agents_lose_otto_behind_a_door() -> void:
+	var level := _build()
+	await wait_physics_frames(4)
+	var pair := _spot_pair(level)
+	_place_otto(level, pair.x)
+	level.otto.enter_door()
+	_agent_at(level, pair.y, signf(pair.x - pair.y))
+	assert_eq(await _shots_within(level, WATCH_FRAMES), 0, "спрятанного не обстреливают")
+	level.otto.leave_door()
+	assert_gt(await _shots_within(level, WATCH_FRAMES), 0, "вышел — снова цель")
+	remove_child(level)
+
+
+## Слепой агент не караулит у края этажа, а ходит по нему туда и обратно.
+func test_a_blind_agent_patrols_the_floor() -> void:
+	var level := _build()
+	await wait_physics_frames(4)
+	var pair := _spot_pair(level)
+	_place_otto(level, pair.x)
+	await _put_out(_lamp_near(level, _floor(level), pair.x))
+	# Агент идёт прочь от Otto, до края этажа.
+	var away := signf(pair.y - pair.x)
+	var agent := _agent_at(level, pair.y, away, true)
+	var turned := false
+	for _frame in FALL_FRAMES * 2:
+		await wait_physics_frames(1)
+		if agent.is_dead():
+			break
+		if agent.facing() == -away:
+			turned = true
+			break
+	assert_true(turned, "дошёл до края и развернулся")
+	remove_child(level)

@@ -206,6 +206,7 @@ func _process(delta: float) -> void:
 		_move_car(delta, view)
 
 	var span := VisibleFloors.around(rules, view)
+	_shroud_agents()
 	# Агенты пересчитываются каждый кадр, а не только на смене полосы: дверь ждёт
 	# своей паузы, и пропустив кадр смены, она не выпустила бы никого до следующей.
 	if spawn_agents:
@@ -249,9 +250,15 @@ func exit_position() -> Vector2:
 	return _exit_position
 
 
-## Погашен ли этаж. Гаснет он навсегда: сбитая лампа обратно не загорается.
+## Погашен ли этаж целиком — все его зоны. Гаснут они навсегда: сбитая лампа
+## обратно не загорается.
 func is_dark(floor_index: int) -> bool:
 	return _lighting.is_dark(floor_index)
+
+
+## Темно ли в точке этажа: погашена ли зона ближайшей к ней лампы (ADR-0023).
+func is_dark_at(floor_index: int, x: float) -> bool:
+	return _lighting.is_dark_at(floor_index, x)
 
 
 ## Режет перекрытие на куски между проёмами.
@@ -477,10 +484,13 @@ func _spawn_lamps() -> void:
 		# Этаж лампы известен здесь, и обратно из координаты его не выводят: она
 		# висит ровно на середине пролёта, где округление решает случай.
 		lamp.floor_index = spot.floor_index
+		# Зона лампы считается от того, что висит: правило темноты узнаёт о
+		# лампе здесь же, где она вешается.
+		_lighting.hang(spot.floor_index, spot.x)
 		lamp.crushed.connect(_on_lamp_crushed)
-		lamp.fell.connect(_on_lamp_fell.bind(lamp.floor_index))
+		lamp.fell.connect(_on_lamp_fell.bind(lamp.floor_index, spot.x))
 		add_child(lamp)
-		lamp.hang(LAMP_HANG_HEIGHT)
+		lamp.hang(LAMP_HANG_HEIGHT, rules.floor_height - rules.slab_height)
 		_lamps.append(lamp)
 
 
@@ -587,15 +597,28 @@ func _on_lamp_crushed(agent: Enemy) -> void:
 	GameState.instance().add_score(points)
 
 
-## Лампа долетела до пола: этаж гаснет и обратно уже не загорается.
+## Лампа долетела до пола: её зона гаснет и обратно уже не загорается.
 ##
-## Гасить нечего: лампа была единственным источником этажа и ушла вместе со
-## своим светом. Здесь остаётся правило — запомнить темноту и сказать агентам.
-func _on_lamp_fell(index: int) -> void:
-	if not _lighting.darken(index):
-		return
-	for agent in _agents_on(index):
-		agent.set_in_the_dark(true)
+## Гасить нечего: свет лампы ушёл вместе с ней. Здесь остаётся правило —
+## запомнить темноту; кто в ней стоит, пересчитает [method _shroud_agents].
+func _on_lamp_fell(index: int, x: float) -> void:
+	_lighting.darken(index, x)
+	_shroud_agents()
+
+
+## Раздаёт агентам темноту: свою — за неё дороже убийство — и тень Otto, от
+## которой зависит, видят ли они его вовсе (ADR-0023, решение 8).
+##
+## Каждый кадр, а не по событию: агенты ходят по этажу, и зона под ними
+## меняется на ходу. Живых в здании не больше восьми, счёт дешёвый.
+func _shroud_agents() -> void:
+	var here := _floor_of(otto)
+	var otto_in_the_dark := _lighting.is_dark_at(here, otto.global_position.x)
+	for agent in agents():
+		if agent.is_dead():
+			continue
+		agent.set_in_the_dark(_lighting.is_dark_at(_floor_of(agent), agent.global_position.x))
+		agent.set_target_in_the_dark(otto_in_the_dark)
 
 
 ## Все агенты здания: они лежат прямо в уровне, рядом с геометрией.
@@ -755,7 +778,10 @@ func _release_agent(post: AgentPost) -> Enemy:
 	add_child(agent)
 	agent.global_position = WorldSpace.to_scene(mat)
 	agent.setup(otto, signf(otto.global_position.x - mat.x))
-	agent.set_in_the_dark(_lighting.is_dark(post.floor_index))
+	agent.set_in_the_dark(_lighting.is_dark_at(post.floor_index, mat.x))
+	# Тень Otto отдаётся сразу, не дожидаясь кадра: иначе первый шаг агент делал
+	# бы, видя Otto там, где его не видно.
+	agent.set_target_in_the_dark(_lighting.is_dark_at(_floor_of(otto), otto.global_position.x))
 	agent.set_menace(_menace())
 	agent.died.connect(_on_agent_died.bind(post))
 	return agent

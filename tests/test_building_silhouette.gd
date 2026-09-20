@@ -66,10 +66,11 @@ func test_slots_stay_centred_on_every_level() -> void:
 		assert_eq(span.x + span.y, middle, "этаж %d сдвинут вбок" % index)
 
 
-## На самом узком уровне должно помещаться обязательное: шахта, двери и лампа.
+## На самом узком этаже должно помещаться обязательное: шахта, его двери и
+## его лампы. Двери и лампы считаются по ширине — узкий этаж заселён скупо.
 func test_the_narrowest_level_fits_everything_it_must_hold() -> void:
 	var rules := _rules()
-	var needed := 1 + rules.doors_per_floor + rules.lamps_per_floor
+	var needed := 1 + rules.doors_on(0) + rules.lamps_on(0)
 	var span := rules.slot_range(BuildingRules.ROOF)
 	assert_true(span.y - span.x + 1 >= needed, "мест меньше, чем надо поставить")
 

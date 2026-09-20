@@ -163,13 +163,14 @@ func kill(crushed: bool = false) -> void:
 	died.emit()
 
 
-## Попадание вражеской пули.
-func take_bullet() -> void:
-	kill()
-
-
 func is_dead() -> bool:
 	return _states.is_dead()
+
+
+## Скрылся ли Otto за дверью. Снаружи его нет, и агентам он не виден:
+## в оригинале войти в дверь значит сбить их со следа (ADR-0023, решение 8).
+func is_hidden() -> bool:
+	return _states.state == OttoStateMachine.State.INDOORS
 
 
 ## Возвращает Otto в игру после смерти. Ставить его на место — дело уровня,

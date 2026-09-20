@@ -78,7 +78,7 @@ static func generate(rules: BuildingRules, seed_value: int) -> BuildingPlan:
 	plan._lay_escalators(rules, rng, taken)
 	plan._lay_exit(rules, rng, taken)
 	plan._lay_doors(rules, rng, taken)
-	plan._lay_lamps(rules, rng, taken)
+	plan._lay_lamps(rules, taken)
 	return plan
 
 
@@ -365,21 +365,49 @@ func _lay_door(
 	return true
 
 
-func _lay_lamps(rules: BuildingRules, rng: RandomNumberGenerator, taken: Dictionary) -> void:
-	# Крыша ламп не получает — над ней небо, подвес держать не на чем. В диапазон
-	# она и не входит: этажи начинаются с нулевого, крыша лежит выше (ADR-0014).
-	# Сам нулевой этаж лампу теперь получает: потолок у него появился.
+## Раскладывает лампы: по ширине этажа и по серединам равных зон.
+##
+## Крыша ламп не получает — над ней небо, подвес держать не на чем. В диапазон
+## она и не входит: этажи начинаются с нулевого, крыша лежит выше (ADR-0014).
+##
+## Не случайно, как остальное: зона лампы — единица темноты (ADR-0023), и лампы,
+## сбившиеся в один край, оставили бы другой край этажа тёмным при всех горящих.
+## Этаж делится на столько зон, сколько ламп, и каждая встаёт в ближайшее к
+## середине своей зоны свободное место. Лампы кладутся последними, поэтому
+## свободного места может не хватить — тогда ламп меньше, но не ноль.
+func _lay_lamps(rules: BuildingRules, taken: Dictionary) -> void:
 	for index in floors:
-		for _number in rules.lamps_per_floor:
-			var slot := _free_slot(rng, rules, taken, [index] as Array[int])
-			if slot < 0:
+		var span := rules.slot_range(index)
+		var free: Array[int] = []
+		for slot in range(span.x, span.y + 1):
+			if not _is_taken(taken, index, slot):
+				free.append(slot)
+
+		var wanted := rules.lamps_on(index)
+		for number in wanted:
+			if free.is_empty():
 				break
+			var ideal := (
+				float(span.x)
+				+ float(span.y - span.x) * (2.0 * float(number) + 1.0) / (2.0 * float(wanted))
+			)
+			var slot := _nearest_slot(free, ideal)
+			free.erase(slot)
 
 			var lamp := LampSpot.new()
 			lamp.floor_index = index
 			lamp.x = rules.slot_x(slot)
 			_occupy(taken, index, slot)
 			lamps.append(lamp)
+
+
+## Свободное место, ближайшее к желаемому. При равном расстоянии — левое.
+static func _nearest_slot(free: Array[int], ideal: float) -> int:
+	var best := free[0]
+	for slot in free:
+		if absf(float(slot) - ideal) < absf(float(best) - ideal):
+			best = slot
+	return best
 
 
 ## Раскладывает красные двери: здание делится на полосы, и из каждой берётся

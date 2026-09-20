@@ -164,8 +164,13 @@ func test_a_fallen_lamp_puts_its_floor_out() -> void:
 		return
 
 	var index := lamp.floor_index
-	assert_false(level.is_dark(index), "до выстрела этаж горит")
+	var lamp_x := WorldSpace.to_plane(lamp.global_position).x
+	assert_false(level.is_dark_at(index, lamp_x), "до выстрела зона горит")
 	var before := _lit(level)
+	var lamps_on_floor := 0
+	for spot in level.plan().lamps:
+		if spot.floor_index == index:
+			lamps_on_floor += 1
 
 	lamp.shoot_down()
 	var left := FALL_FRAMES
@@ -175,10 +180,14 @@ func test_a_fallen_lamp_puts_its_floor_out() -> void:
 	assert_false(is_instance_valid(lamp), "лампа долетела до пола")
 
 	await wait_physics_frames(2)
-	assert_true(level.is_dark(index), "этаж %d погас" % index)
-	# Источник у этажа один — лампа (ADR-0021, решение 4), и он уходит вместе с
-	# ней: «этаж горит» и «лампа висит» — с M15 одно и то же.
-	assert_eq(_lit(level), before - 1, "и источник этажа перестал гореть")
+	assert_true(level.is_dark_at(index, lamp_x), "зона лампы на этаже %d погасла" % index)
+	# Гаснет зона, не этаж: соседние лампы горят (ADR-0023, решение 2).
+	assert_eq(
+		level.is_dark(index), lamps_on_floor == 1, "этаж тёмен целиком, только если лампа была одна"
+	)
+	# У лампы два источника — конус и заливка (ADR-0023, решение 3), и оба уходят
+	# вместе с ней: «зона горит» и «лампа висит» — одно и то же.
+	assert_eq(_lit(level), before - 2, "и оба источника лампы перестали гореть")
 	_drop(level)
 
 

@@ -173,6 +173,67 @@ func test_the_top_floor_gets_a_lamp_now_that_it_has_a_ceiling() -> void:
 	assert_gt(on_top, 0, "у верхнего этажа есть потолок, значит есть и лампа")
 
 
+## Ламп на этаже столько, сколько просит ширина, — если хватило мест: лампы
+## кладутся последними и уступают дверям, шахтам и эскалаторам.
+func test_floors_get_as_many_lamps_as_their_width_asks() -> void:
+	var rules := _rules()
+	for building_seed: int in SEEDS:
+		var plan := BuildingPlan.generate(rules, building_seed)
+		for index: int in rules.floors:
+			var on_floor := _lamps_on(plan, index)
+			assert_gte(on_floor.size(), 1, "сид %d: этаж %d без ламп" % [building_seed, index])
+			assert_lte(
+				on_floor.size(),
+				rules.lamps_on(index),
+				"сид %d: этаж %d — ламп больше, чем просит ширина" % [building_seed, index]
+			)
+		assert_gt(
+			_lamps_on(plan, rules.floors - 1).size(),
+			_lamps_on(plan, 0).size(),
+			"сид %d: внизу ламп больше, чем наверху" % building_seed
+		)
+
+
+## Лампы не сбиваются в один край этажа: зона каждой — единица темноты, и
+## этаж с лампами в одном углу тёмен в другом при всех горящих. Лампы встают в
+## ближайшие свободные места к серединам своих зон, поэтому на тесном этаже
+## они могут стоять рядом — но середина между ними остаётся в середине этажа.
+func test_lamps_are_spread_along_the_floor() -> void:
+	var rules := _rules()
+	for building_seed: int in SEEDS:
+		var plan := BuildingPlan.generate(rules, building_seed)
+		for index: int in rules.floors:
+			var on_floor := _lamps_on(plan, index)
+			if on_floor.size() < 2:
+				continue
+			var span := rules.floor_span(index)
+			var quarter := (span.y - span.x) * 0.25
+			var mean := 0.0
+			for x in on_floor:
+				mean += x
+			mean /= float(on_floor.size())
+			assert_between(
+				mean,
+				span.x + quarter,
+				span.y - quarter,
+				"сид %d: этаж %d — лампы сбились в один край" % [building_seed, index]
+			)
+			assert_gt(
+				on_floor[on_floor.size() - 1] - on_floor[0],
+				0.0,
+				"сид %d: этаж %d — две лампы в одном месте" % [building_seed, index]
+			)
+
+
+func _lamps_on(plan: BuildingPlan, floor_index: int) -> PackedFloat64Array:
+	var xs := PackedFloat64Array()
+	for lamp in plan.lamps:
+		if lamp.floor_index == floor_index:
+			xs.append(lamp.x)
+	xs.sort()
+	return xs
+
+
 ## Крыша — место, а не этаж: агенты на ней не появляются, потому что нет дверей.
 ## Пока она была нулевым этажом, двое стояли в зоне огня от точки старта.
 func test_the_roof_carries_no_doors() -> void:
