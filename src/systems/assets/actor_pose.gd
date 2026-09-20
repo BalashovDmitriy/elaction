@@ -5,11 +5,63 @@ extends RefCounted
 ##
 ## Вынесена из узлов по той же причине, что [OttoStateMachine] и
 ## [ElevatorMotion]: набор поз обязан покрывать все состояния, и проверять это
-## надо без сцены, физики и отрисованного кадра. Имена поз — те же, что в
-## [constant SpriteTextures.OTTO_POSES], и тест следит, чтобы они не разошлись.
+## надо без сцены, физики и отрисованного кадра. Списки поз лежат здесь же, и
+## тест следит, чтобы выбор позы не выходил за них.
+##
+## До M15 списки жили у спрайтов: поза и была картинкой. Теперь позу отыгрывает
+## коробка, а в M16 — [AnimationTree], и место списка — рядом с правилом, которое
+## позу выбирает, а не рядом с тем, кто её показывает.
 
 ## Кадров в цикле ходьбы (ADR-0011, пункт 5).
 const WALK_FRAMES: int = 3
+
+## Кадров ходьбы в секунду. На двенадцати шаг читается как бег, а Otto ходит
+## (ADR-0011, пункт 5).
+const WALK_FPS: float = 10.0
+
+## Позы Otto.
+const OTTO_POSES: PackedStringArray = [
+	"idle",
+	"walk_0",
+	"walk_1",
+	"walk_2",
+	"crouch",
+	"jump",
+	"kick",
+	"shoot",
+	"dead_0",
+	"dead_1",
+	"crushed",
+]
+
+## Позы агента. Он не прыгает и не бьёт ногой — этого не умеет [EnemyBrain].
+## «Crouch» служит ему позой «на колене», «prone» — своя (ADR-0016, пункт 3).
+const AGENT_POSES: PackedStringArray = [
+	"idle",
+	"walk_0",
+	"walk_1",
+	"walk_2",
+	"crouch",
+	"prone",
+	"shoot",
+	"dead_0",
+	"dead_1",
+	"crushed",
+]
+
+## Поза приседа. Одна на Otto и на агента: у агента это «на колене».
+const CROUCH := "crouch"
+
+## Поза агента лёжа. Единственная лежащая поза живого: у неё свой рост, и
+## коробка греев-бокса берёт его у формы коллизии, а не кладёт стоячего набок.
+const PRONE := "prone"
+
+## Позы, в которых актёр лежит, — все три вида смерти и уклонение лёжа.
+##
+## Спрашивают об этом снаружи: греев-бокс кладёт коробку набок, а в M16 на том
+## же вопросе будет выбираться анимация. Перечислять их у каждого, кто спросит,
+## значит разойтись при первой же новой позе.
+const DOWN: PackedStringArray = ["dead_0", "dead_1", "crushed", PRONE]
 
 ## Поза по состоянию для тех состояний, у которых она одна. Константа, а не
 ## словарь на каждый вызов: поза пересчитывается каждый физический кадр и на
@@ -18,7 +70,7 @@ const WALK_FRAMES: int = 3
 ## В воздухе Otto бьёт ногой всегда (ADR-0006, пункт 2), поэтому падение и есть
 ## тот самый удар с разбега — отдельной позы падения нет.
 const BY_STATE: Dictionary = {
-	OttoStateMachine.State.CROUCH: "crouch",
+	OttoStateMachine.State.CROUCH: CROUCH,
 	OttoStateMachine.State.JUMP: "jump",
 	OttoStateMachine.State.FALL: "kick",
 }
@@ -64,9 +116,9 @@ static func of_agent(
 	if dead:
 		return _death(crushed, falling_over)
 	if stance == EnemyBrain.Stance.KNEEL:
-		return "crouch"
+		return CROUCH
 	if stance == EnemyBrain.Stance.PRONE:
-		return "prone"
+		return PRONE
 	if shooting:
 		return "shoot"
 	return walk_frame(walk_phase) if walking else "idle"
@@ -78,7 +130,12 @@ static func of_agent(
 ## [constant WALK_FRAMES]. Со своим `fmod` в каждом актёре цикл замыкался бы не
 ## там, где считается кадр, и последний кадр ходьбы просто не показывался бы.
 static func advance(walk_phase: float, delta: float) -> float:
-	return fmod(walk_phase + delta * SpriteTextures.WALK_FPS, float(WALK_FRAMES))
+	return fmod(walk_phase + delta * WALK_FPS, float(WALK_FRAMES))
+
+
+## Лежит ли актёр в этой позе.
+static func is_down(pose: String) -> bool:
+	return DOWN.has(pose)
 
 
 ## Кадр ходьбы по фазе: целая часть фазы и есть номер кадра.

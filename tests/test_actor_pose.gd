@@ -18,7 +18,7 @@ func test_every_state_of_otto_has_a_pose() -> void:
 	for state: OttoStateMachine.State in _every_state():
 		var pose := ActorPose.of_otto(state, false, false, false, 0.0)
 		assert_true(
-			SpriteTextures.OTTO_POSES.has(pose),
+			ActorPose.OTTO_POSES.has(pose),
 			"состояние %s показывается позой %s" % [OttoStateMachine.state_name(state), pose]
 		)
 
@@ -38,12 +38,12 @@ func test_every_pose_of_otto_is_reachable() -> void:
 						if not shown.has(pose):
 							shown.append(pose)
 
-	for pose: String in SpriteTextures.OTTO_POSES:
+	for pose: String in ActorPose.OTTO_POSES:
 		assert_true(shown.has(pose), "поза %s кому-то нужна" % pose)
 	# И наоборот — как у агента: показать можно только нарисованное. Без этого
 	# опечатка в [ActorPose] дошла бы до игрока розовым квадратом заглушки.
 	for pose: String in shown:
-		assert_true(SpriteTextures.OTTO_POSES.has(pose), "поза %s нарисована" % pose)
+		assert_true(ActorPose.OTTO_POSES.has(pose), "поза %s нарисована" % pose)
 
 
 func test_every_pose_of_the_agent_is_reachable() -> void:
@@ -63,10 +63,10 @@ func test_every_pose_of_the_agent_is_reachable() -> void:
 								if not shown.has(pose):
 									shown.append(pose)
 
-	for pose: String in SpriteTextures.AGENT_POSES:
+	for pose: String in ActorPose.AGENT_POSES:
 		assert_true(shown.has(pose), "поза %s кому-то нужна" % pose)
 	for pose: String in shown:
-		assert_true(SpriteTextures.AGENT_POSES.has(pose), "поза %s нарисована" % pose)
+		assert_true(ActorPose.AGENT_POSES.has(pose), "поза %s нарисована" % pose)
 
 
 func test_death_tells_how_it_happened() -> void:
@@ -117,3 +117,32 @@ func test_a_broken_phase_does_not_break_the_frame() -> void:
 ## значениями, а список из трёх строк честнее, чем обход Stance.keys().
 func _stances() -> Array[EnemyBrain.Stance]:
 	return [EnemyBrain.Stance.STAND, EnemyBrain.Stance.KNEEL, EnemyBrain.Stance.PRONE]
+
+
+func test_every_way_of_dying_counts_as_down() -> void:
+	# Греев-бокс кладёт по этому вопросу коробку набок, а в M16 на нём будет
+	# выбираться анимация: промах здесь оставит труп стоять.
+	for crushed in [true, false]:
+		for falling in [true, false]:
+			var pose := ActorPose.of_otto(OttoStateMachine.State.DEAD, crushed, falling, false, 0.0)
+			assert_true(ActorPose.is_down(pose), "%s — это лежащий" % pose)
+
+
+func test_an_agent_dodging_prone_counts_as_down() -> void:
+	var pose := ActorPose.of_agent(false, false, false, false, false, 0.0, EnemyBrain.Stance.PRONE)
+	assert_true(ActorPose.is_down(pose))
+
+
+func test_the_living_and_upright_are_not_down() -> void:
+	for pose in ["idle", "walk_0", "walk_1", "walk_2", "jump", "kick", "shoot", ActorPose.CROUCH]:
+		assert_false(ActorPose.is_down(pose), "%s — это не лежащий" % pose)
+
+
+func test_the_knee_and_the_crouch_are_one_pose() -> void:
+	# Агент на колене и присевший Otto показываются одинаково — так было и в 2D.
+	var kneeling := ActorPose.of_agent(
+		false, false, false, false, false, 0.0, EnemyBrain.Stance.KNEEL
+	)
+	var crouching := ActorPose.of_otto(OttoStateMachine.State.CROUCH, false, false, false, 0.0)
+	assert_eq(kneeling, crouching)
+	assert_eq(kneeling, ActorPose.CROUCH)

@@ -10,9 +10,9 @@ extends GutTest
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
 
-## Откуда летит пуля, px от агента. Меньше [member BuildingRules.agent_dodge_sight],
+## Откуда летит пуля, м от агента. Меньше [member BuildingRules.agent_dodge_sight],
 ## иначе он её ещё не замечает.
-const BULLET_REACH: float = 150.0
+const BULLET_REACH: float = 1.5
 
 ## Правила, по которым живёт агент, — и по ним же тест отмеряет высоту пули.
 ## Один объект на обоих: с двумя тест мерил бы одним набором чисел, а агент
@@ -34,27 +34,28 @@ func _agent() -> Enemy:
 
 
 ## Пуля Otto, летящая в агента слева направо или справа налево — всё равно,
-## лишь бы в него. [param height] — над ногами агента, px.
+## лишь бы в него. [param height] — над ногами агента, м. В сцене «над» — это
+## рост Y.
 func _bullet_at(agent: Enemy, height: float) -> Bullet:
 	var bullet := BULLET_SCENE.instantiate() as Bullet
 	bullet.direction = -1.0
 	bullet.speed = 0.0
 	bullet.collision_mask = Bullet.FROM_OTTO
 	add_child_autofree(bullet)
-	bullet.global_position = agent.global_position + Vector2(BULLET_REACH, -height)
+	bullet.global_position = agent.global_position + Vector3(BULLET_REACH, height, 0.0)
 	return bullet
 
 
 func test_agent_kneels_under_a_high_bullet() -> void:
 	var agent := _agent()
-	_bullet_at(agent, _rules.agent_kneel_height + 5.0)
+	_bullet_at(agent, _rules.agent_kneel_height + 0.05)
 	await wait_physics_frames(2)
 	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "от высокой пули — на колено")
 
 
 func test_agent_drops_prone_under_a_low_bullet() -> void:
 	var agent := _agent()
-	_bullet_at(agent, _rules.agent_kneel_height - 3.0)
+	_bullet_at(agent, _rules.agent_kneel_height - 0.03)
 	await wait_physics_frames(2)
 	assert_eq(agent.stance(), EnemyBrain.Stance.PRONE, "от низкой — лёжа")
 
@@ -62,7 +63,7 @@ func test_agent_drops_prone_under_a_low_bullet() -> void:
 ## Своя пуля агента не повод ложиться: маска у неё другая, и летит она от него.
 func test_agent_ignores_bullets_that_are_not_his_problem() -> void:
 	var agent := _agent()
-	var bullet := _bullet_at(agent, 66.0)
+	var bullet := _bullet_at(agent, 0.66)
 	bullet.collision_mask = Bullet.FROM_ENEMY
 	await wait_physics_frames(2)
 	assert_eq(agent.stance(), EnemyBrain.Stance.STAND, "чужой выстрел агенту не страшен")
@@ -71,7 +72,7 @@ func test_agent_ignores_bullets_that_are_not_his_problem() -> void:
 ## Пуля, летящая прочь, тоже не повод: она уже прошла мимо.
 func test_agent_ignores_a_bullet_flying_away() -> void:
 	var agent := _agent()
-	var bullet := _bullet_at(agent, 66.0)
+	var bullet := _bullet_at(agent, 0.66)
 	bullet.direction = 1.0
 	await wait_physics_frames(2)
 	assert_eq(agent.stance(), EnemyBrain.Stance.STAND, "вслед ушедшей пуле не приседают")
@@ -84,13 +85,13 @@ func test_agent_ignores_a_bullet_flying_away() -> void:
 ## поз: агент, уклонившийся от выстрела, раз за разом оказывался мёртвым.
 func test_agent_stays_down_until_the_bullet_clears_his_body() -> void:
 	var agent := _agent()
-	var bullet := _bullet_at(agent, _rules.agent_kneel_height + 5.0)
+	var bullet := _bullet_at(agent, _rules.agent_kneel_height + 0.05)
 	await wait_physics_frames(2)
 	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "сперва уходит с линии")
 
 	# Шаги отмеряются от самого тела и самой пули, а не числами: агент и ассеты
-	# уже переезжали в другой масштаб, и записанные руками пиксели тогда молча
-	# перестали попадать в границу, ради которой этот тест и написан.
+	# уже дважды переезжали в другой масштаб, и записанные руками числа тогда
+	# молча перестали попадать в границу, ради которой этот тест и написан.
 	var body_half := _body_half_width(agent)
 	var tail := bullet.half_length()
 
@@ -110,7 +111,7 @@ func test_agent_stays_down_until_the_bullet_clears_his_body() -> void:
 	assert_eq(agent.stance(), EnemyBrain.Stance.STAND, "ушедшая за спину больше не держит")
 
 
-## Полширины тела агента, px. Берётся у формы, как её берёт сам агент.
+## Полширины тела агента, м. Берётся у формы, как её берёт сам агент.
 func _body_half_width(agent: Enemy) -> float:
-	var shape := agent.get_node("Shape") as CollisionShape2D
-	return (shape.shape as RectangleShape2D).size.x * 0.5
+	var shape := agent.get_node("Shape") as CollisionShape3D
+	return (shape.shape as BoxShape3D).size.x * 0.5

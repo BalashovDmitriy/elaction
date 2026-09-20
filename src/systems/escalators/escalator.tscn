@@ -2,29 +2,26 @@
 
 [ext_resource type="Script" path="res://src/systems/escalators/escalator.gd" id="1_escalator"]
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_pad"]
-size = Vector2(72, 30)
+[sub_resource type="BoxShape3D" id="BoxShape3D_pad"]
+size = Vector3(0.72, 0.3, 0.4)
 
-[node name="Escalator" type="Node2D"]
+[node name="Escalator" type="Node3D"]
 script = ExtResource("1_escalator")
 
-[node name="Ramp" type="Line2D" parent="."]
-z_index = -1
-width = 15
-default_color = Color(0.36, 0.44, 0.4, 1)
+[node name="Ramp" type="Node3D" parent="."]
 
-[node name="TopPad" type="Area2D" parent="."]
+[node name="TopPad" type="Area3D" parent="."]
 collision_layer = 0
 collision_mask = 2
 
-[node name="TopPadShape" type="CollisionShape2D" parent="TopPad"]
-position = Vector2(0, -15)
-shape = SubResource("RectangleShape2D_pad")
+[node name="TopPadShape" type="CollisionShape3D" parent="TopPad"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 0)
+shape = SubResource("BoxShape3D_pad")
 
-[node name="BottomPad" type="Area2D" parent="."]
+[node name="BottomPad" type="Area3D" parent="."]
 collision_layer = 0
 collision_mask = 2
 
-[node name="BottomPadShape" type="CollisionShape2D" parent="BottomPad"]
-position = Vector2(0, -15)
-shape = SubResource("RectangleShape2D_pad")
+[node name="BottomPadShape" type="CollisionShape3D" parent="BottomPad"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 0)
+shape = SubResource("BoxShape3D_pad")

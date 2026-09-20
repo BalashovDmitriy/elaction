@@ -90,8 +90,11 @@ func test_otto_and_his_jump_fit_in_frame_on_the_roof() -> void:
 	await _wait_for_the_landing(level)
 
 	var otto := level.otto
-	var body := otto.get_node("Body") as Sprite2D
-	var head := otto.global_position.y + body.offset.y
+	# Макушка — рост стоячей формы над ногами. Кадр и макушка меряются в
+	# плоскости правил, где «выше» — это меньший Y.
+	var standing := otto.get_node("StandingShape") as CollisionShape3D
+	var height := (standing.shape as BoxShape3D).size.y
+	var head := WorldSpace.to_plane(otto.global_position).y - height
 	var view := otto.camera_view()
 
 	assert_gt(head, view.position.y, "макушка Otto ниже верхнего края кадра")
@@ -110,7 +113,7 @@ func test_the_roof_is_empty_when_the_game_starts() -> void:
 		var rules := level.rules
 		for agent in agents:
 			assert_gt(
-				rules.floor_index_near(agent.global_position.y),
+				_floor_of(rules, agent),
 				BuildingRules.ROOF,
 				"сид %d: агент на крыше" % building_seed
 			)
@@ -157,9 +160,9 @@ func test_no_agent_walks_a_floor_far_from_otto() -> void:
 	assert_false(agents.is_empty(), "двери никого не выпустили")
 
 	var rules := level.rules
-	var here := rules.floor_index_near(level.otto.global_position.y)
+	var here := _floor_of(rules, level.otto)
 	for agent in agents:
-		var floor_index := rules.floor_index_near(agent.global_position.y)
+		var floor_index := _floor_of(rules, agent)
 		assert_lt(
 			absi(floor_index - here), 10, "агент на этаже %d, Otto на %d" % [floor_index, here]
 		)
@@ -182,16 +185,16 @@ func test_otto_comes_back_away_from_the_agent_that_killed_him() -> void:
 	# Otto и возвращался, потому что оно было первым по порядку.
 	var agent := preload("res://src/actors/enemy/enemy.tscn").instantiate() as Enemy
 	level.add_child(agent)
-	agent.global_position = Vector2(spots[0], surface)
+	agent.global_position = WorldSpace.to_scene(Vector2(spots[0], surface))
 	agent.setup(level.otto, 1.0)
 	await wait_physics_frames(SETTLE_FRAMES)
 
-	level.otto.global_position = Vector2(spots[0], surface)
+	level.otto.global_position = WorldSpace.to_scene(Vector2(spots[0], surface))
 	level.otto.kill()
 	await wait_physics_frames(60)
 
 	var back := level.otto.global_position.x
-	assert_gt(absf(back - spots[0]), 1.0, "Otto вернулся под тот же ствол")
+	assert_gt(absf(back - spots[0]), 0.01, "Otto вернулся под тот же ствол")
 	_drop(level)
 
 
@@ -268,9 +271,14 @@ func test_agents_take_their_combat_numbers_from_the_rules() -> void:
 ## Ставит Otto посреди этажа: туда, где стоял бы игрок, а не в проём.
 func _stand_on(level: GreyboxLevel, index: int) -> void:
 	var rules := level.rules
-	level.otto.global_position = Vector2(
-		level.plan().safe_x(rules, index), rules.floor_surface(index)
+	level.otto.global_position = WorldSpace.to_scene(
+		Vector2(level.plan().safe_x(rules, index), rules.floor_surface(index))
 	)
+
+
+## Этаж, на котором стоит узел, по правилам здания.
+func _floor_of(rules: BuildingRules, node: Node3D) -> int:
+	return rules.floor_index_near(WorldSpace.to_plane(node.global_position).y)
 
 
 ## Сколько вражеских пуль оказалось в воздухе разом за [constant CROWD_FRAMES].

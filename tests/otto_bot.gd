@@ -17,21 +17,25 @@ extends RefCounted
 ## бы только то, что стоять под выстрелом нельзя.
 ##
 ## Подошедшего вплотную агента бот не обходит, а встречает: приседает, поворачивается
-## и стреляет. Пока он проходил мимо, размен на трёх-четырёх пикселях был мгновенным
+## и стреляет. Пока он проходил мимо, размен на считанных сантиметрах был мгновенным
 ## и уклонение там не помогало — этим и кончались все замеры M11.
-
-## Насколько близко к цели по горизонтали считается «дошёл», px.
-const REACHED: float = 18.0
-
-## С какого расстояния бот открывает огонь, px.
 ##
-## Больше, чем [member EnemyBrain.fire_range] (600 px): кто выстрелил первым,
-## тот и жив. Стреляет бот, только если агент уже на его линии.
-const ENGAGE: float = 720.0
+## Думает бот в координатах правил — там же, где раскладка и этажи. Из сцены он
+## переводит в одном месте, [method _at]: сцена считает Y вверх, правила вниз, и
+## бот, читающий сцену напрямую, шёл бы по зданию вверх ногами (ADR-0021).
 
-## Насколько агент должен совпадать с Otto по высоте, чтобы считаться целью, px.
+## Насколько близко к цели по горизонтали считается «дошёл», м.
+const REACHED: float = 0.18
+
+## С какого расстояния бот открывает огонь, м.
+##
+## Больше, чем [member EnemyBrain.fire_range] (6 м): кто выстрелил первым,
+## тот и жив. Стреляет бот, только если агент уже на его линии.
+const ENGAGE: float = 7.2
+
+## Насколько агент должен совпадать с Otto по высоте, чтобы считаться целью, м.
 ## Пуля летит по горизонтали, и агент этажом ниже — не цель, а трата патрона.
-const SAME_LINE: float = 72.0
+const SAME_LINE: float = 0.72
 
 ## Сколько бот готов драться, не сходя с места, с игрового времени.
 ##
@@ -41,29 +45,29 @@ const SAME_LINE: float = 72.0
 ## Бот, который стоит до победы, не уходит с этажа никогда.
 const DUEL_PATIENCE: float = 2.0
 
-## За сколько пикселей до попадания бот начинает уклоняться.
+## За сколько метров до попадания бот начинает уклоняться.
 ##
 ## Присед мгновенный, но прыжок — нет: чтобы тело успело подняться над низкой
 ## пулей, прыгать надо заранее. Отсюда запас, а не «в последний кадр».
-const DODGE_SIGHT: float = 288.0
+const DODGE_SIGHT: float = 2.88
 
-## Половина ширины тела Otto, px.
+## Половина ширины тела Otto, м.
 ##
 ## Вместе с длиной пули ([method Bullet.half_length]) даёт габарит, из которого
 ## она должна выйти, прежде чем вставать. Агент на этом попадался —
 ## распрямлялся ровно под пулей и ловил её грудью, — и Otto попадался бы так же.
-const BODY_HALF_WIDTH: float = 27.0
+const BODY_HALF_WIDTH: float = 0.27
 
 ## Выше этой высоты над ногами пуля считается высокой: от неё приседают.
-## Сидячая форма Otto — 81 px, и пуля выше неё проходит над головой.
-const HIGH_BULLET: float = 81.0
+## Сидячая форма Otto — 0.81 м, и пуля выше неё проходит над головой.
+const HIGH_BULLET: float = 0.81
 
-## Где встать рядом с шахтой, ожидая кабину, px от её оси. У самого края проёма:
+## Где встать рядом с шахтой, ожидая кабину, м от её оси. У самого края проёма:
 ## кабина стоит на этаже недолго, и от дальней точки бот не успевал войти.
-const WAIT_ASIDE: float = 96.0
+const WAIT_ASIDE: float = 0.96
 
-## Насколько кабина считается пришедшей на этаж, px.
-const CAR_ALIGNED: float = 12.0
+## Насколько кабина считается пришедшей на этаж, м.
+const CAR_ALIGNED: float = 0.12
 
 ## Действия, которые Otto читает по фронту нажатия, а не по удержанию.
 ##
@@ -102,7 +106,7 @@ func step() -> void:
 		_duel_time = 0.0
 		return
 
-	var floor_index := _rules.floor_index_near(_otto.global_position.y)
+	var floor_index := _rules.floor_index_near(_at(_otto).y)
 	var threat := _threat()
 	if threat == null:
 		_duel_time = 0.0
@@ -158,15 +162,20 @@ func release() -> void:
 	_release_all()
 
 
+## Где узел стоит в плоскости правил.
+static func _at(node: Node3D) -> Vector2:
+	return WorldSpace.to_plane(node.global_position)
+
+
 ## Ближайший живой агент на линии огня или null.
 func _threat() -> Enemy:
-	var here := _otto.global_position
+	var here := _at(_otto)
 	var closest: Enemy = null
 	var nearest := ENGAGE
 	for agent in _level.agents():
 		if agent.is_dead():
 			continue
-		var to_agent := agent.global_position - here
+		var to_agent := _at(agent) - here
 		if absf(to_agent.y) > SAME_LINE:
 			continue
 		if absf(to_agent.x) > nearest:
@@ -176,7 +185,7 @@ func _threat() -> Enemy:
 	return closest
 
 
-## Высота ближайшей летящей в Otto пули над его ногами, px, или -1, если лететь
+## Высота ближайшей летящей в Otto пули над его ногами, м, или -1, если лететь
 ## нечему. Считается так же, как у агента, — по группе пуль, а не по детям уровня.
 func _incoming_height() -> float:
 	var best := -1.0
@@ -185,7 +194,9 @@ func _incoming_height() -> float:
 		var bullet := node as Bullet
 		if bullet == null or bullet.collision_mask != Bullet.FROM_ENEMY:
 			continue
-		var to_bullet := bullet.global_position - _otto.global_position
+		var to_bullet := WorldSpace.direction_to_plane(
+			bullet.global_position - _otto.global_position
+		)
 		# Летит ли она в нас — и не ушла ли уже за спину. Мерка не «с какой
 		# стороны», а «сколько ей до нас осталось»: пуля, миновавшая середину,
 		# но не вышедшая из габарита хвостом, всё ещё попадает.
@@ -218,13 +229,13 @@ func _dodge(bullet_height: float) -> void:
 
 ## С какой стороны от Otto стоит агент: -1 слева, +1 справа.
 func _side_of(agent: Enemy) -> float:
-	return signf(agent.global_position.x - _otto.global_position.x)
+	return signf(_at(agent).x - _at(_otto).x)
 
 
 ## Пора ли драться, а не идти дальше.
 ##
-## Пройти мимо агента, который держит тебя на мушке, нельзя: на трёх-четырёх
-## пикселях размен мгновенный, и уклонение там уже ничего не решает — именно
+## Пройти мимо агента, который держит тебя на мушке, нельзя: на считанных
+## сантиметрах размен мгновенный, и уклонение там уже ничего не решает — именно
 ## этим кончались все замеры вехи (ADR-0016, «Чем веха кончилась»).
 func _duelling(threat: Enemy) -> bool:
 	if threat == null:
@@ -237,10 +248,10 @@ func _duelling(threat: Enemy) -> bool:
 		return false
 	if _duel_time > DUEL_PATIENCE:
 		return false
-	return absf(threat.global_position.x - _otto.global_position.x) <= _duel_reach()
+	return absf(_at(threat).x - _at(_otto).x) <= _duel_reach()
 
 
-## Ближе какого расстояния бот не проходит мимо агента, а дерётся, px.
+## Ближе какого расстояния бот не проходит мимо агента, а дерётся, м.
 ##
 ## На ногах это дальность огня самого агента: драться стоит ровно с теми, кто
 ## может попасть. Того, кто дальше, бот обстреливает на ходу — останавливаться,
@@ -255,8 +266,8 @@ func _duel_reach() -> float:
 ## Дуэль: присесть, повернуться к агенту и держать его под огнём.
 ##
 ## Присед здесь не отступление, а лучшая позиция из всех: пуля агента летит в
-## 20 px над полом и проходит над присевшим (его форма — 18 px), а сам Otto из
-## приседа бьёт ниже — и достаёт и стоящего, и вставшего на колено. Ходить
+## 1.05 м над полом и проходит над присевшим (его форма — 0.81 м), а сам Otto
+## из приседа бьёт ниже — и достаёт и стоящего, и вставшего на колено. Ходить
 ## присев нельзя, но в дуэли и не надо.
 ##
 ## Сторона нажимается этим же кадром, и выстрел уйдёт уже в неё: Otto берёт
@@ -272,16 +283,18 @@ func _hold_the_line(threat: Enemy) -> void:
 ## Пока она в пути, шаг вбок — это шаг в пустую шахту, а падение в неё
 ## смертельно. У этажа выйти можно: под ногами пол.
 func _car_aligned() -> bool:
+	var here := _at(_otto)
 	for child in _level.get_children():
 		var car := child as ElevatorCar
 		if car == null:
 			continue
+		var at := _at(car)
 		# Мерка вширь узкая нарочно, хотя Otto и едет где встал, а не на оси:
 		# на всю ширину кабины дуэль в ней включается почти всегда, а из неё бот
 		# выходит боком на этаж — и до низа здания не доезжает (ADR-0016).
-		if absf(car.global_position.x - _otto.global_position.x) > CAR_ALIGNED:
+		if absf(at.x - here.x) > CAR_ALIGNED:
 			continue
-		if absf(car.global_position.y - _otto.global_position.y) > CAR_ALIGNED:
+		if absf(at.y - here.y) > CAR_ALIGNED:
 			continue
 		return car.is_aligned()
 	return false
@@ -302,7 +315,7 @@ func _riding_further(here: int) -> bool:
 	if shaft == null:
 		return true
 	var surface := _rules.floor_surface(_stop_floor(shaft, here))
-	return _otto.global_position.y < surface - CAR_ALIGNED
+	return _at(_otto).y < surface - CAR_ALIGNED
 
 
 func _ride_down() -> void:
@@ -332,7 +345,6 @@ func _descend(floor_index: int) -> void:
 	_walk_to(_rules.slot_x(0))
 
 
-## Заходит в кабину, дождавшись её. В пустой проём шагать нельзя — это падение.
 ## Заходит в кабину, дождавшись её у самого края проёма.
 ##
 ## Входит только на приезд кабины и только стоя рядом. Если заходить в любой
@@ -342,7 +354,8 @@ func _descend(floor_index: int) -> void:
 func _take_the_car(shaft: BuildingPlan.ShaftSpot, floor_index: int) -> void:
 	var surface := _rules.floor_surface(floor_index)
 	var here := _car_waits_at(shaft.x, surface)
-	var aside := absf(_otto.global_position.x - shaft.x) <= WAIT_ASIDE + REACHED
+	var x := _at(_otto).x
+	var aside := absf(x - shaft.x) <= WAIT_ASIDE + REACHED
 
 	if here and not _car_was_here and aside:
 		_boarding = true
@@ -354,7 +367,7 @@ func _take_the_car(shaft: BuildingPlan.ShaftSpot, floor_index: int) -> void:
 		_walk_to(shaft.x)
 		return
 
-	var side := -1.0 if _otto.global_position.x < shaft.x else 1.0
+	var side := -1.0 if x < shaft.x else 1.0
 	_walk_to(shaft.x + side * WAIT_ASIDE)
 
 
@@ -372,7 +385,7 @@ func _approach_door(door: BuildingPlan.DoorSpot) -> void:
 
 ## Идёт к точке. Возвращает true, когда уже пришёл.
 func _walk_to(x: float) -> bool:
-	var gap := x - _otto.global_position.x
+	var gap := x - _at(_otto).x
 	if absf(gap) <= REACHED:
 		return true
 	_press(&"move_right" if gap > 0.0 else &"move_left")
@@ -384,9 +397,10 @@ func _car_waits_at(x: float, surface: float) -> bool:
 		var car := child as ElevatorCar
 		if car == null:
 			continue
-		if absf(car.global_position.x - x) > CAR_ALIGNED:
+		var at := _at(car)
+		if absf(at.x - x) > CAR_ALIGNED:
 			continue
-		if absf(car.global_position.y - surface) <= CAR_ALIGNED:
+		if absf(at.y - surface) <= CAR_ALIGNED:
 			return true
 	return false
 

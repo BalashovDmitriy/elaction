@@ -1,9 +1,6 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://tools/combat_shot.gd" id="1_shot"]
-[ext_resource type="PackedScene" path="res://src/ui/postprocess.tscn" id="2_post"]
 
-[node name="CombatShot" type="Node2D"]
+[node name="CombatShot" type="Node3D"]
 script = ExtResource("1_shot")
-
-[node name="Postprocess" parent="." instance=ExtResource("2_post")]

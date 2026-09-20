@@ -64,11 +64,12 @@ func _live_agents(level: GreyboxLevel) -> Array[Enemy]:
 func _door_behind(level: GreyboxLevel, agent: Enemy) -> Door:
 	var nearest: Door = null
 	var gap := INF
+	var at := WorldSpace.to_plane(agent.global_position)
 	for door in level.doors():
 		var mat := door.mat_position()
-		if absf(mat.y - agent.global_position.y) > 1.0:
+		if absf(mat.y - at.y) > 0.01:
 			continue
-		var distance := absf(mat.x - agent.global_position.x)
+		var distance := absf(mat.x - at.x)
 		if distance < gap:
 			gap = distance
 			nearest = door
@@ -77,12 +78,12 @@ func _door_behind(level: GreyboxLevel, agent: Enemy) -> Door:
 
 ## Одинокая дверь на твёрдом полу: здание для неё поднимать незачем.
 func _bare_door() -> Door:
-	var ground := StaticBody2D.new()
-	var shape := CollisionShape2D.new()
-	var box := RectangleShape2D.new()
-	box.size = Vector2(600.0, 40.0)
+	var ground := StaticBody3D.new()
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(6.0, 0.4, WorldSpace.CORRIDOR_DEPTH)
 	shape.shape = box
-	shape.position = Vector2(0.0, 20.0)
+	shape.position = Vector3(0.0, -0.2, 0.0)
 	ground.add_child(shape)
 	add_child_autofree(ground)
 
@@ -95,7 +96,7 @@ func _bare_door() -> Door:
 func _guest_at(door: Door) -> Otto:
 	var otto := OTTO_SCENE.instantiate() as Otto
 	add_child_autofree(otto)
-	otto.global_position = door.mat_position()
+	otto.global_position = WorldSpace.to_scene(door.mat_position())
 	return otto
 
 
@@ -194,7 +195,8 @@ func test_the_door_shuts_behind_the_agent_that_left_it() -> void:
 			if agent.is_emerging():
 				continue
 			var door := _door_behind(level, agent)
-			if door == null or absf(door.mat_position().x - agent.global_position.x) > 1.0:
+			var at := WorldSpace.to_plane(agent.global_position)
+			if door == null or absf(door.mat_position().x - at.x) > 0.01:
 				continue
 			# Агент ещё стоит на самом коврике, но проём уже освободил: створка
 			# обязана идти обратно, а не стоять нараспашку (ADR-0020, решение 4).

@@ -1,4 +1,4 @@
-extends Node2D
+extends Node3D
 
 ## Снимки боя на настоящем здании — по состоянию, а не по секундомеру.
 ##
@@ -31,9 +31,9 @@ const SETTLE_FRAMES: int = 45
 ## ждётся вечно, и однажды инструмент уже висел вместо того, чтобы сказать.
 const PATIENCE: int = 180
 
-## Где стоит агент, px от Otto. Дальше приседа, но ближе дальности его огня:
+## Где стоит агент, м от Otto. Дальше приседа, но ближе дальности его огня:
 ## так в кадр влезают оба.
-const GAP: float = 450.0
+const GAP: float = 4.5
 
 var _level: GreyboxLevel = null
 var _agent: Enemy = null
@@ -90,17 +90,17 @@ func _run() -> void:
 	_agent = ENEMY_SCENE.instantiate() as Enemy
 	_agent.apply_rules(rules)
 	_level.add_child(_agent)
-	_agent.global_position = Vector2(spot + GAP, rules.floor_surface(_floor))
+	_agent.global_position = WorldSpace.to_scene(Vector2(spot + GAP, rules.floor_surface(_floor)))
 	_agent.walk_speed = 0.0
 	_agent.setup(_level.otto, -1.0)
 	_agent.set_menace(rules.agent_goes_prone_from_menace)
 	await get_tree().physics_frame
 	await _shoot("01_standoff")
 
-	# Высокая пуля идёт в 20 px над полом, колено — 17: агент уходит под неё.
+	# Высокая пуля идёт в 0.9 м над полом, колено — 0.76: агент уходит под неё.
 	await _stage(EnemyBrain.Stance.KNEEL, false, "02_agent_kneels")
 
-	# Низкая, из приседа, идёт в 10 px: колено её уже не пропускает, и агент ложится.
+	# Низкая, из приседа, идёт в 0.45 м: колено её уже не пропускает, и агент ложится.
 	await _stage(EnemyBrain.Stance.PRONE, true, "03_agent_goes_prone")
 
 	Input.action_release(&"move_down")
@@ -112,7 +112,9 @@ func _run() -> void:
 ## Ставит Otto на этаж и ждёт, пока камера доедет. Возвращает его место.
 func _stand_on(index: int) -> float:
 	var spot := _level.plan().safe_x(_level.rules, index)
-	_level.otto.global_position = Vector2(spot, _level.rules.floor_surface(index))
+	_level.otto.global_position = WorldSpace.to_scene(
+		Vector2(spot, _level.rules.floor_surface(index))
+	)
 	for _frame: int in SETTLE_FRAMES:
 		await get_tree().physics_frame
 	return spot

@@ -148,3 +148,29 @@ func test_shaft_with_one_floor_stays_put() -> void:
 func test_shaft_without_floors_is_harmless() -> void:
 	var motion := ElevatorMotion.new()
 	assert_eq(motion.update(STEP, ElevatorMotion.DOWN, true), 0.0)
+
+
+## Прибытие не теряется на дробях: остаток в шаг с лишней миллионной всё равно
+## засчитывается, и кабина делает на этаже паузу, а не касается его и уходит.
+##
+## Найдено ботом в M15: на метрах и float32-остановках остаток до верхней
+## остановки выходил больше шага на последний бит, кабина вставала в микроне от
+## неё — «выровненной» по FLOOR_EPSILON — и без паузы разворачивалась. Otto
+## ждал её на крыше вечно. Здесь то же самое сделано руками и в единицах теста.
+func test_arrival_is_not_lost_to_float_noise() -> void:
+	var motion := _shaft(2)
+	# Пауза старта прошла с запасом, кабина уже едет сама — вверх, к MIDDLE.
+	# Запас нужен: пауза в секунду вычитается по десятой доле, и на дробях
+	# последний кадр может оставить от неё стотриллионную — кабина простояла
+	# бы ещё кадр, и подстроенное ниже положение так и не сдвинулось бы.
+	_run(motion, 1.5, 0.0, false)
+	motion.direction = ElevatorMotion.UP
+	# На один шаг и миллионную дальше этажа: без допуска шаг не дотягивает.
+	motion.position = MIDDLE + motion.speed * STEP + 0.000001
+
+	motion.update(STEP, 0.0, false)
+	assert_eq(motion.aligned_floor(), 1, "кабина пришла на этаж")
+
+	motion.update(STEP, 0.0, false)
+	assert_eq(motion.aligned_floor(), 1, "и стоит на нём паузу, а не касается и уходит")
+	assert_true(motion.is_stopped(), "стоит, а не едет")

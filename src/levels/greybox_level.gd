@@ -1,32 +1,29 @@
 class_name GreyboxLevel
-extends Node2D
+extends Node3D
 
 ## Здание, собранное по [BuildingPlan].
 ##
 ## Где что стоит, решает раскладка по правилам и сиду; уровень только расставляет
-## узлы и связывает их между собой. Геометрия собрана из ассетов окружения
-## ([SpriteTextures], ADR-0011), свет к ним пришёл раньше — в M6.
+## узлы и связывает их между собой. Геометрия — серые коробки (ADR-0021): модели,
+## материалы и настоящий свет придут вехами M16–M19, каждая на своё место.
+##
+## Раскладка считает в плоскости правил, где Y растёт вниз. Всё, что уровень
+## ставит в сцену, проходит через [WorldSpace] — и только через него: разворот
+## Y в одном месте (ADR-0021, решение 2).
 
 ## Otto вышел из здания, собрав все документы.
 signal building_cleared
 
-## Сила заливки горящего этажа и столба света в шахте.
-##
-## Сами цвета живут в [BuildingPalette]: они меняются от раунда к раунду
-## (ADR-0017, решение 2), а сила — нет, она подобрана под ассеты.
-const FLOOR_ENERGY: float = 1.15
-const SHAFT_ENERGY: float = 0.55
-
-## Ширина троса, по которому Otto съезжает на крышу, px.
-const ROPE_WIDTH: float = 12.0
+## Ширина троса, по которому Otto съезжает на крышу, м.
+const ROPE_WIDTH: float = 0.12
 
 ## Сколько Otto висит над крышей в начале здания и как быстро съезжает.
 ##
-## Выше собственного прыжка (240 px с M13): он должен прийти сверху, а не подпрыгнуть.
+## Выше собственного прыжка (2.4 м): он должен прийти сверху, а не подпрыгнуть.
 ## Спуск занимает меньше секунды — это кадр вступления, а не механика
 ## (ADR-0017, решение 4).
-const ROPE_DROP: float = 264.0
-const ROPE_SPEED: float = 420.0
+const ROPE_DROP: float = 2.64
+const ROPE_SPEED: float = 4.2
 
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 const ESCALATOR_SCENE := preload("res://src/systems/escalators/escalator.tscn")
@@ -34,27 +31,44 @@ const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 const LAMP_SCENE := preload("res://src/systems/lighting/lamp.tscn")
 
-const WALL_WIDTH: float = 48.0
+const WALL_WIDTH: float = 0.48
 
 ## Дно шахты: сюда падает тот, кто шагнул в пустой проём.
-const PIT_HEIGHT: float = 60.0
+const PIT_HEIGHT: float = 0.6
 
-## На сколько выше пола висит середина лампы, px.
-const LAMP_HANG_HEIGHT: float = 180.0
+## На сколько выше пола висит середина лампы, м.
+const LAMP_HANG_HEIGHT: float = 1.8
 
 ## Выход из здания — на нижнем этаже.
-const EXIT_WIDTH: float = 192.0
-const EXIT_HEIGHT: float = 120.0
+const EXIT_WIDTH: float = 1.92
+const EXIT_HEIGHT: float = 1.2
 
 ## Машина у выхода: ею оригинал заканчивает здание (ADR-0011, пункт 14).
 ## Стоит рядом с проёмом и уезжает, увозя Otto; следующее здание собирается
 ## после отъезда, а не в тот же кадр.
 ##
-## Габарит нарочно не записан здесь второй раз: его знает сам ассет, а кадр ему
-## задаёт `tools/render_actors.py`. Своя копия числа разъехалась бы с кадром при
-## первой же правке машины, и та повисла бы над полом или утонула в нём.
-const CAR_GAP: float = 36.0
-const CAR_SPEED: float = 960.0
+## Габарит записан здесь: в греев-боксе машина — коробка, и другого источника
+## размера у неё нет. Модель M16 принесёт свой, и число уйдёт вместе с коробкой.
+const CAR_SIZE := Vector3(2.4, 0.9, 1.0)
+const CAR_GAP: float = 0.36
+const CAR_SPEED: float = 9.6
+## Машина стоит снаружи здания: за плоскостью игры, но перед стеной, чтобы
+## Otto проходил перед ней, а не сквозь.
+const CAR_Z: float = -0.6
+
+## Толщина стен, которые только видны: задней стены коридора, дальней стены
+## комнаты и перемычек над дверями. Тел у них нет — по Z никто не ходит.
+const PANEL_THICKNESS: float = 0.1
+
+## Свет греев-бокса (ADR-0021, решение 4): общий тон, при котором погашенный
+## этаж виден, но тёмен, и одна лампа над крышей — у крыши ламп нет, а гаснуть
+## она не должна никогда: ей светит город.
+const AMBIENT_ENERGY: float = 0.35
+const SKY := Color(0.03, 0.04, 0.07)
+const ROOF_LIGHT_COLOR := Color(0.72, 0.78, 0.95)
+const ROOF_LIGHT_ENERGY: float = 0.9
+const ROOF_LIGHT_RANGE: float = 12.0
+const ROOF_LIGHT_HEIGHT: float = 4.0
 
 ## Насколько злее агенты и насколько хуже слушается кабина по тревоге.
 const ALARM_MENACE: float = 1.5
@@ -66,13 +80,12 @@ const ALARM_CAR_DELAY: float = 0.6
 ## дверь отдаёт его за кромкой, и в кадр он уже входит своим ходом.
 const AGENT_SPAWN_MARGIN: int = 1
 
-## Ближе этого дверь агента не выпускает, px.
+## Ближе этого дверь агента не выпускает, м.
 ##
 ## Иначе агент появляется прямо на Otto: двери стоят на местах этажа, и стоящий
-## у двери получал выходящего в упор — на четыре пикселя, — а с такого
-## расстояния не помогают ни уклонение, ни выстрел первым. Дверь просто ждёт,
-## пока игрок отойдёт.
-const AGENT_SAFE_RELEASE: float = 288.0
+## у двери получал выходящего в упор, — а с такого расстояния не помогают ни
+## уклонение, ни выстрел первым. Дверь просто ждёт, пока игрок отойдёт.
+const AGENT_SAFE_RELEASE: float = 2.88
 
 ## На сколько дальше того же запаса агент живёт, прежде чем его уберут.
 ##
@@ -120,23 +133,16 @@ var _plan: BuildingPlan
 var _doors: Array[Door] = []
 var _cars: Array[ElevatorCar] = []
 ## Одежда шахт отдельным узлом: полсотни частей на здание не должны попадать
-## под каждый обход детей уровня.
+## под каждый обход детей уровня. Стены комнаты — там же и по той же причине.
 var _shafts: BuildingShafts = null
+var _walls: Node3D = null
 var _lighting := FloorLighting.new()
-## Заливка по уровню: ключ — номер уровня, крыша включая. Гаснет, когда на
-## этаже падает лампа. Словарь, а не список: уровни считаются от −1.
-var _floor_lights: Dictionary = {}
-## Столбы света в шахтах, по одному на шахту, в порядке раскладки.
-var _shaft_lights: Array[AreaLight] = []
 ## Какие этажи горели в прошлом кадре: пересчитывать их каждый кадр незачем.
 ## Пустой полосой служит (0, -1): у неё конец раньше начала, а (-1, -1) теперь
 ## означает «горит крыша» — это настоящий уровень, и совпадение молчало бы.
 var _lit_span := Vector2i(0, -1)
-## Дальний план: задние стены с окнами и город за ними. Свой узел, потому что
-## их под три сотни, и каждый обход детей уровня перебирал бы ещё и их.
-var _backdrop: BuildingBackdrop = null
-## Лампы здания: их свет тоже гасится за пределами кадра. Упавшие лампы
-## убирают себя сами, поэтому перед обращением проверяется живость.
+## Лампы здания: их свет гасится за пределами кадра. Упавшие лампы убирают себя
+## сами, поэтому перед обращением проверяется живость.
 var _lamps: Array[Lamp] = []
 ## Посты у агентских дверей, по одному на дверь. Двери здания не выпускают всех
 ## разом — только те, чей этаж рядом с игроком (ADR-0014, пункт 4).
@@ -144,18 +150,18 @@ var _posts: Array[AgentPost] = []
 ## Здание сдано. Событие однократное: по нему main собирает следующее здание.
 var _cleared: bool = false
 ## Машина у выхода и её отъезд: пока она едет, здание ещё не сдано.
-var _car: Sprite2D = null
+var _car: MeshInstance3D = null
 var _car_leaving: bool = false
 ## Куда машина уезжает: -1 влево, +1 вправо. Та же сторона, с которой она стоит.
 var _car_towards: float = 1.0
 var _exit_position := Vector2.ZERO
-## Трос вступления и докуда по нему ехать. Пока едет — Otto не слушается ввода.
-var _rope: TextureRect = null
+## Трос вступления и докуда по нему ехать, в плоскости правил. Пока едет —
+## Otto не слушается ввода.
+var _rope: MeshInstance3D = null
 var _sliding: bool = false
 var _rope_target: float = 0.0
 
 @onready var otto: Otto = $Otto
-@onready var _background: ColorRect = $Background
 
 
 func _ready() -> void:
@@ -163,11 +169,11 @@ func _ready() -> void:
 		rules = BuildingRules.new()
 	_plan = BuildingPlan.generate(rules, building_seed)
 
-	_background.size = Vector2(rules.width, rules.total_height())
-	_backdrop = BuildingBackdrop.new()
-	add_child(_backdrop)
-	_backdrop.build(rules, building_seed, WALL_WIDTH)
+	_walls = Node3D.new()
+	_walls.name = "Walls"
+	add_child(_walls)
 	_build_geometry()
+	_build_room()
 	_spawn_shafts()
 	_spawn_escalators()
 	_spawn_doors()
@@ -180,7 +186,7 @@ func _ready() -> void:
 	# Спускается он туда по тросу — как в порте (ADR-0017, решение 4).
 	var roof := BuildingRules.ROOF
 	var landing := Vector2(_plan.safe_x(rules, roof), rules.floor_surface(roof))
-	otto.global_position = landing - Vector2(0.0, ROPE_DROP)
+	otto.global_position = WorldSpace.to_scene(landing - Vector2(0.0, ROPE_DROP))
 	_start_the_slide(landing)
 	otto.died.connect(_on_otto_died)
 	GameState.instance().alarm_raised.connect(_on_alarm_raised)
@@ -190,15 +196,12 @@ func _ready() -> void:
 	otto.apply_camera_bounds(Rect2(0.0, 0.0, rules.width, rules.total_height()))
 
 
-## Гасит всё, что уехало из кадра. Источников в здании шестьдесят, а в кадр
-## влезает два с половиной этажа — ADR-0010, пункт 8.
+## Гасит всё, что уехало из кадра. Ламп в здании тридцать, а в кадр влезает
+## два с половиной этажа — ADR-0010, пункт 8.
 func _process(delta: float) -> void:
 	var view := otto.camera_view()
 	if _car_leaving:
 		_move_car(delta, view)
-
-	# Город отстаёт от камеры, оттого и кажется далёким.
-	_backdrop.follow(view)
 
 	var span := VisibleFloors.around(rules, view)
 	# Агенты пересчитываются каждый кадр, а не только на смене полосы: дверь ждёт
@@ -210,27 +213,11 @@ func _process(delta: float) -> void:
 		return
 
 	_lit_span = span
-	for index: int in _floor_lights:
-		var light: AreaLight = _floor_lights[index]
-		# Погашенный этаж остаётся погашенным: в кадре он или нет, лампы на нём
-		# больше нет. Поэтому видимость решает не только отбор.
-		light.visible = VisibleFloors.covers(span, index) and not _lighting.is_dark(index)
-
-	for index: int in _shaft_lights.size():
-		# Шахта тянется через много этажей, поэтому горит, если в кадр попал
-		# хоть один из них. Без этого в тридцатиэтажке горели бы все шахты разом,
-		# и обещанная дюжина источников в кадре перестала бы быть правдой.
-		var shaft := _plan.shafts[index]
-		_shaft_lights[index].visible = shaft.top <= span.y and shaft.bottom >= span.x
-
-	# У этажа два источника (ADR-0010, пункт 3), и отбор нужен обоим: пятно
-	# лампы вдобавок кладёт тени, то есть стоит дороже заливки. Этаж лампы
-	# берётся из её же положения — так же, как его берёт tools/light_shot.gd.
+	# Свет лампы кладёт тени, то есть стоит дорого, и горит только в кадре.
 	for lamp: Lamp in _lamps:
 		if not is_instance_valid(lamp):
 			continue
-		var floor_index := rules.floor_index_near(lamp.global_position.y)
-		lamp.set_light_visible(VisibleFloors.covers(span, floor_index))
+		lamp.set_light_visible(VisibleFloors.covers(span, lamp.floor_index))
 
 
 ## Раскладка, по которой собрано здание.
@@ -255,7 +242,7 @@ func agent_doors() -> Array[Door]:
 	return serving
 
 
-## Где стоит выход из здания.
+## Где стоит выход из здания, в плоскости правил.
 func exit_position() -> Vector2:
 	return _exit_position
 
@@ -285,10 +272,8 @@ static func slab_segments(
 
 
 func _build_geometry() -> void:
-	# Тайлы берутся один раз на здание: плит и стен в нём под три сотни,
-	# а текстур две.
-	var side_tile := SpriteTextures.tile("wall_side")
-	var slab_tile := SpriteTextures.tile("slab")
+	var slab := GreyboxLook.surface(GreyboxLook.SLAB)
+	var wall := GreyboxLook.surface(GreyboxLook.WALL)
 
 	for index: int in rules.levels():
 		var surface := rules.floor_surface(index)
@@ -297,25 +282,72 @@ func _build_geometry() -> void:
 		# Перекрытие шире собственных стен там, где силуэт делает ступень: оно же
 		# потолок нижнего этажа, а тот шире своего верхнего соседа.
 		for rect in slab_segments(surface, gaps, rules.slab_span(index), rules.slab_height):
-			# Перекрытия тоном раунда не красятся: белый пол и потолок должны
-			# читаться одинаково в любом раунде — это опора, а не фон.
-			_build_solid(rect, slab_tile)
-		_build_side_walls(index, surface, bounds, side_tile)
+			_build_solid(rect, slab)
+		_build_side_walls(index, surface, bounds, wall)
 
 
 ## Боковые стены уровня. Идут ступенями вслед за силуэтом, а не сплошными
 ## столбцами во всю высоту: здание расширяется книзу (ADR-0014, пункт 3).
 ##
 ## У крыши стена доходит до верха мира: это парапет, и он же не даёт шагнуть
-## с крыши мимо здания. Прыжок берёт 240 px, и низкий бортик Otto перемахнул бы.
-func _build_side_walls(index: int, surface: float, bounds: Vector2, tile: CanvasTexture) -> void:
+## с крыши мимо здания. Прыжок берёт 2.4 м, и низкий бортик Otto перемахнул бы.
+func _build_side_walls(
+	index: int, surface: float, bounds: Vector2, material: StandardMaterial3D
+) -> void:
 	var top := rules.story_top(index)
 	var height := surface + rules.slab_height - top
 	if height <= 0.0:
 		return
 
-	_build_solid(Rect2(bounds.x, top, WALL_WIDTH, height), tile, rules.palette.masonry)
-	_build_solid(Rect2(bounds.y - WALL_WIDTH, top, WALL_WIDTH, height), tile, rules.palette.masonry)
+	_build_solid(Rect2(bounds.x, top, WALL_WIDTH, height), material)
+	_build_solid(Rect2(bounds.y - WALL_WIDTH, top, WALL_WIDTH, height), material)
+
+
+## Комната за коридором: задняя стена с проёмами дверей и дальняя стена.
+##
+## Это и есть глубина кадра по ADR-0021, решение 1: игра идёт в плоскости, а
+## объём — за задней стеной, и виден он в проёмы. Проёмы режутся тем же
+## [method BuildingPlan.spans_between], что и перекрытия: дверь занимает в стене
+## ровно свою ширину, над ней — перемычка до потолка.
+##
+## Крыша стены не получает: над ней небо, а дальняя стена там — небоскрёб напротив,
+## и он придёт задним планом в M19.
+func _build_room() -> void:
+	var back := GreyboxLook.surface(GreyboxLook.BACK_WALL)
+	var far := GreyboxLook.surface(GreyboxLook.SKY_WALL)
+	var back_z := WorldSpace.BACK_WALL_Z - PANEL_THICKNESS * 0.5
+	var far_z := WorldSpace.BACK_WALL_Z - WorldSpace.ROOM_DEPTH
+
+	for index: int in rules.levels():
+		if index == BuildingRules.ROOF:
+			continue
+		var surface := rules.floor_surface(index)
+		var top := rules.story_top(index)
+		var bounds := rules.floor_span(index)
+		var inner := Vector2(bounds.x + WALL_WIDTH, bounds.y - WALL_WIDTH)
+
+		var openings := _openings_on(index)
+		var lintel_top := surface - Door.LEAF_SIZE.y
+		for span in BuildingPlan.spans_between(openings, inner):
+			_build_panel(Rect2(span.x, top, span.y - span.x, surface - top), back, back_z)
+		for opening in openings:
+			_build_panel(
+				Rect2(opening.x, top, opening.y - opening.x, lintel_top - top), back, back_z
+			)
+
+		_build_panel(Rect2(inner.x, top, inner.y - inner.x, surface - top), far, far_z)
+
+
+## Проёмы в задней стене этажа: двери и, на нижнем, выход.
+func _openings_on(index: int) -> Array[Vector2]:
+	var openings: Array[Vector2] = []
+	var half := Door.LEAF_SIZE.x * 0.5
+	for spot in _plan.doors:
+		if spot.floor_index == index:
+			openings.append(Vector2(spot.x - half, spot.x + half))
+	if index == rules.floors - 1:
+		openings.append(Vector2(_plan.exit_x - EXIT_WIDTH * 0.5, _plan.exit_x + EXIT_WIDTH * 0.5))
+	return openings
 
 
 func _spawn_shafts() -> void:
@@ -333,7 +365,6 @@ func _spawn_shafts() -> void:
 		car.setup(stops)
 		_cars.append(car)
 		_spawn_shaft_pit(shaft)
-		_light_shaft(shaft)
 
 
 ## Вступление: Otto съезжает по тросу на крышу.
@@ -349,12 +380,11 @@ func _start_the_slide(landing: Vector2) -> void:
 	# физики на всё здание незачем, [method _finish_the_slide] его и снимет.
 	set_physics_process(true)
 
-	_rope = TiledRect.make(
-		Vector2(ROPE_WIDTH, landing.y),
-		Vector2(landing.x - ROPE_WIDTH * 0.5, 0.0),
-		SpriteTextures.tile("rope")
+	_rope = GreyboxLook.box(
+		Vector3(ROPE_WIDTH, landing.y, ROPE_WIDTH), GreyboxLook.surface(GreyboxLook.WALL)
 	)
-	_rope.z_index = -2
+	_rope.position = WorldSpace.to_scene(Vector2(landing.x, landing.y * 0.5))
+	_rope.position.z = -0.3
 	add_child(_rope)
 
 
@@ -367,9 +397,11 @@ func _physics_process(delta: float) -> void:
 	if not _sliding:
 		return
 
-	if otto.global_position.y < _rope_target:
-		otto.global_position.y = minf(otto.global_position.y + ROPE_SPEED * delta, _rope_target)
-	if otto.global_position.y >= _rope_target:
+	var at := WorldSpace.to_plane(otto.global_position)
+	if at.y < _rope_target:
+		at.y = minf(at.y + ROPE_SPEED * delta, _rope_target)
+		otto.global_position = WorldSpace.to_scene(at)
+	if at.y >= _rope_target:
 		_finish_the_slide()
 
 
@@ -386,17 +418,11 @@ func _finish_the_slide() -> void:
 ## Дно шахты: упавший сюда разбивается, вошедший ногами с этажа — нет.
 func _spawn_shaft_pit(shaft: BuildingPlan.ShaftSpot) -> void:
 	var surface := rules.floor_surface(shaft.bottom)
-	var pit := Area2D.new()
-	pit.collision_layer = 0
-	pit.collision_mask = 2
-	pit.position = Vector2(shaft.x, surface - PIT_HEIGHT * 0.5)
-
-	var shape := RectangleShape2D.new()
-	shape.size = Vector2(rules.shaft_width, PIT_HEIGHT)
-	var collision := CollisionShape2D.new()
-	collision.shape = shape
-	pit.add_child(collision)
-
+	var pit := _zone(
+		Rect2(
+			shaft.x - rules.shaft_width * 0.5, surface - PIT_HEIGHT, rules.shaft_width, PIT_HEIGHT
+		)
+	)
 	pit.body_entered.connect(_on_pit_entered)
 	add_child(pit)
 
@@ -404,14 +430,16 @@ func _spawn_shaft_pit(shaft: BuildingPlan.ShaftSpot) -> void:
 func _spawn_escalators() -> void:
 	for spot in _plan.escalators:
 		var escalator := ESCALATOR_SCENE.instantiate() as Escalator
-		escalator.position = Vector2(spot.x, rules.floor_surface(spot.floor_index))
+		escalator.position = WorldSpace.to_scene(
+			Vector2(spot.x, rules.floor_surface(spot.floor_index))
+		)
 		add_child(escalator)
 
 		var descent := Vector2(spot.towards * rules.escalator_run, rules.floor_height)
 		# Перегиб — в самом проёме: через него идут и полотно, и поездка, поэтому
 		# пассажир проходит сквозь дыру, а не сквозь плиту.
 		var gap := spot.gap(rules)
-		var bend := Vector2((gap.x + gap.y) * 0.5 - spot.x, rules.slab_height + 4.0)
+		var bend := Vector2((gap.x + gap.y) * 0.5 - spot.x, rules.slab_height + 0.04)
 		escalator.setup(descent, bend)
 
 
@@ -422,7 +450,7 @@ func _spawn_doors() -> void:
 	var documents := 0
 	for spot in _plan.doors:
 		var door := DOOR_SCENE.instantiate() as Door
-		door.position = Vector2(spot.x, rules.floor_surface(spot.floor_index))
+		door.position = WorldSpace.to_scene(Vector2(spot.x, rules.floor_surface(spot.floor_index)))
 		door.has_document = spot.has_document
 		add_child(door)
 		_doors.append(door)
@@ -442,10 +470,13 @@ func _spawn_doors() -> void:
 func _spawn_lamps() -> void:
 	for spot in _plan.lamps:
 		var lamp := LAMP_SCENE.instantiate() as Lamp
-		lamp.position = Vector2(spot.x, rules.floor_surface(spot.floor_index) - LAMP_HANG_HEIGHT)
+		var hang := rules.floor_surface(spot.floor_index) - LAMP_HANG_HEIGHT
+		lamp.position = WorldSpace.to_scene(Vector2(spot.x, hang))
+		# Этаж лампы известен здесь, и обратно из координаты его не выводят: она
+		# висит ровно на середине пролёта, где округление решает случай.
+		lamp.floor_index = spot.floor_index
 		lamp.crushed.connect(_on_lamp_crushed)
-		# Этаж лампы известен здесь, и обратно из координаты его выводить незачем.
-		lamp.fell.connect(_on_lamp_fell.bind(spot.floor_index))
+		lamp.fell.connect(_on_lamp_fell.bind(lamp.floor_index))
 		add_child(lamp)
 		lamp.hang(LAMP_HANG_HEIGHT)
 		_lamps.append(lamp)
@@ -453,50 +484,42 @@ func _spawn_lamps() -> void:
 
 ## Выход из здания. Не запирается: без всех документов он отправляет обратно
 ## наверх, к несобранной двери (ADR-0005, пункт 5).
+##
+## Сам проём вырезан в задней стене ([method _build_room]); здесь — зона, порог
+## и машина. Порог светится: выход — цель, и читаться он обязан на погашенном
+## этаже (ADR-0019, решение 5).
 func _spawn_exit() -> void:
 	var bottom := rules.floors - 1
 	var surface := rules.floor_surface(bottom)
 	var centre := _plan.exit_x
 	var area := Rect2(centre - EXIT_WIDTH * 0.5, surface - EXIT_HEIGHT, EXIT_WIDTH, EXIT_HEIGHT)
 
-	var zone := Area2D.new()
-	zone.collision_layer = 0
-	zone.collision_mask = 2
-	zone.position = area.position + area.size * 0.5
-	zone.z_index = -1
-
-	var shape := RectangleShape2D.new()
-	shape.size = area.size
-	var collision := CollisionShape2D.new()
-	collision.shape = shape
-	zone.add_child(collision)
-	# Вывеска — одна картинка на весь проём, а не тайл: замощённая, она повторилась
-	# бы половинкой, стоит проёму разойтись с ассетом.
-	zone.add_child(
-		TiledRect.stretched(area.size, -area.size * 0.5, SpriteTextures.tile("exit_way"))
-	)
-
+	var zone := _zone(area)
 	zone.body_entered.connect(_on_exit_entered)
 	add_child(zone)
-	_exit_position = zone.global_position
+	_exit_position = area.get_center()
+
+	var threshold := GreyboxLook.box(
+		Vector3(EXIT_WIDTH, 0.05, PANEL_THICKNESS), GreyboxLook.marker(GreyboxLook.DOOR)
+	)
+	threshold.position = WorldSpace.to_scene(Vector2(centre, surface - 0.025))
+	threshold.position.z = WorldSpace.BACK_WALL_Z + PANEL_THICKNESS
+	add_child(threshold)
 	_spawn_car(area)
 
 
-## Машина у выхода. Стоит на полу нижнего этажа рядом с проёмом, за геометрией:
-## она снаружи здания, и заходить на неё Otto не может — это картинка, не тело.
+## Машина у выхода. Стоит на полу нижнего этажа рядом с проёмом, за плоскостью
+## игры: она снаружи здания, и заходить на неё Otto не может — это вид, не тело.
 func _spawn_car(exit_area: Rect2) -> void:
-	var texture := SpriteTextures.actor("car", "parked")
-	var size := texture.get_size()
-	_car = Sprite2D.new()
-	_car.texture = texture
-	_car.centered = false
-	_car.z_index = -2
+	_car = GreyboxLook.box(CAR_SIZE, GreyboxLook.marker(GreyboxLook.CAR))
 	# Уезжает в ближнюю сторону: там же и стоит. В дальнюю машина ехала бы через
 	# всё здание, и «уехал» растянулось бы на пять секунд вместо одной.
 	_car_towards = -1.0 if exit_area.get_center().x < rules.width * 0.5 else 1.0
-	var x := exit_area.get_center().x + _car_towards * (EXIT_WIDTH * 0.5 + CAR_GAP)
-	_car.position = Vector2(x - size.x * 0.5, exit_area.end.y - size.y)
-	_car.flip_h = _car_towards < 0.0
+	var x := (
+		exit_area.get_center().x + _car_towards * (EXIT_WIDTH * 0.5 + CAR_GAP + CAR_SIZE.x * 0.5)
+	)
+	_car.position = WorldSpace.to_scene(Vector2(x, exit_area.end.y - CAR_SIZE.y * 0.5))
+	_car.position.z = CAR_Z
 	add_child(_car)
 
 
@@ -513,14 +536,14 @@ func _move_car(delta: float, view: Rect2) -> void:
 
 	# Уехала — значит уехала из кадра, а не за границу здания: кадр и есть то,
 	# что видит игрок, а до границы машина ползла бы впятеро дольше.
-	var width := _car.texture.get_width()
-	var gone := _car.position.x + width < view.position.x or _car.position.x > view.end.x
+	var left := _car.position.x - CAR_SIZE.x * 0.5
+	var gone := left + CAR_SIZE.x < view.position.x or left > view.end.x
 	if gone:
 		_car_leaving = false
 		building_cleared.emit()
 
 
-func _on_exit_entered(body: Node2D) -> void:
+func _on_exit_entered(body: Node3D) -> void:
 	var runner := body as Otto
 	if runner == null:
 		return
@@ -545,7 +568,7 @@ func _send_back_for_documents(runner: Otto) -> void:
 	var index := DocumentRoute.door_to_return_to(pending)
 	if index < 0:
 		return
-	runner.global_position = pending[index]
+	runner.global_position = WorldSpace.to_scene(pending[index])
 
 
 ## Лампа накрыла агента по дороге вниз — самый дорогой способ убийства.
@@ -558,12 +581,12 @@ func _on_lamp_crushed(agent: Enemy) -> void:
 
 
 ## Лампа долетела до пола: этаж гаснет и обратно уже не загорается.
+##
+## Гасить нечего: лампа была единственным источником этажа и ушла вместе со
+## своим светом. Здесь остаётся правило — запомнить темноту и сказать агентам.
 func _on_lamp_fell(index: int) -> void:
 	if not _lighting.darken(index):
 		return
-	# Этаж падает до общего тона здания: света на нём больше нет.
-	if _floor_lights.has(index):
-		_floor_lights[index].visible = false
 	for agent in _agents_on(index):
 		agent.set_in_the_dark(true)
 
@@ -584,9 +607,15 @@ func agents() -> Array[Enemy]:
 func _agents_on(index: int) -> Array[Enemy]:
 	var found: Array[Enemy] = []
 	for agent in agents():
-		if rules.floor_index_near(agent.global_position.y) == index:
+		if _floor_of(agent) == index:
 			found.append(agent)
 	return found
+
+
+## Этаж, на котором стоит узел. Единственное место, где высота сцены снова
+## становится высотой правил.
+func _floor_of(node: Node3D) -> int:
+	return rules.floor_index_near(WorldSpace.to_plane(node.global_position).y)
 
 
 ## Держит в здании ровно тех агентов, до которых игроку есть дело: выпускает
@@ -604,7 +633,7 @@ func _agents_on(index: int) -> Array[Enemy]:
 ## Один за кадр — не бережливость, а та же мера: двери и так ждут свою паузу,
 ## а вываливать пятерых разом на смене полосы незачем.
 func _tend_agents(span: Vector2i, delta: float) -> void:
-	var here := rules.floor_index_near(otto.global_position.y)
+	var here := _floor_of(otto)
 	var live := 0
 	var nearest: AgentPost = null
 	var nearest_gap := 0
@@ -717,7 +746,7 @@ func _release_agent(post: AgentPost) -> Enemy:
 	# заводить себе значения по умолчанию ему не приходится.
 	agent.apply_rules(rules)
 	add_child(agent)
-	agent.global_position = mat
+	agent.global_position = WorldSpace.to_scene(mat)
 	agent.setup(otto, signf(otto.global_position.x - mat.x))
 	agent.set_in_the_dark(_lighting.is_dark(post.floor_index))
 	agent.set_menace(_menace())
@@ -766,9 +795,9 @@ func _on_otto_died() -> void:
 ## никуда не делся, и возвращение на то же место — это смерть в петле. На пустом
 ## этаже выбор вырождается в первое свободное место, как было раньше.
 func _respawn_otto() -> void:
-	var index := rules.floor_index_near(otto.global_position.y)
+	var index := _floor_of(otto)
 	var surface := rules.floor_surface(index)
-	otto.global_position = Vector2(_safest_x(index), surface)
+	otto.global_position = WorldSpace.to_scene(Vector2(_safest_x(index), surface))
 	otto.revive()
 
 
@@ -792,7 +821,7 @@ func _safest_x(index: int) -> float:
 	return best
 
 
-func _on_pit_entered(body: Node2D) -> void:
+func _on_pit_entered(body: Node3D) -> void:
 	var victim := body as Otto
 	if victim == null:
 		return
@@ -803,81 +832,85 @@ func _on_pit_entered(body: Node2D) -> void:
 		victim.kill()
 
 
-func _build_solid(rect: Rect2, tile: CanvasTexture, tint := Color.WHITE) -> void:
-	var body := StaticBody2D.new()
-	body.position = rect.position + rect.size * 0.5
-	# Тела добавляются в дерево после Otto, то есть рисовались бы поверх него.
-	# Геометрия всегда за актёрами, но перед фоном (у фона z_index = -12).
-	body.z_index = -1
+## Твёрдая коробка на месте прямоугольника правил: тело и вид.
+##
+## Глубиной на коридор и комнату вместе: перекрытие — пол не только коридора,
+## но и комнаты за стеной, иначе в проём двери было бы видно пустоту под ногами.
+## Передняя грань приходится на переднюю грань коридора, а не на плоскость игры.
+func _build_solid(rect: Rect2, material: StandardMaterial3D) -> void:
+	var depth := WorldSpace.CORRIDOR_DEPTH + WorldSpace.ROOM_DEPTH
+	var size := Vector3(rect.size.x, rect.size.y, depth)
+	var centre := WorldSpace.to_scene(rect.get_center())
+	centre.z = WorldSpace.CORRIDOR_DEPTH * 0.5 - depth * 0.5
 
-	var shape := RectangleShape2D.new()
-	shape.size = rect.size
-	var collision := CollisionShape2D.new()
+	var body := StaticBody3D.new()
+	body.position = centre
+
+	var shape := BoxShape3D.new()
+	shape.size = size
+	var collision := CollisionShape3D.new()
 	collision.shape = shape
 	body.add_child(collision)
-	body.add_child(TiledRect.make(rect.size, -rect.size * 0.5, tile, tint))
-	body.add_child(_occluder(rect.size))
+	body.add_child(GreyboxLook.box(size, material))
 
 	add_child(body)
 
 
-## Столб света в шахте на всю её высоту.
-##
-## Шахта — единственное, что светится в погашенном здании само: она соединяет
-## этажи, и свет в ней показывает, куда идти, когда лампы сбиты. Гасить её вместе
-## с этажом нельзя — этажей у шахты много, а столб один.
-##
-## Верх берётся тот же, что у стоек ([method BuildingShafts.top_of]): у шахты до крыши
-## потолка нет, и столб, отмеренный от верха мира, светил бы в открытом небе
-## над крышей — там, где Otto висит на тросе всё вступление.
-func _light_shaft(shaft: BuildingPlan.ShaftSpot) -> void:
-	var top := _shafts.top_of(shaft)
-	var bottom := rules.floor_surface(shaft.bottom)
-	var area := Rect2(shaft.x - rules.shaft_width * 0.5, top, rules.shaft_width, bottom - top)
-	var light := AreaLight.column(area, rules.palette.shaft_light, SHAFT_ENERGY)
-	add_child(light)
-	_shaft_lights.append(light)
+## Стена, которая только видна: без тела, толщиной [constant PANEL_THICKNESS],
+## серединой на [param z].
+func _build_panel(rect: Rect2, material: StandardMaterial3D, z: float) -> void:
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return
+	var panel := GreyboxLook.box(Vector3(rect.size.x, rect.size.y, PANEL_THICKNESS), material)
+	panel.position = WorldSpace.to_scene(rect.get_center())
+	panel.position.z = z
+	_walls.add_child(panel)
 
 
-## Зажигает здание: общий тон и заливка на каждом этаже.
+## Зона на месте прямоугольника правил, ловящая Otto. Толщиной в тело: она
+## лежит в плоскости игры, как и всё, с чем он взаимодействует.
+func _zone(rect: Rect2) -> Area3D:
+	var zone := Area3D.new()
+	zone.collision_layer = 0
+	zone.collision_mask = 2
+	zone.position = WorldSpace.to_scene(rect.get_center())
+
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(rect.size.x, rect.size.y, WorldSpace.BODY_DEPTH)
+	var collision := CollisionShape3D.new()
+	collision.shape = shape
+	zone.add_child(collision)
+	return zone
+
+
+## Зажигает здание: общий тон и лампа над крышей.
 ##
-## Светлым этаж делает собственный источник, а не отсутствие темноты — вся
-## конструкция вехи держится на этом (ADR-0010, пункт 3).
+## Светлым этаж делает собственный источник — лампа, — а не отсутствие темноты:
+## на этом держится правило темноты (ADR-0010, пункт 3). Общий тон низкий и
+## нужен только затем, чтобы погашенный этаж был тёмен, а не чёрен: агенты в
+## темноте продолжают стрелять, и игрок обязан видеть, во что стрелять в ответ.
+##
+## Крыша ламп не имеет и не гаснет никогда: ей светит город. Пока города нет
+## (M19), его заменяет один источник над крышей.
 func _light_building() -> void:
-	var ambient := CanvasModulate.new()
-	ambient.color = rules.palette.dark
-	add_child(ambient)
+	var environment := Environment.new()
+	environment.background_mode = Environment.BG_COLOR
+	environment.background_color = SKY
+	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	environment.ambient_light_color = rules.palette.dark
+	environment.ambient_light_energy = AMBIENT_ENERGY
+	var world := WorldEnvironment.new()
+	world.environment = environment
+	add_child(world)
 
-	for index: int in rules.levels():
-		var light := AreaLight.covering(_story_area(index), rules.palette.lit, FLOOR_ENERGY)
-		add_child(light)
-		_floor_lights[index] = light
-
-
-## Пролёт уровня: от потолка до низа настила, на котором стоят.
-##
-## Настил включён нарочно: кончайся заливка ровно по полу, сам пол и ноги
-## стоящего на нём остались бы неосвещёнными.
-##
-## У крыши потолка нет — над ней небо, и [method BuildingRules.story_top] отдаёт
-## верх мира. Ламп на крыше тоже нет, поэтому погасить её свет нечем: светит ей
-## город, и это единственный уровень, который не гаснет никогда.
-func _story_area(index: int) -> Rect2:
-	var surface := rules.floor_surface(index)
-	var top := rules.story_top(index)
-	var bounds := rules.floor_span(index)
-	return Rect2(bounds.x, top, bounds.y - bounds.x, surface + rules.slab_height - top)
-
-
-## Перекрытия и стены не пропускают свет: иначе лампа светила бы сквозь пол
-## на соседние этажи, и погашенный этаж подсвечивался бы снизу.
-func _occluder(size: Vector2) -> LightOccluder2D:
-	var half := size * 0.5
-	var shape := OccluderPolygon2D.new()
-	shape.polygon = PackedVector2Array(
-		[-half, Vector2(half.x, -half.y), half, Vector2(-half.x, half.y)]
+	var roof_span := rules.floor_span(BuildingRules.ROOF)
+	var over_roof := Vector2(
+		(roof_span.x + roof_span.y) * 0.5,
+		rules.floor_surface(BuildingRules.ROOF) - ROOF_LIGHT_HEIGHT
 	)
-
-	var occluder := LightOccluder2D.new()
-	occluder.occluder = shape
-	return occluder
+	var sky_light := OmniLight3D.new()
+	sky_light.light_color = ROOF_LIGHT_COLOR
+	sky_light.light_energy = ROOF_LIGHT_ENERGY
+	sky_light.omni_range = ROOF_LIGHT_RANGE
+	sky_light.position = WorldSpace.to_scene(over_roof)
+	add_child(sky_light)
