@@ -32,16 +32,14 @@ const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 const LAMP_SCENE := preload("res://src/systems/lighting/lamp.tscn")
 
-const WALL_WIDTH: float = 0.48
-
 ## Дно шахты: сюда падает тот, кто шагнул в пустой проём.
 const PIT_HEIGHT: float = 0.6
 
 ## На сколько выше пола висит середина лампы, м.
 const LAMP_HANG_HEIGHT: float = 1.8
 
-## Выход из здания — на нижнем этаже.
-const EXIT_WIDTH: float = 1.92
+## Высота выхода из здания. Ширина — [constant BuildingShell.EXIT_WIDTH]:
+## ей же оболочка режет проём в задней стене.
 const EXIT_HEIGHT: float = 1.2
 
 ## Машина у выхода: ею оригинал заканчивает здание (ADR-0011, пункт 14).
@@ -57,10 +55,6 @@ const CAR_SPEED: float = 9.6
 ## Машина стоит снаружи здания: за плоскостью игры, но перед стеной, чтобы
 ## Otto проходил перед ней, а не сквозь.
 const CAR_Z: float = -0.6
-
-## Толщина стен, которые только видны: задней стены коридора, дальней стены
-## комнаты и перемычек над дверями. Тел у них нет — по Z никто не ходит.
-const PANEL_THICKNESS: float = 0.1
 
 ## Вывеска над выходом: габарит и на сколько выше проёма стены висит её
 ## середина, м (ADR-0023, решение 6).
@@ -139,7 +133,9 @@ var _cars: Array[ElevatorCar] = []
 ## Одежда шахт отдельным узлом: полсотни частей на здание не должны попадать
 ## под каждый обход детей уровня. Стены комнаты — там же и по той же причине.
 var _shafts: BuildingShafts = null
-var _walls: Node3D = null
+## Оболочка здания: перекрытия, стены и комната за коридором. Ставит их она,
+## а уровень населяет готовое — ADR-0024 развёл это по узлам.
+var _shell: BuildingShell = null
 ## Рёбра — торцы плит, плинтус, пилястры — тоже своим узлом (ADR-0023, решение 4).
 var _ribs: BuildingRibs = null
 var _lighting := FloorLighting.new()
@@ -175,15 +171,14 @@ func _ready() -> void:
 		rules = BuildingRules.new()
 	_plan = BuildingPlan.generate(rules, building_seed)
 
-	_walls = Node3D.new()
-	_walls.name = "Walls"
-	add_child(_walls)
 	_ribs = BuildingRibs.new()
 	_ribs.name = "Ribs"
 	_ribs.setup(rules, _plan)
 	add_child(_ribs)
-	_build_geometry()
-	_build_room()
+	_shell = BuildingShell.new()
+	_shell.name = "Shell"
+	add_child(_shell)
+	_shell.build(rules, _plan, _ribs)
 	_spawn_shafts()
 	_spawn_escalators()
 	_spawn_doors()
@@ -267,126 +262,6 @@ func is_dark(floor_index: int) -> bool:
 ## Темно ли в точке этажа: погашена ли зона ближайшей к ней лампы (ADR-0023).
 func is_dark_at(floor_index: int, x: float) -> bool:
 	return _lighting.is_dark_at(floor_index, x)
-
-
-## Режет перекрытие на куски между проёмами.
-##
-## Сам разрез — в [method BuildingPlan.spans_between]: по тем же кускам строится
-## граф достижимости, и второй такой же счёт рано или поздно разъехался бы с этим.
-## Проёмы принимаются в любом порядке.
-##
-## Статический, чтобы проверяться тестами без сцены.
-## [param bounds] — левый и правый края перекрытия ([method BuildingRules.slab_span]):
-## здание расширяется книзу, и перекрытие лежит не во всю ширину здания, а от стены
-## до стены — своего этажа или нижнего, смотря какой шире.
-static func slab_segments(
-	surface: float, gaps: Array[Vector2], bounds: Vector2, thickness: float
-) -> Array[Rect2]:
-	var rects: Array[Rect2] = []
-	for span in BuildingPlan.spans_between(gaps, bounds):
-		rects.append(Rect2(span.x, surface, span.y - span.x, thickness))
-	return rects
-
-
-func _build_geometry() -> void:
-	# Перекрытие — пол: полированный, в него ложатся отражения (ADR-0023, решение 5).
-	var slab := GreyboxLook.polished(GreyboxLook.SLAB)
-	var wall := GreyboxLook.surface(GreyboxLook.WALL)
-
-	for index: int in rules.levels():
-		var surface := rules.floor_surface(index)
-		var bounds := rules.floor_span(index)
-		var gaps := _plan.gaps_on(rules, index)
-		# Перекрытие шире собственных стен там, где силуэт делает ступень: оно же
-		# потолок нижнего этажа, а тот шире своего верхнего соседа.
-		for rect in slab_segments(surface, gaps, rules.slab_span(index), rules.slab_height):
-			_build_solid(rect, slab)
-			_ribs.edge_of(rect)
-		_build_side_walls(index, surface, bounds, wall)
-		_build_inner_walls(index, surface, wall)
-
-
-## Внутренние стены этажа: глухие, от пола до потолка (ADR-0024, решение 5).
-##
-## Сквозь них не проходят ни люди, ни пули, и агент за стеной Otto не достаёт.
-## Где они стоят, решает раскладка: она же убрала те, что запирали документ или
-## выход, и граф достижимости считает куски этажа уже с ними.
-func _build_inner_walls(index: int, surface: float, material: StandardMaterial3D) -> void:
-	# От низа перекрытия сверху до пола: стена стоит на плите, а не вместо неё.
-	var top := rules.story_top(index)
-	var height := surface - top
-	if height <= 0.0:
-		return
-	for inner_wall in _plan.walls:
-		if inner_wall.floor_index != index:
-			continue
-		var band := inner_wall.band(rules)
-		_build_solid(Rect2(band.x, top, band.y - band.x, height), material)
-
-
-## Боковые стены уровня. Идут ступенями вслед за силуэтом, а не сплошными
-## столбцами во всю высоту: здание расширяется книзу (ADR-0014, пункт 3).
-##
-## У крыши стена доходит до верха мира: это парапет, и он же не даёт шагнуть
-## с крыши мимо здания. Прыжок берёт 2.4 м, и низкий бортик Otto перемахнул бы.
-func _build_side_walls(
-	index: int, surface: float, bounds: Vector2, material: StandardMaterial3D
-) -> void:
-	var top := rules.story_top(index)
-	var height := surface + rules.slab_height - top
-	if height <= 0.0:
-		return
-
-	_build_solid(Rect2(bounds.x, top, WALL_WIDTH, height), material)
-	_build_solid(Rect2(bounds.y - WALL_WIDTH, top, WALL_WIDTH, height), material)
-
-
-## Комната за коридором: задняя стена с проёмами дверей и дальняя стена.
-##
-## Это и есть глубина кадра по ADR-0021, решение 1: игра идёт в плоскости, а
-## объём — за задней стеной, и виден он в проёмы. Проёмы режутся тем же
-## [method BuildingPlan.spans_between], что и перекрытия: дверь занимает в стене
-## ровно свою ширину, над ней — перемычка до потолка.
-##
-## Крыша стены не получает: над ней небо, а дальняя стена там — небоскрёб напротив,
-## и он придёт задним планом в M19.
-func _build_room() -> void:
-	var back := GreyboxLook.surface(GreyboxLook.BACK_WALL)
-	var far := GreyboxLook.surface(GreyboxLook.SKY_WALL)
-	var back_z := WorldSpace.BACK_WALL_Z - PANEL_THICKNESS * 0.5
-	var far_z := WorldSpace.BACK_WALL_Z - WorldSpace.ROOM_DEPTH
-
-	for index: int in rules.levels():
-		if index == BuildingRules.ROOF:
-			continue
-		var surface := rules.floor_surface(index)
-		var top := rules.story_top(index)
-		var bounds := rules.floor_span(index)
-		var inner := Vector2(bounds.x + WALL_WIDTH, bounds.y - WALL_WIDTH)
-
-		var openings := _openings_on(index)
-		var lintel_top := surface - Door.LEAF_SIZE.y
-		for span in BuildingPlan.spans_between(openings, inner):
-			_build_panel(Rect2(span.x, top, span.y - span.x, surface - top), back, back_z)
-		for opening in openings:
-			_build_panel(
-				Rect2(opening.x, top, opening.y - opening.x, lintel_top - top), back, back_z
-			)
-		_ribs.line_the_wall(index, inner, openings)
-
-		_build_panel(Rect2(inner.x, top, inner.y - inner.x, surface - top), far, far_z)
-
-
-## Проёмы в задней стене этажа: двери и, на нижнем, выход.
-func _openings_on(index: int) -> Array[Vector2]:
-	var openings: Array[Vector2] = []
-	var half := Door.LEAF_SIZE.x * 0.5
-	for spot in _plan.doors:
-		if spot.floor_index == index:
-			openings.append(Vector2(spot.x - half, spot.x + half))
-	if index == rules.floors - 1:
-		openings.append(Vector2(_plan.exit_x - EXIT_WIDTH * 0.5, _plan.exit_x + EXIT_WIDTH * 0.5))
-	return openings
 
 
 func _spawn_shafts() -> void:
@@ -534,7 +409,12 @@ func _spawn_exit() -> void:
 	var bottom := rules.floors - 1
 	var surface := rules.floor_surface(bottom)
 	var centre := _plan.exit_x
-	var area := Rect2(centre - EXIT_WIDTH * 0.5, surface - EXIT_HEIGHT, EXIT_WIDTH, EXIT_HEIGHT)
+	var area := Rect2(
+		centre - BuildingShell.EXIT_WIDTH * 0.5,
+		surface - EXIT_HEIGHT,
+		BuildingShell.EXIT_WIDTH,
+		EXIT_HEIGHT
+	)
 
 	var zone := _zone(area)
 	zone.body_entered.connect(_on_exit_entered)
@@ -542,10 +422,11 @@ func _spawn_exit() -> void:
 	_exit_position = area.get_center()
 
 	var threshold := GreyboxLook.box(
-		Vector3(EXIT_WIDTH, 0.05, PANEL_THICKNESS), GreyboxLook.metal(GreyboxLook.TRIM)
+		Vector3(BuildingShell.EXIT_WIDTH, 0.05, BuildingShell.PANEL_THICKNESS),
+		GreyboxLook.metal(GreyboxLook.TRIM)
 	)
 	threshold.position = WorldSpace.to_scene(Vector2(centre, surface - 0.025))
-	threshold.position.z = WorldSpace.BACK_WALL_Z + PANEL_THICKNESS
+	threshold.position.z = WorldSpace.BACK_WALL_Z + BuildingShell.PANEL_THICKNESS
 	add_child(threshold)
 
 	# Не `sign`: так зовут встроенную функцию, и местная переменная её заслонила бы.
@@ -568,7 +449,8 @@ func _spawn_car(exit_area: Rect2) -> void:
 	# всё здание, и «уехал» растянулось бы на пять секунд вместо одной.
 	_car_towards = -1.0 if exit_area.get_center().x < rules.width * 0.5 else 1.0
 	var x := (
-		exit_area.get_center().x + _car_towards * (EXIT_WIDTH * 0.5 + CAR_GAP + CAR_LENGTH * 0.5)
+		exit_area.get_center().x
+		+ _car_towards * (BuildingShell.EXIT_WIDTH * 0.5 + CAR_GAP + CAR_LENGTH * 0.5)
 	)
 	# Модель стоит колёсами в своём нуле, капотом в +X; в другую сторону она
 	# разворачивается целиком.
@@ -892,6 +774,7 @@ func _safest_x(index: int) -> float:
 	var spots := _plan.safe_spots(rules, index)
 	if spots.is_empty():
 		return _plan.safe_x(rules, index)
+	spots = _spots_on_the_same_piece(index, WorldSpace.to_plane(otto.global_position).x, spots)
 
 	var agents := _agents_on(index)
 	var best := spots[0]
@@ -908,6 +791,30 @@ func _safest_x(index: int) -> float:
 	return best
 
 
+## Места того же куска этажа, на котором стоит [param from_x].
+##
+## Возвращаться Otto обязан на свою сторону: этаж режут проёмы и глухие стены
+## (ADR-0024, решение 5), и за стеной может не оказаться ни лифта, ни эскалатора.
+## Место выбирается по живым агентам, а самое дальнее от них — как раз за стеной:
+## без этого отбора Otto воскресал бы там, откуда не уйти, и умирал бы туда снова.
+##
+## Кусок не нашёлся — отдаётся всё, что было: остаться вовсе без места хуже, чем
+## встать не на своей половине.
+func _spots_on_the_same_piece(
+	index: int, from_x: float, spots: PackedFloat64Array
+) -> PackedFloat64Array:
+	var pieces := BuildingPlan.spans_between(_plan.blocks_on(rules, index), rules.floor_span(index))
+	for piece: Vector2 in pieces:
+		if from_x < piece.x or from_x > piece.y:
+			continue
+		var same := PackedFloat64Array()
+		for x: float in spots:
+			if x >= piece.x and x <= piece.y:
+				same.append(x)
+		return spots if same.is_empty() else same
+	return spots
+
+
 func _on_pit_entered(body: Node3D) -> void:
 	var victim := body as Otto
 	if victim == null:
@@ -917,41 +824,6 @@ func _on_pit_entered(body: Node3D) -> void:
 	)
 	if deadly:
 		victim.kill()
-
-
-## Твёрдая коробка на месте прямоугольника правил: тело и вид.
-##
-## Глубиной на коридор и комнату вместе: перекрытие — пол не только коридора,
-## но и комнаты за стеной, иначе в проём двери было бы видно пустоту под ногами.
-## Передняя грань приходится на переднюю грань коридора, а не на плоскость игры.
-func _build_solid(rect: Rect2, material: StandardMaterial3D) -> void:
-	var depth := WorldSpace.CORRIDOR_DEPTH + WorldSpace.ROOM_DEPTH
-	var size := Vector3(rect.size.x, rect.size.y, depth)
-	var centre := WorldSpace.to_scene(rect.get_center())
-	centre.z = WorldSpace.CORRIDOR_DEPTH * 0.5 - depth * 0.5
-
-	var body := StaticBody3D.new()
-	body.position = centre
-
-	var shape := BoxShape3D.new()
-	shape.size = size
-	var collision := CollisionShape3D.new()
-	collision.shape = shape
-	body.add_child(collision)
-	body.add_child(GreyboxLook.box(size, material))
-
-	add_child(body)
-
-
-## Стена, которая только видна: без тела, толщиной [constant PANEL_THICKNESS],
-## серединой на [param z].
-func _build_panel(rect: Rect2, material: StandardMaterial3D, z: float) -> void:
-	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
-		return
-	var panel := GreyboxLook.box(Vector3(rect.size.x, rect.size.y, PANEL_THICKNESS), material)
-	panel.position = WorldSpace.to_scene(rect.get_center())
-	panel.position.z = z
-	_walls.add_child(panel)
 
 
 ## Зона на месте прямоугольника правил, ловящая Otto. Толщиной в тело: она
