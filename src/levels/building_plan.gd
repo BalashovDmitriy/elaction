@@ -661,23 +661,52 @@ func _lay_walls(rules: BuildingRules, rng: RandomNumberGenerator) -> void:
 ## висит над шахтой.
 func _pick_wall_x(rules: BuildingRules, rng: RandomNumberGenerator, index: int) -> float:
 	var span := rules.slot_range(index)
-	var gaps := gaps_on(rules, index)
+	var busy := _wall_blockers(rules, index)
 	var half := rules.inner_wall_width * 0.5
 
 	var fitting: Array[float] = []
 	for slot in range(span.x + 1, span.y - 1):
 		var x := (rules.slot_x(slot) + rules.slot_x(slot + 1)) * 0.5
-		var over_a_gap := false
-		for gap: Vector2 in gaps:
-			if x + half > gap.x and x - half < gap.y:
-				over_a_gap = true
+		var in_the_way := false
+		for zone: Vector2 in busy:
+			if x + half > zone.x and x - half < zone.y:
+				in_the_way = true
 				break
-		if not over_a_gap:
+		if not in_the_way:
 			fitting.append(x)
 
 	if fitting.is_empty():
 		return INF
 	return fitting[rng.randi_range(0, fitting.size() - 1)]
+
+
+## Куда стену ставить нельзя: полосы, которые она перекрыла бы собой или
+## прижала бы к себе вплотную.
+##
+## Зазор в полшага сетки не украшение: у стены почти метр толщины, и вставшая
+## впритык к проёму она не оставляет места, чтобы стоять. Эскалатор попадался
+## на этом дважды — площадкой сверху и площадкой приземления на этаже ниже:
+## полотно упиралось в стену, и граф достижимости терял связь.
+func _wall_blockers(rules: BuildingRules, index: int) -> Array[Vector2]:
+	var clearance := (rules.slot_x(1) - rules.slot_x(0)) * 0.5
+	var busy: Array[Vector2] = []
+	for gap: Vector2 in gaps_on(rules, index):
+		busy.append(Vector2(gap.x - clearance, gap.y + clearance))
+
+	for escalator in escalators:
+		if escalator.floor_index == index:
+			busy.append(Vector2(escalator.x - clearance, escalator.x + clearance))
+		elif escalator.floor_index == index - 1:
+			var landing := escalator.x + escalator.towards * rules.escalator_run
+			busy.append(Vector2(landing - clearance, landing + clearance))
+
+	# Дверь за стеной — дверь, в которую не войти, а выход — непроходимое здание.
+	for door in doors:
+		if door.floor_index == index:
+			busy.append(Vector2(door.x - clearance, door.x + clearance))
+	if index == floors - 1:
+		busy.append(Vector2(exit_x - clearance, exit_x + clearance))
+	return busy
 
 
 ## Места этажа, куда лампу повесить всё-таки можно, когда свободных не осталось:

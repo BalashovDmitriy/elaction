@@ -19,6 +19,13 @@ const LANDING_FRAMES: int = 180
 ## Сколько кадров дать дверям, чтобы кто-нибудь успел выйти.
 const CROWD_FRAMES: int = 240
 
+## Насколько далеко от своей двери агент ещё считается «только что вышедшим», м.
+##
+## Ровно на коврике его не застать: выход из проёма кончается в шаге от двери,
+## и агент оказывается в метре с лишним. Проверка на точное совпадение держалась
+## на случайности и развалилась, как только мелкая сетка M18 сдвинула двери.
+const JUST_LEFT: float = 2.0
+
 ## Сколько кадров держать «вверх» у одинокой двери: хватает и на створку, и на
 ## то, чтобы Otto успел зайти, если дверь его берёт.
 const KNOCK_FRAMES: int = 30
@@ -189,6 +196,7 @@ func test_the_door_shuts_behind_the_agent_that_left_it() -> void:
 	var level := _build(3)
 	await _wait_for_the_landing(level)
 	var closed_behind := 0
+	var just_left := 0
 	for _frame: int in CROWD_FRAMES:
 		await wait_physics_frames(1)
 		for agent in _live_agents(level):
@@ -196,13 +204,19 @@ func test_the_door_shuts_behind_the_agent_that_left_it() -> void:
 				continue
 			var door := _door_behind(level, agent)
 			var at := WorldSpace.to_plane(agent.global_position)
-			if door == null or absf(door.mat_position().x - at.x) > 0.01:
+			if door == null or absf(door.mat_position().x - at.x) > JUST_LEFT:
 				continue
-			# Агент ещё стоит на самом коврике, но проём уже освободил: створка
-			# обязана идти обратно, а не стоять нараспашку (ADR-0020, решение 4).
+			just_left += 1
+			# Агент ещё у своей двери, но проём уже освободил: створка обязана
+			# идти обратно, а не стоять нараспашку (ADR-0020, решение 4).
 			if door.openness() < 1.0:
 				closed_behind += 1
-	assert_gt(closed_behind, 0, "ни одна дверь за вышедшим не закрывалась")
+	# «Ноль» бывает и оттого, что дверь не закрылась, и оттого, что за окном
+	# наблюдения никто не вышел, — а это разные поломки.
+	assert_gt(just_left, 0, "ни один агент не отходил от своей двери")
+	assert_gt(
+		closed_behind, 0, "ни одна дверь за вышедшим не закрывалась (отошедших %d)" % just_left
+	)
 
 
 ## Дверь закрывается и за агентом, которого сняли сразу, как он вышел.

@@ -142,15 +142,15 @@ func _play(
 		if trace and frames % trace_every == 0:
 			print(
 				(
-					"  [%5d] этаж %d, Otto %s, стоит %s, едет %s, жмёт %s%s"
+					"  [%5d] этаж %d, Otto %s, едет %s, жмёт %s%s; решение: %s"
 					% [
 						frames,
 						here,
 						_at(level.otto),
-						level.otto.is_grounded(),
 						level.otto.is_riding(),
 						_held_keys(),
-						_cars_near(level)
+						_cars_near(level),
+						bot.decision()
 					]
 				)
 			)

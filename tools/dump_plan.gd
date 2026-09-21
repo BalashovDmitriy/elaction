@@ -54,9 +54,59 @@ func _init() -> void:
 				serving += 1
 		print("  %2d  %d / %d" % [index, rules.shafts_on(index), serving])
 
+	_trace_route(plan, rules)
+
 	print("\nДокументы на этажах: %s" % str(plan.document_floors()))
 	print("Выход: x=%.0f" % plan.exit_x)
 	print("Дверей: %d, ламп: %d" % [plan.doors.size(), plan.lamps.size()])
 	print("Проходимо: %s" % str(BuildingRoute.is_winnable(plan, rules)))
 
 	quit()
+
+
+## Маршрут, каким его видит бот: шаг за шагом от крыши к выходу.
+##
+## По этому следу ищут, где спуск встаёт: «бот не прошёл» говорит только этаж,
+## а здесь видно, чем он собирался воспользоваться и куда это ведёт.
+func _trace_route(plan: BuildingPlan, rules: BuildingRules) -> void:
+	print("\nМаршрут по графу: документы сверху вниз, затем выход")
+	var graph := BuildingRoute.walkable(plan, rules)
+	var here := BuildingRules.ROOF
+	var x := plan.safe_x(rules, here)
+
+	# Цели те же, что у бота: верхний несобранный документ, а когда все собраны —
+	# выход. Иначе след показывал бы дорогу, которой бот не идёт.
+	var goals: Array[Dictionary] = []
+	for spot in plan.doors:
+		if spot.has_document:
+			goals.append({"floor": spot.floor_index, "x": spot.x, "what": "документ"})
+	goals.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["floor"] < b["floor"])
+	goals.append({"floor": rules.floors - 1, "x": plan.exit_x, "what": "выход"})
+
+	for goal: Dictionary in goals:
+		print("  → %s на этаже %d, x=%.1f" % [goal["what"], int(goal["floor"]), float(goal["x"])])
+		var reached := false
+		for _step in rules.floors * 3:
+			var move := BuildingRoute.step_toward(
+				graph, here, x, int(goal["floor"]), float(goal["x"])
+			)
+			if move.is_empty():
+				print("     этаж %2d, x=%5.1f — дальше хода нет" % [here, x])
+				return
+			if String(move["kind"]) == "walk":
+				print("     этаж %2d, x=%5.1f: дойти" % [here, x])
+				here = int(goal["floor"])
+				x = float(goal["x"])
+				reached = true
+				break
+			print(
+				(
+					"     этаж %2d, x=%5.1f: %s к x=%.1f → этаж %d"
+					% [here, x, move["kind"], float(move["x"]), int(move["floor"])]
+				)
+			)
+			here = int(move["floor"])
+			x = float(move["to_x"])
+		if not reached:
+			print("     след оборван: маршрут длиннее, чем этажей втрое")
+			return
