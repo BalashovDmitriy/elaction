@@ -42,8 +42,21 @@ func _init() -> void:
 		var mark := [escalator.floor_index, escalator.x, side, gap.x, gap.y]
 		print("  %2d  x=%.0f  %s  проём %.0f..%.0f" % mark)
 
+	print("\nВнутренние стены (этаж, x):")
+	for wall in plan.walls:
+		print("  %2d  x=%.1f" % [wall.floor_index, wall.x])
+
+	print("\nШахт на этаже (цель правил / вышло):")
+	for index in rules.levels():
+		var serving := 0
+		for shaft in plan.shafts:
+			if shaft.top <= index and shaft.bottom >= index:
+				serving += 1
+		print("  %2d  %d / %d" % [index, rules.shafts_on(index), serving])
+
 	print("\nДокументы на этажах: %s" % str(plan.document_floors()))
 	print("Выход: x=%.0f" % plan.exit_x)
 	print("Дверей: %d, ламп: %d" % [plan.doors.size(), plan.lamps.size()])
+	print("Проходимо: %s" % str(BuildingRoute.is_winnable(plan, rules)))
 
 	quit()

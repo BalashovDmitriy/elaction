@@ -48,6 +48,37 @@ func test_the_narrowest_level_is_the_roof_and_the_widest_is_the_bottom() -> void
 	assert_lt(rules.floor_width(BuildingRules.ROOF), rules.width, "наверху уже")
 
 
+## Верхние этажи влезают в кадр целиком, нижние — шире экрана (ADR-0024,
+## решение 2). Башню видно всю, а по стилобату надо ходить.
+##
+## Правила берутся умолчаниями, а не миром теста: ширина кадра метрическая, и
+## сверять её надо с тем зданием, которое собирается в игре.
+func test_narrow_levels_fit_the_frame_and_wide_ones_do_not() -> void:
+	var rules := BuildingRules.new()
+	var frame := _frame_width()
+	var narrow := 0
+	var wide := 0
+	for index: int in rules.levels():
+		var width := rules.floor_width(index)
+		if rules.is_wide(index):
+			assert_gt(width, frame, "этаж %d обязан быть шире кадра" % index)
+			wide += 1
+		else:
+			assert_lt(width, frame, "этаж %d обязан влезать в кадр" % index)
+			narrow += 1
+	assert_gt(narrow, 0, "узкая часть не может быть пустой")
+	assert_gt(wide, 0, "широкая тоже")
+
+
+## Ширина кадра ортокамеры, м. Половину высоты задаёт камера, ширину — из неё
+## и соотношения сторон вьюпорта проекта: считать по окну в headless нельзя,
+## его там нет.
+func _frame_width() -> float:
+	var wide := float(ProjectSettings.get_setting("display/window/size/viewport_width"))
+	var high := float(ProjectSettings.get_setting("display/window/size/viewport_height"))
+	return SideCamera.DEFAULT_HALF_HEIGHT * 2.0 * wide / maxf(high, 1.0)
+
+
 func test_narrow_levels_offer_fewer_slots() -> void:
 	var rules := _rules()
 	var top := rules.slot_range(BuildingRules.ROOF)

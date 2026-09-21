@@ -87,15 +87,20 @@ static func unreachable_spots(plan: BuildingPlan, rules: BuildingRules) -> Array
 	return missing
 
 
-## Куски каждого уровня: пары «левый край, правый край» между проёмами.
+## Куски каждого уровня: пары «левый край, правый край» между тем, что ходьбу
+## прерывает.
+##
+## Режут и проёмы, и внутренние стены ([method BuildingPlan.blocks_on]): сквозь
+## стену не пройти, хотя пол под ней есть. Перекрытие при этом остаётся целым —
+## его считают по одним проёмам, ADR-0024, решение 5.
 ##
 ## Границы берутся у самого уровня: здание расширяется книзу, и кусок во всю
 ## ширину здания вёл бы на узком этаже сквозь стену на улицу.
 static func _floor_segments(plan: BuildingPlan, rules: BuildingRules) -> Dictionary:
 	var floors: Dictionary = {}
 	for index in rules.levels():
-		var gaps := plan.gaps_on(rules, index)
-		floors[index] = BuildingPlan.spans_between(gaps, rules.floor_span(index))
+		var blocks := plan.blocks_on(rules, index)
+		floors[index] = BuildingPlan.spans_between(blocks, rules.floor_span(index))
 	return floors
 
 

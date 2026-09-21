@@ -303,6 +303,25 @@ func _build_geometry() -> void:
 			_build_solid(rect, slab)
 			_ribs.edge_of(rect)
 		_build_side_walls(index, surface, bounds, wall)
+		_build_inner_walls(index, surface, wall)
+
+
+## Внутренние стены этажа: глухие, от пола до потолка (ADR-0024, решение 5).
+##
+## Сквозь них не проходят ни люди, ни пули, и агент за стеной Otto не достаёт.
+## Где они стоят, решает раскладка: она же убрала те, что запирали документ или
+## выход, и граф достижимости считает куски этажа уже с ними.
+func _build_inner_walls(index: int, surface: float, material: StandardMaterial3D) -> void:
+	# От низа перекрытия сверху до пола: стена стоит на плите, а не вместо неё.
+	var top := rules.story_top(index)
+	var height := surface - top
+	if height <= 0.0:
+		return
+	for inner_wall in _plan.walls:
+		if inner_wall.floor_index != index:
+			continue
+		var band := inner_wall.band(rules)
+		_build_solid(Rect2(band.x, top, band.y - band.x, height), material)
 
 
 ## Боковые стены уровня. Идут ступенями вслед за силуэтом, а не сплошными
@@ -639,8 +658,15 @@ func _shroud_agents() -> void:
 	for agent in agents():
 		if agent.is_dead():
 			continue
-		agent.set_in_the_dark(_lighting.is_dark_at(_floor_of(agent), agent.global_position.x))
+		var where := _floor_of(agent)
+		agent.set_in_the_dark(_lighting.is_dark_at(where, agent.global_position.x))
 		agent.set_target_in_the_dark(otto_in_the_dark)
+		# Стена делит только свой этаж: с другого этажа Otto и так не достать.
+		var walled := (
+			where == here
+			and _plan.wall_between(here, agent.global_position.x, otto.global_position.x)
+		)
+		agent.set_target_behind_a_wall(walled)
 
 
 ## Все агенты здания: они лежат прямо в уровне, рядом с геометрией.
@@ -804,6 +830,12 @@ func _release_agent(post: AgentPost) -> Enemy:
 	# Тень Otto отдаётся сразу, не дожидаясь кадра: иначе первый шаг агент делал
 	# бы, видя Otto там, где его не видно.
 	agent.set_target_in_the_dark(_lighting.is_dark_at(_floor_of(otto), otto.global_position.x))
+	agent.set_target_behind_a_wall(
+		(
+			post.floor_index == _floor_of(otto)
+			and _plan.wall_between(post.floor_index, mat.x, otto.global_position.x)
+		)
+	)
 	agent.set_menace(_menace())
 	agent.died.connect(_on_agent_died.bind(post))
 	return agent

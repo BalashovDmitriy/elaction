@@ -31,6 +31,15 @@ const PILASTER_GAP: float = 0.1
 ## читаются столбом, а не ритмом.
 const PILASTER_CLEARANCE: float = 1.0
 
+## Мест этажа в одном конструктивном пролёте — через столько границ сетки стоит
+## промежуточная пилястра.
+##
+## Ритм стены не обязан следовать сетке раскладки. В M18 сетка стала вдвое мельче
+## (ADR-0024, решение 1), и пилястра на каждой границе встала бы через 2.1 м:
+## вдвое чаще прежнего, вдвое больше коробок в кадре и частокол вместо ритма.
+## Два места на пролёт возвращают прежний шаг.
+const SLOTS_PER_BAY: int = 2
+
 var _rules: BuildingRules
 var _plan: BuildingPlan
 
@@ -102,7 +111,7 @@ func _pilasters(span: Vector2, top: float, surface: float) -> void:
 	else:
 		centres.append(span.x + PILASTER_WIDTH * 0.5)
 		centres.append(span.y - PILASTER_WIDTH * 0.5)
-		for slot in range(_rules.slots - 1):
+		for slot in range(0, _rules.slots - 1, SLOTS_PER_BAY):
 			var middle := (_rules.slot_x(slot) + _rules.slot_x(slot + 1)) * 0.5
 			if middle > span.x + PILASTER_CLEARANCE and middle < span.y - PILASTER_CLEARANCE:
 				centres.append(middle)

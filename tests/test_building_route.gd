@@ -38,10 +38,42 @@ func test_route_reaches_every_floor() -> void:
 	assert_eq(floors_seen.size(), rules.floors + 1, "до каждого уровня можно добраться")
 
 
-## Если убрать эскалаторы, полосы шахт перестают соединяться — тест проверяет,
-## что проходимость ловится, а не подтверждается всегда.
-func test_building_without_escalators_is_not_winnable() -> void:
+## Проходимость должна ловиться, а не подтверждаться всегда.
+##
+## До M18 здание ломали, убрав эскалаторы: полосы шахт шли встык и без них не
+## соединялись. Теперь шахты перехлёстываются (ADR-0024, решение 3), и без
+## эскалаторов спуск остаётся — ломать надо иначе.
+func test_an_isolated_bottom_floor_is_not_winnable() -> void:
 	var rules := _rules()
 	var plan := BuildingPlan.generate(rules, 3)
+	assert_true(BuildingRoute.is_winnable(plan, rules), "целое здание проходимо")
+
+	var bottom := plan.floors - 1
+	var kept: Array[BuildingPlan.ShaftSpot] = []
+	for shaft in plan.shafts:
+		if shaft.bottom < bottom:
+			kept.append(shaft)
+	plan.shafts = kept
 	plan.escalators.clear()
-	assert_false(BuildingRoute.is_winnable(plan, rules), "без эскалаторов спуска нет")
+	assert_false(BuildingRoute.is_winnable(plan, rules), "до отрезанного низа не добраться")
+
+
+## Стена режет ходьбу, но не перекрытие (ADR-0024, решение 5). Счёта два, и
+## разъехаться им нельзя: этаж со стеной остаётся цельной плитой, по которой
+## насквозь всё равно не пройти.
+func test_a_wall_cuts_walking_but_not_the_slab() -> void:
+	var rules := _rules()
+	var plan := BuildingPlan.generate(rules, 4)
+	var index := plan.floors - 1
+	var span := rules.floor_span(index)
+
+	var before := BuildingPlan.spans_between(plan.blocks_on(rules, index), span)
+	var wall := BuildingPlan.WallSpot.new()
+	wall.floor_index = index
+	wall.x = (span.x + span.y) * 0.5
+	plan.walls.append(wall)
+
+	var slab := BuildingPlan.spans_between(plan.gaps_on(rules, index), span)
+	var walk := BuildingPlan.spans_between(plan.blocks_on(rules, index), span)
+	assert_eq(slab.size(), 1, "нижний этаж — цельная плита, стена на ней стоит")
+	assert_eq(walk.size(), before.size() + 1, "а ходьба разрезана ею надвое")
