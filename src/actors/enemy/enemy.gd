@@ -61,6 +61,7 @@ var _in_the_dark: bool = false
 ## Стоит ли Otto в темноте. От этого, а не от собственной тени агента, зависит,
 ## видит ли он Otto: из тени освещённого видно, освещённый в тень не видит.
 var _target_in_the_dark: bool = false
+var _target_behind_a_wall: bool = false
 ## Фаза ходьбы, поза выстрела и падения, признак раздавленного — всё как у Otto.
 var _walk_phase: float = 0.0
 var _walking: bool = false
@@ -168,6 +169,16 @@ func set_target_in_the_dark(value: bool) -> void:
 	_target_in_the_dark = value
 
 
+## Сообщает агенту, что между ним и Otto стоит глухая внутренняя стена.
+##
+## Сквозь неё не проходит ни пуля, ни взгляд: стрелять в стену незачем, и агент
+## ходит по своей половине этажа, пока Otto не обойдёт её через другой уровень
+## (ADR-0024, решение 5). Разбирается это тем же путём, что и темнота: не видит —
+## не цель (ADR-0023, решение 8).
+func set_target_behind_a_wall(value: bool) -> void:
+	_target_behind_a_wall = value
+
+
 ## Куда агент смотрит: -1 влево, +1 вправо.
 func facing() -> float:
 	return _brain.facing
@@ -240,7 +251,7 @@ func _shield(value: bool) -> void:
 ## треть от шести» сравнивало бы разные вещи, и агент этажом ниже считался бы
 ## слепым там, где стоящий на той же линии видит.
 func _sees(to_target: Vector2) -> bool:
-	if _target.is_hidden():
+	if _target.is_hidden() or _target_behind_a_wall:
 		return false
 	if not _target_in_the_dark:
 		return true

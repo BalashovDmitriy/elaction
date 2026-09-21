@@ -8,8 +8,11 @@ extends RefCounted
 ## четырежды подряд — на сценариях съёмки — и каждый раз молча снимали не то, что
 ## обещали. Здесь такого быть не должно: бот смотрит, где он есть, и решает заново.
 ##
-## Спуск жадный, потому что генератор это гарантирует: на каждом этаже есть шахта
-## своей полосы, а на каждом стыке полос — эскалатор.
+## Путь бот берёт из графа здания ([method BuildingRoute.walkable]), а не ищет
+## жадно. До M18 жадности хватало: шахты шли встык, и на каждом стыке стоял
+## эскалатор. Теперь шахты перехлёстываются, эскалаторы ходят в обе стороны, а
+## глухая стена делит этаж надвое — и «ехать вниз ближайшей шахтой» упирается
+## в тупик, из которого выход только назад и вверх (ADR-0024).
 ##
 ## Отстреливаться и уклоняться бот умеет: под высокую пулю приседает, через низкую
 ## прыгает. Без этого он мерил бы не игру, а себя — в оригинале присед и прыжок и
@@ -91,12 +94,28 @@ var _duel_time: float = 0.0
 ## Одиночные действия, отпущенные в этом кадре: нажать их снова можно только
 ## со следующего.
 var _resting: Array[StringName] = []
+## Куски этажей и подписанные переходы между ними — [method BuildingRoute.walkable].
+var _graph: Dictionary = {}
+## На каком уровне выходить из кабины. Пока едем — цель поездки.
+var _ride_to: int = 0
+## Куда эта поездка идёт. Направление запоминается при входе: по нему
+## останавливаются, и пересчитывать его на ходу нельзя — выйдут качели.
+var _riding_down: bool = true
+## Столбец шахты, которой задумана поездка. Без него бот, решив «иду к соседней
+## шахте и еду до этажа N», ехал в той кабине, в которой стоял, — если её пролёт
+## этаж N тоже накрывает. С перехлёстом это сплошь и рядом.
+var _ride_shaft_x: float = INF
+## Что бот решил последним разбором: для трассы прогона.
+var _decision: String = ""
 
 
 func _init(level: GreyboxLevel) -> void:
 	_level = level
 	_rules = level.rules
 	_otto = level.otto
+	# Граф считается один раз: раскладка за партию не меняется, а решение
+	# принимается каждый кадр.
+	_graph = BuildingRoute.walkable(level.plan(), _rules)
 
 
 ## Один шаг решения. Зовётся каждый физический кадр.
@@ -120,6 +139,10 @@ func step() -> void:
 	var bullet_height := _incoming_height()
 	# Уклонение отменяет дуэль: нажата будет не сторона, а присед или прыжок.
 	# В кабине уклонения нет вовсе — там от пули не уйти, и остаётся стрелять.
+	#
+	# Разрешать его в стоящей кабине пробовали на M18: на этаже она тот же пол,
+	# и присед на ней работает. Замер это отверг — бот приседал вместо того,
+	# чтобы идти, и на одном сиде не собрал ни одного документа за весь прогон.
 	var dodging := bullet_height >= 0.0 and not _otto.is_riding()
 	# Повёрнут ли ствол к цели этим же кадром: в дуэли бот сам нажимает сторону,
 	# и целиться отдельным кадром не надо.
@@ -139,22 +162,74 @@ func step() -> void:
 		_press(&"shoot")
 
 
-## Шаг спуска: куда бот идёт на этом этаже.
+## Шаг к цели: чем бот воспользуется прямо сейчас.
+##
+## Решение принимает граф здания, а не жадный спуск: с M18 шахты
+## перехлёстываются, эскалаторы ходят в обе стороны, а глухая стена делит этаж
+## надвое (ADR-0024). «Ехать вниз ближайшей шахтой» на таком здании упирается
+## в тупик — бот доходил до середины и давил в стену до конца прогона.
 func _advance(floor_index: int) -> void:
-	if _riding_further(floor_index):
-		_ride_down()
+	if _riding_further():
+		_decision = "едем к этажу %d %s" % [_ride_to, "вниз" if _riding_down else "вверх"]
+		_ride_on()
 		return
 
-	var door := _document_door_on(floor_index)
-	if door != null:
-		_approach_door(door)
+	var goal := _goal()
+	var move := BuildingRoute.step_toward(
+		_graph, floor_index, _at(_otto).x, int(goal["floor"]), float(goal["x"])
+	)
+	if move.is_empty():
+		# Цель недостижима. Генератор такого не выпускает, и ловит это тест
+		# проходимости; здесь остаётся только не ломиться наугад.
 		return
 
-	if floor_index == _rules.floors - 1:
-		_walk_to(_level.exit_position().x)
-		return
+	_decision = (
+		"%s к x=%.1f → этаж %d, цель %s на %d"
+		% [
+			move["kind"],
+			float(move["x"]),
+			int(move["floor"]),
+			"документ" if bool(goal["enter"]) else "выход",
+			int(goal["floor"])
+		]
+	)
 
-	_descend(floor_index)
+	match String(move["kind"]):
+		"shaft":
+			_ride_to = int(move["floor"])
+			_riding_down = _ride_to > floor_index
+			_ride_shaft_x = float(move["x"])
+			if _ride_to == floor_index:
+				_cross_the_shaft(_ride_shaft_x, float(move["to_x"]), floor_index)
+			else:
+				_take_the_car(_ride_shaft_x, floor_index)
+		"escalator":
+			_take_the_escalator(float(move["x"]), int(move["floor"]) < floor_index)
+		_:
+			if _walk_to(float(move["x"])) and bool(goal["enter"]):
+				_press(&"move_up")
+
+
+## Куда бот идёт: к верхнему несобранному документу, а если все собраны — к выходу.
+##
+## Верхний, а не ближайший: спуск идёт сверху вниз, и документ выше текущего
+## этажа означает, что его пропустили, — а без всех пяти выход возвращает назад.
+func _goal() -> Dictionary:
+	var best: BuildingPlan.DoorSpot = null
+	for spot in _level.plan().doors:
+		if not spot.has_document or not _still_pending(spot):
+			continue
+		if best == null or spot.floor_index < best.floor_index:
+			best = spot
+	if best != null:
+		return {"floor": best.floor_index, "x": best.x, "enter": true}
+	return {"floor": _rules.floors - 1, "x": _level.exit_position().x, "enter": false}
+
+
+## Что бот решил этим кадром: цель и ход к ней. Нужно трассе прогона — по
+## «жмёт [down]» не видно, куда он собирался и почему передумал.
+func decision() -> String:
+	return _decision
 
 
 ## Отпускает всё, что держал: без этого Otto продолжал бы идти после смены решения.
@@ -307,42 +382,47 @@ func _car_aligned() -> bool:
 ##
 ## А стоящую на этаже кабину бот проходит насквозь по дороге к эскалатору, и
 ## считать это поездкой нельзя: иначе он разворачивался и ходил туда-сюда.
-func _riding_further(here: int) -> bool:
+func _riding_further() -> bool:
 	if not _otto.is_riding():
 		return false
 
-	var shaft := _shaft_on(here)
-	if shaft == null:
-		return true
-	var surface := _rules.floor_surface(_stop_floor(shaft, here))
-	return _at(_otto).y < surface - CAR_ALIGNED
+	# Кабина, в которой стоим, до цели поездки может и не доходить: шахты
+	# перехлёстываются, и пересадка идёт в кабине, стоящей на своём дне. Такую
+	# надо покинуть, а не давить в ней «вниз» до конца прогона.
+	# Та ли это кабина: стоять можно в одной, а ехать собираться в другой.
+	var shaft := _shaft_under_otto()
+	if shaft == null or not is_equal_approx(shaft.x, _ride_shaft_x):
+		return false
+	if _ride_to < shaft.top or _ride_to > shaft.bottom:
+		return false
+
+	# Остановка односторонняя: «пока не совпало с полом» не годится, потому что
+	# за кадр кабина проходит больше допуска выравнивания и цель перескакивает.
+	# Бот тогда жмёт то вверх, то вниз и качается вокруг этажа до конца прогона.
+	var surface := _rules.floor_surface(_ride_to)
+	var y := _at(_otto).y
+	return y < surface - CAR_ALIGNED if _riding_down else y > surface + CAR_ALIGNED
 
 
-func _ride_down() -> void:
-	_press(&"move_down")
+## Шахта, в чьём столбце стоит Otto. [code]null[/code] — он не в шахте.
+##
+## Столбца мало: две шахты могут стоять в одном месте на разной высоте. Поэтому
+## проверяется и уровень — на одном уровне столбцы у шахт разные.
+func _shaft_under_otto() -> BuildingPlan.ShaftSpot:
+	var here := _at(_otto)
+	var index := _rules.floor_index_near(here.y)
+	for shaft in _level.plan().shafts:
+		if shaft.top > index or shaft.bottom < index:
+			continue
+		if absf(shaft.x - here.x) <= _rules.shaft_width * 0.5:
+			return shaft
+	return null
 
 
-## На каком этаже выходить: на ближайшем снизу с документом, иначе в самом низу полосы.
-func _stop_floor(shaft: BuildingPlan.ShaftSpot, here: int) -> int:
-	for index in range(maxi(shaft.top, here), shaft.bottom + 1):
-		if _document_door_on(index) != null:
-			return index
-	return shaft.bottom
-
-
-func _descend(floor_index: int) -> void:
-	var shaft := _shaft_on(floor_index)
-	if shaft != null and floor_index < shaft.bottom:
-		_take_the_car(shaft, floor_index)
-		return
-
-	var escalator := _escalator_on(floor_index)
-	if escalator != null:
-		_take_the_escalator(escalator)
-		return
-
-	# Ни шахты вниз, ни эскалатора: дальше бот не знает, что делать.
-	_walk_to(_rules.slot_x(0))
+## Ведёт кабину к уровню, на котором решено выходить. Вверх тоже: с M18 путь
+## вниз иногда лежит через этаж выше, где этаж не разрезан (ADR-0024).
+func _ride_on() -> void:
+	_press(&"move_down" if _riding_down else &"move_up")
 
 
 ## Заходит в кабину, дождавшись её у самого края проёма.
@@ -351,36 +431,53 @@ func _descend(floor_index: int) -> void:
 ## момент стоянки, можно попасть на её конец: кабина уедет, пока бот делает
 ## последние шаги, и он шагнёт в пустую шахту — а падение в неё смертельно.
 ## Пропустить приезд не страшно: кабина вернётся, кадров на это заложено.
-func _take_the_car(shaft: BuildingPlan.ShaftSpot, floor_index: int) -> void:
+func _take_the_car(shaft_x: float, floor_index: int) -> void:
 	var surface := _rules.floor_surface(floor_index)
-	var here := _car_waits_at(shaft.x, surface)
+	var here := _car_waits_at(shaft_x, surface)
 	var x := _at(_otto).x
-	var aside := absf(x - shaft.x) <= WAIT_ASIDE + REACHED
+	var aside := absf(x - shaft_x) <= WAIT_ASIDE + REACHED
 
-	if here and not _car_was_here and aside:
+	# Садится, как только кабина здесь и он рядом, — не дожидаясь её приезда.
+	# Ждать именно приезда бот умел с M2, и это было дёшево, пока кабина была
+	# одна на полосу. С перехлёстом он ждёт у шахт постоянно — и переход через
+	# проём идёт как раз к стоящей кабине, которая приезжать уже не собирается.
+	# Каждое такое ожидание — стойка под огнём: все смерти замера случились там.
+	#
+	# Безопасно это потому, что к столбцу он двигается только пока кабина на
+	# месте: ушла — [code]_boarding[/code] снимается тем же кадром.
+	if here and aside:
 		_boarding = true
 	if not here:
 		_boarding = false
 	_car_was_here = here
 
 	if _boarding:
-		_walk_to(shaft.x)
+		_walk_to(shaft_x)
 		return
 
-	var side := -1.0 if x < shaft.x else 1.0
-	_walk_to(shaft.x + side * WAIT_ASIDE)
+	var side := -1.0 if x < shaft_x else 1.0
+	_walk_to(shaft_x + side * WAIT_ASIDE)
 
 
-func _take_the_escalator(escalator: BuildingPlan.EscalatorSpot) -> void:
-	if not _walk_to(escalator.x):
+## Переходит проём шахты насквозь: через стоящую кабину.
+##
+## Шахта режет этаж своим проёмом, и половины сообщаются только так — как в
+## оригинале, где кабина перекрывает проём собой. Пока кабины нет, к проёму
+## подходить нельзя: шагнувший в пустую шахту гибнет, — поэтому бот сперва
+## дожидается её там же, где дожидается поездки.
+func _cross_the_shaft(shaft_x: float, to_x: float, floor_index: int) -> void:
+	if not _car_waits_at(shaft_x, _rules.floor_surface(floor_index)):
+		_take_the_car(shaft_x, floor_index)
 		return
-	_press(&"move_down")
+	_walk_to(to_x)
 
 
-func _approach_door(door: BuildingPlan.DoorSpot) -> void:
-	if not _walk_to(door.x):
+## Встаёт на площадку эскалатора и отправляется. Вверх — тоже: полотно ходит
+## в обе стороны, и обойти разрезанный этаж иногда можно только так.
+func _take_the_escalator(pad_x: float, upward: bool) -> void:
+	if not _walk_to(pad_x):
 		return
-	_press(&"move_up")
+	_press(&"move_up" if upward else &"move_down")
 
 
 ## Идёт к точке. Возвращает true, когда уже пришёл.
@@ -405,13 +502,6 @@ func _car_waits_at(x: float, surface: float) -> bool:
 	return false
 
 
-func _document_door_on(floor_index: int) -> BuildingPlan.DoorSpot:
-	for spot in _level.plan().doors:
-		if spot.has_document and spot.floor_index == floor_index and _still_pending(spot):
-			return spot
-	return null
-
-
 ## Дверь ещё красная: собранная перестаёт ею быть, и второй раз в неё не надо.
 ##
 ## Сверяется и этаж: места на этажах общие, и красная дверь сверху, стоящая в том
@@ -424,20 +514,6 @@ func _still_pending(spot: BuildingPlan.DoorSpot) -> bool:
 		if absf(mat.x - spot.x) <= REACHED and _rules.floor_index_near(mat.y) == spot.floor_index:
 			return true
 	return false
-
-
-func _shaft_on(floor_index: int) -> BuildingPlan.ShaftSpot:
-	for shaft in _level.plan().shafts:
-		if floor_index >= shaft.top and floor_index <= shaft.bottom:
-			return shaft
-	return null
-
-
-func _escalator_on(floor_index: int) -> BuildingPlan.EscalatorSpot:
-	for escalator in _level.plan().escalators:
-		if escalator.floor_index == floor_index:
-			return escalator
-	return null
 
 
 ## Нажимает действие. Возвращает, нажалось ли: одиночное действие, отпущенное

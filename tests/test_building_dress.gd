@@ -246,9 +246,16 @@ func test_every_shaft_is_capped_at_both_ends() -> void:
 		var mine := 0
 		# Низ шахты — пол её нижнего этажа: упор стоит на нём, а не под ним.
 		var floor_surface := level.rules.floor_surface(shaft.bottom)
+		# Своя шахта опознаётся столбцом и высотой разом. Одного столбца мало
+		# с M18: шахты перехлёстываются, место сетки достаётся нескольким из них
+		# на разной высоте, и по одному x в кучу попадали чужие упоры (ADR-0024).
+		var top_edge := level.rules.story_top(shaft.top)
 		var capped_below := false
 		for buffer: Rect2 in buffers:
 			if absf(buffer.get_center().x - shaft.x) > TOLERANCE:
+				continue
+			var middle := buffer.get_center().y
+			if middle < top_edge - TOLERANCE or middle > floor_surface + TOLERANCE:
 				continue
 			mine += 1
 			assert_lte(

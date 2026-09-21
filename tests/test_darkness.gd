@@ -102,22 +102,31 @@ func _shots_within(level: GreyboxLevel, frames: int) -> int:
 
 
 ## Место под лампой и ещё одно на дальности выстрела, но дальше дальности в темноте.
+## Пара мест этажа: первое гасят, второе остаётся светлым.
+##
+## Места берутся **из разных зон** и на дальности выстрела друг от друга. Из
+## одной зоны их брать нельзя: погашенная накрывает оба, и «из тени по
+## освещённому» проверяло бы не то. Раньше первое место просто ставилось под
+## лампу, а второе — в двух-пяти метрах от него; на мелкой сетке M18 оба стали
+## попадать в одну зону, и проверка разваливалась. Теперь пара ищется поперёк
+## границы зон: у самой границы соседние зоны сходятся вплотную, и дальность
+## выстрела туда укладывается.
 func _spot_pair(level: GreyboxLevel) -> Vector2:
 	var rules := level.rules
-	var spots := level.plan().safe_spots(rules, _floor(level))
-	var lamp := _lamp_near(level, _floor(level), spots[0])
-	var under := spots[0]
-	var lamp_x := WorldSpace.to_plane(lamp.global_position).x
-	for x in spots:
-		if absf(x - lamp_x) < absf(under - lamp_x):
-			under = x
-	var far := under
-	for x in spots:
-		var gap := absf(x - under)
-		if gap > rules.agent_dark_fire_range * 1.5 and gap < rules.agent_fire_range * 0.9:
-			far = x
-			break
-	return Vector2(under, far)
+	var index := _floor(level)
+	var spots := level.plan().safe_spots(rules, index)
+	var closest := rules.agent_dark_fire_range * 1.5
+	var furthest := rules.agent_fire_range * 0.9
+
+	for here: float in spots:
+		for there: float in spots:
+			var gap := absf(here - there)
+			if gap <= closest or gap >= furthest:
+				continue
+			if _lamp_near(level, index, here) == _lamp_near(level, index, there):
+				continue
+			return Vector2(here, there)
+	return Vector2(spots[0], spots[0])
 
 
 ## Освещённого Otto агент берёт с полной дальности — так было и так остаётся.

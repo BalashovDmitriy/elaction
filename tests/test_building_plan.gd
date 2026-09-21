@@ -41,36 +41,6 @@ func test_another_seed_moves_the_documents() -> void:
 	assert_ne(_fingerprint(first), _fingerprint(second), "здания различаются")
 
 
-func test_shafts_cover_every_floor() -> void:
-	var rules := _rules()
-	var plan := BuildingPlan.generate(rules, 3)
-	var covered: Dictionary = {}
-	for shaft in plan.shafts:
-		for index in range(shaft.top, shaft.bottom + 1):
-			assert_false(covered.has(index), "полосы шахт не налезают друг на друга")
-			covered[index] = true
-	assert_eq(covered.size(), rules.floors + 1, "каждый уровень обслуживается шахтой")
-	assert_true(covered.has(BuildingRules.ROOF), "верхняя шахта доходит до крыши")
-
-
-func test_neighbouring_shafts_stand_in_different_columns() -> void:
-	var plan := BuildingPlan.generate(_rules(), 4)
-	for index in plan.shafts.size() - 1:
-		var here := plan.shafts[index].x
-		var below := plan.shafts[index + 1].x
-		assert_ne(here, below, "иначе спуск свёлся бы к «зажать вниз»")
-
-
-func test_every_shaft_boundary_has_an_escalator() -> void:
-	var plan := BuildingPlan.generate(_rules(), 5)
-	var bridged: Dictionary = {}
-	for escalator in plan.escalators:
-		bridged[escalator.floor_index] = true
-	for index in plan.shafts.size() - 1:
-		var boundary: int = plan.shafts[index].bottom
-		assert_true(bridged.has(boundary), "со стыка полос надо как-то спуститься")
-
-
 func test_building_holds_exactly_the_wanted_documents() -> void:
 	var rules := _rules()
 	var plan := BuildingPlan.generate(rules, 6)
@@ -111,26 +81,6 @@ func test_nothing_shares_a_place_on_a_floor() -> void:
 		_claim(busy, door.floor_index, door.x)
 	for lamp in plan.lamps:
 		_claim(busy, lamp.floor_index, lamp.x)
-
-
-## Проём эскалатора лежит сбоку от площадки, и подойти к ней надо, не перейдя его.
-## Иначе Otto, идущий от лифта, проваливается на этаж ниже мимо эскалатора.
-func test_escalator_pad_shields_its_gap_from_the_shaft() -> void:
-	var rules := _rules()
-	for building_seed in range(1, 12):
-		var plan := BuildingPlan.generate(rules, building_seed)
-		for escalator in plan.escalators:
-			var from_x := _shaft_x_on(plan, escalator.floor_index)
-			var gap := escalator.gap(rules)
-			var near := minf(from_x, escalator.x)
-			var far := maxf(from_x, escalator.x)
-			assert_false(
-				near < gap.y and gap.x < far,
-				(
-					"сид %d, этаж %d: дыра между лифтом и площадкой"
-					% [building_seed, escalator.floor_index]
-				)
-			)
 
 
 ## На месте возврата нельзя ставить выход: иначе Otto выходил бы из здания,
@@ -238,9 +188,11 @@ func test_lamps_are_spread_along_the_floor() -> void:
 func test_a_crowded_floor_still_gets_a_lamp() -> void:
 	var rules := _rules()
 	rules.slots = 5
+	rules.top_slots = 5
 	rules.width = 16.8
 	rules.floors = 6
-	rules.width_steps = 1
+	# Здание одной ширины: порог ниже дна, и узкой части нет вовсе.
+	rules.wide_from = 0
 	rules.documents = 1
 	rules.doors_per_floor = 3
 	rules.top_doors = 3
@@ -281,22 +233,6 @@ func test_the_roof_carries_no_doors() -> void:
 			assert_gt(door.floor_index, BuildingRules.ROOF, "сид %d" % building_seed)
 
 
-## Шахта проходит сквозь этажи разной ширины, и её столбец должен стоять
-## на каждом из них: здание расширяется книзу, самый тесный — верх полосы.
-func test_every_shaft_stands_on_a_slot_its_whole_band_offers() -> void:
-	var rules := _rules()
-	for building_seed: int in SEEDS:
-		var plan := BuildingPlan.generate(rules, building_seed)
-		for shaft in plan.shafts:
-			for index in range(shaft.top, shaft.bottom + 1):
-				var span := rules.floor_span(index)
-				var half := rules.shaft_width * 0.5
-				assert_true(
-					shaft.x - half >= span.x and shaft.x + half <= span.y,
-					"сид %d: шахта на этаже %d вышла за стену" % [building_seed, index]
-				)
-
-
 ## Всё, что раскладка ставит, должно стоять внутри силуэта своего уровня:
 ## за ним улица, и дверь там висела бы в воздухе.
 func test_nothing_is_placed_outside_its_own_floor() -> void:
@@ -315,13 +251,6 @@ func test_nothing_is_placed_outside_its_own_floor() -> void:
 				lamp.x > span.x and lamp.x < span.y,
 				"сид %d: лампа на этаже %d за стеной" % [building_seed, lamp.floor_index]
 			)
-
-
-func _shaft_x_on(plan: BuildingPlan, floor_index: int) -> float:
-	for shaft in plan.shafts:
-		if floor_index >= shaft.top and floor_index <= shaft.bottom:
-			return shaft.x
-	return 0.0
 
 
 func _claim(busy: Dictionary, floor_index: int, x: float) -> void:

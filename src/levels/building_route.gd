@@ -12,6 +12,18 @@ extends RefCounted
 ## Всё считается по раскладке, без узлов и физики, поэтому проверяется на десятках
 ## сидов за доли секунды — а именно на редких сидах и вылезают дыры в генерации.
 
+## На сколько заходить в кусок этажа от его края, м. Столько нужно, чтобы стоять
+## на нём, а не на самой кромке проёма.
+const STEP_INSIDE: float = 0.3
+
+## Допуск на примыкание: на дробную арифметику, и только на неё.
+##
+## Раньше он был метровым, и на этом граф обещал связь, которой нет: внутренняя
+## стена шириной почти метр (ADR-0024, решение 5) укладывалась в допуск целиком,
+## и кусок за ней считался доступным прямо из кабины. Здание с таким «переходом»
+## проходило проверку, а игрок упирался в стену.
+const TOUCHING_SLACK: float = 0.05
+
 
 ## Узлы, куда можно добраться из точки старта. Ключ — «этаж:кусок».
 static func reachable(plan: BuildingPlan, rules: BuildingRules) -> Dictionary:
@@ -87,15 +99,146 @@ static func unreachable_spots(plan: BuildingPlan, rules: BuildingRules) -> Array
 	return missing
 
 
-## Куски каждого уровня: пары «левый край, правый край» между проёмами.
+## Готовый к ходьбе граф здания: куски уровней и подписанные переходы между ними.
+##
+## Считается один раз на здание и отдаётся тому, кто по нему ходит: раскладка за
+## партию не меняется, а [method step_toward] зовут каждый кадр.
+##
+## Отдельно от [method reachable]: тому достаточно знать, связаны ли узлы, а
+## идущему нужно знать чем — к какой шахте идти и на каком уровне выходить.
+static func walkable(plan: BuildingPlan, rules: BuildingRules) -> Dictionary:
+	var pieces := _floor_segments(plan, rules)
+	return {
+		"pieces": pieces,
+		"moves": _moves(plan, rules, pieces),
+		# Докуда дотянется тот, кто стоит в кабине: она перекрывает проём собой,
+		# и выйти из неё можно в любой край.
+		"reach": rules.shaft_width * 0.5 + TOUCHING_SLACK,
+	}
+
+
+## Первый шаг к цели по готовому графу из [method walkable].
+##
+## Отдаётся один шаг, а не весь маршрут: идущий пересчитывает решение каждый
+## кадр — он промахивается мимо кабины, дерётся, падает и сходит с места, и
+## запомненный маршрут устарел бы к следующему кадру.
+##
+## Ключи ответа: [code]kind[/code] — [code]walk[/code], [code]shaft[/code] или
+## [code]escalator[/code]; [code]x[/code] — куда идти; [code]floor[/code] — на
+## каком уровне оказаться. Пустой словарь — цель недостижима.
+static func step_toward(
+	graph: Dictionary, from_floor: int, from_x: float, to_floor: int, to_x: float
+) -> Dictionary:
+	var pieces: Dictionary = graph["pieces"]
+	var moves: Dictionary = graph["moves"]
+	var goal := _node(to_floor, _segment_at(pieces[to_floor], to_x))
+
+	# Отправных точек может быть несколько. Стоящий в кабине стоит в проёме, а у
+	# проёма куска этажа нет: выйти он волен в любой край, и оба ему открыты.
+	# Отдать один — значит запереть его в том, который выпал первым, и он будет
+	# ездить туда-сюда, пытаясь попасть в соседний.
+	var first: Dictionary = {}
+	var queue: Array[String] = []
+	for segment: int in _segments_near(pieces[from_floor], from_x, float(graph["reach"])):
+		var start := _node(from_floor, segment)
+		if start == goal:
+			return {"kind": "walk", "x": to_x, "floor": to_floor}
+		first[start] = {}
+		queue.append(start)
+	while not queue.is_empty():
+		var here: String = queue.pop_front()
+		for move: Dictionary in moves.get(here, [] as Array[Dictionary]):
+			var next: String = move["to"]
+			if first.has(next):
+				continue
+			first[next] = move if first[here].is_empty() else first[here]
+			if next == goal:
+				return first[next]
+			queue.append(next)
+	return {}
+
+
+## Точка внутри куска, ближайшая к [param x]: с отступом от краёв, чтобы в неё
+## можно было прийти и на ней устоять.
+##
+## Кусок уже двух отступов — берётся его середина: это тесная полоска между
+## проёмами, и точнее в ней не встанешь.
+static func _inside(piece: Vector2, x: float) -> float:
+	if piece.y - piece.x <= STEP_INSIDE * 2.0:
+		return (piece.x + piece.y) * 0.5
+	return clampf(x, piece.x + STEP_INSIDE, piece.y - STEP_INSIDE)
+
+
+## Подписанные переходы: узел -> чем и куда из него можно уйти.
+static func _moves(plan: BuildingPlan, rules: BuildingRules, pieces: Dictionary) -> Dictionary:
+	var moves: Dictionary = {}
+
+	for shaft in plan.shafts:
+		# Кабина связывает все уровни своей шахты, а заодно оба края проёма на
+		# одном уровне: сквозь стоящую кабину проходят насквозь. Ход на тот же
+		# уровень выглядит пустым, но он и есть переход через проём — без него
+		# половины этажа, разрезанного шахтой, друг для друга недостижимы.
+		var boarding: Dictionary = {}
+		for index in range(shaft.top, shaft.bottom + 1):
+			for segment in _segments_touching(pieces[index], shaft.x, rules.shaft_width):
+				var piece: Vector2 = pieces[index][segment]
+				# Выходят не на ось шахты, а в сам кусок: иначе переход через
+				# проём кончался бы ровно в кабине, и «дошёл» наступало,
+				# не сходя с места.
+				boarding[_node(index, segment)] = {"floor": index, "x": _inside(piece, shaft.x)}
+		for from_node: String in boarding:
+			for to_node: String in boarding:
+				if from_node == to_node:
+					continue
+				var to: Dictionary = boarding[to_node]
+				_offer(moves, from_node, "shaft", shaft.x, to["x"], to["floor"], to_node)
+
+	for escalator in plan.escalators:
+		var upper := escalator.floor_index
+		var top_segment := _segment_at(pieces[upper], escalator.x)
+		var landing := escalator.x + escalator.towards * rules.escalator_run
+		var bottom_segment := _segment_at(pieces[upper + 1], landing)
+		if top_segment < 0 or bottom_segment < 0:
+			continue
+		# Эскалатор ходит в обе стороны: с площадки внизу на нём поднимаются.
+		var above := _node(upper, top_segment)
+		var below := _node(upper + 1, bottom_segment)
+		_offer(moves, above, "escalator", escalator.x, landing, upper + 1, below)
+		_offer(moves, below, "escalator", landing, escalator.x, upper, above)
+
+	return moves
+
+
+## [param x] — куда идти, чтобы воспользоваться переходом; [param to_x] — где
+## окажешься. У шахты это одно и то же, у эскалатора — разные концы полотна.
+static func _offer(
+	moves: Dictionary,
+	from_node: String,
+	kind: String,
+	x: float,
+	to_x: float,
+	to_floor: int,
+	to_node: String
+) -> void:
+	if not moves.has(from_node):
+		moves[from_node] = [] as Array[Dictionary]
+	moves[from_node].append({"kind": kind, "x": x, "to_x": to_x, "floor": to_floor, "to": to_node})
+
+
+## Куски каждого уровня: пары «левый край, правый край» между тем, что ходьбу
+## прерывает.
+##
+## Режут и проёмы, и внутренние стены ([method BuildingPlan.blocks_on]): сквозь
+## стену не пройти, хотя пол под ней есть. Перекрытие при этом остаётся целым —
+## его считают по одним проёмам, ADR-0024, решение 5.
 ##
 ## Границы берутся у самого уровня: здание расширяется книзу, и кусок во всю
 ## ширину здания вёл бы на узком этаже сквозь стену на улицу.
 static func _floor_segments(plan: BuildingPlan, rules: BuildingRules) -> Dictionary:
 	var floors: Dictionary = {}
 	for index in rules.levels():
-		var gaps := plan.gaps_on(rules, index)
-		floors[index] = BuildingPlan.spans_between(gaps, rules.floor_span(index))
+		var blocks := plan.blocks_on(rules, index)
+		floors[index] = BuildingPlan.spans_between(blocks, rules.floor_span(index))
 	return floors
 
 
@@ -137,8 +280,39 @@ static func _segments_touching(pieces: Array, x: float, width: float) -> Array[i
 	for index in pieces.size():
 		var piece: Vector2 = pieces[index]
 		# Либо кусок доходит до края столбца, либо столбец целиком внутри него.
-		if piece.y >= x - half - 1.0 and piece.x <= x + half + 1.0:
+		if piece.y >= x - half - TOUCHING_SLACK and piece.x <= x + half + TOUCHING_SLACK:
 			found.append(index)
+	return found
+
+
+## Куски, из которых точка достижима пешком: тот, в котором она лежит, а если
+## она в проёме — все, чей край к ней примыкает.
+##
+## Отдельно от [method _segment_at]: тому «нигде» — законный ответ, по которому
+## достижимость отказывается связывать узел. А идущему нужен ответ всегда: он
+## бывает и в проёме — стоя в кабине лифта, — и выйти оттуда может в любую
+## сторону, потому что кабина перекрывает проём собой.
+static func _segments_near(pieces: Array, x: float, reach: float) -> Array[int]:
+	var here := _segment_at(pieces, x)
+	if here >= 0:
+		return [here] as Array[int]
+
+	# Дальше кабины тянуться некуда: в проёме шире неё пола нет, и стоять там
+	# некому. Не нашлось ни одного края — отдаётся ближайший: лучше неточный
+	# ответ, чем застрявший навсегда.
+	var found: Array[int] = []
+	var nearest := -1
+	var best := INF
+	for index in pieces.size():
+		var piece: Vector2 = pieces[index]
+		var away := maxf(piece.x - x, x - piece.y)
+		if away <= reach:
+			found.append(index)
+		if away < best:
+			best = away
+			nearest = index
+	if found.is_empty() and nearest >= 0:
+		found.append(nearest)
 	return found
 
 
