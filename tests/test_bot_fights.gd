@@ -70,6 +70,9 @@ func test_the_bot_shoots_the_agent_in_its_way() -> void:
 
 	var bot := OttoBot.new(level)
 	var frames := 0
+	# Два кадра на решение, как во всех прогонах ботом: это правило M13, а не
+	# недосмотр. Подробно — `tests/test_building_playthrough.gd`, метод `_tick`,
+	# и `docs/testing.md`, пункт 4.
 	while not agent.is_dead() and frames < DUEL_FRAMES:
 		bot.step()
 		await wait_physics_frames(1)

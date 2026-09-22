@@ -13,7 +13,7 @@ extends SceneTree
 ##     godot --headless --script res://tools/playthrough.gd -- --agents --at-once=8
 ##     godot --headless --script res://tools/playthrough.gd -- --seeds=1 --trace --budget=3000
 ##
-## С [code]--trace[/code] раз в [constant TRACE_EVERY] кадров печатается, где бот
+## С [code]--trace[/code] раз в [constant TRACE_EVERY] шагов печатается, где бот
 ## и что вокруг: этаж, положение, стоит ли, едет ли, где ближайшая кабина. Это
 ## инструмент на случай «застрял», когда итоговая строка говорит лишь этаж.
 ## [code]--budget=N[/code] укорачивает прогон под такую диагностику, а
@@ -21,11 +21,19 @@ extends SceneTree
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
-## Потолок на здание, физических кадров. Тридцать этажей и пять документов —
-## это минуты игрового времени, поэтому бюджет крупный.
-const FRAME_BUDGET: int = 24000
+## Потолок на здание, **шагов бота**. Один шаг — два физических кадра, как и
+## в тестах. Тридцать этажей и пять документов — это минуты игрового времени,
+## поэтому бюджет крупный.
+##
+## Половина прежних 24000: те считались кадрами, а шаг стоит двух — оставленное
+## как есть число молча удвоило бы потолок по часам. Замер вехи — 1992–3176 шагов.
+const STEP_BUDGET: int = 12000
 
-## Как часто печатать трассу, кадров.
+## Сколько жизней выдаётся боту в бесконечном прогоне. Столько же, сколько
+## в тесте: числа обоих должны сходиться (`docs/testing.md`, пункт 4).
+const ENDLESS_LIVES: int = 99
+
+## Как часто печатать трассу, шагов бота.
 const TRACE_EVERY: int = 300
 
 
@@ -44,7 +52,7 @@ func _run() -> void:
 	var at_once := 0
 	var trace := false
 	var trace_every := TRACE_EVERY
-	var budget := FRAME_BUDGET
+	var budget := STEP_BUDGET
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--seeds="):
 			seeds = []
@@ -113,9 +121,8 @@ func _play(
 	# телам, а не по очкам: лампа убивает не хуже пули, а очки у них разные.
 	var kills := 0
 	var counted: Dictionary = {}
-	var continues := 0
 	var was_dead := false
-	# Сколько кадров этаж не менялся: по этому видно застревание, а не медленность.
+	# Сколько шагов этаж не менялся: по этому видно застревание, а не медленность.
 	var stuck := 0
 	var last_floor := -1
 
@@ -126,14 +133,26 @@ func _play(
 		)
 	)
 
+	# Жизни выдаются разом и с запасом — ровно так же, как в прогоне с боем
+	# (`tests/test_building_playthrough.gd`, ENDLESS_LIVES). Подливание на нуле
+	# меняло бы ход партии в самый острый её момент, и инструмент мерил бы уже
+	# другую игру: на сиде 1 он давал две смерти там, где тест насчитывал четыре.
+	# Инструмент и тест обязаны мерить одно и то же (`docs/testing.md`, пункт 4).
+	if endless:
+		game.lives = ENDLESS_LIVES
+		game.lives_changed.emit(game.lives)
+
 	while not cleared[0] and frames < budget:
-		# Жизни подливаются до того, как кончатся, а не после: на нуле уровень
-		# не назначает возвращение в игру вовсе, и Otto остался бы лежать.
-		if endless and game.lives < 2:
-			continues += 1
-			game.lives = GameState.STARTING_LIVES
-			game.lives_changed.emit(game.lives)
 		bot.step()
+		# Два кадра на решение — ровно столько же, сколько у бота в тестах.
+		# Там это выходит из `wait_physics_frames(1)`, который ждёт два кадра,
+		# и на M13 оставлено правилом: бот должен быть самой грубой петлёй
+		# управления, какая случится с игрой (`docs/testing.md`, пункт 4).
+		#
+		# Инструмент обязан водить Otto так же, как тест. На M18a они разошлись
+		# — здесь был один кадр, там два, — и сид 2 проходил в инструменте,
+		# не проходя в тесте. Разбор занял три коммита и увёл в баланс боя.
+		await physics_frame
 		await physics_frame
 		frames += 1
 
@@ -162,7 +181,7 @@ func _play(
 			deaths += 1
 			print(
 				(
-					"  смерть #%d на этаже %d, кадр %d, Otto %s, в кабине %s%s"
+					"  смерть #%d на этаже %d, шаг %d, Otto %s, в кабине %s%s"
 					% [
 						deaths,
 						here,
@@ -178,12 +197,12 @@ func _play(
 		if here == last_floor:
 			stuck += 1
 		else:
-			if stuck > 1800:
-				print("  этаж %d держал бота %d кадров" % [last_floor, stuck])
+			if stuck > 900:
+				print("  этаж %d держал бота %d шагов" % [last_floor, stuck])
 			stuck = 0
 			last_floor = here
 		if over[0]:
-			print("  партия окончена на этаже %d, кадр %d" % [here, frames])
+			print("  партия окончена на этаже %d, шаг %d" % [here, frames])
 			break
 
 	bot.release()
@@ -191,7 +210,7 @@ func _play(
 	var verdict := "прошёл" if ok else "НЕ ПРОШЁЛ"
 	print(
 		(
-			"  %s: кадров %d, этаж %d/%d, документы %d/%d, смертей %d, убито %d, партий %d, очки %d"
+			"  %s: шагов %d, этаж %d/%d, документы %d/%d, смертей %d, убито %d, очки %d"
 			% [
 				verdict,
 				frames,
@@ -201,13 +220,12 @@ func _play(
 				game.documents_total,
 				deaths,
 				kills,
-				continues + 1,
 				game.score
 			]
 		)
 	)
 	if not ok:
-		print("  застрял на этаже %d, стоя там %d кадров" % [last_floor, stuck])
+		print("  застрял на этаже %d, стоя там %d шагов" % [last_floor, stuck])
 
 	game.game_over.disconnect(on_game_over)
 	root.remove_child(level)

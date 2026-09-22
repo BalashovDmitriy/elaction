@@ -34,6 +34,30 @@ func test_shafts_cover_every_floor() -> void:
 	assert_true(serving.has(BuildingRules.ROOF), "верхняя шахта доходит до крыши")
 
 
+## Короткая шахта — не шахта: кабине в ней некуда ехать.
+##
+## Длину задаёт [code]_shaft_length[/code], но дно обрезается по дну здания, и
+## открытая у самого низа полоса выходила короче правила — на сиде 2 такая
+## стояла на 29-м этаже одна-одинёшенька. Ловится это только на редком сиде,
+## поэтому проверка идёт по всем сразу.
+##
+## Порог — [constant BuildingRules.MIN_SHAFT_FLOORS], три этажа, и три они
+## не случайно: двухэтажная кабина M18b в шахте на два этажа не сдвинется.
+func test_no_shaft_is_too_short_to_ride() -> void:
+	var rules := _rules()
+	for building_seed: int in SEEDS:
+		var plan := BuildingPlan.generate(rules, building_seed)
+		for shaft in plan.shafts:
+			assert_gte(
+				shaft.bottom - shaft.top + 1,
+				BuildingRules.MIN_SHAFT_FLOORS,
+				(
+					"сид %d: шахта на x=%.1f обслуживает этажи %d..%d"
+					% [building_seed, shaft.x, shaft.top, shaft.bottom]
+				)
+			)
+
+
 ## Чем ниже, тем больше путей — главный вывод сверки с оригиналом, где на нижних
 ## семи этажах сходятся пять шахт, а в верхней трети работает одна.
 func test_paths_multiply_towards_the_ground() -> void:

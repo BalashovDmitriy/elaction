@@ -70,7 +70,7 @@ func _build_floors() -> void:
 		# Перекрытие шире собственных стен там, где силуэт делает ступень: оно же
 		# потолок нижнего этажа, а тот шире своего верхнего соседа.
 		for rect in slab_segments(surface, gaps, _rules.slab_span(index), _rules.slab_height):
-			build_solid(rect, slab)
+			_build_solid(rect, slab)
 			_ribs.edge_of(rect)
 		_build_side_walls(index, surface, bounds, wall)
 		_build_inner_walls(index, surface, wall)
@@ -91,7 +91,7 @@ func _build_inner_walls(index: int, surface: float, material: StandardMaterial3D
 		if inner_wall.floor_index != index:
 			continue
 		var band := inner_wall.band(_rules)
-		build_solid(Rect2(band.x, top, band.y - band.x, height), material)
+		_build_solid(Rect2(band.x, top, band.y - band.x, height), material)
 
 
 ## Боковые стены уровня. Идут ступенями вслед за силуэтом, а не сплошными
@@ -107,8 +107,8 @@ func _build_side_walls(
 	if height <= 0.0:
 		return
 
-	build_solid(Rect2(bounds.x, top, WALL_WIDTH, height), material)
-	build_solid(Rect2(bounds.y - WALL_WIDTH, top, WALL_WIDTH, height), material)
+	_build_solid(Rect2(bounds.x, top, WALL_WIDTH, height), material)
+	_build_solid(Rect2(bounds.y - WALL_WIDTH, top, WALL_WIDTH, height), material)
 
 
 ## Комната за коридором: задняя стена с проёмами дверей и дальняя стена.
@@ -163,9 +163,10 @@ func _openings_on(index: int) -> Array[Vector2]:
 ## Коробка с телом на месте прямоугольника правил: по ней ходят и об неё
 ## останавливаются пули.
 ##
-## Публичная: тем же способом ставит свои коробки уровень — шахтные упоры и
-## подобное, — и двух способов собрать одну и ту же вещь быть не должно.
-func build_solid(rect: Rect2, material: StandardMaterial3D) -> void:
+## Глубиной на коридор и комнату вместе: перекрытие — пол не только коридора,
+## но и комнаты за стеной, иначе в проём двери было бы видно пустоту под ногами.
+## Передняя грань приходится на переднюю грань коридора, а не на плоскость игры.
+func _build_solid(rect: Rect2, material: StandardMaterial3D) -> void:
 	var depth := WorldSpace.CORRIDOR_DEPTH + WorldSpace.ROOM_DEPTH
 	var size := Vector3(rect.size.x, rect.size.y, depth)
 	var centre := WorldSpace.to_scene(rect.get_center())

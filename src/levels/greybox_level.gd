@@ -540,15 +540,28 @@ func _shroud_agents() -> void:
 	for agent in agents():
 		if agent.is_dead():
 			continue
-		var where := _floor_of(agent)
-		agent.set_in_the_dark(_lighting.is_dark_at(where, agent.global_position.x))
-		agent.set_target_in_the_dark(otto_in_the_dark)
-		# Стена делит только свой этаж: с другого этажа Otto и так не достать.
-		var walled := (
-			where == here
-			and _plan.wall_between(here, agent.global_position.x, otto.global_position.x)
-		)
-		agent.set_target_behind_a_wall(walled)
+		_shroud_agent(agent, _floor_of(agent), agent.global_position.x, here, otto_in_the_dark)
+
+
+## Что агент знает про Otto и про себя: своя темнота, тень Otto и глухая стена
+## между ними.
+##
+## Одним местом на обоих зовущих: [method _shroud_agents] пересчитывает это
+## каждый кадр, а [method _release_agent] — разово, до первого кадра нового
+## агента. Разъехаться им нельзя, иначе первый шаг агент делал бы по другим
+## правилам, чем все следующие, — на стене это едва не случилось.
+##
+## Про Otto ([param here], [param target_in_the_dark]) считается снаружи: в кадре
+## агентов восемь, а Otto один, и восемь одинаковых счётов за кадр ни к чему.
+## [param where] и [param x] — тоже снаружи: у только что выпущенного агента
+## координата ещё коврика двери, а не его тела.
+func _shroud_agent(agent: Enemy, where: int, x: float, here: int, target_in_the_dark: bool) -> void:
+	agent.set_in_the_dark(_lighting.is_dark_at(where, x))
+	agent.set_target_in_the_dark(target_in_the_dark)
+	# Стена делит только свой этаж: с другого этажа Otto и так не достать.
+	agent.set_target_behind_a_wall(
+		where == here and _plan.wall_between(here, x, otto.global_position.x)
+	)
 
 
 ## Все агенты здания: они лежат прямо в уровне, рядом с геометрией.
@@ -708,15 +721,11 @@ func _release_agent(post: AgentPost) -> Enemy:
 	add_child(agent)
 	agent.global_position = WorldSpace.to_scene(mat)
 	agent.setup(otto, signf(otto.global_position.x - mat.x))
-	agent.set_in_the_dark(_lighting.is_dark_at(post.floor_index, mat.x))
-	# Тень Otto отдаётся сразу, не дожидаясь кадра: иначе первый шаг агент делал
-	# бы, видя Otto там, где его не видно.
-	agent.set_target_in_the_dark(_lighting.is_dark_at(_floor_of(otto), otto.global_position.x))
-	agent.set_target_behind_a_wall(
-		(
-			post.floor_index == _floor_of(otto)
-			and _plan.wall_between(post.floor_index, mat.x, otto.global_position.x)
-		)
+	# Тень Otto и стена отдаются сразу, не дожидаясь кадра: иначе первый шаг агент
+	# делал бы, видя Otto там, где его не видно.
+	var here := _floor_of(otto)
+	_shroud_agent(
+		agent, post.floor_index, mat.x, here, _lighting.is_dark_at(here, otto.global_position.x)
 	)
 	agent.set_menace(_menace())
 	agent.died.connect(_on_agent_died.bind(post))

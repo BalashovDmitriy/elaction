@@ -79,8 +79,14 @@ func _shoot_floor(label: String, index: int) -> void:
 func _shoot_the_wall(label: String, index: int) -> void:
 	var wall_x := _wall_x(index)
 	var spots := _level.plan().safe_spots(_level.rules, index)
-	var left := _nearest_spot(spots, wall_x - _level.rules.slot_x(1))
-	var right := _nearest_spot(spots, wall_x + _level.rules.slot_x(1))
+	if spots.is_empty():
+		push_error("этаж %d: вставать некуда" % index)
+		return
+	# Шаг сетки, а не координата места: [method BuildingRules.slot_x] отдаёт «где»,
+	# а тут нужно «насколько в сторону».
+	var step := _level.rules.slot_x(1) - _level.rules.slot_x(0)
+	var left := _nearest_spot(spots, wall_x - step)
+	var right := _nearest_spot(spots, wall_x + step)
 	_place(left, index)
 	_stand_an_agent_at(right, index)
 	await _shoot(label, index)
@@ -100,11 +106,11 @@ func _shoot(label: String, index: int) -> void:
 ## Первый сверху этаж, на котором раскладка поставила стену. [constant
 ## BuildingRules.ROOF] — стен на этом сиде не выпало вовсе.
 func _floor_with_a_wall() -> int:
-	var lowest := BuildingRules.ROOF
+	var highest := BuildingRules.ROOF
 	for wall in _level.plan().walls:
-		if lowest == BuildingRules.ROOF or wall.floor_index < lowest:
-			lowest = wall.floor_index
-	return lowest
+		if highest == BuildingRules.ROOF or wall.floor_index < highest:
+			highest = wall.floor_index
+	return highest
 
 
 func _wall_x(index: int) -> float:
