@@ -146,6 +146,8 @@ var _lit_span := Vector2i(0, -1)
 ## Лампы здания: их свет гасится за пределами кадра. Упавшие лампы убирают себя
 ## сами, поэтому перед обращением проверяется живость.
 var _lamps: Array[Lamp] = []
+## Эскалаторы здания: у каждого свой источник, и гаснет он вне кадра, как лампы.
+var _escalators: Array[Escalator] = []
 ## Посты у агентских дверей, по одному на дверь. Двери здания не выпускают всех
 ## разом — только те, чей этаж рядом с игроком (ADR-0014, пункт 4).
 var _posts: Array[AgentPost] = []
@@ -219,6 +221,15 @@ func _process(_delta: float) -> void:
 	# Столбы шахт — тем же правилом: их в здании втрое больше, чем ламп.
 	if _shafts != null:
 		_shafts.light_span(span)
+	# Эскалатор светит в проём между двумя этажами: горит, пока в кадре хоть
+	# один из них.
+	for escalator: Escalator in _escalators:
+		escalator.set_light_visible(
+			(
+				VisibleFloors.covers(span, escalator.floor_index)
+				or VisibleFloors.covers(span, escalator.floor_index + 1)
+			)
+		)
 
 
 ## Раскладка, по которой собрано здание.
@@ -274,6 +285,9 @@ func _spawn_shafts() -> void:
 		var car := CAR_SCENE.instantiate() as ElevatorCar
 		car.position.x = shaft.x
 		add_child(car)
+		# Кабина занимает просвет этажа целиком, как в оригинале: высоту она
+		# берёт из правил, а не из своей сцены (ADR-0025, решение 10).
+		car.fit_to_story(rules.floor_height - rules.slab_height)
 		car.setup(stops)
 		_cars.append(car)
 		if shaft.double_deck:
@@ -353,6 +367,7 @@ func _spawn_lower_deck(leader: ElevatorCar, shaft: BuildingPlan.ShaftSpot) -> vo
 	var deck := CAR_SCENE.instantiate() as ElevatorCar
 	deck.position.x = shaft.x
 	add_child(deck)
+	deck.fit_to_story(rules.floor_height - rules.slab_height)
 	deck.serve_as_deck(leader, rules.floor_height)
 	# Ярус идёт в общий список наравне с ведущим: агент садится в тот, что стоит
 	# вровень с его этажом, и какой это из двух — не его дело.
@@ -377,7 +392,11 @@ func _spawn_escalators() -> void:
 		escalator.position = WorldSpace.to_scene(
 			Vector2(spot.x, rules.floor_surface(spot.floor_index))
 		)
+		# Этаж известен здесь, и обратно из координаты его не выводят: по нему
+		# уровень гасит источник пролёта вне кадра.
+		escalator.floor_index = spot.floor_index
 		add_child(escalator)
+		_escalators.append(escalator)
 
 		var descent := Vector2(spot.towards * rules.escalator_run, rules.floor_height)
 		# Перегиб — в самом проёме: через него идут и полотно, и поездка, поэтому
@@ -594,51 +613,7 @@ func _shroud_agent(agent: Enemy, where: int, x: float, here: int, target_in_the_
 	agent.set_target_behind_a_wall(
 		where == here and _plan.wall_between(here, x, otto.global_position.x)
 	)
-	agent.set_lift_at(_lift_for(where, x, here))
-
-
-## Ось кабины, в которую агенту стоит войти, чтобы стать ближе к Otto, или NAN.
-##
-## Предлагается только стоящая вровень с его этажом: вызова кабины в оригинале
-## нет ни у кого (ADR-0025, решение 6), а ждать её у проёма агенту нечем — он
-## бы топтался на кромке, разворачиваясь на каждом кадре.
-##
-## **Из подходящих берётся ближайшая.** На этаже стилобата шахт до пяти, и
-## какая-нибудь кабина стоит вровень почти всегда; предложение прыгало с одной
-## на другую, и агент метался между ними, не дойдя ни до одной за полминуты.
-##
-## На этаже Otto кабина не предлагается вовсе: приехали. Поэтому едущий агент
-## выходит там, где Otto, а не на первом попавшемся этаже — пока кабина идёт,
-## вровень она ни с чем не стоит, и предложение само пропадает.
-func _lift_for(where: int, x: float, here: int) -> float:
-	if where == here:
-		return NAN
-
-	var towards := signi(here - where)
-	var best := NAN
-	for car in _cars:
-		if not car.is_aligned() or _floor_of(car) != where:
-			continue
-		var shaft := _shaft_in_column(car.position.x, where)
-		if shaft == null:
-			continue
-		# Шахта обязана вести в сторону Otto: иначе агент уезжает от него.
-		var span := shaft.ride_span()
-		if not ((towards > 0 and span.y > where) or (towards < 0 and span.x < where)):
-			continue
-		if is_nan(best) or absf(car.position.x - x) < absf(best - x):
-			best = car.position.x
-	return best
-
-
-## Шахта, стоящая в этом столбце и обслуживающая этот этаж.
-func _shaft_in_column(x: float, index: int) -> BuildingPlan.ShaftSpot:
-	for shaft in _plan.shafts:
-		if index < shaft.top or index > shaft.bottom:
-			continue
-		if absf(shaft.x - x) <= rules.shaft_width * 0.5:
-			return shaft
-	return null
+	agent.set_lift_at(AgentLifts.offer(_plan, rules, _cars, where, x, here))
 
 
 ## Все агенты здания: они лежат прямо в уровне, рядом с геометрией.

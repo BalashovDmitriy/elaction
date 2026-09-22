@@ -58,6 +58,9 @@ func test_an_agent_rides_down_to_otto() -> void:
 
 	var rules := level.rules
 	var shaft := _a_shaft_to_ride(level)
+	assert_not_null(shaft, "на сиде 1 есть шахта стилобата, по которой ездят")
+	if shaft == null:
+		return
 	var from_index := shaft.top + 1
 	var to_index := shaft.bottom
 	level.otto.global_position = WorldSpace.to_scene(
@@ -101,6 +104,9 @@ func test_an_agent_aboard_does_not_drive() -> void:
 
 	var rules := level.rules
 	var shaft := _a_shaft_to_ride(level)
+	assert_not_null(shaft, "на сиде 1 есть шахта стилобата, по которой ездят")
+	if shaft == null:
+		return
 	var index := shaft.top
 	# Otto далеко: агент в кабине не должен получить власть над ней ни при каких
 	# обстоятельствах, но кадр не должен ещё и превратиться в перестрелку.
@@ -116,14 +122,27 @@ func test_an_agent_aboard_does_not_drive() -> void:
 
 	var car := _car_in_column(level, shaft.x)
 	assert_not_null(car, "в шахте %.1f стоит кабина" % shaft.x)
+	if car == null:
+		return
 	# Пустая кабина ходит от этажа к этажу и с паузой на каждом. Агент внутри
 	# ничего в этом не меняет: она не встаёт и не разгоняется.
+	#
+	# Заодно проверяется, что агент всё это время действительно был внутри:
+	# без этого «кабина ходит сама» сходилось бы и с пустой шахтой, то есть
+	# не проверяло бы ровно того, ради чего тест написан.
 	var moved := 0
+	var aboard := 0
 	for _step in 240:
 		await wait_physics_frames(1)
 		if not car.is_aligned():
 			moved += 1
+		# Допуск в целую ширину шахты, а не в половину: внутри кабины агент
+		# переступает от стенки к стенке, и мерка должна отличать «едет»
+		# от «ушёл по этажу», а не ловить его шаги.
+		if absf(WorldSpace.to_plane(agent.global_position).x - shaft.x) <= rules.shaft_width:
+			aboard += 1
 	assert_gt(moved, 0, "кабина с агентом внутри продолжает ходить сама")
+	assert_eq(aboard, 240, "агент все эти кадры ехал в кабине, а не ушёл по этажу")
 
 
 func _car_in_column(level: GreyboxLevel, x: float) -> ElevatorCar:

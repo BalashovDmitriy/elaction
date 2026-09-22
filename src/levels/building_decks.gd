@@ -38,13 +38,20 @@ static func lay(plan: BuildingPlan, rules: BuildingRules, rng: RandomNumberGener
 			if not plan.shafts[index].double_deck and _takes_a_pair(plan, index):
 				fitting.append(index)
 
+		var placed := false
 		while not fitting.is_empty():
 			var index := BuildingPlan.pick_any(rng, fitting)
 			fitting.erase(index)
 			plan.shafts[index].double_deck = true
 			if BuildingRoute.reachable(plan, rules).size() == whole:
+				placed = true
 				break
 			plan.shafts[index].double_deck = false
+
+		# Ни одна из подошедших шахт не взяла пару — второй заход перебрал бы
+		# ровно тот же набор с тем же исходом, а счёт графа не бесплатный.
+		if not placed:
+			return
 
 
 ## Влезает ли в шахту пара и не запрёт ли она собой спуск.

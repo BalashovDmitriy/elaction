@@ -99,6 +99,37 @@ static func unreachable_spots(plan: BuildingPlan, rules: BuildingRules) -> Array
 	return missing
 
 
+## Ничего ли не отрезано: документы и выход достижимы, и **все куски этажа
+## [param floor_index] тоже**.
+##
+## Второе — про карманы. Стена режет свой этаж надвое, и отрезанная половина
+## бывает никому не нужна: документа в ней нет, [method is_winnable] её не
+## замечает, — а бот, зайдя туда, встаёт до конца прогона (сид 1, 22-й этаж,
+## 3001 шаг «хода нет»).
+##
+## Считать это числом достижимых узлов нельзя, в отличие от двухэтажной пары:
+## пара меняет только рёбра, а стена заводит новый узел, и число их растёт
+## само по себе. Поэтому спрашивается именно про куски этажа.
+static func nothing_is_cut_off(plan: BuildingPlan, rules: BuildingRules, floor_index: int) -> bool:
+	var floors := _floor_segments(plan, rules)
+	var seen := reachable_in(plan, rules, floors)
+
+	for door in plan.doors:
+		if not door.has_document:
+			continue
+		if not seen.has(_node(door.floor_index, _segment_at(floors[door.floor_index], door.x))):
+			return false
+
+	var bottom := plan.floors - 1
+	if not seen.has(_node(bottom, _segment_at(floors[bottom], plan.exit_x))):
+		return false
+
+	for segment in (floors[floor_index] as Array[Vector2]).size():
+		if not seen.has(_node(floor_index, segment)):
+			return false
+	return true
+
+
 ## Готовый к ходьбе граф здания: куски уровней и подписанные переходы между ними.
 ##
 ## Считается один раз на здание и отдаётся тому, кто по нему ходит: раскладка за

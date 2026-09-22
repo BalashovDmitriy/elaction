@@ -714,6 +714,12 @@ func _lay_lamps(rules: BuildingRules, taken: Dictionary) -> void:
 ##
 ## Проверка идёт по [BuildingRoute], а не по своему обходу: куски этажа и связи
 ## между ними разъезжаться не должны, и счёт им один на весь проект.
+##
+## **Порог строже, чем [method BuildingRoute.is_winnable]:** стена не имеет права
+## отрезать и тот кусок этажа, в котором ничего не лежит. Тот следит за
+## документами и выходом, и карман ему безразличен, — а бот, зайдя в карман,
+## встаёт: на сиде 1 он простоял 3001 шаг на 22-м этаже, «хода нет». Ровно тем
+## же порогом проверяется двухэтажная пара ([BuildingDecks]).
 func _lay_walls(rules: BuildingRules, rng: RandomNumberGenerator) -> void:
 	for index in range(floors):
 		if rng.randf() >= rules.wall_chance:
@@ -726,7 +732,7 @@ func _lay_walls(rules: BuildingRules, rng: RandomNumberGenerator) -> void:
 		wall.floor_index = index
 		wall.x = x
 		walls.append(wall)
-		if not BuildingRoute.is_winnable(self, rules):
+		if not BuildingRoute.nothing_is_cut_off(self, rules, index):
 			walls.pop_back()
 
 

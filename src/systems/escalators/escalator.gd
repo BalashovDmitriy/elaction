@@ -79,12 +79,19 @@ const FRAME_MARGIN: float = 0.12
 ## Сколько секунд занимает поездка между площадками.
 @export var travel_time: float = 1.1
 
+## Этаж, с которого эскалатор спускается. Ставит его уровень: обратно из
+## координаты этаж не выводят — узел стоит ровно на полу, где округление
+## решает случай. По нему уровень гасит источник пролёта вне кадра.
+var floor_index: int = 0
+
 var _passenger: Otto = null
 var _path: PackedVector3Array = PackedVector3Array()
 var _progress: float = 0.0
 ## Перегиб полотна в своих координатах. Пустой — [method setup] не звали.
 var _via := Vector3.ZERO
 var _has_via: bool = false
+## Источник пролёта. Пустой — [method setup] не звали.
+var _glow: OmniLight3D = null
 
 var _hum: AudioStreamPlayer3D = null
 @onready var _top_pad: Area3D = $TopPad
@@ -125,6 +132,18 @@ func setup(descent: Vector2, via: Vector2, gap: Vector2, slab: float) -> void:
 ## Везёт ли эскалатор кого-нибудь прямо сейчас.
 func is_busy() -> bool:
 	return _passenger != null
+
+
+## Гасит или зажигает источник пролёта. Зовёт уровень, отбирая видимые этажи —
+## тем же правилом, что у ламп и столбов шахт (ADR-0010, пункт 8).
+##
+## Это не то же самое, что «погас от выстрела»: источник пролёта не участвует
+## в зонах темноты и от пули не гаснет (ADR-0025, решение 4), — но светить ему
+## положено в кадре, а не во всём здании разом. Светильников на здание за
+## полсотни, и не гасившиеся эскалаторы съедали бюджет света целиком.
+func set_light_visible(on: bool) -> void:
+	if _glow != null:
+		_glow.visible = on
 
 
 func _try_board(pad: Area3D, target: Area3D, towards: float) -> bool:
@@ -300,6 +319,7 @@ func _light_the_flight(from: Vector3, to: Vector3) -> void:
 	light.shadow_enabled = false
 	light.position = (from + to) * 0.5 + Vector3(0.0, 0.0, GLOW_Z)
 	_ramp.add_child(light)
+	_glow = light
 
 
 ## Огонёк на конце поручня.

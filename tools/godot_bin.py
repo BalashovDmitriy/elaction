@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import time
 import sys
 from pathlib import Path
 
@@ -71,26 +72,67 @@ def as_text(value: str | bytes | None) -> str:
     return value
 
 
-def run(godot: str, args: list[str], timeout: int = 600) -> tuple[int, str]:
+def run(
+    godot: str,
+    args: list[str],
+    timeout: int = 600,
+    echo: bool = True,
+    stop_on: tuple[str, ...] = (),
+) -> tuple[int, str]:
     """Запускает Godot в папке проекта и возвращает (код возврата, объединённый вывод).
+
+    **Вывод идёт наружу построчно, пока процесс работает.** Набор тестов идёт
+    больше десяти минут, а бот печатает «зациклился» задолго до последней строки:
+    молчащий прогон заставлял ждать конца там, где всё понятно на третьей минуте.
+
+    [stop_on] — сторож: увидев в выводе любую из этих строк, прогон снимается
+    сразу. Ждать после неё нечего, а ждать приходится минутами.
 
     Зависший Godot (например, модальное окно ошибки) снимается по таймауту и
     отдаётся как обычный неуспех с кодом TIMEOUT_EXIT_CODE, а не как traceback.
     """
+    started = time.monotonic()
+    process = subprocess.Popen(
+        [godot, "--path", str(PROJECT_ROOT), *args],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        bufsize=1,
+    )
+
+    lines: list[str] = []
+    assert process.stdout is not None
+    for line in process.stdout:
+        lines.append(line)
+        if echo:
+            # flush на каждой строке: без него труба копит вывод сама, и весь
+            # смысл потока теряется.
+            print(line, end="", flush=True)
+        if any(mark in line for mark in stop_on):
+            return _cut_short(process, lines, f"Прогон снят сторожем: {line.strip()}")
+        if time.monotonic() - started > timeout:
+            return _cut_short(process, lines, f"Godot не ответил за {timeout} с и был снят.")
+
+    process.stdout.close()
+    left = max(timeout - (time.monotonic() - started), 1.0)
     try:
-        completed = subprocess.run(
-            [godot, "--path", str(PROJECT_ROOT), *args],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as expired:
-        output = as_text(expired.stdout) + as_text(expired.stderr)
-        return TIMEOUT_EXIT_CODE, f"{output}\nGodot не ответил за {timeout} с и был снят."
-    return completed.returncode, (completed.stdout or "") + (completed.stderr or "")
+        return process.wait(timeout=left), "".join(lines)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+        return TIMEOUT_EXIT_CODE, "".join(lines) + f"\nGodot не ответил за {timeout} с и был снят."
+
+
+def _cut_short(process: subprocess.Popen, lines: list[str], why: str) -> tuple[int, str]:
+    """Снимает процесс и отдаёт то, что он успел сказать."""
+    process.kill()
+    if process.stdout is not None:
+        process.stdout.close()
+    process.wait()
+    print(why, flush=True)
+    return TIMEOUT_EXIT_CODE, "".join(lines) + "\n" + why
 
 
 def use_utf8_output() -> None:

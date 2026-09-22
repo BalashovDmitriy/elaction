@@ -35,6 +35,18 @@ const INDICATOR_SIZE := Vector3(0.1, 0.06, 0.1)
 const INDICATOR_SPREAD: float = 0.42
 const INDICATOR_RISE: float = 0.03
 
+## Толщина пола и крыши кабины, м. Задана сценой; здесь она нужна затем, что
+## высоту кабина берёт из правил здания, а не из сцены.
+const SLAB_THICKNESS: float = 0.18
+
+## Просвет этажа по умолчанию, м: высота этажа минус плита у стандартных правил.
+## Кабина строится по нему, пока уровень не сказал своё — так одиночная кабина,
+## поднятая тестом без здания, всё равно собрана целиком.
+const DEFAULT_CLEAR_HEIGHT: float = 3.0
+
+## На сколько стрелки утоплены от крыши, м.
+const ARROW_DROP: float = 0.3
+
 ## Тяги между ярусами пары: сечение, разнос от середины и глубина, м.
 ##
 ## Ярусы скреплены и едут вместе, но стоят через этаж — между крышей нижнего и
@@ -63,6 +75,8 @@ var _deck_drop: float = 0.0
 
 var _hum: AudioStreamPlayer3D = null
 var _ding: AudioStreamPlayer3D = null
+## Огоньки на крыше: их двигает [method fit_to_story], когда меняется высота.
+var _indicators: Array[MeshInstance3D] = []
 @onready var _interior: Area3D = $Interior
 @onready var _crush_zone: Area3D = $CrushZone
 @onready var _up_arrow: MeshInstance3D = $UpArrow
@@ -78,20 +92,55 @@ func _ready() -> void:
 	# погашенном этаже (ADR-0019, решение 5). Держат это два индикатора на
 	# крыше, а сама кабина — металл, как шахта.
 	var slab := GreyboxLook.metal(GreyboxLook.CAR)
-	var roof := $RoofVisual as MeshInstance3D
 	($FloorVisual as MeshInstance3D).material_override = slab
-	roof.material_override = slab
+	($RoofVisual as MeshInstance3D).material_override = slab
 	var arrow := GreyboxLook.marker(GreyboxLook.DOOR)
 	_up_arrow.material_override = arrow
 	_down_arrow.material_override = arrow
 
-	var roof_top := roof.position.y + (roof.mesh as BoxMesh).size.y * 0.5
 	for side: float in [-1.0, 1.0]:
 		var indicator := GreyboxLook.box(INDICATOR_SIZE, GreyboxLook.light(GreyboxLook.INDICATOR))
-		indicator.position = Vector3(
-			side * INDICATOR_SPREAD, roof_top + INDICATOR_RISE + INDICATOR_SIZE.y * 0.5, 0.3
-		)
 		add_child(indicator)
+		_indicators.append(indicator)
+	fit_to_story(DEFAULT_CLEAR_HEIGHT)
+
+
+## Растягивает кабину на просвет этажа: пол на полу этажа, крыша у низа плиты.
+##
+## **Кабина занимает просвет целиком — как в оригинале.** Сверка по кадру
+## (256×224): шаг этажа 48 px, плита 7, просвет 41, кабина 40. У нас она была
+## 1.8 м при просвете 3.0 — ровно вполовину ниже, и это расхождение нигде
+## не решалось: размер приехал из 2D-версии M2 и пережил пересчёт пропорций M13
+## (ADR-0025, решение 10).
+##
+## Езде на крыше полная высота не мешает: крыша встаёт у низа плиты, а плита
+## в этом месте прорезана шахтой — стоящий на крыше стоит в проёме, и корпус
+## уходит в этаж выше. Так же это устроено и в оригинале.
+##
+## Высоту задаёт уровень из правил здания, а не сцена: [member
+## BuildingRules.floor_height] и [member BuildingRules.slab_height] —
+## экспортируемые поля, и здание с другими пропорциями собирают тесты.
+func fit_to_story(clear_height: float) -> void:
+	var roof_middle := clear_height - SLAB_THICKNESS * 0.5
+	($RoofShape as CollisionShape3D).position.y = roof_middle
+	($RoofVisual as MeshInstance3D).position.y = roof_middle
+
+	# Форма своя на каждую кабину: подресурс сцены общий на все её копии, и
+	# правка размера на месте растянула бы заодно все остальные кабины здания.
+	var room := clear_height - SLAB_THICKNESS
+	var inside := $Interior/InteriorShape as CollisionShape3D
+	var box := (inside.shape as BoxShape3D).duplicate() as BoxShape3D
+	box.size.y = room
+	inside.shape = box
+	inside.position.y = room * 0.5
+
+	_up_arrow.position.y = clear_height - ARROW_DROP
+	_down_arrow.position.y = clear_height - ARROW_DROP
+	for index in _indicators.size():
+		var side := -1.0 if index == 0 else 1.0
+		_indicators[index].position = Vector3(
+			side * INDICATOR_SPREAD, clear_height + INDICATOR_RISE + INDICATOR_SIZE.y * 0.5, 0.3
+		)
 
 
 func _physics_process(delta: float) -> void:
@@ -200,7 +249,6 @@ func is_aligned() -> bool:
 ## иначе половина связи однажды останется незаданной.
 func take_a_deck(deck: ElevatorCar, drop: float) -> void:
 	_deck = deck
-	_deck_drop = drop
 	# Зона сдавливания верхнего яруса остаётся: между ярусами 1.8 м пустоты,
 	# на крышу нижнего можно встать, и опускающаяся пара прижмёт стоящего.
 	var tie := GreyboxLook.metal(GreyboxLook.CAR)
@@ -220,14 +268,12 @@ func _body_height() -> float:
 
 ## Верх крыши в своих координатах, м.
 func _roof_top() -> float:
-	var roof := $RoofVisual as MeshInstance3D
-	return roof.position.y + (roof.mesh as BoxMesh).size.y * 0.5
+	return ($RoofVisual as MeshInstance3D).position.y + SLAB_THICKNESS * 0.5
 
 
 ## Низ днища в своих координатах, м.
 func _under_the_floor() -> float:
-	var slab := $FloorVisual as MeshInstance3D
-	return slab.position.y - (slab.mesh as BoxMesh).size.y * 0.5
+	return ($FloorVisual as MeshInstance3D).position.y - SLAB_THICKNESS * 0.5
 
 
 ## Держит нижний ярус под ведущим.
@@ -242,9 +288,10 @@ func _ride_along() -> void:
 
 
 ## Скорость кабины за последний кадр: её спрашивает нижний ярус, чтобы решить,
-## давит ли он.
+## давит ли он. У яруса пары своего хода нет — отвечает за него ведущий, иначе
+## едущий вниз ярус отчитывался бы нулём и никого не придавил.
 func speed_now() -> float:
-	return _motion.velocity
+	return _leader.speed_now() if _leader != null else _motion.velocity
 
 
 ## Указатели: погасшая стрелка объясняет, почему кабина не идёт дальше.
@@ -283,5 +330,8 @@ func _on_body_exited(body: Node3D) -> void:
 	if rider == null or rider != _occupant:
 		return
 	_occupant = null
-	_command = 0.0
+	# Через [method drive], а не полем: у яруса пары команду исполняет ведущий,
+	# и забытая у него «вниз» тронула бы пару с места в тот кадр, когда в неё
+	# войдёт следующий, — ещё до того, как тот успеет нажать хоть что-то.
+	drive(0.0)
 	rider.leave(self)

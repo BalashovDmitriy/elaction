@@ -30,6 +30,10 @@ TEST_TIMEOUT = 1200
 # заметить это надо на прогоне, а не когда прогон уже снимается.
 CROWDED_RATIO = 0.75
 
+# Строки, после которых ждать нечего. Бот печатает это, упершись в тупик, и
+# дальше только добирает бюджет шагов — на настоящем здании это минуты.
+STALLED_MARKERS = ("бот зациклился",)
+
 # Скрипт, не прошедший разбор, молча выпадает из прогона: GUT считает тесты
 # остальных файлов и рапортует об успехе. Поэтому ищем следы поломки отдельно.
 BROKEN_SCRIPT_MARKERS = (
@@ -44,9 +48,16 @@ def main() -> int:
     godot = require_godot()
 
     started = time.monotonic()
-    code, output = run(godot, ["--headless", "-s", GUT_CMDLN], timeout=TEST_TIMEOUT)
+    # Вывод идёт потоком: набор долгий, и смотреть его надо по ходу, а не после.
+    # Сторож снимает прогон на первой же строке о зацикленном боте — после неё
+    # он всё равно выжжет весь бюджет шагов, а это минуты ожидания ни за чем.
+    code, output = run(
+        godot,
+        ["--headless", "-s", GUT_CMDLN],
+        timeout=TEST_TIMEOUT,
+        stop_on=STALLED_MARKERS,
+    )
     spent = time.monotonic() - started
-    print(output.strip())
     print(f"\nНабор шёл {spent:.0f} с при лимите {TEST_TIMEOUT}.")
     if spent > TEST_TIMEOUT * CROWDED_RATIO:
         print("Запас до лимита меньше четверти — пора разрезать самый дорогой тест.")

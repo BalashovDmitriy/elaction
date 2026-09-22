@@ -61,6 +61,11 @@ func _ready() -> void:
 
 func _run() -> void:
 	var spot := _escalator_under_a_lamp()
+	if spot == null:
+		push_error("на сиде %d эскалаторов нет — кадр снять не с чего" % BUILDING_SEED)
+		get_tree().quit(1)
+		return
+
 	var rules := _level.rules
 	# Кадр охватывает оба пролёта и оба этажа, которые эскалатор связывает.
 	var middle := Vector2(
@@ -71,7 +76,13 @@ func _run() -> void:
 	await _shoot("01_escalator", middle, 7.2)
 
 	await _shoot_the_dark_shaft("02_shaft_dark")
-	await _shoot_the_pair("03_double_deck")
+	# Неснятый кадр — это провал прогона, и выходить надо с ошибкой. Второй
+	# [method SceneTree.quit] в том же кадре забивает код первого, поэтому
+	# отказ поднимается сюда, а не выходит на месте.
+	var shot := await _shoot_the_pair("03_double_deck")
+	if not shot:
+		get_tree().quit(1)
+		return
 
 	print("  кадры геометрии в %s" % FOLDER)
 	get_tree().quit(0)
@@ -81,13 +92,12 @@ func _run() -> void:
 ##
 ## Кадр берёт два этажа разом — иначе видно один ярус, и пара ничем не
 ## отличается от обычной кабины.
-func _shoot_the_pair(label: String) -> void:
+func _shoot_the_pair(label: String) -> bool:
 	var rules := _level.rules
 	var shaft := _double_deck_shaft()
 	if shaft == null:
 		push_error("на сиде %d пара не выпала — кадр снять не с чего" % BUILDING_SEED)
-		get_tree().quit(1)
-		return
+		return false
 
 	var span := shaft.ride_span()
 	var index := span.x
@@ -99,6 +109,7 @@ func _shoot_the_pair(label: String) -> void:
 	# этаж, и в кадр должны попасть оба.
 	var middle := rules.floor_surface(index) + rules.floor_height * 0.5
 	await _shoot(label, Vector2(shaft.x, middle), 4.2)
+	return true
 
 
 func _double_deck_shaft() -> BuildingPlan.ShaftSpot:
@@ -119,7 +130,7 @@ func _shoot_the_dark_shaft(label: String) -> void:
 	var shaft_x := _shaft_x_on(index)
 	for lamp in _lamps_on(index):
 		lamp.shoot_down()
-	await _settle_after_the_fall()
+	await _settle_after_the_fall(index)
 
 	_level.otto.global_position = WorldSpace.to_scene(
 		Vector2(shaft_x + rules.shaft_width, rules.floor_surface(index))
@@ -146,20 +157,19 @@ func _lamps_on(index: int) -> Array[Lamp]:
 
 
 ## Ждёт, пока сбитые лампы долетят до пола: по состоянию, а не выдержкой.
-func _settle_after_the_fall() -> void:
+##
+## Состояние — «лампа ещё на этаже»: долетев, она сама себя убирает
+## ([method Lamp._land]), и пустой этаж и значит, что все упали. По признаку
+## «уже удаляется» ждать нельзя — он истинен ровно один кадр, тот самый
+## последний, и ожидание кончалось бы, не начавшись.
+func _settle_after_the_fall(index: int) -> void:
 	var left := FALL_STEPS
-	while left > 0 and _falling():
+	while left > 0 and not _lamps_on(index).is_empty():
 		await get_tree().physics_frame
 		left -= 1
+	if left <= 0:
+		push_warning("лампы этажа %d не долетели до пола за %d шагов" % [index, FALL_STEPS])
 	await get_tree().physics_frame
-
-
-func _falling() -> bool:
-	for child in _level.get_children():
-		var lamp := child as Lamp
-		if lamp != null and lamp.is_queued_for_deletion():
-			return true
-	return false
 
 
 ## Эскалатор, к которому ближе всего лампа его этажа.
@@ -169,6 +179,8 @@ func _falling() -> bool:
 ## этажа — снятый там, кадр показывал бы зоны ламп M17, а не геометрию M18b.
 func _escalator_under_a_lamp() -> BuildingPlan.EscalatorSpot:
 	var plan := _level.plan()
+	if plan.escalators.is_empty():
+		return null
 	var best: BuildingPlan.EscalatorSpot = plan.escalators[0]
 	var best_gap := INF
 	for spot in plan.escalators:

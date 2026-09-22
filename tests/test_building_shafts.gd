@@ -41,8 +41,10 @@ func test_shafts_cover_every_floor() -> void:
 ## стояла на 29-м этаже одна-одинёшенька. Ловится это только на редком сиде,
 ## поэтому проверка идёт по всем сразу.
 ##
-## Порог — [constant BuildingRules.MIN_SHAFT_FLOORS], три этажа, и три они
-## не случайно: двухэтажная кабина M18b в шахте на два этажа не сдвинется.
+## Порог — [constant BuildingRules.MIN_SHAFT_FLOORS], четыре этажа, и четыре они
+## не случайно: двухэтажная пара M18b возит только между [code]top + 1[/code] и
+## [code]bottom - 1[/code], и в шахте покороче ей ехать некуда (ADR-0025,
+## решение 2).
 func test_no_shaft_is_too_short_to_ride() -> void:
 	var rules := _rules()
 	for building_seed: int in SEEDS:
