@@ -71,9 +71,41 @@ func _run() -> void:
 	await _shoot("01_escalator", middle, 7.2)
 
 	await _shoot_the_dark_shaft("02_shaft_dark")
+	await _shoot_the_pair("03_double_deck")
 
 	print("  кадры геометрии в %s" % FOLDER)
 	get_tree().quit(0)
+
+
+## Кадр двухэтажной пары: оба яруса и тяги между ними.
+##
+## Кадр берёт два этажа разом — иначе видно один ярус, и пара ничем не
+## отличается от обычной кабины.
+func _shoot_the_pair(label: String) -> void:
+	var rules := _level.rules
+	var shaft := _double_deck_shaft()
+	if shaft == null:
+		push_error("на сиде %d пара не выпала — кадр снять не с чего" % BUILDING_SEED)
+		get_tree().quit(1)
+		return
+
+	var span := shaft.ride_span()
+	var index := span.x
+	_level.otto.global_position = WorldSpace.to_scene(
+		Vector2(shaft.x + rules.shaft_width, rules.floor_surface(index))
+	)
+	_level.otto.velocity = Vector3.ZERO
+	# Середина между этажом верхнего яруса и этажом нижнего: пара стоит через
+	# этаж, и в кадр должны попасть оба.
+	var middle := rules.floor_surface(index) + rules.floor_height * 0.5
+	await _shoot(label, Vector2(shaft.x, middle), 4.2)
+
+
+func _double_deck_shaft() -> BuildingPlan.ShaftSpot:
+	for shaft in _level.plan().shafts:
+		if shaft.double_deck:
+			return shaft
+	return null
 
 
 ## Кадр шахты на погашенном этаже: лампы сбиты, светит только столб.

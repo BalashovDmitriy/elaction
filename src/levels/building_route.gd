@@ -53,7 +53,7 @@ static func node_in(floors: Dictionary, floor_index: int, x: float) -> String:
 static func reachable_in(
 	plan: BuildingPlan, rules: BuildingRules, floors: Dictionary
 ) -> Dictionary:
-	var links := _links(plan, rules, floors)
+	var links: Dictionary = _graph(plan, rules, floors, false)["links"]
 
 	# Спуск начинается с крыши, а не с верхнего этажа: туда Otto попадает лифтом,
 	# и здание, до которого от крыши не добраться, непроходимо.
@@ -110,7 +110,7 @@ static func walkable(plan: BuildingPlan, rules: BuildingRules) -> Dictionary:
 	var pieces := _floor_segments(plan, rules)
 	return {
 		"pieces": pieces,
-		"moves": _moves(plan, rules, pieces),
+		"moves": _graph(plan, rules, pieces, true)["moves"],
 		# Докуда дотянется тот, кто стоит в кабине: она перекрывает проём собой,
 		# и выйти из неё можно в любой край.
 		"reach": rules.shaft_width * 0.5 + TOUCHING_SLACK,
@@ -169,44 +169,104 @@ static func _inside(piece: Vector2, x: float) -> float:
 	return clampf(x, piece.x + STEP_INSIDE, piece.y - STEP_INSIDE)
 
 
-## Подписанные переходы: узел -> чем и куда из него можно уйти.
-static func _moves(plan: BuildingPlan, rules: BuildingRules, pieces: Dictionary) -> Dictionary:
+## Граф здания: кто с кем связан и, по запросу, чем именно.
+##
+## Один обход на оба ответа. Раньше их было два — [code]_moves[/code] и
+## [code]_links[/code], — и они считали одно и то же по-разному: правка под
+## двухэтажную пару (ADR-0025, решение 1) прошла бы в одном и не прошла
+## в другом, а расходились они уже на вырожденном конце эскалатора.
+##
+## [param detailed] — нужна ли подпись каждого перехода. Обходу достижимости
+## довольно соседей, а идущему нужно знать, чем воспользоваться и где он
+## окажется. Словарь на ребро стоит дорого, а [method is_winnable] зовётся
+## около десяти раз на здание — поэтому подпись считается по запросу, но
+## правило, кто с кем связан, остаётся одно на оба ответа.
+static func _graph(
+	plan: BuildingPlan, rules: BuildingRules, pieces: Dictionary, detailed: bool
+) -> Dictionary:
+	var links: Dictionary = {}
 	var moves: Dictionary = {}
 
 	for shaft in plan.shafts:
-		# Кабина связывает все уровни своей шахты, а заодно оба края проёма на
-		# одном уровне: сквозь стоящую кабину проходят насквозь. Ход на тот же
-		# уровень выглядит пустым, но он и есть переход через проём — без него
-		# половины этажа, разрезанного шахтой, друг для друга недостижимы.
-		var boarding: Dictionary = {}
+		# Кабина связывает уровни своей шахты, а заодно оба края проёма на одном
+		# уровне: сквозь стоящую кабину проходят насквозь. Ход на тот же уровень
+		# выглядит пустым, но он и есть переход через проём — без него половины
+		# этажа, разрезанного шахтой, друг для друга недостижимы.
+		#
+		# Узлы посадки — тремя параллельными массивами, а не словарём на узел.
+		# Словарь здесь стоил вдвое всей генерации: шахт дюжина, узлов у каждой
+		# десятки, а перебор их попарно — квадрат. Замер: 24.5 мс на здание
+		# против 12.2 после.
+		var nodes: Array[String] = []
+		var on_floor := PackedInt32Array()
+		# Выходят не на ось шахты, а в сам кусок: иначе переход через проём
+		# кончался бы ровно в кабине, и «дошёл» наступало, не сходя с места.
+		var inside := PackedFloat64Array()
+		# Возит ли кабина с этого узла. Считается заранее, а не в переборе:
+		# [method BuildingPlan.ShaftSpot.ride_span] заводит [Vector2i], а
+		# перебор идёт квадратом от числа узлов.
+		var rides := PackedByteArray()
+		var span := shaft.ride_span()
 		for index in range(shaft.top, shaft.bottom + 1):
 			for segment in _segments_touching(pieces[index], shaft.x, rules.shaft_width):
 				var piece: Vector2 = pieces[index][segment]
-				# Выходят не на ось шахты, а в сам кусок: иначе переход через
-				# проём кончался бы ровно в кабине, и «дошёл» наступало,
-				# не сходя с места.
-				boarding[_node(index, segment)] = {"floor": index, "x": _inside(piece, shaft.x)}
-		for from_node: String in boarding:
-			for to_node: String in boarding:
-				if from_node == to_node:
+				nodes.append(_node(index, segment))
+				on_floor.append(index)
+				inside.append(_inside(piece, shaft.x))
+				rides.append(1 if index >= span.x and index <= span.y else 0)
+
+		for from_index in nodes.size():
+			for to_index in nodes.size():
+				if from_index == to_index:
 					continue
-				var to: Dictionary = boarding[to_node]
-				_offer(moves, from_node, "shaft", shaft.x, to["x"], to["floor"], to_node)
+				# Переход через проём — на своём этаже, и его даёт любая стоящая
+				# кабина. Поездка — только туда, куда довезёт любой из ярусов
+				# пары: вошедший не выбирает, какой ярус его встретит.
+				var to_floor := on_floor[to_index]
+				var from_floor := on_floor[from_index]
+				if to_floor != from_floor and (rides[from_index] == 0 or rides[to_index] == 0):
+					continue
+				_join(links, nodes[from_index], nodes[to_index])
+				if detailed:
+					_offer(
+						moves,
+						nodes[from_index],
+						"shaft",
+						shaft.x,
+						inside[to_index],
+						to_floor,
+						nodes[to_index]
+					)
 
 	for escalator in plan.escalators:
 		var upper := escalator.floor_index
 		var top_segment := _segment_at(pieces[upper], escalator.x)
 		var landing := escalator.x + escalator.towards * rules.escalator_run
 		var bottom_segment := _segment_at(pieces[upper + 1], landing)
+		# -1 — конец эскалатора попал в проём или за стену. Узла с таким номером
+		# на этаже нет, и связывать его нельзя: обход пометил бы его достижимым,
+		# а после этого достижимой считалась бы любая точка этажа внутри дыры.
 		if top_segment < 0 or bottom_segment < 0:
+			push_error("эскалатор на этаже %d упирается в проём" % upper)
 			continue
 		# Эскалатор ходит в обе стороны: с площадки внизу на нём поднимаются.
 		var above := _node(upper, top_segment)
 		var below := _node(upper + 1, bottom_segment)
-		_offer(moves, above, "escalator", escalator.x, landing, upper + 1, below)
-		_offer(moves, below, "escalator", landing, escalator.x, upper, above)
+		_join(links, above, below)
+		_join(links, below, above)
+		if detailed:
+			_offer(moves, above, "escalator", escalator.x, landing, upper + 1, below)
+			_offer(moves, below, "escalator", landing, escalator.x, upper, above)
 
-	return moves
+	return {"links": links, "moves": moves}
+
+
+## Отмечает, что из одного узла можно попасть в другой.
+static func _join(links: Dictionary, from_node: String, to_node: String) -> void:
+	if not links.has(from_node):
+		links[from_node] = [] as Array[String]
+	if not links[from_node].has(to_node):
+		links[from_node].append(to_node)
 
 
 ## [param x] — куда идти, чтобы воспользоваться переходом; [param to_x] — где
@@ -240,37 +300,6 @@ static func _floor_segments(plan: BuildingPlan, rules: BuildingRules) -> Diction
 		var blocks := plan.blocks_on(rules, index)
 		floors[index] = BuildingPlan.spans_between(blocks, rules.floor_span(index))
 	return floors
-
-
-## Куда можно шагнуть из каждого узла.
-static func _links(plan: BuildingPlan, rules: BuildingRules, floors: Dictionary) -> Dictionary:
-	var links: Dictionary = {}
-
-	for shaft in plan.shafts:
-		# Кабина связывает все этажи своей полосы, а заодно оба края проёма:
-		# сквозь стоящую на этаже кабину проходят насквозь.
-		var boarding: Array[String] = []
-		for index in range(shaft.top, shaft.bottom + 1):
-			for segment in _segments_touching(floors[index], shaft.x, rules.shaft_width):
-				boarding.append(_node(index, segment))
-		_connect_all(links, boarding)
-
-	for escalator in plan.escalators:
-		var upper := escalator.floor_index
-		var top_segment := _segment_at(floors[upper], escalator.x)
-		var landing := escalator.x + escalator.towards * rules.escalator_run
-		var bottom_segment := _segment_at(floors[upper + 1], landing)
-		# -1 — конец эскалатора попал в проём или за стену. Узла с таким номером
-		# на этаже нет, и связывать его нельзя: обход пометил бы его достижимым,
-		# а после этого достижимой считалась бы любая точка этажа внутри дыры.
-		if top_segment < 0 or bottom_segment < 0:
-			push_error("эскалатор на этаже %d упирается в проём" % upper)
-			continue
-		_connect_all(
-			links, [_node(upper, top_segment), _node(upper + 1, bottom_segment)] as Array[String]
-		)
-
-	return links
 
 
 ## Куски этажа, примыкающие к столбцу шириной [param width] вокруг [param x].
@@ -322,17 +351,6 @@ static func _segment_at(pieces: Array, x: float) -> int:
 		if x >= piece.x and x <= piece.y:
 			return index
 	return -1
-
-
-static func _connect_all(links: Dictionary, nodes: Array[String]) -> void:
-	for from_node in nodes:
-		for to_node in nodes:
-			if from_node == to_node:
-				continue
-			if not links.has(from_node):
-				links[from_node] = [] as Array[String]
-			if not links[from_node].has(to_node):
-				links[from_node].append(to_node)
 
 
 static func _node(floor_index: int, segment: int) -> String:

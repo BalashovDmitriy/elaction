@@ -210,3 +210,66 @@ func _shaft_x_on(plan: BuildingPlan, floor_index: int) -> float:
 		if floor_index >= shaft.top and floor_index <= shaft.bottom:
 			return shaft.x
 	return 0.0
+
+
+## Пар на здание не больше двух, и каждая стоит в шахте, которая её держит.
+##
+## «Двухэтажная кабина в шахте на три этажа» — это неподвижный лифт: ярусы
+## занимают по высоте два этажа, и возить остаётся между одним (ADR-0025,
+## решение 2). Поэтому проверяется не только число пар, но и то, что диапазон
+## их хода не выродился.
+func test_double_deck_pairs_are_few_and_fit_their_shaft() -> void:
+	var rules := _rules()
+	for building_seed: int in SEEDS:
+		var plan := BuildingPlan.generate(rules, building_seed)
+		var pairs := 0
+		for shaft in plan.shafts:
+			if not shaft.double_deck:
+				continue
+			pairs += 1
+			var span := shaft.ride_span()
+			assert_gte(
+				shaft.height(),
+				BuildingRules.MIN_SHAFT_FLOORS,
+				"сид %d: пара в шахте на %d этажей" % [building_seed, shaft.height()]
+			)
+			assert_lt(
+				span.x,
+				span.y,
+				(
+					"сид %d: паре в шахте %d..%d ехать некуда"
+					% [building_seed, shaft.top, shaft.bottom]
+				)
+			)
+		assert_lte(pairs, BuildingDecks.MOST, "сид %d: пар в здании %d" % [building_seed, pairs])
+
+
+## Пара выпадает в каждом здании, где для неё есть место.
+##
+## Замер, а не пожелание: «не в каждом здании, примерно в одном из трёх» из
+## ADR-0024 было числом выдуманным, и при нём диковину не увидело бы
+## большинство партий. Условие места при этом жёсткое, поэтому доля меряется
+## числом — если она однажды просядет, это будет видно здесь, а не в игре.
+func test_double_deck_shows_up_in_every_building() -> void:
+	var rules := _rules()
+	var with_pair := 0
+	for building_seed in range(1, 41):
+		var plan := BuildingPlan.generate(rules, building_seed)
+		for shaft in plan.shafts:
+			if shaft.double_deck:
+				with_pair += 1
+				break
+	assert_eq(with_pair, 40, "пара нашла себе шахту в каждом здании из сорока")
+
+
+## Пара не запирает спуск: здание с ней проходимо на любом сиде.
+##
+## Стережёт то, ради чего пара ставится последней и снимается при поломке:
+## условие «на каждом этаже есть другой путь» смотрит на этаж целиком, а ходят
+## по кускам этажа, и соседняя шахта может оказаться за проёмом.
+func test_double_deck_never_locks_the_descent() -> void:
+	var rules := _rules()
+	for building_seed in range(1, 41):
+		var plan := BuildingPlan.generate(rules, building_seed)
+		var missing := BuildingRoute.unreachable_spots(plan, rules)
+		assert_true(missing.is_empty(), "сид %d: недостижимо — %s" % [building_seed, missing])

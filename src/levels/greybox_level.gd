@@ -203,18 +203,10 @@ func _ready() -> void:
 
 ## Гасит всё, что уехало из кадра. Ламп в здании тридцать, а в кадр влезает
 ## два с половиной этажа — ADR-0010, пункт 8.
-func _process(delta: float) -> void:
-	var view := otto.camera_view()
-	if _car_leaving:
-		_move_car(delta, view)
-
-	var span := VisibleFloors.around(rules, view)
-	_shroud_agents()
-	# Агенты пересчитываются каждый кадр, а не только на смене полосы: дверь ждёт
-	# своей паузы, и пропустив кадр смены, она не выпустила бы никого до следующей.
-	if spawn_agents:
-		_tend_agents(span, delta)
-
+##
+## Здесь только свет: он часть картинки, и считать его чаще кадра незачем.
+func _process(_delta: float) -> void:
+	var span := VisibleFloors.around(rules, otto.camera_view())
 	if span == _lit_span:
 		return
 
@@ -272,8 +264,11 @@ func _spawn_shafts() -> void:
 	add_child(_shafts)
 	_shafts.dress(rules, _plan)
 	for shaft in _plan.shafts:
+		# Верхний ярус пары не спускается на нижний этаж шахты: нижний упёрся бы
+		# в дно. Поэтому остановки считаются по ведущему, а не по полосе.
+		var lowest := shaft.bottom - 1 if shaft.double_deck else shaft.bottom
 		var stops := PackedFloat32Array()
-		for index in range(shaft.top, shaft.bottom + 1):
+		for index in range(shaft.top, lowest + 1):
 			stops.append(rules.floor_surface(index))
 
 		var car := CAR_SCENE.instantiate() as ElevatorCar
@@ -281,6 +276,8 @@ func _spawn_shafts() -> void:
 		add_child(car)
 		car.setup(stops)
 		_cars.append(car)
+		if shaft.double_deck:
+			_spawn_lower_deck(car, shaft)
 		_spawn_shaft_pit(shaft)
 
 
@@ -293,9 +290,6 @@ func _start_the_slide(landing: Vector2) -> void:
 	_rope_target = landing.y
 	_sliding = true
 	otto.board_escalator()
-	# Вступление длится полсекунды, а здание — минуты: держать ради него обход
-	# физики на всё здание незачем, [method _finish_the_slide] его и снимет.
-	set_physics_process(true)
 
 	_rope = GreyboxLook.box(
 		Vector3(ROPE_WIDTH, landing.y, ROPE_WIDTH), GreyboxLook.surface(GreyboxLook.WALL)
@@ -305,15 +299,35 @@ func _start_the_slide(landing: Vector2) -> void:
 	add_child(_rope)
 
 
+## Ход здания: вступление, отъезд машины, агенты у дверей.
+##
+## Всё это — физика, а не кадр, и раньше жило в [method Node._process]. Разница
+## не косметическая: кадр идёт по настенным часам, физика — ровным шагом, а бот
+## водит Otto шагами физики. Выпуск агентов от delta кадра означал, что на
+## быстрой машине их выходит больше за тот же шаг бота, и один и тот же сид
+## давал то четыре смерти, то пять. Ровно этот долг тянулся с M18a.
+func _physics_process(delta: float) -> void:
+	if _sliding:
+		_slide_along(delta)
+		return
+
+	var view := otto.camera_view()
+	if _car_leaving:
+		_move_car(delta, view)
+
+	_shroud_agents()
+	# Агенты пересчитываются каждый шаг, а не только на смене полосы: дверь ждёт
+	# своей паузы, и пропустив шаг смены, она не выпустила бы никого до следующей.
+	if spawn_agents:
+		_tend_agents(VisibleFloors.around(rules, view), delta)
+
+
 ## Довозит Otto по тросу и убирает трос: он часть вступления, а не здания.
 ##
 ## Трос ведёт Otto, только пока тот выше крыши. Переставили ниже — вступление
 ## кончилось само: так инструменты съёмки и тесты ставят его куда им надо,
 ## не зная про трос вовсе.
-func _physics_process(delta: float) -> void:
-	if not _sliding:
-		return
-
+func _slide_along(delta: float) -> void:
 	var at := WorldSpace.to_plane(otto.global_position)
 	if at.y < _rope_target:
 		at.y = minf(at.y + ROPE_SPEED * delta, _rope_target)
@@ -325,11 +339,24 @@ func _physics_process(delta: float) -> void:
 ## Отдаёт управление игроку и убирает трос.
 func _finish_the_slide() -> void:
 	_sliding = false
-	set_physics_process(false)
 	otto.leave_escalator()
 	if _rope != null:
 		_rope.queue_free()
 		_rope = null
+
+
+## Нижний ярус двухэтажной пары: этажом ниже ведущего и на его ходу.
+##
+## Ставится после ведущего, и это не случайность: ярус берёт высоту ведущего
+## в том же кадре, а узлы обходятся в порядке дерева.
+func _spawn_lower_deck(leader: ElevatorCar, shaft: BuildingPlan.ShaftSpot) -> void:
+	var deck := CAR_SCENE.instantiate() as ElevatorCar
+	deck.position.x = shaft.x
+	add_child(deck)
+	deck.serve_as_deck(leader, rules.floor_height)
+	# Ярус идёт в общий список наравне с ведущим: агент садится в тот, что стоит
+	# вровень с его этажом, и какой это из двух — не его дело.
+	_cars.append(deck)
 
 
 ## Дно шахты: упавший сюда разбивается, вошедший ногами с этажа — нет.
@@ -567,6 +594,51 @@ func _shroud_agent(agent: Enemy, where: int, x: float, here: int, target_in_the_
 	agent.set_target_behind_a_wall(
 		where == here and _plan.wall_between(here, x, otto.global_position.x)
 	)
+	agent.set_lift_at(_lift_for(where, x, here))
+
+
+## Ось кабины, в которую агенту стоит войти, чтобы стать ближе к Otto, или NAN.
+##
+## Предлагается только стоящая вровень с его этажом: вызова кабины в оригинале
+## нет ни у кого (ADR-0025, решение 6), а ждать её у проёма агенту нечем — он
+## бы топтался на кромке, разворачиваясь на каждом кадре.
+##
+## **Из подходящих берётся ближайшая.** На этаже стилобата шахт до пяти, и
+## какая-нибудь кабина стоит вровень почти всегда; предложение прыгало с одной
+## на другую, и агент метался между ними, не дойдя ни до одной за полминуты.
+##
+## На этаже Otto кабина не предлагается вовсе: приехали. Поэтому едущий агент
+## выходит там, где Otto, а не на первом попавшемся этаже — пока кабина идёт,
+## вровень она ни с чем не стоит, и предложение само пропадает.
+func _lift_for(where: int, x: float, here: int) -> float:
+	if where == here:
+		return NAN
+
+	var towards := signi(here - where)
+	var best := NAN
+	for car in _cars:
+		if not car.is_aligned() or _floor_of(car) != where:
+			continue
+		var shaft := _shaft_in_column(car.position.x, where)
+		if shaft == null:
+			continue
+		# Шахта обязана вести в сторону Otto: иначе агент уезжает от него.
+		var span := shaft.ride_span()
+		if not ((towards > 0 and span.y > where) or (towards < 0 and span.x < where)):
+			continue
+		if is_nan(best) or absf(car.position.x - x) < absf(best - x):
+			best = car.position.x
+	return best
+
+
+## Шахта, стоящая в этом столбце и обслуживающая этот этаж.
+func _shaft_in_column(x: float, index: int) -> BuildingPlan.ShaftSpot:
+	for shaft in _plan.shafts:
+		if index < shaft.top or index > shaft.bottom:
+			continue
+		if absf(shaft.x - x) <= rules.shaft_width * 0.5:
+			return shaft
+	return null
 
 
 ## Все агенты здания: они лежат прямо в уровне, рядом с геометрией.
@@ -767,8 +839,10 @@ func _on_otto_died() -> void:
 	# Жизнь снимается сразу, чтобы счётчик не врал, пока тело лежит.
 	if not GameState.instance().lose_life():
 		return
-	# Как и смена агента, возвращение в игру не идёт на паузе.
-	var timer := get_tree().create_timer(OTTO_RESPAWN_DELAY, false)
+	# Как и смена агента, возвращение в игру не идёт на паузе — и отсчитывается
+	# шагами физики, а не кадрами: иначе на быстрой машине Otto возвращается
+	# раньше, чем на медленной, и прогон бота перестаёт повторяться.
+	var timer := get_tree().create_timer(OTTO_RESPAWN_DELAY, false, true)
 	timer.timeout.connect(_respawn_otto)
 
 
