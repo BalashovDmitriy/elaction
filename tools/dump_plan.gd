@@ -33,7 +33,11 @@ func _init() -> void:
 	print("Здание по сиду %d: %d этажей" % [building_seed, plan.floors])
 	print("\nШахты (этажи сверху вниз, x):")
 	for shaft in plan.shafts:
-		print("  %2d..%2d  x=%.0f" % [shaft.top, shaft.bottom, shaft.x])
+		var pair := ""
+		if shaft.double_deck:
+			var span := shaft.ride_span()
+			pair = "  двухэтажная, возит %d..%d" % [span.x, span.y]
+		print("  %2d..%2d  x=%.0f%s" % [shaft.top, shaft.bottom, shaft.x, pair])
 
 	print("\nЭскалаторы (с этажа, x, куда спускается, проём):")
 	for escalator in plan.escalators:

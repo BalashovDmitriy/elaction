@@ -131,6 +131,16 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "muzzle_flash", "actions": ["shoot"], "hold": 0.08},
 		{"label": "settled", "actions": [], "hold": 1.0},
 	],
+	# M18b: спуск с крыши шахтой, на которой веха и держится. Эскалатор, шахту
+	# на погашенном этаже и двухэтажную пару выдержкой не снять — они стоят
+	# по сиду; их снимает tools/geometry_shot.tscn в ту же папку.
+	"M18B":
+	[
+		{"label": "roof", "actions": [], "hold": 1.0},
+		{"label": "walking", "actions": ["move_right"], "hold": 1.5},
+		{"label": "riding_down", "actions": ["move_down"], "hold": 2.5},
+		{"label": "settled", "actions": [], "hold": 1.0},
+	],
 }
 const DEFAULT_PLAN := "M1"
 

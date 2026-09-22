@@ -41,8 +41,10 @@ func test_shafts_cover_every_floor() -> void:
 ## стояла на 29-м этаже одна-одинёшенька. Ловится это только на редком сиде,
 ## поэтому проверка идёт по всем сразу.
 ##
-## Порог — [constant BuildingRules.MIN_SHAFT_FLOORS], три этажа, и три они
-## не случайно: двухэтажная кабина M18b в шахте на два этажа не сдвинется.
+## Порог — [constant BuildingRules.MIN_SHAFT_FLOORS], четыре этажа, и четыре они
+## не случайно: двухэтажная пара M18b возит только между [code]top + 1[/code] и
+## [code]bottom - 1[/code], и в шахте покороче ей ехать некуда (ADR-0025,
+## решение 2).
 func test_no_shaft_is_too_short_to_ride() -> void:
 	var rules := _rules()
 	for building_seed: int in SEEDS:
@@ -174,8 +176,102 @@ func test_every_shaft_stands_on_a_slot_its_whole_band_offers() -> void:
 				)
 
 
+## Пассажир проходит сквозь проём, а не сквозь плиту.
+##
+## С M18b ломаная поездки — площадка по этажу до проёма и один прямой пролёт
+## вниз ([ADR-0025](../docs/adr/0025-shafts-escalators-and-riders.md), решение 4).
+## Перегиб отодвинут внутрь дыры на [constant BuildingPlan.EscalatorSpot.BEND_CLEARANCE],
+## и весь запас там — 15 см: сквозь проём идёт не линия, а тело шириной
+## в полкорпуса. Правится это одним числом в правилах — шириной проёма или
+## его отступом, — и тогда плечо съедается молча.
+##
+## Проверяются обе опасные точки: начало пролёта, где он входит в перекрытие,
+## и его выход из-под плиты этажом ниже.
+func test_escalator_carries_its_rider_through_the_gap() -> void:
+	var rules := _rules()
+	for building_seed: int in SEEDS:
+		var plan := BuildingPlan.generate(rules, building_seed)
+		for escalator in plan.escalators:
+			var gap := escalator.gap(rules)
+			var bend_x := escalator.x + escalator.bend(rules).x
+			var end_x := escalator.x + escalator.towards * rules.escalator_run
+			# Где пролёт выходит из-под плиты: доля спуска, пройденная к её низу.
+			var under := bend_x + (end_x - bend_x) * rules.slab_height / rules.floor_height
+			for at: float in [bend_x, under]:
+				assert_true(
+					at - OttoBot.BODY_HALF_WIDTH >= gap.x and at + OttoBot.BODY_HALF_WIDTH <= gap.y,
+					(
+						"сид %d, этаж %d: пассажир на x=%.2f не влезает в проём %.2f..%.2f"
+						% [building_seed, escalator.floor_index, at, gap.x, gap.y]
+					)
+				)
+
+
 func _shaft_x_on(plan: BuildingPlan, floor_index: int) -> float:
 	for shaft in plan.shafts:
 		if floor_index >= shaft.top and floor_index <= shaft.bottom:
 			return shaft.x
 	return 0.0
+
+
+## Пар на здание не больше двух, и каждая стоит в шахте, которая её держит.
+##
+## «Двухэтажная кабина в шахте на три этажа» — это неподвижный лифт: ярусы
+## занимают по высоте два этажа, и возить остаётся между одним (ADR-0025,
+## решение 2). Поэтому проверяется не только число пар, но и то, что диапазон
+## их хода не выродился.
+func test_double_deck_pairs_are_few_and_fit_their_shaft() -> void:
+	var rules := _rules()
+	for building_seed: int in SEEDS:
+		var plan := BuildingPlan.generate(rules, building_seed)
+		var pairs := 0
+		for shaft in plan.shafts:
+			if not shaft.double_deck:
+				continue
+			pairs += 1
+			var span := shaft.ride_span()
+			assert_gte(
+				shaft.height(),
+				BuildingRules.MIN_SHAFT_FLOORS,
+				"сид %d: пара в шахте на %d этажей" % [building_seed, shaft.height()]
+			)
+			assert_lt(
+				span.x,
+				span.y,
+				(
+					"сид %d: паре в шахте %d..%d ехать некуда"
+					% [building_seed, shaft.top, shaft.bottom]
+				)
+			)
+		assert_lte(pairs, BuildingDecks.MOST, "сид %d: пар в здании %d" % [building_seed, pairs])
+
+
+## Пара выпадает в каждом здании, где для неё есть место.
+##
+## Замер, а не пожелание: «не в каждом здании, примерно в одном из трёх» из
+## ADR-0024 было числом выдуманным, и при нём диковину не увидело бы
+## большинство партий. Условие места при этом жёсткое, поэтому доля меряется
+## числом — если она однажды просядет, это будет видно здесь, а не в игре.
+func test_double_deck_shows_up_in_every_building() -> void:
+	var rules := _rules()
+	var with_pair := 0
+	for building_seed in range(1, 41):
+		var plan := BuildingPlan.generate(rules, building_seed)
+		for shaft in plan.shafts:
+			if shaft.double_deck:
+				with_pair += 1
+				break
+	assert_eq(with_pair, 40, "пара нашла себе шахту в каждом здании из сорока")
+
+
+## Пара не запирает спуск: здание с ней проходимо на любом сиде.
+##
+## Стережёт то, ради чего пара ставится последней и снимается при поломке:
+## условие «на каждом этаже есть другой путь» смотрит на этаж целиком, а ходят
+## по кускам этажа, и соседняя шахта может оказаться за проёмом.
+func test_double_deck_never_locks_the_descent() -> void:
+	var rules := _rules()
+	for building_seed in range(1, 41):
+		var plan := BuildingPlan.generate(rules, building_seed)
+		var missing := BuildingRoute.unreachable_spots(plan, rules)
+		assert_true(missing.is_empty(), "сид %d: недостижимо — %s" % [building_seed, missing])

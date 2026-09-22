@@ -254,46 +254,57 @@ func test_bot_finishes_every_building() -> void:
 ##
 ## Здание на четыре этажа не ловит ничего из этого: у него одна полоса шахт,
 ## один документ и ширина, которая не меняется.
-func test_bot_finishes_the_real_building() -> void:
-	for building_seed: int in TALL_SEEDS:
-		GameState.instance().start_game()
-		var level := _build(building_seed, BuildingRules.new())
-		var cleared := [false]
-		level.building_cleared.connect(func() -> void: cleared[0] = true)
+func test_bot_finishes_the_real_building_seed_1() -> void:
+	await _play_tall(TALL_SEEDS[0])
 
-		var bot := OttoBot.new(level)
-		var game := GameState.instance()
-		var frames := 0
-		var deepest := 0
-		var watchdog := _Watchdog.new()
-		while not cleared[0] and frames < TALL_BUDGET:
-			bot.step()
-			await _tick()
-			frames += 1
-			deepest = maxi(
-				deepest,
-				level.rules.floor_index_near(WorldSpace.to_plane(level.otto.global_position).y)
-			)
-			if watchdog.stalled(deepest, game.documents_collected):
-				break
-		bot.release()
 
-		assert_false(
-			watchdog.tripped, "сид %d: %s" % [building_seed, watchdog.report(level, bot, deepest)]
+func test_bot_finishes_the_real_building_seed_2() -> void:
+	await _play_tall(TALL_SEEDS[1])
+
+
+## Один прогон настоящего здания без охраны.
+##
+## Сид приходит снаружи, а не перебирается циклом: прогон стоит полторы минуты,
+## и раскидать сиды по процессам можно, только если у каждого свой тест
+## (`tools/run_tests.py`, раскладка по шардам).
+func _play_tall(building_seed: int) -> void:
+	GameState.instance().start_game()
+	var level := _build(building_seed, BuildingRules.new())
+	var cleared := [false]
+	level.building_cleared.connect(func() -> void: cleared[0] = true)
+
+	var bot := OttoBot.new(level)
+	var game := GameState.instance()
+	var frames := 0
+	var deepest := 0
+	var watchdog := _Watchdog.new()
+	while not cleared[0] and frames < TALL_BUDGET:
+		bot.step()
+		await _tick()
+		frames += 1
+		deepest = maxi(
+			deepest, level.rules.floor_index_near(WorldSpace.to_plane(level.otto.global_position).y)
 		)
-		assert_true(
-			cleared[0],
-			(
-				"сид %d: бот не прошёл за %d кадров, ниже всего этаж %d из %d"
-				% [building_seed, TALL_BUDGET, deepest, level.rules.floors - 1]
-			)
+		if watchdog.stalled(deepest, game.documents_collected):
+			break
+	bot.release()
+
+	assert_false(
+		watchdog.tripped, "сид %d: %s" % [building_seed, watchdog.report(level, bot, deepest)]
+	)
+	assert_true(
+		cleared[0],
+		(
+			"сид %d: бот не прошёл за %d кадров, ниже всего этаж %d из %d"
+			% [building_seed, TALL_BUDGET, deepest, level.rules.floors - 1]
 		)
-		assert_eq(
-			game.documents_collected,
-			game.documents_total,
-			"сид %d: документы собраны не все" % building_seed
-		)
-		_drop(level)
+	)
+	assert_eq(
+		game.documents_collected,
+		game.documents_total,
+		"сид %d: документы собраны не все" % building_seed
+	)
+	_drop(level)
 
 
 ## DoD вехи M11: здание с агентами проходимо, и бой стоит боту не дороже
@@ -313,73 +324,86 @@ func test_bot_finishes_the_real_building() -> void:
 ## Бот играет хуже человека — он не отступает, не пользуется дверями как укрытием
 ## и не считает наперёд. Поэтому это нижняя планка играбельности: здание, которое
 ## он не проходит, живому игроку тем более не по зубам.
-func test_bot_survives_the_real_building_with_agents() -> void:
-	for building_seed: int in GUARDED_SEEDS:
-		GameState.instance().start_game()
-		var level := _build(building_seed, BuildingRules.new(), true)
-		var cleared := [false]
-		level.building_cleared.connect(func() -> void: cleared[0] = true)
+func test_bot_survives_the_real_building_with_agents_seed_1() -> void:
+	await _play_guarded(GUARDED_SEEDS[0])
 
-		var bot := OttoBot.new(level)
-		var game := GameState.instance()
-		# Жизни выдаются разом и с запасом, а не подливаются на нуле: подливание
-		# меняло бы ход партии в самый острый её момент, и замер мерил бы уже
-		# другую игру. На нуле уровень вообще не назначает возвращение в игру,
-		# и Otto остался бы лежать.
-		game.lives = ENDLESS_LIVES
-		game.lives_changed.emit(game.lives)
-		var frames := 0
-		var deepest := 0
-		var deaths := 0
-		var was_dead := false
-		var watchdog := _Watchdog.new()
-		while not cleared[0] and frames < GUARDED_BUDGET and game.lives > 0:
-			bot.step()
-			await _tick()
-			frames += 1
-			deepest = maxi(
-				deepest,
-				level.rules.floor_index_near(WorldSpace.to_plane(level.otto.global_position).y)
-			)
-			if level.otto.is_dead() and not was_dead:
-				deaths += 1
-			was_dead = level.otto.is_dead()
-			# Смерть тоже считается движением: воскресший Otto начинает заново
-			# и стоять на месте ему уже не дают.
-			if watchdog.stalled(deepest, game.documents_collected + deaths):
-				break
-		bot.release()
 
-		assert_false(
-			watchdog.tripped, "сид %d: %s" % [building_seed, watchdog.report(level, bot, deepest)]
-		)
+func test_bot_survives_the_real_building_with_agents_seed_2() -> void:
+	await _play_guarded(GUARDED_SEEDS[1])
 
-		# Числа печатаются всегда, а не только на провале: по ним видно, куда
-		# ползёт сложность от вехи к вехе, — а это и есть то, ради чего прогон
-		# с боем держат. Зелёный тест без чисел рассказал бы только, что порог
-		# ещё не перейдён.
-		gut.p(
-			(
-				"сид %d: смертей %d, шагов %d, документы %d/%d"
-				% [building_seed, deaths, frames, game.documents_collected, game.documents_total]
-			)
-		)
 
-		assert_true(
-			cleared[0],
-			(
-				"сид %d: бой не пройден за %d шагов. Этаж %d из %d, смертей %d"
-				% [building_seed, frames, deepest, level.rules.floors - 1, deaths]
-			)
+func test_bot_survives_the_real_building_with_agents_seed_3() -> void:
+	await _play_guarded(GUARDED_SEEDS[2])
+
+
+## Один прогон здания с охраной. Сид приходит снаружи по той же причине, что
+## и у [method _play_tall]: тремя сидами подряд это 328 с — сорок процентов
+## всего набора и его пол, ниже которого не опускается никакая раскладка.
+func _play_guarded(building_seed: int) -> void:
+	GameState.instance().start_game()
+	var level := _build(building_seed, BuildingRules.new(), true)
+	var cleared := [false]
+	level.building_cleared.connect(func() -> void: cleared[0] = true)
+
+	var bot := OttoBot.new(level)
+	var game := GameState.instance()
+	# Жизни выдаются разом и с запасом, а не подливаются на нуле: подливание
+	# меняло бы ход партии в самый острый её момент, и замер мерил бы уже
+	# другую игру. На нуле уровень вообще не назначает возвращение в игру,
+	# и Otto остался бы лежать.
+	game.lives = ENDLESS_LIVES
+	game.lives_changed.emit(game.lives)
+	var frames := 0
+	var deepest := 0
+	var deaths := 0
+	var was_dead := false
+	var watchdog := _Watchdog.new()
+	while not cleared[0] and frames < GUARDED_BUDGET and game.lives > 0:
+		bot.step()
+		await _tick()
+		frames += 1
+		deepest = maxi(
+			deepest, level.rules.floor_index_near(WorldSpace.to_plane(level.otto.global_position).y)
 		)
-		assert_eq(
-			game.documents_collected,
-			game.documents_total,
-			"сид %d: документы собраны не все" % building_seed
+		if level.otto.is_dead() and not was_dead:
+			deaths += 1
+		was_dead = level.otto.is_dead()
+		# Смерть тоже считается движением: воскресший Otto начинает заново
+		# и стоять на месте ему уже не дают.
+		if watchdog.stalled(deepest, game.documents_collected + deaths):
+			break
+	bot.release()
+
+	assert_false(
+		watchdog.tripped, "сид %d: %s" % [building_seed, watchdog.report(level, bot, deepest)]
+	)
+
+	# Числа печатаются всегда, а не только на провале: по ним видно, куда
+	# ползёт сложность от вехи к вехе, — а это и есть то, ради чего прогон
+	# с боем держат. Зелёный тест без чисел рассказал бы только, что порог
+	# ещё не перейдён.
+	gut.p(
+		(
+			"сид %d: смертей %d, шагов %d, документы %d/%d"
+			% [building_seed, deaths, frames, game.documents_collected, game.documents_total]
 		)
-		assert_lte(
-			deaths,
-			DEATHS_ALLOWED,
-			"сид %d: бой стоил %d смертей при пороге %d" % [building_seed, deaths, DEATHS_ALLOWED]
+	)
+
+	assert_true(
+		cleared[0],
+		(
+			"сид %d: бой не пройден за %d шагов. Этаж %d из %d, смертей %d"
+			% [building_seed, frames, deepest, level.rules.floors - 1, deaths]
 		)
-		_drop(level)
+	)
+	assert_eq(
+		game.documents_collected,
+		game.documents_total,
+		"сид %d: документы собраны не все" % building_seed
+	)
+	assert_lte(
+		deaths,
+		DEATHS_ALLOWED,
+		"сид %d: бой стоил %d смертей при пороге %d" % [building_seed, deaths, DEATHS_ALLOWED]
+	)
+	_drop(level)

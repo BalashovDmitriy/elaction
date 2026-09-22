@@ -21,14 +21,57 @@ class ShaftSpot:
 	var top: int = 0
 	var bottom: int = 0
 
+	## Ходит ли в шахте двухэтажная пара
+	## ([ADR-0025](../../docs/adr/0025-shafts-escalators-and-riders.md), решение 1).
+	## Ставит её [method BuildingPlan.generate] и только туда, где спуск от этого
+	## не заперт: пара возит по укороченному диапазону.
+	var double_deck: bool = false
+
 	## Сколько этажей обслуживает.
 	func height() -> int:
 		return bottom - top + 1
+
+	## Между какими этажами кабина возит: пара «верхний, нижний», включительно.
+	##
+	## У обычной — вся полоса. У пары — полоса без крайних этажей, и это не
+	## осторожность, а арифметика: верхний ярус возит по [code]top..bottom-1[/code],
+	## нижний по [code]top+1..bottom[/code], а вошедший не выбирает, какой ярус
+	## его встретит. Обещать можно только то, что довезёт любой из двух.
+	##
+	## Крайние этажи шахта при этом не теряет: кабина на них встаёт, и сквозь
+	## неё по-прежнему переходят с одного края проёма на другой.
+	func ride_span() -> Vector2i:
+		if double_deck:
+			return Vector2i(top + 1, bottom - 1)
+		return Vector2i(top, bottom)
+
+	## Возит ли кабина между этими этажами.
+	##
+	## Правило в одной строке — для тех, кто спрашивает про пару этажей.
+	## [BuildingRoute] считает то же самое иначе: он перебирает узлы шахты
+	## квадратом, и заводить там [Vector2i] на каждую пару выходило вдвое
+	## дороже всей генерации.
+	func rides_between(from_index: int, to_index: int) -> bool:
+		var span := ride_span()
+		return (
+			from_index >= span.x
+			and from_index <= span.y
+			and to_index >= span.x
+			and to_index <= span.y
+		)
 
 
 ## Эскалатор ведёт с [member floor_index] на следующий этаж вниз.
 class EscalatorSpot:
 	extends RefCounted
+
+	## Насколько перегиб ломаной отступает внутрь проёма от его ближнего края, м.
+	##
+	## Сквозь дыру проходит не линия пути, а пассажир: он шире её на полкорпуса
+	## (0.27 м), и отступ обязан быть больше. Запас — 0.15 м, и его стережёт
+	## [code]test_escalator_carries_its_rider_through_the_gap[/code].
+	const BEND_CLEARANCE: float = 0.42
+
 	var x: float = 0.0
 	var floor_index: int = 0
 	## Куда спускается полотно: -1 влево, +1 вправо.
@@ -42,6 +85,20 @@ class EscalatorSpot:
 		var near := x + towards * rules.escalator_gap_offset
 		var far := near + towards * rules.escalator_gap_width
 		return Vector2(minf(near, far), maxf(near, far))
+
+	## Перегиб ломаной в своих координатах: где площадка кончается и начинается
+	## пролёт.
+	##
+	## До M18b перегиб стоял посреди проёма и ниже перекрытия, и ломаная шла
+	## двумя пролётами разной крутизны — в кадре это читалось жёлобом, а не
+	## эскалатором (ADR-0025, решение 4). Теперь до проёма идёт площадка по
+	## этажу, а от его ближнего края — один прямой пролёт вниз.
+	##
+	## Считается здесь, рядом с проёмом, через который проходит: уровень ставит
+	## по этому числу конструкцию, тест по нему же проверяет, что пассажир идёт
+	## сквозь дыру, а не сквозь плиту.
+	func bend(rules: BuildingRules) -> Vector2:
+		return Vector2(towards * (rules.escalator_gap_offset + BEND_CLEARANCE), 0.0)
 
 
 class DoorSpot:
@@ -99,9 +156,10 @@ static func generate(rules: BuildingRules, seed_value: int) -> BuildingPlan:
 	plan._lay_exit(rules, rng, taken)
 	plan._lay_doors(rules, rng, taken)
 	plan._lay_lamps(rules, taken)
-	# Стены — последними: их проверяют по достижимости документов и выхода,
-	# а значит те уже должны стоять.
+	# Стены и двухэтажные пары — последними: обе проверяются по достижимости
+	# документов и выхода, а значит те уже должны стоять.
 	plan._lay_walls(rules, rng)
+	BuildingDecks.lay(plan, rules, rng)
 	return plan
 
 
@@ -490,7 +548,7 @@ func _pick_escalator_slot(
 	var pool := roomy if fitting.is_empty() else fitting
 	if not opposite.is_empty():
 		pool = opposite
-	return -1 if pool.is_empty() else _pick_any(rng, pool)
+	return -1 if pool.is_empty() else pick_any(rng, pool)
 
 
 ## Останется ли на уровне место под обязательное — двери и лампы, — если занять
@@ -591,7 +649,7 @@ func _lay_door(
 	if free.is_empty():
 		return false
 
-	var slot := _pick_any(rng, free)
+	var slot := pick_any(rng, free)
 
 	var door := DoorSpot.new()
 	door.floor_index = floor_index
@@ -656,6 +714,12 @@ func _lay_lamps(rules: BuildingRules, taken: Dictionary) -> void:
 ##
 ## Проверка идёт по [BuildingRoute], а не по своему обходу: куски этажа и связи
 ## между ними разъезжаться не должны, и счёт им один на весь проект.
+##
+## **Порог строже, чем [method BuildingRoute.is_winnable]:** стена не имеет права
+## отрезать и тот кусок этажа, в котором ничего не лежит. Тот следит за
+## документами и выходом, и карман ему безразличен, — а бот, зайдя в карман,
+## встаёт: на сиде 1 он простоял 3001 шаг на 22-м этаже, «хода нет». Ровно тем
+## же порогом проверяется двухэтажная пара ([BuildingDecks]).
 func _lay_walls(rules: BuildingRules, rng: RandomNumberGenerator) -> void:
 	for index in range(floors):
 		if rng.randf() >= rules.wall_chance:
@@ -668,7 +732,7 @@ func _lay_walls(rules: BuildingRules, rng: RandomNumberGenerator) -> void:
 		wall.floor_index = index
 		wall.x = x
 		walls.append(wall)
-		if not BuildingRoute.is_winnable(self, rules):
+		if not BuildingRoute.nothing_is_cut_off(self, rules, index):
 			walls.pop_back()
 
 
@@ -686,7 +750,7 @@ func _pick_wall_x(rules: BuildingRules, rng: RandomNumberGenerator, index: int) 
 	var half := rules.inner_wall_width * 0.5
 
 	# Копятся места, а не координаты: выбор из набора идёт одной строкой на весь
-	# файл ([method _pick_any]), потому что счёт сида зависит от порядка обращений
+	# файл ([method pick_any]), потому что счёт сида зависит от порядка обращений
 	# к генератору.
 	var fitting: Array[int] = []
 	for slot in range(span.x + 1, span.y - 1):
@@ -701,7 +765,7 @@ func _pick_wall_x(rules: BuildingRules, rng: RandomNumberGenerator, index: int) 
 
 	if fitting.is_empty():
 		return INF
-	return _wall_x_at(rules, _pick_any(rng, fitting))
+	return _wall_x_at(rules, pick_any(rng, fitting))
 
 
 ## Середина границы между местом [param slot] и следующим за ним: там и стоит стена.
@@ -831,7 +895,7 @@ func _shuffled_range(rng: RandomNumberGenerator, from: int, to: int) -> Array[in
 ## запрет мягкий, а оставить полосу без шахты нельзя.
 static func _pick_slot(rng: RandomNumberGenerator, free: Array[int], avoid: int) -> int:
 	var pool := free.filter(func(slot: int) -> bool: return slot != avoid)
-	return _pick_any(rng, pool if not pool.is_empty() else free)
+	return pick_any(rng, pool if not pool.is_empty() else free)
 
 
 ## Свободное место сразу на всех перечисленных этажах или -1.
@@ -841,12 +905,15 @@ func _free_slot(
 	var free := _free_slots(rules, taken, on_floors)
 	if free.is_empty():
 		return -1
-	return _pick_any(rng, free)
+	return pick_any(rng, free)
 
 
-## Любое место из набора. Счёт сида зависит от порядка обращений к генератору,
-## поэтому выбор — одной строкой на весь файл, а не переписанным трижды.
-static func _pick_any(rng: RandomNumberGenerator, pool: Array[int]) -> int:
+## Любое место из набора.
+##
+## Счёт сида зависит от порядка обращений к генератору, поэтому выбор — одной
+## строкой на весь проект, а не переписанным в каждом правиле. Публичный ради
+## [BuildingDecks]: тот выбирает шахту под пару тем же жребием.
+static func pick_any(rng: RandomNumberGenerator, pool: Array[int]) -> int:
 	return pool[rng.randi_range(0, pool.size() - 1)]
 
 

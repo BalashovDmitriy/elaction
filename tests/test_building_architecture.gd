@@ -171,6 +171,12 @@ func test_no_agent_walks_a_floor_far_from_otto() -> void:
 
 ## Возвращение в игру — не на то же место, где убили: агент оттуда никуда не
 ## делся, и три жизни сгорали на одном пятачке.
+##
+## Агент стоит неподвижно ([code]walk_speed[/code] = 0), и это не удобство, а
+## условие проверки. Ходящий успевает уйти за те 60 кадров, пока Otto лежит, и
+## «вернулся не туда, где убили» начинает зависеть от того, куда он ушёл: на
+## M18b кусок этажа стал короче, агент развернулся раньше — и проверка,
+## поставленная в M10 на настоящую поломку, стала мерить совпадение.
 func test_otto_comes_back_away_from_the_agent_that_killed_him() -> void:
 	var level := _build(1, false)
 	await wait_physics_frames(SETTLE_FRAMES)
@@ -184,6 +190,7 @@ func test_otto_comes_back_away_from_the_agent_that_killed_him() -> void:
 	# Агент ставится вплотную к первому свободному месту: раньше именно туда
 	# Otto и возвращался, потому что оно было первым по порядку.
 	var agent := preload("res://src/actors/enemy/enemy.tscn").instantiate() as Enemy
+	agent.walk_speed = 0.0
 	level.add_child(agent)
 	agent.global_position = WorldSpace.to_scene(Vector2(spots[0], surface))
 	agent.setup(level.otto, 1.0)
@@ -193,7 +200,7 @@ func test_otto_comes_back_away_from_the_agent_that_killed_him() -> void:
 	level.otto.kill()
 	await wait_physics_frames(60)
 
-	var back := level.otto.global_position.x
+	var back := WorldSpace.to_plane(level.otto.global_position).x
 	assert_gt(absf(back - spots[0]), 0.01, "Otto вернулся под тот же ствол")
 	_drop(level)
 

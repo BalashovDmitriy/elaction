@@ -86,6 +86,14 @@ func turn_around() -> void:
 	facing = -facing
 
 
+## Поворачивает агента в заданную сторону. Зовёт узел, когда идти надо не куда
+## глаза глядят, а к стоящей кабине (ADR-0025, решение 6): патруль разворачивает
+## агента у края этажа, а проём шахты с кабиной в нём — уже не край.
+func face(towards: float) -> void:
+	if not is_zero_approx(towards):
+		facing = signf(towards)
+
+
 ## Выстрелил ли агент именно в этом кадре. Спрашивают сразу после [method update].
 func fired() -> bool:
 	return _fired_now

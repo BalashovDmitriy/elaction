@@ -146,6 +146,8 @@ var _lit_span := Vector2i(0, -1)
 ## Лампы здания: их свет гасится за пределами кадра. Упавшие лампы убирают себя
 ## сами, поэтому перед обращением проверяется живость.
 var _lamps: Array[Lamp] = []
+## Эскалаторы здания: у каждого свой источник, и гаснет он вне кадра, как лампы.
+var _escalators: Array[Escalator] = []
 ## Посты у агентских дверей, по одному на дверь. Двери здания не выпускают всех
 ## разом — только те, чей этаж рядом с игроком (ADR-0014, пункт 4).
 var _posts: Array[AgentPost] = []
@@ -203,18 +205,10 @@ func _ready() -> void:
 
 ## Гасит всё, что уехало из кадра. Ламп в здании тридцать, а в кадр влезает
 ## два с половиной этажа — ADR-0010, пункт 8.
-func _process(delta: float) -> void:
-	var view := otto.camera_view()
-	if _car_leaving:
-		_move_car(delta, view)
-
-	var span := VisibleFloors.around(rules, view)
-	_shroud_agents()
-	# Агенты пересчитываются каждый кадр, а не только на смене полосы: дверь ждёт
-	# своей паузы, и пропустив кадр смены, она не выпустила бы никого до следующей.
-	if spawn_agents:
-		_tend_agents(span, delta)
-
+##
+## Здесь только свет: он часть картинки, и считать его чаще кадра незачем.
+func _process(_delta: float) -> void:
+	var span := VisibleFloors.around(rules, otto.camera_view())
 	if span == _lit_span:
 		return
 
@@ -224,6 +218,18 @@ func _process(delta: float) -> void:
 		if not is_instance_valid(lamp):
 			continue
 		lamp.set_light_visible(VisibleFloors.covers(span, lamp.floor_index))
+	# Столбы шахт — тем же правилом: их в здании втрое больше, чем ламп.
+	if _shafts != null:
+		_shafts.light_span(span)
+	# Эскалатор светит в проём между двумя этажами: горит, пока в кадре хоть
+	# один из них.
+	for escalator: Escalator in _escalators:
+		escalator.set_light_visible(
+			(
+				VisibleFloors.covers(span, escalator.floor_index)
+				or VisibleFloors.covers(span, escalator.floor_index + 1)
+			)
+		)
 
 
 ## Раскладка, по которой собрано здание.
@@ -269,15 +275,23 @@ func _spawn_shafts() -> void:
 	add_child(_shafts)
 	_shafts.dress(rules, _plan)
 	for shaft in _plan.shafts:
+		# Верхний ярус пары не спускается на нижний этаж шахты: нижний упёрся бы
+		# в дно. Поэтому остановки считаются по ведущему, а не по полосе.
+		var lowest := shaft.bottom - 1 if shaft.double_deck else shaft.bottom
 		var stops := PackedFloat32Array()
-		for index in range(shaft.top, shaft.bottom + 1):
+		for index in range(shaft.top, lowest + 1):
 			stops.append(rules.floor_surface(index))
 
 		var car := CAR_SCENE.instantiate() as ElevatorCar
 		car.position.x = shaft.x
 		add_child(car)
+		# Кабина занимает просвет этажа целиком, как в оригинале: высоту она
+		# берёт из правил, а не из своей сцены (ADR-0025, решение 10).
+		car.fit_to_story(rules.floor_height - rules.slab_height)
 		car.setup(stops)
 		_cars.append(car)
+		if shaft.double_deck:
+			_spawn_lower_deck(car, shaft)
 		_spawn_shaft_pit(shaft)
 
 
@@ -290,9 +304,6 @@ func _start_the_slide(landing: Vector2) -> void:
 	_rope_target = landing.y
 	_sliding = true
 	otto.board_escalator()
-	# Вступление длится полсекунды, а здание — минуты: держать ради него обход
-	# физики на всё здание незачем, [method _finish_the_slide] его и снимет.
-	set_physics_process(true)
 
 	_rope = GreyboxLook.box(
 		Vector3(ROPE_WIDTH, landing.y, ROPE_WIDTH), GreyboxLook.surface(GreyboxLook.WALL)
@@ -302,15 +313,35 @@ func _start_the_slide(landing: Vector2) -> void:
 	add_child(_rope)
 
 
+## Ход здания: вступление, отъезд машины, агенты у дверей.
+##
+## Всё это — физика, а не кадр, и раньше жило в [method Node._process]. Разница
+## не косметическая: кадр идёт по настенным часам, физика — ровным шагом, а бот
+## водит Otto шагами физики. Выпуск агентов от delta кадра означал, что на
+## быстрой машине их выходит больше за тот же шаг бота, и один и тот же сид
+## давал то четыре смерти, то пять. Ровно этот долг тянулся с M18a.
+func _physics_process(delta: float) -> void:
+	if _sliding:
+		_slide_along(delta)
+		return
+
+	var view := otto.camera_view()
+	if _car_leaving:
+		_move_car(delta, view)
+
+	_shroud_agents()
+	# Агенты пересчитываются каждый шаг, а не только на смене полосы: дверь ждёт
+	# своей паузы, и пропустив шаг смены, она не выпустила бы никого до следующей.
+	if spawn_agents:
+		_tend_agents(VisibleFloors.around(rules, view), delta)
+
+
 ## Довозит Otto по тросу и убирает трос: он часть вступления, а не здания.
 ##
 ## Трос ведёт Otto, только пока тот выше крыши. Переставили ниже — вступление
 ## кончилось само: так инструменты съёмки и тесты ставят его куда им надо,
 ## не зная про трос вовсе.
-func _physics_process(delta: float) -> void:
-	if not _sliding:
-		return
-
+func _slide_along(delta: float) -> void:
 	var at := WorldSpace.to_plane(otto.global_position)
 	if at.y < _rope_target:
 		at.y = minf(at.y + ROPE_SPEED * delta, _rope_target)
@@ -322,11 +353,25 @@ func _physics_process(delta: float) -> void:
 ## Отдаёт управление игроку и убирает трос.
 func _finish_the_slide() -> void:
 	_sliding = false
-	set_physics_process(false)
 	otto.leave_escalator()
 	if _rope != null:
 		_rope.queue_free()
 		_rope = null
+
+
+## Нижний ярус двухэтажной пары: этажом ниже ведущего и на его ходу.
+##
+## Ставится после ведущего, и это не случайность: ярус берёт высоту ведущего
+## в том же кадре, а узлы обходятся в порядке дерева.
+func _spawn_lower_deck(leader: ElevatorCar, shaft: BuildingPlan.ShaftSpot) -> void:
+	var deck := CAR_SCENE.instantiate() as ElevatorCar
+	deck.position.x = shaft.x
+	add_child(deck)
+	deck.fit_to_story(rules.floor_height - rules.slab_height)
+	deck.serve_as_deck(leader, rules.floor_height)
+	# Ярус идёт в общий список наравне с ведущим: агент садится в тот, что стоит
+	# вровень с его этажом, и какой это из двух — не его дело.
+	_cars.append(deck)
 
 
 ## Дно шахты: упавший сюда разбивается, вошедший ногами с этажа — нет.
@@ -347,14 +392,20 @@ func _spawn_escalators() -> void:
 		escalator.position = WorldSpace.to_scene(
 			Vector2(spot.x, rules.floor_surface(spot.floor_index))
 		)
+		# Этаж известен здесь, и обратно из координаты его не выводят: по нему
+		# уровень гасит источник пролёта вне кадра.
+		escalator.floor_index = spot.floor_index
 		add_child(escalator)
+		_escalators.append(escalator)
 
 		var descent := Vector2(spot.towards * rules.escalator_run, rules.floor_height)
 		# Перегиб — в самом проёме: через него идут и полотно, и поездка, поэтому
 		# пассажир проходит сквозь дыру, а не сквозь плиту.
 		var gap := spot.gap(rules)
-		var bend := Vector2((gap.x + gap.y) * 0.5 - spot.x, rules.slab_height + 0.04)
-		escalator.setup(descent, bend)
+		# Проём — в координатах эскалатора: обрамление ставит он сам, а правила
+		# о том, где стоит его узел, знать не обязаны.
+		var edges := Vector2(gap.x - spot.x, gap.y - spot.x)
+		escalator.setup(descent, spot.bend(rules), edges, rules.slab_height)
 
 
 func _spawn_doors() -> void:
@@ -562,6 +613,7 @@ func _shroud_agent(agent: Enemy, where: int, x: float, here: int, target_in_the_
 	agent.set_target_behind_a_wall(
 		where == here and _plan.wall_between(here, x, otto.global_position.x)
 	)
+	agent.set_lift_at(AgentLifts.offer(_plan, rules, _cars, where, x, here))
 
 
 ## Все агенты здания: они лежат прямо в уровне, рядом с геометрией.
@@ -762,8 +814,10 @@ func _on_otto_died() -> void:
 	# Жизнь снимается сразу, чтобы счётчик не врал, пока тело лежит.
 	if not GameState.instance().lose_life():
 		return
-	# Как и смена агента, возвращение в игру не идёт на паузе.
-	var timer := get_tree().create_timer(OTTO_RESPAWN_DELAY, false)
+	# Как и смена агента, возвращение в игру не идёт на паузе — и отсчитывается
+	# шагами физики, а не кадрами: иначе на быстрой машине Otto возвращается
+	# раньше, чем на медленной, и прогон бота перестаёт повторяться.
+	var timer := get_tree().create_timer(OTTO_RESPAWN_DELAY, false, true)
 	timer.timeout.connect(_respawn_otto)
 
 

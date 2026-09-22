@@ -44,11 +44,27 @@ func _build(building_seed: int) -> GreyboxLevel:
 	return level
 
 
+## Кабины со своим ходом — по одной на шахту, в порядке шахт.
+##
+## Ярусы двухэтажных пар ([method ElevatorCar.is_deck]) сюда не идут: у них
+## своего хода нет, они держатся за ведущим, и ставить их на остановки руками
+## бессмысленно. С M18b их в дереве на одну-две больше, чем шахт, и счёт
+## по порядку без этого отбора разъезжался (ADR-0025, решение 1).
 func _cars(level: GreyboxLevel) -> Array[ElevatorCar]:
 	var found: Array[ElevatorCar] = []
 	for child: Node in level.get_children():
 		var car := child as ElevatorCar
-		if car != null:
+		if car != null and not car.is_deck():
+			found.append(car)
+	return found
+
+
+## Ярусы пар: по одному на двухэтажную шахту.
+func _decks(level: GreyboxLevel) -> Array[ElevatorCar]:
+	var found: Array[ElevatorCar] = []
+	for child: Node in level.get_children():
+		var car := child as ElevatorCar
+		if car != null and car.is_deck():
 			found.append(car)
 	return found
 
@@ -106,6 +122,15 @@ func test_every_car_obeys_the_player() -> void:
 		# ничего не проверяя.
 		assert_eq(
 			cars.size(), shafts.size(), "сид %d: кабин не столько, сколько шахт" % building_seed
+		)
+		var pairs := 0
+		for shaft in shafts:
+			if shaft.double_deck:
+				pairs += 1
+		assert_eq(
+			_decks(level).size(),
+			pairs,
+			"сид %d: ярусов не столько, сколько двухэтажных шахт" % building_seed
 		)
 		for index: int in cars.size():
 			var shaft: BuildingPlan.ShaftSpot = shafts[index]

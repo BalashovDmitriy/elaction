@@ -77,3 +77,52 @@ func test_a_wall_cuts_walking_but_not_the_slab() -> void:
 	var walk := BuildingPlan.spans_between(plan.blocks_on(rules, index), span)
 	assert_eq(slab.size(), 1, "нижний этаж — цельная плита, стена на ней стоит")
 	assert_eq(walk.size(), before.size() + 1, "а ходьба разрезана ею надвое")
+
+
+## Граф не обещает поездки, которой пара не сделает.
+##
+## Ярусы скреплены через этаж, и вошедший не выбирает, какой из них его
+## встретит: верхний не спускается на нижний этаж шахты, нижний не поднимается
+## на верхний (ADR-0025, решение 1). Обещать можно только то, что довезёт любой
+## из двух, — иначе бот, задумав такую поездку, будет держать «вниз» до конца
+## бюджета, а игрок решит, что лифт сломан.
+##
+## Переход через проём при этом остаётся на всех этажах шахты: кабина на них
+## встаёт, и сквозь неё проходят с одного края на другой.
+func test_a_pair_promises_only_what_both_decks_reach() -> void:
+	var rules := _rules()
+	var found := 0
+	for building_seed in range(1, 21):
+		var plan := BuildingPlan.generate(rules, building_seed)
+		var graph := BuildingRoute.walkable(plan, rules)
+		var moves: Dictionary = graph["moves"]
+		for shaft in plan.shafts:
+			if not shaft.double_deck:
+				continue
+			found += 1
+			for from_node: String in moves:
+				var from_floor := int(from_node.split(":")[0])
+				for move: Dictionary in moves[from_node]:
+					if move["kind"] != "shaft" or not is_equal_approx(move["x"], shaft.x):
+						continue
+					var to_floor := int(move["floor"])
+					if to_floor == from_floor:
+						continue
+					# Столбец сам по себе шахту не опознаёт: полосы не
+					# перекрываются по этажам, но одно и то же место сетки
+					# занимают разные шахты на разной высоте.
+					if not _inside(shaft, from_floor) or not _inside(shaft, to_floor):
+						continue
+					assert_true(
+						shaft.rides_between(from_floor, to_floor),
+						(
+							"сид %d: шахта %d..%d с парой обещает %d -> %d"
+							% [building_seed, shaft.top, shaft.bottom, from_floor, to_floor]
+						)
+					)
+	assert_gt(found, 0, "на двадцати сидах хоть одна пара обязана выпасть")
+
+
+## Лежит ли этаж в полосе шахты.
+func _inside(shaft: BuildingPlan.ShaftSpot, floor_index: int) -> bool:
+	return floor_index >= shaft.top and floor_index <= shaft.bottom
