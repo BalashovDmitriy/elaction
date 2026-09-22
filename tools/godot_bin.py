@@ -78,6 +78,7 @@ def run(
     timeout: int = 600,
     echo: bool = True,
     stop_on: tuple[str, ...] = (),
+    env: dict[str, str] | None = None,
 ) -> tuple[int, str]:
     """Запускает Godot в папке проекта и возвращает (код возврата, объединённый вывод).
 
@@ -100,6 +101,9 @@ def run(
         encoding="utf-8",
         errors="replace",
         bufsize=1,
+        # Своё окружение нужно шардам: `user://` Godot выводит из APPDATA/HOME,
+        # и без этого два процесса пишут в один файл рекордов.
+        env=env,
     )
 
     lines: list[str] = []
