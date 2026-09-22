@@ -224,6 +224,9 @@ func _process(delta: float) -> void:
 		if not is_instance_valid(lamp):
 			continue
 		lamp.set_light_visible(VisibleFloors.covers(span, lamp.floor_index))
+	# Столбы шахт — тем же правилом: их в здании втрое больше, чем ламп.
+	if _shafts != null:
+		_shafts.light_span(span)
 
 
 ## Раскладка, по которой собрано здание.
@@ -353,8 +356,10 @@ func _spawn_escalators() -> void:
 		# Перегиб — в самом проёме: через него идут и полотно, и поездка, поэтому
 		# пассажир проходит сквозь дыру, а не сквозь плиту.
 		var gap := spot.gap(rules)
-		var bend := Vector2((gap.x + gap.y) * 0.5 - spot.x, rules.slab_height + 0.04)
-		escalator.setup(descent, bend)
+		# Проём — в координатах эскалатора: обрамление ставит он сам, а правила
+		# о том, где стоит его узел, знать не обязаны.
+		var edges := Vector2(gap.x - spot.x, gap.y - spot.x)
+		escalator.setup(descent, spot.bend(rules), edges, rules.slab_height)
 
 
 func _spawn_doors() -> void:

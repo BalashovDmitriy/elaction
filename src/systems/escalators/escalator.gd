@@ -11,6 +11,11 @@ extends Node3D
 ## [method setup]. Поездка идёт по тому же пути, который выложен полотном, и
 ## начинается с того места, где пассажир стоял: иначе его дёргало бы к центру
 ## площадки, а полотно резало бы перекрытие мимо проёма (найдено авторевью M2).
+##
+## С M18b эскалатор — конструкция, а не две коробки полотна
+## ([ADR-0025](../../../docs/adr/0025-shafts-escalators-and-riders.md), решение 4):
+## ступени рельефом, площадки в концах, балюстрада и обрамление проёма. Рельеф,
+## а не анимация: свет M17 ложится на геометрию, ради этого пивот и затевался.
 
 ## Докуда слышен стрёкот полотна, м.
 const HUM_REACH: float = 9.0
@@ -21,6 +26,55 @@ const BELT_DEPTH: float = 0.8
 
 ## На сколько полотно утоплено за плоскость игры: пассажир едет перед ним.
 const BELT_Z: float = -0.5
+
+## Сколько полотно проходит по горизонтали за одну ступень, м.
+##
+## Ступень и есть то, чем эскалатор отличается от пандуса: на пролёте в 2.88 м
+## их выходит дюжина, и зубчатый край читается с любого этажа.
+const STEP_RUN: float = 0.24
+
+## Балюстрада у задней стены: где стоит, какой толщины и высоты, м.
+const RAIL_Z: float = -1.02
+const RAIL_THICKNESS: float = 0.1
+const RAIL_HEIGHT: float = 0.96
+
+## Поручень поверх балюстрады: квадратный в сечении, м.
+const HANDRAIL_SIZE: float = 0.1
+
+## Огонёк на конце поручня: ребро куба, м.
+const END_LIGHT_SIZE: float = 0.16
+
+## Свой источник пролёта: радиус, яркость, цвет и вынос перед ступенями.
+##
+## Без него от конструкции остаются две рейки в темноте: замер на 24 сидах дал
+## 25 эскалаторов из 120 под пятном лампы, в среднем до лампы 5.7 м. Источник
+## не гаснет от выстрела и в зонах темноты не участвует — по той же причине,
+## что и столб света в шахте (ADR-0025, решение 3): темнота решает, видят ли
+## агенты Otto, а путь вниз обязан читаться всегда.
+##
+## Тени не отбрасывает: пролёт стоит в проёме, ронять их ему не на что, а стоят
+## они дороже всего остального в кадре.
+const GLOW_RANGE: float = 3.6
+const GLOW_ENERGY: float = 2.4
+const GLOW_COLOR := Color(1.0, 0.88, 0.68)
+const GLOW_Z: float = -0.3
+
+## Борт со стороны камеры: где стоит, какой глубины и высоты, м.
+##
+## Низкий нарочно (ADR-0025, решение 5). Полноценная балюстрада с этой стороны
+## закрыла бы едущего Otto по грудь, а на эскалаторе он беззащитен: ввод не
+## действует, уклониться нечем, и поездка длится больше секунды.
+const KERB_Z: float = -0.08
+const KERB_DEPTH: float = 0.08
+const KERB_HEIGHT: float = 0.16
+
+## Площадка в конце полотна: длина по ходу и толщина, м.
+const LANDING_RUN: float = 0.66
+const LANDING_THICKNESS: float = 0.12
+
+## Обрамление проёма: ширина стойки по краю дыры и насколько она шире полотна, м.
+const FRAME_WIDTH: float = 0.12
+const FRAME_MARGIN: float = 0.12
 
 ## Сколько секунд занимает поездка между площадками.
 @export var travel_time: float = 1.1
@@ -58,16 +112,14 @@ func _physics_process(delta: float) -> void:
 ## Задаёт геометрию в координатах правил. [param descent] — смещение нижней
 ## площадки от верхней, [param via] — точка перегиба в проёме перекрытия: через
 ## неё идут и полотно, и сама поездка, поэтому пассажир проходит сквозь дыру,
-## а не сквозь плиту.
-func setup(descent: Vector2, via: Vector2) -> void:
+## а не сквозь плиту. [param gap] — края проёма относительно узла, [param slab] —
+## толщина перекрытия: по ним ставится обрамление.
+func setup(descent: Vector2, via: Vector2, gap: Vector2, slab: float) -> void:
 	var down := WorldSpace.direction_to_scene(descent)
 	_via = WorldSpace.direction_to_scene(via)
 	_has_via = true
 	_bottom_pad.position = down
-	# Полотно — два отрезка, каждый своей коробкой: ровное полотно вдоль
-	# ломаной, без растяжения тайла, которого в греев-боксе и нет.
-	_lay_belt(Vector3.ZERO, _via)
-	_lay_belt(_via, down)
+	_build(down, gap, slab)
 
 
 ## Везёт ли эскалатор кого-нибудь прямо сейчас.
@@ -130,18 +182,184 @@ func _point_at(ratio: float) -> Vector3:
 	return _path[_path.size() - 1]
 
 
-## Кладёт отрезок полотна коробкой от [param from] до [param to], в своих
-## координатах. Коробка стоит серединой на середине отрезка и повёрнута вдоль
-## него: так одна и та же коробка годится и на пологий, и на крутой пролёт.
-func _lay_belt(from: Vector3, to: Vector3) -> void:
+## Собирает конструкцию заново по заданной геометрии.
+##
+## Ломаная — это площадка по этажу до проёма и один прямой пролёт вниз. Двумя
+## пролётами разной крутизны она была до M18b, и в кадре читалась жёлобом:
+## пологий вход под 25° упирался в обрыв под 63°, а балюстрады двух пролётов
+## расходились на изломе веером.
+func _build(down: Vector3, gap: Vector2, slab: float) -> void:
+	for part: Node in _ramp.get_children():
+		part.queue_free()
+
+	var towards := signf(down.x)
+	_lay_landing(Vector3.ZERO, _via)
+	_lay_flight(_via, down)
+	# Нижняя площадка уходит по ходу спуска: с неё сходят, приехав.
+	_lay_landing(down, down + Vector3(towards * LANDING_RUN, 0.0, 0.0))
+	_frame_the_gap(gap, slab)
+
+
+## Пролёт: полотно снизу, ступени сверху, балюстрада и борт по бокам.
+func _lay_flight(from: Vector3, to: Vector3) -> void:
 	var span := to - from
-	var length := span.length()
-	if is_zero_approx(length):
+	if is_zero_approx(span.length()):
 		return
 
-	var belt := GreyboxLook.box(
-		Vector3(length, BELT_THICKNESS, BELT_DEPTH), GreyboxLook.surface(GreyboxLook.ESCALATOR)
+	_lay_belt(from, to)
+	_lay_steps(from, span)
+	_lay_sides(from, to)
+	_light_the_flight(from, to)
+
+
+## Полотно пролёта: ровная лента вдоль ломаной.
+##
+## Со стороны её закрывают ступени, но снизу видно именно её: эскалатор проходит
+## сквозь перекрытие, и с нижнего этажа смотрят ему в брюхо.
+func _lay_belt(from: Vector3, to: Vector3) -> void:
+	var span := to - from
+	_add_part(
+		Vector3(span.length(), BELT_THICKNESS, BELT_DEPTH),
+		(from + to) * 0.5 + Vector3(0.0, 0.0, BELT_Z),
+		atan2(span.y, span.x),
+		GreyboxLook.surface(GreyboxLook.ESCALATOR)
 	)
-	belt.position = (from + to) * 0.5 + Vector3(0.0, 0.0, BELT_Z)
-	belt.rotation.z = atan2(span.y, span.x)
-	_ramp.add_child(belt)
+
+
+## Ступени пролёта: коробки с плоским верхом, каждая ниже предыдущей.
+##
+## Не повёрнуты вдоль пролёта нарочно — повёрнутая коробка снова даёт пандус.
+## Верх ступени лежит на ломаной, низ уходит под неё, и соседние заходят друг
+## за друга: силуэт получается зубчатым, а щелей между ступенями нет.
+func _lay_steps(from: Vector3, span: Vector3) -> void:
+	var count := maxi(int(absf(span.x) / STEP_RUN), 1)
+	var tread := span.x / float(count)
+	var riser := span.y / float(count)
+	var height := absf(riser) + BELT_THICKNESS
+	var look := GreyboxLook.metal(GreyboxLook.ESCALATOR)
+
+	for index in count:
+		var top := from.y + riser * float(index)
+		_add_part(
+			Vector3(absf(tread), height, BELT_DEPTH),
+			Vector3(from.x + tread * (float(index) + 0.5), top - height * 0.5, BELT_Z),
+			0.0,
+			look
+		)
+
+
+## Бока пролёта: балюстрада с поручнем у задней стены и низкий борт у камеры.
+func _lay_sides(from: Vector3, to: Vector3) -> void:
+	var span := to - from
+	var angle := atan2(span.y, span.x)
+	var centre := (from + to) * 0.5
+	var length := span.length()
+	# Нормаль к пролёту, всегда вверх: балюстрада стоит на полотне, а не висит
+	# под ним, и на спуске влево знак пролёта не должен её переворачивать.
+	var up := Vector3(-span.y, span.x, 0.0).normalized()
+	if up.y < 0.0:
+		up = -up
+
+	var panel := GreyboxLook.surface(GreyboxLook.ESCALATOR)
+	var trim := GreyboxLook.metal(GreyboxLook.TRIM)
+	var over := BELT_THICKNESS * 0.5
+
+	_add_part(
+		Vector3(length, RAIL_HEIGHT, RAIL_THICKNESS),
+		centre + up * (over + RAIL_HEIGHT * 0.5) + Vector3(0.0, 0.0, RAIL_Z),
+		angle,
+		panel
+	)
+	_add_part(
+		Vector3(length, HANDRAIL_SIZE, HANDRAIL_SIZE),
+		centre + up * (over + RAIL_HEIGHT + HANDRAIL_SIZE * 0.5) + Vector3(0.0, 0.0, RAIL_Z),
+		angle,
+		trim
+	)
+	_add_part(
+		Vector3(length, KERB_HEIGHT, KERB_DEPTH),
+		centre + up * (over + KERB_HEIGHT * 0.5) + Vector3(0.0, 0.0, KERB_Z),
+		angle,
+		trim
+	)
+
+	var cap := up * (over + RAIL_HEIGHT + HANDRAIL_SIZE * 0.5) + Vector3(0.0, 0.0, RAIL_Z)
+	_mark_end(from + cap)
+	_mark_end(to + cap)
+
+
+## Свет пролёта: одна лампа посередине, перед ступенями.
+##
+## Стоит в самом проёме и светит на оба этажа, которые эскалатор связывает, —
+## это не протечка, а ровно то, что он и делает.
+func _light_the_flight(from: Vector3, to: Vector3) -> void:
+	var light := OmniLight3D.new()
+	light.omni_range = GLOW_RANGE
+	light.light_energy = GLOW_ENERGY
+	light.light_color = GLOW_COLOR
+	light.shadow_enabled = false
+	light.position = (from + to) * 0.5 + Vector3(0.0, 0.0, GLOW_Z)
+	_ramp.add_child(light)
+
+
+## Огонёк на конце поручня.
+##
+## Замер на 24 сидах: из 120 эскалаторов под пятном лампы стоит 25, до ближайшей
+## лампы в среднем 5.7 м, в худшем 10.5. Мест на этаже мало, эскалатор занимает
+## два — и встаёт он там, где лампы нет. Конструкция, которую не видно, ничего
+## не даёт, а подсвечивать её источником незачем: проект уже отвечает на это
+## огоньками (ADR-0023, решение 6) — так читаются табло дверей, индикаторы
+## кабины и вывеска выхода. Два огонька на концах поручня говорят «здесь
+## эскалатор» ровно так же.
+func _mark_end(at: Vector3) -> void:
+	_add_part(
+		Vector3(END_LIGHT_SIZE, END_LIGHT_SIZE, END_LIGHT_SIZE),
+		at,
+		0.0,
+		GreyboxLook.light(GreyboxLook.SIGN_WARM)
+	)
+
+
+## Площадка: ровная плита между двумя точками одной высоты.
+##
+## Утоплена в перекрытие: её верх вровень с полом, наружу смотрит только торец.
+## Иначе встающий на неё Otto оказывался бы по щиколотку в плите — он стоит
+## на полу этажа, а не на эскалаторе.
+func _lay_landing(from: Vector3, to: Vector3) -> void:
+	var run := absf(to.x - from.x)
+	if is_zero_approx(run):
+		return
+
+	_add_part(
+		Vector3(run, LANDING_THICKNESS, BELT_DEPTH),
+		Vector3((from.x + to.x) * 0.5, from.y - LANDING_THICKNESS * 0.5, BELT_Z),
+		0.0,
+		GreyboxLook.metal(GreyboxLook.ESCALATOR)
+	)
+
+
+## Обрамление проёма: стойки по краям дыры в перекрытии.
+##
+## Без них дыра читается обрывом плиты — тем же, что и провал шахты, в который
+## падают насмерть. Стойки стоят на краях проёма во всю толщину перекрытия и
+## тела не имеют: сквозь проём ходят, а не протискиваются.
+func _frame_the_gap(gap: Vector2, slab: float) -> void:
+	if slab <= 0.0:
+		return
+
+	var look := GreyboxLook.metal(GreyboxLook.TRIM)
+	for edge: float in [gap.x, gap.y]:
+		_add_part(
+			Vector3(FRAME_WIDTH, slab, BELT_DEPTH + FRAME_MARGIN * 2.0),
+			Vector3(edge, -slab * 0.5, BELT_Z),
+			0.0,
+			look
+		)
+
+
+## Кусок конструкции: коробка без тела на своём месте и под своим углом.
+func _add_part(size: Vector3, at: Vector3, angle: float, material: StandardMaterial3D) -> void:
+	var part := GreyboxLook.box(size, material)
+	part.position = at
+	part.rotation.z = angle
+	_ramp.add_child(part)

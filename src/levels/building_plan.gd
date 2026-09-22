@@ -29,6 +29,14 @@ class ShaftSpot:
 ## Эскалатор ведёт с [member floor_index] на следующий этаж вниз.
 class EscalatorSpot:
 	extends RefCounted
+
+	## Насколько перегиб ломаной отступает внутрь проёма от его ближнего края, м.
+	##
+	## Сквозь дыру проходит не линия пути, а пассажир: он шире её на полкорпуса
+	## (0.27 м), и отступ обязан быть больше. Запас — 0.15 м, и его стережёт
+	## [code]test_escalator_carries_its_rider_through_the_gap[/code].
+	const BEND_CLEARANCE: float = 0.42
+
 	var x: float = 0.0
 	var floor_index: int = 0
 	## Куда спускается полотно: -1 влево, +1 вправо.
@@ -42,6 +50,20 @@ class EscalatorSpot:
 		var near := x + towards * rules.escalator_gap_offset
 		var far := near + towards * rules.escalator_gap_width
 		return Vector2(minf(near, far), maxf(near, far))
+
+	## Перегиб ломаной в своих координатах: где площадка кончается и начинается
+	## пролёт.
+	##
+	## До M18b перегиб стоял посреди проёма и ниже перекрытия, и ломаная шла
+	## двумя пролётами разной крутизны — в кадре это читалось жёлобом, а не
+	## эскалатором (ADR-0025, решение 4). Теперь до проёма идёт площадка по
+	## этажу, а от его ближнего края — один прямой пролёт вниз.
+	##
+	## Считается здесь, рядом с проёмом, через который проходит: уровень ставит
+	## по этому числу конструкцию, тест по нему же проверяет, что пассажир идёт
+	## сквозь дыру, а не сквозь плиту.
+	func bend(rules: BuildingRules) -> Vector2:
+		return Vector2(towards * (rules.escalator_gap_offset + BEND_CLEARANCE), 0.0)
 
 
 class DoorSpot:

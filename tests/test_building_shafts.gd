@@ -174,6 +174,37 @@ func test_every_shaft_stands_on_a_slot_its_whole_band_offers() -> void:
 				)
 
 
+## Пассажир проходит сквозь проём, а не сквозь плиту.
+##
+## С M18b ломаная поездки — площадка по этажу до проёма и один прямой пролёт
+## вниз ([ADR-0025](../docs/adr/0025-shafts-escalators-and-riders.md), решение 4).
+## Перегиб отодвинут внутрь дыры на [constant BuildingPlan.EscalatorSpot.BEND_CLEARANCE],
+## и весь запас там — 15 см: сквозь проём идёт не линия, а тело шириной
+## в полкорпуса. Правится это одним числом в правилах — шириной проёма или
+## его отступом, — и тогда плечо съедается молча.
+##
+## Проверяются обе опасные точки: начало пролёта, где он входит в перекрытие,
+## и его выход из-под плиты этажом ниже.
+func test_escalator_carries_its_rider_through_the_gap() -> void:
+	var rules := _rules()
+	for building_seed: int in SEEDS:
+		var plan := BuildingPlan.generate(rules, building_seed)
+		for escalator in plan.escalators:
+			var gap := escalator.gap(rules)
+			var bend_x := escalator.x + escalator.bend(rules).x
+			var end_x := escalator.x + escalator.towards * rules.escalator_run
+			# Где пролёт выходит из-под плиты: доля спуска, пройденная к её низу.
+			var under := bend_x + (end_x - bend_x) * rules.slab_height / rules.floor_height
+			for at: float in [bend_x, under]:
+				assert_true(
+					at - OttoBot.BODY_HALF_WIDTH >= gap.x and at + OttoBot.BODY_HALF_WIDTH <= gap.y,
+					(
+						"сид %d, этаж %d: пассажир на x=%.2f не влезает в проём %.2f..%.2f"
+						% [building_seed, escalator.floor_index, at, gap.x, gap.y]
+					)
+				)
+
+
 func _shaft_x_on(plan: BuildingPlan, floor_index: int) -> float:
 	for shaft in plan.shafts:
 		if floor_index >= shaft.top and floor_index <= shaft.bottom:
