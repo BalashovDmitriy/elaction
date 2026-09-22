@@ -307,6 +307,26 @@ func _open_shaft(
 	shaft.top = index
 	shaft.bottom = mini(index + _shaft_length(rules, rng, index) - 1, floors - 1)
 
+	# Кончиться шахта может либо достаточно высоко, чтобы сменщице хватило места
+	# открыться, либо на самом дне. Между этими двумя нет ничего: закрывшись на
+	# предпоследнем этаже, она оставляет нижние без пути — новую там уже не
+	# открыть, короче [constant BuildingRules.MIN_SHAFT_FLOORS] полос не бывает.
+	# На сиде 1 так и выходило: полоса 23..27 закрывалась, и на 28–29 оставалось
+	# четыре пути вместо пяти.
+	if shaft.bottom > floors - 1 - BuildingRules.MIN_SHAFT_FLOORS:
+		shaft.bottom = floors - 1
+
+	# Длину задаёт [method _shaft_length], но дно обрезается по дну здания — и
+	# шахта, открытая у самого низа, выходит короче правила. Такая никуда не
+	# везёт: кабине некуда ехать, игроку она бесполезна, а указатели в ней
+	# гаснут оба.
+	#
+	# Открывалась она потому, что число шахт на этаже растёт книзу, и на нижних
+	# раскладка добирала недостающие. Правило числа — потолок желаемого, а не
+	# обещание (см. вызывающего), поэтому здесь честнее не открыть вовсе.
+	if shaft.bottom - shaft.top + 1 < BuildingRules.MIN_SHAFT_FLOORS:
+		return null
+
 	var levels: Array[int] = []
 	for level in range(shaft.top, shaft.bottom + 1):
 		levels.append(level)
@@ -337,8 +357,9 @@ func _shaft_length(rules: BuildingRules, rng: RandomNumberGenerator, index: int)
 	if index <= BuildingRules.ROOF:
 		return maxi(rules.top_shaft_span, 1)
 	var spread := maxi(rules.shaft_span_spread, 0)
-	# Не короче двух уровней: шахта в один этаж никуда не везёт.
-	return maxi(rules.shaft_span + rng.randi_range(-spread, spread), 2)
+	# Не короче [constant BuildingRules.MIN_SHAFT_FLOORS]: короткая шахта никуда
+	# не везёт, а двухэтажная кабина M18b в ней вовсе не сдвинется.
+	return maxi(rules.shaft_span + rng.randi_range(-spread, spread), BuildingRules.MIN_SHAFT_FLOORS)
 
 
 ## Эскалаторы: полоса у порога плюс гарантия на разрыве (ADR-0024, решение 4).
@@ -664,20 +685,28 @@ func _pick_wall_x(rules: BuildingRules, rng: RandomNumberGenerator, index: int) 
 	var busy := _wall_blockers(rules, index)
 	var half := rules.inner_wall_width * 0.5
 
-	var fitting: Array[float] = []
+	# Копятся места, а не координаты: выбор из набора идёт одной строкой на весь
+	# файл ([method _pick_any]), потому что счёт сида зависит от порядка обращений
+	# к генератору.
+	var fitting: Array[int] = []
 	for slot in range(span.x + 1, span.y - 1):
-		var x := (rules.slot_x(slot) + rules.slot_x(slot + 1)) * 0.5
+		var x := _wall_x_at(rules, slot)
 		var in_the_way := false
 		for zone: Vector2 in busy:
 			if x + half > zone.x and x - half < zone.y:
 				in_the_way = true
 				break
 		if not in_the_way:
-			fitting.append(x)
+			fitting.append(slot)
 
 	if fitting.is_empty():
 		return INF
-	return fitting[rng.randi_range(0, fitting.size() - 1)]
+	return _wall_x_at(rules, _pick_any(rng, fitting))
+
+
+## Середина границы между местом [param slot] и следующим за ним: там и стоит стена.
+static func _wall_x_at(rules: BuildingRules, slot: int) -> float:
+	return (rules.slot_x(slot) + rules.slot_x(slot + 1)) * 0.5
 
 
 ## Куда стену ставить нельзя: полосы, которые она перекрыла бы собой или
@@ -692,6 +721,19 @@ func _wall_blockers(rules: BuildingRules, index: int) -> Array[Vector2]:
 	var busy: Array[Vector2] = []
 	for gap: Vector2 in gaps_on(rules, index):
 		busy.append(Vector2(gap.x - clearance, gap.y + clearance))
+
+	# Столбец шахты считается целиком, а не по дырам из [method gaps_on]: на дне
+	# шахты дыры нет — плита там целая, — но кабина стоит и на нём, и стена,
+	# поставленная по одним дырам, вырастала прямо сквозь неё. На сиде 6 такая
+	# вставала в 0.45 м внутрь кабины шахты 15..21: вошедший в неё Otto оказывался
+	# в стене, а граф достижимости обещал выход только в одну сторону.
+	#
+	# Так же считает и [method _is_clear]: шахта занимает место на всех своих
+	# уровнях, дно включая.
+	var shaft_half := rules.shaft_width * 0.5 + clearance
+	for shaft in shafts:
+		if shaft.top <= index and index <= shaft.bottom:
+			busy.append(Vector2(shaft.x - shaft_half, shaft.x + shaft_half))
 
 	for escalator in escalators:
 		if escalator.floor_index == index:

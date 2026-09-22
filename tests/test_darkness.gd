@@ -125,6 +125,13 @@ func _spot_pair(level: GreyboxLevel) -> Vector2:
 				continue
 			if _lamp_near(level, index, here) == _lamp_near(level, index, there):
 				continue
+			# Стена между местами делает агента слепым — и правильно делает
+			# (ADR-0024, решение 5). Проверка здесь про темноту, а не про стены,
+			# и пара обязана стоять по одну её сторону. Без этого тест падал бы
+			# на тех сидах, где стена легла на дуэльный этаж: «освещённого Otto
+			# обстреливают» превращалось бы в «за стеной не обстреливают».
+			if level.plan().wall_between(index, here, there):
+				continue
 			return Vector2(here, there)
 	return Vector2(spots[0], spots[0])
 

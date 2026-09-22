@@ -22,6 +22,9 @@ const DRIVE_FRAMES: int = 30
 ## Насколько кабина должна уехать, чтобы это считалось «слушается», м.
 const MOVED: float = 0.2
 
+## Допуск на совпадение координат, м: на дробную арифметику, и только на неё.
+const TOLERANCE: float = 0.01
+
 
 func before_all() -> void:
 	Engine.time_scale = 1.0
@@ -95,9 +98,31 @@ func test_every_car_obeys_the_player() -> void:
 		var level := _build(building_seed)
 		await wait_physics_frames(SETTLE_FRAMES)
 
-		var number := 0
-		for car: ElevatorCar in _cars(level):
-			number += 1
+		var shafts := level.plan().shafts
+		var cars := _cars(level)
+		# Кабины стоят в дереве в порядке шахт — уровень их так и ставит. Порядок
+		# нигде не обещан, а тест на нём держится: перепутанная пара молча
+		# поставила бы кабину на чужие остановки, и проверка стала бы зелёной,
+		# ничего не проверяя.
+		assert_eq(
+			cars.size(), shafts.size(), "сид %d: кабин не столько, сколько шахт" % building_seed
+		)
+		for index: int in cars.size():
+			var shaft: BuildingPlan.ShaftSpot = shafts[index]
+			var number := index + 1
+			assert_almost_eq(
+				WorldSpace.to_plane(cars[index].global_position).x,
+				shaft.x,
+				TOLERANCE,
+				"сид %d, кабина %d: встала не в своей шахте" % [building_seed, number]
+			)
+			# Кабина ставится на верх своей полосы, а не берётся там, где её
+			# застал прогон. Пустая кабина катается сама, и застать её можно
+			# на нижнем упоре — тогда «не поехала вниз по команде» означало бы
+			# «ехать было некуда», то есть тест падал бы по очереди на разных
+			# сидах без всякой поломки.
+			var car: ElevatorCar = cars[index]
+			await _park(level, car, shaft, shaft.top)
 			await _get_in(level, car)
 			assert_true(
 				level.otto.is_riding(),

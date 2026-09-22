@@ -45,6 +45,38 @@ func test_walls_stand_on_the_slab_between_the_openings() -> void:
 	assert_gt(floors_with_walls, 0, "стены должны хоть где-то появляться")
 
 
+## Стена не растёт сквозь шахту — ни на одном её уровне, дно включая.
+##
+## Дно у шахты — единственный уровень, где проёма в плите нет: кабина на нём
+## стоит, а не проезжает. Раскладка искала место стене по одним проёмам
+## ([method BuildingPlan.gaps_on]), и на дне шахта для неё пропадала: на сиде 6
+## стена вырастала на 0.45 м внутрь кабины шахты 15..21, а на сиде 7 — сразу двух.
+## Вошедший в такую кабину Otto оказывался в стене.
+##
+## Зазор мерится тот же, что и везде: полшага сетки от края проёма (ADR-0024).
+func test_no_wall_grows_through_a_shaft() -> void:
+	var rules := _rules()
+	var clearance := rules.slot_x(1) - rules.slot_x(0)
+	var half := rules.shaft_width * 0.5
+	for building_seed in range(1, 40):
+		var plan := BuildingPlan.generate(rules, building_seed)
+		for wall in plan.walls:
+			var band := wall.band(rules)
+			for shaft in plan.shafts:
+				if shaft.top > wall.floor_index or shaft.bottom < wall.floor_index:
+					continue
+				assert_false(
+					(
+						band.y > shaft.x - half - clearance * 0.5
+						and band.x < shaft.x + half + clearance * 0.5
+					),
+					(
+						"сид %d: стена %.1f жмётся к шахте %.1f на этаже %d"
+						% [building_seed, wall.x, shaft.x, wall.floor_index]
+					)
+				)
+
+
 ## Стена — не на каждом этаже: это крюк через другой этаж, и подряд они
 ## превратили бы спуск в лабиринт.
 func test_walls_are_not_on_every_floor() -> void:
