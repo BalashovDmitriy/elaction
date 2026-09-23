@@ -39,10 +39,12 @@ const WINDOW_SIZE := Vector2(1.2, 1.5)
 ## фасадами, и ночной город выходил без огней, — поэтому даль задаётся здесь.
 const WINDOW_FADE: Array[float] = [1.0, 0.75, 0.55, 0.4]
 
-## Дождь: сколько капель в виду, их вид и скорость, м/с.
-const RAIN_DROPS: int = 1800
-const RAIN_DROP := Vector2(0.035, 1.4)
-const RAIN_COLOR := Color(0.65, 0.72, 0.9, 0.35)
+## Дождь: сколько капель в виду, их вид и скорость, м/с. Редкий и прозрачный:
+## на первых кадрах густой дождь над крышей закрывал Otto — погода фон, а не
+## занавес.
+const RAIN_DROPS: int = 900
+const RAIN_DROP := Vector2(0.025, 1.1)
+const RAIN_COLOR := Color(0.65, 0.72, 0.9, 0.16)
 const RAIN_SPEED: float = 28.0
 
 var _view: SubViewport = null

@@ -13,13 +13,16 @@ extends Node3D
 ## ([ADR-0024](res://docs/adr/0024-building-geometry.md)).
 ##
 ## С M18e здесь же кадры здания по карте: тёмный этаж и башня с дверями ROM
-## (ADR-0028). Папку задаёт [code]--folder=[/code], по умолчанию — M18a.
+## (ADR-0028), с M19 — крыша с городом за ней (ADR-0029). Папку задаёт
+## [code]--folder=[/code], по умолчанию — M18a; сид — [code]--seed=[/code], а с ним
+## и погоду: на сиде 1 туман, на 2 дождь, на 5 ясная ночь.
 ##
 ## Рендер настоящий, не headless — нужен экран.
 ##
 ## Запуск:
 ##     godot --path . res://tools/layout_shot.tscn
 ##     godot --path . res://tools/layout_shot.tscn -- --folder=M18e
+##     godot --path . res://tools/layout_shot.tscn -- --folder=M19 --seed=2
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
@@ -36,17 +39,20 @@ const BUILDING_SEED: int = 1
 
 var _level: GreyboxLevel = null
 var _folder: String = FOLDER
+var _seed: int = BUILDING_SEED
 
 
 func _ready() -> void:
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--folder="):
 			_folder = "res://screens/" + argument.trim_prefix("--folder=")
+		elif argument.begins_with("--seed="):
+			_seed = argument.trim_prefix("--seed=").to_int()
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_folder))
 	GameState.instance().start_game()
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	_level.rules = BuildingRules.new()
-	_level.building_seed = BUILDING_SEED
+	_level.building_seed = _seed
 	# Агентов выпускает только кадр про стену: в остальных ходящая фигура
 	# закрывает собой то, ради чего кадр снят.
 	_level.spawn_agents = false
@@ -56,13 +62,14 @@ func _ready() -> void:
 
 func _run() -> void:
 	var rules := _level.rules
+	await _shoot_floor("00_roof_seed%d" % _seed, BuildingRules.ROOF)
 	await _shoot_floor("01_tower", rules.wide_from - 1)
 	await _shoot_floor("02_podium", rules.floors - 2)
 	await _shoot_floor("03_escalator_band", rules.single_shaft_until)
 
 	var walled := _floor_with_a_wall()
 	if walled == BuildingRules.ROOF:
-		push_error("на сиде %d стен не выпало — кадр стены снять не с чего" % BUILDING_SEED)
+		push_error("на сиде %d стен не выпало — кадр стены снять не с чего" % _seed)
 		get_tree().quit(1)
 		return
 	await _shoot_the_wall("04_inner_wall", walled)

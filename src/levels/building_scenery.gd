@@ -18,7 +18,7 @@ const ROOF_LIGHT_HEIGHT: float = 4.0
 
 ## Дождь над крышей: сколько капель и с какой высоты над настилом они падают.
 ## Внутри здания погоды нет, а крыша — снаружи.
-const ROOF_RAIN_DROPS: int = 600
+const ROOF_RAIN_DROPS: int = 140
 const ROOF_RAIN_HEIGHT: float = 7.0
 
 var weather: Weather.Kind = Weather.Kind.CLEAR
