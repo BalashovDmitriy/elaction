@@ -154,6 +154,14 @@ func set_light_visible(on: bool) -> void:
 	_fill.visible = on
 
 
+## Окрашивает свет лампы тоном палитры раунда (ADR-0029, решение 5): лампы
+## разных раундов светят чуть теплее или холоднее, не ярче и не тусклее.
+func tint(color: Color, share: float) -> void:
+	var shade := LIGHT_COLOR.lerp(color, share)
+	_spot.light_color = shade
+	_fill.light_color = shade
+
+
 func _make_spot() -> SpotLight3D:
 	var light := SpotLight3D.new()
 	light.light_color = LIGHT_COLOR

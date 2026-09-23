@@ -29,6 +29,16 @@ const PANEL_THICKNESS: float = 0.1
 ## в 1.68 свободно.
 const EXIT_WIDTH: float = Proportions.EXIT_WIDTH
 
+## Насколько тон палитры раунда входит в материалы: задняя стена берёт тон
+## этажа, наружные стены — кладку (ADR-0029, решение 5). Немного: палитра —
+## оттенок раунда, а не заливка, и читаемость держится на всех.
+const PALETTE_SHARE: float = 0.18
+
+## Во сколько раз задняя стена тёмного этажа темнее светлой (ADR-0029, решение 6).
+## Кадры M18e: на сумрачной башне тёмный этаж без ламп отличался от светлого
+## слабо — стена отражала общий тон так же, как на светлом.
+const UNLIT_SHADE: float = 0.45
+
 var _rules: BuildingRules = null
 var _plan: BuildingPlan = null
 var _ribs: BuildingRibs = null
@@ -67,7 +77,7 @@ func build(rules: BuildingRules, plan: BuildingPlan, ribs: BuildingRibs) -> void
 func _build_floors() -> void:
 	# Перекрытие — пол: полированный, в него ложатся отражения (ADR-0023, решение 5).
 	var slab := GreyboxLook.polished(GreyboxLook.SLAB)
-	var wall := GreyboxLook.surface(GreyboxLook.WALL)
+	var wall := GreyboxLook.surface(GreyboxLook.WALL.lerp(_rules.palette.masonry, PALETTE_SHARE))
 
 	for index: int in _rules.levels():
 		var surface := _rules.floor_surface(index)
@@ -124,10 +134,13 @@ func _build_side_walls(
 ## [method BuildingPlan.spans_between], что и перекрытия: дверь занимает в стене
 ## ровно свою ширину, над ней — перемычка до потолка.
 ##
-## Крыша стены не получает: над ней небо, а дальняя стена там — небоскрёб напротив,
-## и он придёт задним планом в M19.
+## Крыша стены не получает: над ней небо, а за ней — город ([CityBackdrop]).
 func _build_room() -> void:
-	var back := GreyboxLook.surface(GreyboxLook.BACK_WALL)
+	var tone := GreyboxLook.BACK_WALL.lerp(_rules.palette.story, PALETTE_SHARE)
+	var lit_back := GreyboxLook.surface(tone)
+	var unlit_back := GreyboxLook.surface(
+		Color(tone.r * UNLIT_SHADE, tone.g * UNLIT_SHADE, tone.b * UNLIT_SHADE)
+	)
 	var far := GreyboxLook.surface(GreyboxLook.SKY_WALL)
 	var back_z := WorldSpace.BACK_WALL_Z - PANEL_THICKNESS * 0.5
 	var far_z := WorldSpace.BACK_WALL_Z - WorldSpace.ROOM_DEPTH
@@ -139,6 +152,7 @@ func _build_room() -> void:
 		var top := _rules.story_top(index)
 		var bounds := _rules.floor_span(index)
 		var inner := Vector2(bounds.x + WALL_WIDTH, bounds.y - WALL_WIDTH)
+		var back := unlit_back if _rules.is_unlit(index) else lit_back
 
 		var openings := _openings_on(index)
 		var lintel_top := surface - Door.LEAF_SIZE.y
