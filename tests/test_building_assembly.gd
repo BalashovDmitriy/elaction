@@ -213,3 +213,31 @@ func _wait_for_the_landing(level: GreyboxLevel) -> void:
 		await wait_physics_frames(1)
 		left -= 1
 	assert_true(level.otto.is_grounded(), "Otto съехал по тросу и встал на крышу")
+
+
+## Кабина шириной в шахту: ширину она берёт из правил, а не из сцены.
+##
+## До M18c ширину держала сцена — 1.2 м, — и шахта в 1.8 оставила бы по 30 см
+## щели с каждого борта, в которые Otto проваливался бы, выходя из кабины
+## (ADR-0026, решение 3). Правила берутся нестандартные нарочно: с умолчаниями
+## совпало бы и число из сцены.
+func test_every_car_is_as_wide_as_its_shaft() -> void:
+	var rules := _rules()
+	rules.shaft_width = 1.62
+	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
+	level.rules = rules
+	level.building_seed = 1
+	level.spawn_agents = false
+	add_child_autofree(level)
+	await wait_physics_frames(SETTLE_FRAMES)
+	var cars := 0
+	for child in level.get_children():
+		var car := child as ElevatorCar
+		if car == null:
+			continue
+		cars += 1
+		assert_almost_eq(car.width(), rules.shaft_width, 0.001, "кабина в ширину шахты")
+		var roof := (car.get_node("RoofShape") as CollisionShape3D).shape as BoxShape3D
+		assert_almost_eq(roof.size.x, rules.shaft_width, 0.001, "и крыша у неё той же ширины")
+	assert_gt(cars, 0, "кабины в здании есть")
+	_drop(level)

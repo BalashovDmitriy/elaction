@@ -52,10 +52,11 @@ const CORD_WIDTH: float = 0.03
 
 ## Этаж, на котором лампа висит. Записывает уровень, когда вешает её.
 ##
-## Выводить этаж обратно из координаты нельзя: лампа висит ровно посередине
-## пролёта, между двумя полами, и [method BuildingRules.floor_index_near] на
-## этой середине решает по последнему биту дроби — на пикселях он падал на один
-## этаж, на метрах упал на другой.
+## Выводить этаж обратно из координаты нельзя: до M18c лампа висела ровно
+## посередине пролёта, между двумя полами, и [method BuildingRules.floor_index_near]
+## на этой середине решал по последнему биту дроби — на пикселях он падал на один
+## этаж, на метрах на другой. Под потолком она ближе к полу этажа выше, чем
+## к своему, и вывод из координаты ошибался бы уже всегда.
 var floor_index: int = 0
 
 var _fall := LampFall.new()
@@ -66,6 +67,19 @@ var _cord: MeshInstance3D = null
 @onready var _crush_zone: Area3D = $CrushZone
 @onready var _visual: MeshInstance3D = $Visual
 @onready var _shape: CollisionShape3D = $Shape
+
+
+## Габарит лампы по [Proportions]. Зона удара шире и выше самой лампы: агент
+## гибнет, если лампа задела его краем, а не только серединой.
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_SCENE_INSTANTIATED:
+		return
+	var body := Vector3(Proportions.LAMP.x, Proportions.LAMP.y, 0.4)
+	Proportions.fit_box($Shape as CollisionShape3D, body, false)
+	Proportions.fit_mesh($Visual as MeshInstance3D, body)
+	Proportions.fit_box(
+		$CrushZone/CrushShape as CollisionShape3D, body * Vector3(1.2, 1.13, 1.0), false
+	)
 
 
 func _ready() -> void:

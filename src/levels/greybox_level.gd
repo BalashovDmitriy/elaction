@@ -35,12 +35,22 @@ const LAMP_SCENE := preload("res://src/systems/lighting/lamp.tscn")
 ## Дно шахты: сюда падает тот, кто шагнул в пустой проём.
 const PIT_HEIGHT: float = 0.6
 
-## На сколько выше пола висит середина лампы, м.
-const LAMP_HANG_HEIGHT: float = 1.8
+## На сколько ниже потолка висит середина лампы, м.
+##
+## Под потолком, как в оригинале: при просвете 3.0 м низ лампы на 2.52 —
+## 84% просвета против 82% у оригинала. Два процента — это запас, на котором
+## держится «не из прыжка»: Otto упирается головой в потолок, когда ступни
+## поднялись на 1.32 м, и его пуля идёт не выше 2.47. Сбивают лампу из кабины,
+## как в 1983 (ADR-0026, решение 5).
+##
+## От потолка, а не от пола: этаж другой высоты — а такие собирают тесты —
+## иначе вешал бы лампу в плиту или посреди комнаты.
+const LAMP_DROP: float = Proportions.LAMP_CORD + Proportions.LAMP.y * 0.5
 
-## Высота выхода из здания. Ширина — [constant BuildingShell.EXIT_WIDTH]:
-## ей же оболочка режет проём в задней стене.
-const EXIT_HEIGHT: float = 1.2
+## Высота зоны выхода из здания. Ширина — [constant BuildingShell.EXIT_WIDTH]:
+## ей же оболочка режет проём в задней стене. Выросла вместе с Otto
+## (ADR-0026, решение 7).
+const EXIT_HEIGHT: float = Proportions.BODY * 0.95
 
 ## Машина у выхода: ею оригинал заканчивает здание (ADR-0011, пункт 14).
 ## Стоит рядом с проёмом и уезжает, увозя Otto; следующее здание собирается
@@ -49,7 +59,7 @@ const EXIT_HEIGHT: float = 1.2
 ## Длина модели `car.glb`, м: по ней машина ставится в зазор от проёма и
 ## считается уехавшей из кадра. `tools/build_actors.py` строит кузов ровно такой
 ## длины; высота и ширина у модели свои, и здесь они никому не нужны.
-const CAR_LENGTH: float = 2.4
+const CAR_LENGTH: float = Proportions.CAR_LENGTH
 const CAR_GAP: float = 0.36
 const CAR_SPEED: float = 9.6
 ## Машина стоит снаружи здания: за плоскостью игры, но перед стеной, чтобы
@@ -181,6 +191,10 @@ func _ready() -> void:
 	_shell.name = "Shell"
 	add_child(_shell)
 	_shell.build(rules, _plan, _ribs)
+	var signs := FloorSigns.new()
+	signs.name = "FloorSigns"
+	add_child(signs)
+	signs.hang(rules)
 	_spawn_shafts()
 	_spawn_escalators()
 	_spawn_doors()
@@ -287,7 +301,7 @@ func _spawn_shafts() -> void:
 		add_child(car)
 		# Кабина занимает просвет этажа целиком, как в оригинале: высоту она
 		# берёт из правил, а не из своей сцены (ADR-0025, решение 10).
-		car.fit_to_story(rules.floor_height - rules.slab_height)
+		car.fit_to_story(rules.floor_height - rules.slab_height, rules.shaft_width)
 		car.setup(stops)
 		_cars.append(car)
 		if shaft.double_deck:
@@ -367,7 +381,7 @@ func _spawn_lower_deck(leader: ElevatorCar, shaft: BuildingPlan.ShaftSpot) -> vo
 	var deck := CAR_SCENE.instantiate() as ElevatorCar
 	deck.position.x = shaft.x
 	add_child(deck)
-	deck.fit_to_story(rules.floor_height - rules.slab_height)
+	deck.fit_to_story(rules.floor_height - rules.slab_height, rules.shaft_width)
 	deck.serve_as_deck(leader, rules.floor_height)
 	# Ярус идёт в общий список наравне с ведущим: агент садится в тот, что стоит
 	# вровень с его этажом, и какой это из двух — не его дело.
@@ -432,13 +446,18 @@ func _spawn_doors() -> void:
 	game.start_building(documents)
 
 
+## На сколько выше пола висит середина лампы при этих правилах, м.
+static func lamp_height(of_rules: BuildingRules) -> float:
+	return of_rules.floor_height - of_rules.slab_height - LAMP_DROP
+
+
 func _spawn_lamps() -> void:
 	for spot in _plan.lamps:
 		var lamp := LAMP_SCENE.instantiate() as Lamp
-		var hang := rules.floor_surface(spot.floor_index) - LAMP_HANG_HEIGHT
+		var hang := rules.floor_surface(spot.floor_index) - lamp_height(rules)
 		lamp.position = WorldSpace.to_scene(Vector2(spot.x, hang))
-		# Этаж лампы известен здесь, и обратно из координаты его не выводят: она
-		# висит ровно на середине пролёта, где округление решает случай.
+		# Этаж лампы известен здесь, и обратно из координаты его не выводят: под
+		# потолком она ближе к полу этажа выше, чем к своему.
 		lamp.floor_index = spot.floor_index
 		# Зона лампы считается от того, что висит: правило темноты узнаёт о
 		# лампе здесь же, где она вешается.
@@ -446,7 +465,7 @@ func _spawn_lamps() -> void:
 		lamp.crushed.connect(_on_lamp_crushed)
 		lamp.fell.connect(_on_lamp_fell.bind(lamp.floor_index, spot.x))
 		add_child(lamp)
-		lamp.hang(LAMP_HANG_HEIGHT, rules.floor_height - rules.slab_height)
+		lamp.hang(lamp_height(rules), rules.floor_height - rules.slab_height)
 		_lamps.append(lamp)
 
 
@@ -827,6 +846,11 @@ func _on_otto_died() -> void:
 ## никуда не делся, и возвращение на то же место — это смерть в петле. На пустом
 ## этаже выбор вырождается в первое свободное место, как было раньше.
 func _respawn_otto() -> void:
+	# Таймер висит на дереве, а не на уровне, и переживает его: погибший Otto,
+	# уровень которого убрали — выходом в меню или концом теста, — возвращался
+	# бы в здание, которого уже нет.
+	if not is_inside_tree():
+		return
 	var index := _floor_of(otto)
 	var surface := rules.floor_surface(index)
 	otto.global_position = WorldSpace.to_scene(Vector2(_safest_x(index), surface))

@@ -6,13 +6,13 @@
 [ext_resource type="PackedScene" path="res://assets/models/otto.glb" id="4_model"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_stand"]
-size = Vector3(0.54, 1.26, 0.4)
+size = Vector3(0.72, 1.68, 0.4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_kick"]
-size = Vector3(0.9, 1.26, 0.4)
+size = Vector3(1.2, 1.68, 0.4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_crouch"]
-size = Vector3(0.54, 0.81, 0.4)
+size = Vector3(0.72, 1.08, 0.4)
 
 [node name="Otto" type="CharacterBody3D"]
 collision_layer = 2
@@ -20,11 +20,11 @@ collision_mask = 1
 script = ExtResource("1_otto")
 
 [node name="StandingShape" type="CollisionShape3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.63, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.84, 0)
 shape = SubResource("BoxShape3D_stand")
 
 [node name="CrouchingShape" type="CollisionShape3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.405, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.54, 0)
 shape = SubResource("BoxShape3D_crouch")
 disabled = true
 
@@ -41,5 +41,5 @@ collision_layer = 0
 collision_mask = 4
 
 [node name="KickShape" type="CollisionShape3D" parent="KickZone"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.63, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.84, 0)
 shape = SubResource("BoxShape3D_kick")

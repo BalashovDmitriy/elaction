@@ -268,3 +268,45 @@ func test_every_shaft_is_capped_at_both_ends() -> void:
 		assert_eq(mine, 2, "у шахты на %.2f м оба конца отмечены" % shaft.x)
 		assert_true(capped_below, "у шахты на %.2f м упор лежит на её дне" % shaft.x)
 	_drop(level)
+
+
+## Номер на каждом этаже, как в оригинале: у правой стены, под потолком, и
+## верхний этаж — самый большой номер (ADR-0026, решение 9).
+##
+## Табличка не должна висеть над проёмом шахты: там её закрыла бы кабина, а
+## на любом сиде в крайнем правом месте шахта может стоять.
+func test_every_floor_wears_its_number() -> void:
+	var level := _build(1)
+	await wait_physics_frames(SETTLE_FRAMES)
+	var rules := level.rules
+	var signs := level.get_node("FloorSigns")
+	assert_eq(signs.get_child_count(), rules.floors, "по табличке на этаж, у крыши нет")
+	var half := Proportions.FLOOR_SIGN * 0.5
+	for index in rules.floors:
+		var number := FloorSigns.number_of(rules, index)
+		var plate := signs.get_node("Floor%d" % number) as Node3D
+		assert_not_null(plate, "этаж %d без таблички" % number)
+		if plate == null:
+			continue
+		var label := plate.get_child(1) as Label3D
+		assert_eq(label.text, str(number), "на табличке свой номер")
+		var at := WorldSpace.to_plane(plate.position)
+		var span := rules.floor_span(index)
+		assert_lt(at.x + half.x, span.y - BuildingShell.WALL_WIDTH, "внутри стен")
+		# Ниже полосы, которую прячет кромка перекрытия, — иначе цифр не видно.
+		assert_gt(
+			at.y - half.y, rules.story_top(index) + FloorSigns.hidden_band(), "не под кромкой"
+		)
+		# Правее крайнего места: там ни двери, ни табло над ней, ни лампы.
+		var last := rules.slot_x(rules.slot_range(index).y)
+		assert_gt(at.x - half.x, last + Proportions.SLOT * 0.5, "за крайним местом")
+		for shaft in level.plan().shafts:
+			if shaft.top <= index and index <= shaft.bottom:
+				assert_gt(
+					at.x - half.x,
+					shaft.x + rules.shaft_width * 0.5,
+					"этаж %d: табличка над шахтой" % number
+				)
+	assert_eq(FloorSigns.number_of(rules, 0), rules.floors, "верхний этаж — старший номер")
+	assert_eq(FloorSigns.number_of(rules, rules.floors - 1), 1, "нижний — первый")
+	_drop(level)

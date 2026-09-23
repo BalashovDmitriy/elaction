@@ -13,8 +13,10 @@ extends RefCounted
 
 ## Половина кадра по вертикали и горизонтали, м. Задаётся размером ортокамеры
 ## и соотношением сторон окна.
-var half_height: float = 5.4
-var half_width: float = 9.6
+## По умолчанию — кадр [SideCamera] при 16:9: по высоте на плоскости игры это
+## поле здания оригинала, наклон камеры уже учтён.
+var half_height: float = Proportions.FIELD * 0.5
+var half_width: float = SideCamera.DEFAULT_HALF_HEIGHT * 16.0 / 9.0
 
 ## Прямоугольник, за который камере нельзя выходить, в координатах сцены.
 var limits := Rect2(-INF, -INF, INF, INF)

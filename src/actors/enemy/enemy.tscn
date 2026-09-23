@@ -5,7 +5,7 @@
 [ext_resource type="PackedScene" path="res://assets/models/agent.glb" id="3_model"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_enemy"]
-size = Vector3(0.54, 1.17, 0.4)
+size = Vector3(0.72, 1.68, 0.4)
 
 [node name="Enemy" type="CharacterBody3D"]
 collision_layer = 4
@@ -13,7 +13,7 @@ collision_mask = 1
 script = ExtResource("1_enemy")
 
 [node name="Shape" type="CollisionShape3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.585, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.84, 0)
 shape = SubResource("BoxShape3D_enemy")
 
 [node name="Body" type="Node3D" parent="."]
@@ -21,6 +21,6 @@ script = ExtResource("2_rig")
 model = ExtResource("3_model")
 
 [node name="FloorProbe" type="RayCast3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.405, 0.18, 0)
-target_position = Vector3(0, -0.54, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.54, 0.24, 0)
+target_position = Vector3(0, -0.72, 0)
 collision_mask = 1

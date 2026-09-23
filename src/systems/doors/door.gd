@@ -20,11 +20,10 @@ extends Node3D
 ## Документ взят, дверь перестала быть красной.
 signal document_taken
 
-## Габарит створки, м. Те же 84×171 прежних пикселя; уровень режет по нему проём
-## в задней стене, поэтому число живёт здесь, а не в двух местах — и коробка
-## створки собирается из него же в [method Node._ready], а не лежит в сцене
-## вторым числом.
-const LEAF_SIZE := Vector2(0.84, 1.71)
+## Габарит створки, м: 40% × 70% просвета, как в оригинале ([Proportions]).
+## Уровень режет по нему проём в задней стене, а коробка створки собирается
+## из него же в [method Node._ready], а не лежит в сцене вторым числом.
+const LEAF_SIZE := Proportions.DOOR
 
 ## Толщина створки, м.
 const LEAF_THICKNESS: float = 0.08
@@ -72,6 +71,15 @@ var _sign: MeshInstance3D = null
 @onready var _mat: Area3D = $Mat
 @onready var _leaf: MeshInstance3D = $Leaf
 @onready var _mat_visual: MeshInstance3D = $MatVisual
+
+
+## Коврик по [Proportions] — сразу после сборки сцены, как формы актёров.
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_SCENE_INSTANTIATED:
+		return
+	var mat := Proportions.DOOR_MAT
+	Proportions.fit_box($Mat/MatShape as CollisionShape3D, Vector3(mat, 0.3, 0.4))
+	Proportions.fit_mesh($MatVisual as MeshInstance3D, Vector3(mat, 0.02, mat))
 
 
 func _ready() -> void:
@@ -204,9 +212,11 @@ func _release() -> void:
 
 ## Ведёт створку по ходу [DoorCycle].
 ##
-## В греев-боксе створка сдвигается вбок, в стену, — на всю свою ширину при
-## полном ходе. Не кадры и не поворот: коробке без петель уходить в карман
-## стены честнее всего, а модель с петлями придёт в M16.
+## Створка поворачивается на петлях у левого края внутрь комнаты — на четверть
+## оборота при полном ходе. До M18c она съезжала вбок по стене на всю свою
+## ширину, но при шаге места 1.8 м и створке 1.2 открытая дверь налезала бы на
+## соседнее место — на шахту или другую дверь. Повёрнутая, она не выходит за
+## свой проём: комната за стеной глубиной 7 м (ADR-0026, решение 3).
 ##
 ## Стоящая створка не трогается: зовут отсюда каждый кадр и из каждой двери
 ## здания, а меняется положение только пока дверь ходит.
@@ -216,7 +226,13 @@ func _refresh_look() -> void:
 		return
 	_shown = along
 	_shown_red = has_document
-	_leaf.position.x = -along * LEAF_SIZE.x
+	var angle := along * PI * 0.5
+	var half := LEAF_SIZE.x * 0.5
+	# Поворот вокруг Y на +угол уводит правый край створки в −Z, то есть
+	# в комнату; середина ходит по дуге вокруг петли.
+	_leaf.rotation.y = angle
+	_leaf.position.x = -half + cos(angle) * half
+	_leaf.position.z = WorldSpace.BACK_WALL_Z + LEAF_STANDOFF - sin(angle) * half
 	var tone := GreyboxLook.DOOR_RED if has_document else GreyboxLook.DOOR
 	_leaf.material_override = GreyboxLook.surface(tone)
 	var glow := GreyboxLook.SIGN_RED if has_document else GreyboxLook.SIGN_WARM

@@ -67,10 +67,10 @@ class EscalatorSpot:
 
 	## Насколько перегиб ломаной отступает внутрь проёма от его ближнего края, м.
 	##
-	## Сквозь дыру проходит не линия пути, а пассажир: он шире её на полкорпуса
-	## (0.27 м), и отступ обязан быть больше. Запас — 0.15 м, и его стережёт
+	## Сквозь дыру проходит не линия пути, а пассажир: он шире её на полкорпуса,
+	## и отступ обязан быть больше. Запас — 0.15 м, и его стережёт
 	## [code]test_escalator_carries_its_rider_through_the_gap[/code].
-	const BEND_CLEARANCE: float = 0.42
+	const BEND_CLEARANCE: float = Proportions.BODY_WIDTH * 0.5 + 0.15
 
 	var x: float = 0.0
 	var floor_index: int = 0
@@ -391,7 +391,13 @@ func _open_shaft(
 
 	# Место должно стоять на всех уровнях шахты разом: здание расширяется книзу,
 	# и верх шахты — самое тесное её место.
-	var free := _free_slots(rules, taken, levels)
+	# Шахта ровно в шаг места (ADR-0026, решение 3), и две в соседних местах
+	# сомкнулись бы: между ними не осталось бы пола — ни встать, ни выйти из
+	# кабины иначе, как в соседнюю.
+	var free: Array[int] = []
+	for slot in _free_slots(rules, taken, levels):
+		if not _beside_a_shaft(slot, shaft.top, shaft.bottom):
+			free.append(slot)
 	if free.is_empty():
 		return null
 
@@ -402,6 +408,25 @@ func _open_shaft(
 	for level in levels:
 		_occupy(taken, level, shaft.slot)
 	return shaft
+
+
+## Стоит ли в месте шахта, проходящая уровень [param index], дно включая.
+func _shaft_column_at(slot: int, index: int) -> bool:
+	for shaft in shafts:
+		if shaft.slot == slot and shaft.top <= index and index <= shaft.bottom:
+			return true
+	return false
+
+
+## Стоит ли в соседнем месте шахта, делящая с полосой [param top]..[param bottom]
+## хоть один уровень.
+func _beside_a_shaft(slot: int, top: int, bottom: int) -> bool:
+	for other in shafts:
+		if absi(other.slot - slot) != 1:
+			continue
+		if other.top <= bottom and top <= other.bottom:
+			return true
+	return false
 
 
 ## Сколько уровней обслужит новая шахта.
@@ -481,7 +506,7 @@ func _bridges(index: int) -> bool:
 ## эскалатор; ноль, если он первый.
 ##
 ## Эскалатор занимает два места: своё и следующее по ходу спуска. Проём уходит от
-## оси на 2.28 м, площадка — на 2.88, и в один шаг сетки это не укладывается
+## оси на 2.1 м, площадка — на 2.24, и в один шаг сетки это не укладывается
 ## (ADR-0024, решение 1). Занимал он раньше одно, и на площадку могла встать дверь.
 func _add_escalator(
 	rules: BuildingRules,
@@ -537,6 +562,12 @@ func _pick_escalator_slot(
 	for slot in free:
 		var towards := _descent_towards(rules, slot, floor_index, from_x)
 		if not free.has(slot + int(towards)):
+			continue
+		# Проём уходит от площадки почти на весь шаг следующего места, и шахта
+		# сразу за ним оставила бы между дырами 0.6 м пола — уже тела. Агент,
+		# вышедший из кабины, вставал бы полкорпусом в шахте, а Otto шагал
+		# прямо в проём (авторевью M18c).
+		if _shaft_column_at(slot + 2 * int(towards), floor_index):
 			continue
 		roomy.append(slot)
 		if not is_equal_approx(towards, _away_from(rules, slot, from_x)):

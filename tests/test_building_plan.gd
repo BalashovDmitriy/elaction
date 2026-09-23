@@ -257,3 +257,106 @@ func _claim(busy: Dictionary, floor_index: int, x: float) -> void:
 	var key := "%d:%.0f" % [floor_index, x]
 	assert_false(busy.has(key), "место %s занято дважды" % key)
 	busy[key] = true
+
+
+## Места не делятся — но и габариты не должны налезать друг на друга.
+##
+## Место — точка сетки, а предмет на нём — полоса: створка двери 1.2 м, проём
+## шахты 1.8, лампа 0.6, стена 0.9. При шаге 1.8 м (ADR-0026, решение 3) место
+## занято почти целиком, и у соседей остаётся 0.6 м зазора. Проверка мест этого
+## не видит: две соседние шахты стояли бы каждая на своём месте и смыкались бы
+## без пола между ними.
+##
+## Проём шахты считается на всех её уровнях, дно включая: кабина стоит и там.
+## Проём эскалатора — только на его этаже: этажом ниже там пол.
+func test_nothing_on_a_floor_overlaps_its_neighbours() -> void:
+	var rules := _rules()
+	for building_seed: int in SEEDS:
+		var plan := BuildingPlan.generate(rules, building_seed)
+		for index: int in rules.levels():
+			var bands := _footprints(plan, rules, index)
+			bands.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
+			for number in range(1, bands.size()):
+				var before: Array = bands[number - 1]
+				var after: Array = bands[number]
+				assert_lte(
+					before[1] as float,
+					(after[0] as float) + 0.001,
+					(
+						"сид %d, этаж %d: %s налезает на %s"
+						% [building_seed, index, before[2], after[2]]
+					)
+				)
+
+
+## Две шахты в соседних местах сомкнулись бы: между ними не осталось бы пола,
+## и выйти из кабины можно было бы только в соседнюю.
+func test_shafts_never_stand_side_by_side() -> void:
+	var rules := _rules()
+	var pitch := rules.slot_x(1) - rules.slot_x(0)
+	for building_seed: int in range(1, 41):
+		var plan := BuildingPlan.generate(rules, building_seed)
+		for one in plan.shafts:
+			for other in plan.shafts:
+				if one == other or one.top > other.bottom or other.top > one.bottom:
+					continue
+				assert_gt(
+					absf(one.x - other.x),
+					pitch * 1.5,
+					"сид %d: шахты %d и %d рядом" % [building_seed, one.slot, other.slot]
+				)
+
+
+## Полосы, которые предметы занимают на этаже: [левый край, правый край, что это].
+func _footprints(plan: BuildingPlan, rules: BuildingRules, index: int) -> Array:
+	var bands: Array = []
+	var shaft_half := rules.shaft_width * 0.5
+	for shaft in plan.shafts:
+		if shaft.top <= index and index <= shaft.bottom:
+			bands.append([shaft.x - shaft_half, shaft.x + shaft_half, "шахта"])
+	for escalator in plan.escalators:
+		if escalator.floor_index == index:
+			var gap := escalator.gap(rules)
+			bands.append([gap.x, gap.y, "эскалатор"])
+	var door_half := Door.LEAF_SIZE.x * 0.5
+	for door in plan.doors:
+		if door.floor_index == index:
+			bands.append([door.x - door_half, door.x + door_half, "дверь"])
+	if index == plan.floors - 1:
+		var exit_half := BuildingShell.EXIT_WIDTH * 0.5
+		bands.append([plan.exit_x - exit_half, plan.exit_x + exit_half, "выход"])
+	var wall_half := rules.inner_wall_width * 0.5
+	for wall in plan.walls:
+		if wall.floor_index == index:
+			bands.append([wall.x - wall_half, wall.x + wall_half, "стена"])
+	return bands
+
+
+## Пол между двумя проёмами — либо его нет вовсе, либо на нём помещается тело.
+##
+## Полоса уже тела — ловушка: на ней нельзя встать, а агент, вышедший из
+## кабины, упирается в неё щупом и замирает полкорпусом в шахте. При шаге 1.8 м
+## такую давал эскалатор, спускавшийся к шахте через место: 0.6 м пола против
+## 0.72 тела (авторевью M18c).
+func test_floor_between_openings_fits_a_body() -> void:
+	var rules := _rules()
+	for building_seed: int in range(1, 41):
+		var plan := BuildingPlan.generate(rules, building_seed)
+		for index: int in rules.levels():
+			var holes: Array = []
+			for band: Array in _footprints(plan, rules, index):
+				if band[2] == "шахта" or band[2] == "эскалатор":
+					holes.append(band)
+			holes.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
+			for number in range(1, holes.size()):
+				var strip: float = (holes[number][0] as float) - (holes[number - 1][1] as float)
+				if strip <= 0.001:
+					continue
+				assert_gte(
+					strip,
+					Proportions.BODY_WIDTH,
+					(
+						"сид %d, этаж %d: между %s и %s %.2f м пола"
+						% [building_seed, index, holes[number - 1][2], holes[number][2], strip]
+					)
+				)
