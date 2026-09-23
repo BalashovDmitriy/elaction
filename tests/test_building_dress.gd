@@ -77,7 +77,11 @@ static func _is_a(kind: String, size: Vector3) -> bool:
 		"shaft_rail":
 			return is_equal_approx(size.x, BuildingShafts.RAIL_WIDTH)
 		"shaft_door":
-			return is_equal_approx(size.y, BuildingShafts.DOOR_HEIGHT)
+			# Проём портала шахты: во всю её ширину и в высоту двери (ADR-0031).
+			return (
+				is_equal_approx(size.x, Proportions.SHAFT)
+				and is_equal_approx(size.y, Proportions.DOOR.y)
+			)
 		"shaft_buffer":
 			return is_equal_approx(size.y, BuildingShafts.BUFFER_HEIGHT)
 		"machine_room":
@@ -140,7 +144,8 @@ func test_every_shaft_wears_both_rails() -> void:
 		_drop(level)
 
 
-## Створки стоят на каждом этаже, который шахта обслуживает, — и только там.
+## Портал стоит на каждом этаже, который шахта обслуживает, — и только там. На
+## крыше портала нет: там шахта уходит в машинное отделение.
 func test_shaft_doors_stand_on_every_floor_it_serves() -> void:
 	var level := _build(1)
 	await wait_physics_frames(SETTLE_FRAMES)
@@ -149,8 +154,8 @@ func test_shaft_doors_stand_on_every_floor_it_serves() -> void:
 	var doors := _parts(level, "shaft_door")
 	var served := 0
 	for shaft: BuildingPlan.ShaftSpot in level.plan().shafts:
-		served += shaft.height()
-		for index: int in range(shaft.top, shaft.bottom + 1):
+		for index: int in range(maxi(shaft.top, 0), shaft.bottom + 1):
+			served += 1
 			var surface := rules.floor_surface(index)
 			var found := false
 			for door: Rect2 in doors:

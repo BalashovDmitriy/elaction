@@ -186,6 +186,20 @@ const AUTO_PLANS: Dictionary = {
 	# M19: город, погода, крыша и обстановка. Крыша со скатами и городом за
 	# ней, спуск кабиной мимо кварталов, этаж с предметами у задней стены.
 	# Широкий низ, тёмный этаж и стену по сиду снимает tools/layout_shot.tscn.
+	# M20: детализация — крыша с техникой и неоном, спуск кабиной (стенки, пульт,
+	# тросы, противовес), этаж с дверями, лампами и дорожкой. Гараж, эффекты,
+	# раунды и погоду снимает tools/layout_shot.tscn -- --folder=M20.
+	"M20":
+	[
+		{"label": "roof", "actions": [], "hold": 1.2},
+		{"label": "roof_walk", "actions": ["move_right"], "hold": 2.5},
+		{"label": "to_the_shaft", "actions": ["move_right"], "hold": 2.9},
+		{"label": "riding_down", "actions": ["move_down"], "hold": 2.2},
+		{"label": "stopped", "actions": [], "hold": 1.6},
+		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
+		{"label": "shooting", "actions": ["shoot"], "hold": 0.3},
+		{"label": "floor", "actions": [], "hold": 1.5},
+	],
 	"M19":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},

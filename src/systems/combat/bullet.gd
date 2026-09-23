@@ -124,6 +124,13 @@ func _on_body_entered(body: Node3D) -> void:
 	var target := body as CollisionObject3D
 	if target != null and (target.collision_layer & LIVING) != 0:
 		Sounds.play(Sounds.HIT)
+		# Брызги у самой пули, по её ходу (ADR-0031): остаются на месте, даже
+		# когда пуля уже убрана. Неуязвимого пуля не ранит — брызги показали бы
+		# попадание, которого нет, а неуязвимость видно только миганием. Спрашивается
+		# свойством, а не классом: ссылка на [Otto] замкнула бы загрузку в кольцо.
+		# У агента такого свойства нет, и [method Object.get] отдаёт null.
+		if body.get(&"invulnerable") != true:
+			Blood.spray(get_parent(), global_position, direction)
 	# Геометрия просто гасит пулю, живых разбирает стрелявший.
 	hit_target.emit(body)
 	queue_free()

@@ -408,7 +408,9 @@ func _screens(index: int) -> int:
 ## обязательна из этих дверей одна: остальные занимают то, что осталось после
 ## ламп, — иначе эскалатору на тесном этаже не нашлось бы места.
 func doors_on(index: int) -> int:
-	if index <= ROOF:
+	if index <= ROOF or index == floors - 1:
+		# Этаж выхода — гараж, как подвал оригинала (маска 00): машина стоит не
+		# среди дверей (ADR-0031, решение 4).
 		return 0
 	if doors_cap > 0:
 		return doors_cap

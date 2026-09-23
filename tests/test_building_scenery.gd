@@ -188,8 +188,9 @@ func test_roof_steps_frame_the_machine_room() -> void:
 			)
 
 
-## У декора нет тел, а свет в окружении один — лампа над крышей: окна города и
-## вывески светятся эмиссией и бюджет ламп кадра не трогают.
+## У декора нет тел, а источников в окружении два — лампа над крышей и отсвет
+## неоновой вывески (ADR-0031, решение 2): окна города, вывески этажей, огонь
+## мачты светятся эмиссией и бюджет ламп кадра не трогают.
 func test_scenery_adds_no_bodies_and_no_lights() -> void:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
@@ -204,7 +205,7 @@ func test_scenery_adds_no_bodies_and_no_lights() -> void:
 	var bodies := scenery.find_children("*", "CollisionObject3D", true, false)
 	assert_eq(bodies.size(), 0, "у декора есть тела")
 	var lights := scenery.find_children("*", "Light3D", true, false)
-	assert_eq(lights.size(), 1, "в окружении больше одного источника света")
+	assert_eq(lights.size(), 2, "в окружении не два источника света")
 	assert_not_null(scenery.get_node_or_null("City"), "города нет")
 	remove_child(level)
 
@@ -238,3 +239,196 @@ func _fingerprint(blocks: Array[CityPlan.Block]) -> String:
 	for block in blocks:
 		parts.append("%d:%.2f:%.2f:%d" % [block.row, block.x, block.height, block.lit.size()])
 	return "|".join(parts)
+
+
+## Машина у выхода встаёт так, что по всей длине не задевает ни проём выхода, ни
+## портал шахты (замечание пользователя на кадре гаража M20), ни внутреннюю
+## стену, ни пролёт эскалатора, спускающегося в гараж, и стоит в стенах
+## здания (авторевью M20).
+func test_the_car_parks_clear_of_shafts_and_the_exit() -> void:
+	for skill: int in SKILLS:
+		var rules := _rules(skill)
+		var bottom := rules.floors - 1
+		var bounds := rules.floor_span(bottom)
+		for building_seed: int in SEEDS:
+			var plan := BuildingPlan.generate(rules, building_seed)
+			var x := ExitCar.spot(plan.exit_x, rules, plan)
+			var car := Vector2(x - ExitCar.LENGTH * 0.5, x + ExitCar.LENGTH * 0.5)
+			var label := "навык %d, сид %d" % [skill, building_seed]
+			var exit_half := BuildingShell.EXIT_WIDTH * 0.5
+			var exit := Vector2(plan.exit_x - exit_half, plan.exit_x + exit_half)
+			_assert_apart(car, exit, "%s: машина на проёме выхода" % label)
+			assert_between(
+				x,
+				bounds.x + BuildingShell.WALL_WIDTH + ExitCar.LENGTH * 0.5,
+				bounds.y - BuildingShell.WALL_WIDTH - ExitCar.LENGTH * 0.5,
+				"%s: машина в наружной стене" % label
+			)
+			for shaft in plan.shafts:
+				if shaft.top > bottom or shaft.bottom < bottom:
+					continue
+				var shaft_half := rules.shaft_width * 0.5
+				var column := Vector2(shaft.x - shaft_half, shaft.x + shaft_half)
+				_assert_apart(car, column, "%s: машина перед шахтой x=%.1f" % [label, shaft.x])
+			for wall in plan.walls:
+				if wall.floor_index == bottom:
+					_assert_apart(
+						car, wall.band(rules), "%s: машина в стене x=%.1f" % [label, wall.x]
+					)
+			for escalator in plan.escalators:
+				if escalator.floor_index != bottom - 1:
+					continue
+				var landing := escalator.x + escalator.towards * rules.escalator_run
+				var gap := escalator.gap(rules)
+				var run := Vector2(minf(gap.x, landing), maxf(gap.y, landing))
+				_assert_apart(car, run, "%s: машина на эскалаторе x=%.1f" % [label, escalator.x])
+
+
+## Отрезки [param a] и [param b] не перекрываются (касаться можно).
+func _assert_apart(a: Vector2, b: Vector2, message: String) -> void:
+	assert_true(a.y <= b.x + 0.001 or a.x >= b.y - 0.001, message)
+
+
+## Седан стоит между задней стеной и телом Otto: в стену не входит и в плоскость
+## игры не выходит, поэтому Otto проходит перед машиной, а не сквозь неё. Седан
+## в полтора метра шириной заходил в обе стороны (авторевью M18c и M20).
+func test_the_sedan_fits_between_the_wall_and_otto() -> void:
+	var sedan: Node3D = autofree(CarModel.build())
+	var back := INF
+	var front := -INF
+	for part: Node in sedan.get_children():
+		var mesh := part as MeshInstance3D
+		if mesh == null:
+			continue
+		var box := mesh.transform * mesh.mesh.get_aabb()
+		back = minf(back, box.position.z)
+		front = maxf(front, box.end.z)
+	assert_gt(ExitCar.Z + back, WorldSpace.BACK_WALL_Z, "машина входит в заднюю стену")
+	assert_lt(
+		ExitCar.Z + front,
+		WorldSpace.PLAY_Z - WorldSpace.BODY_DEPTH * 0.5,
+		"машина выходит в плоскость игры — Otto пройдёт сквозь неё"
+	)
+
+
+## Стенки кабины стоят на её полу и доходят до крыши. Пол — в нуле кабины, плита
+## под ним: стенки, отсчитанные от верха плиты, висели на 18 см выше пола
+## (авторевью M20).
+func test_the_cabin_walls_stand_on_its_floor() -> void:
+	var scene := load("res://src/systems/elevators/elevator_car.tscn") as PackedScene
+	var car := scene.instantiate() as ElevatorCar
+	add_child_autofree(car)
+	car.fit_to_story(Proportions.CLEARANCE, Proportions.SHAFT)
+	var half_slab := ElevatorCar.SLAB_THICKNESS * 0.5
+	var floor_top := (car.get_node("FloorVisual") as Node3D).position.y + half_slab
+	var roof_bottom := (car.get_node("RoofVisual") as Node3D).position.y - half_slab
+	var lowest := INF
+	var highest := -INF
+	for part: Node in car._detail._body.get_children():
+		var mesh := part as MeshInstance3D
+		var box := mesh.transform * mesh.mesh.get_aabb()
+		lowest = minf(lowest, box.position.y)
+		highest = maxf(highest, box.end.y)
+	assert_almost_eq(lowest, floor_top, 0.01, "стенки кабины висят над её полом")
+	assert_almost_eq(highest, roof_bottom, 0.01, "стенки кабины не доходят до крыши")
+	remove_child(car)
+
+
+## Уровень качества доходит до здания, которое уже стоит, а не со следующего
+## (ADR-0030, решение 5): отражения, контактные тени и туман воздуха здания.
+func test_quality_reaches_the_building_already_standing() -> void:
+	GameState.instance().start_game()
+	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
+	level.rules = BuildingRules.new()
+	level.building_seed = 1
+	add_child_autofree(level)
+	var air := (level.get_node("Scenery/Air") as WorldEnvironment).environment
+	Graphics.broadcast(Graphics.Quality.LOW)
+	var low: Array[bool] = [air.ssr_enabled, air.ssao_enabled, air.volumetric_fog_enabled]
+	Graphics.broadcast(Graphics.Quality.HIGH)
+	assert_eq(low, [false, false, false] as Array[bool], "низкое качество не дошло до воздуха")
+	assert_true(air.ssr_enabled, "высокое качество не вернуло отражения")
+	remove_child(level)
+
+
+## Этаж выхода — гараж: дверей на нём нет ни на одном сиде и навыке, как в
+## подвале оригинала (ADR-0031, решение 4).
+func test_the_exit_floor_is_a_garage_without_doors() -> void:
+	for skill: int in SKILLS:
+		var rules := _rules(skill)
+		assert_eq(rules.doors_on(rules.floors - 1), 0, "навык %d: гараж с дверями" % skill)
+		for building_seed: int in SEEDS:
+			var plan := BuildingPlan.generate(rules, building_seed)
+			for door in plan.doors:
+				assert_ne(
+					door.floor_index,
+					rules.floors - 1,
+					"навык %d, сид %d: дверь в гараже" % [skill, building_seed]
+				)
+
+
+## Техника крыши стоит внутри её стен (вывеска — по ширине щита вокруг середины).
+func test_roof_kit_stays_on_the_roof() -> void:
+	GameState.instance().start_game()
+	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
+	level.rules = BuildingRules.new()
+	level.building_seed = 2
+	add_child_autofree(level)
+	var kit := level.get_node_or_null("Scenery/RoofKit")
+	assert_not_null(kit, "техники крыши нет")
+	if kit == null:
+		return
+	var bounds := level.rules.floor_span(BuildingRules.ROOF)
+	var parts := kit.find_children("*", "VisualInstance3D", true, false)
+	assert_gt(parts.size(), 10, "на крыше почти ничего не стоит")
+	for part: Node in parts:
+		var x := (part as Node3D).global_position.x
+		assert_between(
+			x, bounds.x - 0.1, bounds.y + 0.1, "деталь крыши за её стенами: %s" % part.name
+		)
+	remove_child(level)
+
+
+## Противовес ходит навстречу кабине: кабина внизу — он наверху.
+func test_the_counterweight_goes_against_the_car() -> void:
+	var detail: CarDetail = autofree(CarDetail.new())
+	add_child(detail)
+	detail.build(1.8, 3.0)
+	detail.hang_cables(0.0, 20.0, 23.0)
+	detail.follow(0.0, 5.0)
+	var weight := detail._weight.global_position.y
+	detail.follow(20.0, 5.0)
+	assert_gt(weight, detail._weight.global_position.y, "кабина поднялась — противовес опустился")
+	# Выше верха шахты противовес не идёт: у шахты на крышу верх — в машинном
+	# отделении, а не над потолком верхней остановки (авторевью M20).
+	detail.set_top(21.0)
+	detail.follow(0.0, 5.0)
+	var weight_top := detail._weight.global_position.y + CarDetail.WEIGHT.y * 0.5
+	assert_lte(weight_top, 21.0 + 0.001, "противовес выше верха шахты")
+	remove_child(detail)
+
+
+## Кровь, выключенная в настройках, не брызгает вовсе.
+func test_blood_respects_the_setting() -> void:
+	var host: Node3D = autofree(Node3D.new())
+	add_child(host)
+	Blood.enabled = false
+	Blood.spray(host, Vector3.ZERO, 1.0)
+	assert_eq(host.get_child_count(), 0, "выключенная кровь брызнула")
+	Blood.enabled = true
+	Blood.spray(host, Vector3.ZERO, 1.0)
+	assert_eq(host.get_child_count(), 1, "включённая кровь не брызнула")
+	remove_child(host)
+
+
+## Сбитая лампа выбрасывает искры в точке попадания, и они остаются там, пока
+## лампа падает (ADR-0031, решение 3а).
+func test_a_shot_lamp_throws_sparks() -> void:
+	var host: Node3D = autofree(Node3D.new())
+	add_child(host)
+	var lamp := (load("res://src/systems/lighting/lamp.tscn") as PackedScene).instantiate() as Lamp
+	host.add_child(lamp)
+	lamp.shoot_down()
+	var sparks := host.find_children("*", "Sparks", false, false)
+	assert_eq(sparks.size(), 1, "искр нет или больше одного выброса")
+	remove_child(host)

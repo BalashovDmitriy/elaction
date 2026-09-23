@@ -41,6 +41,17 @@ const DOOR_REACH: float = 14.4
 
 ## Табло над створкой: габарит и на сколько его середина выше верха створки, м.
 const SIGN_SIZE := Vector3(0.4, 0.13, 0.04)
+
+## Детали двери (ADR-0031, решение 3): филёнки на створке, ручка, отбойная
+## пластина и наличник вокруг проёма, м.
+const PANEL_SIZE := Vector2(0.84, 0.78)
+const PANEL_RELIEF: float = 0.02
+const HANDLE := Vector3(0.15, 0.025, 0.04)
+const ROSETTE := Vector3(0.06, 0.12, 0.02)
+const HANDLE_RISE: float = 1.0
+const KICK_PLATE := Vector2(1.08, 0.2)
+const FRAME_WIDTH: float = 0.08
+const FRAME_DEPTH: float = 0.05
 const SIGN_RISE: float = 0.2
 
 ## Сколько Otto может пересидеть внутри, с.
@@ -72,6 +83,8 @@ var _voice: AudioStreamPlayer3D = null
 var _shown: float = -1.0
 var _shown_red: bool = false
 var _sign: MeshInstance3D = null
+## Филёнки створки: их тон идёт за створкой — красной или обычной.
+var _panels: Array[MeshInstance3D] = []
 
 @onready var _mat: Area3D = $Mat
 @onready var _leaf: MeshInstance3D = $Leaf
@@ -100,6 +113,8 @@ func _ready() -> void:
 		0.0, LEAF_SIZE.y + SIGN_RISE, WorldSpace.BACK_WALL_Z + SIGN_SIZE.z * 0.5
 	)
 	add_child(_sign)
+	_dress_leaf()
+	_frame_the_opening()
 	_refresh_look()
 
 
@@ -240,8 +255,54 @@ func _refresh_look() -> void:
 	_leaf.position.z = WorldSpace.BACK_WALL_Z + LEAF_STANDOFF - sin(angle) * half
 	var tone := GreyboxLook.DOOR_RED if has_document else GreyboxLook.DOOR
 	_leaf.material_override = GreyboxLook.surface(tone)
+	var relief := GreyboxLook.surface(tone.darkened(0.14))
+	for panel in _panels:
+		panel.material_override = relief
 	var glow := GreyboxLook.SIGN_RED if has_document else GreyboxLook.SIGN_WARM
 	_sign.material_override = GreyboxLook.light(glow)
+
+
+## Детали створки: две филёнки, ручка с розеткой у свободного края и отбойная
+## пластина внизу. Дети створки — поворачиваются вместе с ней.
+func _dress_leaf() -> void:
+	var front := LEAF_THICKNESS * 0.5
+	var bottom := -LEAF_SIZE.y * 0.5
+	for rise: float in [0.35, 0.78]:
+		var panel := GreyboxLook.box(
+			Vector3(PANEL_SIZE.x, PANEL_SIZE.y, PANEL_RELIEF), GreyboxLook.surface(GreyboxLook.DOOR)
+		)
+		panel.position = Vector3(0.0, bottom + LEAF_SIZE.y * rise, front + PANEL_RELIEF * 0.5)
+		_leaf.add_child(panel)
+		_panels.append(panel)
+	var chrome := GreyboxLook.metal(GreyboxLook.TRIM)
+	var handle_x := LEAF_SIZE.x * 0.5 - 0.14
+	var rosette := GreyboxLook.box(ROSETTE, chrome)
+	rosette.position = Vector3(handle_x, bottom + HANDLE_RISE, front + ROSETTE.z * 0.5)
+	_leaf.add_child(rosette)
+	var lever := GreyboxLook.box(HANDLE, chrome)
+	lever.position = Vector3(
+		handle_x - HANDLE.x * 0.4, bottom + HANDLE_RISE, front + ROSETTE.z + HANDLE.z * 0.5
+	)
+	_leaf.add_child(lever)
+	var kick := GreyboxLook.box(Vector3(KICK_PLATE.x, KICK_PLATE.y, 0.01), chrome)
+	kick.position = Vector3(0.0, bottom + KICK_PLATE.y * 0.5 + 0.02, front + 0.005)
+	_leaf.add_child(kick)
+
+
+## Наличник вокруг проёма на задней стене: стойки и перемычка.
+func _frame_the_opening() -> void:
+	var trim := GreyboxLook.metal(GreyboxLook.TRIM.darkened(0.35))
+	var half := LEAF_SIZE.x * 0.5
+	var z := WorldSpace.BACK_WALL_Z + FRAME_DEPTH * 0.5
+	for side: float in [-1.0, 1.0]:
+		var jamb := GreyboxLook.box(Vector3(FRAME_WIDTH, LEAF_SIZE.y, FRAME_DEPTH), trim)
+		jamb.position = Vector3(side * (half + FRAME_WIDTH * 0.5), LEAF_SIZE.y * 0.5, z)
+		add_child(jamb)
+	var head := GreyboxLook.box(
+		Vector3(LEAF_SIZE.x + FRAME_WIDTH * 2.0, FRAME_WIDTH, FRAME_DEPTH), trim
+	)
+	head.position = Vector3(0.0, LEAF_SIZE.y + FRAME_WIDTH * 0.5, z)
+	add_child(head)
 
 
 ## Подаёт голос двери. Источник позиционный и один на дверь: поток подменяется,

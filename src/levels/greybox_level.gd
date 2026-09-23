@@ -298,6 +298,7 @@ func _spawn_shafts() -> void:
 		# берёт из правил, а не из своей сцены (ADR-0025, решение 10).
 		car.fit_to_story(rules.floor_height - rules.slab_height, rules.shaft_width)
 		car.setup(stops)
+		car.set_shaft_top(_shafts.top_of(shaft))
 		_cars.append(car)
 		if shaft.double_deck:
 			_spawn_lower_deck(car, shaft)
@@ -334,7 +335,10 @@ func _physics_process(delta: float) -> void:
 		_slide_along(delta)
 		return
 
-	var view := otto.camera_view()
+	# Кадр правил, а не сглаженный кадр игрока: тот едет в _process по настенным
+	# часам, и полоса выпуска агентов после скачка Otto зависела от скорости
+	# машины — в CI тест боя падал через раз (M20).
+	var view := otto.camera_view(true)
 	if _car != null and _car.advance(delta, view):
 		building_cleared.emit()
 
@@ -514,7 +518,7 @@ func _spawn_exit() -> void:
 ## Машина у выхода: ставит её [ExitCar] у проёма, на пол нижнего этажа.
 func _spawn_car(exit_area: Rect2) -> void:
 	_car = ExitCar.new()
-	_car.park(exit_area.get_center().x, exit_area.end.y, rules.width)
+	_car.park(exit_area.get_center().x, exit_area.end.y, rules, _plan)
 	add_child(_car)
 
 

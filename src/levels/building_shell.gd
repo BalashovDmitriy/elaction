@@ -34,10 +34,23 @@ const EXIT_WIDTH: float = Proportions.EXIT_WIDTH
 ## оттенок раунда, а не заливка, и читаемость держится на всех.
 const PALETTE_SHARE: float = 0.18
 
+## Доля тона этажа палитры в задней стене — больше, чем в кладке: на 18% раунды
+## на кадре не различались (вопрос пользователя, ADR-0031, решение 5).
+const STORY_SHARE: float = 0.45
+
 ## Во сколько раз задняя стена тёмного этажа темнее светлой (ADR-0029, решение 6).
 ## Кадры M18e: на сумрачной башне тёмный этаж без ламп отличался от светлого
 ## слабо — стена отражала общий тон так же, как на светлом.
 const UNLIT_SHADE: float = 0.45
+
+## Стена гаража — этажа выхода: бетон вместо конторской стены (ADR-0031,
+## решение 4).
+const GARAGE_WALL := Color(0.24, 0.24, 0.25)
+
+## Парапет крыши: видимая высота, отлив сверху и его свес, м (ADR-0031, решение 2).
+const PARAPET_HEIGHT: float = 1.05
+const COPING_HEIGHT: float = 0.08
+const COPING_OVERHANG: float = 0.06
 
 var _rules: BuildingRules = null
 var _plan: BuildingPlan = null
@@ -123,8 +136,32 @@ func _build_side_walls(
 	if height <= 0.0:
 		return
 
+	if index == BuildingRules.ROOF:
+		_build_parapets(surface, bounds, top, material)
+		return
 	_build_solid(Rect2(bounds.x, top, WALL_WIDTH, height), material)
 	_build_solid(Rect2(bounds.y - WALL_WIDTH, top, WALL_WIDTH, height), material)
+
+
+## Стены крыши: тело во всю высоту неба — прыжок берёт почти два метра, и низкий
+## бортик Otto перемахнул бы, — а видно только парапет по пояс с отливом сверху
+## (ADR-0031, решение 2). До M20 видна была вся стена, и по краям крыши стояли
+## тёмные столбы до верха кадра.
+func _build_parapets(
+	surface: float, bounds: Vector2, top: float, material: StandardMaterial3D
+) -> void:
+	var coping := GreyboxLook.metal(GreyboxLook.TRIM)
+	for left: float in [bounds.x, bounds.y - WALL_WIDTH]:
+		_build_solid(Rect2(left, top, WALL_WIDTH, surface - top), material, false)
+		var wall := Rect2(left, surface - PARAPET_HEIGHT, WALL_WIDTH, PARAPET_HEIGHT)
+		_build_block(wall, material, WorldSpace.CORRIDOR_DEPTH + WorldSpace.ROOM_DEPTH)
+		var cap := Rect2(
+			left - COPING_OVERHANG,
+			surface - PARAPET_HEIGHT - COPING_HEIGHT,
+			WALL_WIDTH + COPING_OVERHANG * 2.0,
+			COPING_HEIGHT
+		)
+		_build_block(cap, coping, WorldSpace.CORRIDOR_DEPTH + WorldSpace.ROOM_DEPTH + 0.1)
 
 
 ## Комната за коридором: задняя стена с проёмами дверей и дальняя стена.
@@ -136,7 +173,7 @@ func _build_side_walls(
 ##
 ## Крыша стены не получает: над ней небо, а за ней — город ([CityBackdrop]).
 func _build_room() -> void:
-	var tone := GreyboxLook.BACK_WALL.lerp(_rules.palette.story, PALETTE_SHARE)
+	var tone := GreyboxLook.BACK_WALL.lerp(_rules.palette.story, STORY_SHARE)
 	var lit_back := GreyboxLook.surface(tone)
 	var unlit_back := GreyboxLook.surface(
 		Color(tone.r * UNLIT_SHADE, tone.g * UNLIT_SHADE, tone.b * UNLIT_SHADE)
@@ -153,6 +190,8 @@ func _build_room() -> void:
 		var bounds := _rules.floor_span(index)
 		var inner := Vector2(bounds.x + WALL_WIDTH, bounds.y - WALL_WIDTH)
 		var back := unlit_back if _rules.is_unlit(index) else lit_back
+		if index == _rules.floors - 1:
+			back = GreyboxLook.surface(GARAGE_WALL)
 
 		var openings := _openings_on(index)
 		var lintel_top := surface - Door.LEAF_SIZE.y
@@ -186,7 +225,10 @@ func _openings_on(index: int) -> Array[Vector2]:
 ## Глубиной на коридор и комнату вместе: перекрытие — пол не только коридора,
 ## но и комнаты за стеной, иначе в проём двери было бы видно пустоту под ногами.
 ## Передняя грань приходится на переднюю грань коридора, а не на плоскость игры.
-func _build_solid(rect: Rect2, material: StandardMaterial3D) -> void:
+##
+## [param shown] — видна ли коробка: стена крыши выше парапета — тело без вида.
+## Не `visible`: так зовут свойство [Node3D], и параметр его заслонял бы.
+func _build_solid(rect: Rect2, material: StandardMaterial3D, shown: bool = true) -> void:
 	var depth := WorldSpace.CORRIDOR_DEPTH + WorldSpace.ROOM_DEPTH
 	var size := Vector3(rect.size.x, rect.size.y, depth)
 	var centre := WorldSpace.to_scene(rect.get_center())
@@ -200,9 +242,19 @@ func _build_solid(rect: Rect2, material: StandardMaterial3D) -> void:
 	var collision := CollisionShape3D.new()
 	collision.shape = shape
 	body.add_child(collision)
-	body.add_child(GreyboxLook.box(size, material))
+	if shown:
+		body.add_child(GreyboxLook.box(size, material))
 
 	add_child(body)
+
+
+## Коробка без тела на месте прямоугольника, глубиной [param depth] от передней
+## грани коридора — как у тел оболочки.
+func _build_block(rect: Rect2, material: StandardMaterial3D, depth: float) -> void:
+	var block := GreyboxLook.box(Vector3(rect.size.x, rect.size.y, depth), material)
+	block.position = WorldSpace.to_scene(rect.get_center())
+	block.position.z = WorldSpace.CORRIDOR_DEPTH * 0.5 - depth * 0.5
+	_panels.add_child(block)
 
 
 ## Стена, которая только видна: без тела, толщиной [constant PANEL_THICKNESS],

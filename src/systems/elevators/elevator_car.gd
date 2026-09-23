@@ -90,6 +90,8 @@ var _ding: AudioStreamPlayer3D = null
 var _indicators: Array[MeshInstance3D] = []
 ## Ширина кабины, м. Задаёт её [method fit_to_story] из правил здания.
 var _width: float = DEFAULT_WIDTH
+## Стенки, светильник, пульт, тросы и противовес — только вид (ADR-0031).
+var _detail: CarDetail = null
 @onready var _interior: Area3D = $Interior
 @onready var _crush_zone: Area3D = $CrushZone
 @onready var _up_arrow: MeshInstance3D = $UpArrow
@@ -115,6 +117,9 @@ func _ready() -> void:
 		var indicator := GreyboxLook.box(INDICATOR_SIZE, GreyboxLook.light(GreyboxLook.INDICATOR))
 		add_child(indicator)
 		_indicators.append(indicator)
+	_detail = CarDetail.new()
+	_detail.name = "Detail"
+	add_child(_detail)
 	fit_to_story(DEFAULT_CLEAR_HEIGHT, DEFAULT_WIDTH)
 
 
@@ -139,6 +144,8 @@ func _ready() -> void:
 ## (ADR-0026, решение 3).
 func fit_to_story(clear_height: float, car_width: float) -> void:
 	_width = car_width
+	if _detail != null:
+		_detail.build(car_width, clear_height)
 	var roof_middle := clear_height - SLAB_THICKNESS * 0.5
 	($RoofShape as CollisionShape3D).position.y = roof_middle
 	($RoofVisual as MeshInstance3D).position.y = roof_middle
@@ -193,6 +200,7 @@ func _physics_process(delta: float) -> void:
 	# у нижнего нет.
 	var occupied := has_rider() or (_deck != null and _deck.has_rider())
 	_place(_motion.update(delta, _command if occupied else 0.0, occupied))
+	_detail.follow(global_position.y, global_position.x)
 
 	var reached := _motion.aligned_floor()
 	if reached != _aligned_floor:
@@ -219,6 +227,25 @@ func setup(stops: PackedFloat32Array, start_floor: int = 0) -> void:
 	_motion.setup(stops, start_floor)
 	_place(_motion.position)
 	_aligned_floor = _motion.aligned_floor()
+	# Тросы и противовес: остановки — высоты правил, у сцены ось y вверх.
+	if _detail != null and not stops.is_empty():
+		var low := WorldSpace.height_to_scene(Array(stops).max())
+		var high := WorldSpace.height_to_scene(Array(stops).min())
+		var room := ($RoofVisual as MeshInstance3D).position.y + SLAB_THICKNESS * 0.5
+		_detail.hang_cables(low, high, high + room)
+		_detail.follow(global_position.y, global_position.x)
+
+
+## Верх шахты [param top] в плоскости правил: докуда идут тросы и противовес.
+##
+## Без этого верх — потолок верхней остановки. У шахты на крышу над верхней
+## остановкой небо, и тросы уходили бы на три метра над настилом — выше
+## машинного отделения. Верх ей даёт уровень: [method BuildingShafts.top_of].
+func set_shaft_top(top: float) -> void:
+	if _detail == null:
+		return
+	_detail.set_top(WorldSpace.height_to_scene(top))
+	_detail.follow(global_position.y, global_position.x)
 
 
 ## Делает кабину нижним ярусом пары: своего хода у неё больше нет, она держится

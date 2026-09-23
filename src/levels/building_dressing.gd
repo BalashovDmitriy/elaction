@@ -42,7 +42,8 @@ static func lay(rules: BuildingRules, plan: BuildingPlan, building_seed: int) ->
 	var dressing := BuildingDressing.new()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([building_seed, SALT])
-	for index in rules.floors:
+	# Этаж выхода — гараж: пустой, с одной машиной (ADR-0031, решение 4).
+	for index in rules.floors - 1:
 		for x: float in free_spots(rules, plan, index):
 			if rng.randf() >= FILL_CHANCE:
 				continue
