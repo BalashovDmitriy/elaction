@@ -39,6 +39,10 @@ const PALETTE_SHARE: float = 0.18
 ## слабо — стена отражала общий тон так же, как на светлом.
 const UNLIT_SHADE: float = 0.45
 
+## Стена гаража — этажа выхода: бетон вместо конторской стены (ADR-0031,
+## решение 4).
+const GARAGE_WALL := Color(0.24, 0.24, 0.25)
+
 var _rules: BuildingRules = null
 var _plan: BuildingPlan = null
 var _ribs: BuildingRibs = null
@@ -153,6 +157,8 @@ func _build_room() -> void:
 		var bounds := _rules.floor_span(index)
 		var inner := Vector2(bounds.x + WALL_WIDTH, bounds.y - WALL_WIDTH)
 		var back := unlit_back if _rules.is_unlit(index) else lit_back
+		if index == _rules.floors - 1:
+			back = GreyboxLook.surface(GARAGE_WALL)
 
 		var openings := _openings_on(index)
 		var lintel_top := surface - Door.LEAF_SIZE.y

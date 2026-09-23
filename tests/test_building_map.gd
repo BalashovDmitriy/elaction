@@ -77,7 +77,8 @@ func test_wide_floors_are_not_emptier_than_a_screen_of_the_original() -> void:
 	var rules := _rules(0)
 	for building_seed: int in SEEDS:
 		var plan := BuildingPlan.generate(rules, building_seed)
-		for index: int in rules.floors:
+		# Этаж выхода — гараж без дверей, как подвал оригинала (ADR-0031, решение 4).
+		for index: int in rules.floors - 1:
 			if not rules.is_wide(index):
 				continue
 			var rom := Arcade.rom_floor(index, rules.floors)

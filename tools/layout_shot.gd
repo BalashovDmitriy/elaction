@@ -75,6 +75,11 @@ func _run() -> void:
 	await _shoot_the_wall("04_inner_wall", walled)
 	await _shoot_floor("05_tower_doors", 2)
 	await _shoot_floor("06_dark_floor", _first_unlit_floor())
+	# Гараж у выхода: машина и разметка (ADR-0031, решение 4).
+	var bottom := rules.floors - 1
+	# Не в самом проёме: без документов выход отправил бы Otto к красной двери.
+	_place(_level.plan().exit_x + 2.5, bottom)
+	await _shoot("07_garage", bottom)
 
 	print("  кадры раскладки в %s" % _folder)
 	get_tree().quit(0)

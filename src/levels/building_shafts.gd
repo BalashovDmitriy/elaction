@@ -14,8 +14,18 @@ extends Node3D
 ## Ширина направляющей шахты, м. Стойка идёт по краю проёма во всю его высоту.
 const RAIL_WIDTH: float = 0.18
 
-## Высота створок шахты, м.
-const DOOR_HEIGHT: float = 1.02
+## Портал шахты на этаже (ADR-0031, решение 1): доля ширины под каждую
+## раскрытую створку, наличник, перемычка и порог, м; цвета металла.
+## Доля тона шахты палитры раунда в направляющих (ADR-0031, решение 5).
+const SHAFT_TONE: float = 0.25
+
+const PORTAL_LEAF_SHARE: float = 0.22
+const PORTAL_JAMB: float = 0.07
+const PORTAL_HEAD: float = 0.1
+const PORTAL_SILL: float = 0.03
+const PORTAL_RECESS := Color(0.07, 0.08, 0.1)
+const PORTAL_LEAF := Color(0.5, 0.5, 0.48)
+const PORTAL_TRIM := Color(0.36, 0.37, 0.4)
 
 ## Высота упора в конце полосы шахты, м.
 const BUFFER_HEIGHT: float = 0.24
@@ -109,20 +119,57 @@ func _dress_shaft(shaft: BuildingPlan.ShaftSpot) -> void:
 	var bottom := _rules.floor_surface(shaft.bottom)
 	var half := _rules.shaft_width * 0.5
 	# Шахта — металл (ADR-0023, решение 5): направляющие ловят блик ламп.
-	var rail := GreyboxLook.metal(GreyboxLook.SHAFT)
+	var rail := GreyboxLook.metal(GreyboxLook.SHAFT.lerp(_rules.palette.shaft, SHAFT_TONE))
 
 	for side: float in [-1.0, 1.0]:
 		var x := shaft.x + half * side
 		var left := x if side < 0.0 else x - RAIL_WIDTH
 		_add_part(Rect2(left, top, RAIL_WIDTH, bottom - top), rail, RAIL_Z, RAIL_DEPTH)
 
-	var panel := GreyboxLook.surface(GreyboxLook.WALL)
-	var panel_z := WorldSpace.BACK_WALL_Z + PANEL_THICKNESS * 0.5 + 0.01
 	for index: int in range(shaft.top, shaft.bottom + 1):
 		var surface := _rules.floor_surface(index)
-		var door := Rect2(shaft.x - half, surface - DOOR_HEIGHT, _rules.shaft_width, DOOR_HEIGHT)
-		_add_part(door, panel, panel_z, PANEL_THICKNESS)
+		if index > BuildingRules.ROOF:
+			_build_portal(shaft.x, surface)
 		_light_the_shaft(shaft.x, index, surface)
+
+
+## Портал шахты на этаже, как на референсе: тёмный проём, раскрытые створки по
+## бокам, наличник, перемычка и порог (ADR-0031, решение 1). Всё у задней стены
+## и без тел: кабина ходит перед ним, и её видно целиком.
+func _build_portal(x: float, surface: float) -> void:
+	var half := _rules.shaft_width * 0.5
+	var height := Proportions.DOOR.y
+	var back_z := WorldSpace.BACK_WALL_Z + PANEL_THICKNESS * 0.5 + 0.01
+	var recess := GreyboxLook.metal(PORTAL_RECESS)
+	var leaf := GreyboxLook.metal(PORTAL_LEAF)
+	var trim := GreyboxLook.metal(PORTAL_TRIM)
+
+	_add_part(
+		Rect2(x - half, surface - height, half * 2.0, height), recess, back_z, PANEL_THICKNESS
+	)
+	var leaf_width := half * 2.0 * PORTAL_LEAF_SHARE
+	for side: float in [-1.0, 1.0]:
+		var from := x - half if side < 0.0 else x + half - leaf_width
+		_add_part(
+			Rect2(from, surface - height, leaf_width, height), leaf, back_z + 0.03, PANEL_THICKNESS
+		)
+		var jamb_from := x - half - PORTAL_JAMB if side < 0.0 else x + half
+		_add_part(
+			Rect2(jamb_from, surface - height, PORTAL_JAMB, height),
+			trim,
+			back_z + 0.05,
+			PANEL_THICKNESS
+		)
+	var head := Rect2(
+		x - half - PORTAL_JAMB,
+		surface - height - PORTAL_HEAD,
+		(half + PORTAL_JAMB) * 2.0,
+		PORTAL_HEAD
+	)
+	_add_part(head, trim, back_z + 0.05, PANEL_THICKNESS)
+	_add_part(
+		Rect2(x - half, surface - PORTAL_SILL, half * 2.0, PORTAL_SILL), trim, back_z + 0.12, 0.2
+	)
 
 
 ## Источник столба на одном этаже шахты: посреди пролёта, перед направляющими.

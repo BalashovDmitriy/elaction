@@ -10,12 +10,9 @@ extends Node3D
 ## Своим узлом с M18d: уровень перерос предел строк, а у машины своё состояние —
 ## куда стоит и едет ли, — которое уровню знать незачем.
 
-const MODEL := preload("res://assets/models/car.glb")
-
-## Длина модели `car.glb`, м: по ней машина ставится в зазор от проёма и
-## считается уехавшей из кадра. `tools/build_actors.py` строит кузов ровно такой
-## длины; высота и ширина у модели свои, и здесь они никому не нужны.
-const LENGTH: float = Proportions.CAR_LENGTH
+## Длина машины, м: по ней она ставится в зазор от проёма и считается уехавшей
+## из кадра. Седан собирает [CarModel] ровно такой длины (ADR-0031, решение 4).
+const LENGTH: float = CarModel.LENGTH
 const GAP: float = 0.36
 const SPEED: float = 9.6
 ## Машина стоит снаружи здания: за плоскостью игры, но перед стеной, чтобы
@@ -41,7 +38,7 @@ func park(exit_x: float, floor_y: float, width: float) -> void:
 	position.z = Z
 	# Модель стоит колёсами в своём нуле, капотом в +X; в другую сторону она
 	# разворачивается целиком.
-	var model := MODEL.instantiate() as Node3D
+	var model := CarModel.build()
 	if towards < 0.0:
 		model.rotation.y = PI
 	add_child(model)
