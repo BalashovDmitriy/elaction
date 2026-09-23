@@ -35,6 +35,9 @@ const PATIENCE: int = 180
 ## так в кадр влезают оба.
 const GAP: float = 4.5
 
+## Сколько кадров дать позе досвестись перед снимком.
+const POSE_SETTLE_FRAMES: int = 12
+
 var _level: GreyboxLevel = null
 var _agent: Enemy = null
 var _seed: int = 1
@@ -130,6 +133,10 @@ func _stand_on(index: int) -> float:
 ## Кадр снимается сразу, как стойка принята, а не после: агент держит её, только
 ## пока пуля летит, и «сниму потом» показало бы его уже выпрямившимся.
 func _stage(wanted: EnemyBrain.Stance, crouching: bool, label: String) -> void:
+	# Увёртка в ROM — действие целиком (@1C7A): пока агент в прошлой стойке,
+	# новую он не примет, и низкая пуля застала бы его на колене.
+	while not _agent.is_dead() and _agent.stance() != EnemyBrain.Stance.STAND:
+		await get_tree().physics_frame
 	if crouching:
 		Input.action_press(&"move_down")
 		await get_tree().physics_frame
@@ -150,6 +157,10 @@ func _stage(wanted: EnemyBrain.Stance, crouching: bool, label: String) -> void:
 			await get_tree().physics_frame
 			left -= 1
 			if _agent.stance() == wanted:
+				# Риг сводит позы плавно (ADR-0022, решение 2): снятый в тот же
+				# кадр, агент вышел бы серединой между двумя стойками.
+				for _frame in POSE_SETTLE_FRAMES:
+					await get_tree().physics_frame
 				await _shoot(label)
 				return
 

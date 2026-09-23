@@ -154,6 +154,21 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "jumping", "actions": ["jump"], "hold": 0.25},
 		{"label": "settled", "actions": [], "hold": 1.0},
 	],
+	# M18d: бой по ROM. Спуск кабиной, выход на этаж и перестрелка: агенты
+	# выходят рядом, стреляют стоя, с колена и лёжа, Otto отвечает из приседа.
+	"M18D":
+	[
+		{"label": "roof", "actions": [], "hold": 1.0},
+		{"label": "to_the_shaft", "actions": ["move_right"], "hold": 5.4},
+		{"label": "riding_down", "actions": ["move_down"], "hold": 2.2},
+		{"label": "stopped", "actions": [], "hold": 1.6},
+		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
+		{"label": "waiting", "actions": [], "hold": 3.0},
+		{"label": "shooting", "actions": ["shoot"], "hold": 0.12},
+		{"label": "crouch_shot", "actions": ["move_down", "shoot"], "hold": 0.3},
+		{"label": "jump_shot", "actions": ["jump", "shoot"], "hold": 0.3},
+		{"label": "firefight", "actions": [], "hold": 2.5},
+	],
 }
 const DEFAULT_PLAN := "M1"
 

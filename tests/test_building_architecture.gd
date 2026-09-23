@@ -313,3 +313,35 @@ func _wait_for_the_landing(level: GreyboxLevel) -> void:
 		await wait_physics_frames(1)
 		left -= 1
 	assert_true(level.otto.is_grounded(), "Otto съехал по тросу и встал на крышу")
+
+
+## Агент выходит там, где Otto: на его этаже, этажом выше или ниже (@5A26).
+##
+## До M18d выпуск шёл по всей полосе видимых этажей от ближайшей двери;
+## по ROM жребий бросается только на три этажа вокруг Otto (ADR-0027, решение 2).
+func test_agents_step_out_next_to_otto() -> void:
+	for building_seed: int in [1, 2, 3]:
+		var level := _build(building_seed, true)
+		var rules := level.rules
+		var here := rules.floors - 2
+		_stand_on(level, here)
+
+		var seen: Dictionary = {}
+		for _frame in CROWD_FRAMES:
+			await wait_physics_frames(1)
+			for agent in _agents_in(level):
+				var id := agent.get_instance_id()
+				if seen.has(id):
+					continue
+				seen[id] = true
+				var floor_index := _floor_of(rules, agent)
+				assert_lte(
+					absi(floor_index - here),
+					1,
+					(
+						"сид %d: агент вышел на этаже %d, Otto на %d"
+						% [building_seed, floor_index, here]
+					)
+				)
+		assert_gt(seen.size(), 0, "сид %d: никто не вышел" % building_seed)
+		_drop(level)

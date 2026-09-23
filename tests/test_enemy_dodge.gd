@@ -14,6 +14,10 @@ const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
 ## не замечает (@05F5).
 const BULLET_REACH: float = 1.2
 
+## Сколько кадров даётся на реакцию: за кадр шанс самого злого ~75%, за
+## дюжину — наверняка.
+const REACT_FRAMES: int = 12
+
 ## Правила, по которым живёт агент, — и по ним же тест отмеряет высоту пули.
 ## Один объект на обоих: с двумя тест мерил бы одним набором чисел, а агент
 ## уклонялся бы по другому, и разошлись бы они молча.
@@ -30,6 +34,9 @@ func _agent() -> Enemy:
 	# Цели нет: уклонение от неё не зависит, а Otto притащил бы за собой
 	# половину игры.
 	agent.setup(null, 1.0)
+	# Решения посеяны: шанс увернуться — за тик ROM, а кадр — четверть тика,
+	# и без сида тест то ловил реакцию, то нет.
+	agent.seed_decisions(1)
 	return agent
 
 
@@ -56,7 +63,7 @@ func test_agent_kneels_under_a_high_bullet() -> void:
 	var agent := _agent()
 	await _step_out(agent)
 	_bullet_at(agent, _rules.agent_kneel_height + 0.05)
-	await wait_physics_frames(2)
+	await wait_physics_frames(REACT_FRAMES)
 	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "от высокой пули — на колено")
 
 
@@ -64,7 +71,7 @@ func test_agent_drops_prone_under_a_low_bullet() -> void:
 	var agent := _agent()
 	await _step_out(agent)
 	_bullet_at(agent, _rules.agent_kneel_height - 0.03)
-	await wait_physics_frames(2)
+	await wait_physics_frames(REACT_FRAMES)
 	assert_eq(agent.stance(), EnemyBrain.Stance.PRONE, "от низкой — лёжа")
 
 
@@ -97,7 +104,7 @@ func test_agent_stays_down_until_the_bullet_clears_his_body() -> void:
 	var agent := _agent()
 	await _step_out(agent)
 	var bullet := _bullet_at(agent, _rules.agent_kneel_height + 0.05)
-	await wait_physics_frames(2)
+	await wait_physics_frames(REACT_FRAMES)
 	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "сперва уходит с линии")
 
 	# Шаги отмеряются от самого тела и самой пули, а не числами: агент и ассеты
