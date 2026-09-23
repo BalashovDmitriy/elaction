@@ -199,12 +199,39 @@ func test_an_otto_in_the_dark_is_seen_only_up_close() -> void:
 	var agent := _agent_at(level, pair.y, signf(pair.x - pair.y))
 	assert_eq(await _shots_within(level, WATCH_FRAMES), 0, "Otto в тени с этой дальности не виден")
 
-	# Otto подходит к агенту на дальность, с которой видно и в темноте.
-	var close := pair.y + signf(pair.x - pair.y) * level.rules.agent_dark_fire_range * 0.6
-	_place_otto(level, close)
-	assert_gt(await _shots_within(level, WATCH_FRAMES), 0, "вплотную его видно и в тени")
-	assert_false(agent.is_dead())
+	# Теперь агент подходит к Otto на дальность, с которой видно и в темноте.
+	#
+	# Подходит агент, а не Otto: на мелкой сетке M18 шаг к агенту выводил Otto
+	# из тени в освещённую зону агента, и проверялось уже не «в тени вплотную».
+	# А попадание считается по гибели Otto, а не по пулям: с метра пуля
+	# долетает в тот же шаг физики, в котором вылетела, и счёт пуль её не видит.
+	agent.queue_free()
+	var close := _floor_beside(level, pair.x, level.rules.agent_dark_fire_range * 0.6)
+	assert_false(is_nan(close), "рядом с Otto есть пол, куда встать агенту")
+	_agent_at(level, close, signf(pair.x - close))
+	var hit := [false]
+	level.otto.died.connect(func() -> void: hit[0] = true)
+	await wait_physics_frames(WATCH_FRAMES)
+	assert_true(level.is_dark_at(_floor(level), pair.x), "Otto так и стоит в тени")
+	assert_true(hit[0], "вплотную его видно и в тени")
 	remove_child(level)
+
+
+## Место на полу в [param reach] от [param x] по этажу дуэли, в любую сторону,
+## где агенту есть на чём стоять. NAN — таких нет.
+func _floor_beside(level: GreyboxLevel, x: float, reach: float) -> float:
+	var rules := level.rules
+	var index := _floor(level)
+	var half := Proportions.BODY_WIDTH * 0.5
+	for side: float in [-1.0, 1.0]:
+		var at := x + side * reach
+		var clear := true
+		for block: Vector2 in level.plan().blocks_on(rules, index):
+			if at + half > block.x and at - half < block.y:
+				clear = false
+		if clear and not level.plan().wall_between(index, x, at):
+			return at
+	return NAN
 
 
 ## Тень агента ничего не решает: из тени освещённого Otto видно.

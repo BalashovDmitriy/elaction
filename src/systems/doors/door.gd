@@ -20,11 +20,10 @@ extends Node3D
 ## Документ взят, дверь перестала быть красной.
 signal document_taken
 
-## Габарит створки, м: 40% × 70% просвета, как в оригинале (ADR-0026,
-## решение 3). Уровень режет по нему проём в задней стене, поэтому число живёт
-## здесь, а не в двух местах — и коробка створки собирается из него же
-## в [method Node._ready], а не лежит в сцене вторым числом.
-const LEAF_SIZE := Vector2(1.2, 2.1)
+## Габарит створки, м: 40% × 70% просвета, как в оригинале ([Proportions]).
+## Уровень режет по нему проём в задней стене, а коробка створки собирается
+## из него же в [method Node._ready], а не лежит в сцене вторым числом.
+const LEAF_SIZE := Proportions.DOOR
 
 ## Толщина створки, м.
 const LEAF_THICKNESS: float = 0.08
@@ -72,6 +71,15 @@ var _sign: MeshInstance3D = null
 @onready var _mat: Area3D = $Mat
 @onready var _leaf: MeshInstance3D = $Leaf
 @onready var _mat_visual: MeshInstance3D = $MatVisual
+
+
+## Коврик по [Proportions] — сразу после сборки сцены, как формы актёров.
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_SCENE_INSTANTIATED:
+		return
+	var mat := Proportions.DOOR_MAT
+	Proportions.fit_box($Mat/MatShape as CollisionShape3D, Vector3(mat, 0.3, 0.4))
+	Proportions.fit_mesh($MatVisual as MeshInstance3D, Vector3(mat, 0.02, mat))
 
 
 func _ready() -> void:

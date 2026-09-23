@@ -42,9 +42,9 @@ var aim_time: float = 0.35
 
 ## Рост агента в каждой стойке, м. По ним и решается, пройдёт ли пуля мимо:
 ## стойка годится, если она ниже летящей пули.
-var stand_height: float = 1.68
-var kneel_height: float = 1.0
-var prone_height: float = 0.52
+var stand_height: float = Proportions.BODY
+var kneel_height: float = Proportions.KNEEL
+var prone_height: float = Proportions.PRONE
 
 ## Что агенту разрешено. В первых зданиях он только стоит, дальше учится
 ## приседать, ещё дальше — ложиться. Разрешение даёт злость, см. [Enemy].

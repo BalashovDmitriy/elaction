@@ -141,6 +141,19 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "riding_down", "actions": ["move_down"], "hold": 2.5},
 		{"label": "settled", "actions": [], "hold": 1.0},
 	],
+	# M18c: пропорции. Рост рядом с дверью и лампой, кабина во весь этаж, 3.67
+	# этажа в кадре — и присед с прыжком: у прыжка голова упирается в потолок.
+	"M18C":
+	[
+		{"label": "roof", "actions": [], "hold": 1.0},
+		{"label": "to_the_shaft", "actions": ["move_right"], "hold": 4.2},
+		{"label": "riding_down", "actions": ["move_down"], "hold": 2.2},
+		{"label": "stopped", "actions": [], "hold": 1.6},
+		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
+		{"label": "crouching", "actions": ["move_down"], "hold": 0.6},
+		{"label": "jumping", "actions": ["jump"], "hold": 0.25},
+		{"label": "settled", "actions": [], "hold": 1.0},
+	],
 }
 const DEFAULT_PLAN := "M1"
 

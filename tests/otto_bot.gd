@@ -59,11 +59,11 @@ const DODGE_SIGHT: float = 2.88
 ## Вместе с длиной пули ([method Bullet.half_length]) даёт габарит, из которого
 ## она должна выйти, прежде чем вставать. Агент на этом попадался —
 ## распрямлялся ровно под пулей и ловил её грудью, — и Otto попадался бы так же.
-const BODY_HALF_WIDTH: float = 0.36
+const BODY_HALF_WIDTH: float = Proportions.BODY_WIDTH * 0.5
 
 ## Выше этой высоты над ногами пуля считается высокой: от неё приседают.
 ## Сидячая форма Otto — 1.08 м, и пуля выше неё проходит над головой.
-const HIGH_BULLET: float = 1.08
+const HIGH_BULLET: float = Proportions.CROUCH
 
 ## Где встать рядом с шахтой, ожидая кабину, м от её оси.
 ##
@@ -84,7 +84,7 @@ const HIGH_BULLET: float = 1.08
 ## наверх, а крышей управлять нельзя ([method Otto.is_riding]). На сиде 2 это
 ## давало бесконечный круг: подъём на крышу, падение обратно на этаж, снова
 ## ожидание — бот не сходил с 21-го этажа до конца прогона.
-const WAIT_ASIDE: float = 1.65
+const WAIT_ASIDE: float = Proportions.SHAFT * 0.5 + BODY_HALF_WIDTH + REACHED + 0.21
 
 ## Насколько кабина считается пришедшей на этаж, м.
 const CAR_ALIGNED: float = 0.12

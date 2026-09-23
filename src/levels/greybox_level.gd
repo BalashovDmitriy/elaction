@@ -45,12 +45,12 @@ const PIT_HEIGHT: float = 0.6
 ##
 ## От потолка, а не от пола: этаж другой высоты — а такие собирают тесты —
 ## иначе вешал бы лампу в плиту или посреди комнаты.
-const LAMP_DROP: float = 0.255
+const LAMP_DROP: float = Proportions.LAMP_CORD + Proportions.LAMP.y * 0.5
 
 ## Высота зоны выхода из здания. Ширина — [constant BuildingShell.EXIT_WIDTH]:
 ## ей же оболочка режет проём в задней стене. Выросла вместе с Otto
 ## (ADR-0026, решение 7).
-const EXIT_HEIGHT: float = 1.6
+const EXIT_HEIGHT: float = Proportions.BODY * 0.95
 
 ## Машина у выхода: ею оригинал заканчивает здание (ADR-0011, пункт 14).
 ## Стоит рядом с проёмом и уезжает, увозя Otto; следующее здание собирается
@@ -59,7 +59,7 @@ const EXIT_HEIGHT: float = 1.6
 ## Длина модели `car.glb`, м: по ней машина ставится в зазор от проёма и
 ## считается уехавшей из кадра. `tools/build_actors.py` строит кузов ровно такой
 ## длины; высота и ширина у модели свои, и здесь они никому не нужны.
-const CAR_LENGTH: float = 3.2
+const CAR_LENGTH: float = Proportions.CAR_LENGTH
 const CAR_GAP: float = 0.36
 const CAR_SPEED: float = 9.6
 ## Машина стоит снаружи здания: за плоскостью игры, но перед стеной, чтобы
@@ -191,6 +191,10 @@ func _ready() -> void:
 	_shell.name = "Shell"
 	add_child(_shell)
 	_shell.build(rules, _plan, _ribs)
+	var signs := FloorSigns.new()
+	signs.name = "FloorSigns"
+	add_child(signs)
+	signs.hang(rules)
 	_spawn_shafts()
 	_spawn_escalators()
 	_spawn_doors()

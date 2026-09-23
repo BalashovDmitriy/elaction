@@ -41,12 +41,12 @@ const GRACE_BLINKS: float = 8.0
 ## Откуда вылетает пуля, от ног. Присев, Otto стреляет ниже — и его выстрел
 ## проходит там, где стоящий враг его не перепрыгнет.
 ##
-## Стоячая — с кадра оригинала: 15 px над полом при росте 22–23, на уровне
-## груди и чуть выше присевшего агента. До лампы под потолком она не достаёт
-## и из прыжка: Otto упирается головой в потолок раньше (ADR-0026, решение 5).
-@export var shot_height_standing: float = 1.12
-@export var shot_height_crouching: float = 0.66
-@export var muzzle_offset: float = 0.53
+## Числа — в [Proportions]: стоячая с кадра оригинала, до лампы под потолком
+## не достаёт и из прыжка — Otto упирается головой в потолок раньше
+## (ADR-0026, решение 5).
+@export var shot_height_standing: float = Proportions.SHOT_HIGH
+@export var shot_height_crouching: float = Proportions.SHOT_LOW
+@export var muzzle_offset: float = Proportions.MUZZLE
 @export var max_fall_speed: float = 12.6
 ## В оригинале Otto приседает на месте. Оставлено переключателем для настройки.
 @export var can_move_while_crouching: bool = false
@@ -83,6 +83,24 @@ var _grace: float = 0.0
 @onready var _body: FigureRig = $Body
 @onready var _camera: SideCamera = $Camera
 @onready var _kick_zone: Area3D = $KickZone
+
+
+## Формы тела задаёт [Proportions], а не сцена: сразу после сборки сцены, ещё
+## до дерева. Тесты читают формы у свежей копии, не добавляя её в дерево, и
+## видеть они обязаны те же числа, что и игра.
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_SCENE_INSTANTIATED:
+		return
+	var depth := WorldSpace.BODY_DEPTH
+	var width := Proportions.BODY_WIDTH
+	Proportions.fit_box($StandingShape as CollisionShape3D, Vector3(width, Proportions.BODY, depth))
+	Proportions.fit_box(
+		$CrouchingShape as CollisionShape3D, Vector3(width, Proportions.CROUCH, depth)
+	)
+	Proportions.fit_box(
+		$KickZone/KickShape as CollisionShape3D,
+		Vector3(Proportions.KICK_WIDTH, Proportions.BODY, depth)
+	)
 
 
 func _ready() -> void:

@@ -39,6 +39,30 @@ except ImportError:  # снаружи Blender
 
 PROJECT_ROOT = TOOLS.parent
 OUT_DIR = PROJECT_ROOT / "assets/models"
+PROPORTIONS = PROJECT_ROOT / "src/systems/proportions.gd"
+
+
+def proportion(name: str) -> float:
+    """Число из `Proportions` игры, в метрах.
+
+    Рост актёров и длина машины задаются в игре одной таблицей (ADR-0026,
+    решение 8), и модель обязана быть ровно того роста, что и коллизия. Своей
+    копии числа здесь нет: скрипт читает константы из `proportions.gd` и
+    считает их выражения — простую арифметику над ранее объявленными. Числа
+    от векторов (`DOOR_MAT` от `DOOR.x`) ему не нужны и пропускаются.
+    """
+    known: dict[str, float] = {}
+    for line in PROPORTIONS.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("const ") or ":=" in line:
+            continue
+        head, _, expression = line[len("const ") :].partition("=")
+        key = head.split(":")[0].strip()
+        try:
+            known[key] = float(eval(expression, {"__builtins__": {}}, dict(known)))
+        except (NameError, AttributeError):
+            continue
+    return known[name]
+
 
 # Фигура описана в долях роста: 28 долей на Otto, как было у спрайтов
 # (ADR-0011, пункт 8). Доля переводится в метры ростом актёра, поэтому
@@ -65,7 +89,7 @@ def _actors() -> dict[str, dict]:
     """
     return {
         "otto": {
-            "height": 1.68,
+            "height": proportion("BODY"),
             "head": "pompadour",
             "suit": palette.OTTO_SUIT,
             "suit_shade": palette.OTTO_SUIT_SHADE,
@@ -74,7 +98,7 @@ def _actors() -> dict[str, dict]:
             "eyes": palette.OTTO_TIE,
         },
         "agent": {
-            "height": 1.68,
+            "height": proportion("BODY"),
             "head": "hat",
             "suit": palette.AGENT_SUIT,
             "suit_shade": palette.AGENT_SUIT_SHADE,
@@ -310,10 +334,10 @@ def _figure(actor: dict) -> None:
 
 def _car() -> None:
     """Красная машина у выхода: ею оригинал заканчивает здание. Без скелета —
-    у неё одна поза. Длина — GreyboxLevel.CAR_LENGTH, 3.2 м; по ней уровень ставит
-    машину в зазор от проёма. Высота выходит 1.27 м, ширина 0.8 — они ничьи.
-    Растёт вместе с Otto: в неё он садится (ADR-0026, решение 7)."""
-    unit = 3.2 / 52.0
+    у неё одна поза. Длина — `Proportions.CAR_LENGTH`, 3.2 м; по ней уровень
+    ставит машину в зазор от проёма. Высота выходит 1.27 м, ширина 0.8 — они
+    ничьи. Растёт вместе с Otto: в неё он садится (ADR-0026, решение 7)."""
+    unit = proportion("CAR_LENGTH") / 52.0
     body = _material("car_body", palette.CAR_BODY)
     glass = _material("car_glass", palette.GLASS)
     wheel = _material("car_wheel", palette.SLAB_SHADOW)

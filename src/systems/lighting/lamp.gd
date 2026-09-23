@@ -69,6 +69,19 @@ var _cord: MeshInstance3D = null
 @onready var _shape: CollisionShape3D = $Shape
 
 
+## Габарит лампы по [Proportions]. Зона удара шире и выше самой лампы: агент
+## гибнет, если лампа задела его краем, а не только серединой.
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_SCENE_INSTANTIATED:
+		return
+	var body := Vector3(Proportions.LAMP.x, Proportions.LAMP.y, 0.4)
+	Proportions.fit_box($Shape as CollisionShape3D, body, false)
+	Proportions.fit_mesh($Visual as MeshInstance3D, body)
+	Proportions.fit_box(
+		$CrushZone/CrushShape as CollisionShape3D, body * Vector3(1.2, 1.13, 1.0), false
+	)
+
+
 func _ready() -> void:
 	_fall.speed = fall_speed
 	# Светильник и есть источник: он светится сам и виден с любого этажа.

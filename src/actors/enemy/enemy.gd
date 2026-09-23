@@ -25,9 +25,9 @@ const SHOOT_POSE_TIME: float = 0.25
 
 ## Насколько близко к оси кабины агент считает, что он уже в ней, м.
 ##
-## Полуширина кабины (0.9) минус полкорпуса агента (0.36): ближе этого он
-## целиком внутри габарита, и шагать дальше некуда.
-const LIFT_ABOARD: float = 0.54
+## Полуширина кабины минус полкорпуса агента: ближе этого он целиком внутри
+## габарита, и шагать дальше некуда.
+const LIFT_ABOARD: float = (Proportions.SHAFT - Proportions.BODY_WIDTH) * 0.5
 
 @export var walk_speed: float = 1.65
 @export var gravity: float = 27.0
@@ -35,14 +35,14 @@ const LIFT_ABOARD: float = 0.54
 
 ## Высота выстрела от ног: попадает в стоящего Otto и проходит над присевшим.
 ##
-## Выше середины его роста нарочно (1.68 у Otto против 1.4 у пули). Пуля агента
+## Выше середины его роста нарочно — пять шестых. Пуля агента
 ## обязана делать три вещи разом: брать стоящего, проходить над присевшим и
 ## проходить над тем, кто стоит ниже этажа — в проёме шахты или в кабине,
 ## вставшей между этажами. На M13, когда Otto вырос в полтора раза, пуля
 ## перестала успевать за ним и начала снимать его в голову прямо в проёме.
 ## На M18c оба выросли ещё в 4/3, и пуля вместе с ними (ADR-0026, решение 2).
-@export var shot_height: float = 1.4
-@export var muzzle_offset: float = 0.53
+@export var shot_height: float = Proportions.AGENT_SHOT
+@export var muzzle_offset: float = Proportions.MUZZLE
 
 ## Сколько тело лежит, прежде чем исчезнуть, с.
 @export var corpse_time: float = 0.5
@@ -83,6 +83,21 @@ var _menace: float = 1.0
 @onready var _body: FigureRig = $Body
 @onready var _floor_probe: RayCast3D = $FloorProbe
 @onready var _shape: CollisionShape3D = $Shape
+
+
+## Форму тела и щуп пола задаёт [Proportions], а не сцена — как у [Otto].
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_SCENE_INSTANTIATED:
+		return
+	var width := Proportions.BODY_WIDTH
+	Proportions.fit_box(
+		$Shape as CollisionShape3D, Vector3(width, Proportions.BODY, WorldSpace.BODY_DEPTH)
+	)
+	# Щуп смотрит на три четверти корпуса вперёд и на корпус вниз: ступню,
+	# которой агент сейчас шагнёт, и пол под ней.
+	var probe := $FloorProbe as RayCast3D
+	probe.position = Vector3(width * 0.75, width / 3.0, 0.0)
+	probe.target_position = Vector3(0.0, -width, 0.0)
 
 
 func _ready() -> void:

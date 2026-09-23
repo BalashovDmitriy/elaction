@@ -27,7 +27,7 @@ const PANEL_THICKNESS: float = 0.1
 ## заходили за неё на 6 см; 2.56 м, которые дал бы рост в 4/3, вырезали бы ещё
 ## и стену над соседней дверью (ADR-0026, решение 7). Otto шириной 0.72 проходит
 ## в 1.68 свободно.
-const EXIT_WIDTH: float = 1.68
+const EXIT_WIDTH: float = Proportions.EXIT_WIDTH
 
 var _rules: BuildingRules = null
 var _plan: BuildingPlan = null

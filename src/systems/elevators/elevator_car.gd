@@ -50,8 +50,8 @@ const SLAB_THICKNESS: float = 0.18
 ## Просвет этажа и ширина шахты по умолчанию, м — те же, что у стандартных
 ## правил. Кабина строится по ним, пока уровень не сказал своё — так одиночная
 ## кабина, поднятая тестом без здания, всё равно собрана целиком.
-const DEFAULT_CLEAR_HEIGHT: float = 3.0
-const DEFAULT_WIDTH: float = 1.8
+const DEFAULT_CLEAR_HEIGHT: float = Proportions.CLEARANCE
+const DEFAULT_WIDTH: float = Proportions.SHAFT
 
 ## На сколько стрелки утоплены от крыши, м.
 const ARROW_DROP: float = 0.3
