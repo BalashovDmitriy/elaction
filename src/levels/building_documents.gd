@@ -50,6 +50,9 @@ static func lay(
 			plan, rules, rng, taken, band.x, band.y, band.z, chosen, routed, spans
 		)
 		left += band.z - placed
+	# Больше одной на этаж не положить: в здании ниже числа ROM остаток
+	# урезается по этажам, как и ручное число, а не падает ошибкой.
+	left = mini(left, wanted - chosen.size())
 	if left > 0:
 		left -= _lay_in(plan, rules, rng, taken, 0, rules.floors - 1, left, chosen, routed, spans)
 	if left > 0:

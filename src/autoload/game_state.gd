@@ -147,13 +147,14 @@ func start_building(total_documents: int) -> void:
 	documents_changed.emit(documents_collected, documents_total)
 
 
-## Обнуляет всё: счёт, жизни, документы, номер здания и тревогу.
+## Обнуляет всё: счёт, жизни, документы, номер здания, соль и тревогу.
 func reset() -> void:
 	score = 0
 	lives = STARTING_LIVES
 	documents_collected = 0
 	documents_total = 0
 	building = 1
+	salt = 0
 	_extra_life_given = false
 	alarm.enter_building()
 	score_changed.emit(score)

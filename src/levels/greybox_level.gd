@@ -118,7 +118,7 @@ class AgentPost:
 ## Правила здания. Пустые — значит берутся по умолчанию.
 @export var rules: BuildingRules
 
-## Сид здания. Им служит номер здания: раскладка меняется от здания к зданию.
+## Сид здания: номер здания с солью партии ([method GameState.building_seed]).
 @export var building_seed: int = 1
 
 ## Выпускать ли агентов из дверей. Выключается в тестах проходимости: они
@@ -897,7 +897,9 @@ func _safest_x(index: int) -> float:
 	var spots := _plan.safe_spots(rules, index)
 	if spots.is_empty():
 		return _plan.safe_x(rules, index)
-	spots = _spots_on_the_same_piece(index, WorldSpace.to_plane(otto.global_position).x, spots)
+	# Своя сторона этажа, а не та, что за стеной или проёмом.
+	var from_x := WorldSpace.to_plane(otto.global_position).x
+	spots = _plan.spots_on_the_same_piece(rules, index, from_x, spots)
 
 	var agents := _agents_on(index)
 	var best := spots[0]
@@ -912,39 +914,6 @@ func _safest_x(index: int) -> float:
 			best_gap = gap
 			best = x
 	return best
-
-
-## Места того же куска этажа, на котором стоит [param from_x].
-##
-## Возвращаться Otto обязан на свою сторону: этаж режут проёмы и глухие стены
-## (ADR-0024, решение 5), и за стеной может не оказаться ни лифта, ни эскалатора.
-## Место выбирается по живым агентам, а самое дальнее от них — как раз за стеной:
-## без этого отбора Otto воскресал бы там, откуда не уйти, и умирал бы туда снова.
-##
-## Погибший в кабине стоит над проёмом шахты, ни в одном куске: тогда берётся
-## ближайший кусок с местами — с него в кабину садятся. Отдай тут всё, Otto
-## воскресал бы в кармане за эскалатором, откуда хода нет (перемер M18e).
-##
-## Мест нет ни в одном куске — отдаётся всё, что было: остаться вовсе без места
-## хуже, чем встать не на своей половине.
-func _spots_on_the_same_piece(
-	index: int, from_x: float, spots: PackedFloat64Array
-) -> PackedFloat64Array:
-	var pieces := BuildingPlan.spans_between(_plan.blocks_on(rules, index), rules.floor_span(index))
-	var best := PackedFloat64Array()
-	var best_gap := INF
-	for piece: Vector2 in pieces:
-		var same := PackedFloat64Array()
-		for x: float in spots:
-			if x >= piece.x and x <= piece.y:
-				same.append(x)
-		if same.is_empty():
-			continue
-		var gap := maxf(maxf(piece.x - from_x, from_x - piece.y), 0.0)
-		if gap < best_gap:
-			best_gap = gap
-			best = same
-	return spots if best.is_empty() else best
 
 
 func _on_pit_entered(body: Node3D) -> void:
