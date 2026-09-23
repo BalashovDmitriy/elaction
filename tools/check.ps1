@@ -31,6 +31,11 @@ try {
     & python (Join-Path $root 'tools\run_tests.py')
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+    # Отпечаток зелёного дерева: хук на push по нему не гоняет то же самое
+    # второй раз (tools/check_stamp.py).
+    & python (Join-Path $root 'tools\check_stamp.py') --write
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
     Write-Host 'Все проверки пройдены.' -ForegroundColor Green
 }
 finally {
