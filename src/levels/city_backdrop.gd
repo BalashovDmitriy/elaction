@@ -27,6 +27,13 @@ const CAMERA_DISTANCE: float = 30.0
 ## замыслу, а целый второй кадр в полном разрешении стоил бы вдвое.
 const RESOLUTION_SHARE: float = 0.5
 
+## Расфокус города (ADR-0030, решение 2): резко до ближнего ряда, дальше —
+## размыто, и тем сильнее, чем дальше. Плоскость игры не трогается — у основной
+## камеры глубины резкости нет.
+const BLUR_FROM: float = 90.0
+const BLUR_OVER: float = 140.0
+const BLUR_AMOUNT: float = 0.06
+
 ## Дом — тёмная коробка: его видно дымкой и окнами, а не гранями.
 const FACADE := Color(0.012, 0.014, 0.022)
 
@@ -50,10 +57,13 @@ const RAIN_SPEED: float = 28.0
 var _view: SubViewport = null
 var _camera: Camera3D = null
 var _ground: float = 0.0
+var _rules: BuildingRules = null
+var _rain_node: GPUParticles3D = null
 
 
 ## Строит город вдоль здания по правилам и сиду, с погодой [param weather].
 func build(rules: BuildingRules, building_seed: int, weather: Weather.Kind) -> void:
+	_rules = rules
 	_ground = WorldSpace.height_to_scene(rules.floor_surface(rules.floors - 1))
 	_view = SubViewport.new()
 	_view.name = "CityView"
@@ -69,13 +79,20 @@ func build(rules: BuildingRules, building_seed: int, weather: Weather.Kind) -> v
 	_camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 	_camera.far = 700.0
 	_camera.current = true
+	var focus := CameraAttributesPractical.new()
+	focus.dof_blur_far_enabled = true
+	focus.dof_blur_far_distance = BLUR_FROM
+	focus.dof_blur_far_transition = BLUR_OVER
+	focus.dof_blur_amount = BLUR_AMOUNT
+	_camera.attributes = focus
 	_view.add_child(_camera)
 
 	var blocks := CityPlan.generate(building_seed, 0.0, rules.width)
 	_view.add_child(_facades(blocks))
 	_view.add_child(_windows(blocks))
 	if Weather.is_raining(weather):
-		_camera.add_child(_rain())
+		_rain_node = _rain()
+		_camera.add_child(_rain_node)
 
 	var layer := CanvasLayer.new()
 	layer.name = "CityLayer"
@@ -91,7 +108,8 @@ func build(rules: BuildingRules, building_seed: int, weather: Weather.Kind) -> v
 	layer.add_child(picture)
 
 	get_viewport().size_changed.connect(_fit_view)
-	_fit_view()
+	add_to_group(Graphics.GROUP)
+	apply_graphics()
 
 
 ## Настраивает основной воздух так, чтобы он рисовал город фоном.
@@ -141,6 +159,15 @@ func _process(_delta: float) -> void:
 	var main := get_viewport().get_camera_3d()
 	if main == null or _camera == null:
 		return
+	# Здание закрыло кадр целиком — город не виден, и второй кадр не рисуется
+	# (ADR-0030, решение 7).
+	var side := main as SideCamera
+	var visible := side == null or is_visible_around(_rules, side.view())
+	_view.render_target_update_mode = (
+		SubViewport.UPDATE_ALWAYS if visible else SubViewport.UPDATE_DISABLED
+	)
+	if not visible:
+		return
 	var place := main.global_position
 	# На оси основной камеры, только дальше от плоскости игры: основная стоит
 	# выше цели на свой наклон, и камера города, поставленная прямо против
@@ -151,6 +178,26 @@ func _process(_delta: float) -> void:
 		_camera.fov = rad_to_deg(2.0 * atan(main.size * 0.5 / CAMERA_DISTANCE))
 
 
+## Виден ли город в кадре [param view] (координаты правил): да, если в кадр
+## попала крыша или небо над ней, или если хоть один этаж в кадре уже кадра.
+static func is_visible_around(rules: BuildingRules, view: Rect2) -> bool:
+	if view.position.y < rules.floor_surface(BuildingRules.ROOF):
+		return true
+	var span := VisibleFloors.around(rules, view)
+	for index in range(span.x, span.y + 1):
+		var bounds := rules.floor_span(clampi(index, 0, rules.floors - 1))
+		if view.position.x < bounds.x or view.end.x > bounds.y:
+			return true
+	return false
+
+
+## Разрешение и дождь по уровню качества (ADR-0030, решение 5).
+func apply_graphics() -> void:
+	_fit_view()
+	if _rain_node != null:
+		_rain_node.amount = maxi(int(float(RAIN_DROPS) * Graphics.rain_share()), 1)
+
+
 func _fit_view() -> void:
 	# Уровень снимают с дерева раньше, чем освобождают (main.gd, _drop_level), а
 	# подписка на размер окна живёт до освобождения: вне дерева вьюпорта нет.
@@ -158,7 +205,8 @@ func _fit_view() -> void:
 		return
 	var window := get_viewport().get_visible_rect().size
 	_view.size = Vector2i(
-		maxi(int(window.x * RESOLUTION_SHARE), 1), maxi(int(window.y * RESOLUTION_SHARE), 1)
+		maxi(int(window.x * Graphics.city_share()), 1),
+		maxi(int(window.y * Graphics.city_share()), 1)
 	)
 
 

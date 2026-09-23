@@ -334,7 +334,10 @@ func _physics_process(delta: float) -> void:
 		_slide_along(delta)
 		return
 
-	var view := otto.camera_view()
+	# Кадр правил, а не сглаженный кадр игрока: тот едет в _process по настенным
+	# часам, и полоса выпуска агентов после скачка Otto зависела от скорости
+	# машины — в CI тест боя падал через раз (M20).
+	var view := otto.camera_view(true)
 	if _car != null and _car.advance(delta, view):
 		building_cleared.emit()
 

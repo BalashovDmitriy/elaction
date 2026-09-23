@@ -167,6 +167,7 @@ func _build_settings() -> void:
 		_slider("UI_VOLUME_SFX", Sounds.SFX_BUS)
 		_languages()
 		_difficulty()
+		_quality()
 		_fullscreen()
 	_button("UI_BACK", _go_back)
 
@@ -300,6 +301,17 @@ func _difficulty() -> void:
 	row.add_child(choice)
 
 
+## Качество графики: три уровня (ADR-0030, решение 5).
+func _quality() -> void:
+	var row := _setting_row("UI_QUALITY")
+	var choice := OptionButton.new()
+	for level: int in Graphics.Quality.size():
+		choice.add_item(tr("UI_QUALITY_%d" % level), level)
+	choice.select(settings.quality)
+	choice.item_selected.connect(_on_quality_selected)
+	row.add_child(choice)
+
+
 func _fullscreen() -> void:
 	var toggle := CheckButton.new()
 	toggle.text = tr("UI_FULLSCREEN")
@@ -401,6 +413,12 @@ func _on_language_selected(index: int) -> void:
 
 func _on_difficulty_selected(index: int) -> void:
 	settings.difficulty = index
+	settings.save_to()
+
+
+func _on_quality_selected(index: int) -> void:
+	settings.quality = index
+	settings.apply()
 	settings.save_to()
 
 

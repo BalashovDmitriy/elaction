@@ -89,6 +89,8 @@ func _ready() -> void:
 	_spot = _make_spot()
 	add_child(_spot)
 	_fill = _make_fill()
+	add_to_group(Graphics.GROUP)
+	apply_graphics()
 	add_child(_fill)
 
 
@@ -152,6 +154,13 @@ func shoot_down() -> void:
 func set_light_visible(on: bool) -> void:
 	_spot.visible = on
 	_fill.visible = on
+
+
+## Тени ламп по уровню качества (ADR-0030, решение 5): на низком без теней,
+## на среднем тень кладёт только конус.
+func apply_graphics() -> void:
+	_spot.shadow_enabled = Graphics.spot_shadows()
+	_fill.shadow_enabled = Graphics.fill_shadows()
 
 
 func _make_spot() -> SpotLight3D:

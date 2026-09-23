@@ -33,6 +33,16 @@ const GLOW_THRESHOLD: float = 1.0
 
 const EXPOSURE: float = 1.15
 
+## Тон кадра — ночной нуар по референсу (ADR-0030, решение 1): кривые по каналам
+## от холодных теней к тёплому свету, чуть больше контраста, чуть меньше цвета.
+## Игровые знаки светятся эмиссией поверх тона и яркими остаются.
+const NOIR_SHADOW := Color(0.0, 0.02, 0.05)
+const NOIR_MIDDLE := Color(0.31, 0.35, 0.39)
+const NOIR_LIGHT := Color(1.0, 0.96, 0.88)
+const NOIR_MIDDLE_AT: float = 0.35
+const CONTRAST: float = 1.08
+const SATURATION: float = 0.88
+
 
 ## Воздух здания с общим тоном [param ambient] — цветом палитры раунда.
 static func environment(ambient: Color) -> Environment:
@@ -60,4 +70,21 @@ static func environment(ambient: Color) -> Environment:
 	air.glow_hdr_threshold = GLOW_THRESHOLD
 	air.tonemap_mode = Environment.TONE_MAPPER_ACES
 	air.tonemap_exposure = EXPOSURE
+
+	air.adjustment_enabled = true
+	air.adjustment_contrast = CONTRAST
+	air.adjustment_saturation = SATURATION
+	air.adjustment_color_correction = noir_curve()
+	Graphics.apply_to(air)
 	return air
+
+
+## Кривые тона: градиент, по которому каждый канал переводится из своего
+## значения в своё. Чёрный уходит в холодный синий, белый — в тёплый.
+static func noir_curve() -> GradientTexture1D:
+	var gradient := Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, NOIR_MIDDLE_AT, 1.0])
+	gradient.colors = PackedColorArray([NOIR_SHADOW, NOIR_MIDDLE, NOIR_LIGHT])
+	var curve := GradientTexture1D.new()
+	curve.gradient = gradient
+	return curve
