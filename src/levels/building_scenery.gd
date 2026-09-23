@@ -20,6 +20,9 @@ const ROOF_LIGHT_HEIGHT: float = 4.0
 ## Внутри здания погоды нет, а крыша — снаружи.
 const ROOF_RAIN_DROPS: int = 140
 const ROOF_RAIN_HEIGHT: float = 7.0
+## Наклон капель над крышей (снос вбок на метр падения) и разброс, градусы.
+const ROOF_RAIN_SLANT: float = 0.1
+const ROOF_RAIN_SPREAD: float = 2.0
 
 var weather: Weather.Kind = Weather.Kind.CLEAR
 var dressing: BuildingDressing = null
@@ -74,36 +77,28 @@ func _light_the_roof(rules: BuildingRules) -> void:
 
 ## Капли над крышей: падают с неба до настила и там кончаются — время жизни
 ## ровно на эту высоту, столкновения частицам не нужны.
+##
+## Сыплются между парапетами и со сдвигом против сноса: из коробки во всю
+## ширину крыши капли у правого парапета выносило за стену, и они гасли в
+## воздухе снаружи башни, на высоте настила (авторевью M19).
 func _roof_rain(rules: BuildingRules) -> GPUParticles3D:
 	var span := rules.floor_span(BuildingRules.ROOF)
 	var width := span.y - span.x
-	var process := ParticleProcessMaterial.new()
-	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	process.emission_box_extents = Vector3(width * 0.5, 0.2, WorldSpace.CORRIDOR_DEPTH * 0.5)
-	process.direction = Vector3(0.1, -1.0, 0.0)
-	process.spread = 2.0
-	process.initial_velocity_min = CityBackdrop.RAIN_SPEED
-	process.initial_velocity_max = CityBackdrop.RAIN_SPEED
-	process.gravity = Vector3.ZERO
-
-	var drop := QuadMesh.new()
-	drop.size = CityBackdrop.RAIN_DROP
-	var look := StandardMaterial3D.new()
-	look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	look.albedo_color = CityBackdrop.RAIN_COLOR
-	drop.material = look
-
-	var rain := GPUParticles3D.new()
+	var inner := Vector2(span.x + BuildingShell.WALL_WIDTH, span.y - BuildingShell.WALL_WIDTH)
+	var drift := ROOF_RAIN_HEIGHT * (ROOF_RAIN_SLANT + tan(deg_to_rad(ROOF_RAIN_SPREAD)))
+	var emitting := Vector2(inner.x, maxf(inner.y - drift, inner.x))
+	var rain := CityBackdrop.rain_particles(
+		ROOF_RAIN_DROPS,
+		ROOF_RAIN_HEIGHT / CityBackdrop.RAIN_SPEED,
+		Vector3((emitting.y - emitting.x) * 0.5, 0.2, WorldSpace.CORRIDOR_DEPTH * 0.5),
+		Vector3(ROOF_RAIN_SLANT, -1.0, 0.0),
+		ROOF_RAIN_SPREAD,
+		Vector2(CityBackdrop.RAIN_SPEED, CityBackdrop.RAIN_SPEED)
+	)
 	rain.name = "RoofRain"
-	rain.amount = ROOF_RAIN_DROPS
-	rain.lifetime = ROOF_RAIN_HEIGHT / CityBackdrop.RAIN_SPEED
-	rain.local_coords = false
-	rain.process_material = process
-	rain.draw_pass_1 = drop
 	var surface := rules.floor_surface(BuildingRules.ROOF)
 	rain.position = WorldSpace.to_scene(
-		Vector2((span.x + span.y) * 0.5, surface - ROOF_RAIN_HEIGHT)
+		Vector2((emitting.x + emitting.y) * 0.5, surface - ROOF_RAIN_HEIGHT)
 	)
 	rain.visibility_aabb = AABB(
 		Vector3(-width, -ROOF_RAIN_HEIGHT - 1.0, -2.0),

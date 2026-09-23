@@ -100,6 +100,41 @@ static func show_behind(environment: Environment) -> void:
 	environment.background_canvas_max_layer = CANVAS_LAYER
 
 
+## Капли дождя: частицы из коробки [param extents], падают в мире, а не за
+## излучателем. Одни на город и крышу — у дождя один вид, и собирать его
+## дважды значило бы развести капли при первой правке.
+static func rain_particles(
+	amount: int,
+	lifetime: float,
+	extents: Vector3,
+	direction: Vector3,
+	spread: float,
+	speed: Vector2
+) -> GPUParticles3D:
+	var process := ParticleProcessMaterial.new()
+	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	process.emission_box_extents = extents
+	process.direction = direction
+	process.spread = spread
+	process.initial_velocity_min = speed.x
+	process.initial_velocity_max = speed.y
+	process.gravity = Vector3.ZERO
+
+	var drop := QuadMesh.new()
+	drop.size = RAIN_DROP
+	var look := _unshaded(RAIN_COLOR)
+	look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	drop.material = look
+
+	var rain := GPUParticles3D.new()
+	rain.amount = amount
+	rain.lifetime = lifetime
+	rain.local_coords = false
+	rain.process_material = process
+	rain.draw_pass_1 = drop
+	return rain
+
+
 ## Повторяет ход основной камеры: те же x, y и наклон, своя глубина и угол
 ## обзора, при котором плоскость игры видна в том же масштабе.
 func _process(_delta: float) -> void:
@@ -107,13 +142,20 @@ func _process(_delta: float) -> void:
 	if main == null or _camera == null:
 		return
 	var place := main.global_position
-	_camera.global_transform = Transform3D(main.global_basis, Vector3(place.x, place.y, 0.0))
-	_camera.translate_object_local(Vector3(0.0, 0.0, CAMERA_DISTANCE))
+	# На оси основной камеры, только дальше от плоскости игры: основная стоит
+	# выше цели на свой наклон, и камера города, поставленная прямо против
+	# цели, сдвигала бы город на 3.5 м вниз (авторевью M19).
+	var back := main.global_basis.z * (CAMERA_DISTANCE - SideCamera.DISTANCE)
+	_camera.global_transform = Transform3D(main.global_basis, place + back)
 	if main.projection == Camera3D.PROJECTION_ORTHOGONAL:
 		_camera.fov = rad_to_deg(2.0 * atan(main.size * 0.5 / CAMERA_DISTANCE))
 
 
 func _fit_view() -> void:
+	# Уровень снимают с дерева раньше, чем освобождают (main.gd, _drop_level), а
+	# подписка на размер окна живёт до освобождения: вне дерева вьюпорта нет.
+	if not is_inside_tree():
+		return
 	var window := get_viewport().get_visible_rect().size
 	_view.size = Vector2i(
 		maxi(int(window.x * RESOLUTION_SHARE), 1), maxi(int(window.y * RESOLUTION_SHARE), 1)
@@ -132,7 +174,7 @@ func _air(weather: Weather.Kind) -> Environment:
 	return air
 
 
-func _unshaded(color: Color, vertex_colors: bool = false) -> StandardMaterial3D:
+static func _unshaded(color: Color, vertex_colors: bool = false) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.albedo_color = color
@@ -176,7 +218,10 @@ func _windows(blocks: Array[CityPlan.Block]) -> MultiMeshInstance3D:
 			var x := left + float(window.x) * CityPlan.WINDOW_STEP.x
 			var y := _ground + CityPlan.WINDOW_STEP.y * (float(window.y) + 1.0)
 			places.append(Transform3D(Basis.IDENTITY, Vector3(x, y, front)))
-			var tone := WINDOW_WARM if (window.x + window.y) % 3 != 0 else WINDOW_COLD
+			# Холодное окно — по хешу окна и дома, а не по диагонали сетки: иначе
+			# по всему городу шёл один и тот же узор (авторевью M19).
+			var cold := hash([block.x, window]) % 3 == 0
+			var tone := WINDOW_COLD if cold else WINDOW_WARM
 			var fade := WINDOW_FADE[mini(block.row, WINDOW_FADE.size() - 1)]
 			colors.append(Color(tone.r * fade, tone.g * fade, tone.b * fade))
 	var many := MultiMesh.new()
@@ -195,28 +240,15 @@ func _windows(blocks: Array[CityPlan.Block]) -> MultiMeshInstance3D:
 
 ## Дождь перед камерой города: частицы едут вместе с ней, но падают в мире.
 func _rain() -> GPUParticles3D:
-	var process := ParticleProcessMaterial.new()
-	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	process.emission_box_extents = Vector3(40.0, 2.0, 30.0)
-	process.direction = Vector3(0.15, -1.0, 0.0)
-	process.spread = 3.0
-	process.initial_velocity_min = RAIN_SPEED
-	process.initial_velocity_max = RAIN_SPEED * 1.2
-	process.gravity = Vector3.ZERO
-
-	var drop := QuadMesh.new()
-	drop.size = RAIN_DROP
-	var look := _unshaded(RAIN_COLOR)
-	look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	drop.material = look
-
-	var rain := GPUParticles3D.new()
+	var rain := rain_particles(
+		RAIN_DROPS,
+		1.6,
+		Vector3(40.0, 2.0, 30.0),
+		Vector3(0.15, -1.0, 0.0),
+		3.0,
+		Vector2(RAIN_SPEED, RAIN_SPEED * 1.2)
+	)
 	rain.name = "Rain"
-	rain.amount = RAIN_DROPS
-	rain.lifetime = 1.6
-	rain.local_coords = false
-	rain.process_material = process
-	rain.draw_pass_1 = drop
 	# Облако капель — над кадром и перед камерой: падают они сквозь весь вид.
 	rain.position = Vector3(0.0, 20.0, -35.0)
 	rain.visibility_aabb = AABB(Vector3(-60.0, -80.0, -60.0), Vector3(120.0, 120.0, 120.0))

@@ -19,6 +19,12 @@ const STEP_RISE: float = 0.3
 ## Сколько скат не доходит до машинного отделения, м.
 const MACHINE_ROOM_GAP: float = 0.15
 
+## Доля кладки палитры раунда в тоне скатов. Меньше, чем у стен
+## ([constant BuildingShell.PALETTE_SHARE]), и от тона дальней стены, а не от
+## стены коридора: скаты стоят позади игры и должны уходить в фон, а не
+## спорить с парапетами (кадры M19).
+const PALETTE_SHARE: float = 0.08
+
 
 ## Ступени скатов прямоугольниками правил: x вдоль крыши, y — от верха ступени
 ## до настила. Левый скат поднимается слева направо, правый — справа налево.
@@ -56,7 +62,7 @@ static func steps(rules: BuildingRules, plan: BuildingPlan) -> Array[Rect2]:
 ## Ставит скаты по правилам и плану. Цвет — кладка палитры раунда, приглушённая
 ## к серому: крыша — фон, а не вывеска (ADR-0029, решение 5).
 func build(rules: BuildingRules, plan: BuildingPlan) -> void:
-	var tone := GreyboxLook.SKY_WALL.lerp(rules.palette.masonry, 0.08)
+	var tone := GreyboxLook.SKY_WALL.lerp(rules.palette.masonry, PALETTE_SHARE)
 	var material := GreyboxLook.surface(tone)
 	var depth := WorldSpace.ROOM_DEPTH
 	for rect in steps(rules, plan):

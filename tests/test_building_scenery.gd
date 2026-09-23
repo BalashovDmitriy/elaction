@@ -96,6 +96,13 @@ func test_props_keep_off_doors_lamps_shafts_and_walls() -> void:
 				for lamp in plan.lamps:
 					if lamp.floor_index == prop.floor_index:
 						assert_gte(absf(lamp.x - prop.x), step * 0.5, where + ": под лампой")
+				# Нижнюю площадку эскалатора safe_spots не держит: на ней стоят.
+				for escalator in plan.escalators:
+					if escalator.floor_index + 1 == prop.floor_index:
+						var landing := escalator.x + escalator.towards * rules.escalator_run
+						assert_gte(
+							absf(landing - prop.x), step * 0.5, where + ": на площадке эскалатора"
+						)
 				for wall in plan.walls:
 					if wall.floor_index == prop.floor_index:
 						assert_gte(
@@ -104,6 +111,48 @@ func test_props_keep_off_doors_lamps_shafts_and_walls() -> void:
 							where + ": вплотную к стене"
 						)
 	assert_gt(total, 0, "ни одного предмета — проверять было нечего")
+
+
+## Труба видна: висит ниже полосы, которую закрывает кромка перекрытия, и не
+## проходит сквозь шахту, полотно эскалатора, вывеску и табличку этажа.
+func test_pipes_show_below_the_slab_edge_and_skip_what_they_would_cover() -> void:
+	var laid := 0
+	var front := BuildingProps.pipe_z() + BuildingProps.PIPE_THICKNESS * 0.5
+	for skill: int in SKILLS:
+		var rules := _rules(skill)
+		for building_seed: int in SEEDS:
+			var plan := BuildingPlan.generate(rules, building_seed)
+			var dressing := BuildingDressing.lay(rules, plan, building_seed)
+			for index: int in dressing.pipes:
+				var where := "навык %d, сид %d, этаж %d" % [skill, building_seed, index]
+				assert_gte(
+					BuildingProps.pipe_top(rules, index),
+					rules.story_top(index) + FloorSigns.hidden_band(front),
+					where + ": труба за кромкой перекрытия"
+				)
+				var covered := _pipe_blockers(rules, plan, dressing, index)
+				for span: Vector2 in BuildingProps.pipe_spans(rules, plan, dressing, index):
+					laid += 1
+					for blocker: Vector2 in covered:
+						assert_true(
+							span.y <= blocker.x + 0.001 or span.x >= blocker.y - 0.001,
+							where + ": труба сквозь %s" % blocker
+						)
+	assert_gt(laid, 0, "ни одной трубы — проверять было нечего")
+
+
+## Вывески обстановки не носят цвета огоньков игры: табло двери, двери с
+## документом и выхода (ADR-0023, решение 6).
+func test_neon_signs_do_not_wear_the_colours_of_game_signs() -> void:
+	var reserved: Array[Color] = [
+		GreyboxLook.SIGN_WARM, GreyboxLook.SIGN_RED, GreyboxLook.SIGN_GREEN
+	]
+	for neon: Color in BuildingProps.NEON:
+		for sign_colour: Color in reserved:
+			var gap := Vector3(
+				neon.r - sign_colour.r, neon.g - sign_colour.g, neon.b - sign_colour.b
+			)
+			assert_gt(gap.length(), 0.3, "вывеска %s похожа на огонёк %s" % [neon, sign_colour])
 
 
 ## Скаты крыши внутри её стен, не заходят на машинное отделение и ниже его.
@@ -147,14 +196,41 @@ func test_scenery_adds_no_bodies_and_no_lights() -> void:
 	level.rules = BuildingRules.new()
 	level.building_seed = 1
 	add_child_autofree(level)
-	var scenery := level.get_node("Scenery")
+	var scenery := level.get_node_or_null("Scenery")
 	assert_not_null(scenery, "окружения нет")
+	if scenery == null:
+		remove_child(level)
+		return
 	var bodies := scenery.find_children("*", "CollisionObject3D", true, false)
 	assert_eq(bodies.size(), 0, "у декора есть тела")
 	var lights := scenery.find_children("*", "Light3D", true, false)
 	assert_eq(lights.size(), 1, "в окружении больше одного источника света")
 	assert_not_null(scenery.get_node_or_null("City"), "города нет")
 	remove_child(level)
+
+
+## Что труба на этаже обязана обходить, парами «левый край, правый край».
+## Считается заново, а не берётся у [BuildingProps]: иначе тест проверял бы
+## разрывы трубы ими же самими.
+func _pipe_blockers(
+	rules: BuildingRules, plan: BuildingPlan, dressing: BuildingDressing, index: int
+) -> Array[Vector2]:
+	var blockers: Array[Vector2] = []
+	var half := rules.shaft_width * 0.5
+	for shaft in plan.shafts:
+		if shaft.top <= index and index <= shaft.bottom:
+			blockers.append(Vector2(shaft.x - half, shaft.x + half))
+	for escalator in plan.escalators:
+		if escalator.floor_index + 1 == index:
+			blockers.append(escalator.gap(rules))
+	for prop in dressing.props:
+		if prop.floor_index == index and prop.kind == BuildingDressing.Kind.SIGN:
+			var reach := BuildingProps.SIGN.x * 0.5
+			blockers.append(Vector2(prop.x - reach, prop.x + reach))
+	var plate := FloorSigns.centre_on(rules, index).x
+	var plate_half := Proportions.FLOOR_SIGN.x * 0.5
+	blockers.append(Vector2(plate - plate_half, plate + plate_half))
+	return blockers
 
 
 func _fingerprint(blocks: Array[CityPlan.Block]) -> String:

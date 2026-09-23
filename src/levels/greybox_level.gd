@@ -462,7 +462,6 @@ func _spawn_lamps() -> void:
 		lamp.fell.connect(_on_lamp_fell.bind(lamp.floor_index, spot.x))
 		add_child(lamp)
 		lamp.hang(lamp_height(rules), rules.floor_height - rules.slab_height)
-		lamp.tint(rules.palette.lit, BuildingShell.PALETTE_SHARE)
 		_lamps.append(lamp)
 	# Тёмные этажи карты ламп не получают, и темнота им объявляется здесь же,
 	# где вешаются лампы: иначе этаж без ламп для правила темноты светел (ADR-0028).
