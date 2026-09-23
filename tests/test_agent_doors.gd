@@ -66,23 +66,6 @@ func _live_agents(level: GreyboxLevel) -> Array[Enemy]:
 	return live
 
 
-## Дверь, из которой этот агент вышел: ближайшая к нему по горизонтали на его
-## этаже. Другого способа связать их снаружи нет — пост живёт внутри уровня.
-func _door_behind(level: GreyboxLevel, agent: Enemy) -> Door:
-	var nearest: Door = null
-	var gap := INF
-	var at := WorldSpace.to_plane(agent.global_position)
-	for door in level.doors():
-		var mat := door.mat_position()
-		if absf(mat.y - at.y) > 0.01:
-			continue
-		var distance := absf(mat.x - at.x)
-		if distance < gap:
-			gap = distance
-			nearest = door
-	return nearest
-
-
 ## Одинокая дверь на твёрдом полу: здание для неё поднимать незачем.
 func _bare_door() -> Door:
 	var ground := StaticBody3D.new()
@@ -151,7 +134,7 @@ func test_no_agent_ever_shows_up_in_front_of_a_shut_door() -> void:
 		for agent in _live_agents(level):
 			if not agent.is_emerging():
 				continue
-			var door := _door_behind(level, agent)
+			var door := level.door_of(agent)
 			assert_not_null(door, "агент вышел неизвестно откуда")
 			if door == null:
 				return
@@ -202,7 +185,7 @@ func test_the_door_shuts_behind_the_agent_that_left_it() -> void:
 		for agent in _live_agents(level):
 			if agent.is_emerging():
 				continue
-			var door := _door_behind(level, agent)
+			var door := level.door_of(agent)
 			var at := WorldSpace.to_plane(agent.global_position)
 			if door == null or absf(door.mat_position().x - at.x) > JUST_LEFT:
 				continue
@@ -241,7 +224,7 @@ func test_a_door_shuts_even_when_its_agent_is_killed_on_the_spot() -> void:
 		for agent in _live_agents(level):
 			if agent.is_emerging():
 				continue
-			emptied = _door_behind(level, agent)
+			emptied = level.door_of(agent)
 			agent.kill()
 			break
 

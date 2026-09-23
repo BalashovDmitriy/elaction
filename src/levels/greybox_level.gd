@@ -257,6 +257,16 @@ func agent_doors() -> Array[Door]:
 	return serving
 
 
+## Дверь, из которой вышел агент, или null. Ближайшая к нему не годится: с M18e
+## двери стоят через место, 1.8 м, и вышедший из проёма агент бывает ближе к
+## соседней (ADR-0028, решение 2).
+func door_of(agent: Enemy) -> Door:
+	for post: AgentPost in _posts:
+		if post.agent == agent:
+			return post.door
+	return null
+
+
 ## Где стоит выход из здания, в плоскости правил.
 func exit_position() -> Vector2:
 	return _exit_position
@@ -457,6 +467,11 @@ func _spawn_lamps() -> void:
 		add_child(lamp)
 		lamp.hang(lamp_height(rules), rules.floor_height - rules.slab_height)
 		_lamps.append(lamp)
+	# Тёмные этажи карты ламп не получают, и темнота им объявляется здесь же,
+	# где вешаются лампы: иначе этаж без ламп для правила темноты светел (ADR-0028).
+	for index in rules.floors:
+		if rules.is_unlit(index):
+			_lighting.mark_unlit(index)
 
 
 ## Выход из здания. Не запирается: без всех документов он отправляет обратно
@@ -703,7 +718,7 @@ func _try_to_spawn(span: Vector2i, live: int, per_floor: Dictionary) -> void:
 	var available := rules.agents_at_once(time)
 	if live >= available:
 		return
-	var slot := _spawn.open_slot(available)
+	var slot := _spawn.open_slot(available, Door.AGENT_OPEN_TIME)
 	if slot < 0:
 		return
 

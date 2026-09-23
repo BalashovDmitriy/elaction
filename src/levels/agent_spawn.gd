@@ -38,12 +38,16 @@ func tick(delta: float) -> bool:
 
 ## Свободная ячейка из первых [param available] или -1: занятая или ещё ждущая
 ## смены не годится.
-func open_slot(available: int) -> int:
+##
+## [param lead] — сколько до конца смены ячейка уже годится. Столько идёт
+## створка двери: она начинает открываться в конце смены, и агент выходит там,
+## где ROM его и выпускает, а не на ход створки позже (ADR-0028, решение 7).
+func open_slot(available: int, lead: float = 0.0) -> int:
 	while _busy.size() < available:
 		_busy.append(false)
 		_wait.append(0.0)
 	for index in available:
-		if not _busy[index] and _wait[index] <= 0.0:
+		if not _busy[index] and _wait[index] <= lead:
 			return index
 	return -1
 

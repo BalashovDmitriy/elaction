@@ -32,7 +32,7 @@ const FALL_FRAMES: int = 240
 func _rules() -> BuildingRules:
 	var rules := BuildingRules.new()
 	rules.floors = 8
-	rules.documents = 2
+	rules.documents_cap = 2
 	return rules
 
 

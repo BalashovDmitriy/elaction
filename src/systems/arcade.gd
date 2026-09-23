@@ -1,11 +1,12 @@
 class_name Arcade
 extends RefCounted
 
-## Правила боя аркадного ROM — одной таблицей.
+## Правила аркадного ROM — боя и здания — одной таблицей.
 ##
 ## Числа и формулы взяты из аннотированного дизассемблера ROM (jotd, перенос на
 ## Amiga); выводы с адресами — в `docs/reference/arcade-rom.md`, решения — в
-## [ADR-0027](../../docs/adr/0027-rom-combat.md). Адрес рядом с числом — место
+## [ADR-0027](../../docs/adr/0027-rom-combat.md) и
+## [ADR-0028](../../docs/adr/0028-building-by-the-map.md). Адрес рядом с числом — место
 ## в `src/elevator_z80.asm` того проекта: по нему число перепроверяется.
 ##
 ## Оригинал считает в тиках логики: кадр 59.19 Гц (драйвер MAME `taitosj`),
@@ -73,6 +74,81 @@ const POSE_THRESHOLDS_LATE: Array[Vector3i] = [
 	Vector3i(0x00, 0x08, 0x40),
 	Vector3i(0x00, 0x00, 0x40),
 ]
+
+## Этажей в здании оригинала. Считаются снизу: первый — нижний, тридцатый —
+## верхний; нулевой — подвал с машиной, его у нас нет (ADR-0028, решение 1).
+const FLOORS: int = 30
+
+## Двери этажа — маска восьми мест, этаж 0..30 (table_280E). Здание оригинала
+## одно, и двери в нём стоят на одних и тех же местах в каждом раунде.
+const DOOR_MASKS: Array[int] = [
+	0x00,
+	0x81,
+	0x81,
+	0x81,
+	0x81,
+	0x81,
+	0x81,
+	0x00,
+	0x7E,
+	0x7E,
+	0x66,
+	0x66,
+	0xE6,
+	0x7E,
+	0x7F,
+	0x67,
+	0xE6,
+	0x66,
+	0x7E,
+	0x66,
+	0x66,
+	0x66,
+	0x66,
+	0x66,
+	0x66,
+	0x66,
+	0x66,
+	0x66,
+	0x66,
+	0x66,
+	0x66,
+]
+
+## Тёмные этажи: ламп на них нет вовсе (@2719), убийство стоит как в темноте
+## (@56A1).
+const DARK_FLOORS := Vector2i(11, 15)
+
+## Полосы красных дверей: этажи ROM включительно и сколько красных в полосе по
+## навыку 0..8 (@27D2, таблицы @282D–@2874). На этаже не больше одной.
+const RED_DOOR_BANDS: Array[Vector2i] = [
+	Vector2i(1, 6),
+	Vector2i(8, 8),
+	Vector2i(9, 11),
+	Vector2i(12, 14),
+	Vector2i(15, 17),
+	Vector2i(18, 20),
+	Vector2i(21, 25),
+	Vector2i(26, 30),
+]
+
+## Квоты красных дверей по полосам [constant RED_DOOR_BANDS] и навыку 0..8.
+##
+## Строки — [Array], а не [PackedInt32Array]: константа из литералов под типом
+## упакованного массива читается по индексу мусором (Godot 4.7).
+const RED_DOOR_QUOTAS: Array[Array] = [
+	[0, 1, 2, 2, 2, 2, 3, 4, 5],
+	[0, 0, 0, 1, 1, 1, 1, 1, 1],
+	[2, 2, 2, 1, 1, 2, 1, 1, 1],
+	[1, 1, 1, 1, 1, 1, 1, 1, 1],
+	[1, 1, 1, 1, 1, 1, 1, 1, 1],
+	[1, 1, 1, 1, 1, 1, 1, 1, 1],
+	[0, 0, 0, 1, 1, 1, 1, 1, 0],
+	[0, 0, 0, 0, 1, 1, 1, 0, 0],
+]
+
+## Выше этого навыка квоты красных дверей не растут (@27D6).
+const RED_DOOR_SKILL_TOP: int = 8
 
 
 ## Тики в секунды.
@@ -178,3 +254,40 @@ static func fire_pose(anger: int, roll: int, late: bool = false) -> Pose:
 ## Шанс увернуться от пули за один тик по злости, из 1.
 static func dodge_chance(anger: int) -> float:
 	return float(DODGE_ODDS[clampi(anger, 0, TOP)]) / 256.0
+
+
+## Этаж ROM для нашего этажа: наш счёт идёт сверху, ROM — снизу (ADR-0028,
+## решение 1). Здание другой высоты растягивает карту по доле высоты, а не
+## обрывает её: тесты собирают и шестиэтажные.
+static func rom_floor(index: int, floors: int) -> int:
+	var from_bottom := float(floors - index) * float(FLOORS) / float(maxi(floors, 1))
+	return clampi(roundi(from_bottom), 1, FLOORS)
+
+
+## Сколько дверей на этаже ROM — мест в его маске (table_280E).
+static func doors_on_floor(rom: int) -> int:
+	var mask := DOOR_MASKS[clampi(rom, 0, FLOORS)]
+	var count := 0
+	while mask > 0:
+		count += mask & 1
+		mask >>= 1
+	return count
+
+
+## Тёмный ли этаж ROM: без ламп и с ценой убийства как в темноте (@2719, @56A1).
+static func is_dark_floor(rom: int) -> bool:
+	return rom >= DARK_FLOORS.x and rom <= DARK_FLOORS.y
+
+
+## Сколько красных дверей в полосе [param band] на этом навыке (@27D2).
+static func red_doors_in_band(band: int, skill_level: int) -> int:
+	var quotas: Array = RED_DOOR_QUOTAS[band]
+	return int(quotas[clampi(skill_level, 0, RED_DOOR_SKILL_TOP)])
+
+
+## Сколько красных дверей в здании на этом навыке: 5, 6 … 10.
+static func red_doors(skill_level: int) -> int:
+	var total := 0
+	for band in RED_DOOR_BANDS.size():
+		total += red_doors_in_band(band, skill_level)
+	return total

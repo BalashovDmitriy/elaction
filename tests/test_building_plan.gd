@@ -44,7 +44,7 @@ func test_another_seed_moves_the_documents() -> void:
 func test_building_holds_exactly_the_wanted_documents() -> void:
 	var rules := _rules()
 	var plan := BuildingPlan.generate(rules, 6)
-	assert_eq(plan.document_floors().size(), rules.documents)
+	assert_eq(plan.document_floors().size(), BuildingDocuments.count(rules))
 
 
 func test_documents_lie_on_different_floors() -> void:
@@ -124,13 +124,19 @@ func test_the_top_floor_gets_a_lamp_now_that_it_has_a_ceiling() -> void:
 
 
 ## Ламп на этаже столько, сколько просит ширина, — если хватило мест: лампы
-## кладутся последними и уступают дверям, шахтам и эскалаторам.
+## уступают дверям, шахтам и эскалаторам. Тёмный этаж карты — ни одной
+## (ADR-0028, решение 4); прочий — хоть одну.
 func test_floors_get_as_many_lamps_as_their_width_asks() -> void:
 	var rules := _rules()
 	for building_seed: int in SEEDS:
 		var plan := BuildingPlan.generate(rules, building_seed)
 		for index: int in rules.floors:
 			var on_floor := _lamps_on(plan, index)
+			if rules.is_unlit(index):
+				assert_eq(
+					on_floor.size(), 0, "сид %d: тёмный этаж %d с лампой" % [building_seed, index]
+				)
+				continue
 			assert_gte(on_floor.size(), 1, "сид %d: этаж %d без ламп" % [building_seed, index])
 			assert_lte(
 				on_floor.size(),
@@ -175,8 +181,8 @@ func test_lamps_are_spread_along_the_floor() -> void:
 			)
 
 
-## Тесное здание: этажи, на которых шахте, эскалаторам и дверям не оставить
-## лампе ни одного свободного места. Такой этаж всё равно обязан получить
+## Тесное здание: этажи, на которых шахте, эскалаторам и обязательной двери не
+## оставить лампе ни одного свободного места. Такой этаж всё равно обязан получить
 ## лампу — иначе он не светел и погасить его нечем, а правило темноты считает
 ## его горящим навсегда.
 ##
@@ -187,20 +193,23 @@ func test_lamps_are_spread_along_the_floor() -> void:
 ## тут нечего.
 func test_a_crowded_floor_still_gets_a_lamp() -> void:
 	var rules := _rules()
-	rules.slots = 5
-	rules.top_slots = 5
+	# Три места, а не пять: с M18e двери сверх обязательной встают после ламп
+	# (ADR-0028, решение 2), и на пяти местах лампе место находится всегда.
+	rules.slots = 3
+	rules.top_slots = 3
 	rules.width = 16.8
 	rules.floors = 6
 	# Здание одной ширины: порог ниже дна, и узкой части нет вовсе.
 	rules.wide_from = 0
-	rules.documents = 1
-	rules.doors_per_floor = 3
-	rules.top_doors = 3
+	rules.documents_cap = 1
+	rules.doors_cap = 3
 	var shared := 0
 	for building_seed: int in SEEDS:
 		var plan := BuildingPlan.generate(rules, building_seed)
 		for index: int in rules.floors:
 			var on_floor := _lamps_on(plan, index)
+			if rules.is_unlit(index):
+				continue
 			assert_gte(
 				on_floor.size(),
 				1,

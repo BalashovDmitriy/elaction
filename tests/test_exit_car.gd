@@ -32,7 +32,7 @@ func _building() -> GreyboxLevel:
 	rules.floors = 4
 	# Без красных дверей здание сдано сразу, как только Otto дошёл до выхода:
 	# документы здесь не проверяются, проверяется машина.
-	rules.documents = 0
+	rules.documents_cap = 0
 
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
 	level.rules = rules

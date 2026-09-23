@@ -120,7 +120,8 @@ func test_stance_heights_hold_together() -> void:
 
 
 ## Ламп по ширине: узкий верх — одна, широкий низ — три. Ряд светильников по
-## потолку, как на референсе, и по зоне темноты на каждую (ADR-0023).
+## потолку, как на референсе, и по зоне темноты на каждую (ADR-0023). Тёмные
+## этажи карты — без ламп, и рост книзу через них не считается (ADR-0028).
 func test_wider_floors_hang_more_lamps() -> void:
 	var rules := _rules()
 	assert_eq(rules.lamps_on(0), 1, "наверху одна лампа")
@@ -129,6 +130,9 @@ func test_wider_floors_hang_more_lamps() -> void:
 	var previous := 0
 	for index: int in rules.floors:
 		var count := rules.lamps_on(index)
+		if rules.is_unlit(index):
+			assert_eq(count, 0, "тёмный этаж %d с лампами" % index)
+			continue
 		assert_gte(count, 1, "этаж %d без ламп" % index)
 		assert_lte(count, rules.lamps_per_floor, "этаж %d выше потолка" % index)
 		assert_gte(count, previous, "этаж %d: книзу ламп не становится меньше" % index)

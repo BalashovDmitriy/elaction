@@ -25,6 +25,9 @@ signal document_taken
 ## из него же в [method Node._ready], а не лежит в сцене вторым числом.
 const LEAF_SIZE := Proportions.DOOR
 
+## Ход створки перед агентом по умолчанию, с — [member agent_open_time].
+const AGENT_OPEN_TIME: float = 0.7
+
 ## Толщина створки, м.
 const LEAF_THICKNESS: float = 0.08
 
@@ -49,8 +52,10 @@ const SIGN_RISE: float = 0.2
 ## Сколько открывается створка перед агентом, с.
 ##
 ## Дольше, чем перед Otto, и нарочно: игрок обязан успеть увидеть створку и уйти.
-## Сверкой не подтверждено — ADR-0020, решение 2.
-@export var agent_open_time: float = 0.7
+## Сверкой не подтверждено — ADR-0020, решение 2. Число — в [constant
+## AGENT_OPEN_TIME]: по нему уровень заранее знает, когда звать дверь, чтобы
+## агент вышел к концу смены (ADR-0028, решение 7).
+@export var agent_open_time: float = AGENT_OPEN_TIME
 
 ## Красная дверь: за ней документ.
 @export var has_document: bool = false

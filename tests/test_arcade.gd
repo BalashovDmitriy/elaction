@@ -89,3 +89,71 @@ func _share(anger: int, pose: Arcade.Pose) -> float:
 		if Arcade.fire_pose(anger, roll) == pose:
 			hits += 1
 	return float(hits) / 256.0
+
+
+## Двери этажей ROM (table_280E), снизу вверх — своя таблица, а не маски
+## `Arcade`: иначе тест сверял бы таблицу саму с собой (ADR-0028).
+func test_doors_per_floor_follow_the_rom_map() -> void:
+	var expected: Array[int] = [
+		0,
+		2,
+		2,
+		2,
+		2,
+		2,
+		2,
+		0,
+		6,
+		6,
+		4,
+		4,
+		5,
+		6,
+		7,
+		5,
+		5,
+		4,
+		6,
+		4,
+		4,
+		4,
+		4,
+		4,
+		4,
+		4,
+		4,
+		4,
+		4,
+		4,
+		4,
+	]
+	for rom: int in expected.size():
+		assert_eq(Arcade.doors_on_floor(rom), expected[rom], "этаж ROM %d" % rom)
+
+
+## Красных дверей 5, 6 … 10 по навыку, выше восьми не растёт (@27D2).
+func test_red_doors_grow_with_skill_up_to_ten() -> void:
+	var expected: Array[int] = [5, 6, 7, 8, 9, 10, 10, 10, 10, 10, 10]
+	for skill: int in expected.size():
+		assert_eq(Arcade.red_doors(skill), expected[skill], "навык %d" % skill)
+	assert_eq(Arcade.red_doors_in_band(7, 0), 0, "в первом здании верх пуст")
+	assert_eq(Arcade.red_doors_in_band(0, 8), 5, "на восьмом низ — пять")
+
+
+## Тёмные этажи — 11–15 и только они (@2719, @56A1).
+func test_dark_floors_are_eleven_to_fifteen() -> void:
+	for rom: int in range(1, Arcade.FLOORS + 1):
+		assert_eq(Arcade.is_dark_floor(rom), rom >= 11 and rom <= 15, "этаж ROM %d" % rom)
+
+
+## Наш счёт сверху, ROM — снизу; другая высота растягивает карту, не выходя
+## за её края.
+func test_rom_floor_counts_from_the_bottom() -> void:
+	assert_eq(Arcade.rom_floor(0, 30), 30, "наш верхний — тридцатый")
+	assert_eq(Arcade.rom_floor(29, 30), 1, "наш нижний — первый")
+	var previous := Arcade.FLOORS + 1
+	for index: int in 6:
+		var rom := Arcade.rom_floor(index, 6)
+		assert_between(rom, 1, Arcade.FLOORS, "шестиэтажное: этаж %d" % index)
+		assert_lt(rom, previous, "книзу номер ROM убывает")
+		previous = rom

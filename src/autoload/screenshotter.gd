@@ -169,6 +169,20 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "jump_shot", "actions": ["jump", "shoot"], "hold": 0.3},
 		{"label": "firefight", "actions": [], "hold": 2.5},
 	],
+	# M18e: здание по карте. Башня с четырьмя дверями на этаж, спуск кабиной
+	# и выход на этаж, где агенты выходят из дверей, стоящих через место.
+	# Тёмные этажи (ROM 11–15) и широкий низ по сиду не выдержкой снимает
+	# tools/layout_shot.tscn в ту же папку.
+	"M18E":
+	[
+		{"label": "roof", "actions": [], "hold": 1.0},
+		{"label": "to_the_shaft", "actions": ["move_right"], "hold": 5.4},
+		{"label": "riding_down", "actions": ["move_down"], "hold": 2.2},
+		{"label": "stopped", "actions": [], "hold": 1.6},
+		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
+		{"label": "waiting", "actions": [], "hold": 3.0},
+		{"label": "doors", "actions": [], "hold": 1.0},
+	],
 }
 const DEFAULT_PLAN := "M1"
 

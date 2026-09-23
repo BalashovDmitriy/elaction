@@ -139,7 +139,7 @@ class _Watchdog:
 func _rules() -> BuildingRules:
 	var rules := BuildingRules.new()
 	rules.floors = 4
-	rules.documents = 1
+	rules.documents_cap = 1
 	rules.shaft_span = 2
 	return rules
 

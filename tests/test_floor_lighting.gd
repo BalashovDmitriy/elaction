@@ -87,3 +87,15 @@ func test_lamps_hang_in_any_order() -> void:
 	assert_true(lighting.is_dark_at(0, 21.0))
 	assert_false(lighting.is_dark_at(0, 11.0))
 	assert_false(lighting.is_dark_at(0, 29.0))
+
+
+## Тёмный этаж карты тёмен в любой точке с начала здания, и гасить на нём
+## нечего (ADR-0028, решение 4). Соседний этаж без ламп — крыша — светел.
+func test_an_unlit_floor_is_dark_everywhere() -> void:
+	var lighting := FloorLighting.new()
+	lighting.mark_unlit(3)
+	for x: float in [0.0, 7.5, 30.0]:
+		assert_true(lighting.is_dark_at(3, x), "тёмный этаж тёмен в x=%.1f" % x)
+	assert_true(lighting.is_dark(3), "и тёмен целиком")
+	assert_false(lighting.darken(3, 1.0), "гасить на нём нечего")
+	assert_false(lighting.is_dark_at(BuildingRules.ROOF, 1.0), "крыша без ламп светла")

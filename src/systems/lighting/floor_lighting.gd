@@ -23,6 +23,9 @@ extends RefCounted
 var _lamps: Dictionary = {}
 ## Погашенные лампы: этаж → {номер лампы в списке этажа: true}.
 var _dark: Dictionary = {}
+## Тёмные этажи карты: ламп на них нет, и темны они с начала здания
+## (ADR-0028, решение 4). Этаж → true.
+var _unlit: Dictionary = {}
 
 
 ## Вешает лампу на этаж. Зовёт уровень, раскладывая здание: зона считается
@@ -33,6 +36,14 @@ func hang(floor_index: int, x: float) -> void:
 	var xs: PackedFloat64Array = _lamps[floor_index]
 	xs.append(x)
 	_lamps[floor_index] = xs
+
+
+## Объявляет этаж тёмным целиком: ламп на нём нет по карте, а не по тесноте.
+##
+## Этаж без ламп по умолчанию светел — ему светит город, как крыше. Тёмный этаж
+## о себе заявляет сам: зовёт уровень, раскладывая здание, как и [method hang].
+func mark_unlit(floor_index: int) -> void:
+	_unlit[floor_index] = true
 
 
 ## Гасит зону лампы, ближайшей к [param x]. Лампа падает там же, где висела,
@@ -52,16 +63,22 @@ func darken(floor_index: int, x: float) -> bool:
 
 
 ## Темно ли в точке этажа: погашена ли зона ближайшей к ней лампы.
-## Этаж без ламп — крыша — не гаснет никогда: ему светит город.
+## Тёмный этаж карты тёмен везде; прочий этаж без ламп — крыша — не гаснет
+## никогда: ему светит город.
 func is_dark_at(floor_index: int, x: float) -> bool:
+	if _unlit.has(floor_index):
+		return true
 	var index := _nearest(floor_index, x)
 	if index < 0 or not _dark.has(floor_index):
 		return false
 	return (_dark[floor_index] as Dictionary).has(index)
 
 
-## Погашен ли этаж целиком: все его зоны, и хоть одна у него есть.
+## Погашен ли этаж целиком: все его зоны, и хоть одна у него есть. Тёмный этаж
+## карты погашен всегда.
 func is_dark(floor_index: int) -> bool:
+	if _unlit.has(floor_index):
+		return true
 	if not _lamps.has(floor_index) or not _dark.has(floor_index):
 		return false
 	var xs: PackedFloat64Array = _lamps[floor_index]

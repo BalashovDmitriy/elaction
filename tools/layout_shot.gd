@@ -12,15 +12,19 @@ extends Node3D
 ## ниже — не влезает, и на этаже тем больше путей, чем он ниже
 ## ([ADR-0024](res://docs/adr/0024-building-geometry.md)).
 ##
+## С M18e здесь же кадры здания по карте: тёмный этаж и башня с дверями ROM
+## (ADR-0028). Папку задаёт [code]--folder=[/code], по умолчанию — M18a.
+##
 ## Рендер настоящий, не headless — нужен экран.
 ##
 ## Запуск:
 ##     godot --path . res://tools/layout_shot.tscn
+##     godot --path . res://tools/layout_shot.tscn -- --folder=M18e
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 
-## Куда складываются кадры.
+## Куда складываются кадры по умолчанию.
 const FOLDER := "res://screens/M18a"
 
 ## Сколько кадров дать зданию, свету и отражениям устояться.
@@ -31,10 +35,14 @@ const SETTLE_FRAMES: int = 45
 const BUILDING_SEED: int = 1
 
 var _level: GreyboxLevel = null
+var _folder: String = FOLDER
 
 
 func _ready() -> void:
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(FOLDER))
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--folder="):
+			_folder = "res://screens/" + argument.trim_prefix("--folder=")
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_folder))
 	GameState.instance().start_game()
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	_level.rules = BuildingRules.new()
@@ -58,8 +66,10 @@ func _run() -> void:
 		get_tree().quit(1)
 		return
 	await _shoot_the_wall("04_inner_wall", walled)
+	await _shoot_floor("05_tower_doors", 2)
+	await _shoot_floor("06_dark_floor", _first_unlit_floor())
 
-	print("  кадры раскладки в %s" % FOLDER)
+	print("  кадры раскладки в %s" % _folder)
 	get_tree().quit(0)
 
 
@@ -97,7 +107,7 @@ func _shoot(label: String, index: int) -> void:
 		await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	var image := get_viewport().get_texture().get_image()
-	var path := "%s/%s.png" % [FOLDER, label]
+	var path := "%s/%s.png" % [_folder, label]
 	image.save_png(path)
 	var rules := _level.rules
 	print("  %s — этаж %d, ширина %.1f м" % [path, index, rules.floor_width(index)])
@@ -111,6 +121,14 @@ func _floor_with_a_wall() -> int:
 		if highest == BuildingRules.ROOF or wall.floor_index < highest:
 			highest = wall.floor_index
 	return highest
+
+
+## Первый сверху тёмный этаж карты (ADR-0028, решение 4).
+func _first_unlit_floor() -> int:
+	for index in _level.rules.floors:
+		if _level.rules.is_unlit(index):
+			return index
+	return 0
 
 
 func _wall_x(index: int) -> float:
