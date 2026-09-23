@@ -517,7 +517,7 @@ func _spawn_exit() -> void:
 ## Машина у выхода: ставит её [ExitCar] у проёма, на пол нижнего этажа.
 func _spawn_car(exit_area: Rect2) -> void:
 	_car = ExitCar.new()
-	_car.park(exit_area.get_center().x, exit_area.end.y, rules.width)
+	_car.park(exit_area.get_center().x, exit_area.end.y, rules, _plan)
 	add_child(_car)
 
 

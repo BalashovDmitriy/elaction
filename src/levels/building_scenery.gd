@@ -43,6 +43,10 @@ func build(rules: BuildingRules, plan: BuildingPlan, building_seed: int) -> void
 	roof.name = "Roof"
 	add_child(roof)
 	roof.build(rules, plan)
+	var kit := RoofKit.new()
+	kit.name = "RoofKit"
+	add_child(kit)
+	kit.build(rules, plan)
 
 	dressing = BuildingDressing.lay(rules, plan, building_seed)
 	var props := BuildingProps.new()

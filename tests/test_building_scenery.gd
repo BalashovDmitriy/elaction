@@ -188,8 +188,9 @@ func test_roof_steps_frame_the_machine_room() -> void:
 			)
 
 
-## У декора нет тел, а свет в окружении один — лампа над крышей: окна города и
-## вывески светятся эмиссией и бюджет ламп кадра не трогают.
+## У декора нет тел, а источников в окружении два — лампа над крышей и отсвет
+## неоновой вывески (ADR-0031, решение 2): окна города, вывески этажей, огонь
+## мачты светятся эмиссией и бюджет ламп кадра не трогают.
 func test_scenery_adds_no_bodies_and_no_lights() -> void:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
@@ -204,7 +205,7 @@ func test_scenery_adds_no_bodies_and_no_lights() -> void:
 	var bodies := scenery.find_children("*", "CollisionObject3D", true, false)
 	assert_eq(bodies.size(), 0, "у декора есть тела")
 	var lights := scenery.find_children("*", "Light3D", true, false)
-	assert_eq(lights.size(), 1, "в окружении больше одного источника света")
+	assert_eq(lights.size(), 2, "в окружении не два источника света")
 	assert_not_null(scenery.get_node_or_null("City"), "города нет")
 	remove_child(level)
 
@@ -238,3 +239,27 @@ func _fingerprint(blocks: Array[CityPlan.Block]) -> String:
 	for block in blocks:
 		parts.append("%d:%.2f:%.2f:%d" % [block.row, block.x, block.height, block.lit.size()])
 	return "|".join(parts)
+
+
+## Машина у выхода встаёт так, что по всей длине не задевает ни проём выхода, ни
+## портал шахты (замечание пользователя на кадре гаража M20).
+func test_the_car_parks_clear_of_shafts_and_the_exit() -> void:
+	var rules := _rules(0)
+	var bottom := rules.floors - 1
+	for building_seed: int in SEEDS:
+		var plan := BuildingPlan.generate(rules, building_seed)
+		var x := ExitCar.spot(plan.exit_x, rules, plan)
+		var half := ExitCar.LENGTH * 0.5
+		var exit_half := BuildingShell.EXIT_WIDTH * 0.5
+		assert_true(
+			x + half <= plan.exit_x - exit_half or x - half >= plan.exit_x + exit_half,
+			"сид %d: машина на проёме выхода" % building_seed
+		)
+		for shaft in plan.shafts:
+			if shaft.top > bottom or shaft.bottom < bottom:
+				continue
+			var shaft_half := rules.shaft_width * 0.5
+			assert_true(
+				x + half <= shaft.x - shaft_half or x - half >= shaft.x + shaft_half,
+				"сид %d: машина перед шахтой x=%.1f" % [building_seed, shaft.x]
+			)

@@ -16,6 +16,10 @@ const STEPS: int = 4
 ## как в оригинале.
 const STEP_RISE: float = 0.3
 
+## Рёбра кровельных листов на ступенях: шаг и сечение, м.
+const RIB_STEP: float = 0.45
+const RIB := Vector2(0.05, 0.05)
+
 ## Сколько скат не доходит до машинного отделения, м.
 const MACHINE_ROOM_GAP: float = 0.15
 
@@ -65,8 +69,18 @@ func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 	var tone := GreyboxLook.SKY_WALL.lerp(rules.palette.masonry, PALETTE_SHARE)
 	var material := GreyboxLook.surface(tone)
 	var depth := WorldSpace.ROOM_DEPTH
+	var rib := GreyboxLook.metal(GreyboxLook.SKY_WALL.lerp(GreyboxLook.TRIM, 0.35))
 	for rect in steps(rules, plan):
 		var box := GreyboxLook.box(Vector3(rect.size.x, rect.size.y, depth), material)
 		box.position = WorldSpace.to_scene(rect.get_center())
 		box.position.z = WorldSpace.BACK_WALL_Z - depth * 0.5
 		add_child(box)
+		# Рёбра кровельных листов по верху ступени (ADR-0031, решение 2): глухая
+		# коробка читалась стеной, а не кровлей.
+		var count := int(rect.size.x / RIB_STEP)
+		for index in count:
+			var x := rect.position.x + RIB_STEP * (float(index) + 0.5)
+			var strip := GreyboxLook.box(Vector3(RIB.x, RIB.y, depth), rib)
+			strip.position = WorldSpace.to_scene(Vector2(x, rect.position.y - RIB.y * 0.5))
+			strip.position.z = box.position.z
+			add_child(strip)

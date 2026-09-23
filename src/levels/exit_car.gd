@@ -26,14 +26,16 @@ var _leaving: bool = false
 
 
 ## Ставит машину у проёма выхода: [param exit_x] — его середина, [param floor_y] —
-## пол нижнего этажа в координатах правил, [param width] — ширина здания.
+## пол нижнего этажа в координатах правил.
 ##
-## Уезжает в ближнюю сторону: там же и стоит. В дальнюю машина ехала бы через
-## всё здание, и «уехал» растянулось бы на пять секунд вместо одной.
-func park(exit_x: float, floor_y: float, width: float) -> void:
+## Место — ближайшее к выходу, где машина по всей длине не заходит ни на проём
+## выхода, ни на шахту: на кадрах M20 седан, поставленный на фиксированном зазоре,
+## загораживал портал соседней шахты. Уезжает в ближнюю к себе сторону здания —
+## в дальнюю ехала бы через всё здание.
+func park(exit_x: float, floor_y: float, rules: BuildingRules, plan: BuildingPlan) -> void:
 	name = "ExitCar"
-	towards = -1.0 if exit_x < width * 0.5 else 1.0
-	var x := exit_x + towards * (BuildingShell.EXIT_WIDTH * 0.5 + GAP + LENGTH * 0.5)
+	var x := spot(exit_x, rules, plan)
+	towards = -1.0 if x < exit_x else 1.0
 	position = WorldSpace.to_scene(Vector2(x, floor_y))
 	position.z = Z
 	# Модель стоит колёсами в своём нуле, капотом в +X; в другую сторону она
@@ -42,6 +44,44 @@ func park(exit_x: float, floor_y: float, width: float) -> void:
 	if towards < 0.0:
 		model.rotation.y = PI
 	add_child(model)
+
+
+## Где машине встать: середина ближайшего к выходу места на нижнем этаже, где
+## она по всей длине с зазором [constant GAP] не задевает ни проём выхода, ни
+## шахту и не выходит за стены. Места нет — у проёма, как было до M20.
+static func spot(exit_x: float, rules: BuildingRules, plan: BuildingPlan) -> float:
+	var bottom := rules.floors - 1
+	var bounds := rules.floor_span(bottom)
+	var busy: Array[Vector2] = [
+		Vector2(exit_x - BuildingShell.EXIT_WIDTH * 0.5, exit_x + BuildingShell.EXIT_WIDTH * 0.5)
+	]
+	var half_shaft := rules.shaft_width * 0.5 + BuildingShafts.PORTAL_JAMB
+	for shaft in plan.shafts:
+		if shaft.top <= bottom and bottom <= shaft.bottom:
+			busy.append(Vector2(shaft.x - half_shaft, shaft.x + half_shaft))
+	var half := LENGTH * 0.5 + GAP
+	# Кандидаты — вплотную к краю каждого занятого места с обеих сторон: ближе
+	# к выходу свободного места быть не может.
+	var candidates: Array[float] = []
+	for zone in busy:
+		candidates.append(zone.x - half)
+		candidates.append(zone.y + half)
+	candidates.sort_custom(
+		func(a: float, b: float) -> bool: return absf(a - exit_x) < absf(b - exit_x)
+	)
+	for x: float in candidates:
+		if x - half < bounds.x + BuildingShell.WALL_WIDTH - 0.001:
+			continue
+		if x + half > bounds.y - BuildingShell.WALL_WIDTH + 0.001:
+			continue
+		var clear := true
+		for zone in busy:
+			if x + half > zone.x + 0.001 and x - half < zone.y - 0.001:
+				clear = false
+				break
+		if clear:
+			return x
+	return exit_x + BuildingShell.EXIT_WIDTH * 0.5 + half
 
 
 ## Otto сел в машину: она трогается.
