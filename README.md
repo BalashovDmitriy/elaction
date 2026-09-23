@@ -164,7 +164,8 @@ Windows при первом запуске покажет предупрежде
   winget install --id BlenderFoundation.Blender
   ```
 
-- Pillow, numpy и soundfile — генераторы звука и иконки:
+- Pillow, numpy и soundfile — генераторы звука и иконки; Pillow нужен и
+  `tools/compare_original.py`, сравнению кадра вехи с оригиналом:
 
   ```powershell
   .venv/Scripts/pip install -r requirements-assets.txt

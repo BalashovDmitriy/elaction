@@ -410,6 +410,14 @@ func _open_shaft(
 	return shaft
 
 
+## Стоит ли в месте шахта, проходящая уровень [param index], дно включая.
+func _shaft_column_at(slot: int, index: int) -> bool:
+	for shaft in shafts:
+		if shaft.slot == slot and shaft.top <= index and index <= shaft.bottom:
+			return true
+	return false
+
+
 ## Стоит ли в соседнем месте шахта, делящая с полосой [param top]..[param bottom]
 ## хоть один уровень.
 func _beside_a_shaft(slot: int, top: int, bottom: int) -> bool:
@@ -554,6 +562,12 @@ func _pick_escalator_slot(
 	for slot in free:
 		var towards := _descent_towards(rules, slot, floor_index, from_x)
 		if not free.has(slot + int(towards)):
+			continue
+		# Проём уходит от площадки почти на весь шаг следующего места, и шахта
+		# сразу за ним оставила бы между дырами 0.6 м пола — уже тела. Агент,
+		# вышедший из кабины, вставал бы полкорпусом в шахте, а Otto шагал
+		# прямо в проём (авторевью M18c).
+		if _shaft_column_at(slot + 2 * int(towards), floor_index):
 			continue
 		roomy.append(slot)
 		if not is_equal_approx(towards, _away_from(rules, slot, from_x)):
@@ -827,11 +841,6 @@ func _wall_blockers(rules: BuildingRules, index: int) -> Array[Vector2]:
 	for door in doors:
 		if door.floor_index == index:
 			busy.append(Vector2(door.x - clearance, door.x + clearance))
-	# Лампа шире зазора между местами: при шаге 1.8 м она заходит на границу
-	# (ADR-0026, решение 3), и стена рядом прошла бы сквозь неё.
-	for lamp in lamps:
-		if lamp.floor_index == index:
-			busy.append(Vector2(lamp.x - clearance, lamp.x + clearance))
 	if index == floors - 1:
 		busy.append(Vector2(exit_x - clearance, exit_x + clearance))
 	return busy

@@ -1,5 +1,6 @@
 # Только для перерисовки ассетов: tools/render_audio.py (ADR-0012) и
-# tools/render_icon.py (ADR-0013). Модели актёров собирает Blender
+# tools/render_icon.py (ADR-0013), — и для tools/compare_original.py, кадра
+# вехи рядом с оригиналом (ADR-0026). Модели актёров собирает Blender
 # (tools/build_actors.py, ADR-0022), pip ему не нужен.
 # В CI не ставится и на запуск игры не влияет — готовые WAV, OGG и ICO
 # лежат в репозитории.

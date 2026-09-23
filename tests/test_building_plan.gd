@@ -330,3 +330,33 @@ func _footprints(plan: BuildingPlan, rules: BuildingRules, index: int) -> Array:
 		if wall.floor_index == index:
 			bands.append([wall.x - wall_half, wall.x + wall_half, "стена"])
 	return bands
+
+
+## Пол между двумя проёмами — либо его нет вовсе, либо на нём помещается тело.
+##
+## Полоса уже тела — ловушка: на ней нельзя встать, а агент, вышедший из
+## кабины, упирается в неё щупом и замирает полкорпусом в шахте. При шаге 1.8 м
+## такую давал эскалатор, спускавшийся к шахте через место: 0.6 м пола против
+## 0.72 тела (авторевью M18c).
+func test_floor_between_openings_fits_a_body() -> void:
+	var rules := _rules()
+	for building_seed: int in range(1, 41):
+		var plan := BuildingPlan.generate(rules, building_seed)
+		for index: int in rules.levels():
+			var holes: Array = []
+			for band: Array in _footprints(plan, rules, index):
+				if band[2] == "шахта" or band[2] == "эскалатор":
+					holes.append(band)
+			holes.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
+			for number in range(1, holes.size()):
+				var strip: float = (holes[number][0] as float) - (holes[number - 1][1] as float)
+				if strip <= 0.001:
+					continue
+				assert_gte(
+					strip,
+					Proportions.BODY_WIDTH,
+					(
+						"сид %d, этаж %d: между %s и %s %.2f м пола"
+						% [building_seed, index, holes[number - 1][2], holes[number][2], strip]
+					)
+				)

@@ -32,6 +32,14 @@ func _otto_shape(name: String) -> Vector3:
 	return size
 
 
+func _agent_shape() -> Vector3:
+	var enemy := ENEMY_SCENE.instantiate() as Enemy
+	var shape := enemy.get_node("Shape") as CollisionShape3D
+	var size := (shape.shape as BoxShape3D).size
+	enemy.free()
+	return size
+
+
 ## Otto проходит в дверь, не пригибаясь: дверь выше него.
 func test_otto_fits_through_a_door() -> void:
 	var opening := Door.LEAF_SIZE.y
@@ -63,11 +71,7 @@ func test_a_floor_has_room_for_otto_and_his_jump() -> void:
 
 ## Агент того же роста, что и Otto: они стоят рядом в одном кадре.
 func test_agent_is_the_same_height_as_otto() -> void:
-	var enemy := ENEMY_SCENE.instantiate() as Enemy
-	var shape := enemy.get_node("Shape") as CollisionShape3D
-	var agent := (shape.shape as BoxShape3D).size
-	enemy.free()
-	assert_almost_eq(agent.y, _otto_shape("StandingShape").y, 0.12, "рост агента и Otto")
+	assert_almost_eq(_agent_shape().y, _otto_shape("StandingShape").y, 0.12, "рост агента и Otto")
 
 
 ## Присев, Otto ниже пули агента — на этом держится всё уклонение (ADR-0006).
@@ -83,11 +87,7 @@ func test_crouching_otto_ducks_under_the_agent_bullet() -> void:
 func test_every_actor_stands_in_the_play_plane() -> void:
 	for name in ["StandingShape", "CrouchingShape"]:
 		assert_almost_eq(_otto_shape(name).z, WorldSpace.BODY_DEPTH, 0.001, "%s Otto" % name)
-	var enemy := ENEMY_SCENE.instantiate() as Enemy
-	var shape := enemy.get_node("Shape") as CollisionShape3D
-	var depth := (shape.shape as BoxShape3D).size.z
-	enemy.free()
-	assert_almost_eq(depth, WorldSpace.BODY_DEPTH, 0.001, "агент")
+	assert_almost_eq(_agent_shape().z, WorldSpace.BODY_DEPTH, 0.001, "агент")
 
 
 ## Доли предметов здания к просвету этажа — по кадру оригинала (ADR-0026).
@@ -105,14 +105,6 @@ func _share_of_clearance(metres: float) -> float:
 
 func _original(pixels: float) -> float:
 	return pixels / ORIGINAL_CLEARANCE_PX
-
-
-func _agent_shape() -> Vector3:
-	var enemy := ENEMY_SCENE.instantiate() as Enemy
-	var shape := enemy.get_node("Shape") as CollisionShape3D
-	var size := (shape.shape as BoxShape3D).size
-	enemy.free()
-	return size
 
 
 func _lamp_shape() -> Vector3:
@@ -225,5 +217,8 @@ func test_a_lamp_is_out_of_reach_from_the_floor() -> void:
 ## В кадре столько этажей, сколько в поле здания оригинала: 176 px при шаге 48.
 func test_the_frame_shows_as_many_floors_as_the_original() -> void:
 	var rules := BuildingRules.new()
-	var floors := SideCamera.DEFAULT_HALF_HEIGHT * 2.0 / rules.floor_height
-	assert_almost_eq(floors, ORIGINAL_FIELD_PX / ORIGINAL_FLOOR_PX, 0.05, "этажей в кадре")
+	# На плоскости игры, как считает сама камера: наклонённый кадр выше своего
+	# размера в 1/cos(наклона) раз.
+	var tilt := deg_to_rad(SideCamera.TILT_DEGREES)
+	var floors := SideCamera.DEFAULT_HALF_HEIGHT * 2.0 / cos(tilt) / rules.floor_height
+	assert_almost_eq(floors, ORIGINAL_FIELD_PX / ORIGINAL_FLOOR_PX, 0.01, "этажей в кадре")

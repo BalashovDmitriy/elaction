@@ -68,7 +68,8 @@ const HIGH_BULLET: float = Proportions.CROUCH
 ## Где встать рядом с шахтой, ожидая кабину, м от её оси.
 ##
 ## **Вне габарита кабины, а не у самого края проёма.** Кабина широкая 1.8 м
-## ([member BuildingRules.shaft_width]), то есть занимает 0.9 м от оси; Otto
+## ([constant Proportions.SHAFT], [member BuildingRules.shaft_width] здания по
+## умолчанию), то есть занимает 0.9 м от оси; Otto
 ## широк [constant BODY_HALF_WIDTH] = 0.36. Значит его середина обязана держаться
 ## дальше 1.26 м от оси, иначе край заходит в габарит кабины.
 ##

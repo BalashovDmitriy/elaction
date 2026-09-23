@@ -136,31 +136,31 @@ func _ready() -> void:
 ## пропорциями собирают тесты. Ширина пришла сюда в M18c: шахта выросла
 ## до 1.8 м, а кабина из сцены осталась бы в 1.2 и болталась бы в ней
 ## (ADR-0026, решение 3).
-func fit_to_story(clear_height: float, width: float) -> void:
-	_width = width
+func fit_to_story(clear_height: float, car_width: float) -> void:
+	_width = car_width
 	var roof_middle := clear_height - SLAB_THICKNESS * 0.5
 	($RoofShape as CollisionShape3D).position.y = roof_middle
 	($RoofVisual as MeshInstance3D).position.y = roof_middle
 	for slab: String in ["FloorShape", "RoofShape"]:
-		_resize(get_node(slab) as CollisionShape3D, width)
+		_resize(get_node(slab) as CollisionShape3D, car_width)
 	for slab: String in ["FloorVisual", "RoofVisual"]:
 		var visual := get_node(slab) as MeshInstance3D
 		var mesh := (visual.mesh as BoxMesh).duplicate() as BoxMesh
-		mesh.size.x = width
+		mesh.size.x = car_width
 		visual.mesh = mesh
-	_resize($CrushZone/CrushShape as CollisionShape3D, width - INNER_INSET)
+	_resize($CrushZone/CrushShape as CollisionShape3D, car_width - INNER_INSET)
 
 	var room := clear_height - SLAB_THICKNESS
 	var inside := $Interior/InteriorShape as CollisionShape3D
-	_resize(inside, width - INNER_INSET, room)
+	_resize(inside, car_width - INNER_INSET, room)
 	inside.position.y = room * 0.5
 
-	_up_arrow.position = Vector3(-width * ARROW_SPREAD, clear_height - ARROW_DROP, 0.3)
-	_down_arrow.position = Vector3(width * ARROW_SPREAD, clear_height - ARROW_DROP, 0.3)
+	_up_arrow.position = Vector3(-car_width * ARROW_SPREAD, clear_height - ARROW_DROP, 0.3)
+	_down_arrow.position = Vector3(car_width * ARROW_SPREAD, clear_height - ARROW_DROP, 0.3)
 	for index in _indicators.size():
 		var side := -1.0 if index == 0 else 1.0
 		_indicators[index].position = Vector3(
-			side * width * INDICATOR_SPREAD,
+			side * car_width * INDICATOR_SPREAD,
 			clear_height + INDICATOR_RISE + INDICATOR_SIZE.y * 0.5,
 			0.3
 		)
@@ -175,11 +175,11 @@ func width() -> float:
 ##
 ## Форма своя на каждую кабину: подресурс сцены общий на все её копии, и
 ## правка размера на месте растянула бы заодно все остальные кабины здания.
-static func _resize(shape: CollisionShape3D, width: float, height: float = -1.0) -> void:
+static func _resize(shape: CollisionShape3D, box_width: float, box_height: float = -1.0) -> void:
 	var box := (shape.shape as BoxShape3D).duplicate() as BoxShape3D
-	box.size.x = width
-	if height > 0.0:
-		box.size.y = height
+	box.size.x = box_width
+	if box_height > 0.0:
+		box.size.y = box_height
 	shape.shape = box
 
 

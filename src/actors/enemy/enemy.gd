@@ -23,12 +23,6 @@ const FALLING_TIME: float = 0.25
 ## Сколько держится поза выстрела, с.
 const SHOOT_POSE_TIME: float = 0.25
 
-## Насколько близко к оси кабины агент считает, что он уже в ней, м.
-##
-## Полуширина кабины минус полкорпуса агента: ближе этого он целиком внутри
-## габарита, и шагать дальше некуда.
-const LIFT_ABOARD: float = (Proportions.SHAFT - Proportions.BODY_WIDTH) * 0.5
-
 @export var walk_speed: float = 1.65
 @export var gravity: float = 27.0
 @export var max_fall_speed: float = 12.6
@@ -202,7 +196,18 @@ func set_lift_at(x: float) -> void:
 func _head_for_the_lift() -> bool:
 	var gap := _lift_x - WorldSpace.to_plane(global_position).x
 	_brain.face(gap)
-	return absf(gap) > LIFT_ABOARD
+	return absf(gap) > _lift_aboard()
+
+
+## Насколько близко к оси кабины агент считает, что он уже в ней, м.
+##
+## Полуширина кабины минус полкорпуса агента: ближе этого он целиком внутри
+## габарита, и шагать дальше некуда. Ширина кабины — у правил здания, а не у
+## [Proportions]: по правилам её растягивает уровень ([method
+## ElevatorCar.fit_to_story]), и с другой шахтой агент вставал бы наполовину
+## снаружи.
+func _lift_aboard() -> float:
+	return maxf(_building_rules().shaft_width * 0.5 - _body_half_width(), 0.0)
 
 
 ## Отдаёт агенту правила здания: из них он берёт все числа боя.

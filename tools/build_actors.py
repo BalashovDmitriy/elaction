@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import argparse
+import functools
 import sys
 from pathlib import Path
 
@@ -48,8 +49,18 @@ def proportion(name: str) -> float:
     Рост актёров и длина машины задаются в игре одной таблицей (ADR-0026,
     решение 8), и модель обязана быть ровно того роста, что и коллизия. Своей
     копии числа здесь нет: скрипт читает константы из `proportions.gd` и
-    считает их выражения — простую арифметику над ранее объявленными. Числа
-    от векторов (`DOOR_MAT` от `DOOR.x`) ему не нужны и пропускаются.
+    считает их выражения — простую арифметику над ранее объявленными.
+    """
+    return _proportions()[name]
+
+
+@functools.cache
+def _proportions() -> dict[str, float]:
+    """Все числовые константы `proportions.gd`, разобранные один раз.
+
+    Числа от векторов (`DOOR_MAT` от `DOOR.x`) и всё, что не число, —
+    строка, массив, выражение со словами GDScript — пропускаются: модели они
+    не нужны, а падать на них разбору незачем.
     """
     known: dict[str, float] = {}
     for line in PROPORTIONS.read_text(encoding="utf-8").splitlines():
@@ -58,10 +69,12 @@ def proportion(name: str) -> float:
         head, _, expression = line[len("const ") :].partition("=")
         key = head.split(":")[0].strip()
         try:
-            known[key] = float(eval(expression, {"__builtins__": {}}, dict(known)))
-        except (NameError, AttributeError):
+            value = eval(expression, {"__builtins__": {}}, dict(known))
+        except Exception:  # noqa: BLE001 — любая не-арифметика GDScript
             continue
-    return known[name]
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            known[key] = float(value)
+    return known
 
 
 # Фигура описана в долях роста: 28 долей на Otto, как было у спрайтов
@@ -335,23 +348,29 @@ def _figure(actor: dict) -> None:
 def _car() -> None:
     """Красная машина у выхода: ею оригинал заканчивает здание. Без скелета —
     у неё одна поза. Длина — `Proportions.CAR_LENGTH`, 3.2 м; по ней уровень
-    ставит машину в зазор от проёма. Высота выходит 1.27 м, ширина 0.8 — они
-    ничьи. Растёт вместе с Otto: в неё он садится (ADR-0026, решение 7)."""
+    ставит машину в зазор от проёма. Высота выходит 1.27 м. Растёт вместе
+    с Otto: в неё он садится (ADR-0026, решение 7).
+
+    Глубина — нет: машина стоит между задней стеной и плоскостью игры
+    (`GreyboxLevel.CAR_Z`), и выросшая в те же 4/3 она упиралась бы в стену
+    и задевала проходящего Otto (авторевью M18c). Поэтому поперёк у неё своя
+    мерка, прежняя: 12 долей — 0.55 м."""
     unit = proportion("CAR_LENGTH") / 52.0
+    deep = 2.4 / 52.0
     body = _material("car_body", palette.CAR_BODY)
     glass = _material("car_glass", palette.GLASS)
     wheel = _material("car_wheel", palette.SLAB_SHADOW)
 
     parts = [
-        _box("body", (52.0 * unit, 12.0 * unit, 9.0 * unit), (0.0, 0.0, 9.0 * unit), body),
-        _box("cabin", (26.0 * unit, 11.0 * unit, 7.0 * unit), (-2.0 * unit, 0.0, 17.0 * unit), body),
-        _box("window", (20.0 * unit, 12.0 * unit, 4.0 * unit), (-2.0 * unit, -0.4 * unit, 17.5 * unit), glass),
+        _box("body", (52.0 * unit, 12.0 * deep, 9.0 * unit), (0.0, 0.0, 9.0 * unit), body),
+        _box("cabin", (26.0 * unit, 11.0 * deep, 7.0 * unit), (-2.0 * unit, 0.0, 17.0 * unit), body),
+        _box("window", (20.0 * unit, 12.0 * deep, 4.0 * unit), (-2.0 * unit, -0.4 * deep, 17.5 * unit), glass),
     ]
     for side in (-16.0, 16.0):
         parts.append(
             _box(
                 "wheel_%d" % int(side),
-                (9.0 * unit, 13.0 * unit, 9.0 * unit),
+                (9.0 * unit, 13.0 * deep, 9.0 * unit),
                 (side * unit, 0.0, 4.5 * unit),
                 wheel,
             )

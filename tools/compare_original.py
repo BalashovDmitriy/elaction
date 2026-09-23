@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 import urllib.request
 from pathlib import Path
@@ -56,11 +57,19 @@ def original(name: str) -> Path:
 
 
 def our_shot(milestone: str, label: str | None) -> Path:
-    """Последний кадр вехи, а с меткой — последний кадр этого шага."""
+    """Последний кадр вехи, а с меткой — последний кадр этого шага.
+
+    «Последний» — по времени записи, а не по имени: время в имени кадра с
+    точностью до секунды, и снятые в одну секунду шаги сортировались бы по
+    алфавиту меток. Имя, занятое в ту же секунду, Screenshotter продолжает
+    суффиксом `-N`, и метка ищется с ним тоже.
+    """
     folder = SCREENS / milestone
-    shots = sorted(p for p in folder.glob("*.jpg") if not p.name.startswith("compare"))
+    shots = [p for p in folder.glob("*.jpg") if not p.name.startswith("compare")]
     if label:
-        shots = [p for p in shots if p.stem.endswith(f"_{label}")]
+        pattern = re.compile(rf"_{re.escape(label)}(-\d+)?$")
+        shots = [p for p in shots if pattern.search(p.stem)]
+    shots.sort(key=lambda p: p.stat().st_mtime)
     if not shots:
         raise SystemExit(f"В {folder} нет кадров{f' шага {label}' if label else ''}: сначала capture.py")
     return shots[-1]
