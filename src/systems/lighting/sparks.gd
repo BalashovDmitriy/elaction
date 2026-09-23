@@ -9,7 +9,7 @@ extends Node3D
 ## правило: на бой и темноту не влияет. Убирает себя сама.
 
 ## Сколько искр и сколько они живут, с.
-const COUNT: int = 48
+const COUNT: int = 70
 const LIFETIME: float = 0.75
 
 ## Скорость вылета, м/с, и тяжесть.
@@ -17,13 +17,18 @@ const SPEED := Vector2(2.5, 6.5)
 const GRAVITY: float = 9.8
 
 ## Штрих искры: ширина и длина, м.
-const STREAK := Vector2(0.012, 0.09)
+## Крупнее тонкой нити: на светлой стене под лампой первые искры в 1 см
+## терялись вовсе (кадры M20).
+const STREAK := Vector2(0.025, 0.18)
 
 ## Вспышка: цвет, сила, радиус и длительность, с.
 const FLASH_COLOR := Color(1.0, 0.82, 0.5)
-const FLASH_ENERGY: float = 3.0
+const FLASH_ENERGY: float = 5.0
 const FLASH_RANGE: float = 3.0
 const FLASH_TIME: float = 0.1
+
+## Насколько искры ближе к камере, чем лампа, м: перед стеной, а не в ней.
+const FRONT: float = 0.3
 
 var _flash: OmniLight3D = null
 var _age: float = 0.0
@@ -34,7 +39,7 @@ static func burst(host: Node, at: Vector3) -> Sparks:
 	var sparks := Sparks.new()
 	sparks.name = "Sparks"
 	host.add_child(sparks)
-	sparks.global_position = at
+	sparks.global_position = at + Vector3(0.0, 0.0, FRONT)
 	return sparks
 
 
@@ -63,8 +68,11 @@ func _process(delta: float) -> void:
 
 func _particles() -> GPUParticles3D:
 	var process := ParticleProcessMaterial.new()
-	process.direction = Vector3(0.0, -0.3, 0.0)
-	process.spread = 180.0
+	# Вниз и в стороны, в плоскости игры: лампа висит у потолка, и искры,
+	# летящие вверх и вглубь, прятались в плите и за стеной (кадры M20).
+	process.direction = Vector3(0.0, -1.0, 0.0)
+	process.spread = 75.0
+	process.particle_flag_disable_z = true
 	process.initial_velocity_min = SPEED.x
 	process.initial_velocity_max = SPEED.y
 	process.gravity = Vector3(0.0, -GRAVITY, 0.0)
@@ -92,7 +100,6 @@ func _particles() -> GPUParticles3D:
 	look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	look.vertex_color_use_as_albedo = true
-	look.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	var streak := QuadMesh.new()
 	streak.size = STREAK
 	streak.material = look

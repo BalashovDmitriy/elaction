@@ -29,6 +29,8 @@ var fullscreen: bool = false
 var difficulty: int = 0
 ## Качество графики — [enum Graphics.Quality] (ADR-0030, решение 5).
 var quality: int = Graphics.Quality.HIGH
+## Показывать ли кровь при попадании пули (ADR-0031).
+var blood: bool = true
 
 
 ## Настройки с диска. Файла нет — значения по умолчанию, язык по локали системы.
@@ -44,6 +46,7 @@ static func load_from(path: String = PATH) -> GameSettings:
 	settings.music = clampf(float(file.get_value(SECTION, "music", settings.music)), 0.0, 1.0)
 	settings.sfx = clampf(float(file.get_value(SECTION, "sfx", settings.sfx)), 0.0, 1.0)
 	settings.fullscreen = bool(file.get_value(SECTION, "fullscreen", settings.fullscreen))
+	settings.blood = bool(file.get_value(SECTION, "blood", settings.blood))
 	settings.difficulty = clampi(
 		int(file.get_value(SECTION, "difficulty", settings.difficulty)), 0, DIFFICULTIES - 1
 	)
@@ -73,6 +76,7 @@ func save_to(path: String = PATH) -> void:
 	file.set_value(SECTION, "fullscreen", fullscreen)
 	file.set_value(SECTION, "difficulty", difficulty)
 	file.set_value(SECTION, "quality", quality)
+	file.set_value(SECTION, "blood", blood)
 	file.save(path)
 
 
@@ -93,6 +97,7 @@ func apply() -> void:
 	if DisplayServer.window_get_mode() != mode:
 		DisplayServer.window_set_mode(mode)
 	Graphics.broadcast(quality as Graphics.Quality)
+	Blood.enabled = blood
 
 
 ## Громкость шины по её имени. Нужна меню: ползунков три, а полей тоже три,

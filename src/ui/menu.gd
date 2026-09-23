@@ -169,6 +169,7 @@ func _build_settings() -> void:
 		_difficulty()
 		_quality()
 		_fullscreen()
+		_blood()
 	_button("UI_BACK", _go_back)
 
 
@@ -413,6 +414,21 @@ func _on_language_selected(index: int) -> void:
 
 func _on_difficulty_selected(index: int) -> void:
 	settings.difficulty = index
+	settings.save_to()
+
+
+## Кровь при попадании пули — выключаемая, как принято в играх (ADR-0031).
+func _blood() -> void:
+	var toggle := CheckButton.new()
+	toggle.text = tr("UI_BLOOD")
+	toggle.button_pressed = settings.blood
+	toggle.toggled.connect(_on_blood_toggled)
+	_column.add_child(toggle)
+
+
+func _on_blood_toggled(pressed: bool) -> void:
+	settings.blood = pressed
+	settings.apply()
 	settings.save_to()
 
 

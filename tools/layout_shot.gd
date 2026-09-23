@@ -80,6 +80,7 @@ func _run() -> void:
 	# Не в самом проёме: без документов выход отправил бы Otto к красной двери.
 	_place(_level.plan().exit_x + 2.5, bottom)
 	await _shoot("07_garage", bottom)
+	await _shoot_effects("08_effects", 2)
 
 	print("  кадры раскладки в %s" % _folder)
 	get_tree().quit(0)
@@ -133,6 +134,33 @@ func _floor_with_a_wall() -> int:
 		if highest == BuildingRules.ROOF or wall.floor_index < highest:
 			highest = wall.floor_index
 	return highest
+
+
+## Искры и кровь (ADR-0031): выброс у лампы и брызги у Otto, снимок на пике
+## разлёта — через несколько кадров, а не после долгой выдержки: искры живут
+## меньше секунды.
+func _shoot_effects(label: String, index: int) -> void:
+	var spots := _level.plan().safe_spots(_level.rules, index)
+	_place(spots[spots.size() / 2], index)
+	for _frame: int in SETTLE_FRAMES:
+		await get_tree().process_frame
+	var lamp: Lamp = null
+	for node in _level.find_children("*", "Lamp", true, false):
+		var candidate := node as Lamp
+		if candidate != null and candidate.floor_index == index:
+			lamp = candidate
+			break
+	if lamp != null:
+		Sparks.burst(_level, lamp.global_position)
+	var chest := _level.otto.global_position + Vector3(0.4, 1.1, 0.0)
+	Blood.spray(_level, chest, 1.0)
+	for _frame: int in 12:
+		await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	var image := get_viewport().get_texture().get_image()
+	var path := "%s/%s.png" % [_folder, label]
+	image.save_png(path)
+	print("  %s — искры и кровь, этаж %d" % [path, index])
 
 
 ## Первый сверху тёмный этаж карты (ADR-0028, решение 4).

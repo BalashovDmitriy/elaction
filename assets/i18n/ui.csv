@@ -25,6 +25,7 @@ UI_VOLUME_MUSIC,Music,Музыка
 UI_VOLUME_SFX,Effects,Эффекты
 UI_LANGUAGE,Language,Язык
 UI_FULLSCREEN,Fullscreen,Полный экран
+UI_BLOOD,Blood,Кровь
 UI_DIFFICULTY,Difficulty,Сложность
 UI_DIFFICULTY_0,Easy,Лёгкая
 UI_DIFFICULTY_1,Normal,Обычная
