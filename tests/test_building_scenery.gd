@@ -242,27 +242,113 @@ func _fingerprint(blocks: Array[CityPlan.Block]) -> String:
 
 
 ## Машина у выхода встаёт так, что по всей длине не задевает ни проём выхода, ни
-## портал шахты (замечание пользователя на кадре гаража M20).
+## портал шахты (замечание пользователя на кадре гаража M20), ни внутреннюю
+## стену, ни пролёт эскалатора, спускающегося в гараж, и стоит в стенах
+## здания (авторевью M20).
 func test_the_car_parks_clear_of_shafts_and_the_exit() -> void:
-	var rules := _rules(0)
-	var bottom := rules.floors - 1
-	for building_seed: int in SEEDS:
-		var plan := BuildingPlan.generate(rules, building_seed)
-		var x := ExitCar.spot(plan.exit_x, rules, plan)
-		var half := ExitCar.LENGTH * 0.5
-		var exit_half := BuildingShell.EXIT_WIDTH * 0.5
-		assert_true(
-			x + half <= plan.exit_x - exit_half or x - half >= plan.exit_x + exit_half,
-			"сид %d: машина на проёме выхода" % building_seed
-		)
-		for shaft in plan.shafts:
-			if shaft.top > bottom or shaft.bottom < bottom:
-				continue
-			var shaft_half := rules.shaft_width * 0.5
-			assert_true(
-				x + half <= shaft.x - shaft_half or x - half >= shaft.x + shaft_half,
-				"сид %d: машина перед шахтой x=%.1f" % [building_seed, shaft.x]
+	for skill: int in SKILLS:
+		var rules := _rules(skill)
+		var bottom := rules.floors - 1
+		var bounds := rules.floor_span(bottom)
+		for building_seed: int in SEEDS:
+			var plan := BuildingPlan.generate(rules, building_seed)
+			var x := ExitCar.spot(plan.exit_x, rules, plan)
+			var car := Vector2(x - ExitCar.LENGTH * 0.5, x + ExitCar.LENGTH * 0.5)
+			var label := "навык %d, сид %d" % [skill, building_seed]
+			var exit_half := BuildingShell.EXIT_WIDTH * 0.5
+			var exit := Vector2(plan.exit_x - exit_half, plan.exit_x + exit_half)
+			_assert_apart(car, exit, "%s: машина на проёме выхода" % label)
+			assert_between(
+				x,
+				bounds.x + BuildingShell.WALL_WIDTH + ExitCar.LENGTH * 0.5,
+				bounds.y - BuildingShell.WALL_WIDTH - ExitCar.LENGTH * 0.5,
+				"%s: машина в наружной стене" % label
 			)
+			for shaft in plan.shafts:
+				if shaft.top > bottom or shaft.bottom < bottom:
+					continue
+				var shaft_half := rules.shaft_width * 0.5
+				var column := Vector2(shaft.x - shaft_half, shaft.x + shaft_half)
+				_assert_apart(car, column, "%s: машина перед шахтой x=%.1f" % [label, shaft.x])
+			for wall in plan.walls:
+				if wall.floor_index == bottom:
+					_assert_apart(
+						car, wall.band(rules), "%s: машина в стене x=%.1f" % [label, wall.x]
+					)
+			for escalator in plan.escalators:
+				if escalator.floor_index != bottom - 1:
+					continue
+				var landing := escalator.x + escalator.towards * rules.escalator_run
+				var gap := escalator.gap(rules)
+				var run := Vector2(minf(gap.x, landing), maxf(gap.y, landing))
+				_assert_apart(car, run, "%s: машина на эскалаторе x=%.1f" % [label, escalator.x])
+
+
+## Отрезки [param a] и [param b] не перекрываются (касаться можно).
+func _assert_apart(a: Vector2, b: Vector2, message: String) -> void:
+	assert_true(a.y <= b.x + 0.001 or a.x >= b.y - 0.001, message)
+
+
+## Седан стоит между задней стеной и телом Otto: в стену не входит и в плоскость
+## игры не выходит, поэтому Otto проходит перед машиной, а не сквозь неё. Седан
+## в полтора метра шириной заходил в обе стороны (авторевью M18c и M20).
+func test_the_sedan_fits_between_the_wall_and_otto() -> void:
+	var sedan: Node3D = autofree(CarModel.build())
+	var back := INF
+	var front := -INF
+	for part: Node in sedan.get_children():
+		var mesh := part as MeshInstance3D
+		if mesh == null:
+			continue
+		var box := mesh.transform * mesh.mesh.get_aabb()
+		back = minf(back, box.position.z)
+		front = maxf(front, box.end.z)
+	assert_gt(ExitCar.Z + back, WorldSpace.BACK_WALL_Z, "машина входит в заднюю стену")
+	assert_lt(
+		ExitCar.Z + front,
+		WorldSpace.PLAY_Z - WorldSpace.BODY_DEPTH * 0.5,
+		"машина выходит в плоскость игры — Otto пройдёт сквозь неё"
+	)
+
+
+## Стенки кабины стоят на её полу и доходят до крыши. Пол — в нуле кабины, плита
+## под ним: стенки, отсчитанные от верха плиты, висели на 18 см выше пола
+## (авторевью M20).
+func test_the_cabin_walls_stand_on_its_floor() -> void:
+	var scene := load("res://src/systems/elevators/elevator_car.tscn") as PackedScene
+	var car := scene.instantiate() as ElevatorCar
+	add_child_autofree(car)
+	car.fit_to_story(Proportions.CLEARANCE, Proportions.SHAFT)
+	var half_slab := ElevatorCar.SLAB_THICKNESS * 0.5
+	var floor_top := (car.get_node("FloorVisual") as Node3D).position.y + half_slab
+	var roof_bottom := (car.get_node("RoofVisual") as Node3D).position.y - half_slab
+	var lowest := INF
+	var highest := -INF
+	for part: Node in car._detail._body.get_children():
+		var mesh := part as MeshInstance3D
+		var box := mesh.transform * mesh.mesh.get_aabb()
+		lowest = minf(lowest, box.position.y)
+		highest = maxf(highest, box.end.y)
+	assert_almost_eq(lowest, floor_top, 0.01, "стенки кабины висят над её полом")
+	assert_almost_eq(highest, roof_bottom, 0.01, "стенки кабины не доходят до крыши")
+	remove_child(car)
+
+
+## Уровень качества доходит до здания, которое уже стоит, а не со следующего
+## (ADR-0030, решение 5): отражения, контактные тени и туман воздуха здания.
+func test_quality_reaches_the_building_already_standing() -> void:
+	GameState.instance().start_game()
+	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
+	level.rules = BuildingRules.new()
+	level.building_seed = 1
+	add_child_autofree(level)
+	var air := (level.get_node("Scenery/Air") as WorldEnvironment).environment
+	Graphics.broadcast(Graphics.Quality.LOW)
+	var low: Array[bool] = [air.ssr_enabled, air.ssao_enabled, air.volumetric_fog_enabled]
+	Graphics.broadcast(Graphics.Quality.HIGH)
+	assert_eq(low, [false, false, false] as Array[bool], "низкое качество не дошло до воздуха")
+	assert_true(air.ssr_enabled, "высокое качество не вернуло отражения")
+	remove_child(level)
 
 
 ## Этаж выхода — гараж: дверей на нём нет ни на одном сиде и навыке, как в
@@ -313,6 +399,12 @@ func test_the_counterweight_goes_against_the_car() -> void:
 	var weight := detail._weight.global_position.y
 	detail.follow(20.0, 5.0)
 	assert_gt(weight, detail._weight.global_position.y, "кабина поднялась — противовес опустился")
+	# Выше верха шахты противовес не идёт: у шахты на крышу верх — в машинном
+	# отделении, а не над потолком верхней остановки (авторевью M20).
+	detail.set_top(21.0)
+	detail.follow(0.0, 5.0)
+	var weight_top := detail._weight.global_position.y + CarDetail.WEIGHT.y * 0.5
+	assert_lte(weight_top, 21.0 + 0.001, "противовес выше верха шахты")
 	remove_child(detail)
 
 

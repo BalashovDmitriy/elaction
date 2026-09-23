@@ -50,7 +50,7 @@ func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 	_commit("edge", GreyboxLook.surface(RUNNER_EDGE_COLOR))
 	_commit("seam", GreyboxLook.surface(SEAM_COLOR))
 	_commit("joint", GreyboxLook.surface(JOINT_COLOR))
-	_commit("crown", GreyboxLook.metal(GreyboxLook.TRIM.darkened(0.4)))
+	_commit("crown", GreyboxLook.metal(GreyboxLook.TRIM.darkened(0.4)), true)
 
 
 func _dress_floor(index: int) -> void:
@@ -112,8 +112,6 @@ func _near_opening(index: int, x: float) -> bool:
 	for shaft in _plan.shafts:
 		if shaft.top <= index and index <= shaft.bottom and absf(shaft.x - x) < half_shaft:
 			return true
-	if index == _rules.floors - 1 and absf(_plan.exit_x - x) < BuildingShell.EXIT_WIDTH:
-		return true
 	return false
 
 
@@ -126,7 +124,11 @@ func _add(kind: String, size: Vector3, at: Vector3) -> void:
 	(_parts[kind] as Array[Transform3D]).append(Transform3D(Basis.from_scale(size), place))
 
 
-func _commit(kind: String, material: StandardMaterial3D) -> void:
+## Кладёт накопленные коробки [param kind] одним мультимешем. Тень кладёт только
+## карниз ([param casts_shadow]): мультимеш — на всё здание, его не отсечь по
+## кадру, и тысячи швов и стыков рисовались бы в каждом проходе теней каждой
+## лампы, хотя плоской детали отбрасывать нечего.
+func _commit(kind: String, material: StandardMaterial3D, casts_shadow: bool = false) -> void:
 	if not _parts.has(kind):
 		return
 	var places: Array[Transform3D] = _parts[kind]
@@ -141,4 +143,6 @@ func _commit(kind: String, material: StandardMaterial3D) -> void:
 	var node := MultiMeshInstance3D.new()
 	node.name = kind.capitalize()
 	node.multimesh = many
+	if not casts_shadow:
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(node)

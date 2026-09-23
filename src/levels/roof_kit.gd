@@ -65,14 +65,19 @@ func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 	var half_room := BuildingShafts.MACHINE_ROOM_SIZE.x * 0.5
 	var left := Vector2(bounds.x + BuildingShell.WALL_WIDTH, shaft.x - half_room)
 	var right := Vector2(shaft.x + half_room, bounds.y - BuildingShell.WALL_WIDTH)
-	var long := left if left.y - left.x >= right.y - right.x else right
-	var short := right if long == left else left
+	var on_the_left := left.y - left.x >= right.y - right.x
+	var long := left if on_the_left else right
+	var short := right if on_the_left else left
+	# Доли длины отсчитываются от парапета: справа от отделения начало отрезка —
+	# само отделение, и бак от его начала вставал у отделения, перед вывеской.
+	var edge := long.x if on_the_left else long.y
+	var inward := (long.y - long.x) * (1.0 if on_the_left else -1.0)
 
 	# Бак у края, кондиционеры ближе к середине: бак посередине закрывал вывеску.
-	var tank_x := long.x + (long.y - long.x) * 0.22
+	var tank_x := edge + inward * 0.22
 	_tank(Vector2(tank_x, _top_at(steps, surface, tank_x)))
 	for index in UNITS:
-		var x := long.x + (long.y - long.x) * (0.55 + 0.2 * float(index))
+		var x := edge + inward * (0.55 + 0.2 * float(index))
 		_unit(Vector2(x, _top_at(steps, surface, x)))
 	if short.y - short.x > 1.0:
 		var x := (short.x + short.y) * 0.5

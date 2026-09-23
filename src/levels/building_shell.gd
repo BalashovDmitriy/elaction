@@ -225,7 +225,10 @@ func _openings_on(index: int) -> Array[Vector2]:
 ## Глубиной на коридор и комнату вместе: перекрытие — пол не только коридора,
 ## но и комнаты за стеной, иначе в проём двери было бы видно пустоту под ногами.
 ## Передняя грань приходится на переднюю грань коридора, а не на плоскость игры.
-func _build_solid(rect: Rect2, material: StandardMaterial3D, visible: bool = true) -> void:
+##
+## [param shown] — видна ли коробка: стена крыши выше парапета — тело без вида.
+## Не `visible`: так зовут свойство [Node3D], и параметр его заслонял бы.
+func _build_solid(rect: Rect2, material: StandardMaterial3D, shown: bool = true) -> void:
 	var depth := WorldSpace.CORRIDOR_DEPTH + WorldSpace.ROOM_DEPTH
 	var size := Vector3(rect.size.x, rect.size.y, depth)
 	var centre := WorldSpace.to_scene(rect.get_center())
@@ -239,7 +242,7 @@ func _build_solid(rect: Rect2, material: StandardMaterial3D, visible: bool = tru
 	var collision := CollisionShape3D.new()
 	collision.shape = shape
 	body.add_child(collision)
-	if visible:
+	if shown:
 		body.add_child(GreyboxLook.box(size, material))
 
 	add_child(body)

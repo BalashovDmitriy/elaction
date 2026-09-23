@@ -298,6 +298,7 @@ func _spawn_shafts() -> void:
 		# берёт из правил, а не из своей сцены (ADR-0025, решение 10).
 		car.fit_to_story(rules.floor_height - rules.slab_height, rules.shaft_width)
 		car.setup(stops)
+		car.set_shaft_top(_shafts.top_of(shaft))
 		_cars.append(car)
 		if shaft.double_deck:
 			_spawn_lower_deck(car, shaft)

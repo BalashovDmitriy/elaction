@@ -27,16 +27,20 @@ const ROOF_RAIN_SPREAD: float = 2.0
 var weather: Weather.Kind = Weather.Kind.CLEAR
 var dressing: BuildingDressing = null
 
+## Воздух здания и дождь над крышей: их перестраивает [method apply_graphics].
+var _air: WorldEnvironment = null
+var _rain_node: GPUParticles3D = null
+
 
 ## Собирает окружение здания по правилам, плану и сиду.
 func build(rules: BuildingRules, plan: BuildingPlan, building_seed: int) -> void:
 	weather = Weather.of_seed(building_seed)
 
-	var air := WorldEnvironment.new()
-	air.name = "Air"
-	air.environment = Atmosphere.environment(rules.palette.dark)
-	CityBackdrop.show_behind(air.environment)
-	add_child(air)
+	_air = WorldEnvironment.new()
+	_air.name = "Air"
+	_air.environment = Atmosphere.environment(rules.palette.dark)
+	CityBackdrop.show_behind(_air.environment)
+	add_child(_air)
 	_light_the_roof(rules)
 
 	var roof := BuildingRoof.new()
@@ -64,7 +68,20 @@ func build(rules: BuildingRules, plan: BuildingPlan, building_seed: int) -> void
 	add_child(city)
 	city.build(rules, building_seed, weather)
 	if Weather.is_raining(weather):
-		add_child(_roof_rain(rules))
+		_rain_node = _roof_rain(rules)
+		add_child(_rain_node)
+	add_to_group(Graphics.GROUP)
+	apply_graphics()
+
+
+## Отражения, контактные тени, объёмный туман и доля капель над крышей по уровню
+## качества (ADR-0030, решение 5). Уровень меняют посреди партии, и применяется
+## он к этому зданию, а не со следующего: воздух собран на всё здание один раз.
+func apply_graphics() -> void:
+	if _air != null:
+		Graphics.apply_to(_air.environment)
+	if _rain_node != null:
+		_rain_node.amount = maxi(int(float(ROOF_RAIN_DROPS) * Graphics.rain_share()), 1)
 
 
 ## Лампа над крышей. Светлой зону делает собственный источник, а не отсутствие

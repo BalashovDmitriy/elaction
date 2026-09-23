@@ -40,6 +40,8 @@ const SPOT_BLUR: float = 1.6
 ## переставала быть темнотой (авторевью M17). Резать радиус нельзя — он и
 ## нужен, чтобы дотянуться до краёв зоны.
 const FILL_RANGE: float = 7.0
+## Радиус заливки без тени — на низком и среднем качестве: не дальше этажа.
+const FILL_RANGE_UNSHADOWED: float = 3.0
 const FILL_ENERGY: float = 1.5
 
 ## Тёплый цвет лампы против холодного общего тона палитры (ADR-0023, решение 3).
@@ -181,6 +183,10 @@ func set_light_visible(on: bool) -> void:
 func apply_graphics() -> void:
 	_spot.shadow_enabled = Graphics.spot_shadows()
 	_fill.shadow_enabled = Graphics.fill_shadows()
+	# Заливка без тени не держится перекрытием и светила бы сквозь плиты на
+	# соседние, погашенные этажи — темнота переставала бы быть темнотой (как в
+	# M17). Без тени её радиус — в этаж (авторевью M20).
+	_fill.omni_range = FILL_RANGE if Graphics.fill_shadows() else FILL_RANGE_UNSHADOWED
 
 
 ## Светильник вместо коробки: абажур конусом и рассеиватель снизу. Коробка

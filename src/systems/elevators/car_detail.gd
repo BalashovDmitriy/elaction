@@ -43,6 +43,9 @@ const CABLE_SPREAD: float = 0.14
 ## Противовес: габарит и где он ходит — за задней стенкой кабины, у левого края.
 const WEIGHT := Vector3(0.3, 1.1, 0.16)
 const WEIGHT_Z: float = -DEPTH * 0.5 - 0.14
+## Отступ противовеса от края шахты, м: левее он проходил сквозь направляющую
+## ([constant BuildingShafts.RAIL_WIDTH], 0.18 м) — по глубине они перекрываются.
+const WEIGHT_INSET: float = 0.22
 
 const STEEL := Color(0.42, 0.43, 0.45)
 const STEEL_DARK := Color(0.2, 0.21, 0.23)
@@ -78,11 +81,14 @@ func build(width: float, clear_height: float) -> void:
 
 	var steel := GreyboxLook.metal(STEEL)
 	var brushed := GreyboxLook.metal(BRUSHED)
-	var inner := clear_height - ElevatorCar.SLAB_THICKNESS * 2.0
-	var middle := ElevatorCar.SLAB_THICKNESS + inner * 0.5
+	# Пол кабины — в её нуле: плита пола лежит под ним, плита крыши — от
+	# просвета без толщины плиты до просвета. Стенки идут от пола до крыши;
+	# отсчитанные от верха плиты пола, они висели на 18 см выше него.
+	var inner := clear_height - ElevatorCar.SLAB_THICKNESS
+	var middle := inner * 0.5
 	var back_z := -DEPTH * 0.5 + WALL * 0.5
 
-	# Задняя стенка с двумя швами, боковые — узкие, во всю глубину.
+	# Задняя стенка с двумя швами, боковые — угловые панели у задней.
 	_part(Vector3(width - WALL * 2.0, inner, WALL), Vector3(0.0, middle, back_z), brushed)
 	for seam: float in [-width / 6.0, width / 6.0]:
 		_part(Vector3(0.012, inner, 0.01), Vector3(seam, middle, back_z + WALL * 0.5), steel)
@@ -106,11 +112,11 @@ func build(width: float, clear_height: float) -> void:
 	)
 	_part(
 		Vector3(width - WALL * 6.0, RAIL.x, RAIL.y),
-		Vector3(0.0, ElevatorCar.SLAB_THICKNESS + RAIL_RISE, back_z + WALL * 0.5 + RAIL.y * 0.5),
+		Vector3(0.0, RAIL_RISE, back_z + WALL * 0.5 + RAIL.y * 0.5),
 		steel
 	)
 	var panel_x := width * 0.5 - WALL - PANEL.x * 0.5 - 0.06
-	var panel_y := ElevatorCar.SLAB_THICKNESS + PANEL_RISE
+	var panel_y := PANEL_RISE
 	var panel_z := back_z + WALL * 0.5 + PANEL.z * 0.5
 	_part(PANEL, Vector3(panel_x, panel_y, panel_z), GreyboxLook.metal(STEEL_DARK))
 	for index in BUTTONS:
@@ -140,6 +146,13 @@ func hang_cables(low: float, high: float, top: float) -> void:
 	add_child(_weight)
 
 
+## Переносит верх шахты [param top] (y сцены): докуда идут тросы и выше чего
+## противовес не поднимается. [method hang_cables] ставит его над потолком
+## верхней остановки, а у шахты на крышу над ней небо — верх там задаёт уровень.
+func set_top(top: float) -> void:
+	_top = top
+
+
 ## Ставит тросы и противовес под кабину, низ которой сейчас на [param car_y].
 ## Противовес ходит навстречу: кабина внизу — он наверху.
 func follow(car_y: float, car_x: float) -> void:
@@ -149,8 +162,10 @@ func follow(car_y: float, car_x: float) -> void:
 	for index in _cables.size():
 		var x := car_x + (float(index) - float(CABLES - 1) * 0.5) * CABLE_SPREAD
 		_stretch(_cables[index], x, roof, _top, -0.1)
-	var weight_y := _low + _high - car_y + _height * 0.5
-	var weight_x := car_x - _width * 0.5 + WEIGHT.x * 0.5 + 0.06
+	# Выше верха шахты противовес не идёт: у шахты на крышу верх — в машинном
+	# отделении, и без упора противовес торчал бы над ним в небо.
+	var weight_y := minf(_low + _high - car_y + _height * 0.5, _top - WEIGHT.y * 0.5)
+	var weight_x := car_x - _width * 0.5 + WEIGHT_INSET + WEIGHT.x * 0.5
 	_weight.global_position = Vector3(weight_x, weight_y, WEIGHT_Z)
 	for index in _weight_cables.size():
 		var x := weight_x + (float(index) - 0.5) * WEIGHT.x * 0.5

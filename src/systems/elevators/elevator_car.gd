@@ -236,6 +236,18 @@ func setup(stops: PackedFloat32Array, start_floor: int = 0) -> void:
 		_detail.follow(global_position.y, global_position.x)
 
 
+## Верх шахты [param top] в плоскости правил: докуда идут тросы и противовес.
+##
+## Без этого верх — потолок верхней остановки. У шахты на крышу над верхней
+## остановкой небо, и тросы уходили бы на три метра над настилом — выше
+## машинного отделения. Верх ей даёт уровень: [method BuildingShafts.top_of].
+func set_shaft_top(top: float) -> void:
+	if _detail == null:
+		return
+	_detail.set_top(WorldSpace.height_to_scene(top))
+	_detail.follow(global_position.y, global_position.x)
+
+
 ## Делает кабину нижним ярусом пары: своего хода у неё больше нет, она держится
 ## на [param drop] метров ниже ведущего и отдаёт ему всё, что от неё хотят.
 ##

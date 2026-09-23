@@ -128,18 +128,16 @@ func build(rules: BuildingRules, plan: BuildingPlan, dressing: BuildingDressing)
 
 
 ## Разметка гаража — этажа выхода (ADR-0031, решение 4): белые полосы между
-## местами и колёсные упоры у стены, в обход шахт и выхода.
+## местами и колёсные упоры у стены, в обход шахт и выхода — их места
+## [method BuildingPlan.safe_spots] и так не отдаёт.
 func _mark_garage(plan: BuildingPlan) -> void:
 	var index := _rules.floors - 1
 	var surface := _rules.floor_surface(index)
 	var stripe := GreyboxLook.surface(GARAGE_STRIPE)
 	var stop := GreyboxLook.surface(GARAGE_STOP)
 	var step := _rules.slot_x(1) - _rules.slot_x(0)
-	var clear := plan.safe_spots(_rules, index)
 	var depth := WorldSpace.CORRIDOR_DEPTH * 0.8
-	for x: float in clear:
-		if absf(x - plan.exit_x) < step:
-			continue
+	for x: float in plan.safe_spots(_rules, index):
 		var line := GreyboxLook.box(Vector3(0.08, 0.01, depth), stripe)
 		line.position = WorldSpace.to_scene(Vector2(x - step * 0.5, surface - 0.005))
 		add_child(line)

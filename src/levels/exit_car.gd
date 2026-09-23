@@ -28,10 +28,10 @@ var _leaving: bool = false
 ## Ставит машину у проёма выхода: [param exit_x] — его середина, [param floor_y] —
 ## пол нижнего этажа в координатах правил.
 ##
-## Место — ближайшее к выходу, где машина по всей длине не заходит ни на проём
-## выхода, ни на шахту: на кадрах M20 седан, поставленный на фиксированном зазоре,
-## загораживал портал соседней шахты. Уезжает в ближнюю к себе сторону здания —
-## в дальнюю ехала бы через всё здание.
+## Место — ближайшее к выходу свободное ([method spot]): на кадрах M20 седан,
+## поставленный на фиксированном зазоре, загораживал портал соседней шахты.
+## Уезжает от выхода — в ту сторону, где
+## стоит: мимо проёма, в который вошёл Otto, она не едет.
 func park(exit_x: float, floor_y: float, rules: BuildingRules, plan: BuildingPlan) -> void:
 	name = "ExitCar"
 	var x := spot(exit_x, rules, plan)
@@ -48,7 +48,8 @@ func park(exit_x: float, floor_y: float, rules: BuildingRules, plan: BuildingPla
 
 ## Где машине встать: середина ближайшего к выходу места на нижнем этаже, где
 ## она по всей длине с зазором [constant GAP] не задевает ни проём выхода, ни
-## шахту и не выходит за стены. Места нет — у проёма, как было до M20.
+## шахту, ни внутреннюю стену, ни пролёт эскалатора и не выходит за стены.
+## Места нет — вплотную справа от проёма.
 static func spot(exit_x: float, rules: BuildingRules, plan: BuildingPlan) -> float:
 	var bottom := rules.floors - 1
 	var bounds := rules.floor_span(bottom)
@@ -59,6 +60,16 @@ static func spot(exit_x: float, rules: BuildingRules, plan: BuildingPlan) -> flo
 	for shaft in plan.shafts:
 		if shaft.top <= bottom and bottom <= shaft.bottom:
 			busy.append(Vector2(shaft.x - half_shaft, shaft.x + half_shaft))
+	# Стена глухая во всю глубину коридора и комнаты, а эскалатор с этажа выше
+	# спускается сюда пролётом от проёма до площадки: машина прошла бы сквозь них.
+	for wall in plan.walls:
+		if wall.floor_index == bottom:
+			busy.append(wall.band(rules))
+	for escalator in plan.escalators:
+		if escalator.floor_index == bottom - 1:
+			var landing := escalator.x + escalator.towards * rules.escalator_run
+			var gap := escalator.gap(rules)
+			busy.append(Vector2(minf(gap.x, landing), maxf(gap.y, landing)))
 	var half := LENGTH * 0.5 + GAP
 	# Кандидаты — вплотную к краю каждого занятого места с обеих сторон: ближе
 	# к выходу свободного места быть не может.
@@ -91,8 +102,9 @@ func drive_away() -> void:
 
 
 ## Везёт машину. Возвращает true в тот кадр, когда она уехала из кадра
-## [param view] — кадр и есть то, что видит игрок, а до границы здания машина
-## ползла бы впятеро дольше.
+## [param view] — до границы здания машина ползла бы впятеро дольше. Кадр
+## уровень даёт по правилам ([method SideCamera.rule_view]), а не сглаженный
+## кадр игрока: сдача здания — событие партии и обязана идти от физики.
 func advance(delta: float, view: Rect2) -> bool:
 	if not _leaving:
 		return false
