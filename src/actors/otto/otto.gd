@@ -315,8 +315,12 @@ func is_grounded() -> bool:
 ## Камера едет за Otto, но упирается в края здания. Поэтому видимое место
 ## считает тот, у кого камера, а не тот, кому оно нужно: снаружи пришлось бы
 ## спрашивать и середину, и размер кадра, и размер окна.
-func camera_view() -> Rect2:
-	return _camera.view()
+##
+## [param for_combat] — кадр, по которому решает бой: агент в нём достаёт Otto
+## (ADR-0027, решение 3а). Тот же, что видит игрок, но не зависит ни от окна,
+## ни от сглаживания камеры — см. [method SideCamera.rule_view].
+func camera_view(for_combat: bool = false) -> Rect2:
+	return _camera.rule_view() if for_combat else _camera.view()
 
 
 ## Куда Otto смотрит: -1 влево, +1 вправо. Туда же уйдёт его следующая пуля.

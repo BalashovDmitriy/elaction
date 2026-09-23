@@ -3,8 +3,8 @@ extends CharacterBody3D
 
 ## Враг-агент.
 ##
-## Выходит из обычной двери, идёт по своему этажу к Otto и стреляет, когда тот
-## оказывается на одной с ним линии. Решает [EnemyBrain], узел исполняет.
+## Выходит из обычной двери, бродит по своему этажу и стреляет, когда Otto
+## оказывается на одной с ним линии (ADR-0027). Решает [EnemyBrain], узел исполняет.
 ##
 ## Телом агент не вредит: в оригинале жизнь снимает только выстрел (ADR-0006,
 ## пункт 4), поэтому зоны урона у него нет — только оружие.
@@ -172,8 +172,8 @@ func _physics_process(delta: float) -> void:
 			left_building.emit(self)
 	if walking and is_on_floor() and _blocked_ahead():
 		# Дальше пола нет или стена: агент остаётся на своём этаже (ADR-0006,
-		# пункт 6). Видя Otto, он встаёт у края; потеряв — разворачивается и идёт
-		# обратно: слепой агент патрулирует этаж, а не караулит проём (ADR-0023).
+		# пункт 6). Выходящий и идущий к кабине встают у края, бродящий
+		# разворачивается.
 		if to_the_lift:
 			# Идущий к кабине встаёт у проёма и ждёт: кабина ушла, пока он шёл,
 			# и шагать в пустую шахту незачем. Разворачивать его нельзя — он
@@ -234,7 +234,12 @@ func _head_for(x: float) -> bool:
 func _head_for_the_lift() -> bool:
 	var gap := _lift_x - WorldSpace.to_plane(global_position).x
 	_brain.face(gap)
-	return absf(gap) > _lift_aboard()
+	var walking := absf(gap) > _lift_aboard()
+	# Сел в кабину — тревога на 90 тиков (@1AED): в кабине агент стреляет, не
+	# глядя на Otto, как в ROM.
+	if not walking:
+		alert_for(Arcade.seconds(Arcade.ALERT_TICKS))
+	return walking
 
 
 ## Насколько близко к оси кабины агент считает, что он уже в ней, м.
@@ -392,9 +397,8 @@ func _shield(value: bool) -> void:
 ## Видит ли агент Otto. За дверью его нет; в темноте он заметен только ближе
 ## [member BuildingRules.agent_dark_fire_range]; освещённого видно как обычно.
 ##
-## Мерится по горизонтали, как и дальность огня в [EnemyBrain]: иначе «1.8 м —
-## треть от шести» сравнивало бы разные вещи, и агент этажом ниже считался бы
-## слепым там, где стоящий на той же линии видит.
+## Мерится по горизонтали: иначе агент этажом ниже считался бы слепым там, где
+## стоящий на той же линии видит.
 func _sees(to_target: Vector2) -> bool:
 	if _target.is_hidden() or _target_behind_a_wall:
 		return false
@@ -441,10 +445,10 @@ func _incoming_height() -> float:
 		var reach := absf(to_bullet.x)
 		if reach > nearest:
 			continue
-		# Уворачивается агент только от пули в полосе ROM — 6..24 px над полом
-		# (@05F5): выше и ниже она мимо и так.
-		var over_floor := -to_bullet.y
-		if over_floor < 6.0 * Proportions.PX or over_floor > 24.0 * Proportions.PX:
+		# Уворачивается агент только от пули в полосе ROM над полом (@05F5):
+		# выше и ниже она мимо и так.
+		var over_floor := -to_bullet.y / Proportions.PX
+		if over_floor < Arcade.DODGE_BAND_PX.x or over_floor > Arcade.DODGE_BAND_PX.y:
 			continue
 		nearest = reach
 		# Ноги агента — ноль, вверх положительно: у пули y отрицательный.
@@ -521,9 +525,10 @@ func _bullet_speed() -> float:
 
 
 ## В кадре ли агент: в ROM дальности огня нет, этаж целиком на экране, и у нас
-## достаёт тот, кого игрок видит (ADR-0027, решение 3а).
+## достаёт тот, кого игрок видит (ADR-0027, решение 3а). Кадр — правил, а не
+## камеры: тот едет по настенным часам и шире на широком окне.
 func _in_frame() -> bool:
-	return _target.camera_view().has_point(WorldSpace.to_plane(global_position))
+	return _target.camera_view(true).has_point(WorldSpace.to_plane(global_position))
 
 
 ## Высота вылета пули по стойке: стоя, из приседа и лёжа — таблица ROM.

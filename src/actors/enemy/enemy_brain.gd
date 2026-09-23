@@ -143,6 +143,11 @@ func update(
 		state = State.WALK
 
 	if _action_left > 0.0:
+		# Otto скрылся за дверью или погиб, пока агент замахивался: выстрела нет.
+		# Невидимого не обстреливают (ADR-0023, решение 8), и замах, начатый по
+		# видимому, этого не отменяет — иначе дверь переставала бы прятать.
+		if _shot_pending and not target_alive:
+			_shot_pending = false
 		_act(delta)
 		return state
 
@@ -251,7 +256,9 @@ func _open_fire(to_target: Vector2, target_low: bool) -> void:
 			stance = Stance.STAND
 	state = State.SHOOT
 	_wind_up_left = Arcade.wind_up(anger)
-	_action_left = maxf(Arcade.action_time(anger), _wind_up_left)
+	# Действие по ROM всегда длиннее замаха на два тика и больше (@1C7A): пуля
+	# уходит внутри него.
+	_action_left = Arcade.action_time(anger)
 	_shot_pending = true
 	# Замах в ноль — пуля уходит в тот же кадр: так в ROM при злости 10 и выше.
 	_act(0.0)

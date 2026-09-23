@@ -560,9 +560,11 @@ func _on_lamp_fell(index: int, x: float) -> void:
 ## которой зависит, видят ли они его вовсе (ADR-0023, решение 8).
 ##
 ## Каждый кадр, а не по событию: агенты ходят по этажу, и зона под ними
-## меняется на ходу. Живых в здании не больше восьми, но ищет их [method agents]
+## меняется на ходу. Живых в здании не больше четырёх, но ищет их [method agents]
 ## перебором всех детей уровня, а их под три сотни: если кадр когда-нибудь упрётся
 ## в это, агентов надо держать списком, а не искать заново.
+##
+## Тем же проходом раздаётся и тревога агентов ([method _stir_agents]).
 func _shroud_agents() -> void:
 	var here := _floor_of(otto)
 	var otto_in_the_dark := _lighting.is_dark_at(here, otto.global_position.x)
@@ -570,6 +572,8 @@ func _shroud_agents() -> void:
 		if agent.is_dead():
 			continue
 		_shroud_agent(agent, _floor_of(agent), agent.global_position.x, here, otto_in_the_dark)
+		if _alert_left > 0.0:
+			agent.alert_for(_alert_left)
 
 
 ## Что агент знает про Otto и про себя: своя темнота, тень Otto и глухая стена
@@ -580,8 +584,8 @@ func _shroud_agents() -> void:
 ## агента. Разъехаться им нельзя, иначе первый шаг агент делал бы по другим
 ## правилам, чем все следующие, — на стене это едва не случилось.
 ##
-## Про Otto ([param here], [param target_in_the_dark]) считается снаружи: в кадре
-## агентов восемь, а Otto один, и восемь одинаковых счётов за кадр ни к чему.
+## Про Otto ([param here], [param target_in_the_dark]) считается снаружи: агентов
+## до четырёх, а Otto один, и четыре одинаковых счёта за кадр ни к чему.
 ## [param where] и [param x] — тоже снаружи: у только что выпущенного агента
 ## координата ещё коврика двери, а не его тела.
 func _shroud_agent(agent: Enemy, where: int, x: float, here: int, target_in_the_dark: bool) -> void:
@@ -749,15 +753,13 @@ func _difficulty() -> int:
 ## Тревога агентов: пуля Otto в кадре при сложности больше нуля — 90 тиков
 ## (@59C8). Под ней выпуск идёт по полному пределу этажа, а агенты стреляют,
 ## не глядя (ADR-0027, решение 5).
+##
+## Самим агентам её раздаёт [method _shroud_agents] тем же проходом, что и
+## темноту: второй перебор трёхсот детей уровня за кадр ради этого ни к чему.
 func _stir_agents(delta: float) -> void:
 	_alert_left = maxf(_alert_left - delta, 0.0)
 	if _difficulty() > 0 and Bullet.any_in_flight(get_tree(), Bullet.FROM_OTTO):
 		_alert_left = Arcade.seconds(Arcade.ALERT_TICKS)
-	if _alert_left <= 0.0:
-		return
-	for agent in agents():
-		if not agent.is_dead():
-			agent.alert_for(_alert_left)
 
 
 ## Ставит дверь на довольствие: с этой минуты она выпускает агентов.
@@ -802,6 +804,10 @@ func _release_agent(post: AgentPost) -> Enemy:
 	# Правила отдаются до дерева: так агент входит в него уже настроенным, и
 	# заводить себе значения по умолчанию ему не приходится.
 	agent.apply_rules(rules)
+	# Сеется до [method Enemy.setup]: выход из двери уже тянет из генератора
+	# длину первого перехода, и несеянный он дал бы её случайной — прогон бота
+	# переставал бы повторяться с первого же агента.
+	agent.seed_decisions(_spawn.rng.randi())
 	add_child(agent)
 	agent.global_position = WorldSpace.to_scene(mat)
 	agent.setup(otto, signf(otto.global_position.x - mat.x))
@@ -813,7 +819,6 @@ func _release_agent(post: AgentPost) -> Enemy:
 	)
 	agent.set_threat(_difficulty(), rules.skill, GameState.instance().alarm.raised)
 	agent.set_late(post.slot >= 2)
-	agent.seed_decisions(_spawn.rng.randi())
 	if _alert_left > 0.0:
 		agent.alert_for(_alert_left)
 	agent.died.connect(_on_agent_died.bind(post))

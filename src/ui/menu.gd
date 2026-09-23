@@ -248,8 +248,9 @@ func _button(key: String, action: Callable) -> void:
 	_column.add_child(button)
 
 
-## Ползунок громкости: подпись и ручка в строку.
-func _slider(key: String, bus: String) -> void:
+## Строка настройки с подписью слева: ползунок, язык, сложность. Сам элемент
+## кладёт в неё зовущий, а в колонку она уже вставлена.
+func _setting_row(key: String) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 
@@ -259,6 +260,13 @@ func _slider(key: String, bus: String) -> void:
 	label.add_theme_font_size_override("font_size", 12)
 	row.add_child(label)
 
+	_column.add_child(row)
+	return row
+
+
+## Ползунок громкости: подпись и ручка в строку.
+func _slider(key: String, bus: String) -> void:
+	var row := _setting_row(key)
 	var slider := HSlider.new()
 	slider.min_value = 0.0
 	slider.max_value = 1.0
@@ -268,19 +276,9 @@ func _slider(key: String, bus: String) -> void:
 	slider.value_changed.connect(func(value: float) -> void: _on_level_changed(bus, value))
 	row.add_child(slider)
 
-	_column.add_child(row)
-
 
 func _languages() -> void:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-
-	var label := Label.new()
-	label.text = tr("UI_LANGUAGE")
-	label.custom_minimum_size = Vector2(150.0, 0.0)
-	label.add_theme_font_size_override("font_size", 12)
-	row.add_child(label)
-
+	var row := _setting_row("UI_LANGUAGE")
 	var choice := OptionButton.new()
 	for index: int in GameSettings.LOCALES.size():
 		var code := GameSettings.LOCALES[index]
@@ -290,28 +288,16 @@ func _languages() -> void:
 	choice.item_selected.connect(_on_language_selected)
 	row.add_child(choice)
 
-	_column.add_child(row)
-
 
 ## Уровень сложности: четыре положения DIP-переключателя автомата.
 func _difficulty() -> void:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-
-	var label := Label.new()
-	label.text = tr("UI_DIFFICULTY")
-	label.custom_minimum_size = Vector2(150.0, 0.0)
-	label.add_theme_font_size_override("font_size", 12)
-	row.add_child(label)
-
+	var row := _setting_row("UI_DIFFICULTY")
 	var choice := OptionButton.new()
 	for level: int in GameSettings.DIFFICULTIES:
 		choice.add_item(tr("UI_DIFFICULTY_%d" % level), level)
 	choice.select(settings.difficulty)
 	choice.item_selected.connect(_on_difficulty_selected)
 	row.add_child(choice)
-
-	_column.add_child(row)
 
 
 func _fullscreen() -> void:

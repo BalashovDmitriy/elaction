@@ -357,10 +357,12 @@ func _crush_those_underneath(speed: float) -> void:
 			# Зона заходит на полу кабины выше днища, и ноги пассажира в неё
 			# попадают: пассажир — тот, кто стоит на полу кабины, а жертва — тот,
 			# кто под днищем. Разводит их высота ступней.
-			var riding := to_local(agent.global_position).y > -SLAB_THICKNESS
+			var riding := to_local(agent.global_position).y > _under_the_floor()
 			if not agent.is_dead() and ShaftHazards.crushes(speed, agent.is_on_floor(), riding):
 				agent.kill(true)
-				GameState.instance().add_score(GameState.CRUSH_SCORE)
+				# Надбавка за темноту — та же, что у пули, ноги и лампы (ADR-0010).
+				var points := GameState.kill_score(GameState.CRUSH_SCORE, agent.is_in_the_dark())
+				GameState.instance().add_score(points)
 			continue
 		var victim := body as Otto
 		if victim == null:

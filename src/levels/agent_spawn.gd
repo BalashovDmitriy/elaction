@@ -8,7 +8,9 @@ extends RefCounted
 ## сцены. ROM держит четыре ячейки агентов (@594D): занятыми бывают три или
 ## четыре, и освободившаяся ждёт смены по сложности (@3866).
 
-## Ячеек агентов: столько держит ROM.
+## Ячеек агентов: столько держит ROM. Ручной потолок здания ([member
+## BuildingRules.agents_at_once_cap]) может просить больше — тогда ячейки
+## добавляются в [method open_slot], иначе он молча упирался бы в четыре.
 const SLOTS: int = 4
 
 ## Генератор жребия: свой у здания и посеянный его сидом — прогон бота
@@ -25,7 +27,7 @@ var _clock: float = 0.0
 ## жребий в ROM бросается раз в тик, а не раз в кадр — иначе на 60 Гц он шёл
 ## бы вчетверо чаще, а на 30 вдвое реже.
 func tick(delta: float) -> bool:
-	for index in SLOTS:
+	for index in _wait.size():
 		_wait[index] = maxf(_wait[index] - delta, 0.0)
 	_clock += delta
 	if _clock < Arcade.TICK:
@@ -37,7 +39,10 @@ func tick(delta: float) -> bool:
 ## Свободная ячейка из первых [param available] или -1: занятая или ещё ждущая
 ## смены не годится.
 func open_slot(available: int) -> int:
-	for index in mini(available, SLOTS):
+	while _busy.size() < available:
+		_busy.append(false)
+		_wait.append(0.0)
+	for index in available:
 		if not _busy[index] and _wait[index] <= 0.0:
 			return index
 	return -1
@@ -50,7 +55,7 @@ func take(slot: int) -> void:
 
 ## Освобождает ячейку: смена в ней придёт через паузу по сложности [param level].
 func release(slot: int, level: int) -> void:
-	if slot < 0 or slot >= SLOTS:
+	if slot < 0 or slot >= _busy.size():
 		return
 	_busy[slot] = false
 	_wait[slot] = Arcade.respawn_wait(level)

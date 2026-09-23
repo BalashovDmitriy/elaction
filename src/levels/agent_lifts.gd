@@ -46,10 +46,7 @@ static func offer(
 
 	# Кабины, стоящие вровень с этажом агента: только они и возят, и они же
 	# перекрывают собой свои проёмы.
-	var standing := PackedFloat64Array()
-	for car in cars:
-		if car.is_aligned() and rules.floor_index_near(_height_of(car)) == where:
-			standing.append(car.position.x)
+	var standing := _standing_at(rules, cars, where)
 	if standing.is_empty():
 		return NAN
 
@@ -61,8 +58,7 @@ static func offer(
 		if shaft == null:
 			continue
 		# Шахта обязана вести в сторону Otto: иначе агент уезжает от него.
-		var span := shaft.ride_span()
-		if not ((towards > 0 and span.y > where) or (towards < 0 and span.x < where)):
+		if not _leads_towards(shaft, where, towards):
 			continue
 		if not _reaches(blocks, x, axis):
 			continue
@@ -86,8 +82,7 @@ static func can_ride(
 	for shaft in plan.shafts:
 		if shaft.top > where or shaft.bottom < where:
 			continue
-		var span := shaft.ride_span()
-		if not ((towards > 0 and span.y > where) or (towards < 0 and span.x < where)):
+		if not _leads_towards(shaft, where, towards):
 			continue
 		var blocks := _walk_blocks(plan, rules, where, PackedFloat64Array([shaft.x]))
 		if _reaches(blocks, x, shaft.x):
@@ -101,11 +96,7 @@ static func can_ride(
 static func nearest_door(
 	plan: BuildingPlan, rules: BuildingRules, cars: Array[ElevatorCar], where: int, x: float
 ) -> float:
-	var standing := PackedFloat64Array()
-	for car in cars:
-		if car.is_aligned() and rules.floor_index_near(_height_of(car)) == where:
-			standing.append(car.position.x)
-	var blocks := _walk_blocks(plan, rules, where, standing)
+	var blocks := _walk_blocks(plan, rules, where, _standing_at(rules, cars, where))
 	var best := NAN
 	for door in plan.doors:
 		if door.floor_index != where or not _reaches(blocks, x, door.x):
@@ -113,6 +104,24 @@ static func nearest_door(
 		if is_nan(best) or absf(door.x - x) < absf(best - x):
 			best = door.x
 	return best
+
+
+## Оси кабин, стоящих вровень с этажом [param where].
+static func _standing_at(
+	rules: BuildingRules, cars: Array[ElevatorCar], where: int
+) -> PackedFloat64Array:
+	var standing := PackedFloat64Array()
+	for car in cars:
+		if car.is_aligned() and rules.floor_index_near(_height_of(car)) == where:
+			standing.append(car.position.x)
+	return standing
+
+
+## Везёт ли шахта с этажа [param where] в сторону [param towards]: вверх — −1,
+## вниз — +1, как растут номера этажей.
+static func _leads_towards(shaft: BuildingPlan.ShaftSpot, where: int, towards: int) -> bool:
+	var span := shaft.ride_span()
+	return (towards > 0 and span.y > where) or (towards < 0 and span.x < where)
 
 
 ## Что режет агенту ходьбу по этажу: проёмы и глухие стены, кроме тех проёмов,
