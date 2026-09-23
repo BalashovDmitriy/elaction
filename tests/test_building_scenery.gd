@@ -263,3 +263,80 @@ func test_the_car_parks_clear_of_shafts_and_the_exit() -> void:
 				x + half <= shaft.x - shaft_half or x - half >= shaft.x + shaft_half,
 				"сид %d: машина перед шахтой x=%.1f" % [building_seed, shaft.x]
 			)
+
+
+## Этаж выхода — гараж: дверей на нём нет ни на одном сиде и навыке, как в
+## подвале оригинала (ADR-0031, решение 4).
+func test_the_exit_floor_is_a_garage_without_doors() -> void:
+	for skill: int in SKILLS:
+		var rules := _rules(skill)
+		assert_eq(rules.doors_on(rules.floors - 1), 0, "навык %d: гараж с дверями" % skill)
+		for building_seed: int in SEEDS:
+			var plan := BuildingPlan.generate(rules, building_seed)
+			for door in plan.doors:
+				assert_ne(
+					door.floor_index,
+					rules.floors - 1,
+					"навык %d, сид %d: дверь в гараже" % [skill, building_seed]
+				)
+
+
+## Техника крыши стоит внутри её стен (вывеска — по ширине щита вокруг середины).
+func test_roof_kit_stays_on_the_roof() -> void:
+	GameState.instance().start_game()
+	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
+	level.rules = BuildingRules.new()
+	level.building_seed = 2
+	add_child_autofree(level)
+	var kit := level.get_node_or_null("Scenery/RoofKit")
+	assert_not_null(kit, "техники крыши нет")
+	if kit == null:
+		return
+	var bounds := level.rules.floor_span(BuildingRules.ROOF)
+	var parts := kit.find_children("*", "VisualInstance3D", true, false)
+	assert_gt(parts.size(), 10, "на крыше почти ничего не стоит")
+	for part: Node in parts:
+		var x := (part as Node3D).global_position.x
+		assert_between(
+			x, bounds.x - 0.1, bounds.y + 0.1, "деталь крыши за её стенами: %s" % part.name
+		)
+	remove_child(level)
+
+
+## Противовес ходит навстречу кабине: кабина внизу — он наверху.
+func test_the_counterweight_goes_against_the_car() -> void:
+	var detail: CarDetail = autofree(CarDetail.new())
+	add_child(detail)
+	detail.build(1.8, 3.0)
+	detail.hang_cables(0.0, 20.0, 23.0)
+	detail.follow(0.0, 5.0)
+	var weight := detail._weight.global_position.y
+	detail.follow(20.0, 5.0)
+	assert_gt(weight, detail._weight.global_position.y, "кабина поднялась — противовес опустился")
+	remove_child(detail)
+
+
+## Кровь, выключенная в настройках, не брызгает вовсе.
+func test_blood_respects_the_setting() -> void:
+	var host: Node3D = autofree(Node3D.new())
+	add_child(host)
+	Blood.enabled = false
+	Blood.spray(host, Vector3.ZERO, 1.0)
+	assert_eq(host.get_child_count(), 0, "выключенная кровь брызнула")
+	Blood.enabled = true
+	Blood.spray(host, Vector3.ZERO, 1.0)
+	assert_eq(host.get_child_count(), 1, "включённая кровь не брызнула")
+	remove_child(host)
+
+
+## Сбитая лампа выбрасывает искры в точке попадания, и они остаются там, пока
+## лампа падает (ADR-0031, решение 3а).
+func test_a_shot_lamp_throws_sparks() -> void:
+	var host: Node3D = autofree(Node3D.new())
+	add_child(host)
+	var lamp := (load("res://src/systems/lighting/lamp.tscn") as PackedScene).instantiate() as Lamp
+	host.add_child(lamp)
+	lamp.shoot_down()
+	var sparks := host.find_children("*", "Sparks", false, false)
+	assert_eq(sparks.size(), 1, "искр нет или больше одного выброса")
+	remove_child(host)
