@@ -64,8 +64,14 @@ var lives: int = STARTING_LIVES
 var documents_collected: int = 0
 var documents_total: int = 0
 
-## Номер здания, он же сид его раскладки.
+## Номер здания. Сид его раскладки — [method building_seed].
 var building: int = 1
+
+## Соль партии: смешивается с номером здания в сид, чтобы здания отличались от
+## партии к партии и не заучивались (ADR-0028, решение 6). Ноль — сид равен
+## номеру здания, как до M18e: так играют тесты и бот, иначе шкала смертей
+## шумела бы.
+var salt: int = 0
 var alarm := Alarm.new()
 
 ## Идёт ли партия. На паузе и после Game Over время не тикает.
@@ -110,9 +116,11 @@ func _exit_tree() -> void:
 		_instance = null
 
 
-## Начинает партию заново: счёт, жизни, первое здание.
-func start_game() -> void:
+## Начинает партию заново: счёт, жизни, первое здание. [param new_salt] —
+## соль партии; ноль, если её не передали.
+func start_game(new_salt: int = 0) -> void:
 	reset()
+	salt = new_salt
 	_running = true
 	building_changed.emit(building)
 
@@ -139,18 +147,26 @@ func start_building(total_documents: int) -> void:
 	documents_changed.emit(documents_collected, documents_total)
 
 
-## Обнуляет всё: счёт, жизни, документы, номер здания и тревогу.
+## Обнуляет всё: счёт, жизни, документы, номер здания, соль и тревогу.
 func reset() -> void:
 	score = 0
 	lives = STARTING_LIVES
 	documents_collected = 0
 	documents_total = 0
 	building = 1
+	salt = 0
 	_extra_life_given = false
 	alarm.enter_building()
 	score_changed.emit(score)
 	lives_changed.emit(lives)
 	documents_changed.emit(documents_collected, documents_total)
+
+
+## Сид раскладки текущего здания: его номер, смешанный с солью партии. Одна
+## и та же соль на раскладку и на бой (ADR-0027, решение 2): уровень сеет
+## сидом и то и другое.
+func building_seed() -> int:
+	return building if salt == 0 else hash([building, salt])
 
 
 ## Засчитывает поднятый документ вместе с очками за него.

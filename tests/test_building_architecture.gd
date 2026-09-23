@@ -345,3 +345,47 @@ func test_agents_step_out_next_to_otto() -> void:
 				)
 		assert_gt(seen.size(), 0, "сид %d: никто не вышел" % building_seed)
 		_drop(level)
+
+
+## Погибший в кабине воскресает рядом с её шахтой, а не где попало.
+##
+## Над проёмом шахты нет куска этажа, и раньше возврат выбирал из всех мест —
+## на навыке 10 Otto воскресал в кармане за эскалатором, откуда хода нет
+## (перемер M18e). Теперь — ближайший к шахте кусок: с него в кабину садятся.
+##
+## Счёт — одна раскладка, и сцену ради него не поднимаем.
+func test_a_rider_killed_in_a_car_comes_back_beside_its_shaft() -> void:
+	for skill: int in [0, 10]:
+		var rules := BuildingRules.new()
+		rules.skill = skill
+		for building_seed: int in [1, 2, 3]:
+			var plan := BuildingPlan.generate(rules, building_seed)
+			for shaft in plan.shafts:
+				for index: int in range(maxi(shaft.top, 0), shaft.bottom + 1):
+					var spots := plan.safe_spots(rules, index)
+					if spots.is_empty():
+						continue
+					var chosen := plan.spots_on_the_same_piece(rules, index, shaft.x, spots)
+					assert_true(
+						_on_one_piece(plan, rules, index, chosen),
+						(
+							"навык %d, сид %d, этаж %d: возврат из шахты x=%.1f по разным кускам"
+							% [skill, building_seed, index, shaft.x]
+						)
+					)
+
+
+## Лежат ли все места на одном куске этажа — между одними и теми же проёмами.
+func _on_one_piece(
+	plan: BuildingPlan, rules: BuildingRules, index: int, spots: PackedFloat64Array
+) -> bool:
+	var pieces := BuildingPlan.spans_between(plan.blocks_on(rules, index), rules.floor_span(index))
+	for piece: Vector2 in pieces:
+		var inside := true
+		for x: float in spots:
+			if x < piece.x or x > piece.y:
+				inside = false
+				break
+		if inside:
+			return true
+	return false

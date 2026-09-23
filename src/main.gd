@@ -104,10 +104,26 @@ func _start_game() -> void:
 	get_tree().paused = false
 	_menu.close()
 	_hud.visible = true
-	GameState.instance().start_game()
+	GameState.instance().start_game(_new_salt())
 	# HUD перерисовывать не надо: start_game и start_building внутри здания
 	# шлют все сигналы, на которые он подписан.
 	_enter_building()
+
+
+## Соль новой партии: случайная, не ноль — ноль значит «без соли» (ADR-0028,
+## решение 6). Аргумент `-- --salt=N` задаёт её руками: так партию можно
+## повторить, а кадры снять на известном здании. Автосъёмка вехи идёт без соли:
+## её сценарий рассчитан на здание по номеру, и по чужой раскладке он прошёл
+## бы мимо шахты.
+func _new_salt() -> int:
+	if SCREENSHOTTER.capturing():
+		return 0
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--salt="):
+			return argument.trim_prefix("--salt=").to_int()
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	return rng.randi_range(1, 0x7FFFFFFF)
 
 
 func _pause() -> void:
@@ -135,7 +151,7 @@ func _enter_building() -> void:
 	var game := GameState.instance()
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	_level.rules = BuildingRules.for_building(game.building, _settings.difficulty)
-	_level.building_seed = game.building
+	_level.building_seed = game.building_seed()
 	# Режим наследуется от родителя, а он тут ALWAYS: без этой строки пауза
 	# не останавливала бы ничего — игра шла бы дальше с надписью «пауза».
 	_level.process_mode = Node.PROCESS_MODE_PAUSABLE

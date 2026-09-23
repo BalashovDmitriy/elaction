@@ -25,7 +25,7 @@ func _init() -> void:
 		if argument.begins_with("--floors="):
 			rules.floors = argument.trim_prefix("--floors=").to_int()
 		elif argument.begins_with("--documents="):
-			rules.documents = argument.trim_prefix("--documents=").to_int()
+			rules.documents_cap = argument.trim_prefix("--documents=").to_int()
 		elif argument.begins_with("--span="):
 			rules.shaft_span = argument.trim_prefix("--span=").to_int()
 	var plan := BuildingPlan.generate(rules, building_seed)

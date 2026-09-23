@@ -118,7 +118,7 @@ class AgentPost:
 ## Правила здания. Пустые — значит берутся по умолчанию.
 @export var rules: BuildingRules
 
-## Сид здания. Им служит номер здания: раскладка меняется от здания к зданию.
+## Сид здания: номер здания с солью партии ([method GameState.building_seed]).
 @export var building_seed: int = 1
 
 ## Выпускать ли агентов из дверей. Выключается в тестах проходимости: они
@@ -255,6 +255,15 @@ func agent_doors() -> Array[Door]:
 	for post: AgentPost in _posts:
 		serving.append(post.door)
 	return serving
+
+
+## Дверь, из которой вышел агент, или null. Не ближайшая к нему: с M18e двери
+## стоят через место, и вышедший бывает ближе к соседней (ADR-0028).
+func door_of(agent: Enemy) -> Door:
+	for post: AgentPost in _posts:
+		if post.agent == agent:
+			return post.door
+	return null
 
 
 ## Где стоит выход из здания, в плоскости правил.
@@ -457,6 +466,11 @@ func _spawn_lamps() -> void:
 		add_child(lamp)
 		lamp.hang(lamp_height(rules), rules.floor_height - rules.slab_height)
 		_lamps.append(lamp)
+	# Тёмные этажи карты ламп не получают, и темнота им объявляется здесь же,
+	# где вешаются лампы: иначе этаж без ламп для правила темноты светел (ADR-0028).
+	for index in rules.floors:
+		if rules.is_unlit(index):
+			_lighting.mark_unlit(index)
 
 
 ## Выход из здания. Не запирается: без всех документов он отправляет обратно
@@ -703,7 +717,7 @@ func _try_to_spawn(span: Vector2i, live: int, per_floor: Dictionary) -> void:
 	var available := rules.agents_at_once(time)
 	if live >= available:
 		return
-	var slot := _spawn.open_slot(available)
+	var slot := _spawn.open_slot(available, Door.AGENT_OPEN_TIME)
 	if slot < 0:
 		return
 
@@ -883,7 +897,9 @@ func _safest_x(index: int) -> float:
 	var spots := _plan.safe_spots(rules, index)
 	if spots.is_empty():
 		return _plan.safe_x(rules, index)
-	spots = _spots_on_the_same_piece(index, WorldSpace.to_plane(otto.global_position).x, spots)
+	# Своя сторона этажа, а не та, что за стеной или проёмом.
+	var from_x := WorldSpace.to_plane(otto.global_position).x
+	spots = _plan.spots_on_the_same_piece(rules, index, from_x, spots)
 
 	var agents := _agents_on(index)
 	var best := spots[0]
@@ -898,30 +914,6 @@ func _safest_x(index: int) -> float:
 			best_gap = gap
 			best = x
 	return best
-
-
-## Места того же куска этажа, на котором стоит [param from_x].
-##
-## Возвращаться Otto обязан на свою сторону: этаж режут проёмы и глухие стены
-## (ADR-0024, решение 5), и за стеной может не оказаться ни лифта, ни эскалатора.
-## Место выбирается по живым агентам, а самое дальнее от них — как раз за стеной:
-## без этого отбора Otto воскресал бы там, откуда не уйти, и умирал бы туда снова.
-##
-## Кусок не нашёлся — отдаётся всё, что было: остаться вовсе без места хуже, чем
-## встать не на своей половине.
-func _spots_on_the_same_piece(
-	index: int, from_x: float, spots: PackedFloat64Array
-) -> PackedFloat64Array:
-	var pieces := BuildingPlan.spans_between(_plan.blocks_on(rules, index), rules.floor_span(index))
-	for piece: Vector2 in pieces:
-		if from_x < piece.x or from_x > piece.y:
-			continue
-		var same := PackedFloat64Array()
-		for x: float in spots:
-			if x >= piece.x and x <= piece.y:
-				same.append(x)
-		return spots if same.is_empty() else same
-	return spots
 
 
 func _on_pit_entered(body: Node3D) -> void:

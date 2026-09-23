@@ -4,8 +4,9 @@ extends RefCounted
 ## Раскладка здания: где шахты, эскалаторы, двери и лампы.
 ##
 ## Считается по [BuildingRules] и сиду, узлов и сцен не знает — поэтому
-## проверяется тестами. Сид — номер здания, чтобы одно и то же здание
-## пересобиралось одинаково (ADR-0008, пункт 2).
+## проверяется тестами. Сид — номер здания, смешанный с солью партии
+## ([method GameState.building_seed]), чтобы одно и то же здание пересобиралось
+## одинаково (ADR-0008, пункт 2; ADR-0028, решение 6).
 ##
 ## Шахты не сквозные и делят здание на полосы; там, где полоса кончается,
 ## генератор обязан поставить эскалатор — иначе спуститься будет нельзя.
@@ -156,9 +157,18 @@ static func generate(rules: BuildingRules, seed_value: int) -> BuildingPlan:
 	plan._lay_exit(rules, rng, taken)
 	plan._lay_doors(rules, rng, taken)
 	plan._lay_lamps(rules, taken)
-	# Стены и двухэтажные пары — последними: обе проверяются по достижимости
-	# документов и выхода, а значит те уже должны стоять.
+	# Стены — после обязательного и до дверей сверх него: стена проверяется по
+	# достижимости документов и выхода, а лишним дверям она нужна уже стоящей.
+	# Встань лишние двери первыми, стене на башне места не оставалось бы: четыре
+	# двери на семь мест, и стен там стало 22 вместо 156 (авторевью M18e).
 	plan._lay_walls(rules, rng)
+	plan._reserve_beside_walls(rules, taken)
+	# Двери сверх обязательной — последними: их по карте до двенадцати на этаж,
+	# и займи они места раньше, лампе пришлось бы делить место с дверью, а стене
+	# не найтись вовсе (ADR-0028, решение 2).
+	plan._lay_more_doors(rules, rng, taken)
+	# Двухэтажные пары проверяются по достижимости документов и выхода, а
+	# значит те уже должны стоять.
 	BuildingDecks.lay(plan, rules, rng)
 	return plan
 
@@ -295,6 +305,41 @@ func safe_spots(rules: BuildingRules, floor_index: int) -> PackedFloat64Array:
 		if _is_clear(rules, floor_index, x):
 			spots.append(x)
 	return spots
+
+
+## Места из [param spots] того же куска этажа, на котором стоит [param from_x].
+##
+## Возвращаться Otto обязан на свою сторону: этаж режут проёмы и глухие стены
+## (ADR-0024, решение 5), и за стеной может не оказаться ни лифта, ни эскалатора.
+## Место выбирается по живым агентам, а самое дальнее от них — как раз за стеной:
+## без этого отбора Otto воскресал бы там, откуда не уйти, и умирал бы туда снова.
+##
+## Погибший в кабине стоит над проёмом шахты, ни в одном куске: тогда берётся
+## ближайший кусок с местами — с него в кабину садятся. Отдай тут всё, Otto
+## воскресал бы в кармане за эскалатором, откуда хода нет (перемер M18e).
+##
+## Здесь, а не в уровне: счёт — одна раскладка, и проверяется он без сцены.
+##
+## Мест нет ни в одном куске — отдаётся всё, что было: остаться вовсе без места
+## хуже, чем встать не на своей половине.
+func spots_on_the_same_piece(
+	rules: BuildingRules, floor_index: int, from_x: float, spots: PackedFloat64Array
+) -> PackedFloat64Array:
+	var pieces := spans_between(blocks_on(rules, floor_index), rules.floor_span(floor_index))
+	var best := PackedFloat64Array()
+	var best_gap := INF
+	for piece: Vector2 in pieces:
+		var same := PackedFloat64Array()
+		for x: float in spots:
+			if x >= piece.x and x <= piece.y:
+				same.append(x)
+		if same.is_empty():
+			continue
+		var gap := maxf(maxf(piece.x - from_x, from_x - piece.y), 0.0)
+		if gap < best_gap:
+			best_gap = gap
+			best = same
+	return spots if best.is_empty() else best
 
 
 func _is_clear(rules: BuildingRules, floor_index: int, x: float) -> bool:
@@ -582,15 +627,16 @@ func _pick_escalator_slot(
 	return -1 if pool.is_empty() else pick_any(rng, pool)
 
 
-## Останется ли на уровне место под обязательное — двери и лампы, — если занять
-## на нём ещё [param taking] мест.
+## Останется ли на уровне место под обязательное — одну дверь и лампы, — если
+## занять на нём ещё [param taking] мест. Двери сверх одной обязательными не
+## считаются: они занимают то, что осталось (ADR-0028, решение 2).
 ##
 ## Без этого счёта раскладка тратит последние места этажа на то, что можно и не
 ## ставить, а лампа потом делит место с дверью: этаж без лампы чёрен в кадре, и
 ## для правила темноты он вечно горящий — гасить нечего (ADR-0023).
 func _room_left(rules: BuildingRules, taken: Dictionary, level: int, taking: int) -> bool:
 	var free := _free_slots(rules, taken, [level] as Array[int])
-	return free.size() - taking >= rules.doors_on(level) + rules.lamps_on(level)
+	return free.size() - taking >= mini(rules.doors_on(level), 1) + rules.lamps_on(level)
 
 
 ## Где ближайшая к середине этажа шахта, которая его обслуживает. Ею меряется,
@@ -651,17 +697,44 @@ func _lay_doors(rules: BuildingRules, rng: RandomNumberGenerator, taken: Diction
 	#
 	# И только туда, куда ведёт маршрут: проём режет этаж надвое, и за дырой
 	# документ достаётся лишь прыжком через неё, а промах роняет этажом ниже.
-	var with_document := _lay_documents(rules, rng, taken)
+	var with_document := BuildingDocuments.lay(self, rules, rng, taken)
 
 	for index in floors:
 		var already := 1 if with_document.has(index) else 0
-		for _number in rules.doors_on(index) - already:
-			if not _lay_door(rules, rng, taken, index, false):
+		for _number in mini(rules.doors_on(index), 1) - already:
+			if not place_door(rules, rng, taken, index, false):
 				break
 
 
+## Двери сверх обязательной: до числа карты, сколько влезет в оставшееся.
+func _lay_more_doors(rules: BuildingRules, rng: RandomNumberGenerator, taken: Dictionary) -> void:
+	# Счёт по этажам — одним проходом: двери сверх него встают только на свой
+	# этаж и чужого счёта не меняют.
+	var placed: Dictionary = {}
+	for door in doors:
+		placed[door.floor_index] = int(placed.get(door.floor_index, 0)) + 1
+	for index in floors:
+		for _number in rules.doors_on(index) - int(placed.get(index, 0)):
+			if not place_door(rules, rng, taken, index, false):
+				break
+
+
+## Занимает места вплотную к стенам: дверь за стеной — дверь, в которую не
+## войти. Тем же зазором стена сама обходит двери ([method _wall_blockers]).
+func _reserve_beside_walls(rules: BuildingRules, taken: Dictionary) -> void:
+	var reach := (rules.slot_x(1) - rules.slot_x(0)) * 0.5 + rules.inner_wall_width * 0.5
+	for wall in walls:
+		var span := rules.slot_range(wall.floor_index)
+		for slot in range(span.x, span.y + 1):
+			if absf(rules.slot_x(slot) - wall.x) < reach:
+				_occupy(taken, wall.floor_index, slot)
+
+
 ## Ставит дверь на свободное место этажа. Возвращает false, если места не нашлось.
-func _lay_door(
+##
+## Публичный ради [BuildingDocuments]: красные двери встают тем же жребием,
+## что и синие.
+func place_door(
 	rules: BuildingRules,
 	rng: RandomNumberGenerator,
 	taken: Dictionary,
@@ -701,8 +774,10 @@ func _lay_door(
 ## Этаж делится на столько зон, сколько ламп, и каждая встаёт в ближайшее к
 ## середине своей зоны свободное место.
 ##
-## Лампы кладутся последними и уступают шахтам, эскалаторам и дверям, поэтому
-## свободного места может не хватить — тогда ламп меньше. **Но не ноль:** этаж
+## Лампы уступают шахтам, эскалаторам и обязательной двери — двери сверх неё
+## встают уже после ламп ([method _lay_more_doors]), — поэтому свободного места
+## может не хватить, и тогда ламп меньше. Тёмный этаж карты ламп не просит вовсе
+## ([method BuildingRules.is_unlit]). **Прочий — не ноль:** этаж
 ## без единой лампы не светел и погасить его нечем — для правила темноты он
 ## навсегда освещённый, хотя в кадре он чёрный. Когда свободных мест не
 ## осталось, лампа делит место с дверью: дверь стоит у задней стены, лампа
@@ -865,61 +940,6 @@ static func _nearest_slot(free: Array[int], ideal: float) -> int:
 		if absf(float(slot) - ideal) < absf(float(best) - ideal):
 			best = slot
 	return best
-
-
-## Раскладывает красные двери: здание делится на полосы, и из каждой берётся
-## один этаж. Так документы разнесены по высоте и пройти приходится всё здание.
-##
-## Внутри полосы этажи перебираются, пока дверь не встанет: на достижимой части
-## этажа может не остаться места, и тогда документ переезжает на соседний этаж,
-## а не пропадает — собрать четыре из пяти нельзя.
-func _lay_documents(
-	rules: BuildingRules, rng: RandomNumberGenerator, taken: Dictionary
-) -> Dictionary:
-	var chosen: Dictionary = {}
-	var wanted := mini(rules.documents, floors)
-	if wanted <= 0:
-		# Раньше проверки: маршрут — перебор всей раскладки, а в здании без
-		# документов он никому не нужен. Да и на здании в ноль этажей он падает.
-		return chosen
-
-	# Куски этажей считаем один раз: сами по себе они — перебор всей раскладки,
-	# и маршруту нужны ровно те же самые.
-	var spans := BuildingRoute.segments(self, rules)
-	var routed := BuildingRoute.reachable_in(self, rules, spans)
-
-	var band := float(floors) / float(wanted)
-	for number in wanted:
-		var from := int(floor(band * float(number)))
-		var to := maxi(int(floor(band * float(number + 1))) - 1, from)
-		var placed := false
-
-		for index: int in _shuffled_range(rng, from, to):
-			if chosen.has(index):
-				continue
-			if not _lay_door(rules, rng, taken, index, true, routed, spans):
-				continue
-			chosen[index] = true
-			placed = true
-			break
-
-		if not placed:
-			push_error("в полосе %d..%d некуда положить документ" % [from, to])
-	return chosen
-
-
-## Этажи полосы в случайном порядке. Своя тасовка, а не [method Array.shuffle]:
-## та берёт глобальный генератор, и здание перестало бы повторяться по сиду.
-func _shuffled_range(rng: RandomNumberGenerator, from: int, to: int) -> Array[int]:
-	var order: Array[int] = []
-	for index in range(from, to + 1):
-		order.append(index)
-	for index in range(order.size() - 1, 0, -1):
-		var other := rng.randi_range(0, index)
-		var kept := order[index]
-		order[index] = order[other]
-		order[other] = kept
-	return order
 
 
 ## Место из набора, по возможности не [param avoid]. Если выбора нет — любое:
