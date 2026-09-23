@@ -96,87 +96,27 @@ func test_slots_spread_between_the_margins() -> void:
 	assert_eq(rules.slot_x(rules.slots - 1), rules.width - rules.margin)
 
 
-func test_agents_get_meaner_building_by_building() -> void:
-	var first := BuildingRules.for_building(1).agent_menace
-	var second := BuildingRules.for_building(2).agent_menace
-	assert_eq(first, 1.0, "первое здание — обычные агенты")
-	assert_almost_eq(second - first, BuildingRules.MENACE_PER_BUILDING, 0.001)
+## Навык растёт с каждым зданием и стартует с уровня сложности партии — как
+## в ROM, где к DIP-переключателю прибавляются пройденные здания (ADR-0027).
+func test_skill_grows_building_by_building() -> void:
+	assert_eq(BuildingRules.for_building(1).skill, 0, "первое здание на лёгком — ноль")
+	assert_eq(BuildingRules.for_building(2).skill, 1, "каждое следующее — на единицу")
+	assert_eq(BuildingRules.for_building(1, 3).skill, 3, "уровень сложности — стартовый навык")
+	assert_eq(BuildingRules.for_building(5, 2).skill, 6)
 
 
-func test_growth_by_building_leaves_room_for_the_alarm() -> void:
-	var far := BuildingRules.for_building(100).agent_menace
-	assert_eq(far, BuildingRules.MENACE_BY_BUILDING_CAP)
-	assert_lt(
-		far,
-		BuildingRules.MENACE_CAP,
-		"рост от зданий упирается ниже общего потолка, иначе сирене нечего добавить"
-	)
-
-
-## Потолок общий: пока он стоял только на росте от зданий, тревога множила уже
-## обрезанное число и уводила дальность выстрела на 900 px при этаже в 1120 px.
-func test_the_alarm_cannot_push_menace_past_the_cap() -> void:
-	var rules := BuildingRules.for_building(100)
-	assert_eq(rules.menace_with(1.5), BuildingRules.MENACE_CAP)
-	assert_eq(rules.menace_with(100.0), BuildingRules.MENACE_CAP, "и никакая другая")
-
-
-func test_the_alarm_still_bites_on_early_buildings() -> void:
-	var rules := BuildingRules.for_building(1)
-	assert_gt(rules.menace_with(1.5), rules.menace_with(1.0))
-
-
-## Ноль из инспектора делил бы на себя задержку смены агента и запер бы дверь.
-func test_menace_never_reaches_zero() -> void:
+## Ручной потолок агентов — для прогонов; без него — ROM, три или четыре.
+func test_agents_at_once_follow_the_rom_unless_capped() -> void:
 	var rules := BuildingRules.new()
-	rules.agent_menace = 0.0
-	assert_gt(rules.menace_with(1.0), 0.0)
+	assert_eq(rules.agents_at_once(0.0), 3, "с начала здания трое")
+	rules.agents_at_once_cap = 7
+	assert_eq(rules.agents_at_once(0.0), 7, "ручной потолок важнее")
 
 
-## Числа боя лежат в правилах здания, а не в сцене агента: только так их можно
-## растить от здания к зданию (ADR-0016, пункт 5).
-func test_combat_numbers_hold_together() -> void:
+func test_stance_heights_hold_together() -> void:
 	var rules := BuildingRules.new()
-	assert_lt(rules.agent_dark_fire_range, rules.agent_fire_range, "в темноте агент замечает ближе")
 	assert_lt(rules.agent_prone_height, rules.agent_kneel_height, "лёжа ниже, чем на колене")
-	assert_lt(
-		rules.agent_kneels_from_menace,
-		rules.agent_goes_prone_from_menace,
-		"сперва агент учится приседать и только потом ложиться"
-	)
-	assert_gt(rules.agent_dodge_sight, 0.0, "не видя пули, уклоняться не от чего")
-	assert_gt(rules.agents_at_once, 0, "здание без агентов — не здание")
-
-
-## Дальность агента не должна простреливать этаж насквозь: иначе подойти к нему
-## нечем, и это ровно то, из-за чего в ADR-0006 пришлось заводить потолок злости.
-##
-## Считается по самому узкому этажу с дверями — верхнему: на широких нижних
-## запас только больше.
-func test_an_agent_cannot_cover_a_whole_floor() -> void:
-	var rules := BuildingRules.new()
-	assert_lt(
-		rules.agent_fire_range,
-		rules.floor_width(0) * 0.5,
-		"даже на самом узком этаже есть куда встать вне огня"
-	)
-
-
-## Ради чего стоит потолок злости: даже у самого злого агента пуля летит
-## дольше, чем игрок успевает нажать.
-##
-## Держит он теперь скорострельность и скорость пули, а не дальность (ADR-0016,
-## пункт 1), и проверять его надо по ним. Время на ход считается по пуле:
-## сколько она летит с дальнего края зоны огня. Пятая доля секунды — это уже
-## не реакция, а лотерея.
-func test_even_the_meanest_agent_leaves_time_to_react() -> void:
-	var rules := BuildingRules.for_building(99)
-	var menace := rules.menace_with(GreyboxLevel.ALARM_MENACE)
-	assert_eq(menace, BuildingRules.MENACE_CAP, "к девяносто девятому зданию злее уже некуда")
-
-	var flight := rules.agent_fire_range / (rules.agent_bullet_speed * menace)
-	assert_gt(flight, 0.2, "пуля с дальнего края летит дольше человеческой реакции")
-	assert_gt(rules.agent_aim_time, 0.0, "а первый выстрел не уходит в тот же кадр")
+	assert_gt(rules.agent_dark_fire_range, 0.0, "в темноте вплотную агент Otto видит")
 
 
 ## Ламп по ширине: узкий верх — одна, широкий низ — три. Ряд светильников по

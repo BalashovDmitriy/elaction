@@ -25,6 +25,11 @@ UI_VOLUME_MUSIC,Music,Музыка
 UI_VOLUME_SFX,Effects,Эффекты
 UI_LANGUAGE,Language,Язык
 UI_FULLSCREEN,Fullscreen,Полный экран
+UI_DIFFICULTY,Difficulty,Сложность
+UI_DIFFICULTY_0,Easy,Лёгкая
+UI_DIFFICULTY_1,Normal,Обычная
+UI_DIFFICULTY_2,Hard,Трудная
+UI_DIFFICULTY_3,Hardest,Очень трудная
 UI_LANGUAGE_RU,Русский,Русский
 UI_LANGUAGE_EN,English,English
 UI_MOVE,Move,Движение

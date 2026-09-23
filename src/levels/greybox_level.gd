@@ -26,7 +26,6 @@ const ROPE_DROP: float = 2.64
 const ROPE_SPEED: float = 4.2
 
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
-const EXIT_CAR_MODEL := preload("res://assets/models/car.glb")
 const ESCALATOR_SCENE := preload("res://src/systems/escalators/escalator.tscn")
 const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
@@ -52,20 +51,6 @@ const LAMP_DROP: float = Proportions.LAMP_CORD + Proportions.LAMP.y * 0.5
 ## (ADR-0026, решение 7).
 const EXIT_HEIGHT: float = Proportions.BODY * 0.95
 
-## Машина у выхода: ею оригинал заканчивает здание (ADR-0011, пункт 14).
-## Стоит рядом с проёмом и уезжает, увозя Otto; следующее здание собирается
-## после отъезда, а не в тот же кадр.
-##
-## Длина модели `car.glb`, м: по ней машина ставится в зазор от проёма и
-## считается уехавшей из кадра. `tools/build_actors.py` строит кузов ровно такой
-## длины; высота и ширина у модели свои, и здесь они никому не нужны.
-const CAR_LENGTH: float = Proportions.CAR_LENGTH
-const CAR_GAP: float = 0.36
-const CAR_SPEED: float = 9.6
-## Машина стоит снаружи здания: за плоскостью игры, но перед стеной, чтобы
-## Otto проходил перед ней, а не сквозь.
-const CAR_Z: float = -0.6
-
 ## Вывеска над выходом: габарит и на сколько выше проёма стены висит её
 ## середина, м (ADR-0023, решение 6).
 const EXIT_SIGN_SIZE := Vector3(1.2, 0.18, 0.06)
@@ -78,9 +63,12 @@ const ROOF_LIGHT_ENERGY: float = 2.4
 const ROOF_LIGHT_RANGE: float = 14.0
 const ROOF_LIGHT_HEIGHT: float = 4.0
 
-## Насколько злее агенты и насколько хуже слушается кабина по тревоге.
-const ALARM_MENACE: float = 1.5
+## Насколько хуже слушается кабина по тревоге, с.
 const ALARM_CAR_DELAY: float = 0.6
+
+## С какого отрыва по этажам агент уходит в ближайшую дверь: в ROM — 80 px
+## экрана, этаж и две трети (@041F).
+const AGENT_FAR_FLOORS: int = 2
 
 ## На сколько этажей дальше видимой полосы дверь ещё выпускает агентов.
 ##
@@ -123,8 +111,8 @@ class AgentPost:
 	## занимает: иначе за время телеграфа успело бы открыться сколько угодно
 	## дверей, и агенты вывалились бы разом сверх потолка (ADR-0020).
 	var opening: bool = false
-	## Сколько двери ещё ждать, прежде чем выпустить следующего, с.
-	var wait: float = 0.0
+	## Ячейка агента, которого дверь выпускает или выпустила; -1 — никакая.
+	var slot: int = -1
 
 
 ## Правила здания. Пустые — значит берутся по умолчанию.
@@ -161,13 +149,13 @@ var _escalators: Array[Escalator] = []
 ## Посты у агентских дверей, по одному на дверь. Двери здания не выпускают всех
 ## разом — только те, чей этаж рядом с игроком (ADR-0014, пункт 4).
 var _posts: Array[AgentPost] = []
+## Жребий выпуска агентов по ROM и сколько ещё длится тревога агентов, с.
+var _spawn := AgentSpawn.new()
+var _alert_left: float = 0.0
 ## Здание сдано. Событие однократное: по нему main собирает следующее здание.
 var _cleared: bool = false
-## Машина у выхода и её отъезд: пока она едет, здание ещё не сдано.
-var _car: Node3D = null
-var _car_leaving: bool = false
-## Куда машина уезжает: -1 влево, +1 вправо. Та же сторона, с которой она стоит.
-var _car_towards: float = 1.0
+## Машина у выхода: пока она едет, здание ещё не сдано.
+var _car: ExitCar = null
 var _exit_position := Vector2.ZERO
 ## Трос вступления и докуда по нему ехать, в плоскости правил. Пока едет —
 ## Otto не слушается ввода.
@@ -182,6 +170,7 @@ func _ready() -> void:
 	if rules == null:
 		rules = BuildingRules.new()
 	_plan = BuildingPlan.generate(rules, building_seed)
+	_spawn.rng.seed = building_seed
 
 	_ribs = BuildingRibs.new()
 	_ribs.name = "Ribs"
@@ -317,7 +306,7 @@ func _spawn_shafts() -> void:
 func _start_the_slide(landing: Vector2) -> void:
 	_rope_target = landing.y
 	_sliding = true
-	otto.board_escalator()
+	otto.ride(true)
 
 	_rope = GreyboxLook.box(
 		Vector3(ROPE_WIDTH, landing.y, ROPE_WIDTH), GreyboxLook.surface(GreyboxLook.WALL)
@@ -340,9 +329,10 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var view := otto.camera_view()
-	if _car_leaving:
-		_move_car(delta, view)
+	if _car != null and _car.advance(delta, view):
+		building_cleared.emit()
 
+	_stir_agents(delta)
 	_shroud_agents()
 	# Агенты пересчитываются каждый шаг, а не только на смене полосы: дверь ждёт
 	# своей паузы, и пропустив шаг смены, она не выпустила бы никого до следующей.
@@ -367,7 +357,7 @@ func _slide_along(delta: float) -> void:
 ## Отдаёт управление игроку и убирает трос.
 func _finish_the_slide() -> void:
 	_sliding = false
-	otto.leave_escalator()
+	otto.ride(false)
 	if _rope != null:
 		_rope.queue_free()
 		_rope = null
@@ -510,45 +500,11 @@ func _spawn_exit() -> void:
 	_spawn_car(area)
 
 
-## Машина у выхода. Стоит на полу нижнего этажа рядом с проёмом, за плоскостью
-## игры: она снаружи здания, и заходить на неё Otto не может — это вид, не тело.
+## Машина у выхода: ставит её [ExitCar] у проёма, на пол нижнего этажа.
 func _spawn_car(exit_area: Rect2) -> void:
-	_car = EXIT_CAR_MODEL.instantiate() as Node3D
-	_car.name = "ExitCar"
-	# Уезжает в ближнюю сторону: там же и стоит. В дальнюю машина ехала бы через
-	# всё здание, и «уехал» растянулось бы на пять секунд вместо одной.
-	_car_towards = -1.0 if exit_area.get_center().x < rules.width * 0.5 else 1.0
-	var x := (
-		exit_area.get_center().x
-		+ _car_towards * (BuildingShell.EXIT_WIDTH * 0.5 + CAR_GAP + CAR_LENGTH * 0.5)
-	)
-	# Модель стоит колёсами в своём нуле, капотом в +X; в другую сторону она
-	# разворачивается целиком.
-	_car.position = WorldSpace.to_scene(Vector2(x, exit_area.end.y))
-	_car.position.z = CAR_Z
-	if _car_towards < 0.0:
-		_car.rotation.y = PI
+	_car = ExitCar.new()
+	_car.park(exit_area.get_center().x, exit_area.end.y, rules.width)
 	add_child(_car)
-
-
-## Otto сел в машину: она уезжает, и только по её отъезду здание считается
-## сданным (ADR-0011, пункт 14). Otto на это время прячется, как за дверью.
-func _drive_away(runner: Otto) -> void:
-	_car_leaving = true
-	runner.enter_door()
-	Sounds.play(Sounds.CAR_AWAY)
-
-
-func _move_car(delta: float, view: Rect2) -> void:
-	_car.position.x += _car_towards * CAR_SPEED * delta
-
-	# Уехала — значит уехала из кадра, а не за границу здания: кадр и есть то,
-	# что видит игрок, а до границы машина ползла бы впятеро дольше.
-	var left := _car.position.x - CAR_LENGTH * 0.5
-	var gone := left + CAR_LENGTH < view.position.x or left > view.end.x
-	if gone:
-		_car_leaving = false
-		building_cleared.emit()
 
 
 func _on_exit_entered(body: Node3D) -> void:
@@ -558,7 +514,10 @@ func _on_exit_entered(body: Node3D) -> void:
 	if GameState.instance().all_documents_collected():
 		if not _cleared:
 			_cleared = true
-			_drive_away(runner)
+			# Otto на время отъезда прячется, как за дверью, и только по отъезду
+			# здание считается сданным (ADR-0011, пункт 14).
+			runner.stay_indoors(true)
+			_car.drive_away()
 		return
 
 	# Перенос отложен: сигнал приходит посреди разбора перекрытий, и двигать
@@ -601,9 +560,11 @@ func _on_lamp_fell(index: int, x: float) -> void:
 ## которой зависит, видят ли они его вовсе (ADR-0023, решение 8).
 ##
 ## Каждый кадр, а не по событию: агенты ходят по этажу, и зона под ними
-## меняется на ходу. Живых в здании не больше восьми, но ищет их [method agents]
+## меняется на ходу. Живых в здании не больше четырёх, но ищет их [method agents]
 ## перебором всех детей уровня, а их под три сотни: если кадр когда-нибудь упрётся
 ## в это, агентов надо держать списком, а не искать заново.
+##
+## Тем же проходом раздаётся и тревога агентов ([method _stir_agents]).
 func _shroud_agents() -> void:
 	var here := _floor_of(otto)
 	var otto_in_the_dark := _lighting.is_dark_at(here, otto.global_position.x)
@@ -611,6 +572,8 @@ func _shroud_agents() -> void:
 		if agent.is_dead():
 			continue
 		_shroud_agent(agent, _floor_of(agent), agent.global_position.x, here, otto_in_the_dark)
+		if _alert_left > 0.0:
+			agent.alert_for(_alert_left)
 
 
 ## Что агент знает про Otto и про себя: своя темнота, тень Otto и глухая стена
@@ -621,8 +584,8 @@ func _shroud_agents() -> void:
 ## агента. Разъехаться им нельзя, иначе первый шаг агент делал бы по другим
 ## правилам, чем все следующие, — на стене это едва не случилось.
 ##
-## Про Otto ([param here], [param target_in_the_dark]) считается снаружи: в кадре
-## агентов восемь, а Otto один, и восемь одинаковых счётов за кадр ни к чему.
+## Про Otto ([param here], [param target_in_the_dark]) считается снаружи: агентов
+## до четырёх, а Otto один, и четыре одинаковых счёта за кадр ни к чему.
 ## [param where] и [param x] — тоже снаружи: у только что выпущенного агента
 ## координата ещё коврика двери, а не его тела.
 func _shroud_agent(agent: Enemy, where: int, x: float, here: int, target_in_the_dark: bool) -> void:
@@ -632,7 +595,17 @@ func _shroud_agent(agent: Enemy, where: int, x: float, here: int, target_in_the_
 	agent.set_target_behind_a_wall(
 		where == here and _plan.wall_between(here, x, otto.global_position.x)
 	)
-	agent.set_lift_at(AgentLifts.offer(_plan, rules, _cars, where, x, here))
+	var lift := AgentLifts.offer(_plan, rules, _cars, where, x, here)
+	agent.set_lift_at(lift)
+	# Далеко отставший агент уходит в ближайшую дверь, а не бродит до конца
+	# здания (@041F): его ячейка нужнее там, где игрок. Но только тот, кому
+	# не на чем доехать: у кого шахта в сторону Otto под боком, ждёт кабину.
+	var stranded := (
+		absi(where - here) >= AGENT_FAR_FLOORS
+		and is_nan(lift)
+		and not AgentLifts.can_ride(_plan, rules, where, x, here)
+	)
+	agent.set_exit_at(AgentLifts.nearest_door(_plan, rules, _cars, where, x) if stranded else NAN)
 
 
 ## Все агенты здания: они лежат прямо в уровне, рядом с геометрией.
@@ -662,26 +635,22 @@ func _floor_of(node: Node3D) -> int:
 	return rules.floor_index_near(WorldSpace.to_plane(node.global_position).y)
 
 
-## Держит в здании ровно тех агентов, до которых игроку есть дело: выпускает
-## их у дверей рядом с кадром и убирает тех, кто остался далеко позади.
+## Держит в здании ровно тех агентов, до которых игроку есть дело, — по правилам
+## выпуска аркадного ROM (ADR-0027, решение 2).
 ##
-## Раньше все 55 выходили разом в [method _ready] и жили до конца здания. Это
-## и не давало играть — двое стояли на крыше в зоне огня от точки старта, — и
-## держало полсотни тел с физикой и ИИ на каждом кадре (ADR-0014, пункт 4).
+## Агентов в здании не больше трёх, а поздно и на высоком навыке — четырёх:
+## столько ячеек держит ROM (@594D). Раз в тик логики уровень бросает жребий:
+## этаж Otto, выше или ниже, — а с шансом по сложности именно этаж Otto (@5A4C), —
+## и случайная свободная синяя дверь на нём. На этаже агентов не больше, чем
+## разрешает время в здании; пока Otto не на ногах или тревоги агентов нет — один
+## (@5905, @59F4).
 ##
-## Живых не больше, чем разрешают правила, и выпускается за кадр один — тот, чья
-## дверь ближе к игроку. Полоса выпуска шире кадра, и внизу здания на каждом её
-## этаже по две двери: без потолка живых набиралось до восемнадцати, и нижние
-## этажи выходили тиром (ADR-0016, пункт 6).
-##
-## Один за кадр — не бережливость, а та же мера: двери и так ждут свою паузу,
-## а вываливать пятерых разом на смене полосы незачем.
+## Поверх ROM остаются наши правила двери: не выпускать вплотную к Otto и
+## телеграф створки (ADR-0020). Агенты, отставшие на несколько этажей за кадр,
+## убираются, как раньше: ячейка им нужнее там, где игрок.
 func _tend_agents(span: Vector2i, delta: float) -> void:
-	var here := _floor_of(otto)
 	var live := 0
-	var nearest: AgentPost = null
-	var nearest_gap := 0
-
+	var per_floor: Dictionary = {}
 	for post: AgentPost in _posts:
 		# Живость проверяется прямо по полю: свой агент у двери один, а чужого
 		# сюда положить некому.
@@ -690,8 +659,11 @@ func _tend_agents(span: Vector2i, delta: float) -> void:
 				post.agent.queue_free()
 				post.agent = null
 				post.door.dismiss_agent()
+				_free_slot(post)
 				continue
 			live += 1
+			var where := _floor_of(post.agent)
+			per_floor[where] = int(per_floor.get(where, 0)) + 1
 			# Створка идёт обратно, как только агент освободил проём: открытая
 			# дверь в кадре значит «оттуда сейчас полезут», и держать её
 			# открытой при живом агенте — размывать знак (ADR-0020, решение 4).
@@ -700,51 +672,94 @@ func _tend_agents(span: Vector2i, delta: float) -> void:
 			continue
 
 		# Створка уже идёт: ждём, пока откроется, и только тогда выпускаем.
-		# Место под потолком живых агент занимает уже сейчас.
+		# Ячейку агент занимает уже сейчас.
 		if post.opening:
 			if not _within(span, post.floor_index, AGENT_SPAWN_MARGIN):
 				post.door.dismiss_agent()
 				post.opening = false
+				_free_slot(post)
 				continue
 			live += 1
+			per_floor[post.floor_index] = int(per_floor.get(post.floor_index, 0)) + 1
 			if post.door.agent_may_step_out():
 				post.agent = _release_agent(post)
 				post.opening = false
 			continue
 
-		# Проём свободен: агента убили или он уехал из полосы. Створка идёт
-		# обратно и отсюда тоже — убитый ровно в тот кадр, когда перестал быть
-		# неуязвимым, до ветки живых не доживает, и дверь, которой об этом не
-		# сказали, осталась бы стоять открытой навсегда: занятую [method
-		# Door.summon_agent] больше не откроет. Вызов у закрытой — пустышка.
+		# Проём свободен: агента убили или он ушёл. Створка идёт обратно и
+		# отсюда тоже — убитый ровно в тот кадр, когда перестал быть неуязвимым,
+		# до ветки живых не доживает, и дверь, которой об этом не сказали,
+		# осталась бы стоять открытой навсегда. Вызов у закрытой — пустышка.
+		post.agent = null
 		post.door.dismiss_agent()
 
-		# Дверь, чей агент умер или уехал, ждёт свою паузу и только потом
-		# выпускает следующего. Пауза идёт игровым временем, а не настенными
-		# часами: на паузе здание замирает целиком, и смена агента не должна
-		# приходить, пока игра стоит, — а под [member Engine.time_scale] она
-		# должна ускоряться вместе со всем остальным, иначе прогон ботом видит
-		# вчетверо более редких агентов, чем игрок.
-		post.agent = null
-		post.wait = maxf(post.wait - delta, 0.0)
-		if post.wait > 0.0 or not _within(span, post.floor_index, AGENT_SPAWN_MARGIN):
-			continue
-		if _too_close_to_otto(post, here):
-			continue
-		# Створка ещё идёт за прошлым агентом — дверь не в счёт. Иначе она,
-		# будучи ближайшей, забирала бы кадр себе и не выпускала никого: за
-		# кадр выпускается один, и берётся он у ближайшей двери.
-		if not post.door.can_summon():
-			continue
+	if _spawn.tick(delta):
+		_try_to_spawn(span, live, per_floor)
 
-		var gap := absi(post.floor_index - here)
-		if nearest == null or gap < nearest_gap:
-			nearest = post
-			nearest_gap = gap
 
-	if nearest != null and live < rules.agents_at_once:
-		# Не агент, а просьба открыться: сам он покажется, когда створка дойдёт.
-		nearest.opening = nearest.door.summon_agent()
+## Один жребий выпуска: ячейка, этаж, дверь (try_to_spawn_an_enemy_5A26).
+func _try_to_spawn(span: Vector2i, live: int, per_floor: Dictionary) -> void:
+	var time := _building_time()
+	var available := rules.agents_at_once(time)
+	if live >= available:
+		return
+	var slot := _spawn.open_slot(available)
+	if slot < 0:
+		return
+
+	var here := _floor_of(otto)
+	var floor_index := _spawn.pick_floor(here, _difficulty())
+	var cap := Arcade.agents_per_floor(time, otto.is_on_foot(), _alert_left > 0.0)
+	if int(per_floor.get(floor_index, 0)) >= cap:
+		return
+
+	var free: Array[AgentPost] = []
+	for post: AgentPost in _posts:
+		if post.floor_index != floor_index or post.opening or is_instance_valid(post.agent):
+			continue
+		if not _within(span, post.floor_index, AGENT_SPAWN_MARGIN):
+			continue
+		# Створка ещё идёт за прошлым агентом — дверь не в счёт.
+		if _too_close_to_otto(post, here) or not post.door.can_summon():
+			continue
+		free.append(post)
+	if free.is_empty():
+		return
+
+	var chosen := free[_spawn.pick(free.size())]
+	# Не агент, а просьба открыться: сам он покажется, когда створка дойдёт.
+	chosen.opening = chosen.door.summon_agent()
+	if chosen.opening:
+		chosen.slot = slot
+		_spawn.take(slot)
+
+
+## Освобождает ячейку поста: смена в ней придёт через паузу по сложности.
+func _free_slot(post: AgentPost) -> void:
+	_spawn.release(post.slot, _difficulty())
+	post.slot = -1
+
+
+## Сколько уже идёт здание, с: от этого растёт сложность (ADR-0027, решение 1).
+func _building_time() -> float:
+	return GameState.instance().alarm.elapsed()
+
+
+## Сложность здания прямо сейчас: навык плюс время (compute_difficulty_592F).
+func _difficulty() -> int:
+	return Arcade.difficulty(rules.skill, _building_time())
+
+
+## Тревога агентов: пуля Otto в кадре при сложности больше нуля — 90 тиков
+## (@59C8). Под ней выпуск идёт по полному пределу этажа, а агенты стреляют,
+## не глядя (ADR-0027, решение 5).
+##
+## Самим агентам её раздаёт [method _shroud_agents] тем же проходом, что и
+## темноту: второй перебор трёхсот детей уровня за кадр ради этого ни к чему.
+func _stir_agents(delta: float) -> void:
+	_alert_left = maxf(_alert_left - delta, 0.0)
+	if _difficulty() > 0 and Bullet.any_in_flight(get_tree(), Bullet.FROM_OTTO):
+		_alert_left = Arcade.seconds(Arcade.ALERT_TICKS)
 
 
 ## Ставит дверь на довольствие: с этой минуты она выпускает агентов.
@@ -789,6 +804,10 @@ func _release_agent(post: AgentPost) -> Enemy:
 	# Правила отдаются до дерева: так агент входит в него уже настроенным, и
 	# заводить себе значения по умолчанию ему не приходится.
 	agent.apply_rules(rules)
+	# Сеется до [method Enemy.setup]: выход из двери уже тянет из генератора
+	# длину первого перехода, и несеянный он дал бы её случайной — прогон бота
+	# переставал бы повторяться с первого же агента.
+	agent.seed_decisions(_spawn.rng.randi())
 	add_child(agent)
 	agent.global_position = WorldSpace.to_scene(mat)
 	agent.setup(otto, signf(otto.global_position.x - mat.x))
@@ -798,17 +817,13 @@ func _release_agent(post: AgentPost) -> Enemy:
 	_shroud_agent(
 		agent, post.floor_index, mat.x, here, _lighting.is_dark_at(here, otto.global_position.x)
 	)
-	agent.set_menace(_menace())
+	agent.set_threat(_difficulty(), rules.skill, GameState.instance().alarm.raised)
+	agent.set_late(post.slot >= 2)
+	if _alert_left > 0.0:
+		agent.alert_for(_alert_left)
 	agent.died.connect(_on_agent_died.bind(post))
+	agent.left_building.connect(_on_agent_left.bind(post))
 	return agent
-
-
-## Насколько злее агенты этого здания прямо сейчас: к росту от здания к зданию
-## добавляется тревога, если она уже включилась. Сам счёт — в [BuildingRules],
-## там же общий на обе надбавки потолок.
-func _menace() -> float:
-	var alarmed := GameState.instance().alarm.raised
-	return rules.menace_with(ALARM_MENACE if alarmed else 1.0)
 
 
 ## Сирена: агенты злеют, кабины начинают отвечать с задержкой.
@@ -819,14 +834,21 @@ func _on_alarm_raised() -> void:
 	for car in _cars:
 		car.set_response_delay(ALARM_CAR_DELAY)
 	for agent in agents():
-		agent.set_menace(_menace())
+		agent.set_alarmed(true)
 
 
 func _on_agent_died(_agent: Enemy, post: AgentPost) -> void:
-	# Смена не по таймеру, а отсчётом у самой двери: выпуском теперь заведует
-	# [method _tend_agents], и он же решает, подошёл ли этаж к игроку. Таймер
-	# выпустил бы агента у двери на другом конце здания, до которой нет дела.
-	post.wait = rules.agent_respawn_delay / _menace()
+	# Ячейка освобождается со сменой по сложности (@3866): следующего выпустит
+	# жребий, а не эта же дверь.
+	_free_slot(post)
+
+
+## Агент дошёл до двери и ушёл в неё (@55B0): тело убирается, ячейка свободна.
+func _on_agent_left(agent: Enemy, post: AgentPost) -> void:
+	agent.queue_free()
+	if post.agent == agent:
+		post.agent = null
+	_free_slot(post)
 
 
 func _on_otto_died() -> void:

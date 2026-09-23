@@ -11,6 +11,7 @@ extends SceneTree
 ##     godot --headless --script res://tools/playthrough.gd -- --seeds=1,2,3
 ##     godot --headless --script res://tools/playthrough.gd -- --seeds=1 --agents
 ##     godot --headless --script res://tools/playthrough.gd -- --agents --at-once=8
+##     godot --headless --script res://tools/playthrough.gd -- --agents --endless --skill=6
 ##     godot --headless --script res://tools/playthrough.gd -- --seeds=1 --trace --budget=3000
 ##
 ## С [code]--trace[/code] раз в [constant TRACE_EVERY] шагов печатается, где бот
@@ -35,6 +36,10 @@ const ENDLESS_LIVES: int = 99
 
 ## Как часто печатать трассу, шагов бота.
 const TRACE_EVERY: int = 300
+
+## Навык здания: уровень сложности плюс пройденные здания (ADR-0027). С ним
+## смертность бота меряется на каждом уровне, а не только на первом здании.
+var _skill: int = 0
 
 
 func _init() -> void:
@@ -64,6 +69,8 @@ func _run() -> void:
 			endless = true
 		elif argument == "--trace":
 			trace = true
+		elif argument.begins_with("--skill="):
+			_skill = maxi(argument.trim_prefix("--skill=").to_int(), 0)
 		elif argument.begins_with("--at-once="):
 			at_once = argument.trim_prefix("--at-once=").to_int()
 		elif argument.begins_with("--budget="):
@@ -97,8 +104,9 @@ func _play(
 
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
 	level.rules = BuildingRules.new()
+	level.rules.skill = _skill
 	if at_once > 0:
-		level.rules.agents_at_once = at_once
+		level.rules.agents_at_once_cap = at_once
 	level.building_seed = building_seed
 	level.spawn_agents = agents
 	root.add_child(level)
@@ -129,7 +137,7 @@ func _play(
 	print(
 		(
 			"\n=== Сид %d, агенты: %s, разом не больше %d ==="
-			% [building_seed, "да" if agents else "нет", level.rules.agents_at_once]
+			% [building_seed, "да" if agents else "нет", level.rules.agents_at_once(0.0)]
 		)
 	)
 

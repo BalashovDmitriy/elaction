@@ -137,7 +137,7 @@ func _stand_an_agent_at(x: float, index: int) -> void:
 	var agent := ENEMY_SCENE.instantiate() as Enemy
 	# Стоит на месте и безоружен: кадр про стену, а не про бой.
 	var peaceful := BuildingRules.new()
-	peaceful.agent_fire_range = 0.0
+	peaceful.agents_hold_fire = true
 	peaceful.agent_dark_fire_range = 0.0
 	agent.apply_rules(peaceful)
 	agent.walk_speed = 0.0

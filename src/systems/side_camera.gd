@@ -41,6 +41,8 @@ const TILT_DEGREES: float = 10.0
 @export var smoothing_speed: float = 8.0
 
 var _bounds := CameraBounds.new()
+## Кадр по правилам боя: 16:9 и без сглаживания, см. [method rule_view].
+var _rule_bounds := CameraBounds.new()
 ## За кем едет камера. Пустой — камера стоит там, где её поставили.
 var _target: Node3D = null
 var _centre := Vector2.ZERO
@@ -111,12 +113,29 @@ func apply_bounds(rect: Rect2) -> void:
 	var lowest := WorldSpace.height_to_scene(rect.end.y)
 	var highest := WorldSpace.height_to_scene(rect.position.y)
 	_bounds.limits = Rect2(rect.position.x, lowest, rect.size.x, highest - lowest)
+	_rule_bounds.limits = _bounds.limits
 	snap_to(_target_point() if _target != null else _centre)
 
 
 ## Что сейчас в кадре, в координатах правил.
 func view() -> Rect2:
-	var scene_view := _bounds.view_at(_centre)
+	return _to_plane(_bounds.view_at(_centre))
+
+
+## Кадр, по которому решает бой, в координатах правил: тот же, что у игрока,
+## но при 16:9 и без сглаживания — встаёт на цель сразу.
+##
+## Кадр игрока едет в [method Node._process] по настенным часам и шире на
+## широком окне. Исход партии обязан идти от физики (`docs/testing.md`, правило
+## из M18b): по кадру игрока агент стрелял бы или нет в зависимости от машины
+## и размера окна, и прогон бота переставал бы повторяться (ADR-0027, решение 3а).
+func rule_view() -> Rect2:
+	var centre := _centre if _target == null else _rule_bounds.clamp_centre(_target_point())
+	return _to_plane(_rule_bounds.view_at(centre))
+
+
+## Кадр сцены — в координаты правил: Y там растёт вниз.
+static func _to_plane(scene_view: Rect2) -> Rect2:
 	var top := WorldSpace.height_to_plane(scene_view.end.y)
 	return Rect2(scene_view.position.x, top, scene_view.size.x, scene_view.size.y)
 

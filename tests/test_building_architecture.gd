@@ -240,38 +240,35 @@ func test_no_more_live_agents_than_the_rules_allow() -> void:
 			most = maxi(most, _agents_in(level).size())
 
 		assert_gt(most, 0, "сид %d: двери на нижних этажах никого не выпустили" % building_seed)
+		# Потолок ROM — три, а поздно в здании четыре (ADR-0027, решение 2).
+		var ceiling := rules.agents_at_once(GameState.instance().alarm.elapsed())
 		assert_lte(
 			most,
-			rules.agents_at_once,
-			(
-				"сид %d: живых агентов разом %d при потолке %d"
-				% [building_seed, most, rules.agents_at_once]
-			)
+			ceiling,
+			"сид %d: живых агентов разом %d при потолке %d" % [building_seed, most, ceiling]
 		)
 		_drop(level)
 
 
-## Числа боя доезжают из правил до самого агента.
+## Правила доезжают из здания до самого агента.
 ##
-## Проверяется дальностью: с нулевой агент не стреляет вовсе, и это видно по
-## пулям и по тому, что Otto жив. Пока числа лежали в сцене агента, здание не
-## могло подкрутить их ничем (ADR-0016, пункт 5).
+## Проверяется переключателем «не стрелять»: с ним агент не стреляет вовсе, и
+## это видно по пулям и по тому, что Otto жив.
 func test_agents_take_their_combat_numbers_from_the_rules() -> void:
 	var toothless := BuildingRules.new()
-	toothless.agent_fire_range = 0.0
-	toothless.agent_dark_fire_range = 0.0
+	toothless.agents_hold_fire = true
 	var harmless := _build(1, true, toothless)
 	_stand_on(harmless, harmless.rules.floors - 2)
 	var quiet := await _worst_moment(harmless)
 	assert_gt(_agents_in(harmless).size(), 0, "агенты вышли")
-	assert_eq(quiet, 0, "но стрелять им нечем: дальность нулевая")
+	assert_eq(quiet, 0, "но им велено не стрелять")
 	assert_false(harmless.otto.is_dead(), "и Otto цел, простояв среди них столбом")
 	_drop(harmless)
 
 	var armed := _build(1, true)
 	_stand_on(armed, armed.rules.floors - 2)
 	var shots := await _worst_moment(armed)
-	assert_gt(shots, 0, "с обычной дальностью те же агенты стреляют")
+	assert_gt(shots, 0, "без запрета те же агенты стреляют")
 	_drop(armed)
 
 
@@ -316,3 +313,35 @@ func _wait_for_the_landing(level: GreyboxLevel) -> void:
 		await wait_physics_frames(1)
 		left -= 1
 	assert_true(level.otto.is_grounded(), "Otto съехал по тросу и встал на крышу")
+
+
+## Агент выходит там, где Otto: на его этаже, этажом выше или ниже (@5A26).
+##
+## До M18d выпуск шёл по всей полосе видимых этажей от ближайшей двери;
+## по ROM жребий бросается только на три этажа вокруг Otto (ADR-0027, решение 2).
+func test_agents_step_out_next_to_otto() -> void:
+	for building_seed: int in [1, 2, 3]:
+		var level := _build(building_seed, true)
+		var rules := level.rules
+		var here := rules.floors - 2
+		_stand_on(level, here)
+
+		var seen: Dictionary = {}
+		for _frame in CROWD_FRAMES:
+			await wait_physics_frames(1)
+			for agent in _agents_in(level):
+				var id := agent.get_instance_id()
+				if seen.has(id):
+					continue
+				seen[id] = true
+				var floor_index := _floor_of(rules, agent)
+				assert_lte(
+					absi(floor_index - here),
+					1,
+					(
+						"сид %d: агент вышел на этаже %d, Otto на %d"
+						% [building_seed, floor_index, here]
+					)
+				)
+		assert_gt(seen.size(), 0, "сид %d: никто не вышел" % building_seed)
+		_drop(level)

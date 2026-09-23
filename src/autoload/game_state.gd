@@ -34,6 +34,8 @@ const DOCUMENT_SCORE: int = 500
 const ENEMY_SHOT_SCORE: int = 100
 const ENEMY_KICK_SCORE: int = 150
 const LAMP_SCORE: int = 300
+## Агент, раздавленный кабиной, — 300, как в ROM (таблица очков @577B).
+const CRUSH_SCORE: int = 300
 
 ## Надбавка за убийство на погашенном этаже. Плоская, а не множитель: сверка
 ## перед M6 нашла таблицу — выстрел 100, выстрел в темноте 150, ногой 150,

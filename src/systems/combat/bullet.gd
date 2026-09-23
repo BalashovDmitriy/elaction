@@ -76,6 +76,16 @@ func _ready() -> void:
 	add_child(_flash)
 
 
+## Летит ли сейчас хоть одна пуля с маской [param mask]. По пуле Otto в кадре
+## агенты поднимают тревогу (ADR-0027, решение 5).
+static func any_in_flight(tree: SceneTree, mask: int) -> bool:
+	for node in tree.get_nodes_in_group(GROUP):
+		var bullet := node as Bullet
+		if bullet != null and bullet.collision_mask == mask:
+			return true
+	return false
+
+
 ## Половина длины пули, м.
 ##
 ## По ней считают, вышла ли пуля из габарита тела: миновав его середину, она

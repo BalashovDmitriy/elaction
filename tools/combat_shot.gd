@@ -35,6 +35,9 @@ const PATIENCE: int = 180
 ## так в кадр влезают оба.
 const GAP: float = 4.5
 
+## Сколько кадров дать позе досвестись перед снимком.
+const POSE_SETTLE_FRAMES: int = 12
+
 var _level: GreyboxLevel = null
 var _agent: Enemy = null
 var _seed: int = 1
@@ -69,8 +72,7 @@ func _run() -> void:
 	var rules := BuildingRules.new()
 	# Стрелять агенту нечем, а уклоняться — есть чем: злости хватает и на колено,
 	# и на «лёжа».
-	rules.agent_fire_range = 0.0
-	rules.agent_dark_fire_range = 0.0
+	rules.agents_hold_fire = true
 
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	if _level == null:
@@ -93,14 +95,14 @@ func _run() -> void:
 	_agent.global_position = WorldSpace.to_scene(Vector2(spot + GAP, rules.floor_surface(_floor)))
 	_agent.walk_speed = 0.0
 	_agent.setup(_level.otto, -1.0)
-	_agent.set_menace(rules.agent_goes_prone_from_menace)
+	_agent.set_threat(Arcade.TOP, rules.skill, false)
 	await get_tree().physics_frame
 	await _shoot("01_standoff")
 
-	# Высокая пуля идёт в 0.9 м над полом, колено — 0.76: агент уходит под неё.
+	# Высокая пуля идёт в 1.13 м над полом, колено — 1.05: агент уходит под неё.
 	await _stage(EnemyBrain.Stance.KNEEL, false, "02_agent_kneels")
 
-	# Низкая, из приседа, идёт в 0.45 м: колено её уже не пропускает, и агент ложится.
+	# Низкая, из приседа, идёт в 0.68 м: колено её уже не пропускает, и агент ложится.
 	await _stage(EnemyBrain.Stance.PRONE, true, "03_agent_goes_prone")
 
 	Input.action_release(&"move_down")
@@ -131,6 +133,10 @@ func _stand_on(index: int) -> float:
 ## Кадр снимается сразу, как стойка принята, а не после: агент держит её, только
 ## пока пуля летит, и «сниму потом» показало бы его уже выпрямившимся.
 func _stage(wanted: EnemyBrain.Stance, crouching: bool, label: String) -> void:
+	# Увёртка в ROM — действие целиком (@1C7A): пока агент в прошлой стойке,
+	# новую он не примет, и низкая пуля застала бы его на колене.
+	while not _agent.is_dead() and _agent.stance() != EnemyBrain.Stance.STAND:
+		await get_tree().physics_frame
 	if crouching:
 		Input.action_press(&"move_down")
 		await get_tree().physics_frame
@@ -151,6 +157,10 @@ func _stage(wanted: EnemyBrain.Stance, crouching: bool, label: String) -> void:
 			await get_tree().physics_frame
 			left -= 1
 			if _agent.stance() == wanted:
+				# Риг сводит позы плавно (ADR-0022, решение 2): снятый в тот же
+				# кадр, агент вышел бы серединой между двумя стойками.
+				for _frame in POSE_SETTLE_FRAMES:
+					await get_tree().physics_frame
 				await _shoot(label)
 				return
 

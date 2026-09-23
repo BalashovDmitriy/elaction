@@ -16,11 +16,17 @@ const SECTION := "settings"
 ## Языки интерфейса. Первый — запасной, если у системы язык незнакомый.
 const LOCALES: PackedStringArray = ["en", "ru"]
 
+## Сколько уровней сложности: столько положений у переключателя автомата.
+const DIFFICULTIES: int = 4
+
 var master: float = 1.0
 var music: float = 0.7
 var sfx: float = 1.0
 var locale: String = ""
 var fullscreen: bool = false
+## Уровень сложности — DIP-переключатель автомата, 0–3: стартовый навык партии,
+## к которому прибавляются пройденные здания (ADR-0027, решение 8).
+var difficulty: int = 0
 
 
 ## Настройки с диска. Файла нет — значения по умолчанию, язык по локали системы.
@@ -36,6 +42,9 @@ static func load_from(path: String = PATH) -> GameSettings:
 	settings.music = clampf(float(file.get_value(SECTION, "music", settings.music)), 0.0, 1.0)
 	settings.sfx = clampf(float(file.get_value(SECTION, "sfx", settings.sfx)), 0.0, 1.0)
 	settings.fullscreen = bool(file.get_value(SECTION, "fullscreen", settings.fullscreen))
+	settings.difficulty = clampi(
+		int(file.get_value(SECTION, "difficulty", settings.difficulty)), 0, DIFFICULTIES - 1
+	)
 
 	var saved := String(file.get_value(SECTION, "locale", settings.locale))
 	settings.locale = saved if LOCALES.has(saved) else settings.locale
@@ -56,6 +65,7 @@ func save_to(path: String = PATH) -> void:
 	file.set_value(SECTION, "sfx", sfx)
 	file.set_value(SECTION, "locale", locale)
 	file.set_value(SECTION, "fullscreen", fullscreen)
+	file.set_value(SECTION, "difficulty", difficulty)
 	file.save(path)
 
 

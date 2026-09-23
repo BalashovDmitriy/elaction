@@ -187,7 +187,7 @@ func _look_for_visitor() -> void:
 func _admit(visitor: Otto) -> void:
 	_guest = visitor
 	visitor.global_position = _mat.global_position
-	visitor.enter_door()
+	visitor.stay_indoors(true)
 	_visit.admit()
 	_cycle.travel_time = open_time
 	_cycle.open()
@@ -203,7 +203,7 @@ func _admit(visitor: Otto) -> void:
 
 func _release() -> void:
 	_guest.global_position = _mat.global_position
-	_guest.leave_door()
+	_guest.stay_indoors(false)
 	_guest = null
 	_visit.release()
 	_cycle.close()
