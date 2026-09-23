@@ -56,13 +56,6 @@ const EXIT_HEIGHT: float = Proportions.BODY * 0.95
 const EXIT_SIGN_SIZE := Vector3(1.2, 0.18, 0.06)
 const EXIT_SIGN_RISE: float = 0.3
 
-## Лампа над крышей — у крыши ламп нет, а гаснуть она не должна никогда: ей
-## светит город. Общий тон и воздух здания — [Atmosphere].
-const ROOF_LIGHT_COLOR := Color(0.72, 0.78, 0.95)
-const ROOF_LIGHT_ENERGY: float = 2.4
-const ROOF_LIGHT_RANGE: float = 14.0
-const ROOF_LIGHT_HEIGHT: float = 4.0
-
 ## Насколько хуже слушается кабина по тревоге, с.
 const ALARM_CAR_DELAY: float = 0.6
 
@@ -189,7 +182,11 @@ func _ready() -> void:
 	_spawn_doors()
 	_spawn_lamps()
 	_spawn_exit()
-	_light_building()
+	# Воздух, крыша, обстановка, город и погода — окружение без геймплея (ADR-0029).
+	var scenery := BuildingScenery.new()
+	scenery.name = "Scenery"
+	add_child(scenery)
+	scenery.build(rules, _plan, building_seed)
 
 	# Otto начинает с крыши, как в оригинале, и там, где нет проёмов. Крыша —
 	# свой уровень над зданием, а не нулевой этаж: ADR-0014, пункт 1.
@@ -941,29 +938,3 @@ func _zone(rect: Rect2) -> Area3D:
 	collision.shape = shape
 	zone.add_child(collision)
 	return zone
-
-
-## Зажигает здание: воздух с общим тоном палитры и лампа над крышей.
-##
-## Светлой зону делает собственный источник — лампа, — а не отсутствие темноты:
-## на этом держится правило темноты (ADR-0010, пункт 3). Воздух — [Atmosphere]:
-## отражения, туман, свечение и тон числами пробы (ADR-0023, решение 7).
-##
-## Крыша ламп не имеет и не гаснет никогда: ей светит город. Пока города нет
-## (M19), его заменяет один источник над крышей.
-func _light_building() -> void:
-	var world := WorldEnvironment.new()
-	world.environment = Atmosphere.environment(rules.palette.dark)
-	add_child(world)
-
-	var roof_span := rules.floor_span(BuildingRules.ROOF)
-	var over_roof := Vector2(
-		(roof_span.x + roof_span.y) * 0.5,
-		rules.floor_surface(BuildingRules.ROOF) - ROOF_LIGHT_HEIGHT
-	)
-	var sky_light := OmniLight3D.new()
-	sky_light.light_color = ROOF_LIGHT_COLOR
-	sky_light.light_energy = ROOF_LIGHT_ENERGY
-	sky_light.omni_range = ROOF_LIGHT_RANGE
-	sky_light.position = WorldSpace.to_scene(over_roof)
-	add_child(sky_light)

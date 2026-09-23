@@ -183,6 +183,19 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "waiting", "actions": [], "hold": 3.0},
 		{"label": "doors", "actions": [], "hold": 1.0},
 	],
+	# M19: город, погода, крыша и обстановка. Крыша со скатами и городом за
+	# ней, спуск кабиной мимо кварталов, этаж с предметами у задней стены.
+	# Широкий низ, тёмный этаж и стену по сиду снимает tools/layout_shot.tscn.
+	"M19":
+	[
+		{"label": "roof", "actions": [], "hold": 1.2},
+		{"label": "roof_walk", "actions": ["move_right"], "hold": 2.5},
+		{"label": "to_the_shaft", "actions": ["move_right"], "hold": 2.9},
+		{"label": "riding_down", "actions": ["move_down"], "hold": 2.2},
+		{"label": "stopped", "actions": [], "hold": 1.6},
+		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
+		{"label": "floor", "actions": [], "hold": 1.5},
+	],
 }
 const DEFAULT_PLAN := "M1"
 

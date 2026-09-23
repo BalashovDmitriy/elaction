@@ -59,9 +59,12 @@ static func centre_on(rules: BuildingRules, index: int) -> Vector2:
 
 
 ## Полоса под потолком, которую кромка перекрытия закрывает от камеры на
-## глубине таблички, м.
-static func hidden_band() -> float:
-	var depth := WorldSpace.CORRIDOR_DEPTH * 0.5 - (WorldSpace.BACK_WALL_Z + STANDOFF)
+## глубине [param z] (по умолчанию — таблички), м.
+##
+## Нужна всему, что висит под потолком у задней стены: трубы обстановки на
+## первых кадрах M19 целиком уходили под кромку (авторевью M19).
+static func hidden_band(z: float = WorldSpace.BACK_WALL_Z + STANDOFF) -> float:
+	var depth := WorldSpace.CORRIDOR_DEPTH * 0.5 - z
 	return depth * tan(deg_to_rad(SideCamera.TILT_DEGREES))
 
 
