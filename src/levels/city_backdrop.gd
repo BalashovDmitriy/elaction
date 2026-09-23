@@ -46,6 +46,10 @@ const WINDOW_SIZE := Vector2(1.2, 1.5)
 ## фасадами, и ночной город выходил без огней, — поэтому даль задаётся здесь.
 const WINDOW_FADE: Array[float] = [1.0, 0.75, 0.55, 0.4]
 
+## Погасшее окно — тёмное стекло чуть светлее фасада: по нему фасад читается
+## сеткой окон, а не россыпью огней (ADR-0031, решение 6).
+const WINDOW_DARK := Color(0.05, 0.06, 0.09)
+
 ## Дождь: сколько капель в виду, их вид и скорость, м/с. Редкий и прозрачный:
 ## на первых кадрах густой дождь над крышей закрывал Otto — погода фон, а не
 ## занавес.
@@ -262,6 +266,18 @@ func _windows(blocks: Array[CityPlan.Block]) -> MultiMeshInstance3D:
 		var front := block.z + block.depth * 0.5 + 0.05
 		var grid := CityPlan.window_grid(block)
 		var left := block.x - float(grid.x - 1) * CityPlan.WINDOW_STEP.x * 0.5
+		var burning: Dictionary = {}
+		for window: Vector2i in block.lit:
+			burning[window] = true
+		for column in grid.x:
+			for level in grid.y:
+				var cell := Vector2i(column, level)
+				if burning.has(cell):
+					continue
+				var dark_x := left + float(column) * CityPlan.WINDOW_STEP.x
+				var dark_y := _ground + CityPlan.WINDOW_STEP.y * (float(level) + 1.0)
+				places.append(Transform3D(Basis.IDENTITY, Vector3(dark_x, dark_y, front)))
+				colors.append(WINDOW_DARK)
 		for window: Vector2i in block.lit:
 			var x := left + float(window.x) * CityPlan.WINDOW_STEP.x
 			var y := _ground + CityPlan.WINDOW_STEP.y * (float(window.y) + 1.0)

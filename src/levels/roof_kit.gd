@@ -68,19 +68,15 @@ func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 	var long := left if left.y - left.x >= right.y - right.x else right
 	var short := right if long == left else left
 
-	_tank(
-		Vector2(
-			long.x + (long.y - long.x) * 0.6,
-			_top_at(steps, surface, long.x + (long.y - long.x) * 0.6)
-		)
-	)
+	# Бак у края, кондиционеры ближе к середине: бак посередине закрывал вывеску.
+	var tank_x := long.x + (long.y - long.x) * 0.22
+	_tank(Vector2(tank_x, _top_at(steps, surface, tank_x)))
 	for index in UNITS:
-		var x := long.x + (long.y - long.x) * (0.15 + 0.2 * float(index))
+		var x := long.x + (long.y - long.x) * (0.55 + 0.2 * float(index))
 		_unit(Vector2(x, _top_at(steps, surface, x)))
 	if short.y - short.x > 1.0:
 		var x := (short.x + short.y) * 0.5
 		_vent(Vector2(x, _top_at(steps, surface, x)))
-	_vent(Vector2(long.x + 0.4, _top_at(steps, surface, long.x + 0.4)))
 	_ladder(shaft.x - half_room - 0.2, surface)
 	_mast(shaft.x, surface - BuildingShafts.MACHINE_ROOM_SIZE.y)
 	_neon((bounds.x + bounds.y) * 0.5, surface)

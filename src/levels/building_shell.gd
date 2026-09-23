@@ -34,6 +34,10 @@ const EXIT_WIDTH: float = Proportions.EXIT_WIDTH
 ## оттенок раунда, а не заливка, и читаемость держится на всех.
 const PALETTE_SHARE: float = 0.18
 
+## Доля тона этажа палитры в задней стене — больше, чем в кладке: на 18% раунды
+## на кадре не различались (вопрос пользователя, ADR-0031, решение 5).
+const STORY_SHARE: float = 0.45
+
 ## Во сколько раз задняя стена тёмного этажа темнее светлой (ADR-0029, решение 6).
 ## Кадры M18e: на сумрачной башне тёмный этаж без ламп отличался от светлого
 ## слабо — стена отражала общий тон так же, как на светлом.
@@ -169,7 +173,7 @@ func _build_parapets(
 ##
 ## Крыша стены не получает: над ней небо, а за ней — город ([CityBackdrop]).
 func _build_room() -> void:
-	var tone := GreyboxLook.BACK_WALL.lerp(_rules.palette.story, PALETTE_SHARE)
+	var tone := GreyboxLook.BACK_WALL.lerp(_rules.palette.story, STORY_SHARE)
 	var lit_back := GreyboxLook.surface(tone)
 	var unlit_back := GreyboxLook.surface(
 		Color(tone.r * UNLIT_SHADE, tone.g * UNLIT_SHADE, tone.b * UNLIT_SHADE)

@@ -40,6 +40,8 @@ const BUILDING_SEED: int = 1
 var _level: GreyboxLevel = null
 var _folder: String = FOLDER
 var _seed: int = BUILDING_SEED
+## Раунд — палитра здания; ноль — правила по умолчанию (первый раунд).
+var _round: int = 0
 
 
 func _ready() -> void:
@@ -48,10 +50,12 @@ func _ready() -> void:
 			_folder = "res://screens/" + argument.trim_prefix("--folder=")
 		elif argument.begins_with("--seed="):
 			_seed = argument.trim_prefix("--seed=").to_int()
+		elif argument.begins_with("--round="):
+			_round = argument.trim_prefix("--round=").to_int()
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_folder))
 	GameState.instance().start_game()
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
-	_level.rules = BuildingRules.new()
+	_level.rules = BuildingRules.for_building(_round) if _round > 0 else BuildingRules.new()
 	_level.building_seed = _seed
 	# Агентов выпускает только кадр про стену: в остальных ходящая фигура
 	# закрывает собой то, ради чего кадр снят.
@@ -62,6 +66,11 @@ func _ready() -> void:
 
 func _run() -> void:
 	var rules := _level.rules
+	if _round > 0:
+		# Кадр раунда: один этаж на палитре раунда — раунды сравниваются рядом.
+		await _shoot_floor("round%d" % _round, 2)
+		get_tree().quit(0)
+		return
 	await _shoot_floor("00_roof_seed%d" % _seed, BuildingRules.ROOF)
 	await _shoot_floor("01_tower", rules.wide_from - 1)
 	await _shoot_floor("02_podium", rules.floors - 2)

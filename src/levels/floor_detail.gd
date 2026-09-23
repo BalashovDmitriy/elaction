@@ -43,7 +43,10 @@ func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 	_plan = plan
 	for index in rules.floors - 1:
 		_dress_floor(index)
-	_commit("runner", GreyboxLook.surface(RUNNER_COLOR))
+	# Дорожка — в тон кладки раунда: ещё одна метка, какой идёт раунд (ADR-0031).
+	_commit(
+		"runner", GreyboxLook.surface(RUNNER_COLOR.lerp(rules.palette.masonry.darkened(0.55), 0.6))
+	)
 	_commit("edge", GreyboxLook.surface(RUNNER_EDGE_COLOR))
 	_commit("seam", GreyboxLook.surface(SEAM_COLOR))
 	_commit("joint", GreyboxLook.surface(JOINT_COLOR))
