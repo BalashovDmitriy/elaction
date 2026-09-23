@@ -257,9 +257,8 @@ func agent_doors() -> Array[Door]:
 	return serving
 
 
-## Дверь, из которой вышел агент, или null. Ближайшая к нему не годится: с M18e
-## двери стоят через место, 1.8 м, и вышедший из проёма агент бывает ближе к
-## соседней (ADR-0028, решение 2).
+## Дверь, из которой вышел агент, или null. Не ближайшая к нему: с M18e двери
+## стоят через место, и вышедший бывает ближе к соседней (ADR-0028).
 func door_of(agent: Enemy) -> Door:
 	for post: AgentPost in _posts:
 		if post.agent == agent:
@@ -922,21 +921,30 @@ func _safest_x(index: int) -> float:
 ## Место выбирается по живым агентам, а самое дальнее от них — как раз за стеной:
 ## без этого отбора Otto воскресал бы там, откуда не уйти, и умирал бы туда снова.
 ##
-## Кусок не нашёлся — отдаётся всё, что было: остаться вовсе без места хуже, чем
-## встать не на своей половине.
+## Погибший в кабине стоит над проёмом шахты, ни в одном куске: тогда берётся
+## ближайший кусок с местами — с него в кабину садятся. Отдай тут всё, Otto
+## воскресал бы в кармане за эскалатором, откуда хода нет (перемер M18e).
+##
+## Мест нет ни в одном куске — отдаётся всё, что было: остаться вовсе без места
+## хуже, чем встать не на своей половине.
 func _spots_on_the_same_piece(
 	index: int, from_x: float, spots: PackedFloat64Array
 ) -> PackedFloat64Array:
 	var pieces := BuildingPlan.spans_between(_plan.blocks_on(rules, index), rules.floor_span(index))
+	var best := PackedFloat64Array()
+	var best_gap := INF
 	for piece: Vector2 in pieces:
-		if from_x < piece.x or from_x > piece.y:
-			continue
 		var same := PackedFloat64Array()
 		for x: float in spots:
 			if x >= piece.x and x <= piece.y:
 				same.append(x)
-		return spots if same.is_empty() else same
-	return spots
+		if same.is_empty():
+			continue
+		var gap := maxf(maxf(piece.x - from_x, from_x - piece.y), 0.0)
+		if gap < best_gap:
+			best_gap = gap
+			best = same
+	return spots if best.is_empty() else best
 
 
 func _on_pit_entered(body: Node3D) -> void:
