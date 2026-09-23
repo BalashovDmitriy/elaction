@@ -98,7 +98,7 @@ func _play(
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
 	level.rules = BuildingRules.new()
 	if at_once > 0:
-		level.rules.agents_at_once = at_once
+		level.rules.agents_at_once_cap = at_once
 	level.building_seed = building_seed
 	level.spawn_agents = agents
 	root.add_child(level)
@@ -129,7 +129,7 @@ func _play(
 	print(
 		(
 			"\n=== Сид %d, агенты: %s, разом не больше %d ==="
-			% [building_seed, "да" if agents else "нет", level.rules.agents_at_once]
+			% [building_seed, "да" if agents else "нет", level.rules.agents_at_once(0.0)]
 		)
 	)
 

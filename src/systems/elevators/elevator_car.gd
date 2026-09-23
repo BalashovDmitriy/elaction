@@ -66,7 +66,8 @@ const TIE_WIDTH: float = 0.1
 const TIE_SPREAD: float = 0.45
 const TIE_DEPTH: float = 0.6
 
-@export var speed: float = 1.8
+## Ход кабины по ROM: 2 px за тик логики, этаж за 1.6 с (ADR-0027, решение 4).
+@export var speed: float = Arcade.speed(Arcade.CAR_PX)
 @export var floor_pause: float = 1.5
 ## Встаёт ли кабина между этажами. Сверкой не подтверждено — см. ADR-0004.
 @export var stops_between_floors: bool = true
@@ -350,6 +351,17 @@ func _crush_those_underneath(speed: float) -> void:
 	if speed <= 0.0:
 		return
 	for body: Node3D in _crush_zone.get_overlapping_bodies():
+		var agent := body as Enemy
+		if agent != null:
+			# Кабина давит и агентов — 300 очков, как в ROM (ADR-0027, решение 6).
+			# Зона заходит на полу кабины выше днища, и ноги пассажира в неё
+			# попадают: пассажир — тот, кто стоит на полу кабины, а жертва — тот,
+			# кто под днищем. Разводит их высота ступней.
+			var riding := to_local(agent.global_position).y > -SLAB_THICKNESS
+			if not agent.is_dead() and ShaftHazards.crushes(speed, agent.is_on_floor(), riding):
+				agent.kill(true)
+				GameState.instance().add_score(GameState.CRUSH_SCORE)
+			continue
 		var victim := body as Otto
 		if victim == null:
 			continue

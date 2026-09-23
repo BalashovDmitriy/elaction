@@ -161,7 +161,7 @@ func _try_board(pad: Area3D, target: Area3D, towards: float) -> bool:
 		_passenger = rider
 		_path = _route_from(rider.global_position, target)
 		_progress = 0.0
-		rider.board_escalator()
+		rider.ride(true)
 		return true
 	return false
 
@@ -181,7 +181,7 @@ func _carry(delta: float) -> void:
 	_passenger.global_position = _point_at(_progress)
 	if _progress < 1.0:
 		return
-	_passenger.leave_escalator()
+	_passenger.ride(false)
 	_passenger = null
 
 

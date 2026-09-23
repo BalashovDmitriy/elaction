@@ -142,3 +142,44 @@ table_50D8 row = pose(+0C, >=7 -> -3)*2 + facing: [height above feet, x offset L
 - walk: +-2 px per tick for Otto and agents (same routine 4450/445F), 29.6 px/s; no difficulty or alarm term found.
 - elevator: direction values +-2 (player_control_07 = $02/$FE @45D8/45E0, scroll_speed 2 "@03C3") => 2 px/tick, 24 ticks
   (1.6 s) per 48 px floor. Medium confidence.
+
+## Part 3 (coordinator follow-up 2)
+
+### Screen-space body box
++16 = sprite screen y of the feet, +15 = +16 + (top - bottom) (@61A4-61AD), updated only while the character is on screen
+(screen y in 0x18..0xE7). Player copies: $8530 (= player+16), $852F (= player+15).
+
+### Fire decision (should_enemy_shoot_0568)
+1. unless alerted (+0E != 0): agent must face Otto (sign of Otto.x - agent.x == facing +0B) (@056E-057B).
+2. Otto situation < 3: on ground, in cab or on cab roof; never while on an escalator (4), in a room (5) or falling (@057E).
+3. vertical overlap of the screen boxes (@05E1-05F4): agent.feet <= Otto.feet < agent.head, or Otto.head >= agent.feet.
+   => "same floor" for firing = bodies overlap in screen height, not the floor number; works for Otto in a moving cab.
+4. wall check on floors 18 (x split 0x7D) and 20 (x split 0xAC): no firing across the wall (@0590-05E0).
+- No |dx| test anywhere => the range is the whole floor width (the play area is 256 px wide, all on screen).
+- plus the gates from Part 2: own bullet slot free, cooldown +19 == 0, action timer +10.
+
+### Movement (enemy_walk_state_53F6, 5B33, 5D13, 04E6, 0434)
+- target x in +1A, mode in +1C. Facing while walking = toward the target (@55F8-5601).
+- Otto on another floor (@5B33): target = the elevator/escalator x of that floor from a per-floor table (table_5B93: 0x58/0x98,
+  0x18/0xD8, 0x78, 0xC2...), with the parity of the enemy index choosing left/right; mode 3/0x0B.
+- same floor (@5D13): mode 0x0D, target x = 0x40 + random(0..15); when reached (|dx| < 3, @5411-5419) -> pause 7 ticks, new
+  target. => agents do not chase Otto horizontally; they stroll and fire whenever facing him (and always when alerted).
+- random action/pause timer (@04E6-0528): 10 or 7 (+random) ticks between decisions, halved odds of long pause when alerted.
+- despawn (@041F-04E5): if an agent on the ground is on a floor other than the dense one and its screen feet are >= 0x50 px
+  (80 px, ~1.7 floors) from Otto's, and floor >= 8 and != 20, it gets mode 0x0C = walk to the nearest existing door and
+  re-enter it (@55B0: situation IN_ROOM) => agents left behind go back into doors.
+- walking speed 2 px/tick like Otto (Part 2). No "keep distance" logic found.
+
+### Hitboxes and bullet hit (enemy_shot_collision_08F8)
+- width: x_right = x + 8 for everybody (@43E1, @4495, @42BC); prone agent x-5 .. x+13 (18 px, @4541-4548).
+- bullet hits when: bullet floor == character floor (+07) (@0920), bullet height in [bottom +03, top +02) (@0927-0931),
+  and the character's leading edge lies in the segment swept this tick, +3 px margin (@0932-0947).
+- character in/on a cab (situation 1/2): floor and height are recomputed from the cab position (@095C) => Otto in a cab can be hit.
+- ignored: dying (+09 == 5), on escalator (situation 4, special check @0911-091F) - escalators are safe as the sources say.
+- player bullet vs agents and agent bullet vs Otto use the same routine; DSW3 bit 6 disables hits on Otto (@08BB).
+
+### Kick (@3127-3198)
+- Otto in jump state (+09 == 7) and situation < 3 (ground, cab, roof).
+- for each agent not dying and situation < 3: screen boxes overlap vertically (agent.head >= Otto.feet and agent.feet < Otto.head)
+  and horizontally (agent.x < Otto.x_right and agent.x_right >= Otto.x).
+- => any overlap during the whole jump (rising or falling) kills: 150 / 200 in dark (@56B9). Walking into an agent is harmless.

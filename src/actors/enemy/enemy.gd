@@ -14,6 +14,9 @@ extends CharacterBody3D
 ## Агент убит. Передаёт себя, чтобы дверь знала, кого выпускать заново.
 signal died(agent: Enemy)
 
+## Агент дошёл до двери и ушёл в неё (ADR-0027, решение 3а). Убирает его уровень.
+signal left_building(agent: Enemy)
+
 const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
 ## Слой врагов в `project.godot`. Агент сходит с него, пока стоит в проёме.
 const ENEMY_LAYER: int = 3
@@ -23,18 +26,14 @@ const FALLING_TIME: float = 0.25
 ## Сколько держится поза выстрела, с.
 const SHOOT_POSE_TIME: float = 0.25
 
-@export var walk_speed: float = 1.65
+## Ходьба — та же, что у Otto: в ROM у них одна процедура шага (ADR-0027).
+@export var walk_speed: float = Arcade.speed(Arcade.WALK_PX)
 @export var gravity: float = 27.0
 @export var max_fall_speed: float = 12.6
 
-## Высота выстрела от ног: попадает в стоящего Otto и проходит над присевшим.
-##
-## Выше середины его роста нарочно — пять шестых. Пуля агента
-## обязана делать три вещи разом: брать стоящего, проходить над присевшим и
-## проходить над тем, кто стоит ниже этажа — в проёме шахты или в кабине,
-## вставшей между этажами. На M13, когда Otto вырос в полтора раза, пуля
-## перестала успевать за ним и начала снимать его в голову прямо в проёме.
-## На M18c оба выросли ещё в 4/3, и пуля вместе с ними (ADR-0026, решение 2).
+## Высота выстрела от ног стоя: попадает в стоящего Otto и проходит над
+## присевшим. Из приседа и лёжа — свои высоты ROM ([Proportions]): из приседа
+## пуля проходит над лежачим, лёжа — бьёт и присевшего (ADR-0027, решение 3).
 @export var shot_height: float = Proportions.AGENT_SHOT
 @export var muzzle_offset: float = Proportions.MUZZLE
 
@@ -45,9 +44,8 @@ const SHOOT_POSE_TIME: float = 0.25
 ## двери и какой разброс по высоте считается «на одной линии». Узел держит их у
 ## себя и отдаёт [EnemyBrain] — так же, как дверь отдаёт свои [DoorVisit].
 ##
-## Остальные числа боя — дальность, пауза, замах, скорость пули и пороги
-## уклонения — приходят из [BuildingRules] ([method apply_rules]): их растит
-## сложность, и лежать в сцене одного агента они не могут (ADR-0016, пункт 5).
+## Числа боя — замах, пауза, поза, увёртка, скорость пули — считает [Arcade]
+## по злости агента и навыку здания (ADR-0027).
 @export var emerge_time: float = 0.6
 @export var same_line: float = 0.45
 
@@ -65,14 +63,24 @@ var _target_in_the_dark: bool = false
 var _target_behind_a_wall: bool = false
 ## Куда идти, чтобы уехать: ось стоящей кабины или NAN, если ехать некуда.
 var _lift_x: float = NAN
+## Куда идти, чтобы уйти из здания: дверь или NAN (@041F).
+var _exit_x: float = NAN
 ## Фаза ходьбы, поза выстрела и падения, признак раздавленного — всё как у Otto.
 var _walk_phase: float = 0.0
 var _walking: bool = false
 var _shooting: float = 0.0
 var _falling_over: float = 0.0
 var _crushed: bool = false
-## Насколько агент злее обычного: 1 — как в первом здании, больше — злее.
-var _menace: float = 1.0
+## С какой злостью агент вышел и сколько он уже живёт, с: злость растёт с
+## возрастом (@5AFC). Навык здания — для скорости пули, тревога — сирена.
+var _spawn_anger: int = 0
+var _age: float = 0.0
+var _skill: int = 0
+var _alarmed: bool = false
+## Сколько ещё длится тревога агентов, с (ADR-0027, решение 5).
+var _alert_left: float = 0.0
+## Последняя выпущенная пуля: в полёте она у агента одна (@1BAE).
+var _bullet: Bullet = null
 
 @onready var _body: FigureRig = $Body
 @onready var _floor_probe: RayCast3D = $FloorProbe
@@ -125,7 +133,19 @@ func _physics_process(delta: float) -> void:
 	# Невидимый Otto для мозга — не цель: он не поворачивается к нему и не
 	# стреляет, а идёт, куда шёл (ADR-0023, решение 8).
 	var sees_target := alive_target and _sees(to_target)
-	var state := _brain.update(delta, to_target, sees_target, _incoming_height())
+	_age += delta
+	_alert_left = maxf(_alert_left - delta, 0.0)
+	_brain.anger = Arcade.aggression(_spawn_anger, _age)
+	_brain.alert = _alert_left > 0.0
+	var state := _brain.update(
+		delta,
+		to_target,
+		sees_target,
+		_incoming_height(),
+		alive_target and _in_frame() and not _building_rules().agents_hold_fire,
+		not is_instance_valid(_bullet),
+		alive_target and _target.is_crouching()
+	)
 	_fit_shape()
 	if _brain.fired():
 		_fire()
@@ -137,8 +157,8 @@ func _physics_process(delta: float) -> void:
 	_shield(stepping_out)
 
 	# Приседая и лёжа агент не ходит: уклонение — это замереть, а не идти
-	# дальше пригнувшись.
-	var walking := (state == EnemyBrain.State.WALK or stepping_out) and _brain.is_standing()
+	# дальше пригнувшись. Стоя он идёт, пока мозг не велел постоять.
+	var walking := _brain.wants_to_walk()
 	# Кабину уровень предлагает, только когда Otto на другом этаже (ADR-0025,
 	# решение 6), — по «видит ли он его» решать тут нечего: [code]sees_target[/code]
 	# значит «Otto не в тени и не за стеной», и через десять этажей оно тоже
@@ -146,6 +166,10 @@ func _physics_process(delta: float) -> void:
 	var to_the_lift := walking and not stepping_out and not is_nan(_lift_x)
 	if to_the_lift:
 		walking = _head_for_the_lift()
+	elif walking and not stepping_out and not is_nan(_exit_x):
+		walking = _head_for(_exit_x)
+		if not walking:
+			left_building.emit(self)
 	if walking and is_on_floor() and _blocked_ahead():
 		# Дальше пола нет или стена: агент остаётся на своём этаже (ADR-0006,
 		# пункт 6). Видя Otto, он встаёт у края; потеряв — разворачивается и идёт
@@ -155,9 +179,11 @@ func _physics_process(delta: float) -> void:
 			# и шагать в пустую шахту незачем. Разворачивать его нельзя — он
 			# тут же забыл бы, зачем пришёл.
 			walking = false
-		elif sees_target or stepping_out:
+		elif stepping_out:
 			walking = false
 		else:
+			# Бродящий агент у края этажа поворачивает: за Otto он не гонится
+			# и у проёма его не караулит (ADR-0027, решение 3а).
 			_brain.turn_around()
 	velocity.x = walk_speed * _brain.facing if walking else 0.0
 	_apply_gravity(delta)
@@ -187,6 +213,18 @@ func set_lift_at(x: float) -> void:
 		_lift_x = x
 
 
+## Показывает агенту дверь, в которую уйти, или NAN — уходить незачем.
+func set_exit_at(x: float) -> void:
+	_exit_x = x
+
+
+## Идти ли к точке [param x] по этажу: дошёл — нет.
+func _head_for(x: float) -> bool:
+	var gap := x - WorldSpace.to_plane(global_position).x
+	_brain.face(gap)
+	return absf(gap) > Proportions.DOOR_MAT * 0.5
+
+
 ## Идти ли к кабине и стоит ли при этом переставлять ноги. Зовётся только тогда,
 ## когда кабина выбрана: без выбора идти некуда и спрашивать нечего.
 ##
@@ -210,12 +248,13 @@ func _lift_aboard() -> float:
 	return maxf(_building_rules().shaft_width * 0.5 - _body_half_width(), 0.0)
 
 
-## Отдаёт агенту правила здания: из них он берёт все числа боя.
+## Отдаёт агенту правила здания: из них он берёт навык и рост в стойках.
 ##
 ## Зовётся до [method Node.add_child] и после — порядок не решает ничего, как и
-## у [method set_menace]: числа переносятся в [EnemyBrain] одним [method _refresh_brain].
+## у [method set_threat]: числа переносятся в [EnemyBrain] одним [method _refresh_brain].
 func apply_rules(rules: BuildingRules) -> void:
 	_rules = rules
+	_skill = rules.skill
 	_refresh_brain()
 
 
@@ -259,10 +298,41 @@ func facing() -> float:
 	return _brain.facing
 
 
-## Насколько агент злее обычного. Растёт от здания к зданию и по тревоге.
-func set_menace(value: float) -> void:
-	_menace = maxf(value, 0.1)
-	_refresh_brain()
+## С какой злостью агент выходит, из какого он навыка здания и звучит ли
+## сирена. Злость при выходе — сложность здания в этот миг (@5AA4); дальше она
+## растёт с возрастом агента сама.
+func set_threat(spawn_anger: int, skill: int, alarmed: bool) -> void:
+	_spawn_anger = clampi(spawn_anger, 0, Arcade.TOP)
+	_skill = maxi(skill, 0)
+	_alarmed = alarmed
+	_brain.anger = Arcade.aggression(_spawn_anger, _age)
+
+
+## Сирена включилась или нет: пуля агента на шаг быстрее (@463D).
+func set_alarmed(value: bool) -> void:
+	_alarmed = value
+
+
+## Тревога агентов на [param seconds]: выстрел Otto в кадре или посадка в
+## кабину (ADR-0027, решение 5). Не укорачивает уже идущую.
+func alert_for(seconds: float) -> void:
+	_alert_left = maxf(_alert_left, seconds)
+
+
+## Третий или четвёртый агент здания: своя таблица поз (table_1D95).
+func set_late(value: bool) -> void:
+	_brain.late = value
+
+
+## Сеет решения агента. Зовёт уровень: генератор у каждого свой, но от сида
+## здания, и прогон бота повторяется до шага.
+func seed_decisions(value: int) -> void:
+	_brain.rng.seed = value
+
+
+## Злость агента сейчас.
+func anger() -> int:
+	return _brain.anger
 
 
 ## Стоит ли агент в темноте. По этому признаку считается надбавка за убийство.
@@ -347,7 +417,8 @@ func _hold_the_plane() -> void:
 ## них ему незачем, и маска у них та же на всех агентов.
 func _incoming_height() -> float:
 	var best := -1.0
-	var nearest := _building_rules().agent_dodge_sight
+	# Дальше 20 px ROM агент пулю не замечает (@05F5).
+	var nearest := Arcade.DODGE_REACH_PX * Proportions.PX
 	for node in get_tree().get_nodes_in_group(Bullet.GROUP):
 		var bullet := node as Bullet
 		if bullet == null or bullet.collision_mask != Bullet.FROM_OTTO:
@@ -369,6 +440,11 @@ func _incoming_height() -> float:
 			continue
 		var reach := absf(to_bullet.x)
 		if reach > nearest:
+			continue
+		# Уворачивается агент только от пули в полосе ROM — 6..24 px над полом
+		# (@05F5): выше и ниже она мимо и так.
+		var over_floor := -to_bullet.y
+		if over_floor < 6.0 * Proportions.PX or over_floor > 24.0 * Proportions.PX:
 			continue
 		nearest = reach
 		# Ноги агента — ноль, вверх положительно: у пули y отрицательный.
@@ -421,25 +497,13 @@ func _floor_ahead() -> bool:
 	return _floor_probe.is_colliding()
 
 
-## Переносит в [EnemyBrain] все числа боя: и те, что приходят из правил здания,
-## и те, что зависят от злости. Считается в одном месте, чтобы порядок вызовов
-## [method _ready], [method apply_rules] и [method set_menace] ничего не решал —
-## иначе настроенный до [method Node.add_child] агент терял бы половину чисел.
+## Переносит в [EnemyBrain] рост в стойках из правил здания. Считается в одном
+## месте, чтобы порядок вызовов [method _ready] и [method apply_rules] ничего не
+## решал — иначе настроенный до [method Node.add_child] агент терял бы числа.
 func _refresh_brain() -> void:
 	var rules := _building_rules()
-	# Дальность не растёт со злостью: в оригинале сложность добавляют
-	# скорострельность, скорость пули и уклонение, а дальности среди них нет
-	# (ADR-0016, пункт 1). Пока она росла, к поздним зданиям агент простреливал
-	# этаж насквозь, и подойти к нему было нечем.
-	_brain.fire_range = rules.agent_fire_range
-	_brain.fire_cooldown = rules.agent_fire_cooldown / _menace
-	_brain.aim_time = rules.agent_aim_time
 	_brain.kneel_height = rules.agent_kneel_height
 	_brain.prone_height = rules.agent_prone_height
-	# Уклоняться агент учится не сразу: это третья ось сложности оригинала,
-	# и в первых зданиях его берут стоящим.
-	_brain.can_kneel = _menace >= rules.agent_kneels_from_menace
-	_brain.can_go_prone = _menace >= rules.agent_goes_prone_from_menace
 
 
 ## Правила, по которым живёт агент. Выпущенному уровнем их отдали, а
@@ -451,10 +515,26 @@ func _building_rules() -> BuildingRules:
 	return _rules
 
 
-## Скорость пули этого агента: растёт со злостью, как в оригинале. Отбирает
-## время на реакцию, но не саму возможность подойти.
+## Скорость пули этого агента: по навыку здания, в тревоге на шаг быстрее (@463D).
 func _bullet_speed() -> float:
-	return _building_rules().agent_bullet_speed * _menace
+	return Arcade.agent_bullet_speed(_skill, _alarmed)
+
+
+## В кадре ли агент: в ROM дальности огня нет, этаж целиком на экране, и у нас
+## достаёт тот, кого игрок видит (ADR-0027, решение 3а).
+func _in_frame() -> bool:
+	return _target.camera_view().has_point(WorldSpace.to_plane(global_position))
+
+
+## Высота вылета пули по стойке: стоя, из приседа и лёжа — таблица ROM.
+func _shot_height() -> float:
+	match _brain.stance:
+		EnemyBrain.Stance.KNEEL:
+			return Proportions.SHOT_LOW
+		EnemyBrain.Stance.PRONE:
+			return Proportions.SHOT_PRONE
+		_:
+			return shot_height
 
 
 func _apply_gravity(delta: float) -> void:
@@ -506,8 +586,9 @@ func _fire() -> void:
 	bullet.hit_target.connect(_on_bullet_hit)
 	get_parent().add_child(bullet)
 	bullet.global_position = (
-		global_position + Vector3(_brain.facing * muzzle_offset, shot_height, 0.0)
+		global_position + Vector3(_brain.facing * muzzle_offset, _shot_height(), 0.0)
 	)
+	_bullet = bullet
 
 
 ## Попадание своей пули. Очков за Otto никто не получает — он просто гибнет.

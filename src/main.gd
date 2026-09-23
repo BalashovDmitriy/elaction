@@ -134,7 +134,7 @@ func _enter_building() -> void:
 
 	var game := GameState.instance()
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
-	_level.rules = BuildingRules.for_building(game.building)
+	_level.rules = BuildingRules.for_building(game.building, _settings.difficulty)
 	_level.building_seed = game.building
 	# Режим наследуется от родителя, а он тут ALWAYS: без этой строки пауза
 	# не останавливала бы ничего — игра шла бы дальше с надписью «пауза».

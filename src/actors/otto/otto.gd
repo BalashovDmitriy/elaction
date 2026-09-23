@@ -32,12 +32,14 @@ const RESPAWN_GRACE: float = 1.5
 ## передышка себя показывает: без него игрок не знает, что она вообще была.
 const GRACE_BLINKS: float = 8.0
 
-@export var walk_speed: float = 2.7
-## Высота прыжка = jump_speed в квадрате, делённая на 2 · gravity. При 11.4 и 27
-## это ~2.4 м — те же 240 прежних пикселей: мир стал метрическим (ADR-0019).
-@export var jump_speed: float = 11.4
-@export var gravity: float = 27.0
-@export var bullet_speed: float = 6.6
+## Ходьба и пуля — по ROM: 2 и 8 px за тик логики (ADR-0027, решение 4).
+@export var walk_speed: float = Arcade.speed(Arcade.WALK_PX)
+## Прыжок по ROM: ступни +25 px (1.88 м) за 14 тиков (0.95 с) — table_42E2.
+## Высота прыжка = jump_speed в квадрате, делённая на 2 · gravity: 7.9 и 16.6
+## дают те же 1.88 м за те же 0.95 с. До M18d прыжок был 2.4 м по физике.
+@export var jump_speed: float = 7.9
+@export var gravity: float = 16.6
+@export var bullet_speed: float = Arcade.speed(Arcade.OTTO_BULLET_PX)
 ## Откуда вылетает пуля, от ног. Присев, Otto стреляет ниже — и его выстрел
 ## проходит там, где стоящий враг его не перепрыгнет.
 ##
@@ -55,6 +57,10 @@ var _states := OttoStateMachine.new()
 ## Один снимок ввода на всё время жизни: перечитывается, а не создаётся заново.
 var _snapshot := OttoInput.new()
 var _posed_state := OttoStateMachine.State.IDLE
+## Скорость по горизонтали в полёте, м/с. Задаётся толчком и в воздухе не
+## меняется: в ROM направление прыжка выбирается при старте (@43FA), а
+## повернуться лицом в полёте можно (@42A7).
+var _air_speed: float = 0.0
 ## Кабина, внутри которой сейчас Otto. На крыше кабины она не заполняется:
 ## оттуда лифтом не управляют (ADR-0004, пункт 3).
 var _car: ElevatorCar = null
@@ -148,7 +154,9 @@ func _physics_process(delta: float) -> void:
 	if _states.just_entered(OttoStateMachine.State.JUMP) and is_on_floor():
 		velocity.y = jump_speed
 
-	velocity.x = _horizontal_speed(_snapshot, state)
+	if is_on_floor() or state == OttoStateMachine.State.DEAD:
+		_air_speed = _horizontal_speed(_snapshot, state)
+	velocity.x = _air_speed
 	if not is_on_floor():
 		velocity.y = maxf(velocity.y - gravity * delta, -max_fall_speed)
 
@@ -187,6 +195,17 @@ func kill(crushed: bool = false) -> void:
 
 func is_dead() -> bool:
 	return _states.is_dead()
+
+
+## Стоит ли Otto на своих ногах — не в кабине, не на эскалаторе, не за дверью.
+## Пока нет, агентов на этаж выходит не больше одного (@59F4).
+func is_on_foot() -> bool:
+	return _car == null and not _states.is_world_driven()
+
+
+## Сидит ли Otto: агент тогда стреляет из приседа (@1CD8).
+func is_crouching() -> bool:
+	return _states.state == OttoStateMachine.State.CROUCH
 
 
 ## Скрылся ли Otto за дверью. Снаружи его нет, и агентам он не виден:
@@ -239,27 +258,25 @@ func horizontal_intent() -> float:
 	return 0.0 if _states.is_dead() else _snapshot.move
 
 
-## Otto скрылся за дверью: снаружи его нет, ввод игрока не действует.
-func enter_door() -> void:
-	_states.go_indoors()
+## Otto скрылся за дверью или дверь выпустила его наружу — сам вышел или
+## выставили через пять секунд. Пока внутри, снаружи его нет и ввод игрока не
+## действует; так же он прячется, пока его увозит машина у выхода.
+func stay_indoors(inside: bool) -> void:
+	if inside:
+		_states.go_indoors()
+	else:
+		_states.come_out()
 	_repose()
 
 
-## Дверь выпустила Otto наружу — сам вышел или выставили через пять секунд.
-func leave_door() -> void:
-	_states.come_out()
-	_repose()
-
-
-## Otto встал на эскалатор: до конца поездки ввод игрока не действует.
-func board_escalator() -> void:
-	_states.ride()
-	_repose()
-
-
-## Эскалатор довёз и вернул управление.
-func leave_escalator() -> void:
-	_states.stop_riding()
+## Otto встал на эскалатор или сошёл с него: пока едет, ввод игрока не
+## действует, а позицией распоряжается эскалатор. Трос вступления пользуется
+## тем же — Otto на нём тоже везут.
+func ride(on: bool) -> void:
+	if on:
+		_states.ride()
+	else:
+		_states.stop_riding()
 	_repose()
 
 

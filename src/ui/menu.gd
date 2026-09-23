@@ -166,6 +166,7 @@ func _build_settings() -> void:
 		_slider("UI_VOLUME_MUSIC", Sounds.MUSIC_BUS)
 		_slider("UI_VOLUME_SFX", Sounds.SFX_BUS)
 		_languages()
+		_difficulty()
 		_fullscreen()
 	_button("UI_BACK", _go_back)
 
@@ -292,6 +293,27 @@ func _languages() -> void:
 	_column.add_child(row)
 
 
+## Уровень сложности: четыре положения DIP-переключателя автомата.
+func _difficulty() -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+
+	var label := Label.new()
+	label.text = tr("UI_DIFFICULTY")
+	label.custom_minimum_size = Vector2(150.0, 0.0)
+	label.add_theme_font_size_override("font_size", 12)
+	row.add_child(label)
+
+	var choice := OptionButton.new()
+	for level: int in GameSettings.DIFFICULTIES:
+		choice.add_item(tr("UI_DIFFICULTY_%d" % level), level)
+	choice.select(settings.difficulty)
+	choice.item_selected.connect(_on_difficulty_selected)
+	row.add_child(choice)
+
+	_column.add_child(row)
+
+
 func _fullscreen() -> void:
 	var toggle := CheckButton.new()
 	toggle.text = tr("UI_FULLSCREEN")
@@ -389,6 +411,11 @@ func _on_language_selected(index: int) -> void:
 	# Страница перерисовывается целиком: подписи собраны кодом, и сами
 	# они на смену языка не отзовутся.
 	show_page(_page)
+
+
+func _on_difficulty_selected(index: int) -> void:
+	settings.difficulty = index
+	settings.save_to()
 
 
 func _on_fullscreen_toggled(pressed: bool) -> void:

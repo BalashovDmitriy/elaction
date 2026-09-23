@@ -10,9 +10,9 @@ extends GutTest
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
 
-## Откуда летит пуля, м от агента. Меньше [member BuildingRules.agent_dodge_sight],
-## иначе он её ещё не замечает.
-const BULLET_REACH: float = 1.5
+## Откуда летит пуля, м от агента. Ближе 20 px ROM (1.5 м), иначе он её ещё
+## не замечает (@05F5).
+const BULLET_REACH: float = 1.2
 
 ## Правила, по которым живёт агент, — и по ним же тест отмеряет высоту пули.
 ## Один объект на обоих: с двумя тест мерил бы одним набором чисел, а агент
@@ -20,17 +20,23 @@ const BULLET_REACH: float = 1.5
 var _rules := BuildingRules.new()
 
 
-## Агент, которому позволено и приседать, и ложиться: в первых зданиях он этого
-## не умеет, а тут проверяется само уклонение.
+## Самый злой агент: шанс увернуться у него — 255 из 256 за тик, а тут
+## проверяется само уклонение, а не жребий.
 func _agent() -> Enemy:
 	var agent := ENEMY_SCENE.instantiate() as Enemy
 	agent.apply_rules(_rules)
 	add_child_autofree(agent)
-	agent.set_menace(_rules.agent_goes_prone_from_menace)
+	agent.set_threat(Arcade.TOP, 0, false)
 	# Цели нет: уклонение от неё не зависит, а Otto притащил бы за собой
 	# половину игры.
 	agent.setup(null, 1.0)
 	return agent
+
+
+## Ждёт, пока агент выйдет из проёма: выходящий по ROM не уворачивается.
+func _step_out(agent: Enemy) -> void:
+	while agent.is_emerging():
+		await wait_physics_frames(1)
 
 
 ## Пуля Otto, летящая в агента слева направо или справа налево — всё равно,
@@ -48,6 +54,7 @@ func _bullet_at(agent: Enemy, height: float) -> Bullet:
 
 func test_agent_kneels_under_a_high_bullet() -> void:
 	var agent := _agent()
+	await _step_out(agent)
 	_bullet_at(agent, _rules.agent_kneel_height + 0.05)
 	await wait_physics_frames(2)
 	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "от высокой пули — на колено")
@@ -55,6 +62,7 @@ func test_agent_kneels_under_a_high_bullet() -> void:
 
 func test_agent_drops_prone_under_a_low_bullet() -> void:
 	var agent := _agent()
+	await _step_out(agent)
 	_bullet_at(agent, _rules.agent_kneel_height - 0.03)
 	await wait_physics_frames(2)
 	assert_eq(agent.stance(), EnemyBrain.Stance.PRONE, "от низкой — лёжа")
@@ -63,6 +71,7 @@ func test_agent_drops_prone_under_a_low_bullet() -> void:
 ## Своя пуля агента не повод ложиться: маска у неё другая, и летит она от него.
 func test_agent_ignores_bullets_that_are_not_his_problem() -> void:
 	var agent := _agent()
+	await _step_out(agent)
 	var bullet := _bullet_at(agent, 0.66)
 	bullet.collision_mask = Bullet.FROM_ENEMY
 	await wait_physics_frames(2)
@@ -72,6 +81,7 @@ func test_agent_ignores_bullets_that_are_not_his_problem() -> void:
 ## Пуля, летящая прочь, тоже не повод: она уже прошла мимо.
 func test_agent_ignores_a_bullet_flying_away() -> void:
 	var agent := _agent()
+	await _step_out(agent)
 	var bullet := _bullet_at(agent, 0.66)
 	bullet.direction = 1.0
 	await wait_physics_frames(2)
@@ -85,6 +95,7 @@ func test_agent_ignores_a_bullet_flying_away() -> void:
 ## поз: агент, уклонившийся от выстрела, раз за разом оказывался мёртвым.
 func test_agent_stays_down_until_the_bullet_clears_his_body() -> void:
 	var agent := _agent()
+	await _step_out(agent)
 	var bullet := _bullet_at(agent, _rules.agent_kneel_height + 0.05)
 	await wait_physics_frames(2)
 	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "сперва уходит с линии")
@@ -106,8 +117,13 @@ func test_agent_stays_down_until_the_bullet_clears_his_body() -> void:
 	await wait_physics_frames(2)
 	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "и пока её держит хвост — тоже")
 
+	# Ушедшая за спину больше не держит — но встаёт агент по концу действия:
+	# увёртка в ROM длится действие целиком, а не пока пуля рядом (@1C7A).
 	bullet.global_position.x = agent.global_position.x - (body_half + tail) * 2.0
-	await wait_physics_frames(2)
+	var action := int(
+		ceilf((Arcade.action_time(Arcade.TOP) + 0.1) * Engine.physics_ticks_per_second)
+	)
+	await wait_physics_frames(action)
 	assert_eq(agent.stance(), EnemyBrain.Stance.STAND, "ушедшая за спину больше не держит")
 
 

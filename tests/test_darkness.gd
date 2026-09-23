@@ -112,6 +112,11 @@ func _agent_at(level: GreyboxLevel, x: float, towards: float, walks: bool = fals
 	if not walks:
 		agent.walk_speed = 0.0
 	level.add_child(agent)
+	if not walks:
+		# Стоящий агент бродит на месте и поворачивается куда придётся, а
+		# стреляет по ROM, только глядя на Otto. Тревога снимает это условие:
+		# проверка здесь о том, видит ли он Otto, а не куда он смотрит.
+		agent.alert_for(1.0e6)
 	agent.global_position = WorldSpace.to_scene(
 		Vector2(x, level.rules.floor_surface(_floor(level)))
 	)
@@ -149,7 +154,9 @@ func _pair_on(level: GreyboxLevel, index: int) -> Vector2:
 	var rules := level.rules
 	var spots := level.plan().safe_spots(rules, index)
 	var closest := rules.agent_dark_fire_range * 1.5
-	var furthest := rules.agent_fire_range * 0.9
+	# Дальности огня нет — есть кадр (ADR-0027, решение 3а): пара обязана
+	# влезать в него вместе с Otto, стоящим на одном из мест.
+	var furthest := SideCamera.DEFAULT_HALF_HEIGHT * 16.0 / 9.0 * 0.9
 
 	for here: float in spots:
 		for there: float in spots:
@@ -259,10 +266,10 @@ func test_agents_lose_otto_behind_a_door() -> void:
 	var pair := _spot_pair(level)
 	assert_ne(pair.x, pair.y, "пара мест для дуэли нашлась")
 	_place_otto(level, pair.x)
-	level.otto.enter_door()
+	level.otto.stay_indoors(true)
 	_agent_at(level, pair.y, signf(pair.x - pair.y))
 	assert_eq(await _shots_within(level, WATCH_FRAMES), 0, "спрятанного не обстреливают")
-	level.otto.leave_door()
+	level.otto.stay_indoors(false)
 	assert_gt(await _shots_within(level, WATCH_FRAMES), 0, "вышел — снова цель")
 	remove_child(level)
 
