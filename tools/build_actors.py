@@ -65,7 +65,7 @@ def _actors() -> dict[str, dict]:
     """
     return {
         "otto": {
-            "height": 1.26,
+            "height": 1.68,
             "head": "pompadour",
             "suit": palette.OTTO_SUIT,
             "suit_shade": palette.OTTO_SUIT_SHADE,
@@ -74,7 +74,7 @@ def _actors() -> dict[str, dict]:
             "eyes": palette.OTTO_TIE,
         },
         "agent": {
-            "height": 1.17,
+            "height": 1.68,
             "head": "hat",
             "suit": palette.AGENT_SUIT,
             "suit_shade": palette.AGENT_SUIT_SHADE,
@@ -310,9 +310,10 @@ def _figure(actor: dict) -> None:
 
 def _car() -> None:
     """Красная машина у выхода: ею оригинал заканчивает здание. Без скелета —
-    у неё одна поза. Длина — GreyboxLevel.CAR_LENGTH, 2.4 м; по ней уровень ставит
-    машину в зазор от проёма. Высота выходит 0.95 м, ширина 0.6 — они ничьи."""
-    unit = 2.4 / 52.0
+    у неё одна поза. Длина — GreyboxLevel.CAR_LENGTH, 3.2 м; по ней уровень ставит
+    машину в зазор от проёма. Высота выходит 1.27 м, ширина 0.8 — они ничьи.
+    Растёт вместе с Otto: в неё он садится (ADR-0026, решение 7)."""
+    unit = 3.2 / 52.0
     body = _material("car_body", palette.CAR_BODY)
     glass = _material("car_glass", palette.GLASS)
     wheel = _material("car_wheel", palette.SLAB_SHADOW)

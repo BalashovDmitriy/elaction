@@ -267,3 +267,26 @@ func test_an_emptied_red_door_starts_letting_agents_out() -> void:
 	assert_true(
 		level.agent_doors().has(red), "опустевшая дверь выглядит обычной и ведёт себя как обычная"
 	)
+
+
+## Открытая створка не выходит за свой проём.
+##
+## Шаг места 1.8 м, створка 1.2: на соседнее место остаётся 0.6. Съезжая вбок
+## на свою ширину, как было до M18c, она налезала бы на соседнюю дверь или
+## шахту — поэтому поворачивается на петле внутрь комнаты (ADR-0026, решение 3).
+func test_an_open_leaf_stays_inside_its_doorway() -> void:
+	var door := _bare_door()
+	assert_true(door.summon_agent(), "дверь открывается")
+	var frames := 0
+	while door.openness() < 1.0 and frames < 240:
+		await wait_physics_frames(1)
+		frames += 1
+	assert_almost_eq(door.openness(), 1.0, 0.001, "дверь открылась до конца")
+
+	var leaf := door.get_node("Leaf") as MeshInstance3D
+	var bounds := leaf.global_transform * leaf.get_aabb()
+	var half := Door.LEAF_SIZE.x * 0.5
+	var centre := door.global_position.x
+	assert_gte(bounds.position.x, centre - half - 0.05, "створка не вышла за проём слева")
+	assert_lte(bounds.end.x, centre + half + 0.05, "и справа")
+	assert_lt(bounds.position.z, WorldSpace.BACK_WALL_Z, "она ушла в комнату, за стену")

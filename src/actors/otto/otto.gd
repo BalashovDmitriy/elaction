@@ -40,9 +40,13 @@ const GRACE_BLINKS: float = 8.0
 @export var bullet_speed: float = 6.6
 ## Откуда вылетает пуля, от ног. Присев, Otto стреляет ниже — и его выстрел
 ## проходит там, где стоящий враг его не перепрыгнет.
-@export var shot_height_standing: float = 0.9
-@export var shot_height_crouching: float = 0.45
-@export var muzzle_offset: float = 0.4
+##
+## Стоячая — с кадра оригинала: 15 px над полом при росте 22–23, на уровне
+## груди и чуть выше присевшего агента. До лампы под потолком она не достаёт
+## и из прыжка: Otto упирается головой в потолок раньше (ADR-0026, решение 5).
+@export var shot_height_standing: float = 1.12
+@export var shot_height_crouching: float = 0.66
+@export var muzzle_offset: float = 0.53
 @export var max_fall_speed: float = 12.6
 ## В оригинале Otto приседает на месте. Оставлено переключателем для настройки.
 @export var can_move_while_crouching: bool = false

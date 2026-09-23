@@ -28,32 +28,42 @@ const DING_REACH: float = 19.2
 ## Насколько гаснет указатель, когда в эту сторону ходу нет.
 const ARROW_DIM: float = 0.18
 
-## Индикаторы на крыше кабины: габарит, разнос от середины и на сколько их
-## середина выше крыши, м. Два красных огонька — читаемость кабины на
-## погашенном этаже (ADR-0023, решение 6); стрелки — как были.
+## Индикаторы на крыше кабины: габарит, разнос от середины в долях ширины
+## кабины и на сколько их середина выше крыши, м. Два красных огонька —
+## читаемость кабины на погашенном этаже (ADR-0023, решение 6).
 const INDICATOR_SIZE := Vector3(0.1, 0.06, 0.1)
-const INDICATOR_SPREAD: float = 0.42
+const INDICATOR_SPREAD: float = 0.35
 const INDICATOR_RISE: float = 0.03
+
+## Стрелки в кабине: разнос от середины в долях ширины кабины.
+const ARROW_SPREAD: float = 0.275
+
+## Насколько проём входа и зона сдавливания уже самой кабины, м: у краёв
+## остаётся по 6 см, чтобы стоящий на полу этажа вплотную к шахте не считался
+## ни пассажиром, ни придавленным.
+const INNER_INSET: float = 0.12
 
 ## Толщина пола и крыши кабины, м. Задана сценой; здесь она нужна затем, что
 ## высоту кабина берёт из правил здания, а не из сцены.
 const SLAB_THICKNESS: float = 0.18
 
-## Просвет этажа по умолчанию, м: высота этажа минус плита у стандартных правил.
-## Кабина строится по нему, пока уровень не сказал своё — так одиночная кабина,
-## поднятая тестом без здания, всё равно собрана целиком.
+## Просвет этажа и ширина шахты по умолчанию, м — те же, что у стандартных
+## правил. Кабина строится по ним, пока уровень не сказал своё — так одиночная
+## кабина, поднятая тестом без здания, всё равно собрана целиком.
 const DEFAULT_CLEAR_HEIGHT: float = 3.0
+const DEFAULT_WIDTH: float = 1.8
 
 ## На сколько стрелки утоплены от крыши, м.
 const ARROW_DROP: float = 0.3
 
-## Тяги между ярусами пары: сечение, разнос от середины и глубина, м.
+## Тяги между ярусами пары: сечение, разнос от середины в долях ширины кабины
+## и глубина, м.
 ##
 ## Ярусы скреплены и едут вместе, но стоят через этаж — между крышей нижнего и
-## днищем верхнего остаётся 1.8 м пустоты. Без тяг это две отдельные кабины,
+## днищем верхнего остаётся этаж пустоты. Без тяг это две отдельные кабины,
 ## которые почему-то ходят вместе (ADR-0025, решение 1).
 const TIE_WIDTH: float = 0.1
-const TIE_SPREAD: float = 0.54
+const TIE_SPREAD: float = 0.45
 const TIE_DEPTH: float = 0.6
 
 @export var speed: float = 1.8
@@ -77,6 +87,8 @@ var _hum: AudioStreamPlayer3D = null
 var _ding: AudioStreamPlayer3D = null
 ## Огоньки на крыше: их двигает [method fit_to_story], когда меняется высота.
 var _indicators: Array[MeshInstance3D] = []
+## Ширина кабины, м. Задаёт её [method fit_to_story] из правил здания.
+var _width: float = DEFAULT_WIDTH
 @onready var _interior: Area3D = $Interior
 @onready var _crush_zone: Area3D = $CrushZone
 @onready var _up_arrow: MeshInstance3D = $UpArrow
@@ -102,10 +114,11 @@ func _ready() -> void:
 		var indicator := GreyboxLook.box(INDICATOR_SIZE, GreyboxLook.light(GreyboxLook.INDICATOR))
 		add_child(indicator)
 		_indicators.append(indicator)
-	fit_to_story(DEFAULT_CLEAR_HEIGHT)
+	fit_to_story(DEFAULT_CLEAR_HEIGHT, DEFAULT_WIDTH)
 
 
-## Растягивает кабину на просвет этажа: пол на полу этажа, крыша у низа плиты.
+## Растягивает кабину на просвет этажа и ширину шахты: пол на полу этажа, крыша
+## у низа плиты, борта у стенок шахты.
 ##
 ## **Кабина занимает просвет целиком — как в оригинале.** Сверка по кадру
 ## (256×224): шаг этажа 48 px, плита 7, просвет 41, кабина 40. У нас она была
@@ -117,30 +130,57 @@ func _ready() -> void:
 ## в этом месте прорезана шахтой — стоящий на крыше стоит в проёме, и корпус
 ## уходит в этаж выше. Так же это устроено и в оригинале.
 ##
-## Высоту задаёт уровень из правил здания, а не сцена: [member
-## BuildingRules.floor_height] и [member BuildingRules.slab_height] —
-## экспортируемые поля, и здание с другими пропорциями собирают тесты.
-func fit_to_story(clear_height: float) -> void:
+## Размеры задаёт уровень из правил здания, а не сцена: [member
+## BuildingRules.floor_height], [member BuildingRules.slab_height] и [member
+## BuildingRules.shaft_width] — экспортируемые поля, и здание с другими
+## пропорциями собирают тесты. Ширина пришла сюда в M18c: шахта выросла
+## до 1.8 м, а кабина из сцены осталась бы в 1.2 и болталась бы в ней
+## (ADR-0026, решение 3).
+func fit_to_story(clear_height: float, width: float) -> void:
+	_width = width
 	var roof_middle := clear_height - SLAB_THICKNESS * 0.5
 	($RoofShape as CollisionShape3D).position.y = roof_middle
 	($RoofVisual as MeshInstance3D).position.y = roof_middle
+	for slab: String in ["FloorShape", "RoofShape"]:
+		_resize(get_node(slab) as CollisionShape3D, width)
+	for slab: String in ["FloorVisual", "RoofVisual"]:
+		var visual := get_node(slab) as MeshInstance3D
+		var mesh := (visual.mesh as BoxMesh).duplicate() as BoxMesh
+		mesh.size.x = width
+		visual.mesh = mesh
+	_resize($CrushZone/CrushShape as CollisionShape3D, width - INNER_INSET)
 
-	# Форма своя на каждую кабину: подресурс сцены общий на все её копии, и
-	# правка размера на месте растянула бы заодно все остальные кабины здания.
 	var room := clear_height - SLAB_THICKNESS
 	var inside := $Interior/InteriorShape as CollisionShape3D
-	var box := (inside.shape as BoxShape3D).duplicate() as BoxShape3D
-	box.size.y = room
-	inside.shape = box
+	_resize(inside, width - INNER_INSET, room)
 	inside.position.y = room * 0.5
 
-	_up_arrow.position.y = clear_height - ARROW_DROP
-	_down_arrow.position.y = clear_height - ARROW_DROP
+	_up_arrow.position = Vector3(-width * ARROW_SPREAD, clear_height - ARROW_DROP, 0.3)
+	_down_arrow.position = Vector3(width * ARROW_SPREAD, clear_height - ARROW_DROP, 0.3)
 	for index in _indicators.size():
 		var side := -1.0 if index == 0 else 1.0
 		_indicators[index].position = Vector3(
-			side * INDICATOR_SPREAD, clear_height + INDICATOR_RISE + INDICATOR_SIZE.y * 0.5, 0.3
+			side * width * INDICATOR_SPREAD,
+			clear_height + INDICATOR_RISE + INDICATOR_SIZE.y * 0.5,
+			0.3
 		)
+
+
+## Ширина кабины, м.
+func width() -> float:
+	return _width
+
+
+## Меняет габарит формы по ширине и, если задана, по высоте.
+##
+## Форма своя на каждую кабину: подресурс сцены общий на все её копии, и
+## правка размера на месте растянула бы заодно все остальные кабины здания.
+static func _resize(shape: CollisionShape3D, width: float, height: float = -1.0) -> void:
+	var box := (shape.shape as BoxShape3D).duplicate() as BoxShape3D
+	box.size.x = width
+	if height > 0.0:
+		box.size.y = height
+	shape.shape = box
 
 
 func _physics_process(delta: float) -> void:
@@ -249,7 +289,7 @@ func is_aligned() -> bool:
 ## иначе половина связи однажды останется незаданной.
 func take_a_deck(deck: ElevatorCar, drop: float) -> void:
 	_deck = deck
-	# Зона сдавливания верхнего яруса остаётся: между ярусами 1.8 м пустоты,
+	# Зона сдавливания верхнего яруса остаётся: между ярусами этаж пустоты,
 	# на крышу нижнего можно встать, и опускающаяся пара прижмёт стоящего.
 	var tie := GreyboxLook.metal(GreyboxLook.CAR)
 	var length := drop - _body_height()
@@ -257,7 +297,7 @@ func take_a_deck(deck: ElevatorCar, drop: float) -> void:
 		return
 	for side: float in [-1.0, 1.0]:
 		var strut := GreyboxLook.box(Vector3(TIE_WIDTH, length, TIE_DEPTH), tie)
-		strut.position = Vector3(side * TIE_SPREAD, _under_the_floor() - length * 0.5, 0.0)
+		strut.position = Vector3(side * _width * TIE_SPREAD, _under_the_floor() - length * 0.5, 0.0)
 		add_child(strut)
 
 

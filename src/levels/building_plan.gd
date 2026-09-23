@@ -68,9 +68,9 @@ class EscalatorSpot:
 	## Насколько перегиб ломаной отступает внутрь проёма от его ближнего края, м.
 	##
 	## Сквозь дыру проходит не линия пути, а пассажир: он шире её на полкорпуса
-	## (0.27 м), и отступ обязан быть больше. Запас — 0.15 м, и его стережёт
+	## (0.36 м), и отступ обязан быть больше. Запас — 0.15 м, и его стережёт
 	## [code]test_escalator_carries_its_rider_through_the_gap[/code].
-	const BEND_CLEARANCE: float = 0.42
+	const BEND_CLEARANCE: float = 0.51
 
 	var x: float = 0.0
 	var floor_index: int = 0
@@ -391,7 +391,13 @@ func _open_shaft(
 
 	# Место должно стоять на всех уровнях шахты разом: здание расширяется книзу,
 	# и верх шахты — самое тесное её место.
-	var free := _free_slots(rules, taken, levels)
+	# Шахта ровно в шаг места (ADR-0026, решение 3), и две в соседних местах
+	# сомкнулись бы: между ними не осталось бы пола — ни встать, ни выйти из
+	# кабины иначе, как в соседнюю.
+	var free: Array[int] = []
+	for slot in _free_slots(rules, taken, levels):
+		if not _beside_a_shaft(slot, shaft.top, shaft.bottom):
+			free.append(slot)
 	if free.is_empty():
 		return null
 
@@ -402,6 +408,17 @@ func _open_shaft(
 	for level in levels:
 		_occupy(taken, level, shaft.slot)
 	return shaft
+
+
+## Стоит ли в соседнем месте шахта, делящая с полосой [param top]..[param bottom]
+## хоть один уровень.
+func _beside_a_shaft(slot: int, top: int, bottom: int) -> bool:
+	for other in shafts:
+		if absi(other.slot - slot) != 1:
+			continue
+		if other.top <= bottom and top <= other.bottom:
+			return true
+	return false
 
 
 ## Сколько уровней обслужит новая шахта.
@@ -481,7 +498,7 @@ func _bridges(index: int) -> bool:
 ## эскалатор; ноль, если он первый.
 ##
 ## Эскалатор занимает два места: своё и следующее по ходу спуска. Проём уходит от
-## оси на 2.28 м, площадка — на 2.88, и в один шаг сетки это не укладывается
+## оси на 2.1 м, площадка — на 2.24, и в один шаг сетки это не укладывается
 ## (ADR-0024, решение 1). Занимал он раньше одно, и на площадку могла встать дверь.
 func _add_escalator(
 	rules: BuildingRules,
@@ -810,6 +827,11 @@ func _wall_blockers(rules: BuildingRules, index: int) -> Array[Vector2]:
 	for door in doors:
 		if door.floor_index == index:
 			busy.append(Vector2(door.x - clearance, door.x + clearance))
+	# Лампа шире зазора между местами: при шаге 1.8 м она заходит на границу
+	# (ADR-0026, решение 3), и стена рядом прошла бы сквозь неё.
+	for lamp in lamps:
+		if lamp.floor_index == index:
+			busy.append(Vector2(lamp.x - clearance, lamp.x + clearance))
 	if index == floors - 1:
 		busy.append(Vector2(exit_x - clearance, exit_x + clearance))
 	return busy

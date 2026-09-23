@@ -3,13 +3,13 @@
 [ext_resource type="Script" path="res://src/systems/lighting/lamp.gd" id="1_lamp"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_lamp"]
-size = Vector3(0.48, 0.72, 0.4)
+size = Vector3(0.6, 0.45, 0.4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_crush"]
-size = Vector3(0.6, 0.78, 0.4)
+size = Vector3(0.72, 0.51, 0.4)
 
 [sub_resource type="BoxMesh" id="BoxMesh_lamp"]
-size = Vector3(0.48, 0.72, 0.4)
+size = Vector3(0.6, 0.45, 0.4)
 
 [node name="Lamp" type="AnimatableBody3D"]
 collision_layer = 8
