@@ -85,6 +85,13 @@ Labels and comments are jotd's; the interpretations below (marked "=>") are mine
   bands: 1-6 {0,1,2,2,2,2,3,4,5}; 8 {0,0,0,1,1,1,1,1,1}; 9-11 {2,2,2,1,1,2,1,1,1}; 12-14 {1..}; 15-17 {1..}; 18-20 {1..};
   21-25 {0,0,0,1,1,1,1,1,0}; 26-30 {0,0,0,0,1,1,1,0,0}
   totals by skill 0..8: 5,6,7,8,9,10,10,10,10.
+- Floors are counted from the bottom: floor 0 is the basement with the car, 30 the top (red-door bands, @2753 lower floors 1-6).
+- Lamps (init_building_2700 @270A): $81DA holds 23 two-bit lamp masks for floors 8..30, all set to 3 (two lamps),
+  $81E6 (floor 20) = 2 (one lamp), $81DD..$81E1 (floors 11..15) = 0 (no lamps). Floors below 8 have no lamps
+  (display_broken_lamp_if_needed_035f, @089A). => the dark floors are 11-15.
+- Kill score (@56A1, @56C6): dark building ($8242) OR victim on the ground on floors 0x0B..0x0F (11-15) => 150 shoot / 200 kick.
+- Red door band tables @282D..@2874, indexed by min(skill, 8): 1-6 {0,1,2,2,2,2,3,4,5}; 8 {0,0,0,1,1,1,1,1,1};
+  9-11 {2,2,2,1,1,2,1,1,1}; 12-14, 15-17, 18-20 {1 x9}; 21-25 {0,0,0,1,1,1,1,1,0}; 26-30 {0,0,0,0,1,1,1,0,0}.
 - Exit shaft ($802D) and double-elevator layout (@2A75) chosen randomly per building.
 - End bonus = 1000 * min(10, skill - DIP + 1) (@5793).
 
