@@ -48,6 +48,14 @@ const LIGHT_COLOR := Color(1.0, 0.9, 0.7)
 ## Шнур подвеса, м: толщина. Длина — от патрона до потолка, и её знает уровень.
 const CORD_WIDTH: float = 0.03
 
+## Абажур: радиус верха, радиус низа и высота; чашка подвеса — радиус и
+## высота, м (ADR-0031, решение 3).
+const SHADE := Vector3(0.1, 0.3, 0.26)
+const CANOPY := Vector2(0.08, 0.05)
+const SHADE_COLOR := Color(0.42, 0.4, 0.36)
+## Чаша рассеивателя под абажуром: радиус и глубина, м.
+const BOWL := Vector2(0.27, 0.13)
+
 @export var fall_speed: float = 7.8
 
 ## Этаж, на котором лампа висит. Записывает уровень, когда вешает её.
@@ -63,6 +71,8 @@ var _fall := LampFall.new()
 var _spot: SpotLight3D = null
 var _fill: OmniLight3D = null
 var _cord: MeshInstance3D = null
+## Рассеиватель абажура: светится, пока лампа цела (ADR-0031, решение 3).
+var _diffuser: MeshInstance3D = null
 
 @onready var _crush_zone: Area3D = $CrushZone
 @onready var _visual: MeshInstance3D = $Visual
@@ -86,6 +96,7 @@ func _ready() -> void:
 	_fall.speed = fall_speed
 	# Светильник и есть источник: он светится сам и виден с любого этажа.
 	_visual.material_override = GreyboxLook.marker(GreyboxLook.LAMP)
+	_dress_fixture()
 	_spot = _make_spot()
 	add_child(_spot)
 	_fill = _make_fill()
@@ -131,6 +142,10 @@ func hang(hang_height: float, headroom: float = 0.0) -> void:
 	)
 	_cord.position = Vector3(0.0, box.size.y * 0.5 + cord_length * 0.5, 0.0)
 	add_child(_cord)
+	# Чашка подвеса на потолке — часть шнура: остаётся с ним, когда лампа падает.
+	var canopy := _cylinder(CANOPY.x, CANOPY.y, GreyboxLook.metal(SHADE_COLOR))
+	canopy.position = Vector3(0.0, cord_length * 0.5 - CANOPY.y * 0.5, 0.0)
+	_cord.add_child(canopy)
 
 
 ## Сбита выстрелом. Повторные попадания ничего не меняют, в том числе и по уже
@@ -139,9 +154,14 @@ func hang(hang_height: float, headroom: float = 0.0) -> void:
 func shoot_down() -> void:
 	if not _fall.start():
 		return
+	# Искры в точке попадания: остаются там, пока лампа падает (ADR-0031).
+	if get_parent() != null:
+		Sparks.burst(get_parent(), global_position)
 	# Сбитая лампа перестаёт светиться сама: корпус тот же, но уже не светильник.
 	# Шнур остаётся на потолке — оборванный, — а не падает и не исчезает с ней.
 	_visual.material_override = GreyboxLook.surface(GreyboxLook.LAMP)
+	if _diffuser != null:
+		_diffuser.material_override = GreyboxLook.surface(GreyboxLook.LAMP.darkened(0.5))
 	if _cord != null:
 		_cord.reparent(get_parent())
 		_cord = null
@@ -161,6 +181,48 @@ func set_light_visible(on: bool) -> void:
 func apply_graphics() -> void:
 	_spot.shadow_enabled = Graphics.spot_shadows()
 	_fill.shadow_enabled = Graphics.fill_shadows()
+
+
+## Светильник вместо коробки: абажур конусом и рассеиватель снизу. Коробка
+## корпуса остаётся — по ней считаются попадание и падение, — но не видна.
+func _dress_fixture() -> void:
+	_visual.transparency = 1.0
+	_visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var box := _shape.shape as BoxShape3D
+	var shade := _cylinder(SHADE.x, SHADE.z, GreyboxLook.metal(SHADE_COLOR), SHADE.y)
+	shade.position = Vector3(0.0, box.size.y * 0.5 - SHADE.z * 0.5, 0.0)
+	# Светильник не отбрасывает тени: источник сидит внутри него, и абажур с
+	# чашей глушили бы собственный свет (кадры M20 — этажи потемнели).
+	shade.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(shade)
+	# Светящаяся чаша под абажуром: видна сбоку, а не только снизу. Лампа — цель,
+	# и в кадре камеры сверху плоский рассеиватель пропадал (кадры M20).
+	var bowl := SphereMesh.new()
+	bowl.radius = BOWL.x
+	bowl.height = BOWL.y * 2.0
+	bowl.is_hemisphere = true
+	_diffuser = MeshInstance3D.new()
+	_diffuser.mesh = bowl
+	_diffuser.material_override = GreyboxLook.marker(GreyboxLook.LAMP)
+	_diffuser.rotation.x = PI
+	_diffuser.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_diffuser.position = Vector3(0.0, box.size.y * 0.5 - SHADE.z, 0.0)
+	add_child(_diffuser)
+
+
+## Цилиндр или усечённый конус: верх [param top], низ [param bottom] (по
+## умолчанию как верх), высота [param height].
+func _cylinder(
+	top: float, height: float, material: StandardMaterial3D, bottom: float = -1.0
+) -> MeshInstance3D:
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = top
+	mesh.bottom_radius = bottom if bottom >= 0.0 else top
+	mesh.height = height
+	var part := MeshInstance3D.new()
+	part.mesh = mesh
+	part.material_override = material
+	return part
 
 
 func _make_spot() -> SpotLight3D:
