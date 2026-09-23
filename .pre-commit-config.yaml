@@ -29,7 +29,11 @@ repos:
       - id: end-of-file-fixer
         entry: python -m pre_commit_hooks.end_of_file_fixer
         exclude: '\.(tscn|tres|import|godot)$'
+      # Через python -m, как end-of-file-fixer выше: exe-лаунчер хука,
+      # который pip кладёт в окружение pre-commit, неподписан, и политика
+      # управления приложениями Windows запрещает его запуск (WinError 4551).
       - id: check-yaml
+        entry: python -m pre_commit_hooks.check_yaml
       - id: check-merge-conflict
       - id: check-case-conflict
       - id: check-added-large-files
@@ -55,10 +59,12 @@ repos:
         always_run: true
         stages: [pre-commit]
 
-      # Тяжёлые проверки движком — только на push, чтобы не тормозить коммиты
+      # Тяжёлые проверки движком — только на push, чтобы не тормозить коммиты.
+      # Если check.ps1 уже прошёл на этом же дереве, повтор пропускается:
+      # tools/check_stamp.py сверяет отпечаток рабочей копии.
       - id: godot-check
         name: godot --headless --import (импорт ресурсов и парсинг скриптов)
-        entry: python tools/godot_check.py
+        entry: python tools/check_stamp.py --run python tools/godot_check.py
         language: system
         pass_filenames: false
         always_run: true
@@ -66,7 +72,7 @@ repos:
 
       - id: gut-tests
         name: тесты GUT (headless)
-        entry: python tools/run_tests.py
+        entry: python tools/check_stamp.py --run python tools/run_tests.py
         language: system
         pass_filenames: false
         always_run: true
