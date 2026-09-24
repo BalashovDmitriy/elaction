@@ -333,6 +333,43 @@ def game_over() -> Stereo:
 # --- Музыка ------------------------------------------------------------------
 
 
+# --- Интерфейс ---------------------------------------------------------------
+#
+# Меню неоновое (ADR-0035), и звук у него электрический: короткие чистые тона
+# с гудением трансформатора под ними, без комнаты — меню нигде не стоит.
+
+
+def _neon_buzz(seconds: float, level: float) -> np.ndarray:
+    """Гудение неона: сетевые 100 Гц с обертонами, приглушённые до фона."""
+    hum = stack(dsp.sine(100.0, seconds) * 0.6, dsp.sine(200.0, seconds) * 0.3, dsp.pulse(300.0, seconds, 0.2) * 0.1)
+    return dsp.decay(dsp.filtered(hum, 1200.0, "low"), tau=seconds * 0.4) * level
+
+
+def ui_move() -> Stereo:
+    """Переход по пунктам меню: короткий мягкий тик. Звучит чаще всех в меню."""
+    tick = dsp.decay(dsp.sine(note("E6"), 0.06), tau=0.012)
+    click = dsp.decay(dsp.filtered(dsp.noise(0.02, 201), 3500.0, "band"), tau=0.003)
+    dry = stack(tick * 0.5, click * 0.25, _neon_buzz(0.06, 0.12))
+    return dsp.master(dsp.mono_to_stereo(dry), peak=0.45)
+
+
+def ui_select() -> Stereo:
+    """Выбор: два тона вверх и вспышка неона — пункт загорелся."""
+    first = dsp.decay(dsp.saw(note("A5"), 0.22, detune=0.004), tau=0.05)
+    second = after(0.055, dsp.decay(dsp.saw(note("E6"), 0.3, detune=0.004), tau=0.08))
+    tone = dsp.filtered(stack(first * 0.35, second * 0.35), 5200.0, "low")
+    zap = dsp.decay(dsp.filtered(dsp.noise(0.05, 211), 2400.0, "high"), tau=0.006)
+    dry = stack(tone, zap * 0.25, _neon_buzz(0.3, 0.2))
+    return dsp.master(dsp.widen(dsp.mono_to_stereo(dsp.echo(dry, 0.09, 0.25, 0.2)), 0.3), peak=0.6)
+
+
+def ui_back() -> Stereo:
+    """Назад: тот же тон, но вниз и тише — неон гаснет."""
+    fall = dsp.decay(dsp.saw(dsp.glide(note("E6"), note("A5"), 0.16), 0.2, detune=0.004), tau=0.05)
+    dry = stack(dsp.filtered(fall, 3800.0, "low") * 0.35, _neon_buzz(0.2, 0.15))
+    return dsp.master(dsp.mono_to_stereo(dry), peak=0.5)
+
+
 def _kick_drum(seconds: float = 0.5) -> np.ndarray:
     body = dsp.decay(dsp.sine(dsp.glide(140.0, 45.0, seconds, curve=4.0), seconds), tau=0.08)
     click = dsp.decay(dsp.filtered(dsp.noise(0.02, 301), 1800.0, "high"), tau=0.004) * 0.4
@@ -560,6 +597,9 @@ EFFECTS: dict[str, Callable[[], Stereo]] = {
     "building_bonus": building_bonus,
     "extra_life": extra_life,
     "game_over": game_over,
+    "ui_move": ui_move,
+    "ui_select": ui_select,
+    "ui_back": ui_back,
 }
 
 ## Музыка пишется в OGG: двадцать секунд стерео в WAV весят три с половиной

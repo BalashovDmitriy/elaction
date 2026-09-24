@@ -31,7 +31,6 @@ DIST_DIR = PROJECT_ROOT / "dist"
 EXTRAS: dict[str, str] = {
     "LICENSE": "LICENSE.txt",
     "CREDITS.md": "CREDITS.md",
-    "assets/fonts/Pixellari.LICENSE.txt": "Pixellari.LICENSE.txt",
     "assets/fonts/Exo2.LICENSE.txt": "Exo2.LICENSE.txt",
 }
 

@@ -5,10 +5,11 @@ extends CanvasLayer
 ##
 ## Один узел на все страницы, а не сцена на каждую: страницы отличаются только
 ## содержимым одной колонки, и держать ради этого шесть файлов значило бы шесть
-## раз повторить рамку, затемнение и разбор ввода.
+## раз повторить фон, вывеску и разбор ввода.
 ##
-## Содержимое собирается кодом, потому что оно данные: список кнопок, список
-## ползунков, список строк таблицы. Разметка в сцене — только рамка вокруг.
+## Содержимое собирается кодом, потому что оно данные: список пунктов, список
+## переключателей, строки таблицы. Разметка в сцене — только фон, вывеска и
+## колонка (ADR-0035).
 
 ## Что игрок выбрал. Решает не меню, а [Main]: оно знает про здание и партию.
 signal play_pressed
@@ -32,11 +33,8 @@ const ACTIONS: Array[Array] = [
 ]
 
 ## Имена кнопок геймпада. В [InputMap] они лежат номерами, а номер игроку
-## ничего не говорит — на коробке написаны буквы.
-##
-## Значения, начинающиеся с `UI_`, переводятся: у крестовины имени на коробке
-## нет, а рисовать стрелки нечем — в пиксельном шрифте их просто не оказалось.
-## Все четыре её направления сводятся в одно слово, и в строке оно одно.
+## ничего не говорит — на коробке написаны буквы. Значения, начинающиеся с
+## `UI_`, переводятся: у крестовины имени на коробке нет.
 const PAD_NAMES: Dictionary = {
 	JOY_BUTTON_A: "A",
 	JOY_BUTTON_B: "B",
@@ -49,6 +47,20 @@ const PAD_NAMES: Dictionary = {
 	JOY_BUTTON_DPAD_LEFT: "UI_DPAD",
 	JOY_BUTTON_DPAD_RIGHT: "UI_DPAD",
 }
+
+## Ширина колонки: пунктов и настроек, px.
+const COLUMN_WIDTH: float = 560.0
+const WIDE_COLUMN: float = 900.0
+## Сколько длится смена страницы и насколько колонка въезжает слева.
+const PAGE_TIME: float = 0.22
+const PAGE_SLIDE: float = 36.0
+## Где начинается колонка: под вывеской на главной и выше на остальных —
+## настройкам нужна вся высота экрана.
+const COLUMN_TOP: float = 340.0
+const COLUMN_TOP_HIGH: float = 110.0
+## Кегль заголовка страницы и строк таблиц.
+const CAPTION_SIZE: int = 28
+const TABLE_SIZE: int = 30
 
 var settings: GameSettings = null
 var records: Records = null
@@ -64,8 +76,18 @@ var _page: Page = Page.MAIN
 ## этому признаку «назад» из рекордов уводило с экрана конца партии в паузу.
 var _back_to: Page = Page.MAIN
 
+## Пока страница собирается и забирает фокус, переход фокуса не звучит: иначе
+## каждая страница открывалась бы щелчком, которого игрок не делал.
+var _settling: bool = false
+var _page_tween: Tween = null
+
 @onready var _column: VBoxContainer = %Page
 @onready var _version: Label = %Version
+@onready var _title: NeonTitle = %Title
+@onready var _subtitle: Label = %Subtitle
+@onready var _hint: Label = %Hint
+@onready var _blur: ColorRect = %Blur
+@onready var _slot: Control = %Slot
 
 
 func _ready() -> void:
@@ -73,9 +95,10 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	# Версия в углу — чтобы игрок мог назвать её, не открывая свойства файла.
 	_version.text = Release.tag()
+	_style_static_labels()
 
 
-## Показывает страницу и забирает фокус на первую кнопку: иначе стрелками
+## Показывает страницу и забирает фокус на первый пункт: иначе стрелками
 ## и геймпадом по меню не походить.
 func show_page(page: Page) -> void:
 	_page = page
@@ -84,12 +107,28 @@ func show_page(page: Page) -> void:
 		# и есть то, куда вернёт «назад».
 		_back_to = page
 	visible = true
+	_settling = true
 	for child: Node in _column.get_children():
 		# Сначала из колонки, потом в утиль: [method Node.queue_free] удаляет узел
 		# лишь в конце кадра, а отложенный [method _focus_first] успевает раньше —
-		# и фокус доставался кнопке прошлой страницы, которую тут же и удаляли.
+		# и фокус доставался пункту прошлой страницы, которую тут же и удаляли.
 		_column.remove_child(child)
 		child.queue_free()
+
+	# Над игрой — пауза и конец партии со своими подстраницами — за меню стоит
+	# замершее здание, и оно размывается. Из главного меню за ним город.
+	var over_game := _back_to != Page.MAIN
+	_blur.visible = over_game
+	_title.visible = page == Page.MAIN
+	_subtitle.visible = page == Page.MAIN
+	_hint.text = tr("UI_HINT")
+	var wide := page == Page.SETTINGS or page == Page.CONTROLS or page == Page.RECORDS
+	_column.custom_minimum_size.x = WIDE_COLUMN if wide else COLUMN_WIDTH
+	# Контейнер сам не сужается: после широких настроек узкая страница осталась
+	# бы шириной настроек, и пункты тянулись бы через полэкрана.
+	_column.reset_size()
+	_slot.position.y = COLUMN_TOP if page == Page.MAIN else COLUMN_TOP_HIGH
+	_column.add_theme_constant_override("separation", 8 if wide else 14)
 
 	match page:
 		Page.MAIN:
@@ -105,6 +144,7 @@ func show_page(page: Page) -> void:
 		Page.CONTROLS:
 			_build_controls()
 
+	_slide_in()
 	_focus_first.call_deferred()
 
 
@@ -123,48 +163,71 @@ func current_page() -> Page:
 	return _page
 
 
+## Пункты текущей страницы — тем, кто водит меню снаружи: тестам и снимкам.
+func rows() -> Array[MenuRow]:
+	var found: Array[MenuRow] = []
+	_collect_rows(_column, found)
+	return found
+
+
+## Вывеска — нужна тестам и снимкам, чтобы остановить мигание.
+func title() -> NeonTitle:
+	return _title
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not visible:
+		return
+	# «Назад» с подстраницы — Esc или B. С корневых страниц уходят только
+	# пунктами: пауза закрывается своим действием, и это решает [Main].
+	if event.is_action_pressed(&"ui_cancel") and not _is_root(_page):
+		get_viewport().set_input_as_handled()
+		_go_back()
+
+
 # --- Страницы ----------------------------------------------------------------
 
 
 func _build_main() -> void:
-	_title("UI_TITLE")
-	_note("UI_SUBTITLE")
-	_button("UI_PLAY", func() -> void: play_pressed.emit())
-	_button("UI_RECORDS", func() -> void: show_page(Page.RECORDS))
-	_button("UI_SETTINGS", func() -> void: show_page(Page.SETTINGS))
-	_button("UI_CONTROLS", func() -> void: show_page(Page.CONTROLS))
-	_button("UI_QUIT", func() -> void: quit_pressed.emit())
+	_action("UI_PLAY", func() -> void: play_pressed.emit())
+	_action("UI_RECORDS", func() -> void: show_page(Page.RECORDS))
+	_action("UI_SETTINGS", func() -> void: show_page(Page.SETTINGS))
+	_action("UI_CONTROLS", func() -> void: show_page(Page.CONTROLS))
+	_action("UI_QUIT", func() -> void: quit_pressed.emit())
 
 
 func _build_pause() -> void:
-	_title("UI_PAUSED")
-	_button("UI_RESUME", func() -> void: resume_pressed.emit())
-	_button("UI_RESTART", func() -> void: restart_pressed.emit())
-	_button("UI_SETTINGS", func() -> void: show_page(Page.SETTINGS))
-	_button("UI_TO_MENU", func() -> void: to_menu_pressed.emit())
+	_caption("UI_PAUSED")
+	_action("UI_RESUME", func() -> void: resume_pressed.emit())
+	_action("UI_RESTART", func() -> void: restart_pressed.emit())
+	_action("UI_SETTINGS", func() -> void: show_page(Page.SETTINGS))
+	_action("UI_TO_MENU", func() -> void: to_menu_pressed.emit())
 
 
 func _build_game_over() -> void:
-	_title("UI_GAME_OVER")
-	_note_text("%s %s" % [tr("UI_YOUR_SCORE"), Hud.format_score(_last_score)])
+	_caption("UI_GAME_OVER")
+	var caption := NeonStyle.label(26, NeonStyle.INK_DIM, 600)
+	caption.text = tr("UI_YOUR_SCORE").to_upper()
+	_column.add_child(caption)
+	var score := NeonStyle.label(88, NeonStyle.INK, 800)
+	score.text = Hud.format_score(_last_score)
+	_column.add_child(score)
 	if _last_place >= 0:
-		var record := Label.new()
+		var record := NeonStyle.label(32, _neon(), 700)
 		record.text = "%s  #%d" % [tr("UI_NEW_RECORD"), _last_place + 1]
-		record.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		record.add_theme_color_override("font_color", Color(1.0, 0.86, 0.5))
 		_column.add_child(record)
-
-	_button("UI_RESTART", func() -> void: restart_pressed.emit())
-	_button("UI_RECORDS", func() -> void: show_page(Page.RECORDS))
-	_button("UI_TO_MENU", func() -> void: to_menu_pressed.emit())
+	_gap(18.0)
+	_action("UI_RESTART", func() -> void: restart_pressed.emit())
+	_action("UI_RECORDS", func() -> void: show_page(Page.RECORDS))
+	_action("UI_TO_MENU", func() -> void: to_menu_pressed.emit())
 
 
 func _build_settings() -> void:
-	_title("UI_SETTINGS")
+	_caption("UI_SETTINGS")
 	if settings != null:
-		_slider("UI_VOLUME_MASTER", Sounds.MASTER_BUS)
-		_slider("UI_VOLUME_MUSIC", Sounds.MUSIC_BUS)
-		_slider("UI_VOLUME_SFX", Sounds.SFX_BUS)
+		_level("UI_VOLUME_MASTER", Sounds.MASTER_BUS)
+		_level("UI_VOLUME_MUSIC", Sounds.MUSIC_BUS)
+		_level("UI_VOLUME_SFX", Sounds.SFX_BUS)
 		_languages()
 		_difficulty()
 		_quality()
@@ -172,43 +235,58 @@ func _build_settings() -> void:
 		_resolution()
 		_render_scale()
 		_blood()
-	_button("UI_BACK", _go_back)
+	_gap(10.0)
+	_back()
 
 
 func _build_records() -> void:
-	_title("UI_RECORDS")
-	var rows := records.rows if records != null else [] as Array[Dictionary]
-	if rows.is_empty():
-		_note("UI_NO_RECORDS")
-	for index: int in rows.size():
-		var row := rows[index]
-		var line := Label.new()
-		line.text = (
-			"%2d.  %10s   %s"
-			% [index + 1, Hud.format_score(int(row[Records.SCORE])), String(row[Records.DATE])]
-		)
-		line.add_theme_font_size_override("font_size", 12)
-		_column.add_child(line)
-	_button("UI_BACK", _go_back)
+	_caption("UI_RECORDS")
+	var rows_shown := records.rows if records != null else [] as Array[Dictionary]
+	if rows_shown.is_empty():
+		_note(tr("UI_NO_RECORDS"))
+	else:
+		# Сеткой, а не строкой с пробелами: Exo 2 пропорциональный, и колонки
+		# из пробелов у него разъезжаются.
+		var grid := GridContainer.new()
+		grid.columns = 3
+		grid.add_theme_constant_override("h_separation", 48)
+		grid.add_theme_constant_override("v_separation", 6)
+		for index: int in rows_shown.size():
+			var row := rows_shown[index]
+			var tint := _neon() if index == 0 else NeonStyle.INK
+			_cell(grid, "%d." % (index + 1), NeonStyle.INK_DIM, HORIZONTAL_ALIGNMENT_RIGHT)
+			_cell(grid, Hud.format_score(int(row[Records.SCORE])), tint, HORIZONTAL_ALIGNMENT_RIGHT)
+			_cell(grid, String(row[Records.DATE]), NeonStyle.INK_DIM, HORIZONTAL_ALIGNMENT_LEFT)
+		_column.add_child(grid)
+	_gap(10.0)
+	_back()
 
 
 func _build_controls() -> void:
-	_title("UI_CONTROLS")
+	_caption("UI_CONTROLS")
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 40)
+	grid.add_theme_constant_override("v_separation", 10)
 	for row: Array in ACTIONS:
 		var actions: Array[StringName] = []
 		for action: Variant in row[1] as Array:
 			actions.append(StringName(action))
-		_two_columns(tr(String(row[0])), _keys_of(actions))
-
-	_note("UI_ACTION_HINT")
-	_note("UI_REBIND_LATER")
-	_button("UI_BACK", _go_back)
+		_cell(grid, tr(String(row[0])), NeonStyle.INK_DIM, HORIZONTAL_ALIGNMENT_LEFT)
+		_cell(grid, _keys_of(actions), NeonStyle.INK, HORIZONTAL_ALIGNMENT_LEFT)
+	_column.add_child(grid)
+	_gap(6.0)
+	_note(tr("UI_ACTION_HINT"))
+	_note(tr("UI_REBIND_LATER"))
+	_gap(10.0)
+	_back()
 
 
 ## Возвращает на страницу, с которой ушли, и записывает настройки на диск:
-## громкость меняется ползунком по шагу, и сохранять её на каждый шаг значило бы
-## писать файл двадцать раз за одно движение мышью.
+## громкость меняется по шагу, и сохранять её на каждый шаг значило бы писать
+## файл двадцать раз за одно движение.
 func _go_back() -> void:
+	Sounds.play(Sounds.UI_BACK)
 	if settings != null:
 		settings.save_to()
 	show_page(_back_to)
@@ -217,175 +295,170 @@ func _go_back() -> void:
 # --- Кирпичи -----------------------------------------------------------------
 
 
-func _title(key: String) -> void:
-	var label := Label.new()
-	label.text = tr(key)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 24)
-	label.add_theme_color_override("font_color", Color(0.95, 0.94, 0.88))
+## Заголовок страницы неоновыми капителями — как подписи на плашках HUD.
+func _caption(key: String) -> void:
+	var label := NeonStyle.label(CAPTION_SIZE, _neon(), 700)
+	label.text = tr(key).to_upper()
 	_column.add_child(label)
+	_gap(6.0)
 
 
-## Пояснение под заголовком по ключу перевода.
-func _note(key: String) -> void:
-	_note_text(tr(key))
-
-
-## То же, но готовой строкой: на экране конца партии подпись собрана из перевода
-## и счёта, и переводить её второй раз нечего.
-func _note_text(text: String) -> void:
-	var label := Label.new()
+func _note(text: String) -> void:
+	var label := NeonStyle.label(22, NeonStyle.INK_DIM, 400)
 	label.text = text
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.custom_minimum_size = Vector2(300.0, 0.0)
-	label.add_theme_font_size_override("font_size", 12)
-	label.add_theme_color_override("font_color", Color(0.7, 0.74, 0.82))
+	label.custom_minimum_size = Vector2(_column.custom_minimum_size.x, 0.0)
 	_column.add_child(label)
 
 
-func _button(key: String, action: Callable) -> void:
-	var button := Button.new()
-	button.text = tr(key)
-	button.flat = true
-	button.pressed.connect(action)
-	_column.add_child(button)
+func _cell(grid: GridContainer, text: String, colour: Color, align: HorizontalAlignment) -> void:
+	var label := NeonStyle.label(TABLE_SIZE, colour, 600)
+	label.text = text
+	label.horizontal_alignment = align
+	grid.add_child(label)
 
 
-## Строка настройки с подписью слева: ползунок, язык, сложность. Сам элемент
-## кладёт в неё зовущий, а в колонку она уже вставлена.
-func _setting_row(key: String) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
+func _gap(height: float) -> void:
+	var gap := Control.new()
+	gap.custom_minimum_size = Vector2(0.0, height)
+	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_column.add_child(gap)
 
-	var label := Label.new()
-	label.text = tr(key)
-	label.custom_minimum_size = Vector2(150.0, 0.0)
-	label.add_theme_font_size_override("font_size", 12)
-	row.add_child(label)
 
+func _action(key: String, action: Callable) -> MenuRow:
+	var row := MenuRow.action(tr(key))
+	row.pressed.connect(
+		func() -> void:
+			Sounds.play(Sounds.UI_SELECT)
+			action.call()
+	)
+	return _add_row(row)
+
+
+func _back() -> void:
+	var row := MenuRow.action(tr("UI_BACK"), 34)
+	row.pressed.connect(_go_back)
+	_add_row(row)
+
+
+func _add_row(row: MenuRow) -> MenuRow:
+	row.neon = _neon()
+	row.focus_entered.connect(_on_row_focused)
+	row.changed.connect(func(_value: Variant) -> void: Sounds.play(Sounds.UI_MOVE))
 	_column.add_child(row)
 	return row
 
 
-## Ползунок громкости: подпись и ручка в строку.
-func _slider(key: String, bus: String) -> void:
-	var row := _setting_row(key)
-	var slider := HSlider.new()
-	slider.min_value = 0.0
-	slider.max_value = 1.0
-	slider.step = 0.05
-	slider.value = settings.level_of(bus)
-	slider.custom_minimum_size = Vector2(160.0, 0.0)
-	slider.value_changed.connect(func(value: float) -> void: _on_level_changed(bus, value))
-	row.add_child(slider)
+## Громкость: полоса и проценты, влево-вправо по пять.
+func _level(key: String, bus: String) -> void:
+	var row := _add_row(MenuRow.slider(tr(key), settings.level_of(bus)))
+	# Громкость применяется сразу, а на диск уезжает при уходе со страницы.
+	row.changed.connect(func(value: Variant) -> void: settings.set_level(bus, float(value)))
 
 
 func _languages() -> void:
-	var row := _setting_row("UI_LANGUAGE")
-	var choice := OptionButton.new()
+	var names: Array[String] = []
+	var current := 0
 	for index: int in GameSettings.LOCALES.size():
 		var code := GameSettings.LOCALES[index]
-		choice.add_item(tr("UI_LANGUAGE_" + code.to_upper()), index)
+		names.append(tr("UI_LANGUAGE_" + code.to_upper()))
 		if code == settings.locale:
-			choice.select(index)
-	choice.item_selected.connect(_on_language_selected)
-	row.add_child(choice)
+			current = index
+	var row := _add_row(MenuRow.choice(tr("UI_LANGUAGE"), names, current))
+	row.changed.connect(_on_language_selected)
 
 
 ## Уровень сложности: четыре положения DIP-переключателя автомата.
 func _difficulty() -> void:
-	var row := _setting_row("UI_DIFFICULTY")
-	var choice := OptionButton.new()
+	var names: Array[String] = []
 	for level: int in GameSettings.DIFFICULTIES:
-		choice.add_item(tr("UI_DIFFICULTY_%d" % level), level)
-	choice.select(settings.difficulty)
-	choice.item_selected.connect(_on_difficulty_selected)
-	row.add_child(choice)
+		names.append(tr("UI_DIFFICULTY_%d" % level))
+	var row := _add_row(MenuRow.choice(tr("UI_DIFFICULTY"), names, settings.difficulty))
+	row.changed.connect(
+		func(value: Variant) -> void:
+			settings.difficulty = int(value)
+			settings.save_to()
+	)
 
 
 ## Качество графики: четыре уровня (ADR-0030, решение 5; «Ультра» — ADR-0034).
 func _quality() -> void:
-	var row := _setting_row("UI_QUALITY")
-	var choice := OptionButton.new()
+	var names: Array[String] = []
 	for level: int in Graphics.Quality.size():
-		choice.add_item(tr("UI_QUALITY_%d" % level), level)
-	choice.select(settings.quality)
-	choice.item_selected.connect(_on_quality_selected)
-	row.add_child(choice)
+		names.append(tr("UI_QUALITY_%d" % level))
+	var row := _add_row(MenuRow.choice(tr("UI_QUALITY"), names, settings.quality))
+	row.changed.connect(
+		func(value: Variant) -> void:
+			settings.quality = int(value)
+			# Выбрал игрок — замер первого запуска его уже не перебьёт.
+			settings.quality_measured = true
+			settings.apply()
+			settings.save_to()
+	)
 
 
 ## Режим окна: окно, без рамки, полный экран в родном разрешении.
 func _window_mode() -> void:
-	var row := _setting_row("UI_WINDOW_MODE")
-	var choice := OptionButton.new()
+	var names: Array[String] = []
 	for mode: int in DisplayModes.Mode.size():
-		choice.add_item(tr("UI_WINDOW_MODE_%d" % mode), mode)
-	choice.select(settings.window_mode)
-	choice.item_selected.connect(_on_window_mode_selected)
-	row.add_child(choice)
+		names.append(tr("UI_WINDOW_MODE_%d" % mode))
+	var row := _add_row(MenuRow.choice(tr("UI_WINDOW_MODE"), names, settings.window_mode))
+	row.changed.connect(
+		func(value: Variant) -> void:
+			settings.window_mode = int(value)
+			settings.apply()
+			settings.save_to()
+	)
 
 
 ## Размер окна — из тех, что держит монитор игрока.
 func _resolution() -> void:
-	var row := _setting_row("UI_RESOLUTION")
-	var choice := OptionButton.new()
 	var area := DisplayModes.window_area().size
 	var sizes := DisplayModes.available(area)
 	var current := DisplayModes.nearest(settings.resolution, area)
-	for index in sizes.size():
-		choice.add_item("%d × %d" % [sizes[index].x, sizes[index].y], index)
+	var names: Array[String] = []
+	var selected := 0
+	for index: int in sizes.size():
+		names.append("%d × %d" % [sizes[index].x, sizes[index].y])
 		if sizes[index] == current:
-			choice.select(index)
-	choice.item_selected.connect(
-		func(index: int) -> void:
-			settings.resolution = sizes[index]
+			selected = index
+	var row := _add_row(MenuRow.choice(tr("UI_RESOLUTION"), names, selected))
+	row.changed.connect(
+		func(value: Variant) -> void:
+			settings.resolution = sizes[int(value)]
 			settings.apply()
 	)
-	row.add_child(choice)
 
 
 ## Масштаб 3D-рендера: на 4K слабая карта рисует сцену меньше, интерфейс — нет.
 func _render_scale() -> void:
-	var row := _setting_row("UI_RENDER_SCALE")
-	var choice := OptionButton.new()
+	var names: Array[String] = []
 	# Отмечается ближайший масштаб, а не равный: в файле может стоять любой, и
 	# без отметки список показывался пустым (авторевью M22).
 	var closest := 0
-	for index in DisplayModes.RENDER_SCALES.size():
+	for index: int in DisplayModes.RENDER_SCALES.size():
 		var share := DisplayModes.RENDER_SCALES[index]
-		choice.add_item("%d%%" % roundi(share * 100.0), index)
+		names.append("%d%%" % roundi(share * 100.0))
 		var gap := absf(share - settings.render_scale)
 		if gap < absf(DisplayModes.RENDER_SCALES[closest] - settings.render_scale):
 			closest = index
-	choice.select(closest)
-	choice.item_selected.connect(
-		func(index: int) -> void:
-			settings.render_scale = DisplayModes.RENDER_SCALES[index]
+	var row := _add_row(MenuRow.choice(tr("UI_RENDER_SCALE"), names, closest))
+	row.changed.connect(
+		func(value: Variant) -> void:
+			settings.render_scale = DisplayModes.RENDER_SCALES[int(value)]
 			settings.apply()
 	)
-	row.add_child(choice)
 
 
-## Строка в две колонки: подпись слева, клавиши справа. Колонка шире подписи
-## самого длинного действия, иначе строки едут друг относительно друга.
-func _two_columns(left: String, right: String) -> void:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-
-	var label := Label.new()
-	label.text = left
-	label.custom_minimum_size = Vector2(110.0, 0.0)
-	label.add_theme_font_size_override("font_size", 12)
-	row.add_child(label)
-
-	var keys := Label.new()
-	keys.text = right
-	keys.add_theme_font_size_override("font_size", 12)
-	keys.add_theme_color_override("font_color", Color(0.72, 0.78, 0.88))
-	row.add_child(keys)
-
-	_column.add_child(row)
+## Кровь при попадании пули — выключаемая, как принято в играх (ADR-0031).
+func _blood() -> void:
+	var row := _add_row(MenuRow.toggle(tr("UI_BLOOD"), settings.blood))
+	row.changed.connect(
+		func(value: Variant) -> void:
+			settings.blood = bool(value)
+			settings.apply()
+			settings.save_to()
+	)
 
 
 ## Клавиши и кнопки действий, как их видит [InputMap].
@@ -415,78 +488,68 @@ func _keys_of(actions: Array[StringName]) -> String:
 
 	var parts: Array[String] = []
 	if not keys.is_empty():
-		parts.append("%s: %s" % [tr("UI_KEYBOARD"), ", ".join(keys)])
+		parts.append(", ".join(keys))
 	if not pads.is_empty():
 		parts.append("%s: %s" % [tr("UI_GAMEPAD"), ", ".join(pads)])
-	return "   ".join(parts)
+	return "   ·   ".join(parts)
 
 
-## Фокус на первый управляемый элемент страницы: иначе стрелками и геймпадом
-## по меню не походить.
-##
-## Обход вглубь и по любому фокусируемому [Control], а не по кнопкам верхнего
-## уровня: на настройках первым стоит ползунок, и лежит он внутри строки —
-## поиск одних кнопок перепрыгивал через полстраницы к «полному экрану».
+## Цвет неона: отеля, как у первого здания и у кромки HUD по умолчанию.
+func _neon() -> Color:
+	return Hud.DEFAULT_NEON
+
+
+func _is_root(page: Page) -> bool:
+	return page == Page.MAIN or page == Page.PAUSE or page == Page.GAME_OVER
+
+
+## Колонка въезжает слева и проявляется — страница сменилась, а не мигнула.
+func _slide_in() -> void:
+	if _page_tween != null:
+		_page_tween.kill()
+	_column.modulate.a = 0.0
+	_column.position.x = -PAGE_SLIDE
+	_page_tween = create_tween()
+	_page_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_page_tween.set_parallel(true)
+	_page_tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_page_tween.tween_property(_column, "modulate:a", 1.0, PAGE_TIME)
+	_page_tween.tween_property(_column, "position:x", 0.0, PAGE_TIME)
+
+
+func _style_static_labels() -> void:
+	for label: Label in [_subtitle, _hint, _version]:
+		label.add_theme_font_override("font", NeonStyle.font(600))
+	_subtitle.text = tr("UI_SUBTITLE")
+
+
+## Фокус на первый пункт страницы: иначе стрелками и геймпадом по меню не
+## походить. Переход фокуса после этого снова звучит.
 func _focus_first() -> void:
-	_focus_within(_column)
+	var found := rows()
+	if not found.is_empty():
+		found[0].grab_focus()
+	_settling = false
 
 
-func _focus_within(parent: Node) -> bool:
+func _collect_rows(parent: Node, found: Array[MenuRow]) -> void:
 	for child: Node in parent.get_children():
-		var control := child as Control
-		if control != null and control.focus_mode != Control.FOCUS_NONE:
-			control.grab_focus()
-			return true
-		if _focus_within(child):
-			return true
-	return false
+		var row := child as MenuRow
+		if row != null:
+			found.append(row)
+		_collect_rows(child, found)
 
 
-## Громкость применяется сразу, а на диск уезжает при уходе со страницы:
-## ползунок шлёт значение на каждый шаг, и файл писался бы двадцать раз за
-## одно движение мышью.
-func _on_level_changed(bus: String, value: float) -> void:
-	settings.set_level(bus, value)
+func _on_row_focused() -> void:
+	if not _settling:
+		Sounds.play(Sounds.UI_MOVE)
 
 
-func _on_language_selected(index: int) -> void:
-	settings.locale = GameSettings.LOCALES[index]
+func _on_language_selected(index: Variant) -> void:
+	settings.locale = GameSettings.LOCALES[int(index)]
 	settings.apply()
 	settings.save_to()
 	# Страница перерисовывается целиком: подписи собраны кодом, и сами
 	# они на смену языка не отзовутся.
+	_subtitle.text = tr("UI_SUBTITLE")
 	show_page(_page)
-
-
-func _on_difficulty_selected(index: int) -> void:
-	settings.difficulty = index
-	settings.save_to()
-
-
-## Кровь при попадании пули — выключаемая, как принято в играх (ADR-0031).
-func _blood() -> void:
-	var toggle := CheckButton.new()
-	toggle.text = tr("UI_BLOOD")
-	toggle.button_pressed = settings.blood
-	toggle.toggled.connect(_on_blood_toggled)
-	_column.add_child(toggle)
-
-
-func _on_blood_toggled(pressed: bool) -> void:
-	settings.blood = pressed
-	settings.apply()
-	settings.save_to()
-
-
-func _on_quality_selected(index: int) -> void:
-	settings.quality = index
-	# Выбрал игрок — замер первого запуска его уже не перебьёт.
-	settings.quality_measured = true
-	settings.apply()
-	settings.save_to()
-
-
-func _on_window_mode_selected(index: int) -> void:
-	settings.window_mode = index
-	settings.apply()
-	settings.save_to()

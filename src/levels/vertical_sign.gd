@@ -33,7 +33,6 @@ const RISE: float = 0.4
 const NEON_HOTEL := Color(1.0, 0.25, 0.55)
 const NEON_OFFICE := Color(0.3, 0.85, 1.0)
 const PANEL := Color(0.07, 0.07, 0.09)
-const FONT := preload("res://assets/fonts/Pixellari.ttf")
 
 ## Отсвет: яркость и радиус, м.
 const GLOW_ENERGY: float = 1.6
@@ -81,7 +80,7 @@ func hang(rules: BuildingRules, identity: BuildingIdentity) -> void:
 		for letter in line:
 			var label := Label3D.new()
 			label.text = letter
-			label.font = FONT
+			label.font = NeonStyle.font(700)
 			label.font_size = 96
 			label.pixel_size = LETTER_SIZE / 96.0
 			label.modulate = neon

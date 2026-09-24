@@ -48,7 +48,6 @@ const BRACE_HEIGHT: float = 0.12
 const BOARD := Vector3(0.7, 0.26, 0.05)
 const BOARD_GAP: float = 0.06
 const BOARD_DIGITS := Color(0.55, 0.82, 1.0)
-const BOARD_FONT := preload("res://assets/fonts/Pixellari.ttf")
 ## Стрелки хода на табло.
 const ARROW_UP := "\u25B2"
 const ARROW_DOWN := "\u25BC"
@@ -285,7 +284,7 @@ func _build_board(x: float, index: int, surface: float) -> void:
 	frame.position.z = WorldSpace.BACK_WALL_Z + PANEL_THICKNESS + 0.06
 	_board_host.add_child(frame)
 	board.digits = Label3D.new()
-	board.digits.font = BOARD_FONT
+	board.digits.font = NeonStyle.font(700)
 	board.digits.font_size = 64
 	board.digits.pixel_size = 0.0034
 	board.digits.modulate = BOARD_DIGITS

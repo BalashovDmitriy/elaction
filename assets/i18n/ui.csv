@@ -53,3 +53,6 @@ UI_REBIND_LATER,Rebinding comes later,Переназначение появит�
 UI_KEYBOARD,Keyboard,Клавиатура
 UI_GAMEPAD,Gamepad,Геймпад
 UI_DPAD,D-pad,Крестовина
+UI_ON,On,Вкл
+UI_OFF,Off,Выкл
+UI_HINT,"Enter — choose   Esc — back","Enter — выбрать   Esc — назад"

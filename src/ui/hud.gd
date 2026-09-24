@@ -23,13 +23,12 @@ const DOCUMENT_ICONS: int = 10
 ## Больше стольких жизней значками не рисуется — дальше число.
 const LIFE_ICONS: int = 5
 
-const FONT := preload("res://assets/fonts/Exo2.ttf")
 const MARGIN: float = 28.0
 
-const INK := Color(0.93, 0.94, 0.97)
-const INK_DIM := Color(0.62, 0.66, 0.76)
+const INK := NeonStyle.INK
+const INK_DIM := NeonStyle.INK_DIM
 const ALARM := Color(1.0, 0.22, 0.2)
-const PLATE := Color(0.03, 0.035, 0.06, 0.62)
+const PLATE := NeonStyle.PLATE
 
 ## Кромка, если здание не сказало своего цвета: неон первого здания — отеля.
 const DEFAULT_NEON := VerticalSign.NEON_HOTEL
@@ -199,7 +198,9 @@ func _build() -> void:
 	_alarm.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	_alarm.position = Vector2(0.0, 150.0)
 	_alarm.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_alarm.add_theme_stylebox_override("panel", _style(Color(0.3, 0.02, 0.02, 0.75), ALARM))
+	_alarm.add_theme_stylebox_override(
+		"panel", NeonStyle.plate(Color(0.3, 0.02, 0.02, 0.75), ALARM)
+	)
 	_alarm.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_alarm)
 	_alarm_label = _label(34, Color(1.0, 0.85, 0.82), 800)
@@ -245,26 +246,11 @@ func _plate(root: Control, preset: Control.LayoutPreset) -> PanelContainer:
 ## Кромка и ореол плашек — в цвет вывески здания.
 func _restyle() -> void:
 	for plate in _plates:
-		plate.add_theme_stylebox_override("panel", _style(PLATE, _neon))
+		plate.add_theme_stylebox_override("panel", NeonStyle.plate(PLATE, _neon))
 	if _building != null:
 		_building.add_theme_color_override("font_color", _neon)
 	for icon in _documents + _lives:
 		icon.set_state(icon.lit, _neon)
-
-
-static func _style(background: Color, neon: Color) -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	box.bg_color = background
-	box.set_corner_radius_all(8)
-	box.border_width_left = 3
-	box.border_color = Color(neon, 0.9)
-	box.shadow_color = Color(neon, 0.18)
-	box.shadow_size = 14
-	box.content_margin_left = 20
-	box.content_margin_right = 20
-	box.content_margin_top = 10
-	box.content_margin_bottom = 12
-	return box
 
 
 func _caption(key: String) -> Label:
@@ -274,17 +260,7 @@ func _caption(key: String) -> Label:
 
 
 func _label(font_size: int, colour: Color, weight: int) -> Label:
-	var label := Label.new()
-	var variation := FontVariation.new()
-	variation.base_font = FONT
-	variation.variation_opentype = {"wght": weight}
-	label.add_theme_font_override("font", variation)
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_color", colour)
-	label.add_theme_color_override("font_shadow_color", Color(0.0, 0.0, 0.0, 0.6))
-	label.add_theme_constant_override("shadow_offset_y", 2)
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return label
+	return NeonStyle.label(font_size, colour, weight)
 
 
 func _on_score_changed(_value: int) -> void:
