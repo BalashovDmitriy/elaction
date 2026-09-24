@@ -5,6 +5,8 @@
 https://github.com/jotd666/elevator_action, файл `src/elevator_z80.asm`.
 Метки и комментарии в нём — jotd; выводы ниже (помечены `=>`) — наши, со
 сверки перед M18d (2026-09-23). Адреса вида `@1BDF` — места в том файле.
+В коде эти числа живут в `Arcade` (`src/systems/arcade.gd`) — с теми же адресами
+в комментариях.
 
 Частота логики подтверждена драйвером MAME `taitosj.cpp`: кадр 59.19 Гц,
 логика раз в 4 кадра — **14.8 тика в секунду, тик 67.6 мс**. Все «тики» ниже —
@@ -25,7 +27,7 @@ https://github.com/jotd666/elevator_action, файл `src/elevator_z80.asm`.
 
 # Notes on the arcade Z80 disassembly (jotd666/elevator_action, src/elevator_z80.asm)
 
-Source: https://github.com/jotd666/elevator_action (cloned to ./jotd_ea). An annotated disassembly of the
+Source: https://github.com/jotd666/elevator_action (a local clone at the time, not kept in this repo). An annotated disassembly of the
 arcade ROM (bootleg set elevatorb, protection removed), made by jotd for a 1:1 Amiga transcode.
 Labels and comments are jotd's; the interpretations below (marked "=>") are mine.
 
@@ -98,7 +100,7 @@ Labels and comments are jotd's; the interpretations below (marked "=>") are mine
 ## Part 2 (coordinator follow-up)
 
 ### Tick rate (confirmed)
-MAME src/mame/taito/taitosj.cpp (saved as mame_taitosj.cpp): `m_screen->set_raw(12_MHz_XTAL / 2, 384, 0, 256, 264, 16, 240); // verified from schematics`
+MAME src/mame/taito/taitosj.cpp (a local copy at the time, not kept in this repo): `m_screen->set_raw(12_MHz_XTAL / 2, 384, 0, 256, 264, 16, 240); // verified from schematics`
 and `m_screen->screen_vblank().set_inputline(m_maincpu, INPUT_LINE_IRQ0, HOLD_LINE);`
 => 6 MHz / (384*264) = 59.19 Hz, one IRQ per vblank. game_speed_8233 = 4 (@2A44) and main loop spins on $80AB (@73F2)
 => logic tick = 4 frames = 67.6 ms, 14.8 ticks/s. Alarm 4096 ticks = 277 s; blackout 66 ticks = 4.46 s.
@@ -119,10 +121,10 @@ Hit test @0920-0947: same floor, bullet height in [bottom, top), x overlap. DIP 
 
 ### Bullets (handle_shoot_5054, table_50D8, update_bullet_4be7)
 table_50D8 row = pose(+0C, >=7 -> -3)*2 + facing: [height above feet, x offset L/R, dx, sprite]
-- pose 0/1 stand/walk: +15  -> 21 px above floor
-- pose 2 crouch:       +9   -> 15 px
+- pose 0/1 stand/walk: +15  -> 21 in the cell, 15 px above floor
+- pose 2 crouch:       +9   -> 15 in the cell, 9 px above floor
 - pose 3/4/5 (jump frames, move with feet): +12 / +12 / +6
-- pose 6 (=9 prone):   +3   -> 9 px, x offset 0x15 forward
+- pose 6 (=9 prone):   +3   -> 9 in the cell, 3 px above floor, x offset 0x15 forward
 - Otto bullet speed 8 px/tick (table byte F8/08), no wind-up ($82F6/7 = 0).
 - enemy bullet speed = $834C px/tick = min(8, skill/4 + 6): 6 (buildings 1-4 at DIP0), 7 (5-8), 8 (9+); alarm +1 up to 8 (@463D).
 - enemy wind-up before the bullet leaves = $82F8[enemy] = max(0, 10 - aggressivity) ticks (@1BDF, @1CA4).
@@ -135,7 +137,7 @@ table_50D8 row = pose(+0C, >=7 -> -3)*2 + facing: [height above feet, x offset L
 - action duration +10 = max(7, windup + 2) ticks.
 - shooting pose by aggressivity (enemies 1-2, table_1D75, pairs of aggr): thresholds t1,t2,t3 /256 -> 4 stand-fire, 5 crouch-fire, 6 prone-fire, 7 other(walk+fire)
   aggr0-1 C4,C4,C4 | 2-3 80,C4,C4 | 4-5 40,C4,C4 | 6-7 20,80,C4 | 8-9 08,40,C4 | 10-11 08,20,C4 | 12-13 08,10,C4 | 14-15 00,08,C4
-  => prone 0% (aggr<6), 27% (6-7), 52% (8-9), 64%, 73%, 73%; crouch peaks 52% at 4-5; 23% "other" always.
+  => prone 0% (aggr<6), 27% (6-7), 52% (8-9), 64%, 70%, 73%; crouch peaks 52% at 4-5; 23% "other" always.
   enemies 3-4 (table_1D95): 40,40,40 ... 00,00,40 => 75% "other", 25% shooting, shifting to prone.
 - pose 6 (prone) downgraded to crouch if x<0x10, x>=0xF0, or near shafts on floors 1-7 (@1CFC-1D3A).
 - pose adjusted to Otto's height (@1CD8): Otto lower by > 8 px -> crouch-fire, Otto higher -> stand-fire (not when aggr 0).
