@@ -162,10 +162,20 @@ def _reset_scene() -> None:
 
 
 def _linear(colour: Rgb) -> tuple[float, float, float, float]:
-    """Цвет палитры в материал. Байты идут как есть, без перевода из sRGB:
-    так писала фигура M16, и под это подобран свет с M17."""
+    """Цвет палитры в материал: байты sRGB, переведённые в линейный цвет.
+
+    Фигура M16 писала байты как есть, и тёмно-синий костюм агента выходил
+    бледно-голубым: 0x2F как линейный — это 0.46 на экране. В оригинале агенты
+    чёрные, и на сравнении M21 разница била в глаза. Материалы пака заданы
+    линейно, и палитра, легшая рядом с ними, обязана быть в том же пространстве.
+    """
+
+    def channel(byte: int) -> float:
+        value = byte / 255.0
+        return value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4
+
     red, green, blue = colour
-    return (red / 255.0, green / 255.0, blue / 255.0, 1.0)
+    return (channel(red), channel(green), channel(blue), 1.0)
 
 
 def _material(name: str, colour: Rgb, roughness: float = 0.85):
