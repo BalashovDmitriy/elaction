@@ -173,10 +173,13 @@ func _build_parapets(
 ##
 ## Крыша стены не получает: над ней небо, а за ней — город ([CityBackdrop]).
 func _build_room() -> void:
+	# Стена — фактура типа здания в тоне этажа (ADR-0033, решение 5): рисунок
+	# даёт фактура, цвет — раунд.
 	var tone := GreyboxLook.BACK_WALL.lerp(_rules.palette.story, STORY_SHARE)
-	var lit_back := GreyboxLook.surface(tone)
-	var unlit_back := GreyboxLook.surface(
-		Color(tone.r * UNLIT_SHADE, tone.g * UNLIT_SHADE, tone.b * UNLIT_SHADE)
+	var paper := tone.lightened(0.55)
+	var lit_back := BuildingFinish.wall(_ribs.identity(), paper)
+	var unlit_back := BuildingFinish.wall(
+		_ribs.identity(), Color(paper.r * UNLIT_SHADE, paper.g * UNLIT_SHADE, paper.b * UNLIT_SHADE)
 	)
 	var far := GreyboxLook.surface(GreyboxLook.SKY_WALL)
 	var back_z := WorldSpace.BACK_WALL_Z - PANEL_THICKNESS * 0.5

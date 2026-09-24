@@ -114,7 +114,7 @@ func test_props_keep_off_doors_lamps_shafts_and_walls() -> void:
 
 
 ## Труба видна: висит ниже полосы, которую закрывает кромка перекрытия, и не
-## проходит сквозь шахту, полотно эскалатора, вывеску и табличку этажа.
+## проходит сквозь шахту, полотно эскалатора и табличку этажа.
 func test_pipes_show_below_the_slab_edge_and_skip_what_they_would_cover() -> void:
 	var laid := 0
 	var front := BuildingProps.pipe_z() + BuildingProps.PIPE_THICKNESS * 0.5
@@ -130,8 +130,8 @@ func test_pipes_show_below_the_slab_edge_and_skip_what_they_would_cover() -> voi
 					rules.story_top(index) + FloorSigns.hidden_band(front),
 					where + ": труба за кромкой перекрытия"
 				)
-				var covered := _pipe_blockers(rules, plan, dressing, index)
-				for span: Vector2 in BuildingProps.pipe_spans(rules, plan, dressing, index):
+				var covered := _pipe_blockers(rules, plan, index)
+				for span: Vector2 in BuildingProps.pipe_spans(rules, plan, index):
 					laid += 1
 					for blocker: Vector2 in covered:
 						assert_true(
@@ -189,8 +189,8 @@ func test_roof_steps_frame_the_machine_room() -> void:
 
 
 ## У декора нет тел, а источников в окружении два — лампа над крышей и отсвет
-## неоновой вывески (ADR-0031, решение 2): окна города, вывески этажей, огонь
-## мачты светятся эмиссией и бюджет ламп кадра не трогают.
+## неоновой вывески на углу (ADR-0033, решение 2): окна города, табло, буквы
+## вывески и огонь антенны светятся эмиссией и бюджет ламп кадра не трогают.
 func test_scenery_adds_no_bodies_and_no_lights() -> void:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
@@ -213,9 +213,7 @@ func test_scenery_adds_no_bodies_and_no_lights() -> void:
 ## Что труба на этаже обязана обходить, парами «левый край, правый край».
 ## Считается заново, а не берётся у [BuildingProps]: иначе тест проверял бы
 ## разрывы трубы ими же самими.
-func _pipe_blockers(
-	rules: BuildingRules, plan: BuildingPlan, dressing: BuildingDressing, index: int
-) -> Array[Vector2]:
+func _pipe_blockers(rules: BuildingRules, plan: BuildingPlan, index: int) -> Array[Vector2]:
 	var blockers: Array[Vector2] = []
 	var half := rules.shaft_width * 0.5
 	for shaft in plan.shafts:
@@ -224,10 +222,6 @@ func _pipe_blockers(
 	for escalator in plan.escalators:
 		if escalator.floor_index + 1 == index:
 			blockers.append(escalator.gap(rules))
-	for prop in dressing.props:
-		if prop.floor_index == index and prop.kind == BuildingDressing.Kind.SIGN:
-			var reach := BuildingProps.SIGN.x * 0.5
-			blockers.append(Vector2(prop.x - reach, prop.x + reach))
 	var plate := FloorSigns.centre_on(rules, index).x
 	var plate_half := Proportions.FLOOR_SIGN.x * 0.5
 	blockers.append(Vector2(plate - plate_half, plate + plate_half))

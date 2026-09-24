@@ -1,61 +1,54 @@
 class_name RoofKit
 extends Node3D
 
-## Всё, что стоит на крыше, кроме скатов: техника, мачта с огнём и неоновая
-## вывеска (ADR-0031, решение 2).
+## Техника крыши: бак или водонапорная башня, кондиционеры, тарелка,
+## солнечные панели, выход на крышу, лестница и антенна с мигающим огнём
+## (ADR-0031, решение 2; с M21b — модели паков, ADR-0033, решение 8).
 ##
-## За плоскостью игры и без тел — Otto ходит по настилу, как ходил. Техника
-## стоит на ступенях скатов ([method BuildingRoof.steps]): там, где у настоящей
-## крыши уровни кровли. Сторона бака и кондиционеров — по месту: бак на ту
-## сторону от машинного отделения, где скат длиннее.
+## Всё без тел и без источников света: огонь антенны — эмиссия. Стоит у задней
+## стены крыши и за ней, на своих ступенях кровли, и не встаёт перед шахтой:
+## над ней машинное отделение, с которого начинается спуск. Неоновая вывеска
+## с M21b живёт на углу фасада ([VerticalSign]): на крыше её закрывала техника.
 
-## Насколько техника отстоит от задней линии коридора вглубь, м.
+## Техника стоит за задней стеной крыши, на ступенях кровли, м.
 const DEPTH_Z: float = WorldSpace.BACK_WALL_Z - 1.8
+## Ближе к краю кровли техника не встаёт, и между предметами зазор, м.
+const EDGE_GAP: float = 0.3
+const GAP: float = 0.35
 
-## Водяной бак: радиус, высота, высота опор.
-const TANK_RADIUS: float = 0.75
-const TANK_HEIGHT: float = 1.4
-const TANK_LEGS: float = 1.0
+## Лестница на машинное отделение.
+const STEEL := Color(0.3, 0.31, 0.33)
+const STEEL_LIGHT := Color(0.52, 0.53, 0.55)
 
-## Блок кондиционера и сколько их.
-const UNIT := Vector3(1.0, 0.7, 0.8)
-const UNITS: int = 2
-
-## Вентиляционная труба: радиус и высота; колпак шире.
-const VENT_RADIUS: float = 0.1
-const VENT_HEIGHT: float = 0.8
-
-## Мачта над машинным отделением: высота и толщина; огонь на верхушке и как
-## часто мигает, с.
-const MAST_HEIGHT: float = 5.0
-const MAST_THICKNESS: float = 0.08
+## Огонь на макушке антенны: размер, период и доля, когда горит.
 const BEACON: float = 0.16
 const BEACON_PERIOD: float = 1.4
 const BEACON_ON: float = 0.35
-
-## Неоновая вывеска на каркасе за крышей: размер щита, на какой высоте над
-## настилом его низ, насколько он позади коридора; надпись и её цвет.
-const SIGN := Vector2(5.0, 1.2)
-## Верх щита в кадре крыши: на 2.6 м надпись уходила за верх кадра.
-const SIGN_RISE: float = 1.6
-const SIGN_Z: float = WorldSpace.BACK_WALL_Z - 6.5
-const SIGN_TEXT := "HOTEL"
-const NEON := Color(1.0, 0.25, 0.55)
-## Отсвет вывески — единственный источник крыши сверх лампы над ней.
-const GLOW_ENERGY: float = 1.6
-const GLOW_RANGE: float = 9.0
-
-const STEEL := Color(0.3, 0.31, 0.33)
-const STEEL_LIGHT := Color(0.52, 0.53, 0.55)
-const TANK := Color(0.36, 0.3, 0.26)
 const BEACON_RED := Color(1.0, 0.12, 0.08)
+
+## Что ставится вдоль длинной стороны кровли — по порядку от края, пока
+## влезает, — и насколько каждый предмет выдвинут от [constant DEPTH_Z]:
+## высокое — дальше, низкое — ближе, иначе башня закрыла бы кондиционеры.
+const LONG_SIDE: Array[String] = [
+	"water_tower", "satellite_dish", "air_conditioner", "air_conditioner", "solar_panel"
+]
+const FORWARD := {
+	"water_tower": 0.0,
+	"water_tank": 0.0,
+	"satellite_dish": 0.9,
+	"air_conditioner": 1.1,
+	"solar_panel": 0.5,
+	"roof_exit": 0.8,
+	"antenna_small": 0.6,
+}
 
 var _beacon: MeshInstance3D = null
 var _clock: float = 0.0
 
 
-## Ставит технику, мачту и вывеску по правилам и плану.
-func build(rules: BuildingRules, plan: BuildingPlan) -> void:
+## Ставит технику по правилам и плану. [param building_seed] решает, бак или
+## водонапорная башня: крыши зданий не повторяют друг друга.
+func build(rules: BuildingRules, plan: BuildingPlan, building_seed: int = 1) -> void:
 	var shaft := plan.roof_shaft()
 	if shaft == null:
 		return
@@ -68,26 +61,32 @@ func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 	var on_the_left := left.y - left.x >= right.y - right.x
 	var long := left if on_the_left else right
 	var short := right if on_the_left else left
-	# Доли длины отсчитываются от парапета: справа от отделения начало отрезка —
-	# само отделение, и бак от его начала вставал у отделения, перед вывеской.
-	var edge := long.x if on_the_left else long.y
-	var inward := (long.y - long.x) * (1.0 if on_the_left else -1.0)
 
-	# Бак у края, кондиционеры ближе к середине: бак посередине закрывал вывеску.
-	var tank_x := edge + inward * 0.22
-	_tank(Vector2(tank_x, _top_at(steps, surface, tank_x)))
-	for index in UNITS:
-		var x := edge + inward * (0.55 + 0.2 * float(index))
-		_unit(Vector2(x, _top_at(steps, surface, x)))
-	if short.y - short.x > 1.0:
-		var x := (short.x + short.y) * 0.5
-		_vent(Vector2(x, _top_at(steps, surface, x)))
+	var line := LONG_SIDE.duplicate()
+	if building_seed % 2 == 0:
+		line[0] = "water_tank"
+	# От парапета внутрь: у края — самое высокое, к отделению — низкое.
+	var cursor := long.x + EDGE_GAP if on_the_left else long.y - EDGE_GAP
+	var inward := 1.0 if on_the_left else -1.0
+	var limit := long.y - GAP if on_the_left else long.x + GAP
+	for prop_name: String in line:
+		var width := PropCatalog.footprint(prop_name).x
+		var far_edge := cursor + inward * width
+		if (far_edge - limit) * inward > 0.0:
+			break
+		_place(prop_name, cursor + inward * width * 0.5, steps, surface)
+		cursor = far_edge + inward * GAP
+
+	var room := short.y - short.x - EDGE_GAP * 2.0
+	for prop_name: String in ["roof_exit", "antenna_small"]:
+		if PropCatalog.footprint(prop_name).x <= room:
+			_place(prop_name, (short.x + short.y) * 0.5, steps, surface)
+			break
 	_ladder(shaft.x - half_room - 0.2, surface)
-	_mast(shaft.x, surface - BuildingShafts.MACHINE_ROOM_SIZE.y)
-	_neon((bounds.x + bounds.y) * 0.5, surface)
+	_antenna(shaft.x, surface - BuildingShafts.MACHINE_ROOM_SIZE.y)
 
 
-## Мигает огнём мачты. Картинка, а не правило: по настенным часам.
+## Мигает огнём антенны. Картинка, а не правило: по настенным часам.
 func _process(delta: float) -> void:
 	if _beacon == null:
 		return
@@ -104,91 +103,22 @@ static func _top_at(steps: Array[Rect2], surface: float, x: float) -> float:
 	return top
 
 
+## Модель каталога на кровле: низом на ступень под серединой.
+func _place(prop_name: String, x: float, steps: Array[Rect2], surface: float) -> void:
+	var item := PropCatalog.make(prop_name)
+	if item == null:
+		return
+	item.position = WorldSpace.to_scene(Vector2(x, _top_at(steps, surface, x)))
+	item.position.z = DEPTH_Z + float(FORWARD.get(prop_name, 0.5))
+	add_child(item)
+
+
 func _box(size: Vector3, at: Vector2, z: float, material: StandardMaterial3D) -> MeshInstance3D:
 	var part := GreyboxLook.box(size, material)
 	part.position = WorldSpace.to_scene(at)
 	part.position.z = z
 	add_child(part)
 	return part
-
-
-func _cylinder(
-	radius: float, height: float, bottom: Vector2, z: float, material: StandardMaterial3D
-) -> void:
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = radius
-	mesh.bottom_radius = radius
-	mesh.height = height
-	var part := MeshInstance3D.new()
-	part.mesh = mesh
-	part.material_override = material
-	part.position = WorldSpace.to_scene(bottom - Vector2(0.0, height * 0.5))
-	part.position.z = z
-	add_child(part)
-
-
-## Бак на четырёх опорах с обручами.
-func _tank(foot: Vector2) -> void:
-	var steel := GreyboxLook.metal(STEEL)
-	for dx: float in [-TANK_RADIUS * 0.7, TANK_RADIUS * 0.7]:
-		for dz: float in [-TANK_RADIUS * 0.6, TANK_RADIUS * 0.6]:
-			_box(
-				Vector3(0.08, TANK_LEGS, 0.08),
-				Vector2(foot.x + dx, foot.y - TANK_LEGS * 0.5),
-				DEPTH_Z + dz,
-				steel
-			)
-	var base := Vector2(foot.x, foot.y - TANK_LEGS)
-	_cylinder(TANK_RADIUS, TANK_HEIGHT, base, DEPTH_Z, GreyboxLook.surface(TANK))
-	for ring: float in [0.25, 0.75]:
-		_cylinder(
-			TANK_RADIUS + 0.03,
-			0.06,
-			Vector2(foot.x, base.y - TANK_HEIGHT * ring + 0.03),
-			DEPTH_Z,
-			steel
-		)
-	# Коническая крышка.
-	var cap := CylinderMesh.new()
-	cap.top_radius = 0.05
-	cap.bottom_radius = TANK_RADIUS
-	cap.height = 0.4
-	var lid := MeshInstance3D.new()
-	lid.mesh = cap
-	lid.material_override = steel
-	lid.position = WorldSpace.to_scene(Vector2(foot.x, base.y - TANK_HEIGHT - 0.2))
-	lid.position.z = DEPTH_Z
-	add_child(lid)
-
-
-## Блок кондиционера с решёткой вентилятора сверху.
-func _unit(foot: Vector2) -> void:
-	_box(
-		UNIT, Vector2(foot.x, foot.y - UNIT.y * 0.5), DEPTH_Z + 0.6, GreyboxLook.metal(STEEL_LIGHT)
-	)
-	_cylinder(
-		UNIT.z * 0.35,
-		0.04,
-		Vector2(foot.x, foot.y - UNIT.y),
-		DEPTH_Z + 0.6,
-		GreyboxLook.metal(STEEL)
-	)
-	for slat in 4:
-		_box(
-			Vector3(UNIT.x * 0.9, 0.03, 0.02),
-			Vector2(foot.x, foot.y - UNIT.y * (0.2 + 0.15 * float(slat))),
-			DEPTH_Z + 0.6 + UNIT.z * 0.5 + 0.01,
-			GreyboxLook.metal(STEEL)
-		)
-
-
-## Вентиляционная труба с колпаком.
-func _vent(foot: Vector2) -> void:
-	var steel := GreyboxLook.metal(STEEL_LIGHT)
-	_cylinder(VENT_RADIUS, VENT_HEIGHT, foot, DEPTH_Z + 1.0, steel)
-	_cylinder(
-		VENT_RADIUS * 2.2, 0.06, Vector2(foot.x, foot.y - VENT_HEIGHT - 0.12), DEPTH_Z + 1.0, steel
-	)
 
 
 ## Лестница на машинное отделение: две тетивы и перекладины.
@@ -203,60 +133,19 @@ func _ladder(x: float, surface: float) -> void:
 		_box(Vector3(0.36, 0.03, 0.03), Vector2(x, surface - 0.25 - float(rung) * 0.3), z, steel)
 
 
-## Мачта над машинным отделением с поперечинами и мигающим огнём.
-func _mast(x: float, base: float) -> void:
-	var steel := GreyboxLook.metal(STEEL)
+## Антенна на машинном отделении с мигающим огнём на макушке.
+func _antenna(x: float, base: float) -> void:
 	var z := WorldSpace.BACK_WALL_Z - 0.2
-	_box(
-		Vector3(MAST_THICKNESS, MAST_HEIGHT, MAST_THICKNESS),
-		Vector2(x, base - MAST_HEIGHT * 0.5),
-		z,
-		steel
-	)
-	for bar: float in [0.35, 0.6, 0.85]:
-		_box(Vector3(0.9 - bar * 0.5, 0.04, 0.04), Vector2(x, base - MAST_HEIGHT * bar), z, steel)
+	var mast := PropCatalog.make("roof_antenna")
+	var height := 0.0
+	if mast != null:
+		mast.position = WorldSpace.to_scene(Vector2(x, base))
+		mast.position.z = z - PropCatalog.footprint("roof_antenna").z * 0.5
+		add_child(mast)
+		height = PropCatalog.footprint("roof_antenna").y
 	_beacon = _box(
 		Vector3(BEACON, BEACON, BEACON),
-		Vector2(x, base - MAST_HEIGHT - BEACON * 0.5),
+		Vector2(x, base - height - BEACON * 0.5),
 		z,
 		GreyboxLook.light(BEACON_RED)
 	)
-
-
-## Неоновая вывеска на решётчатом каркасе за крышей, с цветным отсветом.
-func _neon(x: float, surface: float) -> void:
-	var steel := GreyboxLook.metal(STEEL)
-	var bottom := surface - SIGN_RISE
-	for dx: float in [-SIGN.x * 0.4, 0.0, SIGN.x * 0.4]:
-		_box(
-			Vector3(0.1, SIGN_RISE, 0.1), Vector2(x + dx, surface - SIGN_RISE * 0.5), SIGN_Z, steel
-		)
-	for dy: float in [0.3, 0.7]:
-		_box(Vector3(SIGN.x, 0.06, 0.06), Vector2(x, surface - SIGN_RISE * dy), SIGN_Z, steel)
-	_box(
-		Vector3(SIGN.x, SIGN.y, 0.08),
-		Vector2(x, bottom - SIGN.y * 0.5),
-		SIGN_Z - 0.06,
-		GreyboxLook.metal(Color(0.08, 0.08, 0.1))
-	)
-
-	var text := Label3D.new()
-	text.text = SIGN_TEXT
-	text.font_size = 128
-	text.pixel_size = 0.01
-	text.modulate = NEON
-	text.shaded = false
-	text.outline_size = 0
-	text.position = WorldSpace.to_scene(Vector2(x, bottom - SIGN.y * 0.5))
-	text.position.z = SIGN_Z + 0.01
-	add_child(text)
-
-	var glow := OmniLight3D.new()
-	glow.name = "NeonGlow"
-	glow.light_color = NEON
-	glow.light_energy = GLOW_ENERGY
-	glow.omni_range = GLOW_RANGE
-	glow.shadow_enabled = false
-	glow.position = WorldSpace.to_scene(Vector2(x, bottom - SIGN.y * 0.5))
-	glow.position.z = SIGN_Z + 1.2
-	add_child(glow)

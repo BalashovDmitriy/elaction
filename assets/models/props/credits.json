@@ -1,0 +1,266 @@
+{
+ "houseplant_a": {
+  "title": "Houseplant",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/Kr4kr7OCCQ"
+ },
+ "houseplant_b": {
+  "title": "Houseplant",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/bfLOqIV5uP"
+ },
+ "houseplant_c": {
+  "title": "Houseplant",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/dveIJ0xNpX"
+ },
+ "couch_medium": {
+  "title": "Couch Medium",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/fFfoi1LNKY"
+ },
+ "armchair": {
+  "title": "Armchair",
+  "author": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/myd1WSucAz"
+ },
+ "floor_lamp": {
+  "title": "Light Floor",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/eBQtooeh43"
+ },
+ "grandfather_clock": {
+  "title": "Grandfathers Clock",
+  "author": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/09YKIkFZnA"
+ },
+ "dresser": {
+  "title": "Dresser",
+  "author": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/Ud8QR8Ku9e"
+ },
+ "end_table": {
+  "title": "End Table",
+  "author": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/8gAkbKs1ii"
+ },
+ "table_lamp": {
+  "title": "Table Lamp",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/9Mo3JruPHY"
+ },
+ "trashcan": {
+  "title": "Trashcan",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/vlVx279xut"
+ },
+ "coat_rack": {
+  "title": "Coat Rack",
+  "author": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/uTZAW98YBS"
+ },
+ "vending_machine": {
+  "title": "Vending Machine",
+  "author": "dook",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/yNG4vqWVq0"
+ },
+ "fire_extinguisher": {
+  "title": "Fire Extinguisher",
+  "author": "dook",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/LtrzDvRya9"
+ },
+ "painting": {
+  "title": "Painting",
+  "author": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/Pi6oReAizt"
+ },
+ "wall_art_02": {
+  "title": "Wall Art 02",
+  "author": "Jarlan Perez",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/8jLn8Mvk8v2"
+ },
+ "wall_art_03": {
+  "title": "Wall Art 03",
+  "author": "Jarlan Perez",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/0i3du0jtSu5"
+ },
+ "wall_art_05": {
+  "title": "Wall Art 05",
+  "author": "Jarlan Perez",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/33m6HreB9ax"
+ },
+ "wall_art_06": {
+  "title": "Wall Art 06",
+  "author": "Jarlan Perez",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/2YYlC15J9SZ"
+ },
+ "water_cooler": {
+  "title": "Water Cooler",
+  "author": "J-Toastie",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/zWi9p5FSxD"
+ },
+ "file_cabinet": {
+  "title": "File Cabinet",
+  "author": "J-Toastie",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/9732ObD3OY"
+ },
+ "copier": {
+  "title": "Office Printer / Copier",
+  "author": "Bruno Oliveira",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/bgNnmejxBa-"
+ },
+ "potted_plant": {
+  "title": "Potted Plant",
+  "author": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/GJ3Bm5FDE4"
+ },
+ "cardboard_boxes": {
+  "title": "Cardboard Boxes",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/V9KbWC8Vd6"
+ },
+ "bins": {
+  "title": "Bins",
+  "author": "Dilan Shah",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/75lHRN19gMY"
+ },
+ "bookshelf": {
+  "title": "Bookshelf",
+  "author": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/30Iealxb0p"
+ },
+ "cabinet": {
+  "title": "Cabinet",
+  "author": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/wOiMrnUuhe"
+ },
+ "whiteboard": {
+  "title": "Whiteboard",
+  "author": "jeremy",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/cYQOKE7Wd7D"
+ },
+ "message_board": {
+  "title": "Message board",
+  "author": "Poly by Google",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/fDpegPgEB0j"
+ },
+ "corkboard": {
+  "title": "Wall Corkboard",
+  "author": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/U8yQZ9l0HZ"
+ },
+ "analog_clock": {
+  "title": "Analog clock",
+  "author": "Poly by Google",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/5gAoMR2YHs3"
+ },
+ "fire_exit_sign": {
+  "title": "Fire Exit Sign",
+  "author": "J-Toastie",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/gpft2tHZv4"
+ },
+ "air_vent": {
+  "title": "Air Vent",
+  "author": "J-Toastie",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/PCqBwDkgAz"
+ },
+ "calendar": {
+  "title": "Calendar",
+  "author": "Tomáš Bayer",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/8GqQAqxi3qk"
+ },
+ "water_tower": {
+  "title": "Water Tower",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/tMK8bhapAK"
+ },
+ "water_tank": {
+  "title": "Water Tank",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/XVB8vUbnZb"
+ },
+ "air_conditioner": {
+  "title": "Air Conditioner",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/amFuyE3IF6"
+ },
+ "antenna": {
+  "title": "Antenna",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/OuHQCigiUR"
+ },
+ "antenna_small": {
+  "title": "Antenna",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/l5Oc9swvKk"
+ },
+ "roof_antenna": {
+  "title": "Roof Antenna",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/Fbdg52kqJ6"
+ },
+ "satellite_dish": {
+  "title": "Satellite Dish",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/IDRrztoAMB"
+ },
+ "vent": {
+  "title": "Vent",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/UDFcnJ0U73"
+ },
+ "solar_panel": {
+  "title": "Solar Panel Structure",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/snXloZEimW"
+ },
+ "roof_exit": {
+  "title": "Roof Exit",
+  "author": "J-Toastie",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/GEB4pWBI8l"
+ }
+}

@@ -1,7 +1,8 @@
 class_name BuildingShafts
 extends Node3D
 
-## Одежда шахт здания: направляющие, створки этажей, упоры и машинное отделение.
+## Одежда шахт здания: стальной лист, направляющие, распорки, порталы этажей с
+## табло кабины и кнопками вызова, упоры и машинное отделение.
 ##
 ## Своим узлом, а не прямыми детьми уровня. Частей выходит за полсотни на здание,
 ## а по детям уровня ходят и агенты, и кабины, и половина тестов — каждый такой
@@ -10,6 +11,12 @@ extends Node3D
 ##
 ## Тел здесь нет ни у чего: по направляющим не ходят, они только видны. Ездит
 ## кабина, а проём в перекрытии режет само перекрытие.
+##
+## С M21b шахта стальная (ADR-0033, решение 6): у задней стены во всю высоту —
+## металлический лист с болтами, по перекрытиям — распорки, у портала —
+## хромированный наличник и порог из рифлёной стали. Над порталом — табло с
+## этажом, где кабина сейчас, и стрелкой хода; сбоку — кнопки вызова, горит та,
+## в сторону которой кабина едет к этому этажу (решение 7, только вид).
 
 ## Ширина направляющей шахты, м. Стойка идёт по краю проёма во всю его высоту.
 const RAIL_WIDTH: float = 0.18
@@ -25,7 +32,38 @@ const PORTAL_HEAD: float = 0.1
 const PORTAL_SILL: float = 0.03
 const PORTAL_RECESS := Color(0.07, 0.08, 0.1)
 const PORTAL_LEAF := Color(0.5, 0.5, 0.48)
-const PORTAL_TRIM := Color(0.36, 0.37, 0.4)
+## Хром наличника: светлый металл, ловит блик лампы коридора.
+const PORTAL_TRIM := Color(0.78, 0.8, 0.83)
+
+## Лист во всю высоту шахты: насколько шире проёма и толщина, м.
+const PLATE_MARGIN: float = 0.05
+const PLATE_THICKNESS: float = 0.02
+
+## Распорка между направляющими на уровне перекрытия: высота, м.
+const BRACE_HEIGHT: float = 0.12
+
+## Табло кабины над порталом: размер, зазор над перемычкой, м; цвет цифр —
+## холодный светодиод, как у табло M19 (не красный: красный огонёк на высоте
+## вывески двери — знак двери с документом, авторевью M19).
+const BOARD := Vector3(0.7, 0.26, 0.05)
+const BOARD_GAP: float = 0.06
+const BOARD_DIGITS := Color(0.55, 0.82, 1.0)
+const BOARD_FONT := preload("res://assets/fonts/Pixellari.ttf")
+## Стрелки хода на табло.
+const ARROW_UP := "\u25B2"
+const ARROW_DOWN := "\u25BC"
+
+## Панель кнопок сбоку портала: размер, высота середины, отступ от наличника,
+## кнопка; цвет горящей и тёмной кнопки.
+const CALL_PANEL := Vector3(0.12, 0.26, 0.02)
+const CALL_RISE: float = 1.15
+const CALL_GAP: float = 0.14
+const CALL_BUTTON := Vector3(0.055, 0.055, 0.02)
+const CALL_LIT := Color(0.92, 0.96, 1.0)
+const CALL_DARK := Color(0.2, 0.21, 0.23)
+## Дверь ближе этого к середине шахты занимает стену сбоку: панель туда не
+## ставится.
+const CALL_CLEARANCE: float = 1.5
 
 ## Высота упора в конце полосы шахты, м.
 const BUFFER_HEIGHT: float = 0.24
@@ -72,12 +110,29 @@ var _rules: BuildingRules
 var _plan: BuildingPlan
 ## Источники столба: этаж → те, что на нём стоят. Гаснут вне кадра, как лампы.
 var _glow: Dictionary = {}
+## Табло и кнопки порталов: x шахты → этаж → [ShaftBoard].
+var _boards: Dictionary = {}
+## Кабины, за которыми следят табло: кабина → x её шахты.
+var _watched: Dictionary = {}
+## Что табло уже показывают: кабина → [этаж, направление]. Надписи меняются
+## только при смене, а не каждый кадр.
+var _shown: Dictionary = {}
+
+
+## Табло и кнопки одного портала.
+class ShaftBoard:
+	extends RefCounted
+	var floor_index: int = 0
+	var digits: Label3D = null
+	var up_button: MeshInstance3D = null
+	var down_button: MeshInstance3D = null
 
 
 ## Одевает все шахты здания разом.
 func dress(rules: BuildingRules, plan: BuildingPlan) -> void:
 	_rules = rules
 	_plan = plan
+	set_physics_process(false)
 	for shaft in plan.shafts:
 		_dress_shaft(shaft)
 	_spawn_machine_room()
@@ -126,10 +181,27 @@ func _dress_shaft(shaft: BuildingPlan.ShaftSpot) -> void:
 		var left := x if side < 0.0 else x - RAIL_WIDTH
 		_add_part(Rect2(left, top, RAIL_WIDTH, bottom - top), rail, RAIL_Z, RAIL_DEPTH)
 
+	# Лист с болтами во всю высоту шахты, у задней стены: шахта — стальной
+	# столб сквозь здание, а не продолжение обоев коридора.
+	var plate_half := half + PORTAL_JAMB + PLATE_MARGIN
+	_add_part(
+		Rect2(shaft.x - plate_half, top, plate_half * 2.0, bottom - top),
+		BuildingFinish.shaft_plates(),
+		WorldSpace.BACK_WALL_Z + PLATE_THICKNESS * 0.5 + 0.002,
+		PLATE_THICKNESS
+	)
+
 	for index: int in range(shaft.top, shaft.bottom + 1):
 		var surface := _rules.floor_surface(index)
 		if index > BuildingRules.ROOF:
 			_build_portal(shaft.x, surface)
+			_build_board(shaft.x, index, surface)
+		if index > shaft.top:
+			# Распорка на уровне перекрытия над этажом: там кабина не встаёт.
+			var slab := _rules.story_top(index)
+			_add_part(
+				Rect2(shaft.x - half, slab, half * 2.0, BRACE_HEIGHT), rail, RAIL_Z, RAIL_DEPTH
+			)
 		_light_the_shaft(shaft.x, index, surface)
 
 
@@ -168,8 +240,156 @@ func _build_portal(x: float, surface: float) -> void:
 	)
 	_add_part(head, trim, back_z + 0.05, PANEL_THICKNESS)
 	_add_part(
-		Rect2(x - half, surface - PORTAL_SILL, half * 2.0, PORTAL_SILL), trim, back_z + 0.12, 0.2
+		Rect2(x - half, surface - PORTAL_SILL, half * 2.0, PORTAL_SILL),
+		BuildingFinish.tread_plate(),
+		back_z + 0.12,
+		0.2
 	)
+
+
+## Табло над порталом и кнопки сбоку. Цифры — этаж, где кабина сейчас; пока
+## табло кабину не видело, горит свой этаж.
+func _build_board(x: float, index: int, surface: float) -> void:
+	var board := ShaftBoard.new()
+	board.floor_index = index
+	var head_top := surface - Proportions.DOOR.y - PORTAL_HEAD
+	var frame := GreyboxLook.box(BOARD, GreyboxLook.metal(PORTAL_RECESS))
+	frame.position = WorldSpace.to_scene(Vector2(x, head_top - BOARD_GAP - BOARD.y * 0.5))
+	frame.position.z = WorldSpace.BACK_WALL_Z + PANEL_THICKNESS + 0.06
+	add_child(frame)
+	board.digits = Label3D.new()
+	board.digits.font = BOARD_FONT
+	board.digits.font_size = 64
+	board.digits.pixel_size = 0.0034
+	board.digits.modulate = BOARD_DIGITS
+	board.digits.outline_size = 0
+	board.digits.position = frame.position + Vector3(0.0, 0.0, BOARD.z * 0.5 + 0.003)
+	add_child(board.digits)
+
+	var side := _call_side(x, index)
+	if side != 0.0:
+		var panel_x := x + side * (_rules.shaft_width * 0.5 + PORTAL_JAMB + CALL_GAP)
+		var panel := GreyboxLook.box(CALL_PANEL, GreyboxLook.metal(PORTAL_TRIM))
+		panel.position = WorldSpace.to_scene(Vector2(panel_x, surface - CALL_RISE))
+		panel.position.z = WorldSpace.BACK_WALL_Z + CALL_PANEL.z * 0.5 + 0.01
+		add_child(panel)
+		for up: bool in [true, false]:
+			var button := GreyboxLook.box(CALL_BUTTON, GreyboxLook.metal(CALL_DARK))
+			var lift := CALL_PANEL.y * 0.22 * (1.0 if up else -1.0)
+			button.position = panel.position + Vector3(0.0, lift, CALL_PANEL.z * 0.5 + 0.005)
+			add_child(button)
+			if up:
+				board.up_button = button
+			else:
+				board.down_button = button
+
+	if not _boards.has(x):
+		_boards[x] = {}
+	(_boards[x] as Dictionary)[index] = board
+	_show(board, FloorSigns.number_of(_rules, index), 0.0)
+
+
+## С какой стороны портала панели кнопок место: там, где рядом нет двери и
+## панель не уходит в боковую стену здания. Справа, если свободны обе; 0 —
+## если заняты обе.
+func _call_side(x: float, index: int) -> float:
+	var reach := _rules.shaft_width * 0.5 + PORTAL_JAMB + CALL_GAP + CALL_PANEL.x
+	var bounds := _rules.floor_span(index)
+	var right := x + reach < bounds.y - BuildingShell.WALL_WIDTH
+	var left := x - reach > bounds.x + BuildingShell.WALL_WIDTH
+	for door in _plan.doors:
+		if door.floor_index != index:
+			continue
+		if door.x > x and door.x - x < CALL_CLEARANCE:
+			right = false
+		if door.x < x and x - door.x < CALL_CLEARANCE:
+			left = false
+	if right:
+		return 1.0
+	return -1.0 if left else 0.0
+
+
+## Табло шахты следят за кабиной [param car]: этаж и направление хода.
+## У двухэтажной — за ведущим ярусом.
+func watch(car: ElevatorCar, shaft: BuildingPlan.ShaftSpot) -> void:
+	_watched[car] = shaft.x
+	set_physics_process(true)
+
+
+func _physics_process(_delta: float) -> void:
+	for car: ElevatorCar in _watched:
+		if not is_instance_valid(car):
+			continue
+		refresh(car)
+
+
+## Показывает на табло шахты кабины [param car] её этаж и ход — если что-то
+## изменилось с прошлого раза.
+func refresh(car: ElevatorCar) -> void:
+	# Нижний ярус двухэтажной кабины табло не ведёт: этаж показывает ведущий.
+	if not _watched.has(car):
+		return
+	var index := _nearest_floor(car)
+	var heading := signf(car.speed_now())
+	var last: Array = _shown.get(car, [])
+	if not last.is_empty() and last[0] == index and last[1] == heading:
+		return
+	_shown[car] = [index, heading]
+	var number := FloorSigns.number_of(_rules, index)
+	for board: ShaftBoard in (_boards.get(_watched[car], {}) as Dictionary).values():
+		_show(board, number, coming(heading, index, board.floor_index))
+
+
+## Едет ли кабина к этажу табло: вниз — к этажам под ней, вверх — к этажам над
+## ней. Индексы этажей растут вниз: нулевой — верхний.
+static func coming(heading: float, car_floor: int, board_floor: int) -> float:
+	if heading < 0.0 and board_floor > car_floor:
+		return -1.0
+	if heading > 0.0 and board_floor < car_floor:
+		return 1.0
+	return 0.0
+
+
+## Ближайший к полу кабины этаж.
+func _nearest_floor(car: ElevatorCar) -> int:
+	var rule_y := WorldSpace.to_plane(car.global_position).y
+	var best := 0
+	var best_gap := INF
+	for index in _rules.levels():
+		var gap := absf(_rules.floor_surface(index) - rule_y)
+		if gap < best_gap:
+			best_gap = gap
+			best = index
+	return best
+
+
+func _show(board: ShaftBoard, number: int, heading: float) -> void:
+	var arrow := ARROW_UP if heading > 0.0 else (ARROW_DOWN if heading < 0.0 else "")
+	board.digits.text = str(number) if arrow.is_empty() else "%s %d" % [arrow, number]
+	if board.up_button != null:
+		board.up_button.material_override = GreyboxLook.light(CALL_LIT) if heading > 0.0 else null
+		board.down_button.material_override = GreyboxLook.light(CALL_LIT) if heading < 0.0 else null
+
+
+## Следят ли табло за этой кабиной.
+func watches(car: ElevatorCar) -> bool:
+	return _watched.has(car)
+
+
+## Что показывает табло портала шахты [param x] на этаже [param index].
+func board_text(x: float, index: int) -> String:
+	var board := (_boards.get(x, {}) as Dictionary).get(index) as ShaftBoard
+	return board.digits.text if board != null else ""
+
+
+## Горит ли на этом портале кнопка: +1 — вверх, −1 — вниз, 0 — ни одна.
+func lit_button(x: float, index: int) -> int:
+	var board := (_boards.get(x, {}) as Dictionary).get(index) as ShaftBoard
+	if board == null or board.up_button == null:
+		return 0
+	if board.up_button.material_override != null:
+		return 1
+	return -1 if board.down_button.material_override != null else 0
 
 
 ## Источник столба на одном этаже шахты: посреди пролёта, перед направляющими.

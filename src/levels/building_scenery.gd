@@ -26,6 +26,8 @@ const ROOF_RAIN_SPREAD: float = 2.0
 
 var weather: Weather.Kind = Weather.Kind.CLEAR
 var dressing: BuildingDressing = null
+## Отель или офис и имя здания (ADR-0033, решение 1).
+var identity: BuildingIdentity = null
 
 ## Воздух здания и дождь над крышей: их перестраивает [method apply_graphics].
 var _air: WorldEnvironment = null
@@ -33,8 +35,14 @@ var _rain_node: GPUParticles3D = null
 
 
 ## Собирает окружение здания по правилам, плану и сиду.
-func build(rules: BuildingRules, plan: BuildingPlan, building_seed: int) -> void:
+func build(
+	rules: BuildingRules,
+	plan: BuildingPlan,
+	building_seed: int,
+	building_identity: BuildingIdentity = BuildingIdentity.new()
+) -> void:
 	weather = Weather.of_seed(building_seed)
+	identity = building_identity
 
 	_air = WorldEnvironment.new()
 	_air.name = "Air"
@@ -50,18 +58,21 @@ func build(rules: BuildingRules, plan: BuildingPlan, building_seed: int) -> void
 	var kit := RoofKit.new()
 	kit.name = "RoofKit"
 	add_child(kit)
-	kit.build(rules, plan)
+	kit.build(rules, plan, building_seed)
+	var sign_board := VerticalSign.new()
+	add_child(sign_board)
+	sign_board.hang(rules, identity)
 
 	var details := FloorDetail.new()
 	details.name = "FloorDetail"
 	add_child(details)
 	details.build(rules, plan)
 
-	dressing = BuildingDressing.lay(rules, plan, building_seed)
+	dressing = BuildingDressing.lay(rules, plan, building_seed, identity)
 	var props := BuildingProps.new()
 	props.name = "Props"
 	add_child(props)
-	props.build(rules, plan, dressing)
+	props.build(rules, plan, dressing, identity)
 
 	var city := CityBackdrop.new()
 	city.name = "City"
