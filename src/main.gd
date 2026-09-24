@@ -28,6 +28,11 @@ var _records: Records = null
 var _playing: bool = false
 ## Что удерживалось в прошлом кадре: по этому считается фронт нажатия.
 var _held: Dictionary = {}
+## Страница меню, какой её оставил прошлый кадр. Esc — это и «пауза», и «назад»
+## меню: с настроек над паузой меню возвращает на паузу раньше, чем кадр доходит
+## до [method _process], и по одной текущей странице то же нажатие тут же снимало
+## бы паузу (авторевью M22b).
+var _page_before: Menu.Page = Menu.Page.MAIN
 
 @onready var _menu: Menu = $Menu
 @onready var _hud: Hud = $Hud
@@ -70,12 +75,12 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if not _just_pressed(&"pause"):
-		return
-	if _playing:
-		_pause()
-	elif _menu.current_page() == Menu.Page.PAUSE:
-		_resume()
+	if _just_pressed(&"pause"):
+		if _playing:
+			_pause()
+		elif _page_before == Menu.Page.PAUSE and _menu.current_page() == Menu.Page.PAUSE:
+			_resume()
+	_page_before = _menu.current_page()
 
 
 ## Нажато ли действие именно в этом кадре.

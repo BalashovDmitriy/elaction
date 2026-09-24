@@ -98,9 +98,9 @@ func _ready() -> void:
 	_style_static_labels()
 
 
-## Показывает страницу и забирает фокус на первый пункт: иначе стрелками
-## и геймпадом по меню не походить.
-func show_page(page: Page) -> void:
+## Показывает страницу и забирает фокус на пункт [param focus], обычно первый:
+## иначе стрелками и геймпадом по меню не походить.
+func show_page(page: Page, focus: int = 0) -> void:
 	_page = page
 	if page == Page.MAIN or page == Page.PAUSE or page == Page.GAME_OVER:
 		# Корневые страницы — те, с которых уходят в подстраницы. Последняя из них
@@ -110,7 +110,7 @@ func show_page(page: Page) -> void:
 	_settling = true
 	for child: Node in _column.get_children():
 		# Сначала из колонки, потом в утиль: [method Node.queue_free] удаляет узел
-		# лишь в конце кадра, а отложенный [method _focus_first] успевает раньше —
+		# лишь в конце кадра, а отложенный [method _focus_row] успевает раньше —
 		# и фокус доставался пункту прошлой страницы, которую тут же и удаляли.
 		_column.remove_child(child)
 		child.queue_free()
@@ -121,7 +121,9 @@ func show_page(page: Page) -> void:
 	_blur.visible = over_game
 	_title.visible = page == Page.MAIN
 	_subtitle.visible = page == Page.MAIN
-	_hint.text = tr("UI_HINT")
+	# «Esc — назад» только там, где Esc и правда ведёт назад: с корневых страниц
+	# уходят пунктами, а на паузе Esc её закрывает.
+	_hint.text = tr("UI_HINT_ROOT" if _is_root(page) else "UI_HINT")
 	var wide := page == Page.SETTINGS or page == Page.CONTROLS or page == Page.RECORDS
 	_column.custom_minimum_size.x = WIDE_COLUMN if wide else COLUMN_WIDTH
 	# Контейнер сам не сужается: после широких настроек узкая страница осталась
@@ -145,7 +147,7 @@ func show_page(page: Page) -> void:
 			_build_controls()
 
 	_slide_in()
-	_focus_first.call_deferred()
+	_focus_row.call_deferred(focus)
 
 
 ## Прячет меню целиком — игра продолжается.
@@ -523,12 +525,12 @@ func _style_static_labels() -> void:
 	_subtitle.text = tr("UI_SUBTITLE")
 
 
-## Фокус на первый пункт страницы: иначе стрелками и геймпадом по меню не
+## Фокус на пункт [param at] страницы: иначе стрелками и геймпадом по меню не
 ## походить. Переход фокуса после этого снова звучит.
-func _focus_first() -> void:
+func _focus_row(at: int) -> void:
 	var found := rows()
 	if not found.is_empty():
-		found[0].grab_focus()
+		found[clampi(at, 0, found.size() - 1)].grab_focus()
 	_settling = false
 
 
@@ -550,6 +552,8 @@ func _on_language_selected(index: Variant) -> void:
 	settings.apply()
 	settings.save_to()
 	# Страница перерисовывается целиком: подписи собраны кодом, и сами
-	# они на смену языка не отзовутся.
+	# они на смену языка не отзовутся. Фокус остаётся на языке: с первого пункта
+	# следующее «вправо» крутило бы уже громкость (авторевью M22b).
+	var keep := rows().find(get_viewport().gui_get_focus_owner() as MenuRow)
 	_subtitle.text = tr("UI_SUBTITLE")
-	show_page(_page)
+	show_page(_page, maxi(keep, 0))

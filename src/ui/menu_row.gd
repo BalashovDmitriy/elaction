@@ -33,7 +33,12 @@ var options: Array[String] = []
 var index: int = 0
 var level: float = 0.0
 var on: bool = false
-var neon: Color = VerticalSign.NEON_HOTEL
+## Цвет кромки и ореола. Меню задаёт его уже собранному пункту, поэтому стиль
+## пересобирается сразу, а не с первой вспышкой фокуса.
+var neon: Color = VerticalSign.NEON_HOTEL:
+	set(value):
+		neon = value
+		_restyle()
 
 ## 0 — не выбран, 1 — выбран; между ними — вспышка.
 var glow: float = 0.0:
@@ -97,7 +102,11 @@ func step_value(step: int) -> void:
 			index = wrapi(index + step, 0, options.size())
 			changed.emit(index)
 		Kind.LEVEL:
-			level = clampf(snappedf(level + step * LEVEL_STEP, LEVEL_STEP), 0.0, 1.0)
+			var next := clampf(snappedf(level + step * LEVEL_STEP, LEVEL_STEP), 0.0, 1.0)
+			# Упёрлись в край — ничего не сменилось: ни щелчка, ни записи в шину.
+			if is_equal_approx(next, level):
+				return
+			level = next
 			changed.emit(level)
 		Kind.TOGGLE:
 			on = not on
@@ -151,10 +160,14 @@ func _build(caption: String, font_size: int) -> void:
 func _gui_input(event: InputEvent) -> void:
 	if kind == Kind.ACTION:
 		return
-	if event.is_action_pressed(&"ui_left"):
+	# Громкость листается с повтором, как фокус вверх-вниз: двадцать делений
+	# по одному нажатию — это двадцать нажатий. Варианты — без повтора: смена
+	# языка пересобирает страницу на каждый шаг.
+	var repeat := kind == Kind.LEVEL
+	if event.is_action_pressed(&"ui_left", repeat):
 		step_value(-1)
 		accept_event()
-	elif event.is_action_pressed(&"ui_right"):
+	elif event.is_action_pressed(&"ui_right", repeat):
 		step_value(1)
 		accept_event()
 

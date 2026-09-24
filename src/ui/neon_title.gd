@@ -33,8 +33,15 @@ const BLINKS: Array[float] = [0.06, 0.05, 0.09, 0.12, 0.05]
 		update_minimum_size()
 		queue_redraw()
 @export var neon: Color = VerticalSign.NEON_HOTEL
-## Какая буква мигает; −1 — ни одна (снимки и тесты).
-@export var flicker_letter: int = 4
+## Какая буква мигает; −1 — ни одна (снимки и тесты). Смена посреди моргания
+## зажигает трубку и перерисовывает вывеску: иначе погасшая буква так и
+## оставалась бы на снимке тёмной.
+@export var flicker_letter: int = 4:
+	set(value):
+		flicker_letter = value
+		_lit = true
+		_blink = -1
+		queue_redraw()
 
 var _lit: bool = true
 var _wait: float = 0.0
@@ -50,9 +57,9 @@ func _ready() -> void:
 
 func _get_minimum_size() -> Vector2:
 	var font := NeonStyle.font(WEIGHT)
-	var size := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+	var bare := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
 	var halo := GLOW[0].x
-	return Vector2(size.x + halo * 2.0, size.y + halo)
+	return Vector2(bare.x + halo * 2.0, bare.y + halo)
 
 
 ## Горит ли мигающая буква прямо сейчас. Нужно тесту.
@@ -61,7 +68,9 @@ func is_letter_lit() -> bool:
 
 
 func _process(delta: float) -> void:
-	if flicker_letter < 0:
+	# Вывеска видна только на главной странице, а меню живёт и всю партию:
+	# мигать невидимой буквой — перерисовывать её впустую.
+	if flicker_letter < 0 or not is_visible_in_tree():
 		return
 	_wait -= delta
 	if _wait > 0.0:

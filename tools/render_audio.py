@@ -330,9 +330,6 @@ def game_over() -> Stereo:
     return dsp.master(dsp.widen(placed(stack(shaped, sub), "shaft", mix=0.45)), peak=0.85)
 
 
-# --- Музыка ------------------------------------------------------------------
-
-
 # --- Интерфейс ---------------------------------------------------------------
 #
 # Меню неоновое (ADR-0035), и звук у него электрический: короткие чистые тона
@@ -368,6 +365,9 @@ def ui_back() -> Stereo:
     fall = dsp.decay(dsp.saw(dsp.glide(note("E6"), note("A5"), 0.16), 0.2, detune=0.004), tau=0.05)
     dry = stack(dsp.filtered(fall, 3800.0, "low") * 0.35, _neon_buzz(0.2, 0.15))
     return dsp.master(dsp.mono_to_stereo(dry), peak=0.5)
+
+
+# --- Музыка ------------------------------------------------------------------
 
 
 def _kick_drum(seconds: float = 0.5) -> np.ndarray:

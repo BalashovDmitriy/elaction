@@ -8,6 +8,7 @@ extends GutTest
 ## меню не походить.
 
 const MENU_SCENE := preload("res://src/ui/menu.tscn")
+const MAIN_SCENE := preload("res://src/main.tscn")
 
 ## Сколько кадров дать отложенному фокусу и вспышке выбора.
 const SETTLE_FRAMES: int = 4
@@ -131,12 +132,79 @@ func test_the_stage_drifts_along_the_street() -> void:
 
 
 func test_the_sign_measures_its_glow() -> void:
-	var sign := NeonTitle.new()
-	autofree(sign)
+	var title := NeonTitle.new()
+	autofree(title)
 	var bare := NeonStyle.font(NeonTitle.WEIGHT).get_string_size(
-		sign.text, HORIZONTAL_ALIGNMENT_LEFT, -1, sign.font_size
+		title.text, HORIZONTAL_ALIGNMENT_LEFT, -1, title.font_size
 	)
-	assert_gt(sign.get_combined_minimum_size().x, bare.x, "ореолу оставлено место по краям")
+	assert_gt(title.get_combined_minimum_size().x, bare.x, "ореолу оставлено место по краям")
+
+
+func test_the_sign_blinks_and_stops_on_demand() -> void:
+	# Снимки гасят мигание посреди моргания — и буква не должна остаться тёмной.
+	var title := NeonTitle.new()
+	add_child_autofree(title)
+	assert_true(title.is_letter_lit(), "вывеска зажигается горящей")
+	title._process(NeonTitle.STEADY.y + 0.1)
+	assert_false(title.is_letter_lit(), "дольше самой длинной паузы — буква моргнула")
+	title.flicker_letter = -1
+	assert_true(title.is_letter_lit(), "мигание снято — трубка горит")
+	title._process(NeonTitle.STEADY.y + 0.1)
+	assert_true(title.is_letter_lit(), "и больше не гаснет")
+
+
+func test_a_level_at_its_end_stays_quiet() -> void:
+	# Упёрлась в край — ни щелчка, ни записи в шину на каждое нажатие.
+	var row := MenuRow.slider("x", 1.0)
+	autofree(row)
+	watch_signals(row)
+	row.step_value(1)
+	assert_signal_not_emitted(row, "changed", "выше ста не листается")
+	row.step_value(-1)
+	assert_signal_emit_count(row, "changed", 1, "а вниз — да")
+
+
+func test_a_row_takes_its_neon_after_it_is_built() -> void:
+	# Меню красит пункт уже собранным: кромка обязана перекраситься сразу, а не
+	# с первой вспышкой фокуса.
+	var row := MenuRow.action("x")
+	add_child_autofree(row)
+	row.neon = VerticalSign.NEON_OFFICE
+	var box := row.get_theme_stylebox("normal") as StyleBoxFlat
+	assert_eq(Color(box.border_color, 1.0), Color(VerticalSign.NEON_OFFICE, 1.0))
+
+
+func test_escape_from_settings_over_the_pause_stops_at_the_pause() -> void:
+	# Esc — и «назад» меню, и «пауза» игры. С настроек над паузой меню уходит на
+	# паузу ещё до кадра main, и по одной текущей странице то же нажатие тут же
+	# снимало паузу (авторевью M22b). Кадр разыгран руками: сначала ввод, потом
+	# _process — в этом порядке движок их и зовёт.
+	var locale := TranslationServer.get_locale()
+	var main := MAIN_SCENE.instantiate()
+	add_child_autofree(main)
+	var menu := main.get_node("Menu") as Menu
+	menu.show_page(Menu.Page.PAUSE)
+	menu.show_page(Menu.Page.SETTINGS)
+	main._process(0.0)
+
+	var back := InputEventAction.new()
+	back.action = &"ui_cancel"
+	back.pressed = true
+	menu._unhandled_input(back)
+	Input.action_press(&"pause")
+	main._process(0.0)
+	assert_eq(menu.current_page(), Menu.Page.PAUSE, "назад — на паузу")
+	assert_true(menu.visible, "и пауза не снялась тем же нажатием")
+
+	Input.action_release(&"pause")
+	main._process(0.0)
+	Input.action_press(&"pause")
+	main._process(0.0)
+	assert_false(menu.visible, "второе нажатие на паузе снимает её")
+
+	Input.action_release(&"pause")
+	Sounds.stop_music()
+	TranslationServer.set_locale(locale)
 
 
 func test_no_code_points_at_pixellari() -> void:

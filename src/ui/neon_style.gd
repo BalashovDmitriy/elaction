@@ -33,16 +33,17 @@ static func font(weight: int) -> FontVariation:
 	return variation
 
 
-## Плашка: стекло [param background], кромка слева и ореол в цвет [param neon].
-## Выбранная ([param lit]) — кромка шире и ореол ярче: так видно, где фокус.
-static func plate(background: Color, neon: Color, lit: bool = false) -> StyleBoxFlat:
+## Плашка HUD: стекло [param background], кромка слева и ореол в цвет [param neon].
+## Пункт меню горит ярче и плавно — его стиль собирает [MenuRow] по тем же
+## [constant EDGE] и [constant EDGE_LIT].
+static func plate(background: Color, neon: Color) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
 	box.bg_color = background
 	box.set_corner_radius_all(8)
-	box.border_width_left = EDGE_LIT if lit else EDGE
-	box.border_color = Color(neon, 1.0 if lit else 0.9)
-	box.shadow_color = Color(neon, 0.34 if lit else 0.18)
-	box.shadow_size = 18 if lit else 14
+	box.border_width_left = EDGE
+	box.border_color = Color(neon, 0.9)
+	box.shadow_color = Color(neon, 0.18)
+	box.shadow_size = 14
 	box.content_margin_left = 20
 	box.content_margin_right = 20
 	box.content_margin_top = 10
