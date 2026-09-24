@@ -66,3 +66,14 @@ func test_smoothing_does_not_depend_on_the_frame_rate() -> void:
 	var first := CameraBounds.smoothed(Vector2.ZERO, Vector2(10.0, 0.0), 8.0, 1.0 / 60.0)
 	var two := CameraBounds.smoothed(first, Vector2(10.0, 0.0), 8.0, 1.0 / 60.0)
 	assert_almost_eq(one.x, two.x, 0.0001)
+
+
+## Камера встаёт в стоящую цель ровно, а не ползёт к ней вечно на доли пикселя:
+## ползущая камера давала мерцание кромок дверей и перекрытий (M22).
+func test_the_camera_comes_to_rest() -> void:
+	var at := Vector2.ZERO
+	var target := Vector2(3.0, -2.0)
+	for _frame in 240:
+		at = CameraBounds.smoothed(at, target, 8.0, 1.0 / 60.0)
+	assert_eq(at, target, "за четыре секунды камера встала в цель")
+	assert_eq(CameraBounds.smoothed(at, target, 8.0, 1.0 / 60.0), target, "и больше не сдвигается")
