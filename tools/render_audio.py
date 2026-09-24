@@ -182,12 +182,6 @@ def _bell(pitch: float, seconds: float) -> np.ndarray:
     return out
 
 
-def elevator_ding() -> Stereo:
-    """«Динь» лифта — один из двух эффектов, которые источники называют прямо."""
-    both = stack(_bell(note("C6"), 1.2) * 0.6, after(0.16, _bell(note("G5"), 1.3) * 0.5))
-    return dsp.master(dsp.widen(placed(both, "shaft", mix=0.35)), peak=0.7)
-
-
 def elevator_hum() -> Stereo:
     """Гул кабины: мотор и шум троса. Зацикливается на время поездки."""
     seconds = 2.0
@@ -555,7 +549,6 @@ EFFECTS: dict[str, Callable[[], Stereo]] = {
     "kick": kick,
     "lamp_break": lamp_break,
     "lamp_crash": lamp_crash,
-    "elevator_ding": elevator_ding,
     "elevator_hum": elevator_hum,
     "escalator_hum": escalator_hum,
     "door_open": door_open,
@@ -581,7 +574,6 @@ MUSIC: dict[str, Callable[[], Stereo]] = {
 LONG: frozenset[str] = frozenset(
     {
         "document",
-        "elevator_ding",
         "building_bonus",
         "extra_life",
         "car_away",

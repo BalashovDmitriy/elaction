@@ -20,11 +20,6 @@ signal floor_reached(index: int)
 ## Докуда слышно гул кабины, м. Дальше по этажу он уже не мешает.
 const HUM_REACH: float = 10.8
 
-## Докуда слышно «динь», м. Шире гула, но всё же не на всё здание: пустые
-## кабины катаются сами, и каждая отбивает этажи — глобальный звонок из пяти
-## шахт звенел бы в ухо без остановки.
-const DING_REACH: float = 19.2
-
 ## Насколько гаснет указатель, когда в эту сторону ходу нет.
 const ARROW_DIM: float = 0.18
 
@@ -85,7 +80,6 @@ var _deck: ElevatorCar = null
 var _deck_drop: float = 0.0
 
 var _hum: AudioStreamPlayer3D = null
-var _ding: AudioStreamPlayer3D = null
 ## Огоньки на крыше: их двигает [method fit_to_story], когда меняется высота.
 var _indicators: Array[MeshInstance3D] = []
 ## Ширина кабины, м. Задаёт её [method fit_to_story] из правил здания.
@@ -102,7 +96,6 @@ func _ready() -> void:
 	_interior.body_entered.connect(_on_body_entered)
 	_interior.body_exited.connect(_on_body_exited)
 	_hum = Sounds.source(self, Sounds.ELEVATOR_HUM, HUM_REACH)
-	_ding = Sounds.source(self, Sounds.ELEVATOR_DING, DING_REACH)
 	# Кабина — то, на чём стоят и в чём едут: читаться она обязана и на
 	# погашенном этаже (ADR-0019, решение 5). Держат это два индикатора на
 	# крыше, а сама кабина — металл, как шахта.
@@ -206,8 +199,8 @@ func _physics_process(delta: float) -> void:
 	if reached != _aligned_floor:
 		_aligned_floor = reached
 		if reached >= 0:
-			# «Динь» — один из двух эффектов, которые источники называют прямо.
-			_ding.play()
+			# Звонка на этаже нет с M21: решение пользователя — звенели все кабины,
+			# и пустые тоже, на каждом проезжаемом этаже, будто звонят в дверь.
 			floor_reached.emit(reached)
 
 	# Гул идёт, пока кабина едет. Источник позиционный: шахт в здании пять,

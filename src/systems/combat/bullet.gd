@@ -55,6 +55,7 @@ var direction: float = 1.0
 
 var _travelled: float = 0.0
 var _flash: OmniLight3D = null
+var _look: BulletLook = null
 ## Пуля уже во что-то попала и доживает до конца кадра.
 var _spent: bool = false
 
@@ -62,10 +63,10 @@ var _spent: bool = false
 func _ready() -> void:
 	add_to_group(GROUP)
 	body_entered.connect(_on_body_entered)
-	# Пуля летит всегда вправо-влево, и вид у неё один: направление показывает
-	# сам полёт, а не картинка.
-	var visual := $Visual as MeshInstance3D
-	visual.material_override = GreyboxLook.marker(GreyboxLook.BULLET)
+	# Вид — трассер с хвостом и вспышкой у ствола ([BulletLook]); направление
+	# стрелок задаёт до того, как пуля попадёт в дерево.
+	_look = BulletLook.make(direction)
+	add_child(_look)
 	_flash = OmniLight3D.new()
 	_flash.light_color = FLASH_COLOR
 	_flash.light_energy = FLASH_ENERGY
@@ -101,6 +102,7 @@ func _physics_process(delta: float) -> void:
 	position.x += step
 	_travelled += absf(step)
 	_fade_the_flash()
+	_look.follow(_travelled)
 	if _travelled >= max_range:
 		queue_free()
 
