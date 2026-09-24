@@ -1,12 +1,12 @@
 # Авторы ассетов
 
-Код проекта — MIT (см. README). Здесь — чужие модели и фактуры, которые лежат в
-репозитории, и их лицензии. CC0 авторства не требует, но мы указываем всех: так
+Код проекта — MIT (см. README). Здесь — чужие модели, фактуры и шрифты, которые
+лежат в репозитории, и их лицензии. CC0 авторства не требует, но мы указываем всех: так
 честно. CC-BY 3.0 требует указать автора — это и есть эта страница
 ([ADR-0033](docs/adr/0033-dressing-from-packs.md), решение 4).
 
 Тест `test_prop_catalog` сверяет: у каждой модели из `assets/models/props/`
-есть строка здесь.
+есть строка здесь и в `assets/models/props/credits.json`.
 
 ## Люди и машины
 
@@ -87,5 +87,5 @@
 
 | Что | Автор | Лицензия |
 |---|---|---|
-| Pixellari | Zacchary Dempsey-Plante | SIL OFL 1.1, `assets/fonts/Pixellari.LICENSE.txt` |
+| Pixellari (меню, табло, вывески) | Zacchary Dempsey-Plante | SIL OFL 1.1, `assets/fonts/Pixellari.LICENSE.txt` |
 | Exo 2 (HUD) | The Exo 2 Project Authors | SIL OFL 1.1, `assets/fonts/Exo2.LICENSE.txt` |

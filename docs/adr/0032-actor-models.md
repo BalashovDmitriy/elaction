@@ -83,7 +83,7 @@ Men Pack**, лицензия CC0, персонаж Business Man для Otto и �
 ### 6. Пайплайн: исходник пака в репозитории, сборка через Blender
 
 - Исходник `business_man.glb` (1.5 МБ, CC0) лежит в `assets/source/quaternius/`
-  с лицензией. В папке — `.gdignore`: Godot исходник не импортирует, в игре
+  с лицензией. В `assets/source/` — `.gdignore`: Godot исходник не импортирует, в игре
   только собранные модели.
 - `tools/build_actors.py` открывает исходник в Blender, приводит рост к
   `Proportions.BODY` (1.68 м), перекрашивает материалы палитрой актёра,
