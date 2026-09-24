@@ -114,15 +114,18 @@ func test_props_keep_off_doors_lamps_shafts_and_walls() -> void:
 
 
 ## Труба видна: висит ниже полосы, которую закрывает кромка перекрытия, и не
-## проходит сквозь шахту, полотно эскалатора, вывеску и табличку этажа.
+## проходит сквозь шахту, полотно эскалатора и табличку этажа. Трубы на виду —
+## только в офисе (ADR-0033): там их и проверяем.
 func test_pipes_show_below_the_slab_edge_and_skip_what_they_would_cover() -> void:
 	var laid := 0
 	var front := BuildingProps.pipe_z() + BuildingProps.PIPE_THICKNESS * 0.5
+	var office := BuildingIdentity.new()
+	office.kind = BuildingIdentity.Kind.OFFICE
 	for skill: int in SKILLS:
 		var rules := _rules(skill)
 		for building_seed: int in SEEDS:
 			var plan := BuildingPlan.generate(rules, building_seed)
-			var dressing := BuildingDressing.lay(rules, plan, building_seed)
+			var dressing := BuildingDressing.lay(rules, plan, building_seed, office)
 			for index: int in dressing.pipes:
 				var where := "навык %d, сид %d, этаж %d" % [skill, building_seed, index]
 				assert_gte(
@@ -130,8 +133,8 @@ func test_pipes_show_below_the_slab_edge_and_skip_what_they_would_cover() -> voi
 					rules.story_top(index) + FloorSigns.hidden_band(front),
 					where + ": труба за кромкой перекрытия"
 				)
-				var covered := _pipe_blockers(rules, plan, dressing, index)
-				for span: Vector2 in BuildingProps.pipe_spans(rules, plan, dressing, index):
+				var covered := _pipe_blockers(rules, plan, index)
+				for span: Vector2 in BuildingProps.pipe_spans(rules, plan, index):
 					laid += 1
 					for blocker: Vector2 in covered:
 						assert_true(
@@ -141,13 +144,20 @@ func test_pipes_show_below_the_slab_edge_and_skip_what_they_would_cover() -> voi
 	assert_gt(laid, 0, "ни одной трубы — проверять было нечего")
 
 
-## Вывески обстановки не носят цвета огоньков игры: табло двери, двери с
-## документом и выхода (ADR-0023, решение 6).
+## Неон вывески, цифры табло шахт и огонёк кнопок вызова не носят цвета
+## огоньков игры: табло двери, двери с документом и выхода (ADR-0023,
+## решение 6).
 func test_neon_signs_do_not_wear_the_colours_of_game_signs() -> void:
 	var reserved: Array[Color] = [
 		GreyboxLook.SIGN_WARM, GreyboxLook.SIGN_RED, GreyboxLook.SIGN_GREEN
 	]
-	for neon: Color in BuildingProps.NEON:
+	var glowing: Array[Color] = [
+		VerticalSign.NEON_HOTEL,
+		VerticalSign.NEON_OFFICE,
+		BuildingShafts.BOARD_DIGITS,
+		BuildingShafts.CALL_LIT,
+	]
+	for neon: Color in glowing:
 		for sign_colour: Color in reserved:
 			var gap := Vector3(
 				neon.r - sign_colour.r, neon.g - sign_colour.g, neon.b - sign_colour.b
@@ -189,8 +199,8 @@ func test_roof_steps_frame_the_machine_room() -> void:
 
 
 ## У декора нет тел, а источников в окружении два — лампа над крышей и отсвет
-## неоновой вывески (ADR-0031, решение 2): окна города, вывески этажей, огонь
-## мачты светятся эмиссией и бюджет ламп кадра не трогают.
+## неоновой вывески на углу (ADR-0033, решение 2): окна города, табло, буквы
+## вывески и огонь антенны светятся эмиссией и бюджет ламп кадра не трогают.
 func test_scenery_adds_no_bodies_and_no_lights() -> void:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
@@ -213,9 +223,7 @@ func test_scenery_adds_no_bodies_and_no_lights() -> void:
 ## Что труба на этаже обязана обходить, парами «левый край, правый край».
 ## Считается заново, а не берётся у [BuildingProps]: иначе тест проверял бы
 ## разрывы трубы ими же самими.
-func _pipe_blockers(
-	rules: BuildingRules, plan: BuildingPlan, dressing: BuildingDressing, index: int
-) -> Array[Vector2]:
+func _pipe_blockers(rules: BuildingRules, plan: BuildingPlan, index: int) -> Array[Vector2]:
 	var blockers: Array[Vector2] = []
 	var half := rules.shaft_width * 0.5
 	for shaft in plan.shafts:
@@ -224,10 +232,6 @@ func _pipe_blockers(
 	for escalator in plan.escalators:
 		if escalator.floor_index + 1 == index:
 			blockers.append(escalator.gap(rules))
-	for prop in dressing.props:
-		if prop.floor_index == index and prop.kind == BuildingDressing.Kind.SIGN:
-			var reach := BuildingProps.SIGN.x * 0.5
-			blockers.append(Vector2(prop.x - reach, prop.x + reach))
 	var plate := FloorSigns.centre_on(rules, index).x
 	var plate_half := Proportions.FLOOR_SIGN.x * 0.5
 	blockers.append(Vector2(plate - plate_half, plate + plate_half))
@@ -345,7 +349,9 @@ func test_the_exit_floor_is_a_garage_without_doors() -> void:
 				)
 
 
-## Техника крыши стоит внутри её стен (вывеска — по ширине щита вокруг середины).
+## Техника крыши стоит внутри её стен и за спиной Otto: передом не ближе
+## машинного отделения. На сиде 2 выход на крышу глубиной 2.7 м вставал поперёк
+## плоскости игры (авторевью M21b).
 func test_roof_kit_stays_on_the_roof() -> void:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
@@ -364,6 +370,15 @@ func test_roof_kit_stays_on_the_roof() -> void:
 		assert_between(
 			x, bounds.x - 0.1, bounds.y + 0.1, "деталь крыши за её стенами: %s" % part.name
 		)
+	var models := 0
+	for child in kit.get_children():
+		var model := child as Node3D
+		if model == null or PropCatalog.entry(String(model.name)) == null:
+			continue
+		models += 1
+		var front := model.position.z + PropCatalog.bounds_of(model).end.z
+		assert_lte(front, RoofKit.FRONT_Z + 0.001, "%s выступает в плоскость игры" % model.name)
+	assert_gt(models, 3, "моделей на крыше почти нет")
 	remove_child(level)
 
 

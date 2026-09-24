@@ -118,6 +118,9 @@ class AgentPost:
 ## проверяют, что здание проходится, а не что бой выигрывается.
 @export var spawn_agents: bool = true
 
+## Что за здание: отель или офис и его имя (ADR-0033, решение 1).
+var identity: BuildingIdentity = null
+
 var _plan: BuildingPlan
 var _doors: Array[Door] = []
 var _cars: Array[ElevatorCar] = []
@@ -164,10 +167,12 @@ func _ready() -> void:
 		rules = BuildingRules.new()
 	_plan = BuildingPlan.generate(rules, building_seed)
 	_spawn.rng.seed = building_seed
+	# Отель или офис: от этого отделка стен, обстановка и вывеска (ADR-0033).
+	identity = BuildingIdentity.of(GameState.instance().building, building_seed)
 
 	_ribs = BuildingRibs.new()
 	_ribs.name = "Ribs"
-	_ribs.setup(rules, _plan)
+	_ribs.setup(rules, _plan, identity)
 	add_child(_ribs)
 	_shell = BuildingShell.new()
 	_shell.name = "Shell"
@@ -186,7 +191,7 @@ func _ready() -> void:
 	var scenery := BuildingScenery.new()
 	scenery.name = "Scenery"
 	add_child(scenery)
-	scenery.build(rules, _plan, building_seed)
+	scenery.build(rules, _plan, building_seed, identity)
 
 	# Otto начинает с крыши, как в оригинале, и там, где нет проёмов. Крыша —
 	# свой уровень над зданием, а не нулевой этаж: ADR-0014, пункт 1.
@@ -300,6 +305,8 @@ func _spawn_shafts() -> void:
 		car.setup(stops)
 		car.set_shaft_top(_shafts.top_of(shaft))
 		_cars.append(car)
+		# Табло у порталов показывают, где эта кабина (ADR-0033, решение 7).
+		_shafts.watch(car, shaft)
 		if shaft.double_deck:
 			_spawn_lower_deck(car, shaft)
 		_spawn_shaft_pit(shaft)

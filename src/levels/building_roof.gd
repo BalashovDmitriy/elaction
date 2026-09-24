@@ -67,7 +67,8 @@ static func steps(rules: BuildingRules, plan: BuildingPlan) -> Array[Rect2]:
 ## к серому: крыша — фон, а не вывеска (ADR-0029, решение 5).
 func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 	var tone := GreyboxLook.SKY_WALL.lerp(rules.palette.masonry, PALETTE_SHARE)
-	var material := GreyboxLook.surface(tone)
+	# Кровля — гравий (ADR-0033, решение 8), тон раунда множителем.
+	var material := BuildingFinish.roof_gravel(tone)
 	var depth := WorldSpace.ROOM_DEPTH
 	var rib := GreyboxLook.metal(GreyboxLook.SKY_WALL.lerp(GreyboxLook.TRIM, 0.35))
 	for rect in steps(rules, plan):

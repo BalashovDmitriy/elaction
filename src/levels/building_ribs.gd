@@ -50,11 +50,20 @@ const SLOTS_PER_BAY: int = 2
 
 var _rules: BuildingRules
 var _plan: BuildingPlan
+var _identity: BuildingIdentity = BuildingIdentity.new()
 
 
-func setup(rules: BuildingRules, plan: BuildingPlan) -> void:
+func setup(
+	rules: BuildingRules, plan: BuildingPlan, identity: BuildingIdentity = BuildingIdentity.new()
+) -> void:
 	_rules = rules
 	_plan = plan
+	_identity = identity
+
+
+## Что за здание: по нему отделка стены и пилястр.
+func identity() -> BuildingIdentity:
+	return _identity
 
 
 ## Торец плиты по её переднему краю. [param slab] — кусок перекрытия в
@@ -80,7 +89,9 @@ func line_the_wall(index: int, inner: Vector2, openings: Array[Vector2]) -> void
 	var surface := _rules.floor_surface(index)
 	var top := _rules.story_top(index)
 	var gaps := openings.duplicate()
-	var half := _rules.shaft_width * 0.5
+	# Проём шахты — с наличником портала: пилястра у края простенка иначе
+	# вставала поверх хромированной рамки и прятала её (авторевью M21b).
+	var half := _rules.shaft_width * 0.5 + BuildingShafts.PORTAL_JAMB
 	for shaft in _plan.shafts:
 		if index >= shaft.top and index <= shaft.bottom:
 			gaps.append(Vector2(shaft.x - half, shaft.x + half))
@@ -94,7 +105,7 @@ func _skirting(span: Vector2, surface: float) -> void:
 	var width := span.y - span.x
 	_add_part(
 		Rect2(span.x, surface - SKIRTING_HEIGHT, width, SKIRTING_HEIGHT),
-		GreyboxLook.surface(GreyboxLook.SKIRTING),
+		BuildingFinish.wainscot(_identity, _rules.palette.story),
 		WorldSpace.BACK_WALL_Z,
 		SKIRTING_DEPTH
 	)
@@ -128,7 +139,9 @@ func _pilasters(span: Vector2, top: float, surface: float) -> void:
 	for centre in centres:
 		_add_part(
 			Rect2(centre - PILASTER_WIDTH * 0.5, top + PILASTER_GAP, PILASTER_WIDTH, height),
-			GreyboxLook.surface(GreyboxLook.PILASTER),
+			BuildingFinish.pilaster(
+				_identity, GreyboxLook.PILASTER.lerp(_rules.palette.masonry, 0.1)
+			),
 			WorldSpace.BACK_WALL_Z,
 			PILASTER_DEPTH
 		)
