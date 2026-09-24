@@ -29,6 +29,9 @@ var fullscreen: bool = false
 var difficulty: int = 0
 ## Качество графики — [enum Graphics.Quality] (ADR-0030, решение 5).
 var quality: int = Graphics.Quality.HIGH
+## Выбран ли уровень качества — игроком или замером первого запуска
+## ([QualityProbe], ADR-0034, решение 3). Пока нет, первое здание его мерит.
+var quality_measured: bool = false
 ## Показывать ли кровь при попадании пули (ADR-0031).
 var blood: bool = true
 
@@ -54,6 +57,10 @@ static func load_from(path: String = PATH) -> GameSettings:
 	settings.quality = clampi(
 		int(file.get_value(SECTION, "quality", settings.quality)), 0, Graphics.Quality.size() - 1
 	)
+	# Уровень, сохранённый до M22, выбран игроком: мерить поверх него незачем.
+	settings.quality_measured = bool(
+		file.get_value(SECTION, "quality_measured", file.has_section_key(SECTION, "quality"))
+	)
 
 	var saved := String(file.get_value(SECTION, "locale", settings.locale))
 	settings.locale = saved if LOCALES.has(saved) else settings.locale
@@ -76,6 +83,7 @@ func save_to(path: String = PATH) -> void:
 	file.set_value(SECTION, "fullscreen", fullscreen)
 	file.set_value(SECTION, "difficulty", difficulty)
 	file.set_value(SECTION, "quality", quality)
+	file.set_value(SECTION, "quality_measured", quality_measured)
 	file.set_value(SECTION, "blood", blood)
 	file.save(path)
 

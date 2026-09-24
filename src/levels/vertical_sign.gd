@@ -44,6 +44,7 @@ const FLICKER_EVERY: float = 3.7
 const FLICKER_FOR: float = 0.18
 
 var _letters: Array[Label3D] = []
+var _glow: OmniLight3D = null
 var _flicker: Label3D = null
 var _clock: float = 0.0
 
@@ -99,6 +100,7 @@ func hang(rules: BuildingRules, identity: BuildingIdentity) -> void:
 	)
 
 	var glow := OmniLight3D.new()
+	_glow = glow
 	glow.name = "NeonGlow"
 	glow.light_color = neon
 	glow.light_energy = GLOW_ENERGY
@@ -107,6 +109,15 @@ func hang(rules: BuildingRules, identity: BuildingIdentity) -> void:
 	glow.position = WorldSpace.to_scene(Vector2(x, top + height * 0.5))
 	glow.position.z = Z + 1.2
 	add_child(glow)
+	add_to_group(Graphics.GROUP)
+	apply_graphics()
+
+
+## Отсвет неона в объёмном тумане — по уровню качества (ADR-0034, решение 1):
+## на «Ультра» вокруг вывески светится воздух.
+func apply_graphics() -> void:
+	if _glow != null:
+		_glow.light_volumetric_fog_energy = Graphics.light_in_fog()
 
 
 ## Мигает буквой. Картинка, а не правило: по настенным часам.

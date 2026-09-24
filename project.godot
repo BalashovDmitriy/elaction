@@ -112,6 +112,9 @@ renderer/rendering_method="forward_plus"
 ; даёт только грязь. Настройки объёмного света, SSR и грейдинга сюда не
 ; добавляются — они выбираются на готовой сцене в M17, а не вслепую.
 anti_aliasing/quality/msaa_2d=0
+; Дизеринг против полос на градиентах тумана и неба (ADR-0030, решение 4).
+; Сглаживание 3D и атлас теней ставит Graphics по уровню качества (ADR-0034).
+anti_aliasing/quality/use_debanding=true
 
 [audio]
 

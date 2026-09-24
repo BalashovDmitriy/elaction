@@ -434,6 +434,8 @@ func _on_blood_toggled(pressed: bool) -> void:
 
 func _on_quality_selected(index: int) -> void:
 	settings.quality = index
+	# Выбрал игрок — замер первого запуска его уже не перебьёт.
+	settings.quality_measured = true
 	settings.apply()
 	settings.save_to()
 

@@ -24,6 +24,7 @@ extends Node3D
 ##     godot --path . res://tools/layout_shot.tscn -- --folder=M18e
 ##     godot --path . res://tools/layout_shot.tscn -- --folder=M19 --seed=2
 ##     godot --path . res://tools/layout_shot.tscn -- --folder=M21 --garage --building=3
+##     godot --path . res://tools/layout_shot.tscn -- --folder=M22 --floor-only --quality=3
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
@@ -47,6 +48,8 @@ var _round: int = 0
 var _building: int = 1
 ## Снять только гараж — машины разных зданий рядом.
 var _garage_only: bool = false
+## Снять только этаж башни с дверями — уровни качества рядом.
+var _floor_only: bool = false
 
 
 func _ready() -> void:
@@ -61,6 +64,17 @@ func _ready() -> void:
 			_building = argument.trim_prefix("--building=").to_int()
 		elif argument == "--garage":
 			_garage_only = true
+		elif argument.begins_with("--quality="):
+			Graphics.broadcast(
+				(
+					clampi(
+						argument.trim_prefix("--quality=").to_int(), 0, Graphics.Quality.size() - 1
+					)
+					as Graphics.Quality
+				)
+			)
+		elif argument == "--floor-only":
+			_floor_only = true
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_folder))
 	GameState.instance().start_game()
 	GameState.instance().building = _building
@@ -79,6 +93,10 @@ func _run() -> void:
 	if _round > 0:
 		# Кадр раунда: один этаж на палитре раунда — раунды сравниваются рядом.
 		await _shoot_floor("round%d" % _round, 2)
+		get_tree().quit(0)
+		return
+	if _floor_only:
+		await _shoot_floor("floor_q%d" % Graphics.quality, 2)
 		get_tree().quit(0)
 		return
 	if _garage_only:

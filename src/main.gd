@@ -43,6 +43,8 @@ func _ready() -> void:
 
 	_settings = GameSettings.load_from()
 	_settings.apply()
+	# Виньетка — под HUD и меню, над сценой (ADR-0030, решение 3).
+	add_child(Vignette.new())
 	_records = Records.load_from()
 
 	_menu.settings = _settings
@@ -157,6 +159,12 @@ func _enter_building() -> void:
 	_level.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(_level)
 	_level.building_cleared.connect(_on_building_cleared)
+	# Первый запуск: уровень качества выбирается замером на вступлении здания
+	# (ADR-0034, решение 3). Автосъёмка вехи снимает на уровне из настроек.
+	if QualityProbe.needed(_settings) and not SCREENSHOTTER.capturing():
+		var probe := QualityProbe.new()
+		add_child(probe)
+		probe.start(_settings)
 	# Тема заводится на здание, а не на партию: после тревоги её надо вернуть,
 	# а сирена снимается только сменой здания (ADR-0009).
 	Sounds.play_music(Sounds.ALARM_THEME if game.alarm.raised else Sounds.THEME)

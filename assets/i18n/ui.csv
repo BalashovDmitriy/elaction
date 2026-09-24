@@ -35,6 +35,7 @@ UI_QUALITY,Graphics,Графика
 UI_QUALITY_0,Low,Низкая
 UI_QUALITY_1,Medium,Средняя
 UI_QUALITY_2,High,Высокая
+UI_QUALITY_3,Ultra,Ультра
 UI_LANGUAGE_RU,Русский,Русский
 UI_LANGUAGE_EN,English,English
 UI_MOVE,Move,Движение

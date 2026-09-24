@@ -153,6 +153,16 @@ func dress(rules: BuildingRules, plan: BuildingPlan) -> void:
 	for shaft in plan.shafts:
 		_dress_shaft(shaft)
 	_spawn_machine_room()
+	add_to_group(Graphics.GROUP)
+	apply_graphics()
+
+
+## Столбы света шахт в объёмном тумане — по уровню качества (ADR-0034,
+## решение 1): на «Ультра» в шахте виден луч.
+func apply_graphics() -> void:
+	for index: int in _glow:
+		for light: OmniLight3D in _glow[index]:
+			light.light_volumetric_fog_energy = Graphics.light_in_fog()
 
 
 ## Зажигает столбы света на видимых этажах и гасит остальные.
