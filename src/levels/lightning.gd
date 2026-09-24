@@ -19,6 +19,8 @@ const PULSES: Array[Vector3] = [
 ]
 ## Как быстро гаснет вспышка после включения, 1/с.
 const FADE: float = 9.0
+## Тусклее этого вспышка уже погасла.
+const DARK: float = 0.002
 ## С каким шансом серию видно разрядом.
 const BOLT_CHANCE: float = 0.55
 const BOLT_COLOUR := Color(0.85, 0.9, 1.0)
@@ -51,6 +53,10 @@ func level() -> float:
 ## Ведёт серию на [param delta] секунд.
 func advance(delta: float) -> void:
 	_level = maxf(_level - _level * FADE * delta, 0.0)
+	# Экспонента нуля не достигает: без порога небо и стёкла переписывались бы
+	# каждый кадр и между сериями.
+	if _level < DARK:
+		_level = 0.0
 	if _pulse < 0:
 		_wait -= delta
 		if _wait <= 0.0:
@@ -88,6 +94,9 @@ func _strike() -> void:
 		look.albedo_color = BOLT_COLOUR
 		look.disable_fog = true
 		look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		# Ломаная идёт сверху вниз, и её треугольники обращены от камеры: с
+		# отсечением задних граней разряд не рисовался вовсе (авторевью M22).
+		look.cull_mode = BaseMaterial3D.CULL_DISABLED
 		_bolt.material_override = look
 		add_child(_bolt)
 	var mesh := ImmediateMesh.new()

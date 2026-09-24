@@ -31,10 +31,11 @@ const INK_DIM := Color(0.62, 0.66, 0.76)
 const ALARM := Color(1.0, 0.22, 0.2)
 const PLATE := Color(0.03, 0.035, 0.06, 0.62)
 
-## Кромка, если здание не сказало своего цвета.
-const DEFAULT_NEON := Color(1.0, 0.25, 0.55)
+## Кромка, если здание не сказало своего цвета: неон первого здания — отеля.
+const DEFAULT_NEON := VerticalSign.NEON_HOTEL
 
 var _neon := DEFAULT_NEON
+var _score_caption: Label = null
 var _score: Label = null
 var _documents: Array[HudIcon] = []
 var _lives: Array[HudIcon] = []
@@ -50,7 +51,6 @@ var _shown_floor: int = -2
 
 
 func _ready() -> void:
-	layer = 3
 	_build()
 	var game := GameState.instance()
 	game.score_changed.connect(_on_score_changed)
@@ -69,6 +69,17 @@ func _process(_delta: float) -> void:
 	# а под паузой delta не приходит вовсе.
 	var phase := sin(Time.get_ticks_msec() / 1000.0 * ALARM_BLINKS * TAU) * 0.5 + 0.5
 	_alarm.modulate.a = ALARM_DIM + (1.0 - ALARM_DIM) * phase
+
+
+## Язык сменили в меню посреди партии: подписи собраны кодом из перевода в
+## верхнем регистре и сами не переведутся — подпись очков так и осталась бы на
+## прежнем языке до конца игры, а этаж — до следующего этажа (авторевью M22).
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_TRANSLATION_CHANGED or _score_caption == null:
+		return
+	_score_caption.text = tr("UI_SCORE").to_upper()
+	_shown_floor = -2
+	refresh()
 
 
 ## Здание, за которым следит HUD: его имя, цвет вывески и этаж Otto.
@@ -124,11 +135,15 @@ static func floor_text(rules: BuildingRules, index: int) -> String:
 
 
 func _follow_floor() -> void:
-	if _level == null or not is_instance_valid(_level) or _level.otto == null:
+	# Вне дерева — здание, которое main уже снял и ещё не освободил (выход в
+	# меню): у его Otto нет глобального положения (авторевью M22).
+	if _level == null or not is_instance_valid(_level) or not _level.is_inside_tree():
+		return
+	if _level.otto == null:
 		return
 	var rules := _level.rules
 	var y := WorldSpace.to_plane(_level.otto.global_position).y
-	var index := clampi(rules.floor_index_near(y), BuildingRules.ROOF, rules.floors - 1)
+	var index := rules.floor_index_near(y)
 	if index == _shown_floor:
 		return
 	_shown_floor = index
@@ -155,7 +170,8 @@ func _build() -> void:
 	var left_box := VBoxContainer.new()
 	left_box.add_theme_constant_override("separation", 2)
 	left.add_child(left_box)
-	left_box.add_child(_caption("UI_SCORE"))
+	_score_caption = _caption("UI_SCORE")
+	left_box.add_child(_score_caption)
 	_score = _label(56, INK, 700)
 	left_box.add_child(_score)
 	var docs := HBoxContainer.new()

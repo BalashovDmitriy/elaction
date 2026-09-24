@@ -60,6 +60,27 @@ func test_lightning_flashes_and_goes_dark() -> void:
 	assert_lt(lightning.level(), 0.2, "и гаснет")
 
 
+## Разряд виден с камеры города: ломаная идёт сверху вниз, её треугольники
+## обращены от камеры, и с отсечением задних граней она не рисовалась вовсе.
+func test_the_bolt_is_drawn_from_both_sides() -> void:
+	var lightning := Lightning.new()
+	add_child_autofree(lightning)
+	lightning.setup(3, Vector2(0.0, 40.0), 0.0)
+	lightning.set_process(false)
+	var bolt: MeshInstance3D = null
+	for _step in int(Lightning.PAUSE.y * 60.0) * 6:
+		lightning.advance(1.0 / 60.0)
+		var found := lightning.find_children("*", "MeshInstance3D", false, false)
+		if not found.is_empty():
+			bolt = found[0] as MeshInstance3D
+			break
+	assert_not_null(bolt, "за шесть долгих пауз ни одного разряда")
+	if bolt == null:
+		return
+	var look := bolt.material_override as BaseMaterial3D
+	assert_eq(look.cull_mode, BaseMaterial3D.CULL_DISABLED, "разряд отсекается гранью")
+
+
 ## Молния, огни и неон — без источников света: бюджет ламп кадра не растёт.
 func test_the_city_details_add_no_lights() -> void:
 	var blocks := CityPlan.generate(2, 0.0, 40.0)

@@ -304,7 +304,7 @@ func _difficulty() -> void:
 	row.add_child(choice)
 
 
-## Качество графики: три уровня (ADR-0030, решение 5).
+## Качество графики: четыре уровня (ADR-0030, решение 5; «Ультра» — ADR-0034).
 func _quality() -> void:
 	var row := _setting_row("UI_QUALITY")
 	var choice := OptionButton.new()
@@ -330,8 +330,9 @@ func _window_mode() -> void:
 func _resolution() -> void:
 	var row := _setting_row("UI_RESOLUTION")
 	var choice := OptionButton.new()
-	var sizes := DisplayModes.available(DisplayServer.screen_get_size())
-	var current := DisplayModes.nearest(settings.resolution, DisplayServer.screen_get_size())
+	var area := DisplayModes.window_area().size
+	var sizes := DisplayModes.available(area)
+	var current := DisplayModes.nearest(settings.resolution, area)
 	for index in sizes.size():
 		choice.add_item("%d × %d" % [sizes[index].x, sizes[index].y], index)
 		if sizes[index] == current:
@@ -348,11 +349,16 @@ func _resolution() -> void:
 func _render_scale() -> void:
 	var row := _setting_row("UI_RENDER_SCALE")
 	var choice := OptionButton.new()
+	# Отмечается ближайший масштаб, а не равный: в файле может стоять любой, и
+	# без отметки список показывался пустым (авторевью M22).
+	var closest := 0
 	for index in DisplayModes.RENDER_SCALES.size():
-		var scale := DisplayModes.RENDER_SCALES[index]
-		choice.add_item("%d%%" % roundi(scale * 100.0), index)
-		if is_equal_approx(scale, settings.render_scale):
-			choice.select(index)
+		var share := DisplayModes.RENDER_SCALES[index]
+		choice.add_item("%d%%" % roundi(share * 100.0), index)
+		var gap := absf(share - settings.render_scale)
+		if gap < absf(DisplayModes.RENDER_SCALES[closest] - settings.render_scale):
+			closest = index
+	choice.select(closest)
 	choice.item_selected.connect(
 		func(index: int) -> void:
 			settings.render_scale = DisplayModes.RENDER_SCALES[index]

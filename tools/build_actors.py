@@ -39,7 +39,7 @@ if str(TOOLS) not in sys.path:
 # Цвет байтами sRGB.
 Rgb = tuple[int, int, int]
 
-# Цвета актёров. Жили в `py` — генераторе палитры 2D-спрайтов (ADR-0019,
+# Цвета актёров. Жили в `palette.py` — генераторе палитры 2D-спрайтов (ADR-0019,
 # решение 8); с уборкой 2D в M22 от него остались только они, и место им здесь.
 OTTO_SUIT: Rgb = (0xE8, 0xE3, 0xD2)
 OTTO_SUIT_SHADE: Rgb = (0xB9, 0xB4, 0xA4)

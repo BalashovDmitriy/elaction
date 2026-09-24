@@ -11,6 +11,8 @@ const TEMP := "user://test_settings.cfg"
 ## Откуда берутся ключи переводов: та же таблица, из которой их берёт игра.
 const STRINGS := "res://assets/i18n/ui.csv"
 
+const HUD_SCENE := preload("res://src/ui/hud.tscn")
+
 
 func after_each() -> void:
 	if FileAccess.file_exists(TEMP):
@@ -185,11 +187,28 @@ func test_the_dead_do_not_get_an_extra_life() -> void:
 	assert_eq(game.lives, 0, "мёртвому жизнь не выдают")
 
 
+## Язык сменили посреди партии — подписи HUD, собранные кодом, переводятся.
+func test_the_hud_follows_a_language_change() -> void:
+	var was := TranslationServer.get_locale()
+	TranslationServer.set_locale("en")
+	var hud := HUD_SCENE.instantiate() as Hud
+	add_child_autofree(hud)
+	var english := TranslationServer.translate("UI_SCORE").to_upper()
+	TranslationServer.set_locale("ru")
+	var russian := TranslationServer.translate("UI_SCORE").to_upper()
+	var captions: Array[String] = []
+	for label in hud.find_children("*", "Label", true, false):
+		captions.append((label as Label).text)
+	TranslationServer.set_locale(was)
+	assert_has(captions, russian, "подпись очков перевелась")
+	assert_does_not_have(captions, english, "подпись очков осталась на прежнем языке")
+
+
 ## Папок документов в HUD столько, сколько документов в здании: по ROM их от 5
 ## до 10 по навыку, и HUD на пять папок врал бы на высоком навыке.
 func test_the_hud_draws_a_folder_per_document() -> void:
 	assert_gte(Hud.DOCUMENT_ICONS, Arcade.red_doors(99), "папок меньше, чем бывает документов")
-	var hud := (load("res://src/ui/hud.tscn") as PackedScene).instantiate() as Hud
+	var hud := HUD_SCENE.instantiate() as Hud
 	add_child_autofree(hud)
 	var game := GameState.instance()
 	for total: int in [Arcade.red_doors(0), Arcade.red_doors(99)]:

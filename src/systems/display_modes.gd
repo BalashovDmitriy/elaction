@@ -55,9 +55,15 @@ static func nearest(wanted: Vector2i, screen: Vector2i) -> Vector2i:
 	return best
 
 
-## Применяет режим, размер и масштаб к окну и к корневому виду.
-static func apply(mode: Mode, resolution: Vector2i, render_scale: float, root: Viewport) -> void:
-	var screen := DisplayServer.screen_get_size()
+## Где может стоять окно в режиме окна: экран без панели задач. Окно в размер
+## всего экрана уходило бы заголовком за верхний край, а низом — под панель
+## задач, и на FullHD размер по умолчанию так и выходил (авторевью M22).
+static func window_area() -> Rect2i:
+	return DisplayServer.screen_get_usable_rect()
+
+
+## Применяет режим и размер к окну.
+static func apply_window(mode: Mode, resolution: Vector2i) -> void:
 	match mode:
 		Mode.FULLSCREEN:
 			DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, false)
@@ -65,20 +71,23 @@ static func apply(mode: Mode, resolution: Vector2i, render_scale: float, root: V
 		Mode.BORDERLESS:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 			DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, true)
-			DisplayServer.window_set_size(screen)
+			DisplayServer.window_set_size(DisplayServer.screen_get_size())
 			DisplayServer.window_set_position(DisplayServer.screen_get_position())
 		_:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 			DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, false)
-			var size := nearest(resolution, screen)
+			var area := window_area()
+			var size := nearest(resolution, area.size)
 			DisplayServer.window_set_size(size)
-			var corner := DisplayServer.screen_get_position() + (screen - size) / 2
-			DisplayServer.window_set_position(corner)
-	if root != null:
-		var scale := clampf(render_scale, RENDER_SCALES[-1], 1.0)
-		root.scaling_3d_mode = (
-			Viewport.SCALING_3D_MODE_BILINEAR
-			if is_equal_approx(scale, 1.0)
-			else Viewport.SCALING_3D_MODE_FSR
-		)
-		root.scaling_3d_scale = scale
+			DisplayServer.window_set_position(area.position + (area.size - size) / 2)
+
+
+## Применяет масштаб 3D-рендера к корневому виду.
+static func apply_scale(render_scale: float, root: Viewport) -> void:
+	var share := clampf(render_scale, RENDER_SCALES[-1], 1.0)
+	root.scaling_3d_mode = (
+		Viewport.SCALING_3D_MODE_BILINEAR
+		if is_equal_approx(share, 1.0)
+		else Viewport.SCALING_3D_MODE_FSR
+	)
+	root.scaling_3d_scale = share

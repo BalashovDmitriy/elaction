@@ -98,6 +98,42 @@ func test_the_probe_steps_down_until_the_frame_fits() -> void:
 	)
 
 
+## Время вышло, а уровень не доказан: на слабой карте разогрев «Ультра» не
+## успевает пройти за отведённые секунды, и «Ультра» ей не достаётся.
+func test_a_timed_out_probe_does_not_keep_an_unproven_level() -> void:
+	assert_eq(
+		QualityProbe.settle(Graphics.Quality.ULTRA, PackedFloat64Array()),
+		Graphics.Quality.HIGH,
+		"ничего не намерено — ступенью ниже"
+	)
+	assert_eq(
+		QualityProbe.settle(Graphics.Quality.HIGH, PackedFloat64Array([40.0, 42.0, 41.0])),
+		Graphics.Quality.MEDIUM,
+		"намерено мало, но медленно — ступенью ниже"
+	)
+	assert_eq(
+		QualityProbe.settle(Graphics.Quality.ULTRA, PackedFloat64Array([5.0, 6.0])),
+		Graphics.Quality.ULTRA,
+		"намерено мало, но быстро — остаётся"
+	)
+
+
+## Игрок выбрал уровень, пока шёл замер: замер уходит и выбор не перебивает.
+func test_the_probe_gives_way_to_the_players_choice() -> void:
+	var settings := GameSettings.new()
+	var probe := QualityProbe.new()
+	add_child_autofree(probe)
+	probe.start(settings)
+	assert_eq(Graphics.quality, Graphics.Quality.ULTRA, "замер начинается с «Ультра»")
+	settings.quality = Graphics.Quality.LOW
+	settings.quality_measured = true
+	Graphics.broadcast(Graphics.Quality.LOW)
+	await wait_physics_frames(3)
+	assert_false(is_instance_valid(probe), "замер не ушёл")
+	assert_eq(settings.quality, Graphics.Quality.LOW, "замер перебил выбор игрока")
+	assert_eq(Graphics.quality, Graphics.Quality.LOW, "замер вернул свой уровень")
+
+
 ## Медиана, а не среднее: один долгий кадр загрузки уровень не опускает.
 func test_one_slow_frame_does_not_drop_the_level() -> void:
 	var frames := PackedFloat64Array([4.0, 4.2, 3.9, 60.0, 4.1])

@@ -67,6 +67,8 @@ var _city_air: Environment = null
 var _dark_glass: StandardMaterial3D = null
 var _fog_banks: Node3D = null
 var _lightning: Lightning = null
+## Вспышка, которая сейчас стоит на небе и в стёклах.
+var _flash_shown: float = 0.0
 
 
 ## Строит город вдоль здания по правилам и сиду, с погодой [param weather].
@@ -185,12 +187,15 @@ static func rain_particles(
 ## обзора, при котором плоскость игры видна в том же масштабе.
 func _process(delta: float) -> void:
 	if _fog_banks != null:
-		CityDetails.drift(_fog_banks, delta, 0.0, _rules.width if _rules != null else 40.0)
+		CityDetails.drift(_fog_banks, delta, 0.0, _rules.width)
 	if _lightning != null:
 		var flash := _lightning.level()
-		_city_air.background_energy_multiplier = 1.0 + flash * (FLASH_SKY - 1.0)
-		# Отсвет молнии в стёклах: погасшие окна загораются отражённым небом.
-		_dark_glass.albedo_color = Color.WHITE.lerp(Color.WHITE + FLASH_GLASS * 6.0, flash)
+		# Между вспышками небо и стёкла покадрово не переписываются.
+		if flash != _flash_shown:
+			_flash_shown = flash
+			_city_air.background_energy_multiplier = 1.0 + flash * (FLASH_SKY - 1.0)
+			# Отсвет молнии в стёклах: погасшие окна загораются отражённым небом.
+			_dark_glass.albedo_color = Color.WHITE.lerp(Color.WHITE + FLASH_GLASS * 6.0, flash)
 	var main := get_viewport().get_camera_3d()
 	if main == null or _camera == null:
 		return

@@ -40,6 +40,10 @@ var quality_measured: bool = false
 ## Показывать ли кровь при попадании пули (ADR-0031).
 var blood: bool = true
 
+## Режим и размер, уже поставленные окну: [method apply] зовётся на любую
+## настройку, а окно трогается только тогда, когда они сменились.
+var _window_applied: Array = []
+
 
 ## Настройки с диска. Файла нет — значения по умолчанию, язык по локали системы.
 static func load_from(path: String = PATH) -> GameSettings:
@@ -127,13 +131,16 @@ func apply() -> void:
 	# Окно не трогается в headless-прогонах: там его нет, и тесты настроек
 	# меняли бы размер несуществующего окна.
 	if DisplayServer.get_name() != "headless":
+		# Окно ставится заново, только если сменились режим или размер: иначе
+		# переключение крови или языка возвращало бы в центр окно, отодвинутое
+		# игроком, и заново входило в полный экран (авторевью M22).
+		var window := [window_mode, resolution]
+		if window != _window_applied:
+			DisplayModes.apply_window(window_mode as DisplayModes.Mode, resolution)
+			_window_applied = window
 		var tree := Engine.get_main_loop() as SceneTree
-		DisplayModes.apply(
-			window_mode as DisplayModes.Mode,
-			resolution,
-			render_scale,
-			tree.root if tree != null else null
-		)
+		if tree != null:
+			DisplayModes.apply_scale(render_scale, tree.root)
 	Graphics.broadcast(quality as Graphics.Quality)
 	Blood.enabled = blood
 

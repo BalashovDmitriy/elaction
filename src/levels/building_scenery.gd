@@ -36,6 +36,8 @@ var identity: BuildingIdentity = null
 var _air: WorldEnvironment = null
 var _rain_node: GPUParticles3D = null
 var _city: CityBackdrop = null
+## Окружающий свет воздуха без вспышки: от него считается вспышка молнии.
+var _ambient: float = 0.0
 
 
 ## Собирает окружение здания по правилам, плану и сиду.
@@ -51,6 +53,7 @@ func build(
 	_air = WorldEnvironment.new()
 	_air.name = "Air"
 	_air.environment = Atmosphere.environment(rules.palette.dark)
+	_ambient = _air.environment.ambient_light_energy
 	CityBackdrop.show_behind(_air.environment)
 	add_child(_air)
 	_light_the_roof(rules)
@@ -86,6 +89,8 @@ func build(
 	if Weather.is_raining(weather):
 		_rain_node = _roof_rain(rules)
 		add_child(_rain_node)
+	# Молнии — только в дождь: в ясную ночь и в туман воздух покадрово не трогается.
+	set_process(Weather.is_raining(weather))
 	add_to_group(Graphics.GROUP)
 	apply_graphics()
 
@@ -95,11 +100,7 @@ func build(
 func _process(_delta: float) -> void:
 	if _city == null or _air == null:
 		return
-	var air := _air.environment
-	if not air.has_meta(&"ambient_base"):
-		air.set_meta(&"ambient_base", air.ambient_light_energy)
-	var base := float(air.get_meta(&"ambient_base"))
-	air.ambient_light_energy = base * (1.0 + _city.flash_level() * FLASH_AMBIENT)
+	_air.environment.ambient_light_energy = _ambient * (1.0 + _city.flash_level() * FLASH_AMBIENT)
 
 
 ## Отражения, контактные тени, объёмный туман и доля капель над крышей по уровню
