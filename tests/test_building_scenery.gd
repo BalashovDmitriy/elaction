@@ -289,28 +289,6 @@ func _assert_apart(a: Vector2, b: Vector2, message: String) -> void:
 	assert_true(a.y <= b.x + 0.001 or a.x >= b.y - 0.001, message)
 
 
-## Седан стоит между задней стеной и телом Otto: в стену не входит и в плоскость
-## игры не выходит, поэтому Otto проходит перед машиной, а не сквозь неё. Седан
-## в полтора метра шириной заходил в обе стороны (авторевью M18c и M20).
-func test_the_sedan_fits_between_the_wall_and_otto() -> void:
-	var sedan: Node3D = autofree(CarModel.build())
-	var back := INF
-	var front := -INF
-	for part: Node in sedan.get_children():
-		var mesh := part as MeshInstance3D
-		if mesh == null:
-			continue
-		var box := mesh.transform * mesh.mesh.get_aabb()
-		back = minf(back, box.position.z)
-		front = maxf(front, box.end.z)
-	assert_gt(ExitCar.Z + back, WorldSpace.BACK_WALL_Z, "машина входит в заднюю стену")
-	assert_lt(
-		ExitCar.Z + front,
-		WorldSpace.PLAY_Z - WorldSpace.BODY_DEPTH * 0.5,
-		"машина выходит в плоскость игры — Otto пройдёт сквозь неё"
-	)
-
-
 ## Стенки кабины стоят на её полу и доходят до крыши. Пол — в нуле кабины, плита
 ## под ним: стенки, отсчитанные от верха плиты, висели на 18 см выше пола
 ## (авторевью M20).

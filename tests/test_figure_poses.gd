@@ -13,70 +13,66 @@ func test_every_pose_of_the_agent_has_a_record() -> void:
 		assert_true(FigurePoses.knows(pose_name), "у позы %s нет записи" % pose_name)
 
 
-func test_an_unknown_pose_falls_back_to_idle() -> void:
+func test_every_clip_a_pose_asks_for_is_one_the_model_carries() -> void:
+	# Имена клипов пишет `build_actors.py`; поза с клипом, которого нет в
+	# списке, встала бы в стойку молча.
+	var poses: PackedStringArray = ActorPose.OTTO_POSES + ActorPose.AGENT_POSES
+	for pose_name: String in poses:
+		var clip := FigurePoses.clip_of(pose_name)
+		if clip != null:
+			assert_has(FigurePoses.CLIP_NAMES, clip.name, "%s: клип %s" % [pose_name, clip.name])
+
+
+## ADR-0032, решение 1: где ROM диктует высоту, там поза кодом.
+func test_the_rom_stances_are_poses_in_code() -> void:
+	for pose_name: String in [ActorPose.CROUCH, ActorPose.PRONE, "jump", "kick", "crushed"]:
+		assert_null(FigurePoses.clip_of(pose_name), "%s — поза кодом, не клип" % pose_name)
+
+
+func test_walking_idle_shooting_and_dying_are_clips() -> void:
+	assert_eq(FigurePoses.clip_of("walk_1").name, FigurePoses.CLIP_WALK)
+	assert_eq(FigurePoses.clip_of("walk_1").mode, FigurePoses.Clip.WALK)
+	assert_eq(FigurePoses.clip_of("idle").mode, FigurePoses.Clip.LOOP)
+	assert_eq(FigurePoses.clip_of("shoot").mode, FigurePoses.Clip.ONCE)
+
+
+func test_death_is_the_fall_and_then_the_body() -> void:
+	# Две позы смерти (ADR-0011, пункт 12) — один клип: падение и его конец.
+	assert_eq(FigurePoses.clip_of("dead_0").name, FigurePoses.CLIP_DEATH)
+	assert_eq(FigurePoses.clip_of("dead_1").name, FigurePoses.CLIP_DEATH)
+	assert_eq(FigurePoses.clip_of("dead_0").mode, FigurePoses.Clip.ONCE)
+	assert_eq(FigurePoses.clip_of("dead_1").mode, FigurePoses.Clip.END)
+
+
+func test_an_unknown_pose_falls_back_to_the_stand() -> void:
 	# Актёр без позы в кадре хуже, чем актёр в неверной.
-	assert_true(FigurePoses.of("moonwalk").is_close_to(FigurePoses.of("idle")))
+	var fallback := FigurePoses.of("moonwalk")
+	assert_eq(fallback.legs, Vector2.ZERO)
+	assert_eq(fallback.knees, Vector2.ZERO)
+	assert_almost_eq(fallback.tilt, 0.0, 0.001)
 
 
-func test_walking_swings_the_legs_in_antiphase() -> void:
-	var stride := FigurePoses.walking(0.75)
-	assert_gt(stride.legs.x, 0.0, "левая нога впереди")
-	assert_lt(stride.legs.y, 0.0, "правая позади")
-	assert_almost_eq(stride.legs.x, -stride.legs.y, 0.001, "и ровно в противофазе")
-	assert_lt(stride.arms.x, 0.0, "левая рука навстречу левой ноге")
-	assert_gt(stride.arms.y, 0.0, "правая — навстречу правой")
+func test_a_copy_is_its_own() -> void:
+	# Таблица общая: правка копии не должна трогать запись.
+	var crouch := FigurePoses.of(ActorPose.CROUCH)
+	crouch.legs = Vector2(1.0, 1.0)
+	assert_ne(FigurePoses.of(ActorPose.CROUCH).legs, Vector2(1.0, 1.0))
 
 
-func test_walking_is_a_cycle() -> void:
-	var start := FigurePoses.walking(0.0)
-	var round_trip := FigurePoses.walking(float(ActorPose.WALK_FRAMES))
-	assert_true(start.is_close_to(round_trip), "фаза в полный цикл возвращает ту же позу")
+func test_the_crouch_squats_on_bent_knees() -> void:
+	# Долг M18c: присед — на корточках, а не наклон корпуса.
+	var crouch := FigurePoses.of(ActorPose.CROUCH)
+	assert_gt(crouch.legs.x, 60.0, "бёдра вперёд")
+	assert_gt(crouch.knees.x, 90.0, "колени сложены")
+	assert_lt(crouch.lean, 60.0, "корпус над коленями, а не на них")
 
 
-func test_the_body_rises_when_the_legs_meet() -> void:
-	var together := FigurePoses.walking(0.0)
-	var apart := FigurePoses.walking(0.75)
-	assert_gt(together.lift, apart.lift, "выше всего тело, когда ноги сошлись")
-
-
-func test_walk_frames_are_points_of_the_cycle() -> void:
-	# Имена кадров остались от спрайтов: ригу они приходят строкой.
-	assert_true(FigurePoses.of("walk_0").is_close_to(FigurePoses.walking(0.0)))
-	assert_true(FigurePoses.of("walk_2").is_close_to(FigurePoses.walking(2.0)))
-
-
-func test_blend_ends_where_it_started_and_where_it_goes() -> void:
-	var idle := FigurePoses.of("idle")
-	var kick := FigurePoses.of("kick")
-	assert_true(idle.blend(kick, 0.0).is_close_to(idle))
-	assert_true(idle.blend(kick, 1.0).is_close_to(kick))
-	var half := idle.blend(kick, 0.5)
-	assert_almost_eq(half.legs.x, (idle.legs.x + kick.legs.x) * 0.5, 0.001)
-	assert_almost_eq(half.lean, (idle.lean + kick.lean) * 0.5, 0.001)
-
-
-func test_blend_weight_is_clamped() -> void:
-	var idle := FigurePoses.of("idle")
-	var kick := FigurePoses.of("kick")
-	assert_true(idle.blend(kick, 2.0).is_close_to(kick), "перелёт за цель не выносит за неё")
-	assert_true(idle.blend(kick, -1.0).is_close_to(idle))
+func test_the_crushed_are_flat_and_the_prone_face_down() -> void:
+	assert_lt(FigurePoses.of("crushed").squash, 0.5, "раздавленный сплющен")
+	assert_gt(FigurePoses.of(ActorPose.PRONE).tilt, 45.0, "залёгший — лицом вперёд, не на спине")
 
 
 func test_lift_is_an_extra_above_the_ground_not_a_fix_for_sinking() -> void:
-	# Зазор лежащему даёт риг заземлением, а не таблица: у таблицы для поз без
-	# ходьбы подъёма нет.
-	assert_almost_eq(FigurePoses.of("dead_1").lift, 0.0, 0.001)
-	assert_almost_eq(FigurePoses.of("prone").lift, 0.0, 0.001)
-
-
-func test_the_dead_lie_and_the_crushed_are_flat() -> void:
-	assert_almost_eq(absf(FigurePoses.of("dead_1").tilt), 90.0, 0.001, "труп лежит")
-	assert_lt(FigurePoses.of("crushed").squash, 0.5, "раздавленный сплющен")
-	assert_gt(FigurePoses.of("prone").tilt, 45.0, "залёгший агент — лицом вперёд, не на спине")
-
-
-func test_the_crouch_folds_the_body() -> void:
-	var crouch := FigurePoses.of("crouch")
-	assert_gt(crouch.drop, 0.0, "бёдра проседают")
-	assert_gt(crouch.legs.x, 30.0, "ноги уходят вперёд")
-	assert_gt(crouch.lean, 30.0, "корпус складывается")
+	# Зазор лежащему даёт риг заземлением, а не таблица.
+	assert_almost_eq(FigurePoses.of(ActorPose.PRONE).lift, 0.0, 0.001)
+	assert_almost_eq(FigurePoses.of(ActorPose.CROUCH).lift, 0.0, 0.001)

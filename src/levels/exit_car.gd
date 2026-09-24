@@ -11,7 +11,7 @@ extends Node3D
 ## куда стоит и едет ли, — которое уровню знать незачем.
 
 ## Длина машины, м: по ней она ставится в зазор от проёма и считается уехавшей
-## из кадра. Седан собирает [CarModel] ровно такой длины (ADR-0031, решение 4).
+## из кадра. [CarModel] приводит к ней любую машину жребия (ADR-0032, решение 7).
 const LENGTH: float = CarModel.LENGTH
 const GAP: float = 0.36
 const SPEED: float = 9.6
@@ -23,6 +23,9 @@ const Z: float = -0.6
 var towards: float = 1.0
 
 var _leaving: bool = false
+var _wheels: Array[Node3D] = []
+## Радиус колеса, м: по нему колёса крутятся в лад с ходом, а не буксуют.
+var _wheel_radius: float = 0.3
 
 
 ## Ставит машину у проёма выхода: [param exit_x] — его середина, [param floor_y] —
@@ -32,7 +35,15 @@ var _leaving: bool = false
 ## поставленный на фиксированном зазоре, загораживал портал соседней шахты.
 ## Уезжает от выхода — в ту сторону, где
 ## стоит: мимо проёма, в который вошёл Otto, она не едет.
-func park(exit_x: float, floor_y: float, rules: BuildingRules, plan: BuildingPlan) -> void:
+##
+## [param choice] — какая машина и какого цвета ([method CarModel.choose]).
+func park(
+	exit_x: float,
+	floor_y: float,
+	rules: BuildingRules,
+	plan: BuildingPlan,
+	choice: CarModel.Choice = CarModel.Choice.new()
+) -> void:
 	name = "ExitCar"
 	var x := spot(exit_x, rules, plan)
 	towards = -1.0 if x < exit_x else 1.0
@@ -40,10 +51,16 @@ func park(exit_x: float, floor_y: float, rules: BuildingRules, plan: BuildingPla
 	position.z = Z
 	# Модель стоит колёсами в своём нуле, капотом в +X; в другую сторону она
 	# разворачивается целиком.
-	var model := CarModel.build()
+	var model := CarModel.build(choice)
 	if towards < 0.0:
 		model.rotation.y = PI
 	add_child(model)
+	_wheels = CarModel.wheels(model)
+	for wheel in _wheels:
+		var mesh := wheel as MeshInstance3D
+		if mesh != null:
+			_wheel_radius = maxf(mesh.mesh.get_aabb().size.y * 0.5, 0.05)
+			break
 
 
 ## Где машине встать: середина ближайшего к выходу места на нижнем этаже, где
@@ -109,6 +126,10 @@ func advance(delta: float, view: Rect2) -> bool:
 	if not _leaving:
 		return false
 	position.x += towards * SPEED * delta
+	# Колёса катятся: угол — путь, делённый на радиус. Модель, развёрнутая
+	# назад, катит их в своей системе вперёд, поэтому знак один.
+	for wheel in _wheels:
+		wheel.rotate_object_local(Vector3.BACK, SPEED * delta / _wheel_radius)
 	var left := position.x - LENGTH * 0.5
 	if left + LENGTH < view.position.x or left > view.end.x:
 		_leaving = false

@@ -1,6 +1,8 @@
 extends GutTest
 
-## Тесты машины у выхода.
+## Тесты машины у выхода. С M21 это модели Cars Pack и жребий по зданию
+## (ADR-0032, решение 7); где машина встаёт у выхода на любом сиде, проверяет
+## [code]test_building_scenery[/code].
 ##
 ## В оригинале здание заканчивается тем, что Otto уезжает на красной машине
 ## (ADR-0011, пункт 14). Отсюда правило, которое легко потерять при правках:
@@ -98,3 +100,79 @@ func test_the_building_is_cleared_only_after_the_car_leaves() -> void:
 		await get_tree().process_frame
 		waited += 1
 	assert_true(cleared[0], "здание сдано, когда машина уехала")
+
+
+## Габарит машины по всем её мешам, в системе самой машины.
+func _car_box(car: Node3D) -> AABB:
+	var box := AABB()
+	var first := true
+	for node in car.find_children("*", "MeshInstance3D", true, false):
+		var mesh := node as MeshInstance3D
+		var to_car := car.global_transform.affine_inverse() * mesh.global_transform
+		var part := to_car * mesh.mesh.get_aabb()
+		box = part if first else box.merge(part)
+		first = false
+	return box
+
+
+## Любая машина жребия стоит между задней стеной и телом Otto: в стену не входит
+## и в плоскость игры не выходит, поэтому Otto проходит перед машиной, а не
+## сквозь неё. Седан в полтора метра шириной заходил в обе стороны (авторевью
+## M18c и M20), а машины пака в 1.8 м — тем более, пока их не сжали.
+func test_every_car_fits_between_the_wall_and_otto() -> void:
+	for index in CarModel.MODELS.size():
+		var choice := CarModel.Choice.new()
+		choice.model = index
+		var car: Node3D = CarModel.build(choice)
+		add_child_autofree(car)
+		var box := _car_box(car)
+		var label := CarModel.MODELS[index].resource_path.get_file()
+		assert_gt(ExitCar.Z + box.position.z, WorldSpace.BACK_WALL_Z, "%s входит в стену" % label)
+		assert_lt(
+			ExitCar.Z + box.end.z,
+			WorldSpace.PLAY_Z - WorldSpace.BODY_DEPTH * 0.5,
+			"%s выходит в плоскость игры — Otto пройдёт сквозь неё" % label
+		)
+		# По длине машина ставится в зазор у выхода: длиннее — и заденет проём.
+		assert_almost_eq(box.size.x, CarModel.LENGTH, 0.02, "%s: длина по бамперам" % label)
+		assert_almost_eq(box.position.y, 0.0, 0.02, "%s: колёса на земле" % label)
+		assert_lt(box.size.y, Proportions.BODY, "%s ниже Otto" % label)
+		assert_gt(CarModel.wheels(car).size(), 0, "%s: колёса крутятся" % label)
+
+
+## Первое здание — красная спортивная, как в 1983 году (ADR-0032, решение 7).
+func test_the_first_building_parks_the_red_sports_car() -> void:
+	for building_seed in [1, 7, 12345]:
+		var choice := CarModel.choose(1, building_seed)
+		assert_eq(choice.model, 0, "спортивная")
+		assert_eq(choice.paint, 0, "красная")
+
+
+func test_the_car_is_a_draw_of_the_building_and_stays_the_same() -> void:
+	var seen := {}
+	for building in range(2, 40):
+		var choice := CarModel.choose(building, building * 31)
+		var again := CarModel.choose(building, building * 31)
+		assert_eq(choice.model, again.model, "жребий повторяется для того же здания")
+		assert_eq(choice.paint, again.paint)
+		assert_between(choice.model, 0, CarModel.MODELS.size() - 1)
+		assert_between(choice.paint, 0, CarModel.PAINTS.size() - 1)
+		seen[choice.model] = true
+	assert_gt(seen.size(), 2, "в зданиях стоят разные машины")
+
+
+## Кузов перекрашен краской жребия: материал `Paint` пака подменён.
+func test_the_body_takes_the_drawn_paint() -> void:
+	var choice := CarModel.Choice.new()
+	choice.model = 2
+	choice.paint = 1
+	var car: Node3D = CarModel.build(choice)
+	add_child_autofree(car)
+	var painted := false
+	for node in car.find_children("*", "MeshInstance3D", true, false):
+		var mesh := node as MeshInstance3D
+		for surface in mesh.mesh.get_surface_count():
+			var override := mesh.get_surface_override_material(surface) as StandardMaterial3D
+			if override != null and override.albedo_color.is_equal_approx(CarModel.PAINTS[1]):
+				painted = true
+	assert_true(painted, "кузов в краске жребия")

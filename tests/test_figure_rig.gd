@@ -141,7 +141,9 @@ func test_a_lying_figure_is_long_and_low() -> void:
 	rig.snap()
 	var box := rig.skinned_aabb()
 	assert_lt(box.end.y, rig.height() * 0.5, "лежащий низкий")
-	assert_gt(box.size.z, rig.height() * 0.8, "и длинный вдоль пола")
+	# Клип смерти пака роняет тело не строго назад, а с поворотом: длина —
+	# по диагонали пола, а не только вдоль взгляда.
+	assert_gt(Vector2(box.size.x, box.size.z).length(), rig.height() * 0.8, "и длинный по полу")
 	assert_gte(box.position.y, -0.01, "и не утоплен в пол")
 
 
@@ -157,35 +159,107 @@ func test_no_pose_sinks_below_the_floor() -> void:
 
 
 func test_a_pose_change_is_a_motion_not_a_swap() -> void:
-	# «На стоп-кадре ходьбы видно, что это шаг, а не подмена картинки»: за один
+	# «На стоп-кадре видно, что это движение, а не подмена картинки»: за один
 	# кадр кости сдвигаются к цели, но не долетают.
 	var rig := _rig(OTTO_MODEL)
 	rig.show_pose("idle")
 	rig.snap()
+	var start := rig.bone_rotation(FigureRig.LEG_L)
 	rig.show_pose("kick")
+	var target := rig.target_rotation(FigureRig.LEG_L)
+	var whole := start.angle_to(target)
+	assert_gt(whole, deg_to_rad(40.0), "удар уводит бедро далеко от стойки")
 	# Шаг сглаживания задаётся здесь, а не ждётся кадром: в headless-прогоне
 	# кадр длится «сколько получится», и на нём риг успел бы долететь.
 	rig.advance(FRAME)
-	var leg := rig.current_pose().legs.x
-	var target := FigurePoses.of("kick").legs.x
-	assert_gt(leg, 5.0, "нога уже пошла к удару")
-	assert_lt(leg, target - 5.0, "но за один кадр туда не долетела")
+	var moved := start.angle_to(rig.bone_rotation(FigureRig.LEG_L))
+	assert_gt(moved, deg_to_rad(3.0), "бедро уже пошло к удару")
+	assert_lt(moved, whole - deg_to_rad(3.0), "но за один кадр туда не долетело")
 	for _frame in 120:
 		rig.advance(FRAME)
-	assert_almost_eq(rig.current_pose().legs.x, target, 0.5, "а за две секунды — долетела")
+	assert_almost_eq(
+		rig.bone_rotation(FigureRig.LEG_L).angle_to(target),
+		0.0,
+		0.01,
+		"а за две секунды — долетело"
+	)
 
 
-func test_walking_moves_the_legs_frame_by_frame() -> void:
+func test_walking_moves_the_legs_with_the_phase() -> void:
 	var rig := _rig(OTTO_MODEL)
 	rig.show_pose("walk_0")
 	rig.set_walk_phase(0.0)
 	rig.snap()
-	var before := rig.current_pose().legs.x
-	rig.set_walk_phase(0.5)
+	var before := rig.bone_rotation(FigureRig.LEG_L)
+	# Полтора кадра ходьбы — четверть шага клипа: бедро проходит заметный угол.
+	rig.set_walk_phase(1.5)
 	rig.snap()
-	var after := rig.current_pose().legs.x
-	assert_ne(before, after, "фаза ходьбы двигает ноги")
-	assert_gt(after, before, "к четверти цикла левая нога идёт вперёд")
+	var after := rig.bone_rotation(FigureRig.LEG_L)
+	assert_gt(before.angle_to(after), deg_to_rad(5.0), "фаза ходьбы двигает ноги")
+
+
+func test_a_standing_actor_keeps_walking_where_he_stopped() -> void:
+	# Часы ходьбы копятся из фазы актёра: встал — встали и ноги, а не прыгнули
+	# в начало клипа.
+	var rig := _rig(OTTO_MODEL)
+	rig.show_pose("walk_0")
+	rig.set_walk_phase(1.0)
+	rig.snap()
+	var stopped := rig.bone_rotation(FigureRig.LEG_L)
+	rig.set_walk_phase(1.0)
+	rig.snap()
+	assert_almost_eq(rig.bone_rotation(FigureRig.LEG_L).angle_to(stopped), 0.0, 0.001)
+
+
+## Ходьба клипом, а заземления нет: клип стоит на полу сам. Если пак однажды
+## придёт с ходьбой над полом, это видно здесь, а не на кадре.
+func test_the_walk_clip_keeps_its_feet_on_the_floor() -> void:
+	var rig := _rig(OTTO_MODEL)
+	rig.show_pose("walk_0")
+	for step in 6:
+		rig.set_walk_phase(step * 0.5)
+		rig.snap()
+		var floor_level := rig.skinned_aabb().position.y
+		assert_gt(floor_level, -0.03, "фаза %.1f: подошва не в полу" % (step * 0.5))
+		assert_lt(floor_level, 0.05, "фаза %.1f: и не над ним" % (step * 0.5))
+
+
+## Заземление на ходу — по крайним вершинам костей, а не по всем: расхождение
+## низа с полным габаритом обязано быть в миллиметрах, иначе актёр висит или
+## тонет. Верх по крайним не сверяется: риг берёт у них только низ.
+func test_the_hull_grounds_like_the_whole_mesh() -> void:
+	for model: PackedScene in [OTTO_MODEL, AGENT_MODEL]:
+		var rig := _rig(model)
+		for pose_name: String in ActorPose.AGENT_POSES + PackedStringArray(["jump", "kick"]):
+			rig.show_pose(pose_name)
+			rig.snap()
+			var whole := rig.skinned_aabb()
+			var hull := rig.skinned_aabb(true)
+			assert_almost_eq(
+				hull.position.y, whole.position.y, 0.01, "%s: низ по крайним" % pose_name
+			)
+
+
+func test_every_clip_is_in_both_models() -> void:
+	for model: PackedScene in [OTTO_MODEL, AGENT_MODEL]:
+		var scene := model.instantiate()
+		add_child_autofree(scene)
+		var players := scene.find_children("*", "AnimationPlayer", true, false)
+		assert_eq(players.size(), 1, "%s: один проигрыватель" % model.resource_path)
+		if players.is_empty():
+			continue
+		for clip_name: String in FigurePoses.CLIP_NAMES:
+			assert_true(
+				(players[0] as AnimationPlayer).has_animation(clip_name),
+				"%s: клип %s" % [model.resource_path, clip_name]
+			)
+
+
+## Шляпа — то, чем агент отличается от Otto в темноте (ADR-0032, решение 3).
+func test_the_agent_stands_taller_by_his_hat() -> void:
+	var otto := _rig(OTTO_MODEL)
+	var agent := _rig(AGENT_MODEL)
+	assert_gt(agent.height(), otto.height() + 0.02, "федора над головой")
 
 
 func test_facing_turns_the_figure_along_the_floor() -> void:
