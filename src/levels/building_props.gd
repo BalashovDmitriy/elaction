@@ -25,7 +25,6 @@ const PLATE_Z: float = WorldSpace.BACK_WALL_Z + BuildingRibs.PILASTER_DEPTH + 0.
 const PLATE_HOTEL := Color(0.62, 0.48, 0.22)
 const PLATE_OFFICE := Color(0.55, 0.57, 0.6)
 const PLATE_INK := Color(0.08, 0.07, 0.06)
-const PLATE_FONT := preload("res://assets/fonts/Pixellari.ttf")
 
 ## Труба под потолком: толщина, м. Висит перед пилястрами — они выступают из
 ## стены на [constant BuildingRibs.PILASTER_DEPTH] — и сразу под полосой, которую
@@ -171,7 +170,7 @@ func _plate_the_doors(plan: BuildingPlan, identity: BuildingIdentity) -> void:
 		add_child(plate)
 		var label := Label3D.new()
 		label.text = "%d%02d" % [number, counted[door.floor_index]]
-		label.font = PLATE_FONT
+		label.font = NeonStyle.font(700)
 		label.font_size = 32
 		label.pixel_size = 0.0022
 		label.modulate = PLATE_INK

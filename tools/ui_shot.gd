@@ -20,6 +20,8 @@ const DEFAULT_FOLDER := "M8b"
 ## Сколько кадров дать сцене собраться и странице перерисоваться.
 const SETTLE_FRAMES: int = 20
 const PAGE_FRAMES: int = 6
+## Запас сверх въезда страницы, с: пункты загораются чуть позже, чем она встаёт.
+const PAGE_MARGIN: float = 0.2
 
 var _folder: String = DEFAULT_FOLDER
 var _locale: String = ""
@@ -64,6 +66,8 @@ func _run() -> void:
 	# Экран конца партии показывает счёт и место, поэтому ему их надо задать:
 	# иначе он снимется пустым и соврёт про то, как выглядит на деле.
 	menu.remember(24500, 0)
+	# Вывеска мигает по жребию: без этого буква на снимке то горит, то нет.
+	menu.title().flicker_letter = -1
 
 	var pages: Array[Array] = [
 		[Menu.Page.MAIN, "menu"],
@@ -75,6 +79,10 @@ func _run() -> void:
 	]
 	for page: Array in pages:
 		menu.show_page(page[0] as Menu.Page)
+		# Страница въезжает [constant Menu.PAGE_TIME] по часам, а не по кадрам:
+		# шесть кадров — это десятая доля секунды, и колонка снималась бы
+		# полупрозрачной и сдвинутой.
+		await get_tree().create_timer(Menu.PAGE_TIME + PAGE_MARGIN).timeout
 		for _frame: int in PAGE_FRAMES:
 			await get_tree().process_frame
 		await _shoot("%s_%s" % [page[1], TranslationServer.get_locale()])

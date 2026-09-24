@@ -1,5 +1,4 @@
 keys,en,ru
-UI_TITLE,ELACTION,ELACTION
 UI_SUBTITLE,a remake of Elevator Action,ремейк Elevator Action
 UI_PLAY,Play,Играть
 UI_RECORDS,High scores,Рекорды
@@ -50,6 +49,9 @@ UI_SHOOT,Shoot,Выстрел
 UI_PAUSE,Pause,Пауза
 UI_ACTION_HINT,"Up and down work by place: in a car they drive it, on an escalator pad they start the ride, on a doormat they open the door.","«Вверх» и «вниз» работают по месту: в кабине ведут её, на площадке эскалатора отправляют в поездку, на коврике открывают дверь."
 UI_REBIND_LATER,Rebinding comes later,Переназначение появится позже
-UI_KEYBOARD,Keyboard,Клавиатура
 UI_GAMEPAD,Gamepad,Геймпад
 UI_DPAD,D-pad,Крестовина
+UI_ON,On,Вкл
+UI_OFF,Off,Выкл
+UI_HINT,"Enter — choose   Esc — back","Enter — выбрать   Esc — назад"
+UI_HINT_ROOT,Enter — choose,Enter — выбрать

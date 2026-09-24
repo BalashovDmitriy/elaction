@@ -20,12 +20,19 @@ const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 
 var _level: GreyboxLevel = null
+## Город за главным меню (ADR-0035). Живёт, пока открыто меню, а не партия.
+var _stage: MenuStage = null
 var _settings: GameSettings = null
 var _records: Records = null
 ## Идёт ли партия. На экранах меню — нет, даже пока здание висит в дереве.
 var _playing: bool = false
 ## Что удерживалось в прошлом кадре: по этому считается фронт нажатия.
 var _held: Dictionary = {}
+## Страница меню, какой её оставил прошлый кадр. Esc — это и «пауза», и «назад»
+## меню: с настроек над паузой меню возвращает на паузу раньше, чем кадр доходит
+## до [method _process], и по одной текущей странице то же нажатие тут же снимало
+## бы паузу (авторевью M22b).
+var _page_before: Menu.Page = Menu.Page.MAIN
 
 @onready var _menu: Menu = $Menu
 @onready var _hud: Hud = $Hud
@@ -68,12 +75,12 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if not _just_pressed(&"pause"):
-		return
-	if _playing:
-		_pause()
-	elif _menu.current_page() == Menu.Page.PAUSE:
-		_resume()
+	if _just_pressed(&"pause"):
+		if _playing:
+			_pause()
+		elif _page_before == Menu.Page.PAUSE and _menu.current_page() == Menu.Page.PAUSE:
+			_resume()
+	_page_before = _menu.current_page()
 
 
 ## Нажато ли действие именно в этом кадре.
@@ -88,7 +95,7 @@ func _just_pressed(action: StringName) -> bool:
 	return pressed and not was
 
 
-## Главное меню: здание выбрасывается, музыка остаётся.
+## Главное меню: здание выбрасывается, за меню встаёт город, музыка остаётся.
 func _open_menu() -> void:
 	_playing = false
 	get_tree().paused = false
@@ -96,6 +103,7 @@ func _open_menu() -> void:
 	# продолжал бы идти под главным меню, куда вышли с паузы.
 	GameState.instance().stop_game()
 	_drop_level()
+	_raise_stage()
 	_hud.visible = false
 	_menu.show_page(Menu.Page.MAIN)
 	Sounds.play_music(Sounds.THEME)
@@ -104,6 +112,7 @@ func _open_menu() -> void:
 func _start_game() -> void:
 	_playing = true
 	get_tree().paused = false
+	_drop_stage()
 	_menu.close()
 	_hud.visible = true
 	GameState.instance().start_game(_new_salt())
@@ -173,6 +182,27 @@ func _enter_building() -> void:
 	# Тема заводится на здание, а не на партию: после тревоги её надо вернуть,
 	# а сирена снимается только сменой здания (ADR-0009).
 	Sounds.play_music(Sounds.ALARM_THEME if game.alarm.raised else Sounds.THEME)
+
+
+## Город за меню. Погода — жребием на каждый выход в меню: ясная ночь, туман
+## или дождь с молниями.
+func _raise_stage() -> void:
+	if _stage != null:
+		return
+	_stage = MenuStage.new()
+	_stage.name = "Stage"
+	add_child(_stage)
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	_stage.build(rng.randi())
+
+
+func _drop_stage() -> void:
+	if _stage == null:
+		return
+	remove_child(_stage)
+	_stage.queue_free()
+	_stage = null
 
 
 func _drop_level() -> void:

@@ -146,9 +146,12 @@ def shard_units(units: list[Unit], shards: int) -> list[list[Unit]]:
 def part_of(units: list[Unit], part: str) -> list[Unit]:
     """Единицы части `K/N`: набор делится на N кучек, берётся K-я, с единицы."""
     number, _, total = part.partition("/")
+    wrong = f"часть {part}: ждём K/N, где 1 ≤ K ≤ N"
+    if not (number.isdigit() and total.isdigit()):
+        raise ValueError(wrong)
     k, n = int(number), int(total)
     if not 1 <= k <= n:
-        raise ValueError(f"часть {part}: ждём K/N, где 1 ≤ K ≤ N")
+        raise ValueError(wrong)
     piles = shard_units(units, n)
     # Кучек бывает меньше N, если единиц меньше машин: лишней машине нечего делать.
     return piles[k - 1] if k <= len(piles) else []
@@ -248,7 +251,10 @@ def main() -> int:
     scope = ""
     if args.part:
         everything = len(units)
-        units = part_of(units, args.part)
+        try:
+            units = part_of(units, args.part)
+        except ValueError as error:
+            parser.error(str(error))
         scope = f" Часть {args.part}: единиц {len(units)} из {everything}."
         if not units:
             print(f"Тестовых файлов {len(scripts)}.{scope} Этой машине гнать нечего.")

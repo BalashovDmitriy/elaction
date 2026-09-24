@@ -87,5 +87,4 @@
 
 | Что | Автор | Лицензия |
 |---|---|---|
-| Pixellari (меню, табло, вывески) | Zacchary Dempsey-Plante | SIL OFL 1.1, `assets/fonts/Pixellari.LICENSE.txt` |
-| Exo 2 (HUD) | The Exo 2 Project Authors | SIL OFL 1.1, `assets/fonts/Exo2.LICENSE.txt` |
+| Exo 2 (интерфейс, вывески, таблички, табло) | The Exo 2 Project Authors | SIL OFL 1.1, `assets/fonts/Exo2.LICENSE.txt` |

@@ -17,15 +17,14 @@ extends Node3D
 ## Нумерация как в оригинале: верхний этаж — самый большой номер, нижний — первый.
 ## На крыше таблички нет: там нет ни стены, ни потолка, и в оригинале её там нет.
 
-const FONT := preload("res://assets/fonts/Pixellari.ttf")
-
 ## Кегль шрифта: чем он крупнее, тем чётче цифра. Высоту цифры в мире задаёт
 ## [constant Proportions.FLOOR_DIGIT], а не он.
 const FONT_SIZE: int = 64
 
-## Доля кегля, которую занимает у Pixellari цифра по высоте: по ней кегль
-## переводится в метры.
-const DIGIT_SHARE: float = 0.7
+## Доля кегля, которую занимает у Exo 2 цифра по высоте: по ней кегль
+## переводится в метры. Замер по глифам: от 0.69 («1», «4», «7») до 0.72
+## («0», «3»); у Pixellari, на котором табличка жила до M22b, было 0.69.
+const DIGIT_SHARE: float = 0.71
 
 ## На сколько табличка стоит перед задней стеной: перед пилястрами, чтобы
 ## не утонуть в них у края простенка.
@@ -95,7 +94,7 @@ func _hang_on(index: int) -> void:
 
 	var label := Label3D.new()
 	label.text = str(number_of(_rules, index))
-	label.font = FONT
+	label.font = NeonStyle.font(700)
 	label.font_size = FONT_SIZE
 	label.pixel_size = Proportions.FLOOR_DIGIT / (float(FONT_SIZE) * DIGIT_SHARE)
 	label.modulate = DIGIT

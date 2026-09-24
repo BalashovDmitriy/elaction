@@ -40,6 +40,11 @@ const BUILDING_BONUS := "building_bonus"
 const EXTRA_LIFE := "extra_life"
 const GAME_OVER := "game_over"
 
+## Меню (ADR-0035, решение 5): переход по пунктам, выбор и возврат.
+const UI_MOVE := "ui_move"
+const UI_SELECT := "ui_select"
+const UI_BACK := "ui_back"
+
 ## Музыка. Тема своя, а не из оригинала (ADR-0012, пункт 2); мотив тревоги
 ## звучит вместо неё, пока сирена не снята.
 const THEME := "theme"
@@ -63,6 +68,9 @@ const EFFECTS: PackedStringArray = [
 	BUILDING_BONUS,
 	EXTRA_LIFE,
 	GAME_OVER,
+	UI_MOVE,
+	UI_SELECT,
+	UI_BACK,
 ]
 const MUSIC: PackedStringArray = [THEME, ALARM_THEME]
 
