@@ -27,6 +27,10 @@ const TOP: int = 15
 ## Тревога: 4096 тиков, ~277 с (@466E).
 const ALARM_TICKS: int = 4096
 
+## Бонус за сданное здание: ставка и с какого здания он перестаёт расти (@5793).
+const BUILDING_BONUS: int = 1000
+const BUILDING_BONUS_TOP: int = 10
+
 ## Шаг ходьбы Otto и агента, px за тик (@4450/@445F) — одна процедура на обоих.
 const WALK_PX: float = 2.0
 
@@ -39,6 +43,18 @@ const CAR_PX: float = 2.0
 ## Сколько тиков действует тревога агентов после выстрела Otto или посадки
 ## агента в кабину (@59C8, @1AED).
 const ALERT_TICKS: int = 90
+
+## Отставший агент уходит в ближайшую дверь (@041F-04E5): если его ступни на
+## экране в 80 px и дальше от ступней Otto — и только на этажах ROM с восьмого.
+## Этаж — 48 px, так что стоящему на полу это два этажа.
+##
+## В ROM есть и третье условие — «кроме двадцатого», — но у нас оно не взято:
+## на сиде 2 теста боя агенты, застрявшие на двадцатом, подняли цену здания
+## с одной смерти до десяти. Здание у нас раскладывается не так, как у аркады,
+## и почему ROM бережёт именно двадцатый, по дизассемблеру не видно. Открытый
+## вопрос 9 в `docs/STATUS.md`.
+const LEAVE_PX: float = 80.0
+const LEAVE_FROM_FLOOR: int = 8
 
 ## Насколько близко пуля Otto должна подлететь, чтобы агент от неё уворачивался,
 ## px (@05F5).
@@ -291,3 +307,18 @@ static func red_doors(skill_level: int) -> int:
 	for band in RED_DOOR_BANDS.size():
 		total += red_doors_in_band(band, skill_level)
 	return total
+
+
+## Бонус за сданное здание [param building]: 1000 × min(10, навык − DIP + 1)
+## (@5793). Навык — это DIP плюс пройденные здания ([method skill]), так что
+## множитель — номер здания, и с десятого бонус больше не растёт.
+static func building_bonus(building: int) -> int:
+	return BUILDING_BONUS * clampi(building, 1, BUILDING_BONUS_TOP)
+
+
+## Уходит ли в дверь агент на этаже ROM [param rom], отставший от Otto на
+## [param floors_apart] этажей (@041F-04E5). Шахта в сторону Otto — отдельное
+## наше условие (ADR-0027, решение 3а), его проверяет уровень.
+static func agent_leaves(rom: int, floors_apart: int) -> bool:
+	var apart_px := absf(float(floors_apart)) * Proportions.FLOOR / Proportions.PX
+	return apart_px >= LEAVE_PX and rom >= LEAVE_FROM_FLOOR

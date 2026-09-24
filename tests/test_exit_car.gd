@@ -179,7 +179,7 @@ func test_the_wheels_roll_about_their_axles() -> void:
 
 ## Первое здание — красная спортивная, как в 1983 году (ADR-0032, решение 7).
 func test_the_first_building_parks_the_red_sports_car() -> void:
-	for building_seed in [1, 7, 12345]:
+	for building_seed: int in [1, 7, 12345]:
 		var choice := CarModel.choose(1, building_seed)
 		assert_eq(choice.model, 0, "спортивная")
 		assert_eq(choice.paint, 0, "красная")

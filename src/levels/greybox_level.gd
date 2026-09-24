@@ -4,8 +4,10 @@ extends Node3D
 ## Здание, собранное по [BuildingPlan].
 ##
 ## Где что стоит, решает раскладка по правилам и сиду; уровень только расставляет
-## узлы и связывает их между собой. Геометрия — серые коробки (ADR-0021): модели,
-## материалы и настоящий свет придут вехами M16–M19, каждая на своё место.
+## узлы и связывает их между собой. Начиналось оно серыми коробками (ADR-0021);
+## коробки остались телами коллизий, а вид — отделка, обстановка, свет и
+## модели паков — собирают строители: [BuildingShell], [BuildingRibs],
+## [BuildingShafts], [BuildingScenery] и другие.
 ##
 ## Раскладка считает в плоскости правил, где Y растёт вниз. Всё, что уровень
 ## ставит в сцену, проходит через [WorldSpace] — и только через него: разворот
@@ -24,6 +26,10 @@ const ROPE_WIDTH: float = 0.12
 ## (ADR-0017, решение 4).
 const ROPE_DROP: float = 2.64
 const ROPE_SPEED: float = 4.2
+
+## Сколько кадров физики [method wait_for_the_landing] ждёт по умолчанию: спуск
+## с полусекундой без ввода — около семидесяти, остальное — запас.
+const LANDING_PATIENCE: int = 360
 
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 const ESCALATOR_SCENE := preload("res://src/systems/escalators/escalator.tscn")
@@ -58,10 +64,6 @@ const EXIT_SIGN_RISE: float = 0.3
 
 ## Насколько хуже слушается кабина по тревоге, с.
 const ALARM_CAR_DELAY: float = 0.6
-
-## С какого отрыва по этажам агент уходит в ближайшую дверь: в ROM — 80 px
-## экрана, этаж и две трети (@041F).
-const AGENT_FAR_FLOORS: int = 2
 
 ## На сколько этажей дальше видимой полосы дверь ещё выпускает агентов.
 ##
@@ -271,6 +273,21 @@ func door_of(agent: Enemy) -> Door:
 ## Где стоит выход из здания, в плоскости правил.
 func exit_position() -> Vector2:
 	return _exit_position
+
+
+## Ждёт, пока Otto съедет по тросу и встанет на крышу; true — встал.
+##
+## Здание начинается вступлением: Otto приезжает сверху и первые полсекунды не
+## слушается ввода (ADR-0017, решение 4). Ждать его надо по состоянию, а не
+## выдержкой: длина вступления ещё поменяется, а под [member Engine.time_scale]
+## выдержка и вовсе врёт. Одно место на съёмку и тесты — копии этого цикла
+## разъезжались по проекту вчетвером.
+func wait_for_the_landing(patience: int = LANDING_PATIENCE) -> bool:
+	var left := patience
+	while not otto.is_grounded() and left > 0:
+		await get_tree().physics_frame
+		left -= 1
+	return otto.is_grounded()
 
 
 ## Погашен ли этаж целиком — все его зоны. Гаснут они навсегда: сбитая лампа
@@ -621,10 +638,11 @@ func _shroud_agent(agent: Enemy, where: int, x: float, here: int, target_in_the_
 	var lift := AgentLifts.offer(_plan, rules, _cars, where, x, here)
 	agent.set_lift_at(lift)
 	# Далеко отставший агент уходит в ближайшую дверь, а не бродит до конца
-	# здания (@041F): его ячейка нужнее там, где игрок. Но только тот, кому
-	# не на чем доехать: у кого шахта в сторону Otto под боком, ждёт кабину.
+	# здания: его ячейка нужнее там, где игрок. Когда — решает ROM (@041F):
+	# отрыв и этаж. Но только тот, кому не на чем доехать: у кого шахта в
+	# сторону Otto под боком, ждёт кабину.
 	var stranded := (
-		absi(where - here) >= AGENT_FAR_FLOORS
+		Arcade.agent_leaves(Arcade.rom_floor(where, rules.floors), where - here)
 		and is_nan(lift)
 		and not AgentLifts.can_ride(_plan, rules, where, x, here)
 	)

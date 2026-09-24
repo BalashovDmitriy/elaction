@@ -53,10 +53,6 @@ const STARTING_LIVES: int = 3
 ## в бесконечные жизни — эту ферму мы себе уже предсказывали в ADR-0010.
 const EXTRA_LIFE_SCORE: int = 10000
 
-## Бонус за сданное здание: 1000 × его номер. Источники расходятся, взят
-## вариант с множителем — ADR-0008, пункт 5. Не сверено.
-const BUILDING_BONUS: int = 1000
-
 static var _instance: GameState = null
 
 var score: int = 0
@@ -132,9 +128,10 @@ func stop_game() -> void:
 
 
 ## Здание сдано: бонус за него и переход к следующему. Тревога снимается
-## только здесь — смерть её не снимала и не снимет.
+## только здесь — смерть её не снимала и не снимет. Бонус — по ROM: 1000 × номер
+## здания, но не больше чем за десятое (`Arcade.building_bonus`).
 func finish_building() -> void:
-	add_score(BUILDING_BONUS * building)
+	add_score(Arcade.building_bonus(building))
 	building += 1
 	alarm.enter_building()
 	building_changed.emit(building)

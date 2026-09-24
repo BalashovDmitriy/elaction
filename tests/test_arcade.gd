@@ -157,3 +157,24 @@ func test_rom_floor_counts_from_the_bottom() -> void:
 		assert_between(rom, 1, Arcade.FLOORS, "шестиэтажное: этаж %d" % index)
 		assert_lt(rom, previous, "книзу номер ROM убывает")
 		previous = rom
+
+
+func test_the_building_bonus_stops_growing_at_the_tenth() -> void:
+	# @5793: 1000 × min(10, …). Без потолка бонус рос бы вечно, а в аркаде
+	# сотое здание платит столько же, сколько десятое.
+	assert_eq(Arcade.building_bonus(1), 1000)
+	assert_eq(Arcade.building_bonus(3), 3000)
+	assert_eq(Arcade.building_bonus(10), 10000)
+	assert_eq(Arcade.building_bonus(11), 10000)
+	assert_eq(Arcade.building_bonus(40), 10000)
+
+
+func test_an_agent_left_behind_goes_home_only_where_rom_lets_him() -> void:
+	# @041F: 80 px — два этажа по 48; этаж ROM с восьмого. «Кроме двадцатого»
+	# из ROM не взято — см. комментарий к Arcade.LEAVE_FROM_FLOOR.
+	assert_false(Arcade.agent_leaves(12, 1), "этаж — это 48 px, меньше 80")
+	assert_true(Arcade.agent_leaves(12, 2), "два этажа — 96 px")
+	assert_true(Arcade.agent_leaves(12, -3), "выше или ниже — всё равно")
+	assert_false(Arcade.agent_leaves(7, 5), "ниже восьмого не уходят")
+	assert_true(Arcade.agent_leaves(8, 2), "восьмой — уже да")
+	assert_true(Arcade.agent_leaves(20, 5), "двадцатый у нас не исключение")

@@ -35,7 +35,7 @@ func test_a_direction_survives_the_round_trip() -> void:
 func test_everything_game_side_lands_in_one_plane() -> void:
 	# Плоскость игры одна — ADR-0021, решение 1. Если этот тест покраснел,
 	# значит кто-то начал разносить игровые объекты по глубине.
-	for point in [Vector2.ZERO, Vector2(38.4, 0.0), Vector2(-5.0, 112.0)]:
+	for point: Vector2 in [Vector2.ZERO, Vector2(38.4, 0.0), Vector2(-5.0, 112.0)]:
 		assert_eq(WorldSpace.to_scene(point).z, WorldSpace.PLAY_Z)
 
 

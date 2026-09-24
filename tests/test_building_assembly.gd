@@ -14,9 +14,6 @@ const SEEDS: Array[int] = [1, 2, 3]
 ## Сколько кадров дать зданию устояться перед проверками.
 const SETTLE_FRAMES: int = 10
 
-## Сколько кадров ждать конца вступления: спуск по тросу занимает меньше секунды.
-const LANDING_FRAMES: int = 180
-
 ## Сколько источников света разрешено держать зажжёнными разом.
 ##
 ## Число художественное, а не техническое: замер (ADR-0010, пункт 1) показал,
@@ -202,17 +199,9 @@ func test_otto_starts_on_the_roof() -> void:
 	)
 
 
-## Ждёт, пока Otto съедет по тросу на крышу.
-##
-## Здание с M12 начинается вступлением: Otto приезжает сверху, и первые полсекунды
-## он не на полу и не слушается ввода (ADR-0017, решение 4). Ждать его надо по
-## состоянию, а не выдержкой: под [member Engine.time_scale] выдержка врёт.
+## Ждёт, пока Otto съедет по тросу на крышу ([method GreyboxLevel.wait_for_the_landing]).
 func _wait_for_the_landing(level: GreyboxLevel) -> void:
-	var left := LANDING_FRAMES
-	while not level.otto.is_grounded() and left > 0:
-		await wait_physics_frames(1)
-		left -= 1
-	assert_true(level.otto.is_grounded(), "Otto съехал по тросу и встал на крышу")
+	assert_true(await level.wait_for_the_landing(), "Otto съехал по тросу и встал на крышу")
 
 
 ## Кабина шириной в шахту: ширину она берёт из правил, а не из сцены.
