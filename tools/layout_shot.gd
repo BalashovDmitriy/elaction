@@ -23,6 +23,7 @@ extends Node3D
 ##     godot --path . res://tools/layout_shot.tscn
 ##     godot --path . res://tools/layout_shot.tscn -- --folder=M18e
 ##     godot --path . res://tools/layout_shot.tscn -- --folder=M19 --seed=2
+##     godot --path . res://tools/layout_shot.tscn -- --folder=M21 --garage --building=3
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
@@ -42,6 +43,10 @@ var _folder: String = FOLDER
 var _seed: int = BUILDING_SEED
 ## Раунд — палитра здания; ноль — правила по умолчанию (первый раунд).
 var _round: int = 0
+## Номер здания в партии: от него жребий машины у выхода (ADR-0032, решение 7).
+var _building: int = 1
+## Снять только гараж — машины разных зданий рядом.
+var _garage_only: bool = false
 
 
 func _ready() -> void:
@@ -52,8 +57,13 @@ func _ready() -> void:
 			_seed = argument.trim_prefix("--seed=").to_int()
 		elif argument.begins_with("--round="):
 			_round = argument.trim_prefix("--round=").to_int()
+		elif argument.begins_with("--building="):
+			_building = argument.trim_prefix("--building=").to_int()
+		elif argument == "--garage":
+			_garage_only = true
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_folder))
 	GameState.instance().start_game()
+	GameState.instance().building = _building
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	_level.rules = BuildingRules.for_building(_round) if _round > 0 else BuildingRules.new()
 	_level.building_seed = _seed
@@ -71,6 +81,10 @@ func _run() -> void:
 		await _shoot_floor("round%d" % _round, 2)
 		get_tree().quit(0)
 		return
+	if _garage_only:
+		await _shoot_garage("garage_building%d" % _building)
+		get_tree().quit(0)
+		return
 	await _shoot_floor("00_roof_seed%d" % _seed, BuildingRules.ROOF)
 	await _shoot_floor("01_tower", rules.wide_from - 1)
 	await _shoot_floor("02_podium", rules.floors - 2)
@@ -84,15 +98,19 @@ func _run() -> void:
 	await _shoot_the_wall("04_inner_wall", walled)
 	await _shoot_floor("05_tower_doors", 2)
 	await _shoot_floor("06_dark_floor", _first_unlit_floor())
-	# Гараж у выхода: машина и разметка (ADR-0031, решение 4).
-	var bottom := rules.floors - 1
-	# Не в самом проёме: без документов выход отправил бы Otto к красной двери.
-	_place(_level.plan().exit_x + 2.5, bottom)
-	await _shoot("07_garage", bottom)
+	await _shoot_garage("07_garage")
 	await _shoot_effects("08_effects", 2)
 
 	print("  кадры раскладки в %s" % _folder)
 	get_tree().quit(0)
+
+
+## Гараж у выхода: машина и разметка (ADR-0031, решение 4; машина — ADR-0032).
+func _shoot_garage(label: String) -> void:
+	var bottom := _level.rules.floors - 1
+	# Не в самом проёме: без документов выход отправил бы Otto к красной двери.
+	_place(_level.plan().exit_x + 2.5, bottom)
+	await _shoot(label, bottom)
 
 
 ## Ставит Otto посреди этажа и снимает кадр. Камера едет за ним, поэтому кадр

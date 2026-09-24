@@ -28,7 +28,6 @@ const HIT := "hit"
 const KICK := "kick"
 const LAMP_BREAK := "lamp_break"
 const LAMP_CRASH := "lamp_crash"
-const ELEVATOR_DING := "elevator_ding"
 const ELEVATOR_HUM := "elevator_hum"
 const ESCALATOR_HUM := "escalator_hum"
 const DOOR_OPEN := "door_open"
@@ -53,7 +52,6 @@ const EFFECTS: PackedStringArray = [
 	KICK,
 	LAMP_BREAK,
 	LAMP_CRASH,
-	ELEVATOR_DING,
 	ELEVATOR_HUM,
 	ESCALATOR_HUM,
 	DOOR_OPEN,

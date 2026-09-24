@@ -1,20 +1,26 @@
 #!/usr/bin/env python3
-"""Конструктор актёров: фигура из коробок на скелете, экспорт в glTF.
+"""Сборка актёров из паков Quaternius: Otto, агент и машины, экспорт в glTF.
 
-Наследник `render_actors.py`. Тот строил ту же фигуру в Blender и снимал с неё
-спрайты; с M16 (ADR-0022) Blender отдаёт не кадры, а модель: арматуру с костями
-бёдер, корпуса, головы, рук и ног и коробки, привязанные весами по одной кости.
-Двигает кости уже игра — `FigureRig` по таблице `FigurePoses`, — поэтому
-клипов анимации в файле нет.
+С M21 (ADR-0032) фигура не строится из коробок, а берётся из Ultimate Modular
+Men Pack (CC0) — персонаж Business Man, исходник в `assets/source/quaternius/`.
+Скрипт приводит его к игре:
+
+- рост — ровно `Proportions.BODY`, вместе с ключами позиций в клипах;
+- материалы — палитра актёра: у Otto кремовый костюм, у агента тёмно-синий;
+- агенту — федора и тёмные очки на кости головы (ADR-0032, решения 2 и 4);
+- обоим — пистолет на кисти правой руки: в паке его нет (решение 5);
+- из 24 клипов остаются четыре, с короткими именами (решение 1);
+- машины Cars Pack — капотом в +X, длиной `Proportions.CAR_LENGTH` (решение 7).
 
 Скрипт живёт двумя половинами в одном файле:
 
 - **снаружи** (обычный python из `.venv`) он ищет Blender и запускает в нём
   сам себя;
-- **внутри** Blender (там есть `bpy`) он строит фигуры и пишет `.glb`.
+- **внутри** Blender (там есть `bpy`) он собирает модели и пишет `.glb`.
 
     python tools/build_actors.py             # всех
     python tools/build_actors.py otto        # только Otto
+    python tools/build_actors.py cars        # только машины
     python tools/build_actors.py --list
 """
 
@@ -41,15 +47,50 @@ except ImportError:  # снаружи Blender
 PROJECT_ROOT = TOOLS.parent
 OUT_DIR = PROJECT_ROOT / "assets/models"
 PROPORTIONS = PROJECT_ROOT / "src/systems/proportions.gd"
+SOURCE = PROJECT_ROOT / "assets/source/quaternius/business_man.glb"
+
+# Клипы пака, которые идут в игру, и их имена там. Остальные двадцать
+# выбрасываются: в файле они весили бы больше самой модели. Те же имена ждёт
+# `FigureRig` — разойдясь, риг встанет в позу кодом и скажет об этом ошибкой.
+CLIPS: dict[str, str] = {
+    "CharacterArmature|Idle_Gun": "idle",
+    "CharacterArmature|Walk": "walk",
+    "CharacterArmature|Idle_Gun_Shoot": "shoot",
+    "CharacterArmature|Death": "death",
+}
+
+CARS_SOURCE = PROJECT_ROOT / "assets/source/quaternius/cars"
+
+# Машины Cars Pack и материал кузова у каждой: его игра перекрашивает жребием
+# (ADR-0032, решение 7). У второй спортивной кузов двухцветный — тёмная
+# половина уходит в `PaintShade`. Такси и полиции здесь нет: шпион на
+# патрульной машине странен.
+CARS: dict[str, dict[str, str]] = {
+    "sports_car_2": {"Orange": "Paint", "DarkOrange": "PaintShade"},
+    "sports_car_1": {"White": "Paint"},
+    "car_1": {"Blue": "Paint"},
+    "car_2": {"LightBlue": "Paint"},
+    "suv": {"White": "Paint"},
+}
+
+# Глубина машины по бамперам вместе с колёсами, м: сколько влезает между задней
+# стеной и телом Otto (авторевью M18c и M20). Машины пака в 1.8 м шириной
+# сжимаются по глубине отдельно — сбоку этого не видно, а колёса остаются
+# круглыми: длина и высота идут одним масштабом.
+CAR_DEPTH = 0.74
+
+# Кости пака, к которым крепятся надетые вещи.
+HEAD_BONE = "Head"
+HAND_BONE = "Wrist.R"
 
 
 def proportion(name: str) -> float:
     """Число из `Proportions` игры, в метрах.
 
-    Рост актёров и длина машины задаются в игре одной таблицей (ADR-0026,
-    решение 8), и модель обязана быть ровно того роста, что и коллизия. Своей
-    копии числа здесь нет: скрипт читает константы из `proportions.gd` и
-    считает их выражения — простую арифметику над ранее объявленными.
+    Рост актёров задаётся в игре одной таблицей (ADR-0026, решение 8), и модель
+    обязана быть ровно того роста, что и коллизия. Своей копии числа здесь нет:
+    скрипт читает константы из `proportions.gd` и считает их выражения —
+    простую арифметику над ранее объявленными.
     """
     return _proportions()[name]
 
@@ -77,47 +118,38 @@ def _proportions() -> dict[str, float]:
     return known
 
 
-# Фигура описана в долях роста: 28 долей на Otto, как было у спрайтов
-# (ADR-0011, пункт 8). Доля переводится в метры ростом актёра, поэтому
-# пропорции чиби общие, а рост — у каждого свой и равен его коллизии.
-UNITS: float = 28.0
-
-# Имена костей. Те же ищет FigureRig в Godot: разойдясь, риг молча останется
-# стоять столбом — проверяется тестом со сценой.
-HIPS = "hips"
-TORSO = "torso"
-HEAD = "head"
-ARM_L = "arm_l"
-ARM_R = "arm_r"
-LEG_L = "leg_l"
-LEG_R = "leg_r"
-
-
 def _actors() -> dict[str, dict]:
     """Кто строится и чем отличается.
 
-    Агент отличается не только палитрой, но и головой: шляпа с полями против
-    помпадура (ADR-0011, пункт 13). На погашенном этаже цвета почти нет, и
-    силуэт — единственное, по чему игрок отличает своего от чужого.
+    Модель у обоих одна, поэтому своего от чужого отличают цвет и голова:
+    у агента федора и очки (ADR-0032, решения 2–4). На погашенном этаже цвета
+    почти нет, и силуэт со шляпой — то, по чему игрок узнаёт агента.
+
+    Ключи `colours` — материалы пака: `Suit` — брюки, `Suit.001` — пиджак.
+    Материалы, которых здесь нет (рубашка, ботинки, глаза), остаются пака.
     """
     return {
         "otto": {
-            "height": proportion("BODY"),
-            "head": "pompadour",
-            "suit": palette.OTTO_SUIT,
-            "suit_shade": palette.OTTO_SUIT_SHADE,
-            "skin": palette.OTTO_SKIN,
-            "crown": palette.OTTO_HAIR,
-            "eyes": palette.OTTO_TIE,
+            "colours": {
+                "Suit": palette.OTTO_SUIT_SHADE,
+                "Suit.001": palette.OTTO_SUIT,
+                "Tie": palette.OTTO_TIE,
+                "Skin": palette.OTTO_SKIN,
+                "Hair": palette.OTTO_HAIR,
+            },
+            "hat": False,
+            "glasses": False,
         },
         "agent": {
-            "height": proportion("BODY"),
-            "head": "hat",
-            "suit": palette.AGENT_SUIT,
-            "suit_shade": palette.AGENT_SUIT_SHADE,
-            "skin": palette.AGENT_SKIN,
-            "crown": palette.AGENT_HAT,
-            "eyes": palette.AGENT_SUIT_SHADE,
+            "colours": {
+                "Suit": palette.AGENT_SUIT_SHADE,
+                "Suit.001": palette.AGENT_SUIT,
+                "Tie": palette.AGENT_SUIT_SHADE,
+                "Skin": palette.AGENT_SKIN,
+                "Hair": palette.AGENT_HAT,
+            },
+            "hat": True,
+            "glasses": True,
         },
     }
 
@@ -129,253 +161,447 @@ def _reset_scene() -> None:
     bpy.ops.wm.read_factory_settings(use_empty=True)
 
 
-def _material(name: str, colour: Rgb):
-    """Матовый материал ровно своего цвета: шершавость подберёт M17."""
+def _linear(colour: Rgb) -> tuple[float, float, float, float]:
+    """Цвет палитры в материал: байты sRGB, переведённые в линейный цвет.
+
+    Фигура M16 писала байты как есть, и тёмно-синий костюм агента выходил
+    бледно-голубым: 0x2F как линейный — это 0.46 на экране. В оригинале агенты
+    чёрные, и на сравнении M21 разница била в глаза. Материалы пака заданы
+    линейно, и палитра, легшая рядом с ними, обязана быть в том же пространстве.
+    """
+
+    def channel(byte: int) -> float:
+        value = byte / 255.0
+        return value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4
+
+    red, green, blue = colour
+    return (channel(red), channel(green), channel(blue), 1.0)
+
+
+def _material(name: str, colour: Rgb, roughness: float = 0.85):
     material = bpy.data.materials.new(name)
     # В Blender 5 материал узловой с рождения, и флаг только ругается.
     if not material.use_nodes:
         material.use_nodes = True
     bsdf = material.node_tree.nodes.get("Principled BSDF")
-    red, green, blue = colour
-    bsdf.inputs["Base Color"].default_value = (red / 255.0, green / 255.0, blue / 255.0, 1.0)
-    bsdf.inputs["Roughness"].default_value = 0.85
+    bsdf.inputs["Base Color"].default_value = _linear(colour)
+    bsdf.inputs["Roughness"].default_value = roughness
     bsdf.inputs["Metallic"].default_value = 0.0
     return material
 
 
-def _box(name: str, size, centre, material, bone: str | None = None):
-    """Коробка с уже выпеченным положением: объект стоит в начале координат,
-    а вершины — где надо. Так слияние в один меш ничего не сдвигает.
+def _import_pack():
+    """Исходник пака в сцену. Возвращает арматуру и её меши.
 
-    [param bone] — кость, к которой коробка привязана целиком.
+    Импорт glTF приносит лишнее: пустышки концов костей и икосферу — форму,
+    которой импортёр рисует кости. В модель они не идут.
     """
+    bpy.ops.import_scene.gltf(filepath=str(SOURCE))
+    armature = next(obj for obj in bpy.context.scene.objects if obj.type == "ARMATURE")
+    meshes = [obj for obj in armature.children if obj.type == "MESH"]
+    for obj in list(bpy.context.scene.objects):
+        if obj is not armature and obj not in meshes:
+            bpy.data.objects.remove(obj, do_unlink=True)
+    return armature, meshes
+
+
+def _channelbags(action):
+    """Кривые клипа. В Blender 5 действия слоёные: слой → полоса → мешок."""
+    for layer in action.layers:
+        for strip in layer.strips:
+            yield from strip.channelbags
+
+
+def _keep_clips(armature) -> None:
+    """Оставляет четыре клипа из `CLIPS` и переименовывает их.
+
+    Импортёр раскладывает каждый клип на свою дорожку NLA; экспорт берёт
+    действия, поэтому лишние удаляются вместе с дорожками.
+    """
+    data = armature.animation_data
+    for track in list(data.nla_tracks):
+        data.nla_tracks.remove(track)
+    data.action = None
+    for action in list(bpy.data.actions):
+        if action.name in CLIPS:
+            action.name = CLIPS[action.name]
+            action.use_fake_user = True
+        else:
+            bpy.data.actions.remove(action)
+    missing = set(CLIPS.values()) - {action.name for action in bpy.data.actions}
+    if missing:
+        raise RuntimeError("в паке нет клипов: " + ", ".join(sorted(missing)))
+    # Экспорт в режиме действий берёт те, что можно повесить на арматуру:
+    # каждый клип по очереди ставится ей дорожкой.
+    for action in bpy.data.actions:
+        track = data.nla_tracks.new()
+        track.name = action.name
+        track.strips.new(action.name, 0, action)
+
+
+def _height(meshes) -> tuple[float, float]:
+    """Низ и верх фигуры в первом кадре стойки, м — по вершинам в мире.
+
+    Мерка — не покой, а стойка: игра стоит в ней, и именно её рост обязан
+    совпасть с коллизией. Клип стойки чуть сгибает колени, и по T-позе фигура
+    выходила на 3 см ниже коллизии.
+    """
+    armature = meshes[0].parent
+    data = armature.animation_data
+    # Дорожки NLA всех клипов смешались бы со стойкой: на замер они глушатся.
+    data.use_nla = False
+    data.action = bpy.data.actions[CLIPS["CharacterArmature|Idle_Gun"]]
+    bpy.context.scene.frame_set(0)
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    low, high = float("inf"), float("-inf")
+    for obj in meshes:
+        evaluated = obj.evaluated_get(depsgraph)
+        mesh = evaluated.to_mesh()
+        for vertex in mesh.vertices:
+            z = (evaluated.matrix_world @ vertex.co).z
+            low, high = min(low, z), max(high, z)
+        evaluated.to_mesh_clear()
+    data.action = None
+    data.use_nla = True
+    return low, high
+
+
+def _scale_to(armature, meshes, height: float) -> None:
+    """Приводит рост к игре и запекает масштаб.
+
+    Пак держит скелет в сотых долях с масштабом 100 на объекте арматуры.
+    Масштаб объекта запекается в кости и вершины, но не в клипы: ключи
+    позиций костей лежат в единицах скелета, и их приходится домножить на
+    тот же множитель, иначе Hips в ходьбе качается на сотые доли сантиметра.
+    """
+    low, high = _height(meshes)
+    factor = height / (high - low)
+    object_scale = armature.scale.x * factor
+    armature.scale = (object_scale,) * 3
+
+    for obj in bpy.context.scene.objects:
+        obj.select_set(obj is armature or obj in meshes)
+    bpy.context.view_layer.objects.active = armature
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    for obj in bpy.context.scene.objects:
+        obj.select_set(obj in meshes)
+    bpy.context.view_layer.objects.active = meshes[0]
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+
+    for action in bpy.data.actions:
+        for bag in _channelbags(action):
+            for curve in bag.fcurves:
+                if curve.data_path.endswith(".location"):
+                    for key in curve.keyframe_points:
+                        key.co.y *= object_scale
+                        key.handle_left.y *= object_scale
+                        key.handle_right.y *= object_scale
+
+
+def _recolour(meshes, colours: dict[str, Rgb]) -> None:
+    """Материалы пака в палитру актёра; шершавость у всех одна, как у M16."""
+    seen = set()
+    for obj in meshes:
+        for slot in obj.material_slots:
+            material = slot.material
+            if material is None or material.name in seen:
+                continue
+            seen.add(material.name)
+            bsdf = material.node_tree.nodes.get("Principled BSDF")
+            if bsdf is None:
+                continue
+            if material.name in colours:
+                base = bsdf.inputs["Base Color"]
+                # Импорт glTF заводит цвет иных материалов через свой узел, и
+                # тогда значение гнезда молчит: связь рвётся, цвет пишется в гнездо.
+                for link in list(base.links):
+                    material.node_tree.links.remove(link)
+                base.default_value = _linear(colours[material.name])
+            bsdf.inputs["Roughness"].default_value = 0.85
+            bsdf.inputs["Metallic"].default_value = 0.0
+
+
+def _bone_head(armature, bone: str):
+    return armature.matrix_world @ armature.data.bones[bone].head_local
+
+
+def _head_box(meshes):
+    """Габарит головы в покое: вершины материалов лица и волос выше шеи."""
+    from mathutils import Vector
+
+    low = Vector((float("inf"),) * 3)
+    high = Vector((float("-inf"),) * 3)
+    for obj in meshes:
+        if obj.name != "Suit_Head":
+            continue
+        for vertex in obj.data.vertices:
+            world = obj.matrix_world @ vertex.co
+            low = Vector(map(min, low, world))
+            high = Vector(map(max, high, world))
+    return low, high
+
+
+def _part(name: str, build, material, bone: str):
+    """Меш из `build(bm)`, целиком привязанный к кости [param bone]."""
     import bmesh
 
     mesh = bpy.data.meshes.new(name)
     bm = bmesh.new()
-    bmesh.ops.create_cube(bm, size=1.0)
-    bmesh.ops.scale(bm, vec=size, verts=bm.verts)
-    bmesh.ops.translate(bm, vec=centre, verts=bm.verts)
+    build(bm)
     bm.to_mesh(mesh)
     bm.free()
     mesh.materials.append(material)
-
     obj = bpy.data.objects.new(name, mesh)
     bpy.context.scene.collection.objects.link(obj)
-    if bone is not None:
-        group = obj.vertex_groups.new(name=bone)
-        group.add(list(range(len(mesh.vertices))), 1.0, "REPLACE")
+    group = obj.vertex_groups.new(name=bone)
+    group.add(list(range(len(mesh.vertices))), 1.0, "REPLACE")
     return obj
 
 
-def _armature(name: str, bones: list[tuple[str, tuple, tuple, str | None]]):
-    """Арматура из списка (имя, голова, хвост, родитель). Ось кости — от головы
-    к хвосту; конечности смотрят вниз, и тогда их локальная X — это бок фигуры:
-    поворот вокруг неё качает ногу вперёд-назад, ровно как нужно ходьбе."""
-    data = bpy.data.armatures.new(name)
-    obj = bpy.data.objects.new(name, data)
-    bpy.context.scene.collection.objects.link(obj)
-    bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.mode_set(mode="EDIT")
-    for bone_name, head, tail, parent in bones:
-        bone = data.edit_bones.new(bone_name)
-        bone.head = head
-        bone.tail = tail
-        bone.roll = 0.0
-        if parent is not None:
-            bone.parent = data.edit_bones[parent]
-            bone.use_connect = False
-    bpy.ops.object.mode_set(mode="OBJECT")
-    return obj
+def _box_into(bm, size, centre, rotation=None) -> None:
+    import bmesh
+    from mathutils import Matrix
+
+    made = bmesh.ops.create_cube(bm, size=1.0)
+    verts = made["verts"]
+    bmesh.ops.scale(bm, vec=size, verts=verts)
+    if rotation is not None:
+        bmesh.ops.rotate(bm, cent=(0.0, 0.0, 0.0), matrix=Matrix.Rotation(*rotation), verts=verts)
+    bmesh.ops.translate(bm, vec=centre, verts=verts)
 
 
-def _join(parts: list, name: str):
-    """Сливает коробки в один меш: группы вершин и материалы переживают слияние."""
+def _cylinder_into(bm, radius_x, radius_y, radius_top_scale, height, base, segments=16) -> None:
+    """Эллиптический цилиндр от [param base] вверх; верх сужен в [param radius_top_scale]."""
+    import bmesh
+
+    made = bmesh.ops.create_cone(
+        bm,
+        cap_ends=True,
+        cap_tris=False,
+        segments=segments,
+        radius1=1.0,
+        radius2=radius_top_scale,
+        depth=height,
+    )
+    verts = made["verts"]
+    bmesh.ops.scale(bm, vec=(radius_x, radius_y, 1.0), verts=verts)
+    bmesh.ops.translate(bm, vec=(base[0], base[1], base[2] + height * 0.5), verts=verts)
+
+
+def _hat(meshes, armature, colour: Rgb):
+    """Федора: узкие поля и тулья с заломом сверху (ADR-0032, решение 2).
+
+    Сидит низко, над бровями, и прячет волосы: грани причёски выше полей
+    удаляются, иначе они прорастали бы сквозь тулью в любой позе.
+    """
+    low, high = _head_box(meshes)
+    centre_x = (low.x + high.x) * 0.5
+    centre_y = (low.y + high.y) * 0.5
+    half_x = (high.x - low.x) * 0.5
+    half_y = (high.y - low.y) * 0.5
+    head_height = high.z - low.z
+    brim_z = high.z - head_height * 0.3
+    crown_height = head_height * 0.36
+
+    def build(bm) -> None:
+        # Поля: плоский эллипс шире головы, чуть длиннее вперёд-назад.
+        _cylinder_into(bm, half_x * 2.0, half_y * 1.85, 1.0, head_height * 0.025, (centre_x, centre_y, brim_z))
+        # Тулья сужается кверху, а верх её — залом: вторая, узкая и низкая
+        # ступень сверху даёт силуэту «гребень», по которому федору и узнают.
+        _cylinder_into(bm, half_x * 1.08, half_y * 1.04, 0.8, crown_height * 0.8, (centre_x, centre_y, brim_z))
+        _cylinder_into(
+            bm, half_x * 0.62, half_y * 0.8, 0.7, crown_height * 0.2, (centre_x, centre_y, brim_z + crown_height * 0.8)
+        )
+
+    hat = _part("hat", build, _material("hat", colour, roughness=0.7), HEAD_BONE)
+    _trim_hair(meshes, brim_z + head_height * 0.02)
+    return hat
+
+
+def _trim_hair(meshes, above_z: float) -> None:
+    """Удаляет грани причёски выше [param above_z]: их закрывает шляпа."""
+    import bmesh
+
+    for obj in meshes:
+        if obj.name != "Suit_Head":
+            continue
+        hair = [index for index, slot in enumerate(obj.material_slots) if slot.material and slot.material.name == "Hair"]
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        doomed = [
+            face
+            for face in bm.faces
+            if face.material_index in hair and (obj.matrix_world @ face.calc_center_median()).z > above_z
+        ]
+        bmesh.ops.delete(bm, geom=doomed, context="FACES")
+        bm.to_mesh(obj.data)
+        bm.free()
+
+
+def _glasses(meshes):
+    """Тёмные очки: два стекла и перемычка перед глазами (ADR-0032, решение 4)."""
+    eye_low, eye_high = _material_box(meshes, "Eye")
+    front_y = eye_low.y - 0.006
+    centre_z = (eye_low.z + eye_high.z) * 0.5
+    span = eye_high.x - eye_low.x
+    lens = (span * 0.5, 0.008, span * 0.28)
+
+    def build(bm) -> None:
+        for side in (-1.0, 1.0):
+            _box_into(bm, lens, (side * span * 0.3, front_y, centre_z))
+        _box_into(bm, (span * 0.14, 0.006, span * 0.06), (0.0, front_y, centre_z + span * 0.06))
+
+    return _part("glasses", build, _material("glasses", (0x0B, 0x0C, 0x10), roughness=0.2), HEAD_BONE)
+
+
+def _material_box(meshes, material_name: str):
+    """Габарит граней одного материала в покое."""
+    from mathutils import Vector
+
+    low = Vector((float("inf"),) * 3)
+    high = Vector((float("-inf"),) * 3)
+    for obj in meshes:
+        slots = [i for i, slot in enumerate(obj.material_slots) if slot.material and slot.material.name == material_name]
+        if not slots:
+            continue
+        for polygon in obj.data.polygons:
+            if polygon.material_index not in slots:
+                continue
+            for index in polygon.vertices:
+                world = obj.matrix_world @ obj.data.vertices[index].co
+                low = Vector(map(min, low, world))
+                high = Vector(map(max, high, world))
+    if low.x == float("inf"):
+        raise RuntimeError("в модели нет материала " + material_name)
+    return low, high
+
+
+def _gun(armature):
+    """Пистолет в правой кисти (ADR-0032, решение 5).
+
+    Ставится в покое, в T-позе: рука вытянута вбок ладонью вниз, пальцы — к −X.
+    Клипы пака «с оружием» проворачивают кисть так, что в позе выстрела её −X
+    смотрит по взгляду, а +Y (тыл ладони в T-позе, к спине) — вниз. Поэтому
+    ствол лежит вдоль пальцев, а рукоять уходит из ладони к +Y. Пробой по кадрам
+    `tools/actor_shot.tscn`: ствол по −Y вставал в позе выстрела торчком.
+    """
+    wrist = _bone_head(armature, HAND_BONE)
+    palm = wrist.x - 0.06  # середина ладони: пальцы идут к −X
+
+    def build(bm) -> None:
+        # Затвор со стволом вдоль пальцев, над кулаком.
+        _box_into(bm, (0.19, 0.036, 0.03), (palm - 0.04, wrist.y - 0.035, wrist.z))
+        # Рукоять — в кулаке, к тылу ладони, с лёгким завалом назад.
+        _box_into(bm, (0.035, 0.1, 0.028), (palm + 0.01, wrist.y + 0.02, wrist.z), (-0.25, 3, "Z"))
+
+    return _part("gun", build, _material("gun", (0x1A, 0x1C, 0x22), roughness=0.4), HAND_BONE)
+
+
+def _dress(armature, meshes, actor: dict) -> None:
+    """Надевает вещи и сливает всё в один меш под скелетом."""
+    parts = [_gun(armature)]
+    if actor["glasses"]:
+        parts.append(_glasses(meshes))
+    if actor["hat"]:
+        parts.append(_hat(meshes, armature, actor["colours"]["Hair"]))
+
     for obj in bpy.context.scene.objects:
-        obj.select_set(False)
-    for obj in parts:
-        obj.select_set(True)
-    bpy.context.view_layer.objects.active = parts[0]
+        obj.select_set(obj in meshes or obj in parts)
+    bpy.context.view_layer.objects.active = meshes[0]
     bpy.ops.object.join()
     body = bpy.context.view_layer.objects.active
-    body.name = name
-    body.data.name = name
-    return body
+    body.name = "body"
+    body.data.name = "body"
+    if not any(modifier.type == "ARMATURE" for modifier in body.modifiers):
+        modifier = body.modifiers.new("Armature", "ARMATURE")
+        modifier.object = armature
+    body.parent = armature
 
 
 def _figure(actor: dict) -> None:
-    """Фигура целиком на скелете. Стоит в начале координат ногами, смотрит в -Y:
-    после экспорта с Y вверх это +Z сцены Godot, то есть в камеру."""
-    unit = actor["height"] / UNITS
-    hip = 10.0 * unit
-    torso_top = 19.0 * unit
-    head_side = 9.0 * unit
-    head_top = torso_top + head_side
+    armature, meshes = _import_pack()
+    _keep_clips(armature)
+    _scale_to(armature, meshes, proportion("BODY"))
+    _recolour(meshes, actor["colours"])
+    _dress(armature, meshes, actor)
 
-    suit = _material("suit", actor["suit"])
-    suit_shade = _material("suit_shade", actor["suit_shade"])
-    skin = _material("skin", actor["skin"])
-    crown = _material("crown", actor["crown"])
-    eyes = _material("eyes", actor["eyes"])
 
-    shoulder = torso_top - 1.0 * unit
-    arm_length = torso_top - hip - 1.0 * unit
-    parts = []
+def _car(name: str) -> None:
+    """Машина Cars Pack, приведённая к игре.
 
-    for bone, side in ((LEG_L, -1.0), (LEG_R, 1.0)):
-        parts.append(
-            _box(
-                bone,
-                (3.0 * unit, 3.0 * unit, hip),
-                (side * 2.6 * unit, side * -1.0 * unit, hip * 0.5),
-                suit_shade,
-                bone,
-            )
-        )
+    Капот — в +X Blender (он же +X сцены Godot после экспорта), длина — ровно
+    `Proportions.CAR_LENGTH` и высота тем же масштабом, глубина —
+    [constant CAR_DEPTH]. Где перед, скажут фары: у пака машины смотрят кто
+    куда. Колёса остаются своими объектами — игра крутит их, когда машина
+    уезжает. Начало у них не на оси, а в нуле машины, как их положил пак,
+    поэтому `ExitCar` крутит каждое вокруг середины его меша.
+    """
+    from mathutils import Matrix, Vector
 
-    parts.append(
-        _box(
-            TORSO,
-            (9.0 * unit, 5.0 * unit, torso_top - hip),
-            (0.0, 0.0, (hip + torso_top) * 0.5),
-            suit,
-            TORSO,
-        )
+    bpy.ops.import_scene.gltf(filepath=str(CARS_SOURCE / f"{name}.glb"))
+    objects = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
+
+    lights = Vector((0.0, 0.0, 0.0))
+    count = 0
+    low = Vector((float("inf"),) * 3)
+    high = Vector((float("-inf"),) * 3)
+    for obj in objects:
+        for polygon in obj.data.polygons:
+            material = obj.material_slots[polygon.material_index].material if obj.material_slots else None
+            centre = obj.matrix_world @ polygon.center
+            if material is not None and material.name == "Headlights":
+                lights += centre
+                count += 1
+        for vertex in obj.data.vertices:
+            world = obj.matrix_world @ vertex.co
+            low = Vector(map(min, low, world))
+            high = Vector(map(max, high, world))
+    if count == 0:
+        raise RuntimeError(name + ": у машины нет фар — не понять, где перед")
+    lights /= count
+    size = high - low
+    centre = (low + high) * 0.5
+    # Длина — по большей горизонтальной оси; поворот кладёт фары в +X.
+    along_y = size.y > size.x
+    angle = 0.0
+    if along_y:
+        angle = -1.5707963 if lights.y > centre.y else 1.5707963
+    elif lights.x < centre.x:
+        angle = 3.1415927
+    length = size.y if along_y else size.x
+    depth = size.x if along_y else size.y
+    factor = proportion("CAR_LENGTH") / length
+    squeeze = CAR_DEPTH / depth
+    # Центр по длине и глубине — в нуле, колёса — на полу.
+    place = (
+        Matrix.Diagonal((factor, squeeze, factor, 1.0))
+        @ Matrix.Rotation(angle, 4, "Z")
+        @ Matrix.Translation((-centre.x, -centre.y, -low.z))
     )
+    tops = [obj for obj in objects if obj.parent is None or obj.parent.type != "MESH"]
+    for obj in tops:
+        obj.matrix_world = place @ obj.matrix_world
+    for obj in objects:
+        for other in bpy.context.scene.objects:
+            other.select_set(other is obj)
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+        if "Wheel" in obj.name:
+            obj.name = "Wheel" + obj.name.split("Wheel", 1)[1].split("_", 1)[0]
 
-    for bone, side in ((ARM_L, -1.0), (ARM_R, 1.0)):
-        parts.append(
-            _box(
-                bone,
-                (2.5 * unit, 2.5 * unit, arm_length),
-                (side * 5.0 * unit, side * -1.4 * unit, shoulder - arm_length * 0.5),
-                suit_shade if side < 0 else suit,
-                bone,
-            )
-        )
-    # Пистолет висит в правой руке и смотрит вперёд: рука повернулась —
-    # повернулся и он. Всегда при себе: агент, как и Otto, вооружён.
-    parts.append(
-        _box(
-            "gun",
-            (1.5 * unit, 4.0 * unit, 1.5 * unit),
-            (5.0 * unit, -1.4 * unit - 2.5 * unit, shoulder - arm_length),
-            eyes,
-            ARM_R,
-        )
-    )
-
-    parts.append(
-        _box(
-            HEAD,
-            (head_side, 8.0 * unit, head_side),
-            (0.0, 0.0, torso_top + head_side * 0.5),
-            skin,
-            HEAD,
-        )
-    )
-    for side in (-1.0, 1.0):
-        parts.append(
-            _box(
-                "eye_%d" % int(side),
-                (1.0 * unit, 1.0 * unit, 1.0 * unit),
-                (side * 2.0 * unit, -4.0 * unit, torso_top + head_side * 0.55),
-                eyes,
-                HEAD,
-            )
-        )
-
-    if actor["head"] == "hat":
-        # Шляпа: поля шире головы, тулья над ними. Силуэт агента.
-        parts.append(
-            _box(
-                "brim",
-                (13.0 * unit, 11.0 * unit, 1.0 * unit),
-                (0.0, 0.0, head_top - 0.5 * unit),
-                crown,
-                HEAD,
-            )
-        )
-        parts.append(
-            _box(
-                "crown",
-                (8.0 * unit, 7.0 * unit, 4.0 * unit),
-                (0.0, 0.0, head_top + 2.0 * unit),
-                crown,
-                HEAD,
-            )
-        )
-    else:
-        # Помпадур: кок вперёд и вверх. В оригинале он же попал на логотип.
-        parts.append(
-            _box(
-                "hair",
-                (9.0 * unit, 7.0 * unit, 2.5 * unit),
-                (0.0, 0.0, head_top + 0.2 * unit),
-                crown,
-                HEAD,
-            )
-        )
-        parts.append(
-            _box(
-                "quiff",
-                (6.0 * unit, 5.0 * unit, 2.5 * unit),
-                (0.0, -1.5 * unit, head_top + 1.8 * unit),
-                crown,
-                HEAD,
-            )
-        )
-
-    rig = _armature(
-        "rig",
-        [
-            (HIPS, (0.0, 0.0, hip), (0.0, 0.0, hip + 1.5 * unit), None),
-            (TORSO, (0.0, 0.0, hip), (0.0, 0.0, torso_top), HIPS),
-            (HEAD, (0.0, 0.0, torso_top), (0.0, 0.0, head_top), TORSO),
-            (ARM_L, (-5.0 * unit, 1.4 * unit, shoulder), (-5.0 * unit, 1.4 * unit, shoulder - arm_length), TORSO),
-            (ARM_R, (5.0 * unit, -1.4 * unit, shoulder), (5.0 * unit, -1.4 * unit, shoulder - arm_length), TORSO),
-            (LEG_L, (-2.6 * unit, 1.0 * unit, hip), (-2.6 * unit, 1.0 * unit, 0.0), HIPS),
-            (LEG_R, (2.6 * unit, -1.0 * unit, hip), (2.6 * unit, -1.0 * unit, 0.0), HIPS),
-        ],
-    )
-
-    body = _join(parts, "body")
-    modifier = body.modifiers.new("Armature", "ARMATURE")
-    modifier.object = rig
-    body.parent = rig
-
-
-def _car() -> None:
-    """Красная машина у выхода: ею оригинал заканчивает здание. Без скелета —
-    у неё одна поза. Длина — `Proportions.CAR_LENGTH`, 3.2 м; по ней уровень
-    ставит машину в зазор от проёма. Высота выходит 1.27 м. Растёт вместе
-    с Otto: в неё он садится (ADR-0026, решение 7).
-
-    Глубина — нет: машина стоит между задней стеной и плоскостью игры
-    (`GreyboxLevel.CAR_Z`), и выросшая в те же 4/3 она упиралась бы в стену
-    и задевала проходящего Otto (авторевью M18c). Поэтому поперёк у неё своя
-    мерка, прежняя: 12 долей — 0.55 м."""
-    unit = proportion("CAR_LENGTH") / 52.0
-    deep = 2.4 / 52.0
-    body = _material("car_body", palette.CAR_BODY)
-    glass = _material("car_glass", palette.GLASS)
-    wheel = _material("car_wheel", palette.SLAB_SHADOW)
-
-    parts = [
-        _box("body", (52.0 * unit, 12.0 * deep, 9.0 * unit), (0.0, 0.0, 9.0 * unit), body),
-        _box("cabin", (26.0 * unit, 11.0 * deep, 7.0 * unit), (-2.0 * unit, 0.0, 17.0 * unit), body),
-        _box("window", (20.0 * unit, 12.0 * deep, 4.0 * unit), (-2.0 * unit, -0.4 * deep, 17.5 * unit), glass),
-    ]
-    for side in (-16.0, 16.0):
-        parts.append(
-            _box(
-                "wheel_%d" % int(side),
-                (9.0 * unit, 13.0 * deep, 9.0 * unit),
-                (side * unit, 0.0, 4.5 * unit),
-                wheel,
-            )
-        )
-    _join(parts, "car")
+    renames = CARS[name]
+    for obj in objects:
+        for slot in obj.material_slots:
+            material = slot.material
+            if material is not None and material.name in renames:
+                material.name = renames[material.name]
+            if material is not None:
+                bsdf = material.node_tree.nodes.get("Principled BSDF")
+                if bsdf is not None:
+                    bsdf.inputs["Metallic"].default_value = 0.0
+    for obj in list(bpy.context.scene.objects):
+        if obj.type not in ("MESH", "EMPTY"):
+            bpy.data.objects.remove(obj, do_unlink=True)
 
 
 def _export(path: Path) -> None:
@@ -384,8 +610,9 @@ def _export(path: Path) -> None:
         filepath=str(path),
         export_format="GLB",
         export_yup=True,
-        export_apply=True,
-        export_animations=False,
+        export_apply=False,
+        export_animations=True,
+        export_animation_mode="ACTIONS",
         export_skins=True,
     )
 
@@ -393,11 +620,15 @@ def _export(path: Path) -> None:
 def _build_inside_blender(out_dir: Path, wanted: list[str]) -> None:
     actors = _actors()
     for name in wanted:
+        if name == "cars":
+            for car in CARS:
+                _reset_scene()
+                _car(car)
+                _export(out_dir / "cars" / f"{car}.glb")
+                print(f"  cars/{car}.glb")
+            continue
         _reset_scene()
-        if name == "car":
-            _car()
-        else:
-            _figure(actors[name])
+        _figure(actors[name])
         _export(out_dir / f"{name}.glb")
         print(f"  {name}.glb")
 
@@ -406,7 +637,7 @@ def _build_inside_blender(out_dir: Path, wanted: list[str]) -> None:
 
 
 def _names() -> list[str]:
-    return [*_actors().keys(), "car"]
+    return [*_actors().keys(), "cars"]
 
 
 def _parser() -> argparse.ArgumentParser:

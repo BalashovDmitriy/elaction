@@ -20,3 +20,4 @@
 *.ttf    binary
 *.otf    binary
 *.blend  binary
+*.glb    binary

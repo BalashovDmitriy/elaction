@@ -200,6 +200,24 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "shooting", "actions": ["shoot"], "hold": 0.3},
 		{"label": "floor", "actions": [], "hold": 1.5},
 	],
+	# M21: люди в костюмах. Otto идёт по крыше клипом ходьбы, едет вниз, выходит
+	# на этаж к агентам в федорах, стреляет, садится на корточки и прыгает.
+	# Все позы рядом, с линиями пуль ROM, снимает tools/actor_shot.tscn, машины
+	# у выхода — tools/layout_shot.tscn -- --folder=M21.
+	"M21":
+	[
+		{"label": "roof", "actions": [], "hold": 1.2},
+		{"label": "roof_walk", "actions": ["move_right"], "hold": 2.5},
+		{"label": "to_the_shaft", "actions": ["move_right"], "hold": 2.9},
+		{"label": "riding_down", "actions": ["move_down"], "hold": 2.2},
+		{"label": "stopped", "actions": [], "hold": 1.6},
+		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
+		{"label": "waiting", "actions": [], "hold": 2.5},
+		{"label": "shooting", "actions": ["shoot"], "hold": 0.3},
+		{"label": "crouching", "actions": ["move_down"], "hold": 0.6},
+		{"label": "jumping", "actions": ["jump"], "hold": 0.3},
+		{"label": "firefight", "actions": [], "hold": 2.0},
+	],
 	"M19":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},
