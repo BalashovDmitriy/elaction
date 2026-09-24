@@ -121,8 +121,8 @@ func _stances() -> Array[EnemyBrain.Stance]:
 
 func test_every_way_of_dying_counts_as_down() -> void:
 	# Промах здесь оставит труп стоять — у того, кто когда-нибудь спросит.
-	for crushed in [true, false]:
-		for falling in [true, false]:
+	for crushed: bool in [true, false]:
+		for falling: bool in [true, false]:
 			var pose := ActorPose.of_otto(OttoStateMachine.State.DEAD, crushed, falling, false, 0.0)
 			assert_true(ActorPose.is_down(pose), "%s — это лежащий" % pose)
 
@@ -133,7 +133,9 @@ func test_an_agent_dodging_prone_counts_as_down() -> void:
 
 
 func test_the_living_and_upright_are_not_down() -> void:
-	for pose in ["idle", "walk_0", "walk_1", "walk_2", "jump", "kick", "shoot", ActorPose.CROUCH]:
+	for pose: String in [
+		"idle", "walk_0", "walk_1", "walk_2", "jump", "kick", "shoot", ActorPose.CROUCH
+	]:
 		assert_false(ActorPose.is_down(pose), "%s — это не лежащий" % pose)
 
 

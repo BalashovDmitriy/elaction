@@ -7,6 +7,11 @@
 Запуск:
     python tools/run_tests.py                # шардов по числу ядер, но не больше SHARDS_MAX
     python tools/run_tests.py --shards 1     # один процесс, как было до шардинга
+    python tools/run_tests.py --part 2/3     # вторая треть набора — одна машина матрицы CI
+
+Части делятся тем же жадным способом, что и шарды, по весам `KNOWN_SLOW`: CI
+гоняет набор матрицей на нескольких машинах, и на каждой её часть снова
+раскладывается по ядрам.
 """
 
 from __future__ import annotations
@@ -33,8 +38,9 @@ TEST_TIMEOUT = 1200
 # заметить это надо на прогоне, а не когда прогон уже снимается.
 CROWDED_RATIO = 0.75
 
-# Больше шардов не заводим. Упирается прогон не в ядра, а в самый долгий файл:
-# набор идёт ровно столько, сколько идёт `test_building_playthrough`.
+# Больше шардов не заводим. Упирается прогон не в ядра, а в самую долгую единицу:
+# один сид бота на настоящем здании идёт полторы-две минуты, и седьмой шард
+# стоял бы и ждал его так же, как шестой.
 SHARDS_MAX = 6
 
 # Строки, после которых ждать нечего. Бот печатает это, упершись в тупик, и
@@ -50,8 +56,9 @@ BROKEN_SCRIPT_MARKERS = (
 )
 
 # Файлы, которые режутся по отдельным тестам. Шард не умеет делить файл, а
-# `test_building_playthrough.gd` один весит треть набора: пока он ходил целиком,
+# `test_building_playthrough.gd` весил треть набора: пока он ходил целиком,
 # шесть шардов давали 574 с против 755 — весь прогон стоял и ждал его.
+# Разрезанный по сидам, он дал 139 с (docs/testing.md).
 #
 # Режется он без единой правки в самом тесте: GUT принимает `-gunit_test_name`,
 # и каждый такой кусок идёт своим процессом.
@@ -136,6 +143,17 @@ def shard_units(units: list[Unit], shards: int) -> list[list[Unit]]:
     return [pile for pile in piles if pile]
 
 
+def part_of(units: list[Unit], part: str) -> list[Unit]:
+    """Единицы части `K/N`: набор делится на N кучек, берётся K-я, с единицы."""
+    number, _, total = part.partition("/")
+    k, n = int(number), int(total)
+    if not 1 <= k <= n:
+        raise ValueError(f"часть {part}: ждём K/N, где 1 ≤ K ≤ N")
+    piles = shard_units(units, n)
+    # Кучек бывает меньше N, если единиц меньше машин: лишней машине нечего делать.
+    return piles[k - 1] if k <= len(piles) else []
+
+
 def run_shard(godot: str, units: list[Unit], home: Path) -> tuple[int, str, float]:
     """Гоняет шард: единицы идут подряд, каждая своим процессом Godot.
 
@@ -213,6 +231,11 @@ def main() -> int:
         default=min(os.cpu_count() or 1, SHARDS_MAX),
         help="сколько процессов Godot запускать разом",
     )
+    parser.add_argument(
+        "--part",
+        default="",
+        help="какую часть набора гнать, K/N — для матрицы CI",
+    )
     args = parser.parse_args()
 
     godot = require_godot()
@@ -222,9 +245,17 @@ def main() -> int:
         return 1
 
     units = units_of(scripts)
+    scope = ""
+    if args.part:
+        everything = len(units)
+        units = part_of(units, args.part)
+        scope = f" Часть {args.part}: единиц {len(units)} из {everything}."
+        if not units:
+            print(f"Тестовых файлов {len(scripts)}.{scope} Этой машине гнать нечего.")
+            return 0
     piles = shard_units(units, max(args.shards, 1))
     print(
-        f"Тестовых файлов {len(scripts)}, единиц {len(units)}, шардов {len(piles)}.",
+        f"Тестовых файлов {len(scripts)}, единиц {len(units)}, шардов {len(piles)}.{scope}",
         flush=True,
     )
 

@@ -29,9 +29,19 @@ jobs:
       - name: pre-commit
         run: pre-commit run --all-files --show-diff-on-failure
 
+  # Набор идёт матрицей: `run_tests.py --part K/N` делит его на N машин по весам
+  # тестов, а на машине часть снова раскладывается по ядрам. Упирается прогон
+  # в самую долгую единицу — сид бота на настоящем здании, — и трёх машин
+  # хватает, чтобы каждая шла примерно столько же, сколько он.
   engine:
-    name: Проверка движком
+    name: Проверка движком (${{ matrix.part }}/3)
     runs-on: ubuntu-latest
+    strategy:
+      # Упавшая часть не снимает остальные: иначе второй провал видно только
+      # со второго пуша.
+      fail-fast: false
+      matrix:
+        part: [1, 2, 3]
     steps:
       - uses: actions/checkout@v7
 
@@ -52,4 +62,4 @@ jobs:
         run: python tools/godot_check.py
 
       - name: Тесты GUT
-        run: python tools/run_tests.py
+        run: python tools/run_tests.py --part ${{ matrix.part }}/3

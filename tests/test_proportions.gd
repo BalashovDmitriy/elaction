@@ -10,8 +10,8 @@ extends GutTest
 ## Утверждения здесь — отношения, а не абсолютные числа: мир переезжал в другой
 ## масштаб дважды (M13 и M15), и оба раза тест обязан был остаться зелёным без
 ## правок в утверждениях — это и есть проверка того, что делились только
-## константы (ADR-0021, «Как проверяем»). Окна вернутся в M19 вместе со своей
-## проверкой.
+## константы (ADR-0021, «Как проверяем»). Проверки окон здесь нет: окон в стенах
+## здания нет, город за ним — отдельная сцена.
 
 const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
@@ -85,7 +85,7 @@ func test_crouching_otto_ducks_under_the_agent_bullet() -> void:
 ## Все игровые тела стоят в одной плоскости и одной толщины: иначе тени и
 ## коллизии сходились бы каждая в своей (ADR-0021, решение 1).
 func test_every_actor_stands_in_the_play_plane() -> void:
-	for name in ["StandingShape", "CrouchingShape"]:
+	for name: String in ["StandingShape", "CrouchingShape"]:
 		assert_almost_eq(_otto_shape(name).z, WorldSpace.BODY_DEPTH, 0.001, "%s Otto" % name)
 	assert_almost_eq(_agent_shape().z, WorldSpace.BODY_DEPTH, 0.001, "агент")
 

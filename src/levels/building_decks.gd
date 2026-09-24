@@ -81,7 +81,7 @@ static func _takes_a_pair(plan: BuildingPlan, index: int) -> bool:
 
 ## Есть ли с этажа ход помимо этой шахты: соседняя шахта или эскалатор. Годится
 ## и эскалатор этажом выше: он ведёт вниз, но подняться по нему тоже можно,
-## встав на нижнюю площадку (ADR-0005, пункт 8).
+## встав на нижнюю площадку (ADR-0004, пункт 8).
 static func _another_way_off(
 	plan: BuildingPlan, besides: BuildingPlan.ShaftSpot, floor_index: int
 ) -> bool:

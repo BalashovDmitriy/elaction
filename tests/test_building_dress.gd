@@ -15,9 +15,6 @@ const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 ## Сколько кадров даётся зданию, чтобы встать на места.
 const SETTLE_FRAMES: int = 4
 
-## Сколько кадров ждать спуска по тросу, прежде чем сдаться.
-const PATIENCE: int = 240
-
 ## Насколько часть считается стоящей на своём месте, м: сантиметр.
 const TOLERANCE: float = 0.01
 
@@ -216,10 +213,7 @@ func test_the_rope_lands_otto_on_the_roof() -> void:
 	# прошла бы и на поиске, который троса вообще не видит.
 	assert_eq(_parts(level, "rope").size(), 1, "трос в кадре, пока Otto по нему едет")
 
-	var left := PATIENCE
-	while not level.otto.is_grounded() and left > 0:
-		await wait_physics_frames(1)
-		left -= 1
+	await level.wait_for_the_landing()
 
 	assert_almost_eq(_otto_at(level).y, surface, TOLERANCE, "съехал ровно на крышу")
 	assert_eq(_parts(level, "rope").size(), 0, "трос ушёл вместе с вступлением")

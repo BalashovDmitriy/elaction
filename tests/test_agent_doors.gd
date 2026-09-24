@@ -13,9 +13,6 @@ const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
 const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
 
-## Сколько кадров ждать конца вступления: спуск по тросу занимает меньше секунды.
-const LANDING_FRAMES: int = 180
-
 ## Сколько кадров дать дверям, чтобы кто-нибудь успел выйти.
 const CROWD_FRAMES: int = 240
 
@@ -52,10 +49,7 @@ func _build(building_seed: int) -> GreyboxLevel:
 
 ## Ждёт, пока Otto доедет по тросу и встанет на крышу.
 func _wait_for_the_landing(level: GreyboxLevel) -> void:
-	for _frame: int in LANDING_FRAMES:
-		await wait_physics_frames(1)
-		if level.otto.is_grounded():
-			return
+	await level.wait_for_the_landing()
 
 
 func _live_agents(level: GreyboxLevel) -> Array[Enemy]:

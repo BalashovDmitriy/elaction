@@ -73,14 +73,6 @@ pause={
 "deadzone": 0.2,
 "events": [Object(InputEventKey,"device":-1,"physical_keycode":4194305), Object(InputEventJoypadButton,"device":-1,"button_index":6)]
 }
-restart={
-"deadzone": 0.2,
-"events": [Object(InputEventKey,"device":-1,"physical_keycode":82)]
-}
-quit_game={
-"deadzone": 0.2,
-"events": [Object(InputEventKey,"device":-1,"physical_keycode":81)]
-}
 screenshot={
 "deadzone": 0.2,
 "events": [Object(InputEventKey,"device":-1,"physical_keycode":4194343)]
@@ -125,3 +117,10 @@ buses/default_bus_layout="res://assets/audio/buses.tres"
 ; Переводы собираются из assets/i18n/ui.csv: одна таблица, две колонки.
 locale/translations=PackedStringArray("res://assets/i18n/ui.en.translation", "res://assets/i18n/ui.ru.translation")
 locale/fallback="en"
+
+[debug]
+
+; Правило 1 CLAUDE.md — типы везде. У gdlint такого правила нет, поэтому
+; нетипизированное объявление — ошибка разбора: его ловит godot_check.py и CI.
+; Вендоренный addons/ не задет — движок по умолчанию пропускает его предупреждения.
+gdscript/warnings/untyped_declaration=2

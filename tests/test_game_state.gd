@@ -121,9 +121,9 @@ func test_finished_building_pays_by_its_number() -> void:
 	var game := _state()
 	game.start_game()
 	game.finish_building()
-	assert_eq(game.score, GameState.BUILDING_BONUS, "первое здание — одна ставка")
+	assert_eq(game.score, Arcade.BUILDING_BONUS, "первое здание — одна ставка")
 	game.finish_building()
-	assert_eq(game.score, GameState.BUILDING_BONUS * 3, "второе — двойная")
+	assert_eq(game.score, Arcade.BUILDING_BONUS * 3, "второе — двойная")
 
 
 func test_new_building_takes_the_alarm_off() -> void:
