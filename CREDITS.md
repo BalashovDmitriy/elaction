@@ -83,8 +83,9 @@
 | `roof_gravel` | [Gravel043](https://ambientcg.com/view?id=Gravel043) | ambientCG | CC0 1.0 |
 | `hotel_wall` | своя, рисуется кодом | elaction | MIT |
 
-## Шрифт
+## Шрифты
 
 | Что | Автор | Лицензия |
 |---|---|---|
 | Pixellari | Zacchary Dempsey-Plante | SIL OFL 1.1, `assets/fonts/Pixellari.LICENSE.txt` |
+| Exo 2 (HUD) | The Exo 2 Project Authors | SIL OFL 1.1, `assets/fonts/Exo2.LICENSE.txt` |

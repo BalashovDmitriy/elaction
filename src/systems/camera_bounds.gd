@@ -15,6 +15,10 @@ extends RefCounted
 ## и соотношением сторон окна.
 ## По умолчанию — кадр [SideCamera] при 16:9: по высоте на плоскости игры это
 ## поле здания оригинала, наклон камеры уже учтён.
+## Ближе этого к цели камера встаёт в неё ровно, м: полмиллиметра — сотая доля
+## пикселя в кадре FullHD.
+const ARRIVED: float = 0.0005
+
 var half_height: float = Proportions.FIELD * 0.5
 var half_width: float = SideCamera.DEFAULT_HALF_HEIGHT * 16.0 / 9.0
 
@@ -48,7 +52,13 @@ func view_at(centre: Vector2) -> Rect2:
 static func smoothed(from: Vector2, towards: Vector2, speed: float, delta: float) -> Vector2:
 	if speed <= 0.0 or delta <= 0.0:
 		return towards
-	return from.lerp(towards, 1.0 - exp(-speed * delta))
+	var moved := from.lerp(towards, 1.0 - exp(-speed * delta))
+	# Экспонента до цели не доходит никогда: камера ползла бы к стоящему Otto
+	# вечно, на доли пикселя за кадр, и кромки дверей и перекрытий мерцали бы
+	# (замер `tools/flicker_shot.tscn`, M22). В полумиллиметре — встаёт ровно.
+	if moved.distance_to(towards) < ARRIVED:
+		return towards
+	return moved
 
 
 func _clamp_axis(wanted: float, low: float, high: float, half: float) -> float:

@@ -54,11 +54,21 @@ const RAIN_DROP := Vector2(0.025, 1.1)
 const RAIN_COLOR := Color(0.65, 0.72, 0.9, 0.16)
 const RAIN_SPEED: float = 28.0
 
+## Во сколько раз небо ярче во вспышке молнии, и как сильно загораются стёкла.
+const FLASH_SKY: float = 4.0
+const FLASH_GLASS := Color(0.55, 0.6, 0.75)
+
 var _view: SubViewport = null
 var _camera: Camera3D = null
 var _ground: float = 0.0
 var _rules: BuildingRules = null
 var _rain_node: GPUParticles3D = null
+var _city_air: Environment = null
+var _dark_glass: StandardMaterial3D = null
+var _fog_banks: Node3D = null
+var _lightning: Lightning = null
+## Вспышка, которая сейчас стоит на небе и в стёклах.
+var _flash_shown: float = 0.0
 
 
 ## Строит город вдоль здания по правилам и сиду, с погодой [param weather].
@@ -72,7 +82,8 @@ func build(rules: BuildingRules, building_seed: int, weather: Weather.Kind) -> v
 	add_child(_view)
 
 	var air := WorldEnvironment.new()
-	air.environment = _air(weather)
+	_city_air = _air(weather)
+	air.environment = _city_air
 	_view.add_child(air)
 
 	_camera = Camera3D.new()
@@ -88,12 +99,30 @@ func build(rules: BuildingRules, building_seed: int, weather: Weather.Kind) -> v
 	_view.add_child(_camera)
 
 	var blocks := CityPlan.generate(building_seed, 0.0, rules.width)
-	_view.add_child(_facades(blocks))
+	var facades := _facades(blocks)
+	_view.add_child(facades)
 	_view.add_child(_windows(blocks))
-	_view.add_child(_dark_windows(blocks))
-	if Weather.is_raining(weather):
-		_rain_node = _rain()
-		_camera.add_child(_rain_node)
+	var dark := _dark_windows(blocks)
+	_dark_glass = (dark.multimesh.mesh as QuadMesh).material as StandardMaterial3D
+	_view.add_child(dark)
+	# Детали города (M22): верхи, огни, неон, зарево улиц.
+	var facade_look := (facades.multimesh.mesh as BoxMesh).material
+	_view.add_child(CityDetails.crowns(blocks, _ground, facade_look))
+	_view.add_child(CityDetails.beacons(blocks, _ground))
+	_view.add_child(CityDetails.signs(blocks, _ground))
+	_view.add_child(CityDetails.street_glow(_ground, 0.0, rules.width))
+	match weather:
+		Weather.Kind.CLEAR:
+			_view.add_child(CityDetails.night_sky(building_seed, 0.0, rules.width, _ground))
+		Weather.Kind.FOG:
+			_fog_banks = CityDetails.fog_banks(building_seed, 0.0, rules.width, _ground)
+			_view.add_child(_fog_banks)
+		Weather.Kind.RAIN:
+			_rain_node = _rain()
+			_camera.add_child(_rain_node)
+			_lightning = Lightning.new()
+			_lightning.setup(building_seed, Vector2(0.0, rules.width), _ground)
+			_view.add_child(_lightning)
 
 	var layer := CanvasLayer.new()
 	layer.name = "CityLayer"
@@ -156,7 +185,17 @@ static func rain_particles(
 
 ## Повторяет ход основной камеры: те же x, y и наклон, своя глубина и угол
 ## обзора, при котором плоскость игры видна в том же масштабе.
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	if _fog_banks != null:
+		CityDetails.drift(_fog_banks, delta, 0.0, _rules.width)
+	if _lightning != null:
+		var flash := _lightning.level()
+		# Между вспышками небо и стёкла покадрово не переписываются.
+		if flash != _flash_shown:
+			_flash_shown = flash
+			_city_air.background_energy_multiplier = 1.0 + flash * (FLASH_SKY - 1.0)
+			# Отсвет молнии в стёклах: погасшие окна загораются отражённым небом.
+			_dark_glass.albedo_color = Color.WHITE.lerp(Color.WHITE + FLASH_GLASS * 6.0, flash)
 	var main := get_viewport().get_camera_3d()
 	if main == null or _camera == null:
 		return
@@ -192,6 +231,11 @@ static func is_visible_around(rules: BuildingRules, view: Rect2) -> bool:
 	return false
 
 
+## Яркость вспышки молнии прямо сейчас, 0–1: воздух здания светлеет с ней.
+func flash_level() -> float:
+	return _lightning.level() if _lightning != null else 0.0
+
+
 ## Разрешение и дождь по уровню качества (ADR-0030, решение 5).
 func apply_graphics() -> void:
 	_fit_view()
@@ -220,6 +264,10 @@ func _air(weather: Weather.Kind) -> Environment:
 	air.fog_light_color = Weather.sky(weather)
 	air.fog_density = Weather.city_fog(weather)
 	air.tonemap_mode = Environment.TONE_MAPPER_ACES
+	# Свечение — чтобы огни антенн и неон на дальних домах цвели в размытии.
+	air.glow_enabled = true
+	air.glow_intensity = 0.7
+	air.glow_hdr_threshold = 0.9
 	return air
 
 

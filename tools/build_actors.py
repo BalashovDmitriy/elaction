@@ -36,8 +36,20 @@ TOOLS = Path(__file__).resolve().parent
 if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
 
-import palette
-from palette import Rgb
+# Цвет байтами sRGB.
+Rgb = tuple[int, int, int]
+
+# Цвета актёров. Жили в `palette.py` — генераторе палитры 2D-спрайтов (ADR-0019,
+# решение 8); с уборкой 2D в M22 от него остались только они, и место им здесь.
+OTTO_SUIT: Rgb = (0xE8, 0xE3, 0xD2)
+OTTO_SUIT_SHADE: Rgb = (0xB9, 0xB4, 0xA4)
+OTTO_HAIR: Rgb = (0x3A, 0x2E, 0x27)
+OTTO_SKIN: Rgb = (0xD8, 0xA6, 0x7B)
+OTTO_TIE: Rgb = (0x3A, 0x3F, 0x4E)
+AGENT_SUIT: Rgb = (0x2F, 0x35, 0x47)
+AGENT_SUIT_SHADE: Rgb = (0x23, 0x28, 0x3A)
+AGENT_HAT: Rgb = (0x26, 0x2B, 0x3B)
+AGENT_SKIN: Rgb = (0xC0, 0x8F, 0x68)
 
 try:
     import bpy
@@ -131,22 +143,22 @@ def _actors() -> dict[str, dict]:
     return {
         "otto": {
             "colours": {
-                "Suit": palette.OTTO_SUIT_SHADE,
-                "Suit.001": palette.OTTO_SUIT,
-                "Tie": palette.OTTO_TIE,
-                "Skin": palette.OTTO_SKIN,
-                "Hair": palette.OTTO_HAIR,
+                "Suit": OTTO_SUIT_SHADE,
+                "Suit.001": OTTO_SUIT,
+                "Tie": OTTO_TIE,
+                "Skin": OTTO_SKIN,
+                "Hair": OTTO_HAIR,
             },
             "hat": False,
             "glasses": False,
         },
         "agent": {
             "colours": {
-                "Suit": palette.AGENT_SUIT_SHADE,
-                "Suit.001": palette.AGENT_SUIT,
-                "Tie": palette.AGENT_SUIT_SHADE,
-                "Skin": palette.AGENT_SKIN,
-                "Hair": palette.AGENT_HAT,
+                "Suit": AGENT_SUIT_SHADE,
+                "Suit.001": AGENT_SUIT,
+                "Tie": AGENT_SUIT_SHADE,
+                "Skin": AGENT_SKIN,
+                "Hair": AGENT_HAT,
             },
             "hat": True,
             "glasses": True,

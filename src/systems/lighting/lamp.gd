@@ -179,10 +179,14 @@ func set_light_visible(on: bool) -> void:
 
 
 ## Тени ламп по уровню качества (ADR-0030, решение 5): на низком без теней,
-## на среднем тень кладёт только конус.
+## на среднем тень кладёт только конус. На «Ультра» конус виден в воздухе
+## коридора (ADR-0034, решение 1); заливка светит в туман на четверть — иначе
+## воздух вокруг лампы светился бы шаром, а не конусом.
 func apply_graphics() -> void:
 	_spot.shadow_enabled = Graphics.spot_shadows()
 	_fill.shadow_enabled = Graphics.fill_shadows()
+	_spot.light_volumetric_fog_energy = Graphics.light_in_fog()
+	_fill.light_volumetric_fog_energy = Graphics.light_in_fog() * 0.25
 	# Заливка без тени не держится перекрытием и светила бы сквозь плиты на
 	# соседние, погашенные этажи — темнота переставала бы быть темнотой (как в
 	# M17). Без тени её радиус — в этаж (авторевью M20).

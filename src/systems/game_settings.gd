@@ -1,7 +1,7 @@
 class_name GameSettings
 extends RefCounted
 
-## Настройки игрока: громкости, язык, полный экран.
+## Настройки игрока: громкости, язык, окно, графика.
 ##
 ## Первое, что игра пишет на диск (ADR-0012). Лежат в `user://`, а не рядом
 ## с игрой: у собранной игры своя папка данных, и писать в неё — единственный
@@ -23,14 +23,26 @@ var master: float = 1.0
 var music: float = 0.7
 var sfx: float = 1.0
 var locale: String = ""
-var fullscreen: bool = false
+## Режим окна — [enum DisplayModes.Mode]: окно, без рамки, полный экран.
+var window_mode: int = DisplayModes.Mode.WINDOWED
+## Размер окна в режиме окна. Полный экран и окно без рамки — в разрешении экрана.
+var resolution: Vector2i = DisplayModes.DEFAULT_RESOLUTION
+## Масштаб 3D-рендера, доля разрешения окна (FSR ниже единицы).
+var render_scale: float = 1.0
 ## Уровень сложности — DIP-переключатель автомата, 0–3: стартовый навык партии,
 ## к которому прибавляются пройденные здания (ADR-0027, решение 8).
 var difficulty: int = 0
 ## Качество графики — [enum Graphics.Quality] (ADR-0030, решение 5).
 var quality: int = Graphics.Quality.HIGH
+## Выбран ли уровень качества — игроком или замером первого запуска
+## ([QualityProbe], ADR-0034, решение 3). Пока нет, первое здание его мерит.
+var quality_measured: bool = false
 ## Показывать ли кровь при попадании пули (ADR-0031).
 var blood: bool = true
+
+## Режим и размер, уже поставленные окну: [method apply] зовётся на любую
+## настройку, а окно трогается только тогда, когда они сменились.
+var _window_applied: Array = []
 
 
 ## Настройки с диска. Файла нет — значения по умолчанию, язык по локали системы.
@@ -45,7 +57,27 @@ static func load_from(path: String = PATH) -> GameSettings:
 	settings.master = clampf(float(file.get_value(SECTION, "master", settings.master)), 0.0, 1.0)
 	settings.music = clampf(float(file.get_value(SECTION, "music", settings.music)), 0.0, 1.0)
 	settings.sfx = clampf(float(file.get_value(SECTION, "sfx", settings.sfx)), 0.0, 1.0)
-	settings.fullscreen = bool(file.get_value(SECTION, "fullscreen", settings.fullscreen))
+	# До M22 окно было флажком «полный экран»: он и становится режимом.
+	var legacy_full := bool(file.get_value(SECTION, "fullscreen", false))
+	settings.window_mode = clampi(
+		int(
+			file.get_value(
+				SECTION,
+				"window_mode",
+				DisplayModes.Mode.FULLSCREEN if legacy_full else settings.window_mode
+			)
+		),
+		0,
+		DisplayModes.Mode.size() - 1
+	)
+	var size: Variant = file.get_value(SECTION, "resolution", settings.resolution)
+	if size is Vector2i:
+		settings.resolution = size
+	settings.render_scale = clampf(
+		float(file.get_value(SECTION, "render_scale", settings.render_scale)),
+		DisplayModes.RENDER_SCALES[-1],
+		1.0
+	)
 	settings.blood = bool(file.get_value(SECTION, "blood", settings.blood))
 	settings.difficulty = clampi(
 		int(file.get_value(SECTION, "difficulty", settings.difficulty)), 0, DIFFICULTIES - 1
@@ -53,6 +85,10 @@ static func load_from(path: String = PATH) -> GameSettings:
 
 	settings.quality = clampi(
 		int(file.get_value(SECTION, "quality", settings.quality)), 0, Graphics.Quality.size() - 1
+	)
+	# Уровень, сохранённый до M22, выбран игроком: мерить поверх него незачем.
+	settings.quality_measured = bool(
+		file.get_value(SECTION, "quality_measured", file.has_section_key(SECTION, "quality"))
 	)
 
 	var saved := String(file.get_value(SECTION, "locale", settings.locale))
@@ -73,14 +109,17 @@ func save_to(path: String = PATH) -> void:
 	file.set_value(SECTION, "music", music)
 	file.set_value(SECTION, "sfx", sfx)
 	file.set_value(SECTION, "locale", locale)
-	file.set_value(SECTION, "fullscreen", fullscreen)
+	file.set_value(SECTION, "window_mode", window_mode)
+	file.set_value(SECTION, "resolution", resolution)
+	file.set_value(SECTION, "render_scale", render_scale)
 	file.set_value(SECTION, "difficulty", difficulty)
 	file.set_value(SECTION, "quality", quality)
+	file.set_value(SECTION, "quality_measured", quality_measured)
 	file.set_value(SECTION, "blood", blood)
 	file.save(path)
 
 
-## Применяет настройки к игре: шины, язык и окно.
+## Применяет настройки к игре: шины, язык, окно и графику.
 ##
 ## Один метод на всё, потому что применять их надо вместе и в одном порядке:
 ## иначе меню меняет громкость, а язык остаётся от прошлого запуска.
@@ -89,13 +128,19 @@ func apply() -> void:
 	Sounds.set_level(Sounds.MUSIC_BUS, music)
 	Sounds.set_level(Sounds.SFX_BUS, sfx)
 	TranslationServer.set_locale(locale)
-	var mode := (
-		DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
-		if fullscreen
-		else DisplayServer.WINDOW_MODE_WINDOWED
-	)
-	if DisplayServer.window_get_mode() != mode:
-		DisplayServer.window_set_mode(mode)
+	# Окно не трогается в headless-прогонах: там его нет, и тесты настроек
+	# меняли бы размер несуществующего окна.
+	if DisplayServer.get_name() != "headless":
+		# Окно ставится заново, только если сменились режим или размер: иначе
+		# переключение крови или языка возвращало бы в центр окно, отодвинутое
+		# игроком, и заново входило в полный экран (авторевью M22).
+		var window := [window_mode, resolution]
+		if window != _window_applied:
+			DisplayModes.apply_window(window_mode as DisplayModes.Mode, resolution)
+			_window_applied = window
+		var tree := Engine.get_main_loop() as SceneTree
+		if tree != null:
+			DisplayModes.apply_scale(render_scale, tree.root)
 	Graphics.broadcast(quality as Graphics.Quality)
 	Blood.enabled = blood
 

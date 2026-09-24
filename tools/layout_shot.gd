@@ -24,6 +24,7 @@ extends Node3D
 ##     godot --path . res://tools/layout_shot.tscn -- --folder=M18e
 ##     godot --path . res://tools/layout_shot.tscn -- --folder=M19 --seed=2
 ##     godot --path . res://tools/layout_shot.tscn -- --folder=M21 --garage --building=3
+##     godot --path . res://tools/layout_shot.tscn -- --folder=M22 --floor-only --quality=3
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
@@ -38,6 +39,40 @@ const SETTLE_FRAMES: int = 45
 ## разобрана в статусе, и кадры сравниваются с ней, а не с новым зданием.
 const BUILDING_SEED: int = 1
 
+## Пробные наборы тона (ADR-0030, решение 1): тень, середина, свет, контраст,
+## насыщенность, экспозиция, свечение. Второй взят в игру в M22
+## ([Atmosphere]); остальные — для следующего подбора.
+const TONES: Array[Dictionary] = [
+	{},
+	{
+		"shadow": Color(0.0, 0.015, 0.045),
+		"middle": Color(0.28, 0.33, 0.38),
+		"light": Color(1.0, 0.96, 0.88),
+		"contrast": 1.16,
+		"saturation": 0.84,
+		"exposure": 1.1,
+		"glow": 0.55,
+	},
+	{
+		"shadow": Color(0.0, 0.03, 0.08),
+		"middle": Color(0.27, 0.33, 0.4),
+		"light": Color(1.0, 0.93, 0.8),
+		"contrast": 1.12,
+		"saturation": 0.9,
+		"exposure": 1.15,
+		"glow": 0.6,
+	},
+	{
+		"shadow": Color(0.01, 0.02, 0.04),
+		"middle": Color(0.3, 0.33, 0.36),
+		"light": Color(1.0, 0.95, 0.85),
+		"contrast": 1.2,
+		"saturation": 0.8,
+		"exposure": 1.2,
+		"glow": 0.5,
+	},
+]
+
 var _level: GreyboxLevel = null
 var _folder: String = FOLDER
 var _seed: int = BUILDING_SEED
@@ -47,6 +82,12 @@ var _round: int = 0
 var _building: int = 1
 ## Снять только гараж — машины разных зданий рядом.
 var _garage_only: bool = false
+## Снять только этаж башни с дверями — уровни качества рядом.
+var _floor_only: bool = false
+## Снять только крышу — город над ней и погоду.
+var _roof_only: bool = false
+## Вариант тона для подбора (M22): 0 — как в игре, иначе — пробный набор кривых.
+var _tone: int = 0
 
 
 func _ready() -> void:
@@ -61,6 +102,21 @@ func _ready() -> void:
 			_building = argument.trim_prefix("--building=").to_int()
 		elif argument == "--garage":
 			_garage_only = true
+		elif argument.begins_with("--quality="):
+			Graphics.broadcast(
+				(
+					clampi(
+						argument.trim_prefix("--quality=").to_int(), 0, Graphics.Quality.size() - 1
+					)
+					as Graphics.Quality
+				)
+			)
+		elif argument == "--floor-only":
+			_floor_only = true
+		elif argument == "--roof-only":
+			_roof_only = true
+		elif argument.begins_with("--tone="):
+			_tone = clampi(argument.trim_prefix("--tone=").to_int(), 0, TONES.size() - 1)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_folder))
 	GameState.instance().start_game()
 	GameState.instance().building = _building
@@ -79,6 +135,19 @@ func _run() -> void:
 	if _round > 0:
 		# Кадр раунда: один этаж на палитре раунда — раунды сравниваются рядом.
 		await _shoot_floor("round%d" % _round, 2)
+		get_tree().quit(0)
+		return
+	if _tone > 0:
+		_apply_tone(TONES[_tone])
+	if _roof_only:
+		await _shoot_floor("roof_seed%d" % _seed, BuildingRules.ROOF)
+		get_tree().quit(0)
+		return
+	if _floor_only:
+		var tag := "tone%d" % _tone if _tone > 0 else "q%d" % Graphics.quality
+		await _shoot_floor("floor_%s" % tag, 2)
+		if _tone > 0:
+			await _shoot_floor("dark_%s" % tag, _first_unlit_floor())
 		get_tree().quit(0)
 		return
 	if _garage_only:
@@ -103,6 +172,22 @@ func _run() -> void:
 
 	print("  кадры раскладки в %s" % _folder)
 	get_tree().quit(0)
+
+
+## Пробный тон поверх воздуха здания: кривые, контраст, насыщенность,
+## экспозиция и свечение.
+func _apply_tone(tone: Dictionary) -> void:
+	var air := (_level.get_node("Scenery/Air") as WorldEnvironment).environment
+	var gradient := Gradient.new()
+	gradient.offsets = PackedFloat32Array([0.0, Atmosphere.NOIR_MIDDLE_AT, 1.0])
+	gradient.colors = PackedColorArray([tone["shadow"], tone["middle"], tone["light"]])
+	var curve := GradientTexture1D.new()
+	curve.gradient = gradient
+	air.adjustment_color_correction = curve
+	air.adjustment_contrast = tone["contrast"]
+	air.adjustment_saturation = tone["saturation"]
+	air.tonemap_exposure = tone["exposure"]
+	air.glow_intensity = tone["glow"]
 
 
 ## Гараж у выхода: машина и разметка (ADR-0031, решение 4; машина — ADR-0032).

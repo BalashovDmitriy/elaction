@@ -11,6 +11,8 @@ const TEMP := "user://test_settings.cfg"
 ## Откуда берутся ключи переводов: та же таблица, из которой их берёт игра.
 const STRINGS := "res://assets/i18n/ui.csv"
 
+const HUD_SCENE := preload("res://src/ui/hud.tscn")
+
 
 func after_each() -> void:
 	if FileAccess.file_exists(TEMP):
@@ -26,7 +28,9 @@ func test_settings_survive_a_restart() -> void:
 	settings.music = 0.1
 	settings.sfx = 0.9
 	settings.locale = "en"
-	settings.fullscreen = true
+	settings.window_mode = DisplayModes.Mode.BORDERLESS
+	settings.resolution = Vector2i(2560, 1440)
+	settings.render_scale = 0.67
 	settings.save_to(TEMP)
 
 	var loaded := GameSettings.load_from(TEMP)
@@ -34,7 +38,30 @@ func test_settings_survive_a_restart() -> void:
 	assert_almost_eq(loaded.music, 0.1, 0.001)
 	assert_almost_eq(loaded.sfx, 0.9, 0.001)
 	assert_eq(loaded.locale, "en")
-	assert_true(loaded.fullscreen)
+	assert_eq(loaded.window_mode, DisplayModes.Mode.BORDERLESS)
+	assert_eq(loaded.resolution, Vector2i(2560, 1440))
+	assert_almost_eq(loaded.render_scale, 0.67, 0.001)
+
+
+## Настройки до M22 хранили флажок «полный экран»: он становится режимом окна.
+func test_the_old_fullscreen_flag_becomes_a_window_mode() -> void:
+	var old := ConfigFile.new()
+	old.set_value(GameSettings.SECTION, "fullscreen", true)
+	old.save(TEMP)
+	assert_eq(GameSettings.load_from(TEMP).window_mode, DisplayModes.Mode.FULLSCREEN)
+
+
+## Размеры окна — только те, что влезают на монитор; 4K — на экране 4K.
+func test_window_sizes_fit_the_screen() -> void:
+	var full_hd := DisplayModes.available(Vector2i(1920, 1080))
+	assert_eq(full_hd[-1], Vector2i(1920, 1080), "на FullHD больше FullHD не предлагается")
+	assert_has(DisplayModes.available(Vector2i(3840, 2160)), Vector2i(3840, 2160), "4K есть на 4K")
+	assert_eq(DisplayModes.available(Vector2i(800, 600)).size(), 1, "на крошечном — хоть один")
+	assert_eq(
+		DisplayModes.nearest(Vector2i(3840, 2160), Vector2i(1920, 1080)),
+		Vector2i(1920, 1080),
+		"сменили монитор — размер ужимается под новый"
+	)
 
 
 func test_settings_without_a_file_take_the_system_language() -> void:
@@ -158,3 +185,38 @@ func test_the_dead_do_not_get_an_extra_life() -> void:
 
 	game.add_score(GameState.EXTRA_LIFE_SCORE)
 	assert_eq(game.lives, 0, "мёртвому жизнь не выдают")
+
+
+## Язык сменили посреди партии — подписи HUD, собранные кодом, переводятся.
+func test_the_hud_follows_a_language_change() -> void:
+	var was := TranslationServer.get_locale()
+	TranslationServer.set_locale("en")
+	var hud := HUD_SCENE.instantiate() as Hud
+	add_child_autofree(hud)
+	var english := TranslationServer.translate("UI_SCORE").to_upper()
+	TranslationServer.set_locale("ru")
+	var russian := TranslationServer.translate("UI_SCORE").to_upper()
+	var captions: Array[String] = []
+	for label in hud.find_children("*", "Label", true, false):
+		captions.append((label as Label).text)
+	TranslationServer.set_locale(was)
+	assert_has(captions, russian, "подпись очков перевелась")
+	assert_does_not_have(captions, english, "подпись очков осталась на прежнем языке")
+
+
+## Папок документов в HUD столько, сколько документов в здании: по ROM их от 5
+## до 10 по навыку, и HUD на пять папок врал бы на высоком навыке.
+func test_the_hud_draws_a_folder_per_document() -> void:
+	assert_gte(Hud.DOCUMENT_ICONS, Arcade.red_doors(99), "папок меньше, чем бывает документов")
+	var hud := HUD_SCENE.instantiate() as Hud
+	add_child_autofree(hud)
+	var game := GameState.instance()
+	for total: int in [Arcade.red_doors(0), Arcade.red_doors(99)]:
+		game.start_building(total)
+		hud.refresh()
+		var shown := 0
+		for icon in hud.find_children("*", "HudIcon", true, false):
+			if (icon as HudIcon).kind == HudIcon.Kind.DOCUMENT and (icon as Control).visible:
+				shown += 1
+		assert_eq(shown, total, "документов %d — столько и папок" % total)
+	game.reset()
