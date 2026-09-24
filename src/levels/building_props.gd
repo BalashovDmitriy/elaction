@@ -17,6 +17,10 @@ const STANDOFF: float = 0.04
 const PLATE := Vector3(0.16, 0.1, 0.015)
 const PLATE_RISE: float = 1.5
 const PLATE_GAP: float = 0.14
+## Табличка висит перед пилястрами, как табличка этажа
+## ([constant FloorSigns.STANDOFF]): у края простенка рядом с дверью стоит
+## пилястра, и табличка на самой стене тонула в ней целиком (авторевью M21b).
+const PLATE_Z: float = WorldSpace.BACK_WALL_Z + BuildingRibs.PILASTER_DEPTH + 0.01
 ## Таблички: латунь с тёмными цифрами в отеле, сталь в офисе.
 const PLATE_HOTEL := Color(0.62, 0.48, 0.22)
 const PLATE_OFFICE := Color(0.55, 0.57, 0.6)
@@ -163,7 +167,7 @@ func _plate_the_doors(plan: BuildingPlan, identity: BuildingIdentity) -> void:
 		var y := _rules.floor_surface(door.floor_index) - PLATE_RISE
 		var plate := GreyboxLook.box(PLATE, metal)
 		plate.position = WorldSpace.to_scene(Vector2(x, y))
-		plate.position.z = WorldSpace.BACK_WALL_Z + STANDOFF + PLATE.z * 0.5
+		plate.position.z = PLATE_Z + PLATE.z * 0.5
 		add_child(plate)
 		var label := Label3D.new()
 		label.text = "%d%02d" % [number, counted[door.floor_index]]

@@ -89,7 +89,9 @@ func line_the_wall(index: int, inner: Vector2, openings: Array[Vector2]) -> void
 	var surface := _rules.floor_surface(index)
 	var top := _rules.story_top(index)
 	var gaps := openings.duplicate()
-	var half := _rules.shaft_width * 0.5
+	# Проём шахты — с наличником портала: пилястра у края простенка иначе
+	# вставала поверх хромированной рамки и прятала её (авторевью M21b).
+	var half := _rules.shaft_width * 0.5 + BuildingShafts.PORTAL_JAMB
 	for shaft in _plan.shafts:
 		if index >= shaft.top and index <= shaft.bottom:
 			gaps.append(Vector2(shaft.x - half, shaft.x + half))

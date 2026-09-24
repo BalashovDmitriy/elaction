@@ -22,8 +22,9 @@ func _identities() -> Array[BuildingIdentity]:
 	return [hotel, office]
 
 
-## Что на этаже мебель задевать не вправе: проёмы дверей, шахты с наличниками,
-## глухие стены, пролёт эскалатора с этажа выше и выход.
+## Что на этаже мебель задевать не вправе: проёмы дверей, шахты с наличниками
+## и панелью кнопок вызова, глухие стены, пролёт эскалатора с этажа выше и выход.
+## Сторону панели решает [BuildingShafts] — её здесь не пересчитать, не повторив.
 func _blockers(rules: BuildingRules, plan: BuildingPlan, index: int) -> Array[Vector2]:
 	var zones: Array[Vector2] = []
 	var door_half := Door.LEAF_SIZE.x * 0.5
@@ -34,6 +35,9 @@ func _blockers(rules: BuildingRules, plan: BuildingPlan, index: int) -> Array[Ve
 	for shaft in plan.shafts:
 		if shaft.top <= index and index <= shaft.bottom:
 			zones.append(Vector2(shaft.x - shaft_half, shaft.x + shaft_half))
+			var panel := BuildingShafts.call_panel_span(rules, plan, shaft.x, index)
+			if panel.y > panel.x:
+				zones.append(panel)
 	for wall in plan.walls:
 		if wall.floor_index == index:
 			zones.append(wall.band(rules))
@@ -85,31 +89,34 @@ func test_furniture_does_not_overlap() -> void:
 				)
 
 
-## На стене не висит у шахты (там панель кнопок) и над высокой мебелью.
+## На стене не висит у шахты (там панель кнопок) и над высокой мебелью — в
+## отеле и в офисе: комод с лампой бывает только в отеле.
 func test_wall_decor_keeps_off_shafts_and_tall_furniture() -> void:
 	var hung := 0
-	for building_seed: int in SEEDS:
-		var rules := _rules(5)
-		var step := rules.slot_x(1) - rules.slot_x(0)
-		var plan := BuildingPlan.generate(rules, building_seed)
-		var dressing := BuildingDressing.lay(rules, plan, building_seed, _identities()[1])
-		for item in dressing.decor:
-			hung += 1
-			assert_lte(
-				item.width, BuildingDressing.WALL_WIDTH + 0.001, "%s шире простенка" % item.name
-			)
-			for shaft in plan.shafts:
-				if shaft.top <= item.floor_index and item.floor_index <= shaft.bottom:
-					assert_gte(absf(shaft.x - item.x), step * 1.5, "%s у шахты" % item.name)
-			for prop in dressing.props:
-				if prop.floor_index != item.floor_index:
-					continue
-				if PropCatalog.entry(prop.name).height > BuildingDressing.TALL:
-					assert_gte(
-						absf(prop.x - item.x) + 0.001,
-						(prop.width + BuildingDressing.WALL_WIDTH) * 0.5,
-						"%s над %s" % [item.name, prop.name]
-					)
+	for identity in _identities():
+		for building_seed: int in SEEDS:
+			var rules := _rules(5)
+			var step := rules.slot_x(1) - rules.slot_x(0)
+			var plan := BuildingPlan.generate(rules, building_seed)
+			var dressing := BuildingDressing.lay(rules, plan, building_seed, identity)
+			for item in dressing.decor:
+				hung += 1
+				assert_lte(
+					item.width, BuildingDressing.WALL_WIDTH + 0.001, "%s шире простенка" % item.name
+				)
+				for shaft in plan.shafts:
+					if shaft.top <= item.floor_index and item.floor_index <= shaft.bottom:
+						assert_gte(absf(shaft.x - item.x), step * 1.5, "%s у шахты" % item.name)
+				for prop in dressing.props:
+					if prop.floor_index != item.floor_index:
+						continue
+					# Рост — с лампой сверху: она заходила на низ картины.
+					if PropCatalog.footprint(prop.name).y > BuildingDressing.TALL:
+						assert_gte(
+							absf(prop.x - item.x) + 0.001,
+							(prop.width + BuildingDressing.WALL_WIDTH) * 0.5,
+							"%s над %s" % [item.name, prop.name]
+						)
 	assert_gt(hung, 0, "стены пустые")
 
 

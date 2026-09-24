@@ -349,7 +349,9 @@ func test_the_exit_floor_is_a_garage_without_doors() -> void:
 				)
 
 
-## Техника крыши стоит внутри её стен (вывеска — по ширине щита вокруг середины).
+## Техника крыши стоит внутри её стен и за спиной Otto: передом не ближе
+## машинного отделения. На сиде 2 выход на крышу глубиной 2.7 м вставал поперёк
+## плоскости игры (авторевью M21b).
 func test_roof_kit_stays_on_the_roof() -> void:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
@@ -368,6 +370,15 @@ func test_roof_kit_stays_on_the_roof() -> void:
 		assert_between(
 			x, bounds.x - 0.1, bounds.y + 0.1, "деталь крыши за её стенами: %s" % part.name
 		)
+	var models := 0
+	for child in kit.get_children():
+		var model := child as Node3D
+		if model == null or PropCatalog.entry(String(model.name)) == null:
+			continue
+		models += 1
+		var front := model.position.z + PropCatalog.bounds_of(model).end.z
+		assert_lte(front, RoofKit.FRONT_Z + 0.001, "%s выступает в плоскость игры" % model.name)
+	assert_gt(models, 3, "моделей на крыше почти нет")
 	remove_child(level)
 
 

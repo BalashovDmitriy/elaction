@@ -61,9 +61,15 @@ const CALL_GAP: float = 0.14
 const CALL_BUTTON := Vector3(0.055, 0.055, 0.02)
 const CALL_LIT := Color(0.92, 0.96, 1.0)
 const CALL_DARK := Color(0.2, 0.21, 0.23)
-## Дверь ближе этого к середине шахты занимает стену сбоку: панель туда не
-## ставится.
-const CALL_CLEARANCE: float = 1.5
+
+## Табло и панель висят перед пилястрами, как табличка этажа
+## ([constant FloorSigns.STANDOFF]): у края простенка пилястра стоит вплотную
+## к порталу, выступает из стены на [constant BuildingRibs.PILASTER_DEPTH], и
+## панель на самой стене тонула в ней целиком (авторевью M21b).
+const MOUNT_Z: float = WorldSpace.BACK_WALL_Z + BuildingRibs.PILASTER_DEPTH + 0.01
+
+## Что показывает табло, пока кабина на крыше: этажа с таким номером нет.
+const ROOF_LABEL := "R"
 
 ## Высота упора в конце полосы шахты, м.
 const BUFFER_HEIGHT: float = 0.24
@@ -110,9 +116,11 @@ var _rules: BuildingRules
 var _plan: BuildingPlan
 ## Источники столба: этаж → те, что на нём стоят. Гаснут вне кадра, как лампы.
 var _glow: Dictionary = {}
-## Табло и кнопки порталов: x шахты → этаж → [ShaftBoard].
+## Табло и кнопки порталов: x шахты → этаж → [ShaftBoard]. В одном столбце
+## бывает несколько шахт — этажи у них не пересекаются, поэтому ключ «x и этаж»
+## однозначен, но обновлять табло надо по этажам своей шахты, а не по столбцу.
 var _boards: Dictionary = {}
-## Кабины, за которыми следят табло: кабина → x её шахты.
+## Кабины, за которыми следят табло: кабина → её шахта.
 var _watched: Dictionary = {}
 ## Что табло уже показывают: кабина → [этаж, направление]. Надписи меняются
 ## только при смене, а не каждый кадр.
@@ -130,6 +138,8 @@ class ShaftBoard:
 	var digits: Label3D = null
 	var up_button: MeshInstance3D = null
 	var down_button: MeshInstance3D = null
+	## Какая кнопка горит: [constant Intent.UP], [constant Intent.DOWN] или 0.
+	var lit: float = 0.0
 
 
 ## Одевает все шахты здания разом.
@@ -273,12 +283,12 @@ func _build_board(x: float, index: int, surface: float) -> void:
 	board.digits.position = frame.position + Vector3(0.0, 0.0, BOARD.z * 0.5 + 0.003)
 	_board_host.add_child(board.digits)
 
-	var side := _call_side(x, index)
+	var side := call_side(_rules, _plan, x, index)
 	if side != 0.0:
 		var panel_x := x + side * (_rules.shaft_width * 0.5 + PORTAL_JAMB + CALL_GAP)
 		var panel := GreyboxLook.box(CALL_PANEL, GreyboxLook.metal(PORTAL_TRIM))
 		panel.position = WorldSpace.to_scene(Vector2(panel_x, surface - CALL_RISE))
-		panel.position.z = WorldSpace.BACK_WALL_Z + CALL_PANEL.z * 0.5 + 0.01
+		panel.position.z = MOUNT_Z + CALL_PANEL.z * 0.5
 		_board_host.add_child(panel)
 		for up: bool in [true, false]:
 			var button := GreyboxLook.box(CALL_BUTTON, GreyboxLook.metal(CALL_DARK))
@@ -293,33 +303,67 @@ func _build_board(x: float, index: int, surface: float) -> void:
 	if not _boards.has(x):
 		_boards[x] = {}
 	(_boards[x] as Dictionary)[index] = board
-	_show(board, FloorSigns.number_of(_rules, index), 0.0)
+	_show(board, floor_label(_rules, index), 0.0, 0.0)
 
 
-## С какой стороны портала панели кнопок место: там, где рядом нет двери и
-## панель не уходит в боковую стену здания. Справа, если свободны обе; 0 —
-## если заняты обе.
-func _call_side(x: float, index: int) -> float:
-	var reach := _rules.shaft_width * 0.5 + PORTAL_JAMB + CALL_GAP + CALL_PANEL.x
-	var bounds := _rules.floor_span(index)
+## Что пишет табло про этаж [param index]: номер таблички этажа, а на крыше —
+## [constant ROOF_LABEL]. Номер крыши по формуле вышел бы на единицу больше
+## верхнего этажа — этажа, которого в здании нет.
+static func floor_label(rules: BuildingRules, index: int) -> String:
+	if index <= BuildingRules.ROOF:
+		return ROOF_LABEL
+	return str(FloorSigns.number_of(rules, index))
+
+
+## Сколько панель кнопок занимает у шахты [param x] на этаже [param index]:
+## пара «левый край, правый край», или нулевая пара, если панели нет. Мебель
+## перед ней не встаёт ([method BuildingDressing.blocked_zones]).
+static func call_panel_span(
+	rules: BuildingRules, plan: BuildingPlan, x: float, index: int
+) -> Vector2:
+	var side := call_side(rules, plan, x, index)
+	if side == 0.0:
+		return Vector2.ZERO
+	var near := x + side * (rules.shaft_width * 0.5 + PORTAL_JAMB + CALL_GAP - CALL_PANEL.x * 0.5)
+	var far := near + side * CALL_PANEL.x
+	return Vector2(minf(near, far), maxf(near, far))
+
+
+## С какой стороны портала панели кнопок место: там, где до двери или выхода
+## хватает стены и панель не уходит в боковую стену здания. Справа, если
+## свободны обе; 0 — если заняты обе.
+##
+## Дверь считается с наличником, а слева от шахты — ещё и с табличкой номера,
+## которая висит справа от двери ([BuildingProps]): по середине двери панель
+## вставала на наличник двери соседнего места и на её табличку.
+static func call_side(rules: BuildingRules, plan: BuildingPlan, x: float, index: int) -> float:
+	var reach := rules.shaft_width * 0.5 + PORTAL_JAMB + CALL_GAP + CALL_PANEL.x
+	var bounds := rules.floor_span(index)
 	var right := x + reach < bounds.y - BuildingShell.WALL_WIDTH
 	var left := x - reach > bounds.x + BuildingShell.WALL_WIDTH
-	for door in _plan.doors:
-		if door.floor_index != index:
-			continue
-		if door.x > x and door.x - x < CALL_CLEARANCE:
+	var door_half := Door.LEAF_SIZE.x * 0.5 + Door.FRAME_WIDTH
+	var plate_reach := Door.LEAF_SIZE.x * 0.5 + BuildingProps.PLATE_GAP + BuildingProps.PLATE.x
+	var openings: Array[Vector2] = []
+	for door in plan.doors:
+		if door.floor_index == index:
+			openings.append(Vector2(door.x - door_half, door.x + maxf(door_half, plate_reach)))
+	if index == rules.floors - 1:
+		var exit_half := Proportions.EXIT_WIDTH * 0.5
+		openings.append(Vector2(plan.exit_x - exit_half, plan.exit_x + exit_half))
+	for opening in openings:
+		if opening.x > x and opening.x < x + reach:
 			right = false
-		if door.x < x and x - door.x < CALL_CLEARANCE:
+		if opening.y < x and opening.y > x - reach:
 			left = false
 	if right:
 		return 1.0
 	return -1.0 if left else 0.0
 
 
-## Табло шахты следят за кабиной [param car]: этаж и направление хода.
-## У двухэтажной — за ведущим ярусом.
+## Табло шахты [param shaft] следят за кабиной [param car]: этаж и направление
+## хода. У двухэтажной — за ведущим ярусом.
 func watch(car: ElevatorCar, shaft: BuildingPlan.ShaftSpot) -> void:
-	_watched[car] = shaft.x
+	_watched[car] = shaft
 	set_physics_process(true)
 
 
@@ -336,46 +380,66 @@ func refresh(car: ElevatorCar) -> void:
 	# Нижний ярус двухэтажной кабины табло не ведёт: этаж показывает ведущий.
 	if not _watched.has(car):
 		return
+	var shaft := _watched[car] as BuildingPlan.ShaftSpot
 	var index := _nearest_floor(car)
-	var heading := signf(car.speed_now())
+	var heading := heading_of(car.speed_now())
 	var last: Array = _shown.get(car, [])
 	if not last.is_empty() and last[0] == index and last[1] == heading:
 		return
 	_shown[car] = [index, heading]
-	var number := FloorSigns.number_of(_rules, index)
-	for board: ShaftBoard in (_boards.get(_watched[car], {}) as Dictionary).values():
-		_show(board, number, coming(heading, index, board.floor_index))
+	var label := floor_label(_rules, index)
+	# Только этажи своей шахты: в том же столбце бывает другая, со своей кабиной,
+	# и табло столбца целиком показывали бы то одну кабину, то другую.
+	var column := _boards.get(shaft.x, {}) as Dictionary
+	for floor_index in range(shaft.top, shaft.bottom + 1):
+		var board := column.get(floor_index) as ShaftBoard
+		if board != null:
+			_show(board, label, heading, coming(heading, index, floor_index))
+
+
+## Ход кабины по её скорости: [constant Intent.UP], [constant Intent.DOWN] или
+## 0. Скорость — в плоскости правил, где y растёт вниз: едущая вниз кабина
+## отчитывается положительной скоростью, как и в [method ElevatorCar.speed_now].
+static func heading_of(speed: float) -> float:
+	if is_zero_approx(speed):
+		return 0.0
+	return Intent.DOWN if speed > 0.0 else Intent.UP
 
 
 ## Едет ли кабина к этажу табло: вниз — к этажам под ней, вверх — к этажам над
-## ней. Индексы этажей растут вниз: нулевой — верхний.
+## ней. Направления — [Intent]; индексы этажей растут вниз, нулевой — верхний.
 static func coming(heading: float, car_floor: int, board_floor: int) -> float:
-	if heading < 0.0 and board_floor > car_floor:
-		return -1.0
-	if heading > 0.0 and board_floor < car_floor:
-		return 1.0
+	if heading == Intent.DOWN and board_floor > car_floor:
+		return Intent.DOWN
+	if heading == Intent.UP and board_floor < car_floor:
+		return Intent.UP
 	return 0.0
 
 
-## Ближайший к полу кабины этаж.
+## Ближайший к полу кабины этаж её шахты.
 func _nearest_floor(car: ElevatorCar) -> int:
-	var rule_y := WorldSpace.to_plane(car.global_position).y
-	var best := 0
-	var best_gap := INF
-	for index in _rules.levels():
-		var gap := absf(_rules.floor_surface(index) - rule_y)
-		if gap < best_gap:
-			best_gap = gap
-			best = index
-	return best
+	var index := _rules.floor_index_near(WorldSpace.to_plane(car.global_position).y)
+	var shaft := _watched.get(car) as BuildingPlan.ShaftSpot
+	return clampi(index, shaft.top, shaft.bottom) if shaft != null else index
 
 
-func _show(board: ShaftBoard, number: int, heading: float) -> void:
-	var arrow := ARROW_UP if heading > 0.0 else (ARROW_DOWN if heading < 0.0 else "")
-	board.digits.text = str(number) if arrow.is_empty() else "%s %d" % [arrow, number]
+## Пишет на табло этаж и стрелку хода кабины [param heading] и зажигает кнопку
+## [param call] — ту, в сторону которой кабина идёт к этому этажу.
+func _show(board: ShaftBoard, label: String, heading: float, call: float) -> void:
+	var arrow := ""
+	if heading == Intent.UP:
+		arrow = ARROW_UP
+	elif heading == Intent.DOWN:
+		arrow = ARROW_DOWN
+	board.digits.text = label if arrow.is_empty() else "%s %s" % [arrow, label]
+	board.lit = call if board.up_button != null else 0.0
 	if board.up_button != null:
-		board.up_button.material_override = GreyboxLook.light(CALL_LIT) if heading > 0.0 else null
-		board.down_button.material_override = GreyboxLook.light(CALL_LIT) if heading < 0.0 else null
+		# Погасшая кнопка возвращается к тёмному металлу: без материала коробка
+		# рисовалась бы белым материалом движка по умолчанию.
+		var lit := GreyboxLook.light(CALL_LIT)
+		var dark := GreyboxLook.metal(CALL_DARK)
+		board.up_button.material_override = lit if call == Intent.UP else dark
+		board.down_button.material_override = lit if call == Intent.DOWN else dark
 
 
 ## Следят ли табло за этой кабиной.
@@ -389,14 +453,11 @@ func board_text(x: float, index: int) -> String:
 	return board.digits.text if board != null else ""
 
 
-## Горит ли на этом портале кнопка: +1 — вверх, −1 — вниз, 0 — ни одна.
-func lit_button(x: float, index: int) -> int:
+## Какая кнопка горит на этом портале: [constant Intent.UP], [constant
+## Intent.DOWN] или 0 — ни одна (или панели нет).
+func lit_button(x: float, index: int) -> float:
 	var board := (_boards.get(x, {}) as Dictionary).get(index) as ShaftBoard
-	if board == null or board.up_button == null:
-		return 0
-	if board.up_button.material_override != null:
-		return 1
-	return -1 if board.down_button.material_override != null else 0
+	return board.lit if board != null else 0.0
 
 
 ## Источник столба на одном этаже шахты: посреди пролёта, перед направляющими.
@@ -469,4 +530,4 @@ func _spawn_machine_room() -> void:
 		MACHINE_ROOM_SIZE
 	)
 	var z := WorldSpace.BACK_WALL_Z + MACHINE_ROOM_DEPTH * 0.5
-	_add_part(rect, GreyboxLook.surface(GreyboxLook.WALL), z, MACHINE_ROOM_DEPTH)
+	_add_part(rect, BuildingFinish.shaft_concrete(GreyboxLook.WALL), z, MACHINE_ROOM_DEPTH)

@@ -12,6 +12,9 @@ extends Node3D
 
 ## Техника стоит за задней стеной крыши, на ступенях кровли, м.
 const DEPTH_Z: float = WorldSpace.BACK_WALL_Z - 1.8
+## Ближе этого к камере техника не выступает: передняя грань машинного
+## отделения, за спиной Otto.
+const FRONT_Z: float = WorldSpace.BACK_WALL_Z + BuildingShafts.MACHINE_ROOM_DEPTH
 ## Ближе к краю кровли техника не встаёт, и между предметами зазор, м.
 const EDGE_GAP: float = 0.3
 const GAP: float = 0.35
@@ -39,6 +42,7 @@ const FORWARD := {
 	"air_conditioner": 1.1,
 	"solar_panel": 0.5,
 	"roof_exit": 0.8,
+	"antenna": 0.7,
 	"antenna_small": 0.6,
 }
 
@@ -78,7 +82,7 @@ func build(rules: BuildingRules, plan: BuildingPlan, building_seed: int = 1) -> 
 		cursor = far_edge + inward * GAP
 
 	var room := short.y - short.x - EDGE_GAP * 2.0
-	for prop_name: String in ["roof_exit", "antenna_small"]:
+	for prop_name: String in ["roof_exit", "antenna", "antenna_small"]:
 		if PropCatalog.footprint(prop_name).x <= room:
 			_place(prop_name, (short.x + short.y) * 0.5, steps, surface)
 			break
@@ -104,12 +108,17 @@ static func _top_at(steps: Array[Rect2], surface: float, x: float) -> float:
 
 
 ## Модель каталога на кровле: низом на ступень под серединой.
+##
+## Передом не ближе машинного отделения: модели крыши по глубине не сжимаются, и
+## выход на крышу в 2.7 м глубиной от [constant DEPTH_Z] вставал поперёк
+## плоскости игры — Otto шёл сквозь него, а тот закрывал Otto (авторевью M21b).
 func _place(prop_name: String, x: float, steps: Array[Rect2], surface: float) -> void:
 	var item := PropCatalog.make(prop_name)
 	if item == null:
 		return
 	item.position = WorldSpace.to_scene(Vector2(x, _top_at(steps, surface, x)))
-	item.position.z = DEPTH_Z + float(FORWARD.get(prop_name, 0.5))
+	var depth := PropCatalog.footprint(prop_name).z
+	item.position.z = minf(DEPTH_Z + float(FORWARD.get(prop_name, 0.5)), FRONT_Z - depth)
 	add_child(item)
 
 

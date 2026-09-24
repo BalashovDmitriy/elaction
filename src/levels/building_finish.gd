@@ -58,7 +58,7 @@ static func shaft_plates() -> StandardMaterial3D:
 	return _textured("shaft_plates", STEEL_TINT, PLATES_REPEAT, 0.6)
 
 
-## Бетон шахты: распорки, боковины, стены машинного отделения.
+## Бетон машинного отделения над шахтой.
 static func shaft_concrete(tone: Color) -> StandardMaterial3D:
 	return _textured("shaft_concrete", tone, STONE_REPEAT, 0.0)
 
@@ -68,14 +68,9 @@ static func tread_plate() -> StandardMaterial3D:
 	return _textured("tread_plate", STEEL_TINT, 0.6, 0.8)
 
 
-## Гравий настила крыши.
+## Гравий кровли: ступени скатов крыши ([BuildingRoof]).
 static func roof_gravel(tone: Color) -> StandardMaterial3D:
 	return _textured("roof_gravel", tone, GRAVEL_REPEAT, 0.0)
-
-
-## Забыть кэш: материалы держат цвет раунда, а тесты меняют раунды подряд.
-static func forget() -> void:
-	_cache.clear()
 
 
 static func _textured(

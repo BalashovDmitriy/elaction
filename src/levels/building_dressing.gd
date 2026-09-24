@@ -39,11 +39,12 @@ const WALL_CHANCE: float = 0.9
 const NARROW: float = 0.8
 const WIDE: float = 2.4
 
-## Предмет на стене не шире этого, м: он висит между пилястрами, а те стоят в
-## 0.6 м от середины места ([constant BuildingRibs.PILASTER_WIDTH] шириной).
-const WALL_WIDTH: float = 0.7
+## Предмет на стене не шире этого, м: он висит между пилястрами. Число одно с
+## каталогом — тот приводит к нему модели.
+const WALL_WIDTH: float = PropCatalog.WALL_MAX_WIDTH
 
-## Мебель выше этого закрывает стену: над ней ничего не вешается.
+## Мебель выше этого закрывает стену: над ней ничего не вешается. Рост — с тем,
+## что стоит сверху: лампа на комоде заходила на низ картины.
 const TALL: float = 1.25
 
 ## С каким шансом под потолком этажа офиса идёт труба. В отеле труб на виду нет.
@@ -170,8 +171,9 @@ static func wall_spots(
 
 
 ## Что на этаже мебели задевать нельзя, отрезками «левый край, правый край»:
-## проёмы дверей, шахты с наличниками, глухие стены и пролёт эскалатора с
-## этажа выше — он спускается сюда наклонной полосой почти в два метра.
+## проёмы дверей, шахты с наличниками и панелью кнопок вызова, глухие стены и
+## пролёт эскалатора с этажа выше — он спускается сюда наклонной полосой почти
+## в два метра.
 static func blocked_zones(
 	rules: BuildingRules, plan: BuildingPlan, floor_index: int
 ) -> Array[Vector2]:
@@ -184,6 +186,11 @@ static func blocked_zones(
 	for shaft in plan.shafts:
 		if shaft.top <= floor_index and floor_index <= shaft.bottom:
 			zones.append(Vector2(shaft.x - shaft_half, shaft.x + shaft_half))
+			if floor_index > BuildingRules.ROOF:
+				# Мебель стоит перед стеной и закрывала бы кнопки собой.
+				var panel := BuildingShafts.call_panel_span(rules, plan, shaft.x, floor_index)
+				if panel.y > panel.x:
+					zones.append(panel)
 	for wall in plan.walls:
 		if wall.floor_index == floor_index:
 			zones.append(wall.band(rules))
@@ -254,7 +261,7 @@ static func _beside_shaft(
 ## Стоит ли на [param x] высокая мебель, закрывающая стену.
 static func _under_tall(on_floor: Array[PropSpot], x: float) -> bool:
 	for prop in on_floor:
-		var item := PropCatalog.entry(prop.name)
-		if item.height > TALL and absf(prop.x - x) < prop.width * 0.5 + WALL_WIDTH * 0.5:
+		var tall := PropCatalog.footprint(prop.name).y > TALL
+		if tall and absf(prop.x - x) < prop.width * 0.5 + WALL_WIDTH * 0.5:
 			return true
 	return false

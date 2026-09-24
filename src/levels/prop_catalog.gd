@@ -88,6 +88,8 @@ static var _entries: Dictionary = _build()
 ## Габариты собранных предметов по имени: жребий раскладки спрашивает их на
 ## каждом месте, а модель грузится один раз.
 static var _footprints: Dictionary = {}
+## Габарит повёрнутой модели до масштаба, по имени.
+static var _boxes: Dictionary = {}
 
 
 ## Все записи каталога.
@@ -128,7 +130,11 @@ static func make(prop_name: String) -> Node3D:
 	turned.add_child(model)
 	if item != null:
 		turned.rotation = Vector3(deg_to_rad(item.pitch), deg_to_rad(item.yaw), 0.0)
-	var box := PropCatalog.bounds_of_turned(turned)
+	# Габарит модели один на все её копии: обход мешей — раз на имя, а не на
+	# каждый предмет здания.
+	if not _boxes.has(prop_name):
+		_boxes[prop_name] = PropCatalog.bounds_of_turned(turned)
+	var box: AABB = _boxes[prop_name]
 	var height := item.height if item != null else box.size.y
 	var factor := height / maxf(box.size.y, 0.001)
 	if item != null and item.place == Place.WALL:
@@ -153,7 +159,7 @@ static func make(prop_name: String) -> Node3D:
 			# Сверху, по середине глубины низа: лампа стоит на столешнице, а не
 			# на её заднем крае.
 			var depth := box.size.z * factor * squeeze
-			var top_depth := bounds_of(on_top).size.z
+			var top_depth := footprint(item.top).z
 			on_top.position = Vector3(0.0, height, (depth - top_depth) * 0.5)
 			holder.add_child(on_top)
 	return holder
