@@ -114,15 +114,18 @@ func test_props_keep_off_doors_lamps_shafts_and_walls() -> void:
 
 
 ## Труба видна: висит ниже полосы, которую закрывает кромка перекрытия, и не
-## проходит сквозь шахту, полотно эскалатора и табличку этажа.
+## проходит сквозь шахту, полотно эскалатора и табличку этажа. Трубы на виду —
+## только в офисе (ADR-0033): там их и проверяем.
 func test_pipes_show_below_the_slab_edge_and_skip_what_they_would_cover() -> void:
 	var laid := 0
 	var front := BuildingProps.pipe_z() + BuildingProps.PIPE_THICKNESS * 0.5
+	var office := BuildingIdentity.new()
+	office.kind = BuildingIdentity.Kind.OFFICE
 	for skill: int in SKILLS:
 		var rules := _rules(skill)
 		for building_seed: int in SEEDS:
 			var plan := BuildingPlan.generate(rules, building_seed)
-			var dressing := BuildingDressing.lay(rules, plan, building_seed)
+			var dressing := BuildingDressing.lay(rules, plan, building_seed, office)
 			for index: int in dressing.pipes:
 				var where := "навык %d, сид %d, этаж %d" % [skill, building_seed, index]
 				assert_gte(
@@ -141,13 +144,20 @@ func test_pipes_show_below_the_slab_edge_and_skip_what_they_would_cover() -> voi
 	assert_gt(laid, 0, "ни одной трубы — проверять было нечего")
 
 
-## Вывески обстановки не носят цвета огоньков игры: табло двери, двери с
-## документом и выхода (ADR-0023, решение 6).
+## Неон вывески, цифры табло шахт и огонёк кнопок вызова не носят цвета
+## огоньков игры: табло двери, двери с документом и выхода (ADR-0023,
+## решение 6).
 func test_neon_signs_do_not_wear_the_colours_of_game_signs() -> void:
 	var reserved: Array[Color] = [
 		GreyboxLook.SIGN_WARM, GreyboxLook.SIGN_RED, GreyboxLook.SIGN_GREEN
 	]
-	for neon: Color in BuildingProps.NEON:
+	var glowing: Array[Color] = [
+		VerticalSign.NEON_HOTEL,
+		VerticalSign.NEON_OFFICE,
+		BuildingShafts.BOARD_DIGITS,
+		BuildingShafts.CALL_LIT,
+	]
+	for neon: Color in glowing:
 		for sign_colour: Color in reserved:
 			var gap := Vector3(
 				neon.r - sign_colour.r, neon.g - sign_colour.g, neon.b - sign_colour.b

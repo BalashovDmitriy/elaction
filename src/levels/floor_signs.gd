@@ -1,13 +1,18 @@
 class_name FloorSigns
 extends Node3D
 
-## Номера этажей: красная табличка с белыми цифрами у правой стены каждого этажа.
+## Номера этажей: табло с красными цифрами у правой стены каждого этажа.
 ##
 ## В оригинале она висит на каждом этаже, под самым потолком, вплотную к правой
 ## стене. Это не обстановка, а игровая сводка: сколько ещё спускаться и где
-## лежит документ (ADR-0026, решение 9). Поэтому табличка светится сама — тем же
-## приёмом, что табло дверей (ADR-0023, решение 6), — и читается на погашенном
+## лежит документ (ADR-0026, решение 9). Поэтому цифры светятся сами — тем же
+## приёмом, что табло дверей (ADR-0023, решение 6), — и читаются на погашенном
 ## этаже.
+##
+## С M21b светится только цифра, а не вся табличка (замечание пользователя:
+## красный светящийся щит «сильно выделяется» среди обоев и мебели). Табло как
+## настоящее: стальная рамка, тёмное стекло, красные цифры с ореолом. Красный —
+## от таблички оригинала.
 ##
 ## Нумерация как в оригинале: верхний этаж — самый большой номер, нижний — первый.
 ## На крыше таблички нет: там нет ни стены, ни потолка, и в оригинале её там нет.
@@ -25,6 +30,14 @@ const DIGIT_SHARE: float = 0.7
 ## На сколько табличка стоит перед задней стеной: перед пилястрами, чтобы
 ## не утонуть в них у края простенка.
 const STANDOFF: float = 0.25
+
+## Рамка табло: насколько шире стекла с каждой стороны и её цвет — тёмная сталь.
+const BEZEL: float = 0.04
+const BEZEL_COLOR := Color(0.34, 0.35, 0.38)
+## Стекло: почти чёрное с красным отливом — цифре есть на чём гореть.
+const GLASS := Color(0.06, 0.02, 0.02)
+## Цифра — красный светодиод с ореолом того же тона.
+const DIGIT := Color(1.0, 0.28, 0.2)
 
 var _rules: BuildingRules = null
 
@@ -76,19 +89,25 @@ func _hang_on(index: int) -> void:
 	sign_node.position.z = WorldSpace.BACK_WALL_Z + STANDOFF
 	add_child(sign_node)
 
-	var board := GreyboxLook.box(
-		Vector3(plate.x, plate.y, 0.04), GreyboxLook.light(GreyboxLook.SIGN_RED)
-	)
-	sign_node.add_child(board)
+	# Первым — стекло, вторым — цифра: тест ищет её вторым ребёнком.
+	var glass := GreyboxLook.box(Vector3(plate.x, plate.y, 0.03), GreyboxLook.polished(GLASS))
+	sign_node.add_child(glass)
 
 	var label := Label3D.new()
 	label.text = str(number_of(_rules, index))
 	label.font = FONT
 	label.font_size = FONT_SIZE
 	label.pixel_size = Proportions.FLOOR_DIGIT / (float(FONT_SIZE) * DIGIT_SHARE)
-	label.modulate = Color.WHITE
-	label.outline_size = 0
-	# Цифра — свет, а не краска: освещение сцены её не трогает, как и табличку.
+	label.modulate = DIGIT
+	label.outline_modulate = Color(DIGIT, 0.35)
+	label.outline_size = 10
+	# Цифра — свет, а не краска: освещение сцены её не трогает.
 	label.shaded = false
-	label.position.z = 0.03
+	label.position.z = 0.02
 	sign_node.add_child(label)
+
+	var bezel := GreyboxLook.box(
+		Vector3(plate.x + BEZEL * 2.0, plate.y + BEZEL * 2.0, 0.02), GreyboxLook.metal(BEZEL_COLOR)
+	)
+	bezel.position.z = -0.015
+	sign_node.add_child(bezel)

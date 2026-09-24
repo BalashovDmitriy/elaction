@@ -117,6 +117,10 @@ var _watched: Dictionary = {}
 ## Что табло уже показывают: кабина → [этаж, направление]. Надписи меняются
 ## только при смене, а не каждый кадр.
 var _shown: Dictionary = {}
+## Табло и кнопки — своим узлом: по прямым детям шахт тесты ищут их части
+## (направляющие, упоры, трос спуска), и панель кнопок в 12 см шириной
+## сходила бы за трос.
+var _board_host: Node3D = null
 
 
 ## Табло и кнопки одного портала.
@@ -133,6 +137,9 @@ func dress(rules: BuildingRules, plan: BuildingPlan) -> void:
 	_rules = rules
 	_plan = plan
 	set_physics_process(false)
+	_board_host = Node3D.new()
+	_board_host.name = "Boards"
+	add_child(_board_host)
 	for shaft in plan.shafts:
 		_dress_shaft(shaft)
 	_spawn_machine_room()
@@ -256,7 +263,7 @@ func _build_board(x: float, index: int, surface: float) -> void:
 	var frame := GreyboxLook.box(BOARD, GreyboxLook.metal(PORTAL_RECESS))
 	frame.position = WorldSpace.to_scene(Vector2(x, head_top - BOARD_GAP - BOARD.y * 0.5))
 	frame.position.z = WorldSpace.BACK_WALL_Z + PANEL_THICKNESS + 0.06
-	add_child(frame)
+	_board_host.add_child(frame)
 	board.digits = Label3D.new()
 	board.digits.font = BOARD_FONT
 	board.digits.font_size = 64
@@ -264,7 +271,7 @@ func _build_board(x: float, index: int, surface: float) -> void:
 	board.digits.modulate = BOARD_DIGITS
 	board.digits.outline_size = 0
 	board.digits.position = frame.position + Vector3(0.0, 0.0, BOARD.z * 0.5 + 0.003)
-	add_child(board.digits)
+	_board_host.add_child(board.digits)
 
 	var side := _call_side(x, index)
 	if side != 0.0:
@@ -272,12 +279,12 @@ func _build_board(x: float, index: int, surface: float) -> void:
 		var panel := GreyboxLook.box(CALL_PANEL, GreyboxLook.metal(PORTAL_TRIM))
 		panel.position = WorldSpace.to_scene(Vector2(panel_x, surface - CALL_RISE))
 		panel.position.z = WorldSpace.BACK_WALL_Z + CALL_PANEL.z * 0.5 + 0.01
-		add_child(panel)
+		_board_host.add_child(panel)
 		for up: bool in [true, false]:
 			var button := GreyboxLook.box(CALL_BUTTON, GreyboxLook.metal(CALL_DARK))
 			var lift := CALL_PANEL.y * 0.22 * (1.0 if up else -1.0)
 			button.position = panel.position + Vector3(0.0, lift, CALL_PANEL.z * 0.5 + 0.005)
-			add_child(button)
+			_board_host.add_child(button)
 			if up:
 				board.up_button = button
 			else:
