@@ -104,10 +104,11 @@ func _build() -> void:
 	follow(0.0)
 
 
+## Ядро: светится эмиссией. Не unshaded — у unshaded Godot 4 эмиссию не берёт,
+## и ядро горело бы альбедо, не ярче единицы, без ореола (авторевью M21).
 static func _core() -> StandardMaterial3D:
 	if _core_material == null:
 		_core_material = StandardMaterial3D.new()
-		_core_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		_core_material.albedo_color = CORE
 		_core_material.emission_enabled = true
 		_core_material.emission = CORE
@@ -153,5 +154,7 @@ static func _flash_mat() -> StandardMaterial3D:
 		_flash_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		_flash_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 		_flash_material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		# Без этого билборд теряет масштаб узла, и вспышка не сжималась бы.
+		_flash_material.billboard_keep_scale = true
 		_flash_material.albedo_texture = texture
 	return _flash_material

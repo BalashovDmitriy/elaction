@@ -81,6 +81,15 @@ const HULL_DIRECTIONS: Array[Vector3] = [
 	Vector3(-1, -1, -1),
 ]
 
+## Какая доля пути перехода остаётся, когда риг встаёт в цель ровно: экспонента
+## сама по себе не доходит никогда. Тысячная — для удара ногой в 90° это десятая
+## градуса, глазу не видно; при [member smoothing] 16 переход длится 0.43 с.
+##
+## Порог — доля пути, а не угол между кадрами: `Quaternion.angle_to` у двух
+## равных кватернионов float32 отдаёт шум до 0.001 рад, и порог в углах мельче
+## шума не срабатывал никогда (авторевью M21).
+const SETTLE_LEFT: float = 0.001
+
 
 ## Поверхность меша, снятая один раз: вершины, привязка к костям и веса.
 ##
@@ -164,8 +173,15 @@ class Frame:
 	var lift: float = 0.0
 	var squash: float = 1.0
 
+	## Своя копия: массивы копируются целиком, без интерполяции по костям.
 	func copy() -> Frame:
-		return blend(self, 0.0)
+		var twin := Frame.new()
+		twin.rotations = rotations.duplicate()
+		twin.positions = positions.duplicate()
+		twin.tilt = tilt
+		twin.lift = lift
+		twin.squash = squash
+		return twin
 
 	## Смесь двух кадров: [param weight] 0 — этот, 1 — [param other].
 	func blend(other: Frame, weight: float) -> Frame:
@@ -180,19 +196,6 @@ class Frame:
 		mixed.lift = lerpf(lift, other.lift, t)
 		mixed.squash = lerpf(squash, other.squash, t)
 		return mixed
-
-	## Совпадают ли кадры с точностью до долей градуса и миллиметра.
-	func is_close_to(other: Frame) -> bool:
-		if absf(tilt - other.tilt) > 0.01 or absf(squash - other.squash) > 0.001:
-			return false
-		if absf(lift - other.lift) > 0.0001:
-			return false
-		for bone in rotations.size():
-			if rotations[bone].angle_to(other.rotations[bone]) > 0.0002:
-				return false
-			if positions[bone].distance_squared_to(other.positions[bone]) > 1e-8:
-				return false
-		return true
 
 
 ## Клип, разобранный на дорожки: какая дорожка какую кость ведёт.
@@ -225,6 +228,9 @@ var _meshes: Array[MeshInstance3D] = []
 var _surfaces: Array[SkinnedSurface] = []
 var _bones: Dictionary = {}
 var _clips: Dictionary = {}
+## Кадр покоя скелета: основа кадров клипа. Снят один раз — клип на ходу
+## собирается каждый кадр, а покой не меняется.
+var _rest: Frame = null
 ## Первый кадр стойки: основа поз кодом. Его глобальные положения костей
 ## посчитаны один раз — от них берутся оси поворотов.
 var _stand: Frame = null
@@ -244,8 +250,11 @@ var _clock: float = 0.0
 var _walk_clock: float = 0.0
 var _walk_phase: float = 0.0
 var _current: Frame = null
-## Кости уже стоят в целевом кадре позы кодом: раскладывать нечего. Стоящих в
-## позе кодом (присевший, залёгший) каждый кадр перебирали бы вершины впустую.
+## Кадр, в котором риг стоял, когда сменилась поза: из него идёт переход.
+var _from: Frame = null
+## Переход кончился: риг стоит в кадре позы. У неподвижной цели (поза кодом,
+## конец клипа) раскладывать больше нечего — стоящих и лежащих каждый кадр
+## перебирали бы вершины впустую; клип стойки и ходьбы риг дальше просто играет.
 var _settled: bool = false
 
 
@@ -272,6 +281,7 @@ func _ready() -> void:
 			push_error("в модели нет кости %s: %s" % [bone_name, model.resource_path])
 			continue
 		_bones[bone_name] = index
+	_rest = _read_rest()
 	_read_clips()
 
 	for node in _instance.find_children("*", "MeshInstance3D", true, false):
@@ -293,26 +303,30 @@ func _process(delta: float) -> void:
 	advance(delta)
 
 
-## Шаг сглаживания: кости идут к позе на долю пути за [param delta] секунд.
+## Шаг перехода: кости идут от кадра, где риг стоял при смене позы, к кадру
+## позы; остаток пути гаснет экспонентой по [member smoothing].
 ## Зовётся из [method Node._process]; тестам отдан наружу, потому что длина
 ## кадра в headless-прогоне не 1/60, а «сколько получится».
 func advance(delta: float) -> void:
 	if _skeleton == null:
 		return
+	# Неподвижная цель — поза кодом, конец клипа: долетев до неё, риг замирает.
+	# Проверка до шага часов: клип «один раз» успевает встать в последний кадр.
+	var frozen := _settled and _is_still()
 	_pose_time += delta
 	_clock += delta
-	var clip := FigurePoses.clip_of(_pose_name)
-	# Поза кодом неподвижна: долетев до неё, риг замирает.
-	if _settled and clip == null:
+	if frozen:
 		return
 	var wanted := _wanted()
-	if _settled:
-		_current = wanted
-	else:
-		_current = _current.blend(wanted, 1.0 - exp(-smoothing * delta))
-		_settled = _current.is_close_to(wanted)
-		if _settled:
-			_current = wanted
+	if not _settled:
+		# Переход — смесь кадра, из которого риг ушёл, с живым кадром цели. Клип
+		# идёт своим ходом и во время перехода: гоняясь за ним сглаживанием, риг
+		# волочился бы за ходьбой с отставанием в 15° и не догонял бы никогда.
+		var left := exp(-smoothing * _pose_time)
+		_settled = _from == null or left < SETTLE_LEFT
+		if not _settled:
+			wanted = _from.blend(wanted, 1.0 - left)
+	_current = wanted
 	_apply(_current, false)
 
 
@@ -326,6 +340,7 @@ func show_pose(pose_name: String) -> void:
 	# Кадры ходьбы — одна поза клипом: смена кадра не перезапускает переход.
 	if was_walking and pose_name.begins_with("walk_"):
 		return
+	_from = _current
 	_pose_time = 0.0
 	_settled = false
 
@@ -360,6 +375,12 @@ func snap() -> void:
 	_current = _wanted()
 	_settled = true
 	_apply(_current, true)
+
+
+## Кончился ли переход к текущей позе. Тестам: риг, не долетающий никогда,
+## перебирал бы кости и вершины каждый кадр до конца жизни актёра.
+func settled() -> bool:
+	return _settled
 
 
 ## Поворот кости в текущем кадре, как его видит скелет. Тестам: по нему видно,
@@ -472,7 +493,7 @@ func _read_clips() -> void:
 
 
 ## Кадр покоя скелета: основа, на которую ложатся дорожки клипа.
-func _rest_frame() -> Frame:
+func _read_rest() -> Frame:
 	var frame := Frame.new()
 	var count := _skeleton.get_bone_count()
 	frame.rotations.resize(count)
@@ -486,7 +507,7 @@ func _rest_frame() -> Frame:
 
 ## Кадр клипа на момент [param time], с.
 func _clip_frame(clip_name: String, time: float) -> Frame:
-	var frame := _rest_frame()
+	var frame := _rest.copy()
 	if not _clips.has(clip_name):
 		return frame
 	var tracks := _clips[clip_name] as ClipTracks
@@ -520,6 +541,29 @@ func _wanted() -> Frame:
 		FigurePoses.Clip.WALK:
 			time = fmod(_walk_clock * FigurePoses.WALK_CLIP_RATE, length)
 	return _clip_frame(clip.name, time)
+
+
+## Стоит ли цель на месте: поза кодом, конец клипа, клип «один раз», доигранный
+## до последнего кадра. Стойка и ходьба идут всегда.
+func _is_still() -> bool:
+	var clip := FigurePoses.clip_of(_pose_name)
+	if clip == null or not _clips.has(clip.name):
+		return true
+	match clip.mode:
+		FigurePoses.Clip.END:
+			return true
+		FigurePoses.Clip.ONCE:
+			return _pose_time >= (_clips[clip.name] as ClipTracks).length()
+	return false
+
+
+## Стоит ли клип позы на полу сам: стойка и ходьба пака — да, с точностью до
+## сантиметра. Конец клипа смерти — нет: тело уходит в пол на 6 см.
+func _grounded_by_the_pack() -> bool:
+	var clip := FigurePoses.clip_of(_pose_name)
+	if clip == null or not _clips.has(clip.name):
+		return false
+	return clip.mode == FigurePoses.Clip.LOOP or clip.mode == FigurePoses.Clip.WALK
 
 
 ## Кадр позы кодом: стойка, на которую легли углы [FigurePoses.Pose].
@@ -602,8 +646,9 @@ func _globals(frame: Frame) -> Array[Transform3D]:
 ## Раскладывает кадр по костям и по самой модели.
 ##
 ## [param exact] — заземлять по всем вершинам, а не по крайним: для снимков и
-## тестов. На ходу хватает крайних, а кадр клипа, в который риг уже пришёл,
-## не заземляется вовсе — пак поставил его на пол сам.
+## тестов. На ходу хватает крайних, а стойка и ходьба, в которые риг уже пришёл,
+## не заземляются вовсе — их пак поставил на пол сам. Клипы «один раз» и конец
+## клипа заземляются, как поза кодом: лежащий в конце смерти уходит в пол.
 func _apply(frame: Frame, exact: bool) -> void:
 	for bone in frame.rotations.size():
 		_skeleton.set_bone_pose_rotation(bone, frame.rotations[bone])
@@ -616,8 +661,7 @@ func _apply(frame: Frame, exact: bool) -> void:
 	_instance.rotation.x = deg_to_rad(frame.tilt)
 	_instance.scale = Vector3(widen, frame.squash, widen)
 	_instance.position.y = 0.0
-	var in_clip := FigurePoses.clip_of(_pose_name) != null
-	if in_clip and _settled and not exact:
+	if _settled and not exact and _grounded_by_the_pack():
 		return
 	_skeleton.force_update_all_bone_transforms()
 

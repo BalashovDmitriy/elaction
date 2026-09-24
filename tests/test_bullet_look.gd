@@ -41,6 +41,21 @@ func test_the_muzzle_flash_stays_where_the_shot_was_and_fades() -> void:
 	assert_gt(flash.transparency, 0.0, "и гаснет")
 	look.follow(BulletLook.FLASH_FADE + 0.01)
 	assert_false(flash.visible, "а за первые полметра гаснет совсем")
+	# Билборд без keep_scale теряет масштаб узла: вспышка не сжималась бы.
+	var material := flash.material_override as StandardMaterial3D
+	assert_true(material.billboard_keep_scale, "вспышка сжимается, а не только гаснет")
+
+
+## Ядро светится эмиссией, а unshaded Godot 4 эмиссию не берёт: ядро горело бы
+## альбедо, не ярче единицы, и ореола у трассера не было бы (авторевью M21).
+func test_the_core_glows_brighter_than_the_frame() -> void:
+	var core := _look(1.0).get_node("Core") as MeshInstance3D
+	var material := core.material_override as StandardMaterial3D
+	assert_true(material.emission_enabled, "ядро светится")
+	assert_gt(material.emission_energy_multiplier, 1.0, "ярче кадра")
+	assert_ne(
+		material.shading_mode, BaseMaterial3D.SHADING_MODE_UNSHADED, "эмиссия у unshaded молчит"
+	)
 
 
 func test_the_bullet_wears_the_tracer_and_keeps_its_shape() -> void:

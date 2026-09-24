@@ -24,6 +24,10 @@ var towards: float = 1.0
 
 var _leaving: bool = false
 var _wheels: Array[Node3D] = []
+## Середина каждого колеса в его собственных координатах: вокруг неё оно и
+## крутится. Начало узла колеса у пака не на оси, а в нуле машины, и поворот
+## вокруг начала носил бы колёса кругом по кузову (авторевью M21).
+var _hubs := PackedVector3Array()
 ## Радиус колеса, м: по нему колёса крутятся в лад с ходом, а не буксуют.
 var _wheel_radius: float = 0.3
 
@@ -56,11 +60,13 @@ func park(
 		model.rotation.y = PI
 	add_child(model)
 	_wheels = CarModel.wheels(model)
+	_hubs = PackedVector3Array()
 	for wheel in _wheels:
 		var mesh := wheel as MeshInstance3D
+		var box := mesh.mesh.get_aabb() if mesh != null else AABB()
+		_hubs.append(box.get_center())
 		if mesh != null:
-			_wheel_radius = maxf(mesh.mesh.get_aabb().size.y * 0.5, 0.05)
-			break
+			_wheel_radius = maxf(box.size.y * 0.5, 0.05)
 
 
 ## Где машине встать: середина ближайшего к выходу места на нижнем этаже, где
@@ -126,10 +132,14 @@ func advance(delta: float, view: Rect2) -> bool:
 	if not _leaving:
 		return false
 	position.x += towards * SPEED * delta
-	# Колёса катятся: угол — путь, делённый на радиус. Модель, развёрнутая
-	# назад, катит их в своей системе вперёд, поэтому знак один.
-	for wheel in _wheels:
-		wheel.rotate_object_local(Vector3.BACK, SPEED * delta / _wheel_radius)
+	# Колёса катятся вокруг своих осей: угол — путь, делённый на радиус. Капот
+	# в +X, и колесо, катящееся вперёд, идёт по часовой, если смотреть с +Z, —
+	# это минус вокруг +Z. Модель, развёрнутая назад, катит их в своей системе
+	# вперёд, поэтому знак один.
+	var spin := Basis(Vector3.BACK, -SPEED * delta / _wheel_radius)
+	for index in _wheels.size():
+		var hub := _hubs[index]
+		_wheels[index].transform *= Transform3D(spin, hub - spin * hub)
 	var left := position.x - LENGTH * 0.5
 	if left + LENGTH < view.position.x or left > view.end.x:
 		_leaving = false

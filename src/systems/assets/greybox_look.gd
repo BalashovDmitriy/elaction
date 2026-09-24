@@ -38,7 +38,6 @@ const PILASTER := Color(0.40, 0.40, 0.42)
 const DOOR := Color(0.78, 0.66, 0.30)
 const DOOR_RED := Color(0.76, 0.24, 0.22)
 const LAMP := Color(1.0, 0.93, 0.72)
-const BULLET := Color(1.0, 0.88, 0.60)
 const CAR := Color(0.70, 0.22, 0.20)
 
 ## Огоньки (ADR-0023, решение 6): табло обычной и красной двери, вывеска выхода,
@@ -88,8 +87,8 @@ static func metal(color: Color) -> StandardMaterial3D:
 	return _made("e%s" % color, color, METAL_ROUGHNESS, METAL_METALLIC, 0.0)
 
 
-## Маркер: светится сам, неярко. Светильник лампы и пуля — то, что и в жизни
-## есть источник.
+## Маркер: светится сам, неярко. Светильник лампы — то, что и в жизни есть
+## источник. Пуля с M21 — трассер своего вида ([BulletLook]).
 static func marker(color: Color) -> StandardMaterial3D:
 	return _made("m%s" % color, color, SURFACE_ROUGHNESS, 0.0, MARKER_GLOW)
 

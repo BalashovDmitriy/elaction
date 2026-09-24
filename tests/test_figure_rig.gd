@@ -213,15 +213,54 @@ func test_a_standing_actor_keeps_walking_where_he_stopped() -> void:
 
 ## Ходьба клипом, а заземления нет: клип стоит на полу сам. Если пак однажды
 ## придёт с ходьбой над полом, это видно здесь, а не на кадре.
+##
+## Мерка — после шага `advance`, а не после `snap`: снимок заземляет по всем
+## вершинам, и по нему низ был бы в нуле при любом клипе (авторевью M21).
 func test_the_walk_clip_keeps_its_feet_on_the_floor() -> void:
 	var rig := _rig(OTTO_MODEL)
 	rig.show_pose("walk_0")
 	for step in 6:
 		rig.set_walk_phase(step * 0.5)
 		rig.snap()
+		rig.advance(0.0)
 		var floor_level := rig.skinned_aabb().position.y
 		assert_gt(floor_level, -0.03, "фаза %.1f: подошва не в полу" % (step * 0.5))
 		assert_lt(floor_level, 0.05, "фаза %.1f: и не над ним" % (step * 0.5))
+
+
+## Переход кончается: и к позе кодом, и к клипу риг долетает за полсекунды.
+## Порог в углах мельче шума float32 не срабатывал никогда, а ходьба уходила от
+## сглаживания вперёд, и каждый актёр, хоть раз сменивший позу, до конца жизни
+## перебирал кости и вершины каждый кадр (авторевью M21).
+func test_a_transition_ends_for_poses_and_clips() -> void:
+	var rig := _rig(OTTO_MODEL)
+	var phase := 0.0
+	for pose_name: String in ["kick", "idle", "walk_0", "crouch", "dead_1"]:
+		rig.show_pose(pose_name)
+		for _frame in 45:
+			phase = ActorPose.advance(phase, FRAME)
+			rig.set_walk_phase(phase)
+			rig.advance(FRAME)
+		assert_true(rig.settled(), "%s: переход кончился за три четверти секунды" % pose_name)
+		assert_almost_eq(
+			rig.bone_rotation(FigureRig.LEG_L).angle_to(rig.target_rotation(FigureRig.LEG_L)),
+			0.0,
+			0.01,
+			"%s: бедро в кадре позы, а не позади него" % pose_name
+		)
+
+
+## В игре лежащий заземлён так же, как на снимке: конец клипа смерти пака уходит
+## в пол на 6 см, и риг, долетев до него, обязан тело поднять.
+func test_a_settled_corpse_lies_on_the_floor() -> void:
+	var rig := _rig(OTTO_MODEL)
+	rig.show_pose("dead_1")
+	for _frame in 60:
+		rig.advance(FRAME)
+	assert_true(rig.settled(), "тело легло")
+	var floor_level := rig.skinned_aabb().position.y
+	assert_gt(floor_level, -0.015, "лежащий не утоплен в пол")
+	assert_lt(floor_level, 0.03, "и не висит над ним")
 
 
 ## Заземление на ходу — по крайним вершинам костей, а не по всем: расхождение

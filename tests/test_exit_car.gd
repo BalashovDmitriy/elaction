@@ -140,6 +140,43 @@ func test_every_car_fits_between_the_wall_and_otto() -> void:
 		assert_gt(CarModel.wheels(car).size(), 0, "%s: колёса крутятся" % label)
 
 
+## Колёса на отъезде крутятся вокруг своих осей и катятся вперёд: середина колеса
+## стоит на месте, а низ уходит назад по ходу. Начало узла колеса у пака — в нуле
+## машины, и поворот вокруг него носил колёса кругом по кузову (авторевью M21).
+func test_the_wheels_roll_about_their_axles() -> void:
+	var rules := BuildingRules.new()
+	var plan := BuildingPlan.generate(rules, 1)
+	var car := ExitCar.new()
+	car.park(plan.exit_x, 0.0, rules, plan)
+	add_child_autofree(car)
+	var wheels := car.find_children("Wheel*", "MeshInstance3D", true, false)
+	assert_gt(wheels.size(), 0, "у машины есть колёса")
+	var hubs: Array[Vector3] = []
+	var treads: Array[Vector3] = []
+	for node in wheels:
+		var wheel := node as MeshInstance3D
+		var box := wheel.mesh.get_aabb()
+		var hub := box.get_center()
+		hubs.append(car.to_local(wheel.to_global(hub)))
+		treads.append(car.to_local(wheel.to_global(hub - Vector3(0.0, box.size.y * 0.5, 0.0))))
+	car.drive_away()
+	car.advance(1.0 / 120.0, Rect2(-1000.0, -1000.0, 2000.0, 2000.0))
+	for index in wheels.size():
+		var wheel := wheels[index] as MeshInstance3D
+		var box := wheel.mesh.get_aabb()
+		var hub := box.get_center()
+		var hub_now := car.to_local(wheel.to_global(hub))
+		var tread_now := car.to_local(wheel.to_global(hub - Vector3(0.0, box.size.y * 0.5, 0.0)))
+		assert_almost_eq(
+			hub_now.distance_to(hubs[index]), 0.0, 0.001, "%s: ось на месте" % wheel.name
+		)
+		assert_lt(
+			(tread_now.x - treads[index].x) * car.towards,
+			-0.01,
+			"%s: низ колеса уходит назад — колесо катится вперёд" % wheel.name
+		)
+
+
 ## Первое здание — красная спортивная, как в 1983 году (ADR-0032, решение 7).
 func test_the_first_building_parks_the_red_sports_car() -> void:
 	for building_seed in [1, 7, 12345]:
