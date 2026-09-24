@@ -26,7 +26,9 @@ func test_settings_survive_a_restart() -> void:
 	settings.music = 0.1
 	settings.sfx = 0.9
 	settings.locale = "en"
-	settings.fullscreen = true
+	settings.window_mode = DisplayModes.Mode.BORDERLESS
+	settings.resolution = Vector2i(2560, 1440)
+	settings.render_scale = 0.67
 	settings.save_to(TEMP)
 
 	var loaded := GameSettings.load_from(TEMP)
@@ -34,7 +36,30 @@ func test_settings_survive_a_restart() -> void:
 	assert_almost_eq(loaded.music, 0.1, 0.001)
 	assert_almost_eq(loaded.sfx, 0.9, 0.001)
 	assert_eq(loaded.locale, "en")
-	assert_true(loaded.fullscreen)
+	assert_eq(loaded.window_mode, DisplayModes.Mode.BORDERLESS)
+	assert_eq(loaded.resolution, Vector2i(2560, 1440))
+	assert_almost_eq(loaded.render_scale, 0.67, 0.001)
+
+
+## Настройки до M22 хранили флажок «полный экран»: он становится режимом окна.
+func test_the_old_fullscreen_flag_becomes_a_window_mode() -> void:
+	var old := ConfigFile.new()
+	old.set_value(GameSettings.SECTION, "fullscreen", true)
+	old.save(TEMP)
+	assert_eq(GameSettings.load_from(TEMP).window_mode, DisplayModes.Mode.FULLSCREEN)
+
+
+## Размеры окна — только те, что влезают на монитор; 4K — на экране 4K.
+func test_window_sizes_fit_the_screen() -> void:
+	var full_hd := DisplayModes.available(Vector2i(1920, 1080))
+	assert_eq(full_hd[-1], Vector2i(1920, 1080), "на FullHD больше FullHD не предлагается")
+	assert_has(DisplayModes.available(Vector2i(3840, 2160)), Vector2i(3840, 2160), "4K есть на 4K")
+	assert_eq(DisplayModes.available(Vector2i(800, 600)).size(), 1, "на крошечном — хоть один")
+	assert_eq(
+		DisplayModes.nearest(Vector2i(3840, 2160), Vector2i(1920, 1080)),
+		Vector2i(1920, 1080),
+		"сменили монитор — размер ужимается под новый"
+	)
 
 
 func test_settings_without_a_file_take_the_system_language() -> void:

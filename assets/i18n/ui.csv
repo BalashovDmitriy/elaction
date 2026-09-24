@@ -26,7 +26,12 @@ UI_VOLUME_MASTER,Master volume,Общая громкость
 UI_VOLUME_MUSIC,Music,Музыка
 UI_VOLUME_SFX,Effects,Эффекты
 UI_LANGUAGE,Language,Язык
-UI_FULLSCREEN,Fullscreen,Полный экран
+UI_WINDOW_MODE,Display,Экран
+UI_WINDOW_MODE_0,Window,Окно
+UI_WINDOW_MODE_1,Borderless,Без рамки
+UI_WINDOW_MODE_2,Fullscreen,Полный экран
+UI_RESOLUTION,Resolution,Разрешение
+UI_RENDER_SCALE,Render scale,Масштаб рендера
 UI_BLOOD,Blood,Кровь
 UI_DIFFICULTY,Difficulty,Сложность
 UI_DIFFICULTY_0,Easy,Лёгкая
