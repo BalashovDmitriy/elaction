@@ -158,3 +158,21 @@ func test_the_dead_do_not_get_an_extra_life() -> void:
 
 	game.add_score(GameState.EXTRA_LIFE_SCORE)
 	assert_eq(game.lives, 0, "мёртвому жизнь не выдают")
+
+
+## Папок документов в HUD столько, сколько документов в здании: по ROM их от 5
+## до 10 по навыку, и HUD на пять папок врал бы на высоком навыке.
+func test_the_hud_draws_a_folder_per_document() -> void:
+	assert_gte(Hud.DOCUMENT_ICONS, Arcade.red_doors(99), "папок меньше, чем бывает документов")
+	var hud := (load("res://src/ui/hud.tscn") as PackedScene).instantiate() as Hud
+	add_child_autofree(hud)
+	var game := GameState.instance()
+	for total: int in [Arcade.red_doors(0), Arcade.red_doors(99)]:
+		game.start_building(total)
+		hud.refresh()
+		var shown := 0
+		for icon in hud.find_children("*", "HudIcon", true, false):
+			if (icon as HudIcon).kind == HudIcon.Kind.DOCUMENT and (icon as Control).visible:
+				shown += 1
+		assert_eq(shown, total, "документов %d — столько и папок" % total)
+	game.reset()

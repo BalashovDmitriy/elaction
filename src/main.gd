@@ -159,6 +159,8 @@ func _enter_building() -> void:
 	_level.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(_level)
 	_level.building_cleared.connect(_on_building_cleared)
+	# HUD берёт у здания имя, цвет вывески и этаж Otto (M22).
+	_hud.follow(_level)
 	# Первый запуск: уровень качества выбирается замером на вступлении здания
 	# (ADR-0034, решение 3). Автосъёмка вехи снимает на уровне из настроек.
 	if QualityProbe.needed(_settings) and not SCREENSHOTTER.capturing():

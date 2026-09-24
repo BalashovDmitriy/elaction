@@ -28,7 +28,7 @@ const FOG_EMISSION := Color(0.03, 0.04, 0.06)
 
 ## Свечение только с того, что ярче кадра: иначе блум растит каждую лампу в
 ## белый столб и съедает деталь, ради которой всё и затевалось.
-const GLOW_INTENSITY: float = 0.45
+const GLOW_INTENSITY: float = 0.6
 const GLOW_THRESHOLD: float = 1.0
 
 const EXPOSURE: float = 1.15
@@ -36,12 +36,16 @@ const EXPOSURE: float = 1.15
 ## Тон кадра — ночной нуар по референсу (ADR-0030, решение 1): кривые по каналам
 ## от холодных теней к тёплому свету, чуть больше контраста, чуть меньше цвета.
 ## Игровые знаки светятся эмиссией поверх тона и яркими остаются.
-const NOIR_SHADOW := Color(0.0, 0.02, 0.05)
-const NOIR_MIDDLE := Color(0.31, 0.35, 0.39)
-const NOIR_LIGHT := Color(1.0, 0.96, 0.88)
+##
+## Подобран в M22 по кадрам из трёх наборов (`layout_shot --tone=N`): холод в
+## тенях и тепло в свете разведены сильнее, чем в M20, — мрамор и обои больше
+## не выбеливались лампой, а двери и лампы стали теплее на синей стене.
+const NOIR_SHADOW := Color(0.0, 0.03, 0.08)
+const NOIR_MIDDLE := Color(0.27, 0.33, 0.4)
+const NOIR_LIGHT := Color(1.0, 0.93, 0.8)
 const NOIR_MIDDLE_AT: float = 0.35
-const CONTRAST: float = 1.08
-const SATURATION: float = 0.88
+const CONTRAST: float = 1.12
+const SATURATION: float = 0.9
 
 
 ## Воздух здания с общим тоном [param ambient] — цветом палитры раунда.

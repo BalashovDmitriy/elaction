@@ -19,6 +19,8 @@ UI_SCORE,Score,Очки
 UI_LIVES,Lives,Жизни
 UI_DOCUMENTS,Documents,Документы
 UI_ROUND,Round,Раунд
+UI_FLOOR,Floor,Этаж
+UI_ROOF,Roof,Крыша
 UI_ALARM,ALARM,ТРЕВОГА
 UI_VOLUME_MASTER,Master volume,Общая громкость
 UI_VOLUME_MUSIC,Music,Музыка

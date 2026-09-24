@@ -221,6 +221,18 @@ const AUTO_PLANS: Dictionary = {
 	# M21b: мир моделями паков. Крыша с техникой и вывеска на углу, спуск кабиной
 	# мимо табло этажей, этаж отеля с обстановкой и стальная шахта. Офис и гаражи
 	# по зданиям снимает tools/layout_shot.tscn -- --folder=M21b --building=N.
+	# M22: грейдинг и HUD — тот же спуск, что M21b: крыша, кабина, этаж отеля.
+	# Уровни качества и тон рядом снимает tools/layout_shot.tscn --floor-only.
+	"M22":
+	[
+		{"label": "roof", "actions": [], "hold": 1.2},
+		{"label": "roof_walk", "actions": ["move_right"], "hold": 2.5},
+		{"label": "to_the_shaft", "actions": ["move_right"], "hold": 2.9},
+		{"label": "riding_down", "actions": ["move_down"], "hold": 2.2},
+		{"label": "stopped", "actions": [], "hold": 1.6},
+		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
+		{"label": "floor", "actions": [], "hold": 1.5},
+	],
 	"M21B":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},
