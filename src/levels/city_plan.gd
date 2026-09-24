@@ -8,6 +8,11 @@ extends RefCounted
 ## город повторяется по сиду и закрывает всю ширину кадра. Координаты — метры
 ## сцены города: x вдоль здания, y вверх от земли, z вглубь, от камеры прочь.
 
+## Чем кончается дом сверху (M22, замечание пользователя — «больше детализации
+## заднему фону»): плоская крыша, уступ, шпиль, бак, антенна. Силуэт горизонта
+## и в размытии читается городом, а не рядом коробок.
+enum Crown { FLAT, SETBACK, SPIRE, TANK, ANTENNA }
+
 
 ## Дом: коробка на земле и сетка окон на фасаде, обращённом к камере.
 class Block:
@@ -22,6 +27,14 @@ class Block:
 	var depth: float = 0.0
 	## Горящие окна: пары «колонка, этаж» от левого нижнего угла фасада.
 	var lit: Array[Vector2i] = []
+	## Верх дома и мигает ли на нём красный огонь.
+	var crown: Crown = Crown.FLAT
+	var beacon: bool = false
+	## Неоновая вывеска на фасаде: цвет (прозрачный — вывески нет), ширина и
+	## высота, на какой высоте её середина.
+	var sign_colour := Color(0.0, 0.0, 0.0, 0.0)
+	var sign_size := Vector2.ZERO
+	var sign_y: float = 0.0
 
 
 ## Ряды по глубине: насколько ряд позади плоскости игры, м, и какой высоты там
@@ -53,6 +66,25 @@ const WINDOW_STEP := Vector2(2.4, Proportions.FLOOR)
 ## Сколько окон горит ночью.
 const LIT_SHARE: float = 0.35
 
+## С каким шансом у дома горит целый этаж.
+const LIT_FLOOR_CHANCE: float = 0.35
+
+## Доли верхов домов: плоских больше всего, шпилей меньше всего.
+const CROWN_WEIGHTS: Array[float] = [0.4, 0.22, 0.1, 0.16, 0.12]
+
+## С каким шансом у шпиля и антенны мигает огонь, и у высокого плоского дома.
+const BEACON_CHANCE: float = 0.8
+
+## С каким шансом на доме неоновая вывеска и какие у неё цвета: не цвета
+## огоньков игры (ADR-0023, решение 6).
+const SIGN_CHANCE: float = 0.4
+const SIGN_COLOURS: Array[Color] = [
+	Color(1.0, 0.25, 0.6),
+	Color(0.3, 0.85, 1.0),
+	Color(0.62, 0.35, 1.0),
+	Color(0.75, 0.82, 1.0),
+]
+
 ## Смешивается с сидом, чтобы город не повторял жребий раскладки здания.
 const SALT: int = 0x0C17_7A11
 
@@ -78,7 +110,50 @@ static func generate(building_seed: int, from_x: float, to_x: float) -> Array[Bl
 			block.lit = _lit_windows(rng, block)
 			blocks.append(block)
 			x += block.width + rng.randf_range(GAP.x, GAP.y)
+	_dress_crowns(blocks, building_seed)
 	return blocks
+
+
+## Верхи и вывески — своим жребием, после раскладки: раскладка кварталов по
+## сиду та же, что до M22, и её тесты не сдвигаются.
+static func _dress_crowns(blocks: Array[Block], building_seed: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash([building_seed, SALT, "crowns"])
+	for block in blocks:
+		block.crown = _weighted(rng, CROWN_WEIGHTS) as Crown
+		var tall := block.height > ROWS[block.row].z * 0.8
+		var pointed := block.crown == Crown.SPIRE or block.crown == Crown.ANTENNA
+		block.beacon = (pointed or tall) and rng.randf() < BEACON_CHANCE
+		if rng.randf() < SIGN_CHANCE:
+			block.sign_colour = SIGN_COLOURS[rng.randi_range(0, SIGN_COLOURS.size() - 1)]
+			block.sign_size = Vector2(
+				block.width * rng.randf_range(0.35, 0.7), rng.randf_range(2.0, 4.0)
+			)
+			# Где угодно по высоте, а не только под крышей: камера города видит
+			# полосу домов на своей высоте, и вывеска под самой крышей близкого
+			# дома с этажей не видна вовсе.
+			block.sign_y = block.height * rng.randf_range(0.12, 0.9)
+		# Горящие этажи — как у контор ночью: целая строка окон, на которой
+		# видно, что дом живой. Своим списком, чтобы окна раскладки не менялись.
+		if rng.randf() < LIT_FLOOR_CHANCE:
+			var grid := window_grid(block)
+			var level := rng.randi_range(0, grid.y - 1)
+			for column in grid.x:
+				var cell := Vector2i(column, level)
+				if not block.lit.has(cell):
+					block.lit.append(cell)
+
+
+static func _weighted(rng: RandomNumberGenerator, weights: Array[float]) -> int:
+	var total := 0.0
+	for weight in weights:
+		total += weight
+	var roll := rng.randf() * total
+	for index in weights.size():
+		roll -= weights[index]
+		if roll <= 0.0:
+			return index
+	return weights.size() - 1
 
 
 ## Сколько колонок и этажей окон у фасада дома.

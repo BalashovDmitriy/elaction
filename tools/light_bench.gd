@@ -9,8 +9,13 @@ extends Node3D
 ##
 ## Рендер настоящий, не headless — нужен экран. Число пишется в STATUS.
 ##
+## С M22 — и по всему зданию (ADR-0030, решение 6): `--whole` ставит Otto на
+## каждый этаж от крыши до гаража на каждом уровне качества и пишет средний и
+## худший кадр уровня, с этажом, где худший случился.
+##
 ## Запуск:
 ##     godot --path . res://tools/light_bench.tscn
+##     godot --path . res://tools/light_bench.tscn -- --whole
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
@@ -22,6 +27,9 @@ const SETTLE_STEPS: int = 240
 const MEASURE_FRAMES: int = 240
 ## Бюджет кадра, мс: 60 кадров в секунду.
 const BUDGET_MS: float = 16.6
+## По всему зданию: сколько кадров дать этажу устояться и сколько мерить.
+const FLOOR_SETTLE: int = 20
+const FLOOR_FRAMES: int = 30
 
 
 func _ready() -> void:
@@ -37,11 +45,57 @@ func _ready() -> void:
 
 	# Не крыша, а широкий этаж: три лампы, двери с табло и агенты у них —
 	# самый дорогой кадр здания.
+	if OS.get_cmdline_user_args().has("--whole"):
+		_run_whole(level)
+		return
 	var index := level.rules.floors - 3
 	level.otto.global_position = WorldSpace.to_scene(
 		Vector2(level.plan().safe_x(level.rules, index), level.rules.floor_surface(index))
 	)
 	_run(level)
+
+
+## Всё здание на каждом уровне качества: худший кадр — этаж, где он случился.
+func _run_whole(level: GreyboxLevel) -> void:
+	var viewport := get_viewport().get_viewport_rid()
+	RenderingServer.viewport_set_measure_render_time(viewport, true)
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+	Engine.max_fps = 0
+	level.spawn_agents = false
+	var rules := level.rules
+	var failed := false
+	for quality: int in Graphics.Quality.size():
+		Graphics.broadcast(quality as Graphics.Quality)
+		# Шейдеры уровня компилируются на первых кадрах: их не меряем.
+		for _frame in 60:
+			await get_tree().process_frame
+		var total := 0.0
+		var samples := 0
+		var worst := 0.0
+		var worst_floor := 0
+		for index in range(BuildingRules.ROOF, rules.floors):
+			level.otto.global_position = WorldSpace.to_scene(
+				Vector2(level.plan().safe_x(rules, index), rules.floor_surface(index))
+			)
+			for _frame in FLOOR_SETTLE:
+				await get_tree().process_frame
+			for _frame in FLOOR_FRAMES:
+				await get_tree().process_frame
+				var spent := RenderingServer.viewport_get_measured_render_time_gpu(viewport)
+				total += spent
+				samples += 1
+				if spent > worst:
+					worst = spent
+					worst_floor = index
+		var mean := total / maxf(float(samples), 1.0)
+		failed = failed or worst > BUDGET_MS
+		print(
+			(
+				"  уровень %d: GPU %.2f мс в среднем, худший %.2f на этаже %s, бюджет %.1f"
+				% [quality, mean, worst, str(FloorSigns.number_of(rules, worst_floor)), BUDGET_MS]
+			)
+		)
+	get_tree().quit(1 if failed else 0)
 
 
 func _run(level: GreyboxLevel) -> void:

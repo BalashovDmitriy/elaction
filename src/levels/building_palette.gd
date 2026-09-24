@@ -9,9 +9,9 @@ extends Resource
 ## раунда, и набор зацикливается, как зацикливаются сами раунды
 ## ([ADR-0017](../../docs/adr/0017-spectrum-palette-and-shafts.md), решение 2).
 ##
-## Ассеты окружения нарисованы серыми там, где их красит палитра: стены, кладка
-## и части шахты. Тон приходит умножением ([member CanvasItem.modulate]), поэтому
-## нормаль и блик остаются на месте и свет из M6 по-прежнему ложится на рельеф.
+## Тон раунда ложится на материалы здания: с M21b — множителем на фактуру
+## стены ([BuildingFinish]), так что рисунок обоев и штукатурки остаётся, а
+## цвет даёт раунд.
 ##
 ## Первый раунд — кадр порта: бирюзовые этажи, красная кладка, синяя шахта.
 
@@ -27,18 +27,13 @@ static var _rounds: Array[BuildingPalette] = []
 ## Тон направляющих и створок шахты.
 @export var shaft := Color(0.22, 0.32, 0.95)
 
-## Заливка горящего этажа.
-@export var lit := Color(1.0, 0.95, 0.86)
-
 ## Общий тон здания — и он же тон погашенного этажа (ADR-0010, пункт 3).
 ##
-## Отличается от [member lit] не яркостью, а оттенком: в темноте агенты
-## продолжают стрелять, и «просто темнее» означало бы смерть ни за что.
+## Отличается от света лампы ([constant Lamp.LIGHT_COLOR]) не только яркостью,
+## а оттенком: в темноте агенты продолжают стрелять, и «просто темнее» означало
+## бы смерть ни за что.
 ## Разрыв между парой проверяется тестом на каждой палитре набора.
 @export var dark := Color(0.34, 0.42, 0.72)
-
-## Столб света в шахте. Он не гаснет вместе с этажом: это свет самой шахты.
-@export var shaft_light := Color(0.78, 0.86, 1.0)
 
 
 ## Сколько палитр в наборе. Набор конечный и идёт по кругу.
@@ -65,7 +60,6 @@ static func _all() -> Array[BuildingPalette]:
 				Color(0.0, 0.78, 0.78),
 				Color(0.85, 0.16, 0.16),
 				Color(0.22, 0.32, 0.95),
-				Color(1.0, 0.95, 0.86),
 				Color(0.34, 0.42, 0.72)
 			),
 			# Зелёный раунд: кладка уходит в пурпур, шахта остаётся холодной.
@@ -73,7 +67,6 @@ static func _all() -> Array[BuildingPalette]:
 				Color(0.22, 0.80, 0.30),
 				Color(0.78, 0.20, 0.72),
 				Color(0.20, 0.36, 0.92),
-				Color(1.0, 0.96, 0.82),
 				Color(0.30, 0.40, 0.70)
 			),
 			# Пурпурный раунд: шахта бирюзовая, иначе она слилась бы со стеной.
@@ -81,7 +74,6 @@ static func _all() -> Array[BuildingPalette]:
 				Color(0.80, 0.26, 0.80),
 				Color(0.26, 0.34, 0.86),
 				Color(0.16, 0.78, 0.78),
-				Color(1.0, 0.93, 0.88),
 				Color(0.32, 0.38, 0.74)
 			),
 			# Жёлтый раунд: самый тёплый этаж в наборе, и погашенный отделяется
@@ -90,7 +82,6 @@ static func _all() -> Array[BuildingPalette]:
 				Color(0.82, 0.76, 0.18),
 				Color(0.80, 0.22, 0.20),
 				Color(0.22, 0.34, 0.90),
-				Color(1.0, 0.97, 0.90),
 				Color(0.28, 0.40, 0.76)
 			),
 		]
@@ -98,12 +89,11 @@ static func _all() -> Array[BuildingPalette]:
 
 
 static func _make(
-	story_tone: Color, masonry_tone: Color, shaft_tone: Color, lit_tone: Color, dark_tone: Color
+	story_tone: Color, masonry_tone: Color, shaft_tone: Color, dark_tone: Color
 ) -> BuildingPalette:
 	var palette := BuildingPalette.new()
 	palette.story = story_tone
 	palette.masonry = masonry_tone
 	palette.shaft = shaft_tone
-	palette.lit = lit_tone
 	palette.dark = dark_tone
 	return palette

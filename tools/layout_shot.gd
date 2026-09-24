@@ -84,6 +84,8 @@ var _building: int = 1
 var _garage_only: bool = false
 ## Снять только этаж башни с дверями — уровни качества рядом.
 var _floor_only: bool = false
+## Снять только крышу — город над ней и погоду.
+var _roof_only: bool = false
 ## Вариант тона для подбора (M22): 0 — как в игре, иначе — пробный набор кривых.
 var _tone: int = 0
 
@@ -111,6 +113,8 @@ func _ready() -> void:
 			)
 		elif argument == "--floor-only":
 			_floor_only = true
+		elif argument == "--roof-only":
+			_roof_only = true
 		elif argument.begins_with("--tone="):
 			_tone = clampi(argument.trim_prefix("--tone=").to_int(), 0, TONES.size() - 1)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_folder))
@@ -135,6 +139,10 @@ func _run() -> void:
 		return
 	if _tone > 0:
 		_apply_tone(TONES[_tone])
+	if _roof_only:
+		await _shoot_floor("roof_seed%d" % _seed, BuildingRules.ROOF)
+		get_tree().quit(0)
+		return
 	if _floor_only:
 		var tag := "tone%d" % _tone if _tone > 0 else "q%d" % Graphics.quality
 		await _shoot_floor("floor_%s" % tag, 2)

@@ -24,6 +24,9 @@ const ROOF_RAIN_HEIGHT: float = 7.0
 const ROOF_RAIN_SLANT: float = 0.1
 const ROOF_RAIN_SPREAD: float = 2.0
 
+## Во сколько раз светлеет окружающий свет здания во вспышке молнии.
+const FLASH_AMBIENT: float = 2.5
+
 var weather: Weather.Kind = Weather.Kind.CLEAR
 var dressing: BuildingDressing = null
 ## Отель или офис и имя здания (ADR-0033, решение 1).
@@ -32,6 +35,7 @@ var identity: BuildingIdentity = null
 ## Воздух здания и дождь над крышей: их перестраивает [method apply_graphics].
 var _air: WorldEnvironment = null
 var _rain_node: GPUParticles3D = null
+var _city: CityBackdrop = null
 
 
 ## Собирает окружение здания по правилам, плану и сиду.
@@ -75,6 +79,7 @@ func build(
 	props.build(rules, plan, dressing, identity)
 
 	var city := CityBackdrop.new()
+	_city = city
 	city.name = "City"
 	add_child(city)
 	city.build(rules, building_seed, weather)
@@ -83,6 +88,18 @@ func build(
 		add_child(_rain_node)
 	add_to_group(Graphics.GROUP)
 	apply_graphics()
+
+
+## Вспышка молнии доходит до здания: воздух коридоров на миг светлеет (M22).
+## Не источник — яркость окружающего света, и бюджет ламп она не трогает.
+func _process(_delta: float) -> void:
+	if _city == null or _air == null:
+		return
+	var air := _air.environment
+	if not air.has_meta(&"ambient_base"):
+		air.set_meta(&"ambient_base", air.ambient_light_energy)
+	var base := float(air.get_meta(&"ambient_base"))
+	air.ambient_light_energy = base * (1.0 + _city.flash_level() * FLASH_AMBIENT)
 
 
 ## Отражения, контактные тени, объёмный туман и доля капель над крышей по уровню

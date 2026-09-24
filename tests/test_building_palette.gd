@@ -52,12 +52,13 @@ func _apart(first: Color, second: Color) -> float:
 func test_every_round_keeps_the_dark_floor_readable() -> void:
 	for number: int in range(1, BuildingPalette.count() + 1):
 		var palette := BuildingPalette.of_round(number)
-		var lit := palette.lit.get_luminance()
+		# Горящий этаж — свет лампы: он и отличает его от погашенного (ADR-0010).
+		var lit := Lamp.LIGHT_COLOR.get_luminance()
 		var dark := palette.dark.get_luminance()
 		assert_gt(lit - dark, LIGHT_GAP, "раунд %d: погашенный этаж не темнее горящего" % number)
 		assert_gt(dark, DARK_FLOOR, "раунд %d: погашенный этаж ушёл в чёрное" % number)
 		assert_gt(
-			_hue_gap(palette.lit, palette.dark),
+			_hue_gap(Lamp.LIGHT_COLOR, palette.dark),
 			HUE_GAP,
 			"раунд %d: погашенный отличается только яркостью" % number
 		)
