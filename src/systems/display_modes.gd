@@ -31,6 +31,17 @@ const RENDER_SCALES: Array[float] = [1.0, 0.77, 0.67, 0.5]
 ## Размер окна по умолчанию — базовый размер проекта.
 const DEFAULT_RESOLUTION := Vector2i(1920, 1080)
 
+## Предел кадров «по монитору»: с вертикальной синхронизацией кадры держит она,
+## без неё — предел в частоту экрана.
+const FRAME_MONITOR: int = 0
+## Предела нет: сколько карта выдаст (с синхронизацией — всё равно частота экрана).
+const FRAME_UNLIMITED: int = -1
+## Пределы кадров в меню. Список частот монитора не предлагается: в Godot 4.7
+## нет способа ни перечислить режимы экрана, ни сменить частоту — эксклюзивный
+## полный экран берёт режим рабочего стола. Поэтому частоту экрана игра не
+## выбирает, а только ограничивает кадры (просьба пользователя, M24b).
+const FRAME_LIMITS: Array[int] = [FRAME_MONITOR, 60, 120, 144, 165, 240, FRAME_UNLIMITED]
+
 
 ## Размеры окна, которые влезают на экран [param screen]. Хоть один — всегда:
 ## на экране меньше 720p окно будет больше экрана, но игра запустится.
@@ -105,6 +116,34 @@ static func apply_window(mode: Mode, resolution: Vector2i) -> void:
 			)
 			DisplayServer.window_set_size(frame.size)
 			DisplayServer.window_set_position(frame.position)
+
+
+## [member Engine.max_fps] для предела [param limit] из [constant FRAME_LIMITS]:
+## ноль — без предела движка. «По монитору» без синхронизации — частота экрана
+## [param refresh], если она известна; с синхронизацией кадры держит она сама.
+static func max_fps(limit: int, vsync: bool, refresh: float) -> int:
+	match limit:
+		FRAME_UNLIMITED:
+			return 0
+		FRAME_MONITOR:
+			return 0 if vsync or refresh <= 0.0 else roundi(refresh)
+		_:
+			return maxi(limit, 0)
+
+
+## Режим вертикальной синхронизации окна для флажка настроек.
+static func vsync_mode(vsync: bool) -> DisplayServer.VSyncMode:
+	return DisplayServer.VSYNC_ENABLED if vsync else DisplayServer.VSYNC_DISABLED
+
+
+## Применяет вертикальную синхронизацию к окну.
+static func apply_vsync(vsync: bool) -> void:
+	DisplayServer.window_set_vsync_mode(vsync_mode(vsync))
+
+
+## Применяет предел кадров: частота экрана спрашивается у того, где стоит окно.
+static func apply_frame_limit(limit: int, vsync: bool) -> void:
+	Engine.max_fps = max_fps(limit, vsync, DisplayServer.screen_get_refresh_rate())
 
 
 ## Применяет масштаб 3D-рендера к корневому виду.

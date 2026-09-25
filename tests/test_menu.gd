@@ -37,16 +37,50 @@ func test_every_page_builds_and_takes_focus() -> void:
 
 func test_settings_have_every_choice() -> void:
 	# Громкость трижды, язык, сложность, графика, экран, разрешение, масштаб,
-	# кровь, кадры в секунду — и «назад».
+	# предел кадров, синхронизация, кровь, кадры в секунду — и «назад».
 	var menu := _menu()
 	menu.show_page(Menu.Page.SETTINGS)
 	var kinds: Array[int] = []
 	for row: MenuRow in menu.rows():
 		kinds.append(row.kind)
 	assert_eq(kinds.count(MenuRow.Kind.LEVEL), 3, "три громкости")
-	assert_eq(kinds.count(MenuRow.Kind.CHOICE), 6, "шесть переключателей")
-	assert_eq(kinds.count(MenuRow.Kind.TOGGLE), 2, "флажки крови и кадров в секунду")
+	assert_eq(kinds.count(MenuRow.Kind.CHOICE), 7, "семь переключателей")
+	assert_eq(kinds.count(MenuRow.Kind.TOGGLE), 3, "синхронизация, кровь и кадры в секунду")
 	assert_eq(kinds.count(MenuRow.Kind.ACTION), 1, "назад")
+
+
+## Предел кадров — по монитору по умолчанию, числа подписаны как счётчик HUD;
+## а следом — флажок синхронизации, включённый по умолчанию. Листать пункт тест
+## не листает: выбор пишет настройки в файл игрока.
+func test_the_frame_limit_row_offers_the_caps() -> void:
+	var menu := _menu()
+	menu.show_page(Menu.Page.SETTINGS)
+	var rows := menu.rows()
+	var at := -1
+	for index: int in rows.size():
+		if rows[index].kind == MenuRow.Kind.CHOICE and rows[index].options.has("144 FPS"):
+			at = index
+	assert_gt(at, -1, "пункт предела кадров")
+	if at < 0:
+		return
+	var limit := rows[at]
+	assert_eq(limit.options.size(), DisplayModes.FRAME_LIMITS.size())
+	assert_eq(limit.index, 0, "по умолчанию — по монитору")
+	assert_string_contains(limit.value_text(), menu.frame_limit_name(DisplayModes.FRAME_MONITOR))
+	assert_eq(limit.options[-1], menu.frame_limit_name(DisplayModes.FRAME_UNLIMITED))
+	assert_eq(rows[at + 1].kind, MenuRow.Kind.TOGGLE, "следом — синхронизация")
+	assert_true(rows[at + 1].on, "синхронизация включена")
+
+
+## Настройки растут пунктами, а экран — нет: «назад» не должен заехать на
+## подсказку внизу. С пределом кадров и синхронизацией запас — пять пикселей.
+func test_the_settings_fit_above_the_hint() -> void:
+	var menu := _menu()
+	menu.show_page(Menu.Page.SETTINGS)
+	await wait_physics_frames(SETTLE_FRAMES)
+	var hint := menu.get_node("%Hint") as Label
+	var bottom := menu.rows()[-1].get_global_rect().end.y
+	assert_lte(bottom, hint.get_global_rect().position.y, "последний пункт выше подсказки")
 
 
 func test_the_game_behind_blurs_only_over_a_game() -> void:
