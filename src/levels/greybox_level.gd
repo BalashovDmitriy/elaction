@@ -212,7 +212,18 @@ func _ready() -> void:
 ## незачем.
 func _process(_delta: float) -> void:
 	_listen_where_otto_is()
-	var span := VisibleFloors.around(rules, otto.camera_view())
+	var seen := otto.camera_view()
+	var span := VisibleFloors.around(rules, seen)
+	# Свет выезда — только когда кадр ушёл за торец здания к воротам: в игре
+	# камера туда не заходит, и фонарь с неоном улицы там не горят вовсе.
+	if _garage != null and _garage.gate != null:
+		var bottom := rules.floors - 1
+		_garage.gate.show_street(
+			(
+				seen.position.x < rules.floor_span(bottom).x
+				and (VisibleFloors.covers(span, bottom) or VisibleFloors.covers(span, bottom - 1))
+			)
+		)
 	if span == _lit_span:
 		return
 

@@ -351,8 +351,9 @@ func test_otto_gets_in_through_the_open_driver_door() -> void:
 	assert_false(hinge.visible)
 
 
-## С посадки кадр раздвигается влево за торец: ворота, площадка и пандус в
-## кадре, а машина уходит из него, поднявшись по пандусу, а не в край кадра.
+## С посадки кадр раздвигается влево за торец: ворота, площадка и тоннель в
+## кадре. Машина трогается — кадр едет за ней вверх по пандусу до улицы, и
+## уходит она из кадра уже по улице, а не с середины подъёма.
 func test_the_car_drives_up_the_ramp_in_the_widened_frame() -> void:
 	var level := await _building()
 	var car := _car_of(level) as ExitCar
@@ -366,13 +367,17 @@ func test_the_car_drives_up_the_ramp_in_the_widened_frame() -> void:
 	_stand_at_the_door(level)
 	assert_true(await _wait_for_the_start(level))
 	var view := level.otto.camera_view(true)
-	assert_lt(
-		view.position.x, gate - GarageGate.RAMP_APRON - GarageGate.RAMP_RUN * 0.5, "пандус в кадре"
-	)
+	assert_lt(view.position.x, gate - GarageRamp.TUNNEL, "тоннель в кадре")
 	assert_gt(view.end.x, car.position.x + ExitCar.LENGTH * 0.5, "и машина у ворот")
+	var bottom := view.end.y
 	var waited := 0
+	var last := view
 	while not cleared[0] and waited < PATIENCE:
+		last = level.otto.camera_view(true)
 		await get_tree().physics_frame
 		waited += 1
 	assert_true(cleared[0], "машина ушла из кадра")
-	assert_gt(car.position.y, floor_y + rules.floor_height * 0.5, "уходит, поднявшись по пандусу")
+	var top := gate - GarageGate.RAMP_APRON - GarageGate.RAMP_RUN
+	assert_lt(last.position.x, top, "кадр доехал за машиной до улицы")
+	assert_lt(last.end.y, bottom - rules.floor_height * 0.9, "и поднялся вместе с ней")
+	assert_gt(car.position.y, floor_y + rules.floor_height * 0.99, "уходит по улице")

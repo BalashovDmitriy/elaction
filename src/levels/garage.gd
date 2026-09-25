@@ -337,7 +337,7 @@ func build(rules: BuildingRules, plan: BuildingPlan, building_seed: int) -> void
 	gate = GarageGate.new()
 	gate.name = "Gate"
 	add_child(gate)
-	gate.build(rules)
+	gate.build(rules, building_seed)
 	_hang_signs()
 	# Тёмному этажу ламп не дают вовсе ([method BuildingRules.lamps_on]), и
 	# гасить по зонам ламп там нечего: гаснут все светильники разом.
@@ -382,8 +382,6 @@ func show_lights(in_view: bool) -> void:
 	for fixture in _fixtures:
 		if fixture.light != null:
 			fixture.light.visible = in_view and fixture.lit
-	if gate != null:
-		gate.show_lights(in_view)
 
 
 ## Сколько светильников светят по-настоящему — для тестов бюджета.
@@ -796,16 +794,16 @@ func _park_cars() -> void:
 	for spot in _parked:
 		var model := CarModel.build(spot.choice)
 		model.name = "Parked"
-		model.scale = Vector3(1.0, 1.0, CAR_WIDTH / _depth_of(model))
+		model.scale = Vector3(1.0, 1.0, CAR_WIDTH / depth_of(model))
 		# Капот модели — в +X; поворот на четверть вокруг Y уводит его в -Z.
 		model.rotation.y = PI * 0.5 if spot.nose_in else -PI * 0.5
 		model.position = _at(spot.x, _surface, CAR_Z)
-		_switch_lights_off(model)
+		switch_lights_off(model)
 		cars.add_child(model)
 
 
-## Глубина модели пака по её мешам, м.
-static func _depth_of(model: Node3D) -> float:
+## Глубина модели пака по её мешам, м. Ею же ставит машину улица за выездом.
+static func depth_of(model: Node3D) -> float:
 	var low := INF
 	var high := -INF
 	for node in model.find_children("*", "MeshInstance3D", true, false):
@@ -816,7 +814,7 @@ static func _depth_of(model: Node3D) -> float:
 	return maxf(high - low, 0.1)
 
 
-static func _switch_lights_off(model: Node3D) -> void:
+static func switch_lights_off(model: Node3D) -> void:
 	for node in model.find_children("*", "MeshInstance3D", true, false):
 		var mesh := node as MeshInstance3D
 		for surface in mesh.mesh.get_surface_count():
