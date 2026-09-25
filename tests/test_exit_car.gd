@@ -65,11 +65,14 @@ func test_the_exit_has_a_car() -> void:
 	var at := WorldSpace.to_plane(car.global_position)
 	assert_almost_eq(at.y, surface, TOLERANCE, "колёсами на полу")
 
-	# Место — ближайшее к выходу свободное (ADR-0031, решение 4); не ближе зазора.
+	# Место — у ворот в левом торце, капотом к ним (ADR-0038, решение 3); выход —
+	# место Otto у водительской двери, на самой машине.
 	var expected := ExitCar.spot(exit_at.x, level.rules, level.plan())
 	assert_almost_eq(at.x, expected, TOLERANCE, "машина стоит на своём месте")
-	var gap := BuildingShell.EXIT_WIDTH * 0.5 + ExitCar.GAP + ExitCar.LENGTH * 0.5
-	assert_gte(absf(at.x - exit_at.x) + TOLERANCE, gap, "машина не в проёме выхода")
+	var parked := ExitCar.parked_span(level.rules)
+	assert_almost_eq(at.x, (parked.x + parked.y) * 0.5, TOLERANCE, "машина у ворот")
+	assert_between(exit_at.x, parked.x, parked.y, "выход у машины")
+	assert_eq((car as ExitCar).towards, -1.0, "капотом к воротам")
 
 
 func test_the_building_is_cleared_only_after_the_car_leaves() -> void:

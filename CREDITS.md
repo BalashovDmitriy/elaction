@@ -124,6 +124,13 @@
 | `door_open` | Door, Front, Opening | InspectorJ | CC-BY 4.0 | [freesound.org](https://freesound.org/people/InspectorJ/sounds/431117/) |
 | `door_close` | wooden door close | joedeshon | CC-BY 4.0 | [freesound.org](https://freesound.org/people/joedeshon/sounds/117415/) |
 | `car_away` | car drive away | soundmary | CC-BY 4.0 | [freesound.org](https://freesound.org/people/soundmary/sounds/128190/) |
+| `helicopter` | Helicopter_Hover | Lydmakeren | CC0 1.0 | [freesound.org](https://freesound.org/people/Lydmakeren/sounds/541482/) |
+| `helicopter_pass` | Helicopter Flyby, Distant, A | InspectorJ | CC-BY 4.0 | [freesound.org](https://freesound.org/people/InspectorJ/sounds/405234/) |
+| `rope_slide` | abseil2 | beerbelly38 | CC-BY 4.0 | [freesound.org](https://freesound.org/people/beerbelly38/sounds/162151/) |
+| `car_door` | car door close | monotraum | CC0 1.0 | [freesound.org](https://freesound.org/people/monotraum/sounds/208695/) |
+| `car_start` | Car Start | snakebarney | CC0 1.0 | [freesound.org](https://freesound.org/people/snakebarney/sounds/138099/) |
+| `garage_gate` | Automatic Garage Roller Door Opening | freesoundjon01 | CC0 1.0 | [freesound.org](https://freesound.org/people/freesoundjon01/sounds/202666/) |
+| `basement_open` | Door buzz alarm elevator HALIFAX 93 | TRP | CC0 1.0 | [freesound.org](https://freesound.org/people/TRP/sounds/567317/) |
 | `ui_move` | UI Audio: click1 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/ui-audio) |
 | `ui_select` | Interface Sounds: confirmation_001 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/interface-sounds) |
 | `ui_back` | UI Audio: mouserelease1 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/ui-audio) |

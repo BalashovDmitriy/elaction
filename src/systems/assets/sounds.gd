@@ -46,6 +46,15 @@ const CAR_AWAY := "car_away"
 const BUILDING_BONUS := "building_bonus"
 const EXTRA_LIFE := "extra_life"
 const GAME_OVER := "game_over"
+## M24b (ADR-0038): вертолёт висит над крышей и пролетает, Otto съезжает по
+## тросу; дверца и мотор машины, ворота паркинга; шахта в подвал открылась.
+const HELICOPTER := "helicopter"
+const HELICOPTER_PASS := "helicopter_pass"
+const ROPE_SLIDE := "rope_slide"
+const CAR_DOOR := "car_door"
+const CAR_START := "car_start"
+const GARAGE_GATE := "garage_gate"
+const BASEMENT_OPEN := "basement_open"
 ## Джингл смерти Otto: звучит поверх самой смерти.
 const DEATH_JINGLE := "death_jingle"
 
@@ -94,6 +103,13 @@ const EFFECTS: PackedStringArray = [
 	OTTO_DEATH,
 	AGENT_DEATH,
 	CAR_AWAY,
+	HELICOPTER,
+	HELICOPTER_PASS,
+	ROPE_SLIDE,
+	CAR_DOOR,
+	CAR_START,
+	GARAGE_GATE,
+	BASEMENT_OPEN,
 	BUILDING_BONUS,
 	EXTRA_LIFE,
 	GAME_OVER,
@@ -114,6 +130,7 @@ const JINGLES: PackedStringArray = [DOCUMENT, EXTRA_LIFE, BUILDING_BONUS, GAME_O
 ## партии не зациклен: он доигрывает под экраном рекорда и молкнет.
 const LOOPED: PackedStringArray = [
 	ELEVATOR_HUM,
+	HELICOPTER,
 	ESCALATOR_HUM,
 	THEME,
 	ALARM_THEME,

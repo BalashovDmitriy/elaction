@@ -77,9 +77,12 @@ func test_paths_multiply_towards_the_ground() -> void:
 			assert_eq(here, wanted, "сид %d: этаж %d обслуживают не так" % [building_seed, index])
 
 		var top := int(serving.get(BuildingRules.ROOF, 0))
+		var above := int(serving.get(rules.floors - 2, 0))
 		var bottom := int(serving.get(rules.floors - 1, 0))
 		assert_eq(top, 1, "наверху спуск безальтернативен")
-		assert_eq(bottom, rules.shafts_max, "на дне сходятся все")
+		assert_eq(above, rules.shafts_max, "над подвалом сходятся все")
+		# В подвал — одна жребием, как в ROM (ADR-0038, решение 3).
+		assert_eq(bottom, 1, "в подвал спускается одна")
 
 
 func test_neighbouring_shafts_stand_in_different_columns() -> void:
