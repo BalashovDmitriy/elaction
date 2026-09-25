@@ -1,6 +1,7 @@
 extends GutTest
 
-## Одежда здания: шахта, машинное отделение и трос вступления.
+## Одежда здания: шахта и машинное отделение. Вступление с вертолётом —
+## в `test_roof_arrival.gd`.
 ##
 ## Части одежды — коробки без тела, и тест узнаёт их по габариту: тому же, каким
 ## их собирают [BuildingShafts] и [GreyboxLevel]. Другого признака у серой коробки
@@ -47,9 +48,7 @@ func _drop(level: GreyboxLevel) -> void:
 ##
 ## Ищутся и в самом уровне, и в [BuildingShafts]: одежда шахт живёт своим узлом
 ## (частей за полсотни на здание, и под каждый обход детей они попадать не
-## должны), а трос вступления — по-прежнему прямой ребёнок уровня. Смотреть
-## только в шахты значит не видеть троса вовсе, и проверка на него, ничего не
-## находя, проходила бы всегда.
+## должны), а машинное отделение — прямой ребёнок уровня.
 func _parts(level: GreyboxLevel, kind: String) -> Array[Rect2]:
 	var found: Array[Rect2] = []
 	var hosts: Array[Node] = [level]
@@ -86,8 +85,6 @@ static func _is_a(kind: String, size: Vector3) -> bool:
 				is_equal_approx(size.x, BuildingShafts.MACHINE_ROOM_SIZE.x)
 				and is_equal_approx(size.y, BuildingShafts.MACHINE_ROOM_SIZE.y)
 			)
-		"rope":
-			return is_equal_approx(size.x, GreyboxLevel.ROPE_WIDTH)
 	return false
 
 
@@ -203,31 +200,6 @@ func test_machine_room_stands_over_the_top_shaft() -> void:
 		_drop(level)
 
 
-## Вступление кончается тем, что Otto стоит на крыше и снова слушается игрока.
-func test_the_rope_lands_otto_on_the_roof() -> void:
-	var level := _build(1)
-	var rules := level.rules
-	var surface := rules.floor_surface(BuildingRules.ROOF)
-	assert_lt(_otto_at(level).y, surface, "начинает он над крышей, на тросе")
-	# Трос сперва обязан найтись: иначе проверка «ушёл» ничего не значит — она
-	# прошла бы и на поиске, который троса вообще не видит.
-	assert_eq(_parts(level, "rope").size(), 1, "трос в кадре, пока Otto по нему едет")
-
-	await level.wait_for_the_landing()
-
-	assert_almost_eq(_otto_at(level).y, surface, TOLERANCE, "съехал ровно на крышу")
-	assert_eq(_parts(level, "rope").size(), 0, "трос ушёл вместе с вступлением")
-
-	# Управляем: до M12 ввод на спуске не действовал, и «приехал» не означало
-	# «отпустили». Проверяется не состоянием, а тем, что Otto пошёл.
-	var before := _otto_at(level).x
-	Input.action_press(&"move_right")
-	await wait_physics_frames(6)
-	Input.action_release(&"move_right")
-	assert_gt(_otto_at(level).x, before, "и снова слушается игрока")
-	_drop(level)
-
-
 ## У каждой шахты есть упоры сверху и снизу: по ним видно, где полоса кончается.
 ##
 ## Проверяется и место по вертикали, а не только счёт: нижний упор однажды уехал
@@ -282,13 +254,13 @@ func test_every_floor_wears_its_number() -> void:
 	assert_eq(signs.get_child_count(), rules.floors, "по табличке на этаж, у крыши нет")
 	var half := Proportions.FLOOR_SIGN * 0.5
 	for index in rules.floors:
-		var number := FloorSigns.number_of(rules, index)
-		var plate := signs.get_node("Floor%d" % number) as Node3D
-		assert_not_null(plate, "этаж %d без таблички" % number)
+		var number := FloorSigns.label_of(rules, index)
+		var plate := signs.get_node("Floor%s" % number) as Node3D
+		assert_not_null(plate, "этаж %s без таблички" % number)
 		if plate == null:
 			continue
 		var label := plate.get_child(1) as Label3D
-		assert_eq(label.text, str(number), "на табличке свой номер")
+		assert_eq(label.text, number, "на табличке свой номер")
 		var at := WorldSpace.to_plane(plate.position)
 		var span := rules.floor_span(index)
 		assert_lt(at.x + half.x, span.y - BuildingShell.WALL_WIDTH, "внутри стен")
@@ -304,8 +276,10 @@ func test_every_floor_wears_its_number() -> void:
 				assert_gt(
 					at.x - half.x,
 					shaft.x + rules.shaft_width * 0.5,
-					"этаж %d: табличка над шахтой" % number
+					"этаж %s: табличка над шахтой" % number
 				)
 	assert_eq(FloorSigns.number_of(rules, 0), rules.floors, "верхний этаж — старший номер")
-	assert_eq(FloorSigns.number_of(rules, rules.floors - 1), 1, "нижний — первый")
+	assert_eq(FloorSigns.number_of(rules, rules.floors - 2), 2, "над паркингом — второй")
+	assert_eq(FloorSigns.label_of(rules, rules.floors - 1), "P", "нижний — паркинг, «P»")
+	assert_eq(FloorSigns.label_of(rules, rules.floors - 2), "2", "остальные не сдвинулись")
 	_drop(level)

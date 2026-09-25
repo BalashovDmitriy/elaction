@@ -6,9 +6,10 @@ extends Node3D
 ## Красная прячет документ, обычная — засаду. Створку ведёт [DoorCycle], правила
 ## визита Otto — [DoorVisit]; узел отвечает за коврик, вид и выдачу документа.
 ##
-## Дверью пользуются двое, и по-разному. Otto стучится сам и сидит внутри, пока
-## не выйдет время. Агента дверь выпускает по просьбе уровня, и открывается перед
-## ним заметно дольше: створка — это предупреждение (ADR-0020, решение 2).
+## Дверью пользуются двое, и по-разному. Otto стучится сам, створка закрывается
+## за ним и открывается, выпуская, ровно через 70 тиков ROM (ADR-0038, решение 2).
+## Агента дверь выпускает по просьбе уровня, и открывается перед ним заметно
+## дольше: створка — это предупреждение (ADR-0020, решение 2).
 ##
 ## Створка висит в задней стене коридора, порог — в плоскости игры (ADR-0021,
 ## решение 1). Проём в стене за створкой режет сам уровень.
@@ -17,8 +18,16 @@ extends Node3D
 ## читаемость двери на погашенном этаже — сама створка больше не светится
 ## (ADR-0023, решение 6).
 
-## Документ взят, дверь перестала быть красной.
+## Документ взят, дверь перестала быть красной. Как в ROM — на выходе Otto,
+## а не на входе (ADR-0038, решение 2).
 signal document_taken
+
+## Otto ушёл внутрь и створка пошла за ним. По этому уровень ведёт агентов к
+## двери ([DoorWatch]).
+signal otto_hid
+
+## Otto вышел наружу.
+signal otto_came_out
 
 ## Габарит створки, м: 40% × 70% просвета, как в оригинале ([Proportions]).
 ## Уровень режет по нему проём в задней стене, а коробка створки собирается
@@ -53,9 +62,21 @@ const KICK_PLATE := Vector2(1.08, 0.2)
 const FRAME_WIDTH: float = 0.08
 const FRAME_DEPTH: float = 0.05
 const SIGN_RISE: float = 0.2
+## Пока Otto за красной дверью, закрытая створка в тени коридора сливалась с
+## темнотой (кадр `door_02_inside_closed`). Теперь створка чуть светится сама —
+## красным, как была, — а табло над ней медленно дышит: раз в столько секунд,
+## от своей обычной яркости до этой доли сверху. Источников света не прибавляет.
+const OCCUPIED_PULSE: float = 1.6
+const OCCUPIED_GLOW: float = 1.8
+## Насколько занятая створка светится сама: доля её цвета. Маркер
+## ([method GreyboxLook.marker]) горел плоским розовым пятном ярче всех дверей.
+const OCCUPIED_LEAF_GLOW: float = 0.14
 
-## Сколько Otto может пересидеть внутри, с.
-@export var hide_time: float = 5.0
+## Краски занятой створки по тону: их две на все двери (створка и филёнки).
+static var _occupied_paints: Dictionary = {}
+
+## Сколько Otto сидит внутри, с: 70 тиков ROM, считая от стука.
+@export var hide_time: float = Arcade.seconds(Arcade.ROOM_TICKS)
 
 ## Сколько открывается створка перед гостем, с.
 @export var open_time: float = 0.25
@@ -74,6 +95,8 @@ const SIGN_RISE: float = 0.2
 var _visit := DoorVisit.new()
 var _cycle := DoorCycle.new()
 var _guest: Otto = null
+## Otto, который уже снаружи, но ещё выходит: створка закрывается за ним.
+var _stepping_out: Otto = null
 ## Дверь открыта под агента: занята, пока он не выйдет.
 var _expecting_agent: bool = false
 var _voice: AudioStreamPlayer3D = null
@@ -82,7 +105,12 @@ var _voice: AudioStreamPlayer3D = null
 ## трогать трансформ полсотни раз на ровном месте.
 var _shown: float = -1.0
 var _shown_red: bool = false
+var _shown_occupied: bool = false
 var _sign: MeshInstance3D = null
+## Своё табло на время, пока Otto внутри: общий материал огонька дышал бы у всех
+## красных дверей здания разом. И часы дыхания — по физике: на паузе оно стоит.
+var _pulse: StandardMaterial3D = null
+var _pulse_clock: float = 0.0
 ## Филёнки створки: их тон идёт за створкой — красной или обычной.
 var _panels: Array[MeshInstance3D] = []
 
@@ -102,6 +130,7 @@ func _notification(what: int) -> void:
 
 func _ready() -> void:
 	_visit.hide_time = hide_time
+	_visit.leaf_time = open_time
 	_mat_visual.material_override = GreyboxLook.surface(GreyboxLook.SLAB)
 	var leaf := BoxMesh.new()
 	leaf.size = Vector3(LEAF_SIZE.x, LEAF_SIZE.y, LEAF_THICKNESS)
@@ -121,22 +150,34 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	_cycle.tick(delta)
 	_refresh_look()
+	_breathe(delta)
+
+	if _stepping_out != null:
+		_see_out()
+		return
 
 	if _guest == null:
 		_look_for_visitor()
 		return
 
-	if _visit.tick(delta, _guest.horizontal_intent(), _cycle.is_open()):
-		_release()
+	match _visit.tick(delta, _cycle.is_open()):
+		DoorVisit.Cue.HIDE:
+			_hide_the_guest()
+		DoorVisit.Cue.LET_OUT:
+			_cycle.open()
+			Sounds.play(Sounds.DOOR_OPEN)
+		DoorVisit.Cue.OUT:
+			_release()
 
 
-## Осталась ли за дверью добыча. По этому признаку выбирают, куда вернуть Otto.
+## Осталась ли за дверью добыча: красная ли она ещё. Документ достаётся на
+## выходе (ADR-0038, решение 2), и до выхода дверь остаётся красной.
 func is_pending() -> bool:
 	return has_document
 
 
-## Точка, где Otto стоит перед дверью, в координатах правил: сюда же его
-## возвращают за документом.
+## Точка, где Otto стоит перед дверью, в координатах правил: сюда он входит
+## и отсюда выходит.
 func mat_position() -> Vector2:
 	return WorldSpace.to_plane(_mat.global_position)
 
@@ -191,8 +232,8 @@ func _look_for_visitor() -> void:
 	if _expecting_agent:
 		# Дверь занята выходом агента, и Otto в неё не пускают. Дело не в
 		# вежливости: створку за агентом закрывает уровень ([method
-		# dismiss_agent]), а отсидка гостя идёт только при открытой двери —
-		# пущенный сюда Otto остался бы внутри навсегда.
+		# dismiss_agent]), а визит гостя идёт по створке — прячется он и выходит
+		# только в открытую, — и пущенный сюда Otto застрял бы в проёме.
 		return
 	for body: Node3D in _mat.get_overlapping_bodies():
 		var visitor := body as Otto
@@ -204,40 +245,78 @@ func _look_for_visitor() -> void:
 		return
 
 
+## Впускает Otto: створка открывается, и пока она идёт, он шагает в проём.
+##
+## Шаг в проём — поездка, как на эскалаторе: ввод снят и достать его нельзя уже
+## сейчас — в ROM он неуязвим от первого шага внутрь, — но он ещё на виду.
+## Прячется он, когда створка откроется ([method _hide_the_guest]).
 func _admit(visitor: Otto) -> void:
 	_guest = visitor
 	visitor.global_position = _mat.global_position
-	visitor.stay_indoors(true)
+	visitor.ride(true)
 	_visit.admit()
 	_cycle.travel_time = open_time
 	_cycle.open()
 	Sounds.play(Sounds.DOOR_OPEN)
-	Sounds.muffle_music(Sounds.MUFFLE_DOOR, true)
+
+
+## Створка открылась: Otto внутри, и она закрывается за ним. Коридор отсюда
+## слышно глухо — и музыку, и шаги с выстрелами (ADR-0038, решение 2).
+func _hide_the_guest() -> void:
+	_guest.ride(false)
+	_guest.stay_indoors(true)
+	_cycle.close()
+	Sounds.play(Sounds.DOOR_CLOSE)
+	_muffle(true)
+	otto_hid.emit()
+
+
+## Выпускает Otto в открытую створку и закрывает её за ним. Документ достаётся
+## здесь, на выходе, как в ROM: пока Otto внутри, дверь ещё красная.
+##
+## Выход кончается, когда створка закрылась: до тех пор Otto на виду, но ввод
+## снят и достать его нельзя — в ROM он неуязвим «до полного выхода». Без этого
+## агент, дождавшийся у двери, стрелял бы в того, кто ещё стоит в проёме.
+func _release() -> void:
+	_guest.global_position = _mat.global_position
+	_guest.stay_indoors(false)
+	_guest.ride(true)
+	_stepping_out = _guest
+	_guest = null
+	_visit.release()
+	_cycle.close()
+	Sounds.play(Sounds.DOOR_CLOSE)
+	_muffle(false)
+	otto_came_out.emit()
 
 	if not has_document:
 		return
-	# Документ достаётся за вход, и дверь сразу перестаёт быть красной.
 	has_document = false
 	Sounds.play(Sounds.DOCUMENT)
 	document_taken.emit()
 
 
-func _release() -> void:
-	_guest.global_position = _mat.global_position
-	_guest.stay_indoors(false)
-	_guest = null
-	_visit.release()
-	_cycle.close()
-	Sounds.play(Sounds.DOOR_CLOSE)
-	Sounds.muffle_music(Sounds.MUFFLE_DOOR, false)
+## Створка закрылась за вышедшим: управление снова у игрока.
+func _see_out() -> void:
+	if not _cycle.is_shut():
+		return
+	if is_instance_valid(_stepping_out):
+		_stepping_out.ride(false)
+	_stepping_out = null
+
+
+## Глушит коридор за дверью или возвращает его: музыку и звуки мира разом.
+func _muffle(on: bool) -> void:
+	Sounds.muffle_music(Sounds.MUFFLE_DOOR, on)
+	Sounds.muffle_world(on)
 
 
 ## Здание выбросили, пока Otto за дверью, — новая партия с паузы, выход в меню.
-## Глухую музыку снимает сама дверь: иначе это пришлось бы помнить каждому, кто
+## Глухой звук снимает сама дверь: иначе это пришлось бы помнить каждому, кто
 ## выбрасывает здание.
 func _exit_tree() -> void:
-	if _guest != null:
-		Sounds.muffle_music(Sounds.MUFFLE_DOOR, false)
+	if _guest != null and _visit.is_hiding():
+		_muffle(false)
 
 
 ## Ведёт створку по ходу [DoorCycle].
@@ -252,10 +331,16 @@ func _exit_tree() -> void:
 ## здания, а меняется положение только пока дверь ходит.
 func _refresh_look() -> void:
 	var along := _cycle.openness()
-	if is_equal_approx(along, _shown) and has_document == _shown_red:
+	var occupied := _occupied()
+	if (
+		is_equal_approx(along, _shown)
+		and has_document == _shown_red
+		and occupied == _shown_occupied
+	):
 		return
 	_shown = along
 	_shown_red = has_document
+	_shown_occupied = occupied
 	var angle := along * PI * 0.5
 	var half := LEAF_SIZE.x * 0.5
 	# Поворот вокруг Y на +угол уводит правый край створки в −Z, то есть
@@ -264,12 +349,47 @@ func _refresh_look() -> void:
 	_leaf.position.x = -half + cos(angle) * half
 	_leaf.position.z = WorldSpace.BACK_WALL_Z + LEAF_STANDOFF - sin(angle) * half
 	var tone := GreyboxLook.DOOR_RED if has_document else GreyboxLook.DOOR
-	_leaf.material_override = GreyboxLook.surface(tone)
-	var relief := GreyboxLook.surface(tone.darkened(0.14))
+	# Занятая створка светится сама, неярко: маркер, а не краска.
+	_leaf.material_override = _paint(tone, occupied)
+	var relief := _paint(tone.darkened(0.14), occupied)
 	for panel in _panels:
 		panel.material_override = relief
 	var glow := GreyboxLook.SIGN_RED if has_document else GreyboxLook.SIGN_WARM
 	_sign.material_override = GreyboxLook.light(glow)
+	_pulse_clock = 0.0
+
+
+## Краска створки: занятая светится сама, неярко, — красной остаётся и в тени.
+static func _paint(tone: Color, occupied: bool) -> StandardMaterial3D:
+	var plain := GreyboxLook.surface(tone)
+	if not occupied:
+		return plain
+	var found: Variant = _occupied_paints.get(tone)
+	if found != null:
+		return found as StandardMaterial3D
+	var glowing := plain.duplicate() as StandardMaterial3D
+	glowing.emission_enabled = true
+	glowing.emission = tone
+	glowing.emission_energy_multiplier = OCCUPIED_LEAF_GLOW
+	_occupied_paints[tone] = glowing
+	return glowing
+
+
+## Otto за этой дверью: вошёл и ещё не вышел.
+func _occupied() -> bool:
+	return _guest != null and _visit.is_hiding()
+
+
+## Табло над занятой дверью медленно дышит, пока Otto внутри.
+func _breathe(delta: float) -> void:
+	if not _shown_occupied:
+		return
+	if _pulse == null:
+		_pulse = GreyboxLook.light(GreyboxLook.SIGN_RED).duplicate() as StandardMaterial3D
+	_pulse_clock += delta
+	var phase := 0.5 - 0.5 * cos(_pulse_clock * TAU / OCCUPIED_PULSE)
+	_pulse.emission_energy_multiplier = GreyboxLook.LIGHT_GLOW * lerpf(1.0, OCCUPIED_GLOW, phase)
+	_sign.material_override = _pulse
 
 
 ## Детали створки: две филёнки, ручка с розеткой у свободного края и отбойная

@@ -58,6 +58,12 @@ var velocity: float = 0.0
 ## прямо описано в оригинале (ADR-0009, пункт 1).
 var response_delay: float = 0.0
 
+## Заперта ли нижняя остановка: кабина не спускается на неё ни с пассажиром,
+## ни сама. Так шахта в подвал не везёт туда, пока не собраны все документы
+## (M24b; правило ставит [BasementLock]). Кабину, уже стоящую ниже, замок не
+## двигает — он только не пускает вниз.
+var bottom_locked: bool = false
+
 var _pause_left: float = 0.0
 var _held: float = 0.0
 ## Вёл ли кабину пассажир с тех пор, как вошёл. Между этажами встаёт только
@@ -110,7 +116,9 @@ func update(delta: float, command: float, occupied: bool) -> float:
 func can_go(towards: float) -> bool:
 	if floors.is_empty() or is_zero_approx(towards):
 		return false
-	return absf(_shaft_limit(towards) - position) > FLOOR_EPSILON
+	# По направлению, а не по модулю: кабина под запертой остановкой ниже
+	# своего предела, и «вниз» к пределу вело бы её вверх.
+	return (_shaft_limit(towards) - position) * signf(towards) > FLOOR_EPSILON
 
 
 ## Совпал ли пол кабины с полом этажа: только тогда из неё можно выйти.
@@ -153,7 +161,8 @@ func _drive(delta: float, command: float) -> void:
 			return
 		direction = signf(command)
 		_steered = true
-		_move_towards(_shaft_limit(direction), delta)
+		if can_go(direction):
+			_move_towards(_shaft_limit(direction), delta)
 		return
 
 	# Команда отпущена.
@@ -219,10 +228,10 @@ func _move_towards(target: float, delta: float) -> bool:
 	return false
 
 
-## Ближайший этаж, в любую сторону.
+## Ближайший открытый этаж, в любую сторону.
 func _nearest_floor() -> float:
 	var best := floors[0]
-	for stop: float in floors:
+	for stop: float in _open_floors():
 		if absf(stop - position) < absf(best - position):
 			best = stop
 	return best
@@ -230,13 +239,22 @@ func _nearest_floor() -> float:
 
 ## Дальняя граница шахты по направлению движения.
 func _shaft_limit(towards: float) -> float:
-	return floors[0] if towards < 0.0 else floors[floors.size() - 1]
+	var open := _open_floors()
+	return open[0] if towards < 0.0 else open[open.size() - 1]
+
+
+## Остановки, на которые кабине можно: все, кроме запертой нижней. У шахты в
+## один этаж запирать нечего — иначе у неё не осталось бы ни одной.
+func _open_floors() -> PackedFloat32Array:
+	if not bottom_locked or floors.size() < 2:
+		return floors
+	return floors.slice(0, floors.size() - 1)
 
 
 ## Ближайший этаж строго по ходу движения или NAN, если дальше ехать некуда.
 func _next_floor(towards: float) -> float:
 	var best := NAN
-	for stop: float in floors:
+	for stop: float in _open_floors():
 		var gap := stop - position
 		if towards < 0.0 and gap < -FLOOR_EPSILON:
 			if is_nan(best) or stop > best:

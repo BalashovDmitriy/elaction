@@ -17,8 +17,20 @@ extends Node3D
 ##     godot --path . res://tools/light_bench.tscn
 ##     godot --path . res://tools/light_bench.tscn -- --whole
 ##     godot --path . res://tools/light_bench.tscn -- --whole --seed=2
+##     godot --path . res://tools/light_bench.tscn -- --garage --x=16
 ##
 ## Сид по умолчанию — 1, туман. Дождь (M24a) меряется на сиде 2.
+##
+## `--garage` (M24b) меряет нижний этаж — паркинг со светильниками и чужими
+## машинами; `--x=` ставит Otto в нужную точку этажа, иначе — на безопасное
+## место, как на широком этаже.
+##
+## `--exit=` (M24b) ставит кадр выезда: середина кадра — на столько метров правее
+## левого торца здания, как у [method ExitBoarding.exit_frame]; `--lift=` —
+## насколько низ кадра поднят над низом здания, м, как у кадра, едущего за
+## машиной по пандусу. С ними Otto ставится в паркинг сам:
+##     godot --path . res://tools/light_bench.tscn -- --exit=3.5
+##     godot --path . res://tools/light_bench.tscn -- --exit=-9.45 --lift=3.6
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
@@ -33,6 +45,9 @@ const BUDGET_MS: float = 16.6
 ## По всему зданию: сколько кадров дать этажу устояться и сколько мерить.
 const FLOOR_SETTLE: int = 20
 const FLOOR_FRAMES: int = 30
+
+## Кадр выезда (`--exit=`), в плоскости правил; пустой — кадр по Otto.
+var _exit_bounds := Rect2()
 
 
 func _ready() -> void:
@@ -55,9 +70,26 @@ func _ready() -> void:
 		_run_whole(level)
 		return
 	var index := level.rules.floors - 3
-	level.otto.global_position = WorldSpace.to_scene(
-		Vector2(level.plan().safe_x(level.rules, index), level.rules.floor_surface(index))
-	)
+	var x := NAN
+	var exit_shift := NAN
+	var lift := 0.0
+	for argument: String in OS.get_cmdline_user_args():
+		if argument == "--garage":
+			index = level.rules.floors - 1
+		elif argument.begins_with("--x="):
+			x = argument.trim_prefix("--x=").to_float()
+		elif argument.begins_with("--exit="):
+			exit_shift = argument.trim_prefix("--exit=").to_float()
+			index = level.rules.floors - 1
+		elif argument.begins_with("--lift="):
+			lift = argument.trim_prefix("--lift=").to_float()
+	if is_nan(x):
+		x = level.plan().safe_x(level.rules, index)
+	level.otto.global_position = WorldSpace.to_scene(Vector2(x, level.rules.floor_surface(index)))
+	if not is_nan(exit_shift):
+		var rules := level.rules
+		var centre := rules.floor_span(rules.floors - 1).x + exit_shift
+		_exit_bounds = Rect2(centre - 0.5, 0.0, 1.0, rules.total_height() - lift)
 	_run(level)
 
 
@@ -133,10 +165,19 @@ func _run_whole(level: GreyboxLevel) -> void:
 func _run(level: GreyboxLevel) -> void:
 	var viewport := get_viewport().get_viewport_rid()
 	RenderingServer.viewport_set_measure_render_time(viewport, true)
+	# Город — своим видом, как в замере по зданию: с кадра выезда он виден.
+	var city := level.get_node_or_null("Scenery/City/CityView") as SubViewport
+	var city_rid := city.get_viewport_rid() if city != null else RID()
+	if city_rid.is_valid():
+		RenderingServer.viewport_set_measure_render_time(city_rid, true)
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	Engine.max_fps = 0
 
 	for _step: int in SETTLE_STEPS:
+		# Вступление, отпустив камеру, возвращает ей границы здания: кадр выезда
+		# ставится заново, пока здание устаивается.
+		if _exit_bounds.has_area():
+			level.otto.apply_camera_bounds(_exit_bounds)
 		await get_tree().physics_frame
 
 	var gpu := 0.0
@@ -145,6 +186,8 @@ func _run(level: GreyboxLevel) -> void:
 	for _frame: int in MEASURE_FRAMES:
 		await get_tree().process_frame
 		var spent := RenderingServer.viewport_get_measured_render_time_gpu(viewport)
+		if city_rid.is_valid() and city.render_target_update_mode != SubViewport.UPDATE_DISABLED:
+			spent += RenderingServer.viewport_get_measured_render_time_gpu(city_rid)
 		gpu += spent
 		worst = maxf(worst, spent)
 		cpu += RenderingServer.viewport_get_measured_render_time_cpu(viewport)

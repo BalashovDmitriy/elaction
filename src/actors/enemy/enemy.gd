@@ -26,6 +26,10 @@ const FALLING_TIME: float = 0.25
 ## Сколько держится поза выстрела, с.
 const SHOOT_POSE_TIME: float = 0.25
 
+## Насколько близко к месту у двери агент считает, что дошёл, м. Больше пути за
+## два кадра под ускорением тестов (docs/testing.md), меньше отступа от коврика.
+const WATCH_REACH: float = 0.12
+
 ## Ходьба — та же, что у Otto: в ROM у них одна процедура шага (ADR-0027).
 @export var walk_speed: float = Arcade.speed(Arcade.WALK_PX)
 @export var gravity: float = 27.0
@@ -49,6 +53,12 @@ const SHOOT_POSE_TIME: float = 0.25
 ## Луч прицела: горит, пока агент замахивается. По нему от выстрела уходит
 ## игрок — и бот тестов (ADR-0037, решение 5). Ставит сам агент.
 var laser: AimLaser = null
+
+## Где ждать у двери, за которой спрятался Otto, и где сама дверь; NAN — не ждёт
+## ([DoorWatch], ADR-0038, решение 2). Ставит уровень каждый кадр; полями, а не
+## методом — это присваивание и ничего больше, как тень и темнота.
+var watch_at: float = NAN
+var watch_door: float = NAN
 
 ## Правила здания, из которого вышел агент. Пустых не бывает: без них он
 ## достаёт значения по умолчанию — те же, что у здания по умолчанию.
@@ -141,7 +151,8 @@ func _physics_process(delta: float) -> void:
 		_incoming_height(),
 		alive_target and _in_frame() and not _building_rules().agents_hold_fire,
 		not is_instance_valid(_bullet),
-		alive_target and _target.is_crouching()
+		alive_target and _target.is_crouching(),
+		alive_target and _target.hittable
 	)
 	_fit_shape()
 	if _brain.fired():
@@ -157,14 +168,22 @@ func _physics_process(delta: float) -> void:
 	# Приседая и лёжа агент не ходит: уклонение — это замереть, а не идти
 	# дальше пригнувшись. Стоя он идёт, пока мозг не велел постоять.
 	var walking := _brain.wants_to_walk()
+	# Ждущий у двери идёт к своему месту и без пауз брожения: он не бродит, а
+	# караулит. Дошёл — стоит лицом к двери.
+	var watching := not stepping_out and not is_nan(watch_at)
+	if watching:
+		walking = _brain.is_standing() and _head_for(watch_at, WATCH_REACH)
+		if not walking:
+			_brain.face(watch_door - WorldSpace.to_plane(global_position).x)
 	# Кабину уровень предлагает, только когда Otto на другом этаже (ADR-0025,
 	# решение 6), — по «видит ли он его» решать тут нечего: [code]sees_target[/code]
 	# значит «Otto не в тени и не за стеной», и через десять этажей оно тоже
 	# истинно. Гейт по нему отключал бы лифты почти всегда.
-	var to_the_lift := walking and not stepping_out and not is_nan(_lift_x)
+	var free_to_go := walking and not watching and not stepping_out
+	var to_the_lift := free_to_go and not is_nan(_lift_x)
 	if to_the_lift:
 		walking = _head_for_the_lift()
-	elif walking and not stepping_out and not is_nan(_exit_x):
+	elif free_to_go and not is_nan(_exit_x):
 		walking = _head_for(_exit_x)
 		if not walking:
 			left_building.emit(self)
@@ -172,10 +191,10 @@ func _physics_process(delta: float) -> void:
 		# Дальше пола нет или стена: агент остаётся на своём этаже (ADR-0006,
 		# пункт 6). Выходящий и идущий к кабине встают у края, бродящий
 		# разворачивается.
-		if to_the_lift:
+		if to_the_lift or watching:
 			# Идущий к кабине встаёт у проёма и ждёт: кабина ушла, пока он шёл,
 			# и шагать в пустую шахту незачем. Разворачивать его нельзя — он
-			# тут же забыл бы, зачем пришёл.
+			# тут же забыл бы, зачем пришёл. Идущий к двери — так же.
 			walking = false
 		elif stepping_out:
 			walking = false
@@ -216,11 +235,11 @@ func set_exit_at(x: float) -> void:
 	_exit_x = x
 
 
-## Идти ли к точке [param x] по этажу: дошёл — нет.
-func _head_for(x: float) -> bool:
+## Идти ли к точке [param x] по этажу: ближе [param reach] — дошёл.
+func _head_for(x: float, reach: float = Proportions.DOOR_MAT * 0.5) -> bool:
 	var gap := x - WorldSpace.to_plane(global_position).x
 	_brain.face(gap)
-	return absf(gap) > Proportions.DOOR_MAT * 0.5
+	return absf(gap) > reach
 
 
 ## Идти ли к кабине и стоит ли при этом переставлять ноги. Зовётся только тогда,

@@ -31,6 +31,10 @@ const SILENT_DB: float = -60.0
 const MUSIC_MUFFLED_HZ: float = 900.0
 const AMBIENCE_MUFFLED_HZ: float = 1600.0
 const OPEN_HZ: float = 20000.0
+## Коридор из-за красной двери: шаги, выстрелы и двери глухо и тише
+## (ADR-0038, решение 2).
+const SFX_MUFFLED_HZ: float = 700.0
+const SFX_MUFFLED_DB: float = -6.0
 ## Как быстро звук уходит за стену и возвращается, с.
 const MUFFLE_TIME: float = 0.35
 ## Фон на этажах тише, чем на крыше, дБ.
@@ -79,6 +83,7 @@ var _ambience_fades: Dictionary = {}
 ## Почему музыка сейчас из-за стены: пауза, красная дверь. Пока есть хоть
 ## одна причина — глухо; пауза посреди визита не возвращает звук на выходе из неё.
 var _muffled_by: Dictionary = {}
+var _world_muffled: bool = false
 var _outdoors: bool = true
 var _weather: Weather.Kind = Weather.Kind.CLEAR
 ## Какой по счёту город звучит. Гром назначается городу, и к следующему — в
@@ -143,6 +148,8 @@ func play(name: String) -> void:
 
 	var player := _sfx[_next]
 	_next = (_next + 1) % _sfx.size()
+	# Голоса общие, а шина у звука своя: меню и джинглы мимо глушения коридора.
+	player.bus = Sounds.bus_of(name)
 	player.stream = stream
 	player.play()
 	if Sounds.JINGLES.has(name):
@@ -207,6 +214,20 @@ func muffle_music(reason: String, on: bool) -> void:
 
 func music_muffled() -> bool:
 	return not _muffled_by.is_empty()
+
+
+## Звуки мира из-за стены — Otto за красной дверью. Глушится шина эффектов с
+## фоном; меню и джинглы идут мимо неё ([constant Sounds.INTERFACE_BUS]).
+func muffle_world(on: bool) -> void:
+	if _world_muffled == on:
+		return
+	_world_muffled = on
+	_sweep(Sounds.SFX_BUS, SFX_MUFFLED_HZ if on else OPEN_HZ)
+	_gain(Sounds.SFX_BUS, SFX_MUFFLED_DB if on else 0.0, MUFFLE_TIME)
+
+
+func world_muffled() -> bool:
+	return _world_muffled
 
 
 ## Петли фона: улица, дождь, ветер. Лишние уходят, новые входят наплывом,
@@ -291,8 +312,19 @@ func set_level(bus: String, level: float) -> void:
 	# настройкам громкость шины, которой нет.
 	var value := clampf(level, 0.0, 1.0)
 	_levels[bus] = value
-	# Тишина — это не «минус восемьдесят децибел», а выключенная шина: на малых
-	# громкостях логарифм уходит в минус бесконечность и трещит по дороге.
+	_apply_level(index, value)
+	# Интерфейс и джинглы — мимо шины эффектов, но под её ползунком: в
+	# настройках их громкость всегда была громкостью эффектов, и своей шиной
+	# они обзавелись ради глушения за дверью, а не ради ещё одного ползунка.
+	if bus == Sounds.SFX_BUS:
+		var interface := AudioServer.get_bus_index(Sounds.INTERFACE_BUS)
+		if interface >= 0:
+			_apply_level(interface, value)
+
+
+## Тишина — это не «минус восемьдесят децибел», а выключенная шина: на малых
+## громкостях логарифм уходит в минус бесконечность и трещит по дороге.
+static func _apply_level(index: int, value: float) -> void:
 	AudioServer.set_bus_mute(index, is_zero_approx(value))
 	AudioServer.set_bus_volume_db(index, linear_to_db(maxf(value, 0.0001)))
 
@@ -315,12 +347,13 @@ func reset() -> void:
 		(_tweens[key] as Tween).kill()
 	_tweens.clear()
 	_muffled_by.clear()
+	_world_muffled = false
 	_outdoors = true
 	_weather = Weather.Kind.CLEAR
 	_duck_until = 0.0
 	_city += 1
 	_ambience_shot.stop()
-	for bus: String in [Sounds.MUSIC_BUS, Sounds.AMBIENCE_BUS]:
+	for bus: String in [Sounds.MUSIC_BUS, Sounds.AMBIENCE_BUS, Sounds.SFX_BUS]:
 		_muffle_of(bus).cutoff_hz = OPEN_HZ
 		AudioServer.set_bus_effect_enabled(AudioServer.get_bus_index(bus), MUFFLE_EFFECT, false)
 		_gain_of(bus).volume_db = 0.0

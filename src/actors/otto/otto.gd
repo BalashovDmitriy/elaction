@@ -38,6 +38,9 @@ const GRACE_BLINKS: float = 8.0
 ## не падение: без этого поставленный этажом ниже разбивался бы на ровном месте.
 const TELEPORT_GAP: float = 0.5
 
+## Кнопки, нажатие которых может уйти на пропуск вступления ([method ride]).
+const PRESS_ACTIONS: Array[StringName] = [&"jump", &"shoot"]
+
 ## Ходьба и пуля — по ROM: 2 и 8 px за тик логики (ADR-0027, решение 4); пуля
 ## втрое быстрее ROM ([constant Arcade.BULLET_PACE], ADR-0037, решение 5).
 @export var walk_speed: float = Arcade.speed(Arcade.WALK_PX)
@@ -65,6 +68,15 @@ var step_sound: String = Sounds.STEP_CONCRETE
 ## Шаг этажа здания, м: упавший больше чем на этаж разбивается (ADR-0037,
 ## решение 7). Ставит уровень из своих правил; по умолчанию — стандартный этаж.
 var floor_height: float = Proportions.FLOOR
+## Можно ли в Otto сейчас попасть так, чтобы он погиб. Нельзя за дверью и в её
+## проёме, на эскалаторе, в прилёте на крыше — везде, где ввод снят
+## ([constant OttoStateMachine.State.RIDE]), — и в передышку после возвращения в
+## игру. Агенты по этому придерживают выстрел: пуля сквозь неуязвимого читалась
+## бы как ошибка, а не как правило. Свойством, как и [member invulnerable]: так
+## оно рядом с ним и не множит методы узла.
+var hittable: bool:
+	get:
+		return _grace <= 0.0 and not _states.is_world_driven()
 ## Идёт ли передышка после возвращения в игру: пуля в Otto попадает, но не
 ## ранит. По этому [Bullet] решает, брызгать ли кровью. Свойством, а не методом:
 ## пуля спрашивает его через [method Object.get], не зная класса Otto.
@@ -87,6 +99,9 @@ var _car: ElevatorCar = null
 var _headroom: float = 0.0
 ## Куда Otto смотрит: -1 влево, +1 вправо. Туда же летят его пули.
 var _facing: float = 1.0
+## Насколько Otto повёрнут спиной к камере, 0..1: садясь в машину, он
+## поворачивается к ней, а не шагает в глубину боком ([method turn_into_depth]).
+var _depth_turn: float = 0.0
 ## Фаза ходьбы: целая часть — номер кадра из трёх.
 var _walk_phase: float = 0.0
 ## Сколько ещё держать позу выстрела и позу падения, с.
@@ -108,6 +123,9 @@ var _was_grounded: bool = true
 var _last_position := Vector3.ZERO
 ## Сколько ещё держится передышка после возвращения в игру, с.
 var _grace: float = 0.0
+## Кнопки, нажатие которых потрачено на пропуск вступления ([method ride]):
+## пока их держат, Otto их не слышит, отпустили — снова слышит.
+var _spent_actions: Array[StringName] = []
 
 @onready var _standing_shape: CollisionShape3D = $StandingShape
 @onready var _crouching_shape: CollisionShape3D = $CrouchingShape
@@ -149,6 +167,8 @@ func _physics_process(delta: float) -> void:
 		# Переставили — уровень, тест или съёмка: с новой точки и считаем.
 		_rest_here()
 	_snapshot.read_actions()
+	if not _spent_actions.is_empty():
+		_forget_spent_presses()
 	if _car != null:
 		# В кабине «вверх/вниз» ведут её, а присесть внутри нельзя.
 		_car.drive(vertical_intent())
@@ -244,6 +264,17 @@ func is_hidden() -> bool:
 	return _states.state == OttoStateMachine.State.INDOORS
 
 
+## Снимает из снимка ввода нажатия, потраченные на пропуск, пока кнопку держат.
+func _forget_spent_presses() -> void:
+	for action: StringName in _spent_actions.duplicate():
+		if not Input.is_action_pressed(action):
+			_spent_actions.erase(action)
+		elif action == &"jump":
+			_snapshot.jump_pressed = false
+		else:
+			_snapshot.shoot_pressed = false
+
+
 ## Возвращает Otto в игру после смерти. Ставить его на место — дело уровня,
 ## поэтому зовут это уже после переноса: опора, от которой считается падение,
 ## берётся отсюда.
@@ -283,15 +314,9 @@ func jump_height() -> float:
 	return jump_speed * jump_speed / (2.0 * gravity)
 
 
-## Намерение по горизонтали за последний кадр. По нему дверь понимает, что
-## Otto просится наружу раньше срока.
-func horizontal_intent() -> float:
-	return 0.0 if _states.is_dead() else _snapshot.move
-
-
-## Otto скрылся за дверью или дверь выпустила его наружу — сам вышел или
-## выставили через пять секунд. Пока внутри, снаружи его нет и ввод игрока не
-## действует; так же он прячется, пока его увозит машина у выхода.
+## Otto скрылся за дверью или дверь выпустила его наружу — через 70 тиков ROM,
+## раньше не выйти (ADR-0038, решение 2). Пока внутри, снаружи его нет и ввод
+## игрока не действует; так же он прячется, пока его увозит машина у выхода.
 func stay_indoors(inside: bool) -> void:
 	if inside:
 		_states.go_indoors()
@@ -300,14 +325,32 @@ func stay_indoors(inside: bool) -> void:
 	_repose()
 
 
+## Поворачивает Otto спиной к камере на долю [param weight]: 0 — вдоль этажа,
+## куда он смотрит, 1 — лицом в глубину. Так он садится в машину у выхода.
+func turn_into_depth(weight: float) -> void:
+	_depth_turn = clampf(weight, 0.0, 1.0)
+
+
 ## Otto встал на эскалатор или сошёл с него: пока едет, ввод игрока не
 ## действует, а позицией распоряжается эскалатор. Трос вступления пользуется
 ## тем же — Otto на нём тоже везут.
-func ride(on: bool) -> void:
+##
+## [param presses_spent] — отпуская, не слышать прыжка и выстрела, которые
+## держат прямо сейчас, пока их не отпустят. Так отпускает вступление, когда его
+## пропустили прыжком или выстрелом: то же нажатие иначе дошло бы и до Otto —
+## пропуск выстрелом стрелял бы, а пропуск прыжком прыгал. Глушится именно
+## нажатие, а не шаг физики: вступление видит кнопку по своему краю «отпущена —
+## нажата», а Otto — по [method Input.is_action_just_pressed], и шаг, в котором
+## нажатие видит каждый, не обязан совпасть.
+func ride(on: bool, presses_spent: bool = false) -> void:
 	if on:
 		_states.ride()
 	else:
 		_states.stop_riding()
+	if presses_spent:
+		for action: StringName in PRESS_ACTIONS:
+			if Input.is_action_pressed(action) and not _spent_actions.has(action):
+				_spent_actions.append(action)
 	_repose()
 
 
@@ -359,8 +402,10 @@ func facing() -> float:
 	return _facing
 
 
-func apply_camera_bounds(bounds: Rect2) -> void:
-	_camera.apply_bounds(bounds)
+## Границы камеры в координатах правил. [param snap] — встать на место сразу;
+## без него камера доедет к новым границам сглаживанием (конец вступления).
+func apply_camera_bounds(bounds: Rect2, snap: bool = true) -> void:
+	_camera.apply_bounds(bounds, snap)
 
 
 ## Возвращает тело в плоскость игры.
@@ -535,6 +580,8 @@ func _update_look(delta: float) -> void:
 	_body.show_pose(_pose())
 	_body.set_walk_phase(_walk_phase)
 	_body.face(_facing)
+	if _depth_turn > 0.0:
+		_body.rotation.y = lerp_angle(_body.rotation.y, PI, _depth_turn)
 	_body.set_transparency(1.0 - _grace_alpha())
 
 

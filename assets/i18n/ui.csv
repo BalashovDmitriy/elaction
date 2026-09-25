@@ -16,8 +16,10 @@ UI_NEW_RECORD,New record!,Новый рекорд!
 UI_NO_RECORDS,No records yet,Рекордов пока нет
 UI_SCORE,Score,Очки
 UI_ROUND,Round,Раунд
+UI_BONUS,Bonus,Бонус
 UI_FLOOR,Floor,Этаж
 UI_ROOF,Roof,Крыша
+UI_PARKING,Parking,Паркинг
 UI_ALARM,ALARM,ТРЕВОГА
 UI_VOLUME_MASTER,Master volume,Общая громкость
 UI_VOLUME_MUSIC,Music,Музыка
@@ -29,6 +31,10 @@ UI_WINDOW_MODE_1,Borderless,Без рамки
 UI_WINDOW_MODE_2,Fullscreen,Полный экран
 UI_RESOLUTION,Resolution,Разрешение
 UI_RENDER_SCALE,Render scale,Масштаб рендера
+UI_FRAME_LIMIT,Frame limit,Предел кадров
+UI_FRAME_LIMIT_MONITOR,Monitor,По монитору
+UI_FRAME_LIMIT_NONE,Unlimited,Без предела
+UI_VSYNC,VSync,Вертикальная синхронизация
 UI_BLOOD,Blood,Кровь
 UI_SHOW_FPS,Show FPS,Показывать FPS
 UI_DIFFICULTY,Difficulty,Сложность

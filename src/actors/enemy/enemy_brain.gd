@@ -62,6 +62,9 @@ var _fired_now: bool = false
 var _action_left: float = 0.0
 var _wind_up_left: float = 0.0
 var _shot_pending: bool = false
+## Можно ли в Otto сейчас попасть. Нельзя — замах доходит до [constant MIN_TELL]
+## и держится там: луч горит, а пуля ждёт.
+var _target_hittable: bool = true
 ## Стреляет ли агент на ходу: поза «прочее» ROM — выстрел без остановки.
 var _on_the_move: bool = false
 ## Брожение: сколько ещё идти и сколько ещё стоять.
@@ -139,6 +142,12 @@ func wind_up_left() -> float:
 ## в кадре» (ADR-0027, решение 3а). [param gun_free] — нет ли в полёте его
 ## прошлой пули: она у агента одна (@1BAE). [param target_low] — Otto присел:
 ## тогда агент стреляет из приседа (@1CD8).
+##
+## [param target_hittable] — можно ли в Otto сейчас попасть. Нельзя, пока он
+## выходит из двери, едет на эскалаторе или мигает после возвращения в игру:
+## пуля прошла бы сквозь него, и игрок видел бы попадание без смерти. Целиться
+## в такого можно, стрелять — нет: замах держится на [constant MIN_TELL], и
+## пуля уходит через четверть секунды после того, как Otto стал уязвим.
 func update(
 	delta: float,
 	to_target: Vector2,
@@ -146,9 +155,11 @@ func update(
 	incoming_height: float = -1.0,
 	in_range: bool = true,
 	gun_free: bool = true,
-	target_low: bool = false
+	target_low: bool = false,
+	target_hittable: bool = true
 ) -> State:
 	_fired_now = false
+	_target_hittable = target_hittable
 	if state == State.DEAD:
 		return state
 
@@ -226,7 +237,13 @@ func is_emerging() -> bool:
 
 
 ## Идёт действие: замах, выстрел, выдержка позы. Кончилось — агент встаёт.
+##
+## Пока в Otto не попасть, время замаха идёт только до [constant MIN_TELL], и
+## действие стоит вместе с ним: разрыв между замахом и концом действия тот же,
+## что по ROM, — просто пуля уходит позже.
 func _act(delta: float) -> void:
+	if _shot_pending and not _target_hittable:
+		delta = clampf(_wind_up_left - MIN_TELL, 0.0, delta)
 	_action_left -= delta
 	if _shot_pending:
 		_wind_up_left -= delta

@@ -22,6 +22,11 @@ const MASTER_BUS := "Master"
 ## Фон — дочерняя шина эффектов: громкость эффектов в настройках ведёт и его
 ## (ADR-0036, решение 5).
 const AMBIENCE_BUS := "Ambience"
+## Интерфейс и джинглы — мимо шины эффектов, прямо в общую: глушение коридора
+## за красной дверью их не трогает — щелчок меню и джингл документа звучат не
+## в коридоре. Громкость ведёт тот же ползунок эффектов ([method
+## AudioDirector.set_level]).
+const INTERFACE_BUS := "Interface"
 
 ## Причины, по которым музыка звучит из-за стены.
 const MUFFLE_PAUSE := "pause"
@@ -46,6 +51,15 @@ const CAR_AWAY := "car_away"
 const BUILDING_BONUS := "building_bonus"
 const EXTRA_LIFE := "extra_life"
 const GAME_OVER := "game_over"
+## M24b (ADR-0038): вертолёт висит над крышей и пролетает, Otto съезжает по
+## тросу; дверца и мотор машины, ворота паркинга; шахта в подвал открылась.
+const HELICOPTER := "helicopter"
+const HELICOPTER_PASS := "helicopter_pass"
+const ROPE_SLIDE := "rope_slide"
+const CAR_DOOR := "car_door"
+const CAR_START := "car_start"
+const GARAGE_GATE := "garage_gate"
+const BASEMENT_OPEN := "basement_open"
 ## Джингл смерти Otto: звучит поверх самой смерти.
 const DEATH_JINGLE := "death_jingle"
 
@@ -88,6 +102,13 @@ const EFFECTS: PackedStringArray = [
 	OTTO_DEATH,
 	AGENT_DEATH,
 	CAR_AWAY,
+	HELICOPTER,
+	HELICOPTER_PASS,
+	ROPE_SLIDE,
+	CAR_DOOR,
+	CAR_START,
+	GARAGE_GATE,
+	BASEMENT_OPEN,
 	BUILDING_BONUS,
 	EXTRA_LIFE,
 	GAME_OVER,
@@ -104,10 +125,14 @@ const AMBIENCE: PackedStringArray = [
 ## Джинглы: на время звучания приглушают трек (ADR-0036, решение 6).
 const JINGLES: PackedStringArray = [DOCUMENT, EXTRA_LIFE, BUILDING_BONUS, GAME_OVER, DEATH_JINGLE]
 
+## Звуки меню: как и джинглы, идут в [constant INTERFACE_BUS].
+const INTERFACE: PackedStringArray = [UI_MOVE, UI_SELECT, UI_BACK]
+
 ## Звуки, которые звучат петлёй, пока длится то, что их вызвало. Трек конца
 ## партии не зациклен: он доигрывает под экраном рекорда и молкнет.
 const LOOPED: PackedStringArray = [
 	ELEVATOR_HUM,
+	HELICOPTER,
 	ESCALATOR_HUM,
 	THEME,
 	ALARM_THEME,
@@ -125,6 +150,12 @@ const LOOPED: PackedStringArray = [
 const MAX_VARIANTS: int = 9
 
 static var _cache: Dictionary = {}
+
+
+## Шина, в которую идёт эффект [param name]: меню и джинглы — в
+## [constant INTERFACE_BUS], всё остальное, звуки мира, — в [constant SFX_BUS].
+static func bus_of(name: String) -> String:
+	return INTERFACE_BUS if INTERFACE.has(name) or JINGLES.has(name) else SFX_BUS
 
 
 ## Все имена разом: по ним ходит тест.
@@ -267,6 +298,13 @@ static func muffle_music(reason: String, on: bool) -> void:
 	var director := AudioDirector.instance()
 	if director != null:
 		director.muffle_music(reason, on)
+
+
+## Звуки мира из-за стены: Otto за красной дверью слышит коридор глухо.
+static func muffle_world(on: bool) -> void:
+	var director := AudioDirector.instance()
+	if director != null:
+		director.muffle_world(on)
 
 
 ## Погода вокруг: по ней директор выбирает петли фона снаружи и внутри.

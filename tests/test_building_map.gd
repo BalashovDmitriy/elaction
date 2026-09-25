@@ -205,17 +205,21 @@ func test_salt_changes_the_building_and_zero_keeps_it() -> void:
 ## Плотные двери не вытесняют стены: стены встают раньше дверей сверх
 ## обязательной. Когда было наоборот, на башне их осталось 22 из 156 на 120
 ## зданиях (авторевью M18e); по ставке [member BuildingRules.wall_chance] на
-## 24 зданиях теста их ждут около сорока.
+## тех же 120 зданиях их около ста сорока.
+##
+## Зданий 120, а не 24, как было: на 24 разброс жребия того же порядка, что и
+## запас до порога, — с шахтой в подвал (M24b) те же 24 дали 18 стен при
+## прежнем среднем, и тест падал на перетасовке, а не на вытеснении.
 func test_dense_doors_leave_room_for_walls_in_the_tower() -> void:
 	var tower := 0
 	for skill: int in SKILLS:
 		var rules := _rules(skill)
-		for building_seed: int in SEEDS:
+		for building_seed: int in range(1, 41):
 			var plan := BuildingPlan.generate(rules, building_seed)
 			for wall in plan.walls:
 				if not rules.is_wide(wall.floor_index):
 					tower += 1
-	assert_gte(tower, 20, "стен на башне %d — двери их вытеснили" % tower)
+	assert_gte(tower, 100, "стен на башне %d — двери их вытеснили" % tower)
 
 
 ## Документов 5–10 жребием по сиду, с первого здания (ADR-0037, решение 8):

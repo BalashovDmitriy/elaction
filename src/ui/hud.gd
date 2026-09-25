@@ -9,6 +9,10 @@ extends CanvasLayer
 ## где Otto, справа — жизни силуэтами, внизу справа — раунд, под именем здания —
 ## мигающая плашка тревоги.
 ##
+## Бонус здания — плашкой посреди кадра, пока машина с Otto уезжает: подпись и
+## число, которое набегает от нуля (ADR-0038, решение 4). Отдельного экрана
+## итогов нет — как в ROM, строка поверх сцены.
+##
 ## Строки автомата с рекордом нет: игра ремейк, интерфейс на той же стороне, что
 ## картинка и звук. Всё собирается кодом: плашки — данные, а не разметка.
 
@@ -34,6 +38,14 @@ const PLATE := NeonStyle.PLATE
 const DEFAULT_NEON := VerticalSign.NEON_HOTEL
 ## Как часто переписывается счётчик кадров, с: каждый кадр цифры мельтешили бы.
 const FPS_EVERY: float = 0.25
+## За сколько набегает бонус здания, с: машина уезжает из кадра примерно за
+## столько же.
+const BONUS_COUNT_TIME: float = 1.2
+## Запас по бокам числа бонуса сверх отступов плашки, px: цифры в 72 кегля
+## выступают за свою ширину, и «1 000» подходило к кромке вплотную.
+const BONUS_PAD: float = 18.0
+## Кегль числа бонуса.
+const BONUS_SIZE: int = 72
 
 ## Показывать ли счётчик кадров. Статическое, как [member Blood.enabled]: его
 ## ставят настройки, а HUD читает, не зная, кто их держит.
@@ -56,6 +68,10 @@ var _shown_floor: int = -2
 var _fps_plate: PanelContainer = null
 var _fps: Label = null
 var _fps_next: float = 0.0
+var _bonus_plate: PanelContainer = null
+var _bonus_caption: Label = null
+var _bonus: Label = null
+var _bonus_count: Tween = null
 
 
 func _ready() -> void:
@@ -87,6 +103,7 @@ func _notification(what: int) -> void:
 	if what != NOTIFICATION_TRANSLATION_CHANGED or _score_caption == null:
 		return
 	_score_caption.text = tr("UI_SCORE").to_upper()
+	_bonus_caption.text = tr("UI_BONUS").to_upper()
 	_shown_floor = -2
 	refresh()
 
@@ -122,6 +139,46 @@ func refresh() -> void:
 	_alarm.visible = game.alarm.raised
 
 
+## Показывает бонус здания: число набегает от нуля до [param amount] за
+## [constant BONUS_COUNT_TIME]. На паузе счёт стоит вместе с игрой.
+func count_bonus(amount: int) -> void:
+	if _bonus_count != null:
+		_bonus_count.kill()
+	_bonus_plate.visible = true
+	_show_bonus_value(0.0)
+	_bonus_count = create_tween()
+	_bonus_count.set_pause_mode(Tween.TWEEN_PAUSE_STOP)
+	_bonus_count.tween_method(_show_bonus_value, 0.0, float(amount), BONUS_COUNT_TIME)
+
+
+## Сколько бонусу ещё набегать до полного, с: 0 — досчитан или его нет.
+func bonus_time_left() -> float:
+	if _bonus_count == null or not _bonus_count.is_valid() or not _bonus_count.is_running():
+		return 0.0
+	return maxf(BONUS_COUNT_TIME - _bonus_count.get_total_elapsed_time(), 0.0)
+
+
+## Убирает плашку бонуса: следующее здание, меню или новая партия.
+func hide_bonus() -> void:
+	if _bonus_count != null:
+		_bonus_count.kill()
+		_bonus_count = null
+	_bonus_plate.visible = false
+
+
+## Видна ли плашка бонуса и что на ней за число.
+func bonus_shown() -> bool:
+	return _bonus_plate.visible
+
+
+func bonus_text() -> String:
+	return _bonus.text
+
+
+func _show_bonus_value(value: float) -> void:
+	_bonus.text = format_score(roundi(value))
+
+
 ## Счёт с пробелами по три цифры: 12 400 читается с одного взгляда, 12400 — нет.
 static func format_score(score: int) -> String:
 	var digits := str(absi(score))
@@ -133,10 +190,13 @@ static func format_score(score: int) -> String:
 	return ("-" if score < 0 else "") + grouped
 
 
-## Этаж, где стоит Otto, так, как его видит игрок: номер таблички или крыша.
+## Этаж, где стоит Otto, так, как его видит игрок: номер таблички, крыша или
+## паркинг — нижний этаж, на табличках «P» ([method FloorSigns.label_of]).
 static func floor_text(rules: BuildingRules, index: int) -> String:
 	if index == BuildingRules.ROOF:
 		return TranslationServer.translate("UI_ROOF").to_upper()
+	if FloorSigns.is_parking(rules, index):
+		return TranslationServer.translate("UI_PARKING").to_upper()
 	return (
 		"%s %d"
 		% [TranslationServer.translate("UI_FLOOR").to_upper(), FloorSigns.number_of(rules, index)]
@@ -231,6 +291,27 @@ func _build() -> void:
 		_lives.append(icon)
 	_lives_more = _label(34, INK, 700)
 	lives.add_child(_lives_more)
+	# Посреди кадра: бонус здания на отъезде машины. Спрятан до выхода.
+	_bonus_plate = _plate(root, Control.PRESET_CENTER)
+	_bonus_plate.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_bonus_plate.grow_vertical = Control.GROW_DIRECTION_BOTH
+	var bonus_box := VBoxContainer.new()
+	bonus_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	_bonus_plate.add_child(bonus_box)
+	_bonus_caption = _caption("UI_BONUS")
+	_bonus_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	bonus_box.add_child(_bonus_caption)
+	_bonus = _label(BONUS_SIZE, INK, 800)
+	_bonus.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# Место под самый большой бонус — сразу: плашка не растёт, пока число
+	# набегает, и у любого числа по бокам один и тот же воздух.
+	var widest := format_score(Arcade.building_bonus(Arcade.BUILDING_BONUS_TOP))
+	var width := (
+		NeonStyle.font(800).get_string_size(widest, HORIZONTAL_ALIGNMENT_LEFT, -1, BONUS_SIZE).x
+	)
+	_bonus.custom_minimum_size.x = ceilf(width + BONUS_PAD * 2.0)
+	bonus_box.add_child(_bonus)
+	_bonus_plate.visible = false
 	# Справа снизу: кадры в секунду, если их просили показывать. Мелко и
 	# приглушённо — это справка, а не часть игры.
 	_fps_plate = _plate(root, Control.PRESET_BOTTOM_RIGHT)

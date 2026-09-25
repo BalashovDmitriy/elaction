@@ -162,6 +162,24 @@ SOUNDS: dict[str, list[Source]] = {
                              gain=-4.0)],
     "car_away": [freesound(128190, 1160789, "soundmary", "car drive away", BY4, mono=True,
                            end=8.0, fade_out=2.0, level="loop", gain=4.0)],
+    # --- M24b: вертолёт, трос, машина, ворота, шахта в подвал (ADR-0038).
+    "helicopter": [freesound(541482, 11157357, "Lydmakeren", "Helicopter_Hover", CC0,
+                             mono=True, start=150.0, end=170.0, loop=2.0, level="loop",
+                             trim=False)],
+    "helicopter_pass": [freesound(405234, 5121236, "InspectorJ", "Helicopter Flyby, Distant, A",
+                                  BY4, mono=True, start=110.0, end=170.0, fade_in=2.0,
+                                  fade_out=5.0, level="peak")],
+    "rope_slide": [freesound(162151, 1212810, "beerbelly38", "abseil2", BY4, mono=True,
+                             start=0.2, end=1.9, fade_out=0.3)],
+    "car_door": [freesound(208695, 1756543, "monotraum", "car door close", CC0, mono=True,
+                           gain=-4.0)],
+    "car_start": [freesound(138099, 1572282, "snakebarney", "Car Start", CC0, mono=True,
+                            fade_out=0.8)],
+    "garage_gate": [freesound(202666, 2814925, "freesoundjon01",
+                              "Automatic Garage Roller Door Opening", CC0, mono=True, start=0.8,
+                              end=11.8, fade_out=0.5)],
+    "basement_open": [freesound(567317, 97550, "TRP", "Door buzz alarm elevator HALIFAX 93",
+                                CC0, mono=True, end=1.5)],
     "ui_move": [kenney("ui", "Audio/click1.ogg", "UI Audio: click1", mono=True, gain=-10.0)],
     "ui_select": [kenney("interface", "Audio/confirmation_001.ogg",
                          "Interface Sounds: confirmation_001", mono=True, gain=-8.0)],
@@ -191,7 +209,7 @@ SOUNDS: dict[str, list[Source]] = {
 # Что звучит петлёй: сшивка нужна им, а форматом — OGG.
 LONG = {"theme", "alarm_theme", "menu_theme", "game_over_theme", "city", "rain",
         "rain_window", "wind", "room_tone", "shaft_hum", "elevator_hum", "escalator_hum",
-        "car_away", "thunder_near", "thunder_far", "neon_buzz", "building_bonus", "game_over"}
+        "car_away", "helicopter", "helicopter_pass", "garage_gate", "thunder_near", "thunder_far", "neon_buzz", "building_bonus", "game_over"}
 
 
 def _download(url: str) -> bytes:

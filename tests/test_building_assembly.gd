@@ -199,9 +199,14 @@ func test_otto_starts_on_the_roof() -> void:
 	)
 
 
-## Ждёт, пока Otto съедет по тросу на крышу ([method GreyboxLevel.wait_for_the_landing]).
+## Ставит Otto на крышу ([method GreyboxLevel.wait_for_the_landing]).
+##
+## Вступление пропускается, как пропускает его игрок прыжком: здесь проверяется,
+## что здание держит Otto, а не сценка с вертолётом, — а она идёт четыре с
+## лишним секунды на сид без ускорения времени (`test_roof_arrival.gd`).
 func _wait_for_the_landing(level: GreyboxLevel) -> void:
-	assert_true(await level.wait_for_the_landing(), "Otto съехал по тросу и встал на крышу")
+	level.skip_the_intro()
+	assert_true(await level.wait_for_the_landing(), "Otto встал на крышу")
 
 
 ## Кабина шириной в шахту: ширину она берёт из правил, а не из сцены.

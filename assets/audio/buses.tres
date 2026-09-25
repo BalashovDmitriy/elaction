@@ -1,4 +1,4 @@
-[gd_resource type="AudioBusLayout" load_steps=5 format=3]
+[gd_resource type="AudioBusLayout" load_steps=7 format=3]
 
 [sub_resource type="AudioEffectLowPassFilter" id="music_muffle"]
 resource_name = "Muffle"
@@ -13,6 +13,14 @@ resource_name = "Muffle"
 cutoff_hz = 20000.0
 
 [sub_resource type="AudioEffectAmplify" id="ambience_duck"]
+resource_name = "Duck"
+volume_db = 0.0
+
+[sub_resource type="AudioEffectLowPassFilter" id="sfx_muffle"]
+resource_name = "Muffle"
+cutoff_hz = 20000.0
+
+[sub_resource type="AudioEffectAmplify" id="sfx_duck"]
 resource_name = "Duck"
 volume_db = 0.0
 
@@ -39,6 +47,10 @@ bus/2/mute = false
 bus/2/bypass_fx = false
 bus/2/volume_db = 0.0
 bus/2/send = &"Master"
+bus/2/effect/0/effect = SubResource("sfx_muffle")
+bus/2/effect/0/enabled = false
+bus/2/effect/1/effect = SubResource("sfx_duck")
+bus/2/effect/1/enabled = true
 bus/3/name = &"Ambience"
 bus/3/solo = false
 bus/3/mute = false
@@ -49,3 +61,9 @@ bus/3/effect/0/effect = SubResource("ambience_muffle")
 bus/3/effect/0/enabled = false
 bus/3/effect/1/effect = SubResource("ambience_duck")
 bus/3/effect/1/enabled = true
+bus/4/name = &"Interface"
+bus/4/solo = false
+bus/4/mute = false
+bus/4/bypass_fx = false
+bus/4/volume_db = 0.0
+bus/4/send = &"Master"

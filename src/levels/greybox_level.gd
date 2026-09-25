@@ -13,23 +13,15 @@ extends Node3D
 ## ставит в сцену, проходит через [WorldSpace] — и только через него: разворот
 ## Y в одном месте (ADR-0021, решение 2).
 
-## Otto вышел из здания, собрав все документы.
+## Otto сел в машину, и она тронулась: пока она уезжает, считается бонус.
+signal car_started
+## Машина с Otto ушла из кадра: здание сдано.
 signal building_cleared
 
-## Ширина троса, по которому Otto съезжает на крышу, м.
-const ROPE_WIDTH: float = 0.12
-
-## Сколько Otto висит над крышей в начале здания и как быстро съезжает.
-##
-## Выше собственного прыжка (2.4 м): он должен прийти сверху, а не подпрыгнуть.
-## Спуск занимает меньше секунды — это кадр вступления, а не механика
-## (ADR-0017, решение 4).
-const ROPE_DROP: float = 2.64
-const ROPE_SPEED: float = 4.2
-
-## Сколько кадров физики [method wait_for_the_landing] ждёт по умолчанию: спуск
-## с полусекундой без ввода — около семидесяти, остальное — запас.
-const LANDING_PATIENCE: int = 360
+## Сколько кадров физики [method wait_for_the_landing] ждёт по умолчанию:
+## вступление с вертолётом идёт около 4.5 с — 270 шагов без ускорения времени,
+## остальное — запас (ADR-0038, решение 1).
+const LANDING_PATIENCE: int = 480
 
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 const ESCALATOR_SCENE := preload("res://src/systems/escalators/escalator.tscn")
@@ -49,15 +41,9 @@ const LAMP_SCENE := preload("res://src/systems/lighting/lamp.tscn")
 ## иначе вешал бы лампу в плиту или посреди комнаты.
 const LAMP_DROP: float = Proportions.LAMP_CORD + Proportions.LAMP.y * 0.5
 
-## Высота зоны выхода из здания. Ширина — [constant BuildingShell.EXIT_WIDTH]:
-## ей же оболочка режет проём в задней стене. Выросла вместе с Otto
+## Высота места у двери машины, где Otto садится. Выросла вместе с Otto
 ## (ADR-0026, решение 7).
 const EXIT_HEIGHT: float = Proportions.BODY * 0.95
-
-## Вывеска над выходом: габарит и на сколько выше проёма стены висит её
-## середина, м (ADR-0023, решение 6).
-const EXIT_SIGN_SIZE := Vector3(1.2, 0.18, 0.06)
-const EXIT_SIGN_RISE: float = 0.3
 
 ## Насколько хуже слушается кабина по тревоге, с.
 const ALARM_CAR_DELAY: float = 0.6
@@ -147,17 +133,19 @@ var _escalators: Array[Escalator] = []
 var _posts: Array[AgentPost] = []
 ## Жребий выпуска агентов по ROM и сколько ещё длится тревога агентов, с.
 var _spawn := AgentSpawn.new()
+## Кто из агентов ждёт у двери, за которой Otto (ADR-0038, решение 2).
+var _watch := DoorWatch.new()
 var _alert_left: float = 0.0
-## Здание сдано. Событие однократное: по нему main собирает следующее здание.
-var _cleared: bool = false
 ## Машина у выхода: пока она едет, здание ещё не сдано.
 var _car: ExitCar = null
+## Выход через машину: Otto садится, она уезжает (ADR-0038, решение 4).
+var _boarding: ExitBoarding = null
 var _exit_position := Vector2.ZERO
-## Трос вступления и докуда по нему ехать, в плоскости правил. Пока едет —
-## Otto не слушается ввода.
-var _rope: MeshInstance3D = null
-var _sliding: bool = false
-var _rope_target: float = 0.0
+## Паркинг нижнего этажа: ворота, светильники, чужие машины (ADR-0038).
+var _garage: Garage = null
+## Вступление: вертолёт привозит Otto на крышу. Пока идёт — Otto не слушается
+## ввода, а агенты и кабины стоят.
+var _arrival := RoofArrival.new()
 
 @onready var otto: Otto = $Otto
 
@@ -167,6 +155,8 @@ func _ready() -> void:
 		rules = BuildingRules.new()
 	_plan = BuildingPlan.generate(rules, building_seed)
 	_spawn.rng.seed = building_seed
+	# Свой генератор, не выпуска: иначе вход в дверь менял бы и выпуск агентов.
+	_watch.rng.seed = building_seed * 31 + 7
 	# Отель или офис: от этого отделка стен, обстановка и вывеска (ADR-0033).
 	identity = BuildingIdentity.of(GameState.instance().building, building_seed)
 
@@ -185,7 +175,12 @@ func _ready() -> void:
 	_spawn_shafts()
 	_spawn_escalators()
 	_spawn_doors()
+	# После дверей: запирать подвал или нет, решает число документов здания.
+	var basement := BasementLock.new()
+	add_child(basement)
+	basement.setup(rules, _plan, _cars)
 	_spawn_lamps()
+	_build_garage()
 	_spawn_exit()
 	# Воздух, крыша, обстановка, город и погода — окружение без геймплея (ADR-0029).
 	var scenery := BuildingScenery.new()
@@ -196,19 +191,18 @@ func _ready() -> void:
 
 	# Otto начинает с крыши, как в оригинале, и там, где нет проёмов. Крыша —
 	# свой уровень над зданием, а не нулевой этаж: ADR-0014, пункт 1.
-	# Спускается он туда по тросу — как в порте (ADR-0017, решение 4).
+	# Привозит его вертолёт, как в порте для ZX Spectrum, — в каждом здании
+	# (ADR-0038, решение 1). После гибели вертолёта нет: [method _respawn_otto].
 	var roof := BuildingRules.ROOF
 	var landing := Vector2(_plan.safe_x(rules, roof), rules.floor_surface(roof))
-	otto.global_position = WorldSpace.to_scene(landing - Vector2(0.0, ROPE_DROP))
 	# Разбивается упавший больше чем на этаж — этаж этого здания (ADR-0037).
 	otto.floor_height = rules.floor_height
-	_start_the_slide(landing)
 	otto.died.connect(_on_otto_died)
 	GameState.instance().alarm_raised.connect(_on_alarm_raised)
 	if GameState.instance().alarm.raised:
 		# Здание заведено уже при включённой сирене — редкость, но бывает.
 		_on_alarm_raised()
-	otto.apply_camera_bounds(Rect2(0.0, 0.0, rules.width, rules.total_height()))
+	_arrival.begin(self, otto, landing, Rect2(0.0, 0.0, rules.width, rules.total_height()))
 
 
 ## Гасит всё, что уехало из кадра. Ламп в здании тридцать, а в кадр влезает
@@ -218,7 +212,18 @@ func _ready() -> void:
 ## незачем.
 func _process(_delta: float) -> void:
 	_listen_where_otto_is()
-	var span := VisibleFloors.around(rules, otto.camera_view())
+	var seen := otto.camera_view()
+	var span := VisibleFloors.around(rules, seen)
+	# Свет выезда — только когда кадр ушёл за торец здания к воротам: в игре
+	# камера туда не заходит, и фонарь с неоном улицы там не горят вовсе.
+	if _garage != null and _garage.gate != null:
+		var bottom := rules.floors - 1
+		_garage.gate.show_street(
+			(
+				seen.position.x < rules.floor_span(bottom).x
+				and (VisibleFloors.covers(span, bottom) or VisibleFloors.covers(span, bottom - 1))
+			)
+		)
 	if span == _lit_span:
 		return
 
@@ -231,6 +236,9 @@ func _process(_delta: float) -> void:
 	# Столбы шахт — тем же правилом: их в здании втрое больше, чем ламп.
 	if _shafts != null:
 		_shafts.light_span(span)
+	# Свет трубок паркинга — тоже.
+	if _garage != null:
+		_garage.show_lights(VisibleFloors.covers(span, rules.floors - 1))
 	# Эскалатор светит в проём между двумя этажами: горит, пока в кадре хоть
 	# один из них.
 	for escalator: Escalator in _escalators:
@@ -273,15 +281,20 @@ func door_of(agent: Enemy) -> Door:
 	return null
 
 
-## Где стоит выход из здания, в плоскости правил.
+## Где стоит выход из здания — водительская дверь машины, — в плоскости правил.
 func exit_position() -> Vector2:
 	return _exit_position
 
 
+## Паркинг нижнего этажа: у него ворота ([method Garage.open_gate]).
+func garage() -> Garage:
+	return _garage
+
+
 ## Ждёт, пока Otto съедет по тросу и встанет на крышу; true — встал.
 ##
-## Здание начинается вступлением: Otto приезжает сверху и первые полсекунды не
-## слушается ввода (ADR-0017, решение 4). Ждать его надо по состоянию, а не
+## Здание начинается вступлением: вертолёт привозит Otto, и до приземления он не
+## слушается ввода (ADR-0038, решение 1). Ждать его надо по состоянию, а не
 ## выдержкой: длина вступления ещё поменяется, а под [member Engine.time_scale]
 ## выдержка и вовсе врёт. Одно место на съёмку и тесты — копии этого цикла
 ## разъезжались по проекту вчетвером.
@@ -291,6 +304,22 @@ func wait_for_the_landing(patience: int = LANDING_PATIENCE) -> bool:
 		await get_tree().physics_frame
 		left -= 1
 	return otto.is_grounded()
+
+
+## Пропускает вступление: Otto сразу на крыше, вертолёт уходит. Возвращает,
+## шло ли вступление, — по этому [Main] решает, пауза это или пропуск.
+func skip_the_intro() -> bool:
+	return _arrival.skip()
+
+
+## Идёт ли вступление.
+func is_in_the_intro() -> bool:
+	return _arrival.is_playing()
+
+
+## Вертолёт вступления; null, когда он улетел.
+func helicopter() -> Helicopter:
+	return _arrival.helicopter()
 
 
 ## Погашен ли этаж целиком — все его зоны. Гаснут они навсегда: сбитая лампа
@@ -335,24 +364,6 @@ func _spawn_shafts() -> void:
 		_shaft_hums.add(shaft, _shafts.top_of(shaft), rules.floor_surface(shaft.bottom))
 
 
-## Вступление: Otto съезжает по тросу на крышу.
-##
-## Пока едет, он «на эскалаторе» — ввод не действует, физика молчит, и коорди-
-## натой распоряжается уровень. Тот же приём, что у двери и эскалатора: своего
-## состояния ради одного кадра вступления заводить незачем.
-func _start_the_slide(landing: Vector2) -> void:
-	_rope_target = landing.y
-	_sliding = true
-	otto.ride(true)
-
-	_rope = GreyboxLook.box(
-		Vector3(ROPE_WIDTH, landing.y, ROPE_WIDTH), GreyboxLook.surface(GreyboxLook.WALL)
-	)
-	_rope.position = WorldSpace.to_scene(Vector2(landing.x, landing.y * 0.5))
-	_rope.position.z = -0.3
-	add_child(_rope)
-
-
 ## Ход здания: вступление, отъезд машины, агенты у дверей.
 ##
 ## Всё это — физика, а не кадр, и раньше жило в [method Node._process]. Разница
@@ -361,16 +372,22 @@ func _start_the_slide(landing: Vector2) -> void:
 ## быстрой машине их выходит больше за тот же шаг бота, и один и тот же сид
 ## давал то четыре смерти, то пять. Ровно этот долг тянулся с M18a.
 func _physics_process(delta: float) -> void:
-	if _sliding:
-		_slide_along(delta)
+	if _arrival.is_playing():
+		_arrival.advance(delta)
 		return
+	_arrival.linger()
 
 	# Кадр правил, а не сглаженный кадр игрока: тот едет в _process по настенным
 	# часам, и полоса выпуска агентов после скачка Otto зависела от скорости
 	# машины — в CI тест боя падал через раз (M20).
 	var view := otto.camera_view(true)
-	if _car != null and _car.advance(delta, view):
-		building_cleared.emit()
+	if _boarding != null:
+		var ready_to_go := GameState.instance().all_documents_collected()
+		match _boarding.step(delta, otto, ready_to_go, view):
+			ExitBoarding.Event.STARTED:
+				car_started.emit()
+			ExitBoarding.Event.LEFT:
+				building_cleared.emit()
 
 	_stir_agents(delta)
 	_shroud_agents()
@@ -378,29 +395,6 @@ func _physics_process(delta: float) -> void:
 	# своей паузы, и пропустив шаг смены, она не выпустила бы никого до следующей.
 	if spawn_agents:
 		_tend_agents(VisibleFloors.around(rules, view), delta)
-
-
-## Довозит Otto по тросу и убирает трос: он часть вступления, а не здания.
-##
-## Трос ведёт Otto, только пока тот выше крыши. Переставили ниже — вступление
-## кончилось само: так инструменты съёмки и тесты ставят его куда им надо,
-## не зная про трос вовсе.
-func _slide_along(delta: float) -> void:
-	var at := WorldSpace.to_plane(otto.global_position)
-	if at.y < _rope_target:
-		at.y = minf(at.y + ROPE_SPEED * delta, _rope_target)
-		otto.global_position = WorldSpace.to_scene(at)
-	if at.y >= _rope_target:
-		_finish_the_slide()
-
-
-## Отдаёт управление игроку и убирает трос.
-func _finish_the_slide() -> void:
-	_sliding = false
-	otto.ride(false)
-	if _rope != null:
-		_rope.queue_free()
-		_rope = null
 
 
 ## Нижний ярус двухэтажной пары: этажом ниже ведущего и на его ходу.
@@ -451,6 +445,8 @@ func _spawn_doors() -> void:
 		door.has_document = spot.has_document
 		add_child(door)
 		_doors.append(door)
+		door.otto_hid.connect(_on_otto_hid.bind(door))
+		door.otto_came_out.connect(_watch.end)
 
 		if not door.is_pending():
 			_enlist_door(door)
@@ -492,84 +488,38 @@ func _spawn_lamps() -> void:
 			_lighting.mark_unlit(index)
 
 
-## Выход из здания. Не запирается: без всех документов он отправляет обратно
-## наверх, к несобранной двери (ADR-0005, пункт 5).
+## Выход из здания. Без всех документов в подвал не попасть — его запирает
+## [BasementLock]; в подвале Otto сам идёт к машине и садится (ADR-0038, решение 4).
 ##
-## Сам проём вырезан в задней стене ([method _build_room]); здесь — зона, порог,
-## вывеска и машина. Вывеска горит своим светом: выход — цель, и читаться он
-## обязан на погашенном этаже (ADR-0019, решение 5; ADR-0023, решение 6).
+## Здесь — машина и место посадки у её двери. Ворота, в которые она уезжает,
+## и зелёная вывеска над ними — [Garage] (ADR-0038, решение 3).
 func _spawn_exit() -> void:
 	var bottom := rules.floors - 1
 	var surface := rules.floor_surface(bottom)
 	var centre := _plan.exit_x
-	var area := Rect2(
-		centre - BuildingShell.EXIT_WIDTH * 0.5,
-		surface - EXIT_HEIGHT,
-		BuildingShell.EXIT_WIDTH,
-		EXIT_HEIGHT
-	)
-
-	var zone := _zone(area)
-	zone.body_entered.connect(_on_exit_entered)
-	add_child(zone)
-	_exit_position = area.get_center()
-
-	var threshold := GreyboxLook.box(
-		Vector3(BuildingShell.EXIT_WIDTH, 0.05, BuildingShell.PANEL_THICKNESS),
-		GreyboxLook.metal(GreyboxLook.TRIM)
-	)
-	threshold.position = WorldSpace.to_scene(Vector2(centre, surface - 0.025))
-	threshold.position.z = WorldSpace.BACK_WALL_Z + BuildingShell.PANEL_THICKNESS
-	add_child(threshold)
-
-	# Не `sign`: так зовут встроенную функцию, и местная переменная её заслонила бы.
-	var board := GreyboxLook.box(EXIT_SIGN_SIZE, GreyboxLook.light(GreyboxLook.SIGN_GREEN))
-	board.name = "ExitSign"
-	board.position = WorldSpace.to_scene(
-		Vector2(centre, surface - Door.LEAF_SIZE.y - EXIT_SIGN_RISE)
-	)
-	board.position.z = WorldSpace.BACK_WALL_Z + EXIT_SIGN_SIZE.z * 0.5
-	add_child(board)
-	_spawn_car(area)
+	_spawn_car(centre, surface)
 
 
-## Машина у выхода: ставит её [ExitCar] у проёма, на пол нижнего этажа.
-func _spawn_car(exit_area: Rect2) -> void:
+## Паркинг на нижнем этаже — вид, без тел: зал, колонны, светильники, чужие
+## машины и ворота в левом торце (ADR-0038, решение 3).
+func _build_garage() -> void:
+	_garage = Garage.new()
+	_garage.name = "Garage"
+	add_child(_garage)
+	_garage.build(rules, _plan, building_seed)
+
+
+## Машина у выхода: ставит её [ExitCar] у ворот, на пол нижнего этажа. Сесть в
+## неё можно у водительской двери — туда и ведёт [method exit_position].
+func _spawn_car(exit_x: float, surface: float) -> void:
 	_car = ExitCar.new()
 	var choice := CarModel.choose(GameState.instance().building, building_seed)
-	_car.park(exit_area.get_center().x, exit_area.end.y, rules, _plan, choice)
+	_car.park(exit_x, surface, rules, _plan, choice)
 	add_child(_car)
-
-
-func _on_exit_entered(body: Node3D) -> void:
-	var runner := body as Otto
-	if runner == null:
-		return
-	if GameState.instance().all_documents_collected():
-		if not _cleared:
-			_cleared = true
-			# Otto на время отъезда прячется, как за дверью, и только по отъезду
-			# здание считается сданным (ADR-0011, пункт 14).
-			runner.stay_indoors(true)
-			_car.drive_away()
-		return
-
-	# Перенос отложен: сигнал приходит посреди разбора перекрытий, и двигать
-	# тело прямо здесь движок просит не делать.
-	_send_back_for_documents.call_deferred(runner)
-
-
-## Возвращает Otto к самой верхней несобранной двери.
-func _send_back_for_documents(runner: Otto) -> void:
-	var pending := PackedVector2Array()
-	for door in _doors:
-		if door.is_pending():
-			pending.append(door.mat_position())
-
-	var index := DocumentRoute.door_to_return_to(pending)
-	if index < 0:
-		return
-	runner.global_position = WorldSpace.to_scene(pending[index])
+	# Заглушённая машина стоит с тёмными фарами: зажигаются они на отъезде.
+	_car.set_lights(false)
+	_boarding = ExitBoarding.new(_car, surface, _garage, ExitBoarding.exit_frame(rules))
+	_exit_position = _boarding.door_point()
 
 
 ## Лампа накрыла агента по дороге вниз — самый дорогой способ убийства.
@@ -587,6 +537,9 @@ func _on_lamp_crushed(agent: Enemy) -> void:
 ## запомнить темноту; кто в ней стоит, пересчитает [method _shroud_agents].
 func _on_lamp_fell(index: int, x: float) -> void:
 	_lighting.darken(index, x)
+	if index == rules.floors - 1 and _garage != null:
+		# Светильники паркинга в зоне лампы гаснут вместе с ней.
+		_garage.darken(x)
 	_shroud_agents()
 
 
@@ -602,10 +555,20 @@ func _on_lamp_fell(index: int, x: float) -> void:
 func _shroud_agents() -> void:
 	var here := _floor_of(otto)
 	var otto_in_the_dark := _lighting.is_dark_at(here, otto.global_position.x)
+	_watch.start_frame()
+	# Преграды этажа, где спрятан Otto, — одни на всех его агентов: этаж такой
+	# один ([method DoorWatch.covers]), и считать их на каждого незачем.
+	var watch_blocks: Array[Vector2] = []
+	var blocks_counted := false
 	for agent in agents():
 		if agent.is_dead():
 			continue
-		_shroud_agent(agent, _floor_of(agent), agent.global_position.x, here, otto_in_the_dark)
+		var where := _floor_of(agent)
+		_shroud_agent(agent, where, agent.global_position.x, here, otto_in_the_dark)
+		if not blocks_counted and _watch.covers(where):
+			watch_blocks = _plan.blocks_on(rules, where)
+			blocks_counted = true
+		_post_agent(agent, where, watch_blocks)
 		if _alert_left > 0.0:
 			agent.alert_for(_alert_left)
 
@@ -643,6 +606,23 @@ func _shroud_agent(agent: Enemy, where: int, x: float, here: int, target_in_the_
 	agent.set_exit_at(AgentLifts.nearest_door(_plan, rules, _cars, where, x) if stranded else NAN)
 
 
+## Ставит агента ждать у двери, за которой Otto, или снимает с поста
+## ([DoorWatch]). Только из покадрового прохода, не при выпуске: жребий бросается
+## при первом взгляде на агента, и только что вышедший получит его кадром позже —
+## пока он в проёме, место у двери ему всё равно ни к чему. [param blocks] —
+## преграды этажа Otto; на других этажах [DoorWatch] их не смотрит.
+func _post_agent(agent: Enemy, where: int, blocks: Array[Vector2]) -> void:
+	var x := WorldSpace.to_plane(agent.global_position).x
+	agent.watch_at = _watch.post_for(agent.get_instance_id(), where, x, blocks)
+	agent.watch_door = _watch.door_x()
+
+
+## Otto спрятался за дверью [param door]: агенты его этажа могут пойти её ждать.
+func _on_otto_hid(door: Door) -> void:
+	var mat := door.mat_position()
+	_watch.begin(rules.floor_index_near(mat.y), mat.x)
+
+
 ## Все агенты здания: они лежат прямо в уровне, рядом с геометрией.
 ##
 ## Публичный: бот и прогон снаружи ищут ровно то же самое, и три копии одного
@@ -664,13 +644,14 @@ func _agents_on(index: int) -> Array[Enemy]:
 	return found
 
 
-## Звук по месту Otto — правила в [PlaceSound]: на крыше и у выхода улица в
-## полную силу, на этажах — из-за стекла; шаг по полу здания.
+## Звук по месту Otto — правила в [PlaceSound]: на крыше и у ворот паркинга
+## улица в полную силу, на этажах — из-за стекла; шаг по полу здания.
 func _listen_where_otto_is() -> void:
 	var index := _floor_of(otto)
 	var at := WorldSpace.to_plane(otto.global_position)
-	Sounds.set_outdoors(PlaceSound.hears_street(rules, index, at.x, _exit_position.x))
-	otto.step_sound = PlaceSound.step_at(index == BuildingRules.ROOF, identity)
+	Sounds.set_outdoors(PlaceSound.hears_street(rules, index, at.x, Garage.gate_x(rules)))
+	var on_concrete := index == BuildingRules.ROOF or index == rules.floors - 1
+	otto.step_sound = PlaceSound.step_at(on_concrete, identity)
 	_shaft_hums.follow(at.y)
 
 
@@ -945,19 +926,3 @@ func _safest_x(index: int) -> float:
 			best_gap = gap
 			best = x
 	return best
-
-
-## Зона на месте прямоугольника правил, ловящая Otto. Толщиной в тело: она
-## лежит в плоскости игры, как и всё, с чем он взаимодействует.
-func _zone(rect: Rect2) -> Area3D:
-	var zone := Area3D.new()
-	zone.collision_layer = 0
-	zone.collision_mask = 2
-	zone.position = WorldSpace.to_scene(rect.get_center())
-
-	var shape := BoxShape3D.new()
-	shape.size = Vector3(rect.size.x, rect.size.y, WorldSpace.BODY_DEPTH)
-	var collision := CollisionShape3D.new()
-	collision.shape = shape
-	zone.add_child(collision)
-	return zone

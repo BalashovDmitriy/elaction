@@ -141,13 +141,17 @@ func test_each_building_gets_its_own_things() -> void:
 ## не меньше двух на три этажа. Узкий этаж башни с четырьмя дверями, двумя
 ## лампами и шахтой держит всего три-четыре свободных места, и больше мебели
 ## на него не встанет.
+##
+## Зданий сорок, а не восемь: с M24b пять шахт сходятся этажом выше, над
+## подвалом (ADR-0038, решение 3), мебели в среднем стало 0.69 вместо 0.71 на
+## этаж, и на восьми сидах разброс жребия уводил отель под порог.
 func test_floors_are_not_bare() -> void:
 	var rules := _rules(5)
 	for identity in _identities():
 		var floors := 0
 		var furniture := 0
 		var decor := 0
-		for building_seed: int in SEEDS:
+		for building_seed: int in range(1, 41):
 			var plan := BuildingPlan.generate(rules, building_seed)
 			var dressing := BuildingDressing.lay(rules, plan, building_seed, identity)
 			floors += rules.floors - 1

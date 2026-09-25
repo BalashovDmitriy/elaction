@@ -192,3 +192,35 @@ table_50D8 row = pose(+0C, >=7 -> -3)*2 + facing: [height above feet, x offset L
 - for each agent not dying and situation < 3: screen boxes overlap vertically (agent.head >= Otto.feet and agent.feet < Otto.head)
   and horizontally (agent.x < Otto.x_right and agent.x_right >= Otto.x).
 - => any overlap during the whole jump (rising or falling) kills: 150 / 200 in dark (@56B9). Walking into an agent is harmless.
+
+## Part 4 (M24b: roof arrival, red door, basement, exit)
+
+Timings: the roof intro runs at 5 frames per tick (@4EA3), the car exit at 3 (@0B59), the fast scroll at 1.
+
+### Roof arrival (player_arriving_on_roof_anim_4d70)
+- start floor $1F (roof), wait 20 ticks, sound $C2 "grapple thrown" (@4D90), hook/line tiles 13 ticks (4EAC), wire in
+  tension 7 (4EE7), slide 18 (4F13), slowing 16 (4F4F), release 9 (4F5D), look-around 26 (4FC7), then
+  force_player_into_elevator_4e14: input right 8 ticks, then down until the cab reaches floor 30. ~11-12 s, no control.
+- line tiles from row 6 col 0 ($C8C0), step $22 => diagonal from the upper-left edge; Otto sprite starts at x=$F0 (off left).
+- once per game: @3531 checks $824A==0, set @353F, cleared only in init_player_data_2e98 (@2EA7).
+  Next building (@0A0E): start on floor 30 at x=$67, no rope. Helicopter exists only in the ZX Spectrum port.
+- death (player_died_75fe @7633): respawn floor = max(5, floor), x=$67, or the red door x if that floor still has one (@2FAA).
+
+### Red door (@3BDA-3C25, update_in_room_timer_3c3e)
+- player only; floor must have an uncollected red door ($8210 == 8 means none/collected); not jumping or crouching;
+  x inside a 7 px window; facing the door. No "up" press.
+- ticks 1-7 walk in 2 px/tick, sound $37; tick 8 sprite $FF and the door closes (a_red_door_has_closed_13fe).
+- forced exit when the counter == $82ED = $46 = 70 ticks (@2A5B) = 4.73 s, no difficulty term.
+- early exit: counter 9..69, joystick away from the door (@3CFB-3D13).
+- exit ~10 ticks; document collected and 500 points on exit (@3CCD, @3CCF), sound $36 (reward_for_documents_1456).
+- invulnerable from the first step in to the full exit (hit test needs sprite state 2, @08F8). No code sends agents to the door.
+
+### Basement and exit
+- floor 0: door mask 00, one shaft reaches it — exit shaft $802D, random 0..4 among the lower shafts (@273F-274F),
+  init_elevator_params_2aaa lowers its min floor (@2ABD). No escalator. Car always on the left (table_0D2D, $8035 = 0).
+- on arrival on floor 0 (@75B6-75E5) control is taken: ground_floor_reached_764E, check_if_all_documents_collected_09A3.
+- all documents (@09D3-0A05, @0B21-0B4C): forced walk left, forced jump left at x $20..$34, hidden in the car at x < $20;
+  sound $C8 (@0C31); car right 44 ticks at 4 px, U-turn 9 ticks (frames 3/7), left off-screen; ~115 ticks ≈ 5.8 s.
+  Bonus line drawn over the scene from counter 7 (@0DAD-0E65); no tally screen.
+- missing documents (@09B5-0A69): highest floor with a red door is the target; sound $38 at counter 4; at counter 30
+  Otto is hidden and the playfield scrolls up 2 px/frame; 20 ticks after, sound $39, Otto placed at the door x (@2FAA).

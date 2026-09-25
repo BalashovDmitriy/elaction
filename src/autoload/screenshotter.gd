@@ -244,6 +244,20 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "floor", "actions": [], "hold": 1.5},
 		{"label": "walking_on", "actions": ["move_left"], "hold": 1.6},
 	],
+	# M24b: вертолёт привозит Otto (сценку снимает tools/intro_shot.tscn), дальше
+	# тот же спуск: крыша, кабина, этаж. Паркинг — tools/garage_shot.tscn; до
+	# двери, подвала и выхода сценарий по времени не доходит, своего инструмента
+	# съёмки у них пока нет.
+	"M24B":
+	[
+		{"label": "roof", "actions": [], "hold": 1.2},
+		{"label": "roof_walk", "actions": ["move_right"], "hold": 2.5},
+		{"label": "to_the_shaft", "actions": ["move_right"], "hold": 2.9},
+		{"label": "riding_down", "actions": ["move_down"], "hold": 2.2},
+		{"label": "stopped", "actions": [], "hold": 1.6},
+		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
+		{"label": "floor", "actions": [], "hold": 1.5},
+	],
 	"M19":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},

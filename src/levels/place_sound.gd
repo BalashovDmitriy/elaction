@@ -6,22 +6,23 @@ extends RefCounted
 ## Правила — отдельно от [GreyboxLevel]: уровень только спрашивает их каждый
 ## кадр, а проверить их можно без здания.
 
-## Докуда от проёма выхода слышна улица, м: у выхода фон в полную силу, как на
-## крыше.
+## Докуда от ворот паркинга слышна улица, м: у ворот фон в полную силу, как на
+## крыше. С M24b выход — ворота в торце нижнего этажа (ADR-0038, решение 3).
 const STREET_REACH: float = 6.0
 
 
 ## Слышна ли улица с уровня [param index] в точке [param x]: на крыше — везде,
-## на нижнем этаже — у проёма выхода [param exit_x].
+## на нижнем этаже — у ворот паркинга [param exit_x] ([method Garage.gate_x]).
 static func hears_street(rules: BuildingRules, index: int, x: float, exit_x: float) -> bool:
 	if index == BuildingRules.ROOF:
 		return true
 	return index == rules.floors - 1 and absf(x - exit_x) <= STREET_REACH
 
 
-## Чем звучит шаг на крыше или на этаже здания [param building]: ковёр отеля,
-## камень конторы и крыши.
-static func step_at(on_roof: bool, building: BuildingIdentity) -> String:
-	if on_roof or building == null or not building.is_hotel():
+## Чем звучит шаг на этаже здания [param building]: ковёр отеля, камень конторы.
+## [param on_concrete] — Otto на голом бетоне: на крыше или в паркинге нижнего
+## этажа (ADR-0038, решение 3), там ковра нет и в отеле.
+static func step_at(on_concrete: bool, building: BuildingIdentity) -> String:
+	if on_concrete or building == null or not building.is_hotel():
 		return Sounds.STEP_CONCRETE
 	return Sounds.STEP_CARPET

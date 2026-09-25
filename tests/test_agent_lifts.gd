@@ -21,6 +21,10 @@ const SETTLE_FRAMES: int = 10
 ## полторы секунды, так что застать её агент может не сразу.
 const RIDE_FRAMES: int = 1800
 
+## Сид решений агента: паузы и повороты брожения. Любой — поездка от них не
+## зависит; сеется, чтобы прогон повторялся.
+const AGENT_SEED: int = 1
+
 
 func _build() -> GreyboxLevel:
 	GameState.instance().start_game()
@@ -67,12 +71,27 @@ func test_an_agent_rides_down_to_otto() -> void:
 		Vector2(level.plan().safe_x(rules, to_index), rules.floor_surface(to_index))
 	)
 
+	# Агент выходит, когда кабина уже стоит вровень с его этажом, и прямо у её
+	# проёма. Раньше он выходил сразу и ловил кабину, бродя по этажу: застанет
+	# ли он её в полторы секунды стоянки, решали его паузы и повороты — жребий,
+	# ещё и несеянный. Раскладка M24b сдвинула соседние шахты, и тест стал
+	# проходить через раз. Проверяется поездка, а не удача в брожении.
+	var standing := false
+	for _step in RIDE_FRAMES:
+		if _car_standing_at(level, shaft.x, from_index):
+			standing = true
+			break
+		await wait_physics_frames(1)
+	assert_true(standing, "кабина шахты %.1f встала на этаже %d" % [shaft.x, from_index])
+
 	var agent := ENEMY_SCENE.instantiate() as Enemy
 	level.add_child(agent)
-	# Рядом с шахтой, чтобы не тратить прогон на дорогу через весь этаж.
 	agent.global_position = WorldSpace.to_scene(
 		Vector2(shaft.x - rules.shaft_width, rules.floor_surface(from_index))
 	)
+	# Сеется, как сеет своих уровень ([method GreyboxLevel._release_agent]):
+	# несеянный генератор давал бы каждому прогону свои паузы брожения.
+	agent.seed_decisions(AGENT_SEED)
 	agent.setup(level.otto, 1.0)
 
 	var lowest := from_index
@@ -143,6 +162,17 @@ func test_an_agent_aboard_does_not_drive() -> void:
 			aboard += 1
 	assert_gt(moved, 0, "кабина с агентом внутри продолжает ходить сама")
 	assert_eq(aboard, 240, "агент все эти кадры ехал в кабине, а не ушёл по этажу")
+
+
+## Стоит ли в шахте [param x] кабина вровень с этажом [param index].
+func _car_standing_at(level: GreyboxLevel, x: float, index: int) -> bool:
+	for child in level.get_children():
+		var car := child as ElevatorCar
+		if car == null or absf(car.position.x - x) >= 0.1 or not car.is_aligned():
+			continue
+		if level.rules.floor_index_near(WorldSpace.to_plane(car.global_position).y) == index:
+			return true
+	return false
 
 
 func _car_in_column(level: GreyboxLevel, x: float) -> ElevatorCar:

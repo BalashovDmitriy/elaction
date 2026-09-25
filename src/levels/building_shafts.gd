@@ -336,13 +336,14 @@ func _build_board(x: float, index: int, surface: float) -> void:
 	_show(board, floor_label(_rules, index), 0.0, 0.0)
 
 
-## Что пишет табло про этаж [param index]: номер таблички этажа, а на крыше —
+## Что пишет табло про этаж [param index]: подпись таблички этажа — номер, у
+## паркинга «P» ([method FloorSigns.label_of]), — а на крыше
 ## [constant ROOF_LABEL]. Номер крыши по формуле вышел бы на единицу больше
 ## верхнего этажа — этажа, которого в здании нет.
 static func floor_label(rules: BuildingRules, index: int) -> String:
 	if index <= BuildingRules.ROOF:
 		return ROOF_LABEL
-	return str(FloorSigns.number_of(rules, index))
+	return FloorSigns.label_of(rules, index)
 
 
 ## Сколько панель кнопок занимает у шахты [param x] на этаже [param index]:
@@ -359,7 +360,7 @@ static func call_panel_span(
 	return Vector2(minf(near, far), maxf(near, far))
 
 
-## С какой стороны портала панели кнопок место: там, где до двери или выхода
+## С какой стороны портала панели кнопок место: там, где до двери
 ## хватает стены и панель не уходит в боковую стену здания. Справа, если
 ## свободны обе; 0 — если заняты обе.
 ##
@@ -377,9 +378,6 @@ static func call_side(rules: BuildingRules, plan: BuildingPlan, x: float, index:
 	for door in plan.doors:
 		if door.floor_index == index:
 			openings.append(Vector2(door.x - door_half, door.x + maxf(door_half, plate_reach)))
-	if index == rules.floors - 1:
-		var exit_half := Proportions.EXIT_WIDTH * 0.5
-		openings.append(Vector2(plan.exit_x - exit_half, plan.exit_x + exit_half))
 	for opening in openings:
 		if opening.x > x and opening.x < x + reach:
 			right = false

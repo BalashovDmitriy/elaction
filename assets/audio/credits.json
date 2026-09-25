@@ -23,6 +23,12 @@
   "licence": "CC-BY 4.0",
   "url": "https://incompetech.com/music/royalty-free/licenses/"
  },
+ "basement_open": {
+  "title": "Door buzz alarm elevator HALIFAX 93",
+  "author": "TRP",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/TRP/sounds/567317/"
+ },
  "building_bonus": {
   "title": "Rollin at 5 (фрагмент)",
   "author": "Kevin MacLeod (incompetech.com)",
@@ -34,6 +40,18 @@
   "author": "soundmary",
   "licence": "CC-BY 4.0",
   "url": "https://freesound.org/people/soundmary/sounds/128190/"
+ },
+ "car_door": {
+  "title": "car door close",
+  "author": "monotraum",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/monotraum/sounds/208695/"
+ },
+ "car_start": {
+  "title": "Car Start",
+  "author": "snakebarney",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/snakebarney/sounds/138099/"
  },
  "city": {
   "title": "city night hum",
@@ -95,6 +113,24 @@
   "licence": "CC-BY 4.0",
   "url": "https://incompetech.com/music/royalty-free/licenses/"
  },
+ "garage_gate": {
+  "title": "Automatic Garage Roller Door Opening",
+  "author": "freesoundjon01",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/freesoundjon01/sounds/202666/"
+ },
+ "helicopter": {
+  "title": "Helicopter_Hover",
+  "author": "Lydmakeren",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/Lydmakeren/sounds/541482/"
+ },
+ "helicopter_pass": {
+  "title": "Helicopter Flyby, Distant, A",
+  "author": "InspectorJ",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/InspectorJ/sounds/405234/"
+ },
  "kick": {
   "title": "punch",
   "author": "thefsoundman",
@@ -148,6 +184,12 @@
   "author": "addiofbaddi",
   "licence": "CC0 1.0",
   "url": "https://freesound.org/people/addiofbaddi/sounds/241659/"
+ },
+ "rope_slide": {
+  "title": "abseil2",
+  "author": "beerbelly38",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/beerbelly38/sounds/162151/"
  },
  "shaft_hum": {
   "title": "low hum control room",
