@@ -147,6 +147,8 @@ var _escalators: Array[Escalator] = []
 var _posts: Array[AgentPost] = []
 ## Жребий выпуска агентов по ROM и сколько ещё длится тревога агентов, с.
 var _spawn := AgentSpawn.new()
+## Кто из агентов ждёт у двери, за которой Otto (ADR-0038, решение 2).
+var _watch := DoorWatch.new()
 var _alert_left: float = 0.0
 ## Здание сдано. Событие однократное: по нему main собирает следующее здание.
 var _cleared: bool = false
@@ -167,6 +169,8 @@ func _ready() -> void:
 		rules = BuildingRules.new()
 	_plan = BuildingPlan.generate(rules, building_seed)
 	_spawn.rng.seed = building_seed
+	# Свой генератор, не выпуска: иначе вход в дверь менял бы и выпуск агентов.
+	_watch.rng.seed = building_seed * 31 + 7
 	# Отель или офис: от этого отделка стен, обстановка и вывеска (ADR-0033).
 	identity = BuildingIdentity.of(GameState.instance().building, building_seed)
 
@@ -451,6 +455,8 @@ func _spawn_doors() -> void:
 		door.has_document = spot.has_document
 		add_child(door)
 		_doors.append(door)
+		door.otto_hid.connect(_on_otto_hid.bind(door))
+		door.otto_came_out.connect(_watch.end)
 
 		if not door.is_pending():
 			_enlist_door(door)
@@ -602,10 +608,13 @@ func _on_lamp_fell(index: int, x: float) -> void:
 func _shroud_agents() -> void:
 	var here := _floor_of(otto)
 	var otto_in_the_dark := _lighting.is_dark_at(here, otto.global_position.x)
+	_watch.start_frame()
 	for agent in agents():
 		if agent.is_dead():
 			continue
-		_shroud_agent(agent, _floor_of(agent), agent.global_position.x, here, otto_in_the_dark)
+		var where := _floor_of(agent)
+		_shroud_agent(agent, where, agent.global_position.x, here, otto_in_the_dark)
+		_post_agent(agent, where)
 		if _alert_left > 0.0:
 			agent.alert_for(_alert_left)
 
@@ -641,6 +650,25 @@ func _shroud_agent(agent: Enemy, where: int, x: float, here: int, target_in_the_
 		and not AgentLifts.can_ride(_plan, rules, where, x, here)
 	)
 	agent.set_exit_at(AgentLifts.nearest_door(_plan, rules, _cars, where, x) if stranded else NAN)
+
+
+## Ставит агента ждать у двери, за которой Otto, или снимает с поста
+## ([DoorWatch]). Только из покадрового прохода, не при выпуске: жребий бросается
+## при первом взгляде на агента, и только что вышедший получит его кадром позже —
+## пока он в проёме, место у двери ему всё равно ни к чему.
+func _post_agent(agent: Enemy, where: int) -> void:
+	var blocks: Array[Vector2] = []
+	if _watch.covers(where):
+		blocks = _plan.blocks_on(rules, where)
+	var x := WorldSpace.to_plane(agent.global_position).x
+	agent.watch_at = _watch.post_for(agent.get_instance_id(), where, x, blocks)
+	agent.watch_door = _watch.door_x()
+
+
+## Otto спрятался за дверью [param door]: агенты его этажа могут пойти её ждать.
+func _on_otto_hid(door: Door) -> void:
+	var mat := door.mat_position()
+	_watch.begin(rules.floor_index_near(mat.y), mat.x)
 
 
 ## Все агенты здания: они лежат прямо в уровне, рядом с геометрией.
