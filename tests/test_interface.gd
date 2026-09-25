@@ -254,11 +254,19 @@ func test_the_fps_counter_follows_the_setting() -> void:
 	var hud := HUD_SCENE.instantiate() as Hud
 	add_child_autofree(hud)
 	Hud.show_fps = loaded.show_fps
-	await get_tree().process_frame
+	await _hud_frame()
 	assert_true(_fps_label_visible(hud), "включили — счётчик виден")
 	Hud.show_fps = false
-	await get_tree().process_frame
+	await _hud_frame()
 	assert_false(_fps_label_visible(hud), "выключили — пропал")
+
+
+## Ждёт, пока `_process` HUD гарантированно отработает хотя бы раз.
+## `process_frame` дерево шлёт до `_process` узлов того же кадра, и после одного
+## `await` HUD может ещё не обновиться — на CI тест из-за этого падал.
+func _hud_frame() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
 
 
 func _fps_label_visible(hud: Hud) -> bool:
