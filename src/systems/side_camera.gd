@@ -108,13 +108,17 @@ func snap_to(point: Vector2) -> void:
 ## от [method follow], позванного из [method Node._ready] Otto, когда он ещё
 ## стоял в начале координат, — и от неё камера полсекунды ехала бы вбок через
 ## пустое здание. [Camera2D] такого не делал: он вставал на место первым кадром.
-func apply_bounds(rect: Rect2) -> void:
+##
+## [param snap] = false оставляет камеру ехать к новым границам сглаживанием: так
+## кадр вступления, пущенный выше верха мира, опускается к зданию (ADR-0038).
+func apply_bounds(rect: Rect2, snap: bool = true) -> void:
 	# Низ правил — это верх сцены, и наоборот.
 	var lowest := WorldSpace.height_to_scene(rect.end.y)
 	var highest := WorldSpace.height_to_scene(rect.position.y)
 	_bounds.limits = Rect2(rect.position.x, lowest, rect.size.x, highest - lowest)
 	_rule_bounds.limits = _bounds.limits
-	snap_to(_target_point() if _target != null else _centre)
+	if snap:
+		snap_to(_target_point() if _target != null else _centre)
 
 
 ## Что сейчас в кадре, в координатах правил.

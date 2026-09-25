@@ -359,8 +359,10 @@ func facing() -> float:
 	return _facing
 
 
-func apply_camera_bounds(bounds: Rect2) -> void:
-	_camera.apply_bounds(bounds)
+## Границы камеры в координатах правил. [param snap] — встать на место сразу;
+## без него камера доедет к новым границам сглаживанием (конец вступления).
+func apply_camera_bounds(bounds: Rect2, snap: bool = true) -> void:
+	_camera.apply_bounds(bounds, snap)
 
 
 ## Возвращает тело в плоскость игры.
