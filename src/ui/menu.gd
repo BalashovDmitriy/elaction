@@ -280,9 +280,8 @@ func _build_controls() -> void:
 		_cell(grid, _keys_of(actions), NeonStyle.INK, HORIZONTAL_ALIGNMENT_LEFT)
 	_column.add_child(grid)
 	_gap(6.0)
-	_note(tr("UI_ACTION_HINT"))
-	_note(tr("UI_FALL_RULE"))
-	_note(tr("UI_AIM_HINT"))
+	# Только клавиши, без объяснений игры: в неё разбираются по ходу, как в
+	# любой другой (решение пользователя, ADR-0037, решение 9).
 	_note(tr("UI_REBIND_LATER"))
 	_gap(10.0)
 	_back()

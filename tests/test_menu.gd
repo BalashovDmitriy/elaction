@@ -256,9 +256,3 @@ func test_the_controls_open_from_the_pause_and_lead_back() -> void:
 			if (label as Label).text == wanted:
 				found = row
 	assert_not_null(found, "на паузе есть «Управление»")
-	menu.show_page(Menu.Page.CONTROLS)
-	var notes: Array[String] = []
-	for label: Node in menu.find_children("*", "Label", true, false):
-		notes.append((label as Label).text)
-	assert_has(notes, tr("UI_FALL_RULE"), "правило падения — на экране управления")
-	assert_has(notes, tr("UI_AIM_HINT"), "и луч прицела")
