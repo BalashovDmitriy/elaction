@@ -32,18 +32,20 @@ func test_the_trail_is_behind_the_bullet() -> void:
 		)
 
 
-func test_the_muzzle_flash_stays_where_the_shot_was_and_fades() -> void:
-	var look := _look(-1.0)
-	var flash := look.get_node("Flash") as MeshInstance3D
-	assert_true(flash.visible, "в миг выстрела вспышка горит")
-	look.follow(0.3)
-	assert_almost_eq(flash.position.x, 0.3, 0.001, "вспышка отстаёт от пули ровно на путь")
-	assert_gt(flash.transparency, 0.0, "и гаснет")
-	look.follow(BulletLook.FLASH_FADE + 0.01)
-	assert_false(flash.visible, "а за первые полметра гаснет совсем")
-	# Билборд без keep_scale теряет масштаб узла: вспышка не сжималась бы.
-	var material := flash.material_override as StandardMaterial3D
-	assert_true(material.billboard_keep_scale, "вспышка сжимается, а не только гаснет")
+## Вспышка у ствола — импульс света на несколько кадров, а не весь полёт
+## пули: с M24a пуля втрое быстрее, и свет, едущий с ней, гас бы за кадр в
+## метре от стрелка (ADR-0037, решение 5). Узел вспышки убирает себя сам.
+func test_the_muzzle_flash_is_a_short_pulse_that_cleans_up() -> void:
+	var host := Node3D.new()
+	add_child_autofree(host)
+	var fx := ShotFx.muzzle(host, Vector3(1.0, 1.0, 0.0), 1.0)
+	var lights := fx.find_children("*", "OmniLight3D", false, false)
+	assert_eq(lights.size(), 1, "в миг выстрела — вспышка света")
+	assert_false((lights[0] as OmniLight3D).shadow_enabled, "без тени: живёт три кадра")
+	await wait_seconds(ShotFx.FLASH_TIME + 0.1)
+	assert_eq(fx.find_children("*", "OmniLight3D", false, false).size(), 0, "и гаснет")
+	await wait_seconds(ShotFx.SMOKE_LIFETIME + 0.4)
+	assert_false(is_instance_valid(fx), "дымок рассеялся — узла нет")
 
 
 ## Ядро светится эмиссией, а unshaded Godot 4 эмиссию не берёт: ядро горело бы

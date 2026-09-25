@@ -246,6 +246,31 @@ func test_a_door_shuts_even_when_its_agent_is_killed_on_the_spot() -> void:
 	fail_test("дверь так и осталась открытой за убитым агентом")
 
 
+## Труп лежит до конца здания (ADR-0037, решение 6), но ни ячейки, ни двери не
+## держит: следующий агент выходит, пока убитый лежит.
+func test_a_corpse_does_not_hold_back_the_next_agent() -> void:
+	var level := _build(3)
+	await _wait_for_the_landing(level)
+
+	var corpse: Enemy = null
+	for _frame: int in CROWD_FRAMES * 6:
+		await wait_physics_frames(1)
+		var live := _live_agents(level)
+		if corpse == null:
+			for agent in live:
+				if not agent.is_emerging():
+					corpse = agent
+					agent.kill()
+					break
+			continue
+		if not live.is_empty():
+			assert_true(is_instance_valid(corpse), "труп лежит, пока выходит следующий")
+			return
+
+	assert_not_null(corpse, "из дверей никто не вышел — убивать было некого")
+	fail_test("после убитого не вышел никто: труп держит выпуск")
+
+
 func test_an_emptied_red_door_starts_letting_agents_out() -> void:
 	var level := _build(3)
 	var red: Door = null

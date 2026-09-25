@@ -38,14 +38,15 @@ const GRACE_BLINKS: float = 8.0
 ## не падение: без этого поставленный этажом ниже разбивался бы на ровном месте.
 const TELEPORT_GAP: float = 0.5
 
-## Ходьба и пуля — по ROM: 2 и 8 px за тик логики (ADR-0027, решение 4).
+## Ходьба и пуля — по ROM: 2 и 8 px за тик логики (ADR-0027, решение 4); пуля
+## втрое быстрее ROM ([constant Arcade.BULLET_PACE], ADR-0037, решение 5).
 @export var walk_speed: float = Arcade.speed(Arcade.WALK_PX)
 ## Прыжок по ROM: ступни +25 px (1.88 м) за 14 тиков (0.95 с) — table_42E2.
 ## Высота прыжка = jump_speed в квадрате, делённая на 2 · gravity: 7.9 и 16.6
 ## дают те же 1.88 м за те же 0.95 с. До M18d прыжок был 2.4 м по физике.
 @export var jump_speed: float = 7.9
 @export var gravity: float = 16.6
-@export var bullet_speed: float = Arcade.speed(Arcade.OTTO_BULLET_PX)
+@export var bullet_speed: float = Arcade.bullet_speed(Arcade.OTTO_BULLET_PX)
 ## Откуда вылетает пуля, от ног. Присев, Otto стреляет ниже — и его выстрел
 ## проходит там, где стоящий враг его не перепрыгнет.
 ##

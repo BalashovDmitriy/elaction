@@ -109,6 +109,18 @@ func fired() -> bool:
 	return _fired_now
 
 
+## Замахивается ли агент: выстрел решён, а пуля ещё не ушла. Всё это время
+## виден луч прицела (ADR-0037, решение 5). Замах в ноль — при злости 10 и выше
+## (@1BDF) — луча не даёт: пуля уходит в тот же кадр.
+func is_winding_up() -> bool:
+	return state == State.SHOOT and _shot_pending and _wind_up_left > 0.0
+
+
+## Сколько ещё до вылета пули, с; ноль — замаха нет.
+func wind_up_left() -> float:
+	return maxf(_wind_up_left, 0.0) if is_winding_up() else 0.0
+
+
 ## Пересчитывает решение.
 ##
 ## [param to_target] — от агента к Otto. [param target_alive] — есть ли в кого

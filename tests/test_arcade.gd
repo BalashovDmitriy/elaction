@@ -178,3 +178,21 @@ func test_an_agent_left_behind_goes_home_only_where_rom_lets_him() -> void:
 	assert_false(Arcade.agent_leaves(7, 5), "ниже восьмого не уходят")
 	assert_true(Arcade.agent_leaves(8, 2), "восьмой — уже да")
 	assert_true(Arcade.agent_leaves(20, 5), "двадцатый у нас не исключение")
+
+
+## Пули втрое быстрее ROM — у обеих сторон (ADR-0037, решение 5): у Otto
+## ~27 м/с, у агента от ~20 до ~27. Таблица ROM под множителем та же.
+func test_bullets_fly_three_times_faster_than_the_rom() -> void:
+	assert_almost_eq(Arcade.bullet_speed(Arcade.OTTO_BULLET_PX), 26.6, 0.1, "пуля Otto")
+	assert_almost_eq(
+		Arcade.agent_shot_speed(0, false), Arcade.agent_bullet_speed(0, false) * 3.0, 0.001
+	)
+	assert_almost_eq(Arcade.agent_shot_speed(40, true), 26.6, 0.1, "агент — не выше пули Otto")
+
+
+## Агент замечает пулю втрое дальше и потому уклоняется в то же время, что в
+## ROM: 20 px при 8 px за тик — два с половиной тика (@05F5).
+func test_the_dodge_window_keeps_the_rom_time() -> void:
+	var window := Arcade.dodge_reach() / Arcade.bullet_speed(Arcade.OTTO_BULLET_PX)
+	var rom := Arcade.seconds(Arcade.DODGE_REACH_PX / Arcade.OTTO_BULLET_PX)
+	assert_almost_eq(window, rom, 0.0001, "время на увёртку — как в ROM")
