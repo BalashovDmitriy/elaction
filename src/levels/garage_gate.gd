@@ -66,6 +66,8 @@ var _outside: MeshInstance3D = null
 var _beacon: MeshInstance3D = null
 ## Мотор шторы: позиционный источник у проёма, заводится при первом подъёме.
 var _voice: AudioStreamPlayer3D = null
+## Выезд за воротами: у него фонарь, который горит, пока нижний этаж в кадре.
+var _ramp: GarageRamp = null
 
 
 ## Собирает ворота у левой стены нижнего этажа.
@@ -254,30 +256,19 @@ func _build_frame() -> void:
 		)
 
 
-## Пандус за воротами: площадка у проёма и подъём влево на этаж — за краем
-## кадра, камера здания туда не заходит. По нему уезжает машина.
+## Пандус за воротами и выезд вокруг него — своим узлом ([GarageRamp]): с
+## выезда он в кадре, и собран разрезом, как здание. По пандусу уезжает машина.
 func _build_ramp() -> void:
-	var ramp := Node3D.new()
-	ramp.name = "Ramp"
-	add_child(ramp)
-	var concrete := BuildingFinish.shaft_concrete(Garage.CONCRETE)
-	var left := _rules.floor_span(_rules.floors - 1).x
-	var width := WorldSpace.CORRIDOR_DEPTH + 0.4
-	var thickness := _rules.slab_height
-	_box(
-		Vector3(RAMP_APRON, thickness, width),
-		concrete,
-		_at(left - RAMP_APRON * 0.5, _surface + thickness * 0.5, 0.0),
-		true,
-		ramp
-	)
-	var rise := _rules.floor_height
-	var slope := Vector2(RAMP_RUN, rise).length()
-	var incline := _box(Vector3(slope, thickness, width), concrete, Vector3.ZERO, true, ramp)
-	incline.rotation.z = -atan2(rise, RAMP_RUN)
-	incline.position = _at(
-		left - RAMP_APRON - RAMP_RUN * 0.5, _surface - rise * 0.5 + thickness * 0.5, 0.0
-	)
+	_ramp = GarageRamp.new()
+	add_child(_ramp)
+	_ramp.build(_rules)
+
+
+## Свет выезда — фонарь над пандусом — горит, пока нижний этаж в кадре, как
+## светильники паркинга ([method Garage.show_lights]).
+func show_lights(in_view: bool) -> void:
+	if _ramp != null:
+		_ramp.show_light(in_view)
 
 
 ## Вывеска EXIT на перемычке над воротами, лицом к камере.

@@ -87,6 +87,9 @@ var _car: ElevatorCar = null
 var _headroom: float = 0.0
 ## Куда Otto смотрит: -1 влево, +1 вправо. Туда же летят его пули.
 var _facing: float = 1.0
+## Насколько Otto повёрнут спиной к камере, 0..1: садясь в машину, он
+## поворачивается к ней, а не шагает в глубину боком ([method turn_into_depth]).
+var _depth_turn: float = 0.0
 ## Фаза ходьбы: целая часть — номер кадра из трёх.
 var _walk_phase: float = 0.0
 ## Сколько ещё держать позу выстрела и позу падения, с.
@@ -292,6 +295,12 @@ func stay_indoors(inside: bool) -> void:
 	else:
 		_states.come_out()
 	_repose()
+
+
+## Поворачивает Otto спиной к камере на долю [param weight]: 0 — вдоль этажа,
+## куда он смотрит, 1 — лицом в глубину. Так он садится в машину у выхода.
+func turn_into_depth(weight: float) -> void:
+	_depth_turn = clampf(weight, 0.0, 1.0)
 
 
 ## Otto встал на эскалатор или сошёл с него: пока едет, ввод игрока не
@@ -531,6 +540,8 @@ func _update_look(delta: float) -> void:
 	_body.show_pose(_pose())
 	_body.set_walk_phase(_walk_phase)
 	_body.face(_facing)
+	if _depth_turn > 0.0:
+		_body.rotation.y = lerp_angle(_body.rotation.y, PI, _depth_turn)
 	_body.set_transparency(1.0 - _grace_alpha())
 
 

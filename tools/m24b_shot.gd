@@ -11,8 +11,8 @@ extends Node
 ##    закрыта, у двери ждёт агент), Otto выходит.
 ## 2. Подвал: над подвалом, у шахты вниз — створки закрыты; все документы
 ##    собраны — створки расходятся и разошлись.
-## 3. Выход: Otto у машины, садится, фары и ворота, машина уезжает, бонус на
-##    HUD, затемнение.
+## 3. Выход: Otto у машины, садится — дверца открыта, он шагает к борту, —
+##    фары и ворота, машина уезжает по пандусу, бонус на HUD, затемнение.
 ##
 ## Otto ставится по раскладке, как в [code]garage_shot.gd[/code]; к двери и к
 ## машине его подводят игровыми действиями. Агент у двери ставится руками: жребий
@@ -195,7 +195,14 @@ func _exit() -> void:
 	Input.action_release(&"move_left")
 	if not boarded:
 		return
-	await _shoot("exit_02_boarding")
+	var car := _level.get(&"_car") as ExitCar
+	var step_back := ExitBoarding.STEP_BACK_FROM + ExitBoarding.STEP_BACK_TIME * 0.6
+	await _until(func() -> bool: return boarding.phase == ExitBoarding.Phase.GETTING_IN)
+	await _seconds(step_back)
+	if car.door_openness() > 0.5:
+		await _shoot("exit_02_boarding")
+	else:
+		push_error("дверца машины не открыта на посадке")
 	await _until(func() -> bool: return boarding.phase == ExitBoarding.Phase.STARTING)
 	await _seconds(0.8)
 	await _shoot("exit_03_lights_gate")

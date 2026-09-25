@@ -38,6 +38,25 @@ const SOUND_REACH: float = 24.0
 ## Машина стоит снаружи здания: за плоскостью игры, но перед стеной, чтобы
 ## Otto проходил перед ней, а не сквозь.
 const Z: float = -0.6
+## Водительская дверца. У моделей пака дверь не отдельной деталью, поэтому на
+## посадку поверх кузова распахивается своя створка — тонкая панель в краске
+## кузова со стеклом, на петлях у передней стойки. Видна, пока открыта: закрытую
+## рисует сама модель. Длина — доля длины машины; низ панели, линия окна и верх
+## стекла — доли высоты кузова.
+const DOOR_LENGTH: float = LENGTH * 0.26
+const DOOR_SILL: float = 0.24
+const DOOR_BELT: float = 0.6
+const DOOR_TOP: float = 0.9
+const DOOR_THICKNESS: float = 0.04
+## Насколько распахнута открытая дверца, градусы.
+const DOOR_SWING: float = 62.0
+const DOOR_GLASS := Color(0.08, 0.1, 0.13)
+## Плафон салона: зажигается с открытой дверцей, как в любой машине, и
+## высвечивает садящегося и дверцу — у ворот темно. Без тени; яркость и
+## дальность, м.
+const DOME := Color(1.0, 0.82, 0.6)
+const DOME_ENERGY: float = 1.6
+const DOME_RANGE: float = 2.6
 
 ## Куда машина уезжает: -1 влево, +1 вправо. С M24b всегда влево — в ворота.
 var towards: float = 1.0
@@ -59,6 +78,19 @@ var _wheels: Array[Node3D] = []
 var _hubs := PackedVector3Array()
 ## Радиус колеса, м: по нему колёса крутятся в лад с ходом, а не буксуют.
 var _wheel_radius: float = 0.3
+## Пандус за воротами ([GarageGate]): где начинается подъём, в плоскости правил,
+## его длина и высота, м. По нему машина уезжает наверх, а не сквозь землю.
+var _ramp_start: float = 0.0
+var _ramp_run: float = 0.0
+var _ramp_rise: float = 0.0
+## Пол, на котором машина стоит, в плоскости правил.
+var _floor_y: float = 0.0
+## Петля водительской дверцы и насколько дверца открыта: 0 — закрыта.
+var _door_hinge: Node3D = null
+var _door_open: float = 0.0
+var _dome: OmniLight3D = null
+## Ближний к камере борт кузова, Z в системе машины: к нему Otto шагает на посадке.
+var _near_side: float = 0.0
 
 
 ## Ставит машину у ворот паркинга: [param exit_x] — середина выхода, [param
@@ -78,6 +110,10 @@ func park(
 	name = "ExitCar"
 	var x := spot(exit_x, rules, plan)
 	towards = -1.0
+	_floor_y = floor_y
+	_ramp_start = rules.floor_span(rules.floors - 1).x - GarageGate.RAMP_APRON
+	_ramp_run = GarageGate.RAMP_RUN
+	_ramp_rise = rules.floor_height
 	position = WorldSpace.to_scene(Vector2(x, floor_y))
 	position.z = Z
 	# Модель стоит колёсами в своём нуле, капотом в +X; в другую сторону она
@@ -86,6 +122,7 @@ func park(
 	if towards < 0.0:
 		model.rotation.y = PI
 	add_child(model)
+	_hang_the_door(model, CarModel.PAINTS[choice.paint])
 	_wheels = CarModel.wheels(model)
 	_hubs = PackedVector3Array()
 	for wheel in _wheels:
@@ -171,6 +208,30 @@ func door_x() -> float:
 	return position.x + towards * DOOR_OFFSET
 
 
+## Открывает водительскую дверцу: 0 — закрыта (и не видна), 1 — распахнута.
+func set_door(openness: float) -> void:
+	_door_open = clampf(openness, 0.0, 1.0)
+	if _door_hinge == null:
+		return
+	_door_hinge.visible = _door_open > 0.0
+	# Свободный край дверцы — к багажнику, и распахивается она к камере (+Z):
+	# поворот вокруг +Y уводит +X в -Z, поэтому знак — по [member towards].
+	var eased := ease(_door_open, -2.0)
+	_door_hinge.rotation.y = towards * deg_to_rad(DOOR_SWING) * eased
+	_dome.visible = _door_open > 0.0
+	_dome.light_energy = DOME_ENERGY * eased
+
+
+## Насколько открыта водительская дверца.
+func door_openness() -> float:
+	return _door_open
+
+
+## Где садящийся встаёт в глубину, Z сцены: у ближнего борта, в проёме дверцы.
+func seat_z() -> float:
+	return global_position.z + _near_side - 0.18
+
+
 ## Otto сел: машина качнулась под ним и хлопнула дверцей.
 func take_the_driver() -> void:
 	_rocking = ROCK_TIME
@@ -243,6 +304,7 @@ func advance(delta: float, view: Rect2) -> bool:
 		return false
 	_speed = minf(_speed + ACCELERATION * delta, SPEED)
 	position.x += towards * _speed * delta
+	_climb()
 	# Колёса катятся вокруг своих осей: угол — путь, делённый на радиус. Капот
 	# в +X, и колесо, катящееся вперёд, идёт по часовой, если смотреть с +Z, —
 	# это минус вокруг +Z. Модель, развёрнутая назад, катит их в своей системе
@@ -256,6 +318,78 @@ func advance(delta: float, view: Rect2) -> bool:
 		_leaving = false
 		return true
 	return false
+
+
+## Вешает водительскую дверцу на петлю у передней стойки: панель в краске
+## [param paint] и стекло над ней. Размеры — по габариту модели [param model].
+func _hang_the_door(model: Node3D, paint: Color) -> void:
+	var box := AABB()
+	var first := true
+	for node in model.find_children("*", "MeshInstance3D", true, false):
+		var mesh := node as MeshInstance3D
+		var part := (model.transform * _to_model(model, mesh)) * mesh.mesh.get_aabb()
+		box = part if first else box.merge(part)
+		first = false
+	_near_side = box.end.z
+	var height := box.size.y
+	_door_hinge = Node3D.new()
+	_door_hinge.name = "DoorHinge"
+	# Петля — у передней стойки: от середины дверцы к капоту на половину её длины.
+	var front := towards * (DOOR_OFFSET + DOOR_LENGTH * 0.5)
+	_door_hinge.position = Vector3(front, 0.0, _near_side + DOOR_THICKNESS * 0.5 + 0.01)
+	add_child(_door_hinge)
+	var reach := -towards * DOOR_LENGTH * 0.5
+	var panel_h := height * (DOOR_BELT - DOOR_SILL)
+	var panel := GreyboxLook.box(
+		Vector3(DOOR_LENGTH, panel_h, DOOR_THICKNESS), GreyboxLook.polished(paint)
+	)
+	panel.name = "DoorPanel"
+	panel.position = Vector3(reach, height * DOOR_SILL + panel_h * 0.5, 0.0)
+	_door_hinge.add_child(panel)
+	var glass_h := height * (DOOR_TOP - DOOR_BELT)
+	var glass := GreyboxLook.box(
+		Vector3(DOOR_LENGTH * 0.86, glass_h, DOOR_THICKNESS * 0.5), GreyboxLook.polished(DOOR_GLASS)
+	)
+	glass.name = "DoorGlass"
+	glass.position = Vector3(reach * 1.1, height * DOOR_BELT + glass_h * 0.5, 0.0)
+	_door_hinge.add_child(glass)
+	_dome = OmniLight3D.new()
+	_dome.name = "Dome"
+	_dome.light_color = DOME
+	_dome.omni_range = DOME_RANGE
+	_dome.shadow_enabled = false
+	_dome.position = Vector3(towards * DOOR_OFFSET, height * 0.8, _near_side + 0.3)
+	add_child(_dome)
+	set_door(0.0)
+
+
+## Трансформ меша [param mesh] в системе модели [param model].
+static func _to_model(model: Node3D, mesh: Node3D) -> Transform3D:
+	var chain := Transform3D.IDENTITY
+	var node: Node = mesh
+	while node != null and node != model:
+		var spatial := node as Node3D
+		if spatial != null:
+			chain = spatial.transform * chain
+		node = node.get_parent()
+	return chain
+
+
+## Ставит машину на пандус за воротами: высота по середине машины, наклон — по
+## подъёму. Пандус идёт влево от площадки у ворот, выше него — улица, ровно.
+func _climb() -> void:
+	if _ramp_run <= 0.0:
+		return
+	var along := clampf((_ramp_start - position.x) / _ramp_run, 0.0, 1.0)
+	var at := WorldSpace.to_plane(position)
+	at.y = _floor_y - _ramp_rise * along
+	var z := position.z
+	position = WorldSpace.to_scene(at)
+	position.z = z
+	# Капот смотрит влево, и нос на подъёме задирается: поворот вокруг +Z по
+	# часовой, если смотреть с камеры, — минус.
+	var slope := atan2(_ramp_rise, _ramp_run)
+	rotation.z = -slope if along > 0.0 and along < 1.0 else 0.0
 
 
 ## Звук на месте машины: позиционный источник, который уезжает вместе с ней.

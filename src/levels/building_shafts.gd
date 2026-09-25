@@ -336,13 +336,14 @@ func _build_board(x: float, index: int, surface: float) -> void:
 	_show(board, floor_label(_rules, index), 0.0, 0.0)
 
 
-## Что пишет табло про этаж [param index]: номер таблички этажа, а на крыше —
+## Что пишет табло про этаж [param index]: подпись таблички этажа — номер, у
+## паркинга «P» ([method FloorSigns.label_of]), — а на крыше
 ## [constant ROOF_LABEL]. Номер крыши по формуле вышел бы на единицу больше
 ## верхнего этажа — этажа, которого в здании нет.
 static func floor_label(rules: BuildingRules, index: int) -> String:
 	if index <= BuildingRules.ROOF:
 		return ROOF_LABEL
-	return str(FloorSigns.number_of(rules, index))
+	return FloorSigns.label_of(rules, index)
 
 
 ## Сколько панель кнопок занимает у шахты [param x] на этаже [param index]:

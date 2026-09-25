@@ -257,6 +257,21 @@ func test_the_round_sits_in_the_middle_plate() -> void:
 	game.reset()
 
 
+## Нижний этаж — паркинг: HUD пишет «ПАРКИНГ», а не «ЭТАЖ 1», как колонны и
+## табло там пишут «P» (ADR-0038, решение 3). Этаж над ним — по-прежнему второй.
+func test_the_hud_calls_the_bottom_floor_parking() -> void:
+	var was := TranslationServer.get_locale()
+	var rules := BuildingRules.new()
+	var bottom := rules.floors - 1
+	for locale: String in GameSettings.LOCALES:
+		TranslationServer.set_locale(locale)
+		var parking := TranslationServer.translate("UI_PARKING").to_upper()
+		var floor_word := TranslationServer.translate("UI_FLOOR").to_upper()
+		assert_eq(Hud.floor_text(rules, bottom), parking, "паркинг на %s" % locale)
+		assert_eq(Hud.floor_text(rules, bottom - 1), "%s 2" % floor_word, "над ним — второй")
+	TranslationServer.set_locale(was)
+
+
 ## Кадры в секунду — по флажку настроек, в углу HUD; флажок переживает перезапуск.
 func test_the_fps_counter_follows_the_setting() -> void:
 	var settings := GameSettings.new()

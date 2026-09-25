@@ -16,6 +16,13 @@ extends Node3D
 ##
 ## Нумерация как в оригинале: верхний этаж — самый большой номер, нижний — первый.
 ## На крыше таблички нет: там нет ни стены, ни потолка, и в оригинале её там нет.
+##
+## Нижний этаж — подземный паркинг (ADR-0038, решение 3), и везде, где игрок
+## видит этаж, он «P», а не «1»: на табличке, на табло шахт, на колоннах паркинга
+## и в HUD. Номера остальных этажей не сдвигаются — [method number_of] прежний.
+
+## Как подписан нижний этаж — паркинг — там, где у других номер.
+const PARKING_MARK := "P"
 
 ## Кегль шрифта: чем он крупнее, тем чётче цифра. Высоту цифры в мире задаёт
 ## [constant Proportions.FLOOR_DIGIT], а не он.
@@ -54,6 +61,17 @@ static func number_of(rules: BuildingRules, index: int) -> int:
 	return rules.floors - index
 
 
+## Паркинг ли этаж [param index]: нижний этаж здания.
+static func is_parking(rules: BuildingRules, index: int) -> bool:
+	return index == rules.floors - 1
+
+
+## Подпись этажа [param index] так, как её видит игрок: номер, а у паркинга —
+## [constant PARKING_MARK].
+static func label_of(rules: BuildingRules, index: int) -> String:
+	return PARKING_MARK if is_parking(rules, index) else str(number_of(rules, index))
+
+
 ## Где висит середина таблички этажа, в координатах правил.
 ##
 ## Не вплотную к потолку, как в оригинале, а ниже на полосу, которую закрывает
@@ -83,7 +101,7 @@ static func hidden_band(z: float = WorldSpace.BACK_WALL_Z + STANDOFF) -> float:
 func _hang_on(index: int) -> void:
 	var plate := Proportions.FLOOR_SIGN
 	var sign_node := Node3D.new()
-	sign_node.name = "Floor%d" % number_of(_rules, index)
+	sign_node.name = "Floor%s" % label_of(_rules, index)
 	sign_node.position = WorldSpace.to_scene(centre_on(_rules, index))
 	sign_node.position.z = WorldSpace.BACK_WALL_Z + STANDOFF
 	add_child(sign_node)
@@ -93,7 +111,7 @@ func _hang_on(index: int) -> void:
 	sign_node.add_child(glass)
 
 	var label := Label3D.new()
-	label.text = str(number_of(_rules, index))
+	label.text = label_of(_rules, index)
 	label.font = NeonStyle.font(700)
 	label.font_size = FONT_SIZE
 	label.pixel_size = Proportions.FLOOR_DIGIT / (float(FONT_SIZE) * DIGIT_SHARE)

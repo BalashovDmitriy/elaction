@@ -115,8 +115,9 @@ const FIXTURE_BODY := Color(0.7, 0.71, 0.72)
 const HEADLIGHT_OFF := Color(0.6, 0.6, 0.56)
 const TAILLIGHT_OFF := Color(0.32, 0.04, 0.03)
 
-## Надпись уровня паркинга на простенке у таблички этажа.
-const LEVEL_MARK := "B1"
+## Надпись уровня паркинга на простенке у таблички этажа: та же «P», что на
+## табличке этажа, табло шахт и в HUD.
+const LEVEL_MARK := FloorSigns.PARKING_MARK
 
 ## Соль жребия машин: своя, чтобы паркинг не ходил в ногу с раскладкой.
 const SALT: int = 0x6A2A_6E00
@@ -381,6 +382,8 @@ func show_lights(in_view: bool) -> void:
 	for fixture in _fixtures:
 		if fixture.light != null:
 			fixture.light.visible = in_view and fixture.lit
+	if gate != null:
+		gate.show_lights(in_view)
 
 
 ## Сколько светильников светят по-настоящему — для тестов бюджета.

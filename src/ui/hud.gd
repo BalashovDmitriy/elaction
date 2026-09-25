@@ -41,6 +41,11 @@ const FPS_EVERY: float = 0.25
 ## За сколько набегает бонус здания, с: машина уезжает из кадра примерно за
 ## столько же.
 const BONUS_COUNT_TIME: float = 1.2
+## Запас по бокам числа бонуса сверх отступов плашки, px: цифры в 72 кегля
+## выступают за свою ширину, и «1 000» подходило к кромке вплотную.
+const BONUS_PAD: float = 18.0
+## Кегль числа бонуса.
+const BONUS_SIZE: int = 72
 
 ## Показывать ли счётчик кадров. Статическое, как [member Blood.enabled]: его
 ## ставят настройки, а HUD читает, не зная, кто их держит.
@@ -146,6 +151,13 @@ func count_bonus(amount: int) -> void:
 	_bonus_count.tween_method(_show_bonus_value, 0.0, float(amount), BONUS_COUNT_TIME)
 
 
+## Сколько бонусу ещё набегать до полного, с: 0 — досчитан или его нет.
+func bonus_time_left() -> float:
+	if _bonus_count == null or not _bonus_count.is_valid() or not _bonus_count.is_running():
+		return 0.0
+	return maxf(BONUS_COUNT_TIME - _bonus_count.get_total_elapsed_time(), 0.0)
+
+
 ## Убирает плашку бонуса: следующее здание, меню или новая партия.
 func hide_bonus() -> void:
 	if _bonus_count != null:
@@ -178,10 +190,13 @@ static func format_score(score: int) -> String:
 	return ("-" if score < 0 else "") + grouped
 
 
-## Этаж, где стоит Otto, так, как его видит игрок: номер таблички или крыша.
+## Этаж, где стоит Otto, так, как его видит игрок: номер таблички, крыша или
+## паркинг — нижний этаж, на табличках «P» ([method FloorSigns.label_of]).
 static func floor_text(rules: BuildingRules, index: int) -> String:
 	if index == BuildingRules.ROOF:
 		return TranslationServer.translate("UI_ROOF").to_upper()
+	if FloorSigns.is_parking(rules, index):
+		return TranslationServer.translate("UI_PARKING").to_upper()
 	return (
 		"%s %d"
 		% [TranslationServer.translate("UI_FLOOR").to_upper(), FloorSigns.number_of(rules, index)]
@@ -286,8 +301,15 @@ func _build() -> void:
 	_bonus_caption = _caption("UI_BONUS")
 	_bonus_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bonus_box.add_child(_bonus_caption)
-	_bonus = _label(72, INK, 800)
+	_bonus = _label(BONUS_SIZE, INK, 800)
 	_bonus.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# Место под самый большой бонус — сразу: плашка не растёт, пока число
+	# набегает, и у любого числа по бокам один и тот же воздух.
+	var widest := format_score(Arcade.building_bonus(Arcade.BUILDING_BONUS_TOP))
+	var width := (
+		NeonStyle.font(800).get_string_size(widest, HORIZONTAL_ALIGNMENT_LEFT, -1, BONUS_SIZE).x
+	)
+	_bonus.custom_minimum_size.x = ceilf(width + BONUS_PAD * 2.0)
 	bonus_box.add_child(_bonus)
 	_bonus_plate.visible = false
 	# Справа снизу: кадры в секунду, если их просили показывать. Мелко и

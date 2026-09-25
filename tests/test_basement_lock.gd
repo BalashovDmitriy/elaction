@@ -238,6 +238,22 @@ func test_the_hatch_holds_until_the_last_document() -> void:
 	assert_eq(lock.find_children("Hatch", "", false, false).size(), 0, "створки разошлись и убраны")
 
 
+## Запертые створки — тяжёлая сталь, а не плитка пола (кадр M24b): зебра по
+## кромке и красные огоньки, пока заперто; последний документ огоньки гасит.
+func test_the_locked_hatch_reads_as_a_steel_shutter() -> void:
+	var level := await _building(1)
+	var lock := _lock_of(level)
+	assert_gt(lock.find_children("Hazard*", "MeshInstance3D", true, false).size(), 0, "зебра")
+	var lamps := lock.find_children("LockLamp*", "MeshInstance3D", true, false)
+	assert_gt(lamps.size(), 0, "огоньки замка")
+	for lamp: Node in lamps:
+		assert_true((lamp as MeshInstance3D).visible, "горят, пока заперто")
+	GameState.instance().collect_document()
+	for lamp: Node in lamps:
+		if is_instance_valid(lamp):
+			assert_false((lamp as MeshInstance3D).visible, "открыто — погасли")
+
+
 ## Шахта в подвал этого здания и её кабина.
 func _basement_shaft(level: GreyboxLevel) -> BuildingPlan.ShaftSpot:
 	for shaft in level.plan().shafts:
