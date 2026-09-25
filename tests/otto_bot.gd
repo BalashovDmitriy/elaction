@@ -114,6 +114,20 @@ const CAR_ALIGNED: float = 0.12
 ## потом нажимается снова.
 const TAPS: Array[StringName] = [&"jump", &"shoot"]
 
+## За сколько секунд до попадания бот в кабине уводит её с линии огня.
+const CAR_DODGE_SIGHT: float = 0.6
+
+## Ниже этой высоты над ногами пулю в кабине перепрыгивают: потолок кабины
+## не пускает прыжок выше.
+const CAR_LOW_BULLET: float = 0.6
+
+## Допуск на то, что луч дотянулся до Otto, м.
+const LASER_SLACK: float = 0.1
+
+## Ближе этого к этажу отпущенная кабина дотягивает сама
+## ([member ElevatorMotion.settle_distance]).
+const SETTLE_BY_ITSELF: float = 0.3
+
 var _level: GreyboxLevel
 var _rules: BuildingRules
 var _otto: Otto
@@ -139,6 +153,11 @@ var _riding_down: bool = true
 var _ride_shaft_x: float = INF
 ## Что бот решил последним разбором: для трассы прогона.
 var _decision: String = ""
+## Сколько ещё держать кабину в сторону, выбранную от пули, с. Решение
+## держится до пролёта пули: сменивший ход тут же выходит из-под луча, и
+## пересчёт на каждом шаге качал бы кабину туда-сюда прямо на линии огня.
+var _car_dodge_left: float = 0.0
+var _car_dodge_dir: float = 0.0
 
 
 func _init(level: GreyboxLevel) -> void:
@@ -171,17 +190,30 @@ func step() -> void:
 	var incoming := _incoming()
 	var bullet_height := _dodge_height(incoming)
 	# Уклонение отменяет дуэль: нажата будет не сторона, а присед или прыжок.
-	# В кабине уклонения нет вовсе — там от пули не уйти, и остаётся стрелять.
+	# В кабине присесть нельзя, и уклонение там своё — увести кабину с линии
+	# ([method _dodge_in_car]). До M24a его не было вовсе: пуля ROM медленная,
+	# и бот успевал выстрелить первым. Втрое быстрая пуля по едущему вниз Otto
+	# — это половина смертей замера M24a.
 	#
-	# Разрешать его в стоящей кабине пробовали на M18: на этаже она тот же пол,
-	# и присед на ней работает. Замер это отверг — бот приседал вместо того,
-	# чтобы идти, и на одном сиде не собрал ни одного документа за весь прогон.
+	# Приседать в стоящей кабине пробовали на M18: замер это отверг — бот
+	# приседал вместо того, чтобы идти, и на одном сиде не собрал ни одного
+	# документа за весь прогон.
 	var dodging := bullet_height >= 0.0 and not _otto.is_riding()
+	var car := _car_of_otto() if _otto.is_riding() else null
+	_car_dodge_left = maxf(_car_dodge_left - _otto.get_physics_process_delta_time(), 0.0)
+	if car == null:
+		_car_dodge_left = 0.0
+	var car_dodging := (
+		car != null
+		and (_car_dodge_left > 0.0 or (incoming.x >= 0.0 and incoming.y <= CAR_DODGE_SIGHT))
+	)
 	# Повёрнут ли ствол к цели этим же кадром: в дуэли бот сам нажимает сторону,
 	# и целиться отдельным кадром не надо.
-	var aiming := not dodging and _duelling(threat)
+	var aiming := not dodging and not car_dodging and _duelling(threat)
 	if dodging:
 		_dodge(bullet_height)
+	elif car_dodging:
+		_dodge_in_car(car, incoming)
 	elif aiming:
 		_hold_the_line(threat)
 	else:
@@ -205,6 +237,15 @@ func _advance(floor_index: int) -> void:
 	if _riding_further():
 		_decision = "едем к этажу %d %s" % [_ride_to, "вниз" if _riding_down else "вверх"]
 		_ride_on()
+		return
+	if _otto.is_riding() and not _car_aligned_under_otto():
+		# Кабина стоит между этажами — увёл её с линии огня. Довести до этажа.
+		var nearest := _rules.floor_surface(floor_index)
+		_decision = "довожу кабину до этажа %d" % floor_index
+		# Вблизи этажа кабина дотягивает сама, стоит только отпустить: держать
+		# сторону — значит качать её вокруг этажа.
+		if absf(_at(_otto).y - nearest) > SETTLE_BY_ITSELF:
+			_press(&"move_down" if _at(_otto).y < nearest else &"move_up")
 		return
 
 	var goal := _goal()
@@ -349,12 +390,20 @@ func _laser_threat(agent: Enemy) -> Vector2:
 	if signf(to_otto.x) != laser.direction:
 		return Vector2(-1.0, INF)
 	var gap := absf(to_otto.x)
-	if laser.length() < gap - BODY_HALF_WIDTH:
+	# Луч, упёршийся в самого Otto, кончается ровно у края его тела, и сравнение
+	# без допуска отбрасывало его через раз — по погрешности плавающей точки.
+	if laser.length() < gap - BODY_HALF_WIDTH - LASER_SLACK:
 		return Vector2(-1.0, INF)
 	var height := -to_otto.y
-	if height < 0.0 or height > Proportions.BODY:
+	var time := laser.time_to(gap)
+	# В кабине Otto сам едет на линию или с неё: мерится высота на момент, когда
+	# пуля придёт. Возвращается нынешняя — по ней решает [method _dodge_in_car].
+	var car := _car_of_otto() if _otto.is_riding() else null
+	var arriving := height + (car.speed_now() * time if car != null else 0.0)
+	var slack := 0.1 if car != null else 0.0
+	if arriving < -slack or arriving > Proportions.BODY + slack:
 		return Vector2(-1.0, INF)
-	return Vector2(height, laser.time_to(gap))
+	return Vector2(height, time)
 
 
 ## Высота, от которой уходить этим кадром, или −1.
@@ -626,3 +675,55 @@ func _release_all() -> void:
 		if TAPS.has(action):
 			_resting.append(action)
 	_pressed.clear()
+
+
+## Кабина, в которой едет Otto, или null.
+func _car_of_otto() -> ElevatorCar:
+	var here := _at(_otto)
+	for child in _level.get_children():
+		var car := child as ElevatorCar
+		if car == null or not car.has_rider():
+			continue
+		var at := _at(car)
+		if absf(at.x - here.x) > car.width() * 0.5 or absf(at.y - here.y) > 0.6:
+			continue
+		return car
+	return null
+
+
+## Стоит ли кабина Otto у этажа.
+func _car_aligned_under_otto() -> bool:
+	var car := _car_of_otto()
+	return car == null or car.is_aligned()
+
+
+## Уход от выстрела в кабине: присесть там нельзя, зато можно увести кабину.
+##
+## Кабина идёт ровным ходом без разгона, и за оставшееся до пули время она
+## сдвигает Otto на [code]скорость · время[/code]. Вниз — пуля уходит над
+## головой, вверх — под ноги, в днище. Берётся сторона с большим запасом;
+## низкую пулю в стоящей кабине проще перепрыгнуть.
+func _dodge_in_car(car: ElevatorCar, incoming: Vector2) -> void:
+	if _car_dodge_left > 0.0:
+		if car.can_go(_car_dodge_dir):
+			_press(&"move_down" if _car_dodge_dir > 0.0 else &"move_up")
+		return
+	var height := incoming.x
+	if (
+		height <= CAR_LOW_BULLET
+		and car.is_aligned()
+		and _otto.is_grounded()
+		and incoming.y <= JUMP_LEAD
+		and _press(&"jump")
+	):
+		return
+	var shift := car.speed * incoming.y
+	var over_head := height + shift - Proportions.BODY
+	var under_feet := shift - height
+	var down := over_head if car.can_go(1.0) else -INF
+	var up := under_feet if car.can_go(-1.0) else -INF
+	if is_inf(down) and is_inf(up):
+		return
+	_car_dodge_dir = 1.0 if down >= up else -1.0
+	_car_dodge_left = incoming.y + 0.1
+	_press(&"move_down" if _car_dodge_dir > 0.0 else &"move_up")

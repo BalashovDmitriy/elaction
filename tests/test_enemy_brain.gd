@@ -71,11 +71,15 @@ func test_the_wind_up_is_visible_until_the_shot() -> void:
 	assert_eq(brain.wind_up_left(), 0.0)
 
 
-## Злой — без замаха: при злости 10 и выше пуля уходит сразу.
-func test_a_mean_agent_fires_at_once() -> void:
+## Злой — с самым коротким замахом: в ROM при злости 10 и выше пуля уходит
+## сразу, у нас — через [constant EnemyBrain.MIN_TELL], чтобы луч успели увидеть.
+func test_a_mean_agent_fires_after_the_shortest_tell() -> void:
 	var brain := _brain(12)
 	_run(brain, 0.4, FAR_ABOVE)
-	assert_lte(_frames_to_shot(brain, IN_FRONT), 1, "злой стреляет с первого кадра")
+	var frames := _frames_to_shot(brain, IN_FRONT)
+	var tell := int(ceil(EnemyBrain.MIN_TELL / STEP))
+	assert_gte(frames, tell - 1, "не раньше минимального замаха")
+	assert_lte(frames, tell + 1, "и не позже")
 
 
 ## Пауза после выстрела — max(0, 80 − 8·злость) тиков (@0055).
@@ -153,3 +157,14 @@ func test_turning_around_flips_the_facing() -> void:
 	assert_eq(brain.facing, -1.0)
 	brain.turn_around()
 	assert_eq(brain.facing, 1.0)
+
+
+## Луч прицела виден при любой злости: у ROM на десяти и выше замаха нет, а
+## втрое быстрая пуля без него неотвратима (ADR-0037, решение 5).
+func test_the_tell_never_drops_below_the_minimum() -> void:
+	for level: int in range(0, 20):
+		assert_gte(EnemyBrain.tell_time(level), EnemyBrain.MIN_TELL, "злость %d" % level)
+		assert_gte(EnemyBrain.tell_time(level), Arcade.wind_up(level), "не короче ROM")
+		assert_gt(
+			Arcade.action_time(level), EnemyBrain.tell_time(level), "пуля уходит внутри действия"
+		)

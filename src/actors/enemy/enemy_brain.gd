@@ -20,6 +20,12 @@ enum State { EMERGING, WALK, SHOOT, DEAD }
 ## какой высоте уйдёт его собственная.
 enum Stance { STAND, KNEEL, PRONE }
 
+## Замах не короче этого, с, при любой злости. В ROM при злости 10 и выше замаха
+## нет вовсе, и пуля уходит в тот же кадр; от медленной пули ROM это было
+## терпимо, от втрое быстрой (ADR-0037, решение 5) без луча прицела не уйти —
+## ни человеку, ни боту тестов. Четверть секунды — на реакцию, а не на отдых.
+const MIN_TELL: float = 0.25
+
 ## Сколько агент выбирается из двери, с: всё это время он не стреляет.
 var emerge_time: float = 0.6
 
@@ -267,13 +273,20 @@ func _open_fire(to_target: Vector2, target_low: bool) -> void:
 		_:
 			stance = Stance.STAND
 	state = State.SHOOT
-	_wind_up_left = Arcade.wind_up(anger)
+	_wind_up_left = tell_time(anger)
 	# Действие по ROM всегда длиннее замаха на два тика и больше (@1C7A): пуля
 	# уходит внутри него.
 	_action_left = Arcade.action_time(anger)
 	_shot_pending = true
-	# Замах в ноль — пуля уходит в тот же кадр: так в ROM при злости 10 и выше.
+	# Замаха в ноль не бывает ([constant MIN_TELL]), но шаг зовётся сразу: так
+	# замах начинается в этом же кадре, а не в следующем.
 	_act(0.0)
+
+
+## Замах перед выстрелом на злости [param level], с: по ROM, но не короче
+## [constant MIN_TELL].
+static func tell_time(level: int) -> float:
+	return maxf(MIN_TELL, Arcade.wind_up(level))
 
 
 ## Брожение по этажу: идёт, стоит, снова идёт — в случайную сторону (@5D13).
