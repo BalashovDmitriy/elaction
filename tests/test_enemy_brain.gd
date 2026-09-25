@@ -168,3 +168,48 @@ func test_the_tell_never_drops_below_the_minimum() -> void:
 		assert_gt(
 			Arcade.action_time(level), EnemyBrain.tell_time(level), "пуля уходит внутри действия"
 		)
+
+
+## Неуязвимого не обстреливают: Otto выходит из двери, у которой его ждали,
+## и пуля, пущенная в этот миг, прошла бы сквозь него. Агент целится — луч
+## горит, — но пуля ждёт, сколько бы неуязвимость ни длилась.
+func test_agent_holds_the_shot_while_otto_cannot_be_hit() -> void:
+	var brain := _brain(0)
+	_run(brain, 0.4, FAR_ABOVE)
+	for _frame: int in 300:
+		brain.update(STEP, IN_FRONT, true, -1.0, true, true, false, false)
+		assert_false(brain.fired(), "в неуязвимого не стреляют")
+	assert_true(brain.is_winding_up(), "но целятся: луч прицела горит")
+	assert_eq(brain.state, EnemyBrain.State.SHOOT)
+	assert_almost_eq(brain.wind_up_left(), EnemyBrain.MIN_TELL, STEP, "замах стоит на минимуме")
+
+
+## Стал уязвим — пуля уходит через [constant EnemyBrain.MIN_TELL]: четверть
+## секунды на реакцию, как у самого злого агента, и ни кадром позже.
+func test_agent_fires_once_otto_can_be_hit_again() -> void:
+	var brain := _brain(0)
+	_run(brain, 0.4, FAR_ABOVE)
+	for _frame: int in 120:
+		brain.update(STEP, IN_FRONT, true, -1.0, true, true, false, false)
+	var frames := -1
+	for frame: int in 60:
+		brain.update(STEP, IN_FRONT, true)
+		if brain.fired():
+			frames = frame
+			break
+	assert_gt(frames, -1, "стал уязвим — выстрел")
+	assert_almost_eq(
+		float(frames + 1) * STEP, EnemyBrain.MIN_TELL, STEP * 1.5, "через замах-минимум"
+	)
+
+
+## Короткая неуязвимость посреди длинного замаха его не удлиняет сверх нужного:
+## пока замах больше минимума, он идёт как шёл.
+func test_a_long_tell_runs_down_while_otto_cannot_be_hit() -> void:
+	var brain := _brain(0)
+	_run(brain, 0.4, FAR_ABOVE)
+	brain.update(STEP, IN_FRONT, true, -1.0, true, true, false, false)
+	var start := brain.wind_up_left()
+	assert_gt(start, EnemyBrain.MIN_TELL + STEP * 3.0, "у спокойного замах длиннее минимума")
+	brain.update(STEP, IN_FRONT, true, -1.0, true, true, false, false)
+	assert_almost_eq(brain.wind_up_left(), start - STEP, 0.0001, "замах идёт")
