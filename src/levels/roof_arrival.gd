@@ -33,6 +33,13 @@ const HOVER_HEIGHT: float = 4.2
 ## с крыши, и камера съезжает к ним сглаживанием, без рывка.
 const CAMERA_HEADROOM: float = 4.5
 
+## Выше кадр вступления не поднимается, даже если вертолёт висит выше обычного
+## над высокой техникой: крыша должна остаться в кадре с запасом на рост Otto.
+const DECK_IN_FRAME: float = 1.6
+
+## Сколько над верхом вертолёта остаётся неба в кадре, м.
+const SKY_ABOVE: float = 0.4
+
 ## Руки Otto на крюке, ступни ниже на столько, м: рост с поднятыми руками.
 const REACH: float = Proportions.BODY * 1.15
 
@@ -77,9 +84,13 @@ func begin(host: Node3D, otto: Otto, landing: Vector2, bounds: Rect2) -> void:
 	_otto = otto
 	_landing = landing
 	_bounds = bounds
+	var deck := WorldSpace.to_scene(landing).y
+	var obstacles := roof_obstacles(host, deck, [otto] as Array[Node])
 	_helicopter = Helicopter.new()
 	host.add_child(_helicopter)
-	var hover := WorldSpace.to_scene(landing - Vector2(0.0, HOVER_HEIGHT))
+	_helicopter.avoid(obstacles)
+	# Над высокой техникой — башней, антенной — вертолёт висит выше обычного.
+	var hover := _helicopter.safe_hover(WorldSpace.to_scene(landing - Vector2(0.0, HOVER_HEIGHT)))
 	_helicopter.fly_in(hover)
 
 	var hook := _helicopter.hook_at_hover(hover)
@@ -87,14 +98,51 @@ func begin(host: Node3D, otto: Otto, landing: Vector2, bounds: Rect2) -> void:
 	_otto.visible = false
 	_place(Vector3(hook.x, hook.y - REACH, WorldSpace.PLAY_Z))
 	# Кадр встаёт сразу, снимком: первый кадр здания — уже кадр вступления.
+	# Висит вертолёт выше обычного — и кадр выше, пока крыша в нём остаётся.
+	var top := WorldSpace.to_plane(hover).y - _helicopter.top_above_skids() - SKY_ABOVE
+	var headroom := clampf(
+		bounds.position.y - top,
+		CAMERA_HEADROOM,
+		bounds.position.y + Proportions.FIELD - landing.y - DECK_IN_FRAME
+	)
 	var framed := Rect2(
-		bounds.position.x, bounds.position.y - CAMERA_HEADROOM, bounds.size.x, Proportions.FIELD
+		bounds.position.x, bounds.position.y - headroom, bounds.size.x, Proportions.FIELD
 	)
 	_otto.apply_camera_bounds(framed)
 	_camera_held = true
 	for action: StringName in SKIP_ACTIONS:
 		_held[action] = Input.is_action_pressed(action)
 	_step = Step.FLY_IN
+
+
+## Что стоит на крыше выше настила [param deck] (высота в координатах сцены):
+## видимые меши уровня — техника, машинное отделение с антенной, кровля,
+## вывеска. Без кабин (их прикрывает машинное отделение), без города (он в
+## своём [SubViewport] и своём мире), без дождя (его струи и ореолы — не
+## предметы) и без [param skip] — Otto и тому подобного.
+static func roof_obstacles(host: Node, deck: float, skip: Array[Node]) -> Array[AABB]:
+	var found: Array[AABB] = []
+	for node: Node in host.find_children("*", "MeshInstance3D", true, false):
+		var mesh := node as MeshInstance3D
+		if mesh.mesh == null or not mesh.is_visible_in_tree() or _skipped(mesh, host, skip):
+			continue
+		var box := mesh.global_transform * mesh.mesh.get_aabb()
+		if box.end.y > deck + 0.05 and box.position.y < deck + 20.0:
+			found.append(box)
+	return found
+
+
+static func _skipped(node: Node, host: Node, skip: Array[Node]) -> bool:
+	var at := node.get_parent()
+	while at != null and at != host:
+		if at is SubViewport or at is RoofRain or at is Helicopter or skip.has(at):
+			return true
+		# Кабина — внутри шахты, а её тросы тянутся до потолка машинного
+		# отделения и режутся шейдером: габарит у них выше того, что видно.
+		if at is ElevatorCar:
+			return true
+		at = at.get_parent()
+	return false
 
 
 ## Идёт ли вступление: Otto ещё не на крыше.

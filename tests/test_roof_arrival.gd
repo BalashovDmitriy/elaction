@@ -154,6 +154,48 @@ func test_the_rope_reaches_the_deck_and_the_frame_holds_both() -> void:
 		_drop(level)
 
 
+## Весь путь — прилёт, висение, уход — вертолёт идёт над техникой крыши, а не
+## сквозь неё: ни корпус, ни диск винта не задевают габарита ни одного предмета.
+## Сиды выбраны с водонапорной башней у места посадки (нечётные) и с баком.
+func test_the_flight_clears_everything_on_the_roof() -> void:
+	for building_seed: int in [1, 2, 3, 5, 7]:
+		var level := _build(building_seed)
+		var deck := WorldSpace.to_scene(_landing(level)).y
+		var roof := RoofArrival.roof_obstacles(level, deck, [level.otto] as Array[Node])
+		# Сначала — что техника вообще нашлась: пустой список прошёл бы всегда.
+		var kit := level.find_children("*", "RoofKit", true, false)
+		assert_eq(kit.size(), 1, "сид %d: на крыше есть техника" % building_seed)
+		var props := 0
+		for node: Node in kit[0].find_children("*", "MeshInstance3D", true, false):
+			var box := (
+				(node as MeshInstance3D).global_transform * (node as MeshInstance3D).mesh.get_aabb()
+			)
+			if roof.has(box):
+				props += 1
+		assert_gt(props, 3, "сид %d: техника крыши в списке помех" % building_seed)
+
+		var hits := PackedStringArray()
+		var frames := 0
+		while level.helicopter() != null and frames < GreyboxLevel.LANDING_PATIENCE + GONE_FRAMES:
+			var helicopter := level.helicopter()
+			for part: AABB in [helicopter.hull_box(), helicopter.rotor_box()]:
+				for obstacle: AABB in roof:
+					if part.intersects(obstacle) and hits.size() < 5:
+						hits.append(
+							(
+								"x %.1f, y %.1f над крышей"
+								% [part.get_center().x, part.position.y - deck]
+							)
+						)
+			await wait_physics_frames(1)
+			frames += 1
+		assert_eq(
+			hits.size(), 0, "сид %d: вертолёт задел технику: %s" % [building_seed, ", ".join(hits)]
+		)
+		assert_null(level.helicopter(), "сид %d: вертолёт улетел" % building_seed)
+		_drop(level)
+
+
 ## Вступление — сценка, а не ожидание: от четырёх до шести секунд до управления.
 func test_the_intro_takes_four_to_six_seconds() -> void:
 	var level := _build(1)

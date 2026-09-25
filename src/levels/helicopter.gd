@@ -72,9 +72,36 @@ const GONE_AFTER: float = 38.0
 ## летящий ровно не клонился бы вовсе.
 const DRAG: float = 0.35
 const TILT_GAIN: float = 0.75
-## Предел наклона — 14°, в радианах: функции в константу GDScript не пускает.
-const TILT_MAX: float = 0.2443
+## Предел наклона — 10°, в радианах: функции в константу GDScript не пускает.
+## На нём же держится запас над техникой крыши ([method clear_height]): хвост
+## наклонённого корпуса опускается на 0.9 м, и при 14° запас рос бы вдвое.
+const TILT_MAX: float = 0.1745
 const TILT_EASE: float = 5.0
+
+## Запас над техникой крыши, м, и крутизна подъёма к ней: путь не прыгает вверх
+## над башней, а заранее набирает высоту — метр на полтора пройденных.
+const CLEARANCE: float = 0.4
+const CLEAR_SLOPE: float = 0.65
+
+## Ободок корпуса: холодный отсвет по краям силуэта. Хвостовая балка ночью
+## иначе пропадает — на неё не падает ни свет кабины, ни прожектор. Это второй
+## проход меша, а не источник: ни теней, ни света в бюджете кадра.
+const RIM_COLOR := Color(0.5, 0.62, 0.85)
+const RIM_POWER: float = 2.2
+const RIM_STRENGTH: float = 0.55
+const RIM_SHADER := """
+shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, cull_back, fog_disabled;
+
+uniform vec4 rim_color : source_color;
+uniform float rim_power = 2.0;
+uniform float rim_strength = 0.5;
+
+void fragment() {
+	float edge = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), rim_power);
+	ALBEDO = rim_color.rgb * edge * rim_strength;
+}
+"""
 
 ## Висение не бывает неподвижным: вертолёт чуть ходит вверх-вниз.
 const BOB_HEIGHT: float = 0.06
@@ -135,6 +162,14 @@ var _strobe: Node3D = null
 var _search: SpotLight3D = null
 var _cabin: OmniLight3D = null
 var _engine: AudioStreamPlayer3D = null
+## Габарит корпуса со стрелой лебёдки и габарит диска винта в координатах узла,
+## при нулевом наклоне; и они же со всеми наклонами до [constant TILT_MAX].
+var _hull_local := AABB()
+var _rotor_local := AABB()
+var _hull_reach := AABB()
+var _rotor_reach := AABB()
+## Техника крыши, над которой надо пройти: габариты в координатах сцены.
+var _obstacles: Array[AABB] = []
 
 
 func _init() -> void:
@@ -147,14 +182,63 @@ func _init() -> void:
 
 ## Начинает прилёт: вертолёт появляется за левым краем и идёт к [param hover] —
 ## точке под осью винта на уровне полозьев, в координатах сцены.
+##
+## Точка поднимается над техникой крыши, если та выше ([method safe_hover]).
 func fly_in(hover: Vector3) -> void:
-	_hover = Vector3(hover.x, hover.y, DEPTH_Z)
+	_hover = safe_hover(hover)
 	_from = _hover + Vector3(-ARRIVAL_DISTANCE, ARRIVAL_RISE, 0.0)
 	_phase = Phase.ARRIVING
 	_time = 0.0
 	position = _from
 	_velocity = Vector3.ZERO
 	_start_engine()
+
+
+## Что на крыше мешает полёту: габариты в координатах сцены. Путь прилёта,
+## висение и уход идут над ними с запасом [constant CLEARANCE].
+func avoid(obstacles: Array[AABB]) -> void:
+	_obstacles = obstacles
+
+
+## Точка висения над [param hover], поднятая над техникой крыши, если нужно.
+func safe_hover(hover: Vector3) -> Vector3:
+	return Vector3(hover.x, maxf(hover.y, clear_height(hover.x)), DEPTH_Z)
+
+
+## Ниже какой высоты полозьям нельзя опускаться, когда ось винта над
+## [param x], — по всей технике крыши, при любом наклоне корпуса и с запасом.
+## Над соседями высота спадает склоном [constant CLEAR_SLOPE]: путь набирает
+## её заранее. Мешать нечему — минус бесконечность.
+func clear_height(x: float) -> float:
+	var lowest := -INF
+	for obstacle: AABB in _obstacles:
+		for reach: AABB in [_hull_reach, _rotor_reach]:
+			var near := DEPTH_Z + reach.position.z - CLEARANCE
+			var far := DEPTH_Z + reach.end.z + CLEARANCE
+			if obstacle.end.z < near or obstacle.position.z > far:
+				continue
+			var left := x + reach.position.x - CLEARANCE
+			var right := x + reach.end.x + CLEARANCE
+			var gap := maxf(maxf(obstacle.position.x - right, left - obstacle.end.x), 0.0)
+			var needed := obstacle.end.y + CLEARANCE - reach.position.y - gap * CLEAR_SLOPE
+			lowest = maxf(lowest, needed)
+	return lowest
+
+
+## Насколько верх вертолёта с винтом выше полозьев при любом наклоне, м.
+func top_above_skids() -> float:
+	return maxf(_hull_reach.end.y, _rotor_reach.end.y)
+
+
+## Габарит корпуса со стрелой лебёдки сейчас, в координатах сцены.
+func hull_box() -> AABB:
+	return _body.global_transform * _hull_local
+
+
+## Габарит диска винта сейчас, в координатах сцены: винт крутится, и габарит
+## берётся по всему диску, а не по лопастям в этот миг.
+func rotor_box() -> AABB:
+	return _body.global_transform * _rotor_local
 
 
 ## Висит ли над точкой — прилетел и ещё не ушёл.
@@ -236,6 +320,7 @@ func _process(delta: float) -> void:
 func _arrive() -> void:
 	var u := clampf(_time / ARRIVAL_TIME, 0.0, 1.0)
 	position = _from.lerp(_hover, _arrival_progress(u))
+	position.y = maxf(position.y, clear_height(position.x))
 	if u >= 1.0:
 		_phase = Phase.HOVERING
 		_time = 0.0
@@ -270,6 +355,7 @@ func _start_leaving() -> void:
 func _fly_off(delta: float) -> void:
 	var speed := minf(maxf(_velocity.x, 0.0) + LEAVE_ACCELERATION * delta, LEAVE_SPEED)
 	position += Vector3(speed, speed * LEAVE_CLIMB, 0.0) * delta
+	position.y = maxf(position.y, clear_height(position.x))
 
 
 ## Клонит корпус по ускорению и сопротивлению — носом вниз на разгоне и полном
@@ -351,6 +437,42 @@ func _dress() -> void:
 	hull_box = placed * _surface_box(source, 0)
 	_hang_winch(hull_box)
 	_hang_lights(hull_box)
+	_measure(hull_box, placed, source, hub)
+
+
+## Габариты для прохода над крышей: корпус со стрелой лебёдки до плоскости игры
+## и диск винта — круг радиусом самой дальней вершины лопасти.
+func _measure(hull: AABB, placed: Transform3D, source: Mesh, hub: Vector3) -> void:
+	var near := maxf(hull.end.z, -DEPTH_Z)
+	_hull_local = AABB(hull.position, Vector3(hull.size.x, hull.size.y, near - hull.position.z))
+	var to_rotor := placed * _rotor.transform
+	var centre := placed * hub
+	var radius := 0.0
+	var low := INF
+	var high := -INF
+	var vertices := (
+		source.surface_get_arrays(ROTOR_SURFACE)[Mesh.ARRAY_VERTEX] as PackedVector3Array
+	)
+	for vertex: Vector3 in vertices:
+		var at := to_rotor * (vertex - hub)
+		radius = maxf(radius, Vector2(at.x - centre.x, at.z - centre.z).length())
+		low = minf(low, at.y)
+		high = maxf(high, at.y)
+	_rotor_local = AABB(
+		Vector3(centre.x - radius, low, centre.z - radius),
+		Vector3(radius * 2.0, high - low, radius * 2.0)
+	)
+	_hull_reach = _tilted(_hull_local)
+	_rotor_reach = _tilted(_rotor_local)
+
+
+## Габарит [param box] при всех наклонах до [constant TILT_MAX]: при малых углах
+## крайние точки — на краях диапазона и в нуле.
+static func _tilted(box: AABB) -> AABB:
+	var reach := box
+	for angle: float in [-TILT_MAX, TILT_MAX]:
+		reach = reach.merge(Transform3D(Basis(Vector3.BACK, angle), Vector3.ZERO) * box)
+	return reach
 
 
 ## Стрела лебёдки над дверью: от ближнего борта в плоскость игры. Трос висит с её
@@ -480,6 +602,7 @@ static func _paint(index: int, source: Mesh) -> Material:
 			hull.albedo_color = HULL_COLOR
 			hull.metallic = 0.55
 			hull.roughness = 0.32
+			hull.next_pass = _rim()
 			return hull
 		GLASS_SURFACE:
 			var glass := StandardMaterial3D.new()
@@ -493,6 +616,18 @@ static func _paint(index: int, source: Mesh) -> Material:
 		ROTOR_SURFACE:
 			return GreyboxLook.metal(ROTOR_COLOR)
 	return source.surface_get_material(index)
+
+
+## Второй проход корпуса — холодный ободок по краям силуэта.
+static func _rim() -> ShaderMaterial:
+	var shader := Shader.new()
+	shader.code = RIM_SHADER
+	var rim := ShaderMaterial.new()
+	rim.shader = shader
+	rim.set_shader_parameter(&"rim_color", RIM_COLOR)
+	rim.set_shader_parameter(&"rim_power", RIM_POWER)
+	rim.set_shader_parameter(&"rim_strength", RIM_STRENGTH)
+	return rim
 
 
 static func _surface_middle(mesh: Mesh, index: int) -> Vector3:
