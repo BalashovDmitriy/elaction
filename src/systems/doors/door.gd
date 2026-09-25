@@ -6,9 +6,10 @@ extends Node3D
 ## Красная прячет документ, обычная — засаду. Створку ведёт [DoorCycle], правила
 ## визита Otto — [DoorVisit]; узел отвечает за коврик, вид и выдачу документа.
 ##
-## Дверью пользуются двое, и по-разному. Otto стучится сам и сидит внутри, пока
-## не выйдет время. Агента дверь выпускает по просьбе уровня, и открывается перед
-## ним заметно дольше: створка — это предупреждение (ADR-0020, решение 2).
+## Дверью пользуются двое, и по-разному. Otto стучится сам, створка закрывается
+## за ним и открывается, выпуская, ровно через 70 тиков ROM (ADR-0038, решение 2).
+## Агента дверь выпускает по просьбе уровня, и открывается перед ним заметно
+## дольше: створка — это предупреждение (ADR-0020, решение 2).
 ##
 ## Створка висит в задней стене коридора, порог — в плоскости игры (ADR-0021,
 ## решение 1). Проём в стене за створкой режет сам уровень.
@@ -17,8 +18,16 @@ extends Node3D
 ## читаемость двери на погашенном этаже — сама створка больше не светится
 ## (ADR-0023, решение 6).
 
-## Документ взят, дверь перестала быть красной.
+## Документ взят, дверь перестала быть красной. Как в ROM — на выходе Otto,
+## а не на входе (ADR-0038, решение 2).
 signal document_taken
+
+## Otto ушёл внутрь и створка пошла за ним. По этому уровень ведёт агентов к
+## двери ([DoorWatch]).
+signal otto_hid
+
+## Otto вышел наружу.
+signal otto_came_out
 
 ## Габарит створки, м: 40% × 70% просвета, как в оригинале ([Proportions]).
 ## Уровень режет по нему проём в задней стене, а коробка створки собирается
@@ -54,8 +63,8 @@ const FRAME_WIDTH: float = 0.08
 const FRAME_DEPTH: float = 0.05
 const SIGN_RISE: float = 0.2
 
-## Сколько Otto может пересидеть внутри, с.
-@export var hide_time: float = 5.0
+## Сколько Otto сидит внутри, с: 70 тиков ROM, считая от стука.
+@export var hide_time: float = Arcade.seconds(Arcade.ROOM_TICKS)
 
 ## Сколько открывается створка перед гостем, с.
 @export var open_time: float = 0.25
@@ -74,6 +83,8 @@ const SIGN_RISE: float = 0.2
 var _visit := DoorVisit.new()
 var _cycle := DoorCycle.new()
 var _guest: Otto = null
+## Otto, который уже снаружи, но ещё выходит: створка закрывается за ним.
+var _stepping_out: Otto = null
 ## Дверь открыта под агента: занята, пока он не выйдет.
 var _expecting_agent: bool = false
 var _voice: AudioStreamPlayer3D = null
@@ -102,6 +113,7 @@ func _notification(what: int) -> void:
 
 func _ready() -> void:
 	_visit.hide_time = hide_time
+	_visit.leaf_time = open_time
 	_mat_visual.material_override = GreyboxLook.surface(GreyboxLook.SLAB)
 	var leaf := BoxMesh.new()
 	leaf.size = Vector3(LEAF_SIZE.x, LEAF_SIZE.y, LEAF_THICKNESS)
@@ -122,12 +134,22 @@ func _physics_process(delta: float) -> void:
 	_cycle.tick(delta)
 	_refresh_look()
 
+	if _stepping_out != null:
+		_see_out()
+		return
+
 	if _guest == null:
 		_look_for_visitor()
 		return
 
-	if _visit.tick(delta, _guest.horizontal_intent(), _cycle.is_open()):
-		_release()
+	match _visit.tick(delta, _cycle.is_open()):
+		DoorVisit.Cue.HIDE:
+			_hide_the_guest()
+		DoorVisit.Cue.LET_OUT:
+			_cycle.open()
+			Sounds.play(Sounds.DOOR_OPEN)
+		DoorVisit.Cue.OUT:
+			_release()
 
 
 ## Осталась ли за дверью добыча. По этому признаку выбирают, куда вернуть Otto.
@@ -191,8 +213,8 @@ func _look_for_visitor() -> void:
 	if _expecting_agent:
 		# Дверь занята выходом агента, и Otto в неё не пускают. Дело не в
 		# вежливости: створку за агентом закрывает уровень ([method
-		# dismiss_agent]), а отсидка гостя идёт только при открытой двери —
-		# пущенный сюда Otto остался бы внутри навсегда.
+		# dismiss_agent]), а визит гостя идёт по створке — прячется он и выходит
+		# только в открытую, — и пущенный сюда Otto застрял бы в проёме.
 		return
 	for body: Node3D in _mat.get_overlapping_bodies():
 		var visitor := body as Otto
@@ -204,40 +226,78 @@ func _look_for_visitor() -> void:
 		return
 
 
+## Впускает Otto: створка открывается, и пока она идёт, он шагает в проём.
+##
+## Шаг в проём — поездка, как на эскалаторе: ввод снят и достать его нельзя уже
+## сейчас — в ROM он неуязвим от первого шага внутрь, — но он ещё на виду.
+## Прячется он, когда створка откроется ([method _hide_the_guest]).
 func _admit(visitor: Otto) -> void:
 	_guest = visitor
 	visitor.global_position = _mat.global_position
-	visitor.stay_indoors(true)
+	visitor.ride(true)
 	_visit.admit()
 	_cycle.travel_time = open_time
 	_cycle.open()
 	Sounds.play(Sounds.DOOR_OPEN)
-	Sounds.muffle_music(Sounds.MUFFLE_DOOR, true)
+
+
+## Створка открылась: Otto внутри, и она закрывается за ним. Коридор отсюда
+## слышно глухо — и музыку, и шаги с выстрелами (ADR-0038, решение 2).
+func _hide_the_guest() -> void:
+	_guest.ride(false)
+	_guest.stay_indoors(true)
+	_cycle.close()
+	Sounds.play(Sounds.DOOR_CLOSE)
+	_muffle(true)
+	otto_hid.emit()
+
+
+## Выпускает Otto в открытую створку и закрывает её за ним. Документ достаётся
+## здесь, на выходе, как в ROM: пока Otto внутри, дверь ещё красная.
+##
+## Выход кончается, когда створка закрылась: до тех пор Otto на виду, но ввод
+## снят и достать его нельзя — в ROM он неуязвим «до полного выхода». Без этого
+## агент, дождавшийся у двери, стрелял бы в того, кто ещё стоит в проёме.
+func _release() -> void:
+	_guest.global_position = _mat.global_position
+	_guest.stay_indoors(false)
+	_guest.ride(true)
+	_stepping_out = _guest
+	_guest = null
+	_visit.release()
+	_cycle.close()
+	Sounds.play(Sounds.DOOR_CLOSE)
+	_muffle(false)
+	otto_came_out.emit()
 
 	if not has_document:
 		return
-	# Документ достаётся за вход, и дверь сразу перестаёт быть красной.
 	has_document = false
 	Sounds.play(Sounds.DOCUMENT)
 	document_taken.emit()
 
 
-func _release() -> void:
-	_guest.global_position = _mat.global_position
-	_guest.stay_indoors(false)
-	_guest = null
-	_visit.release()
-	_cycle.close()
-	Sounds.play(Sounds.DOOR_CLOSE)
-	Sounds.muffle_music(Sounds.MUFFLE_DOOR, false)
+## Створка закрылась за вышедшим: управление снова у игрока.
+func _see_out() -> void:
+	if not _cycle.is_shut():
+		return
+	if is_instance_valid(_stepping_out):
+		_stepping_out.ride(false)
+	_stepping_out = null
+
+
+## Глушит коридор за дверью или возвращает его: музыку и звуки мира разом.
+func _muffle(on: bool) -> void:
+	Sounds.muffle_music(Sounds.MUFFLE_DOOR, on)
+	Sounds.muffle_world(on)
 
 
 ## Здание выбросили, пока Otto за дверью, — новая партия с паузы, выход в меню.
-## Глухую музыку снимает сама дверь: иначе это пришлось бы помнить каждому, кто
+## Глухой звук снимает сама дверь: иначе это пришлось бы помнить каждому, кто
 ## выбрасывает здание.
 func _exit_tree() -> void:
-	if _guest != null:
-		Sounds.muffle_music(Sounds.MUFFLE_DOOR, false)
+	if _guest != null and _visit.is_hiding():
+		_muffle(false)
 
 
 ## Ведёт створку по ходу [DoorCycle].

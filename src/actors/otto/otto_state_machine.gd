@@ -57,7 +57,7 @@ func go_indoors() -> void:
 	state = State.INDOORS
 
 
-## Otto вышел из двери — сам или потому, что его выставили через пять секунд.
+## Otto вышел из двери: срок за ней вышел (ADR-0038, решение 2).
 func come_out() -> void:
 	if state != State.INDOORS:
 		return
