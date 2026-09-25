@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://b5tded3unc8wu"
-path="res://.godot/imported/helicopter.glb-8246387a45d15ebf7d6f75373da81cf9.scn"
+uid="uid://20xcu1ienlnk"
+path="res://.godot/imported/helicopter.glb-5ecfe5cc8c628b8e60587d83701c99a1.scn"
 
 [deps]
 
-source_file="res://assets/models/props/helicopter.glb"
-dest_files=["res://.godot/imported/helicopter.glb-8246387a45d15ebf7d6f75373da81cf9.scn"]
+source_file="res://assets/models/aircraft/helicopter.glb"
+dest_files=["res://.godot/imported/helicopter.glb-5ecfe5cc8c628b8e60587d83701c99a1.scn"]
 
 [params]
 

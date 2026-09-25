@@ -76,7 +76,10 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	if _just_pressed(&"pause"):
-		if _playing:
+		# Пауза во вступлении его пропускает, а не открывает меню (ADR-0038).
+		if _playing and _level != null and _level.skip_the_intro():
+			pass
+		elif _playing:
 			_pause()
 		elif _page_before == Menu.Page.PAUSE and _menu.current_page() == Menu.Page.PAUSE:
 			_resume()

@@ -16,20 +16,10 @@ extends Node3D
 ## Otto вышел из здания, собрав все документы.
 signal building_cleared
 
-## Ширина троса, по которому Otto съезжает на крышу, м.
-const ROPE_WIDTH: float = 0.12
-
-## Сколько Otto висит над крышей в начале здания и как быстро съезжает.
-##
-## Выше собственного прыжка (2.4 м): он должен прийти сверху, а не подпрыгнуть.
-## Спуск занимает меньше секунды — это кадр вступления, а не механика
-## (ADR-0017, решение 4).
-const ROPE_DROP: float = 2.64
-const ROPE_SPEED: float = 4.2
-
-## Сколько кадров физики [method wait_for_the_landing] ждёт по умолчанию: спуск
-## с полусекундой без ввода — около семидесяти, остальное — запас.
-const LANDING_PATIENCE: int = 360
+## Сколько кадров физики [method wait_for_the_landing] ждёт по умолчанию:
+## вступление с вертолётом идёт около 4.5 с — 270 шагов без ускорения времени,
+## остальное — запас (ADR-0038, решение 1).
+const LANDING_PATIENCE: int = 480
 
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 const ESCALATOR_SCENE := preload("res://src/systems/escalators/escalator.tscn")
@@ -151,11 +141,9 @@ var _car: ExitCar = null
 var _exit_position := Vector2.ZERO
 ## Паркинг нижнего этажа: ворота, светильники, чужие машины (ADR-0038).
 var _garage: Garage = null
-## Трос вступления и докуда по нему ехать, в плоскости правил. Пока едет —
-## Otto не слушается ввода.
-var _rope: MeshInstance3D = null
-var _sliding: bool = false
-var _rope_target: float = 0.0
+## Вступление: вертолёт привозит Otto на крышу. Пока идёт — Otto не слушается
+## ввода, а агенты и кабины стоят.
+var _arrival := RoofArrival.new()
 
 @onready var otto: Otto = $Otto
 
@@ -197,19 +185,18 @@ func _ready() -> void:
 
 	# Otto начинает с крыши, как в оригинале, и там, где нет проёмов. Крыша —
 	# свой уровень над зданием, а не нулевой этаж: ADR-0014, пункт 1.
-	# Спускается он туда по тросу — как в порте (ADR-0017, решение 4).
+	# Привозит его вертолёт, как в порте для ZX Spectrum, — в каждом здании
+	# (ADR-0038, решение 1). После гибели вертолёта нет: [method _respawn_otto].
 	var roof := BuildingRules.ROOF
 	var landing := Vector2(_plan.safe_x(rules, roof), rules.floor_surface(roof))
-	otto.global_position = WorldSpace.to_scene(landing - Vector2(0.0, ROPE_DROP))
 	# Разбивается упавший больше чем на этаж — этаж этого здания (ADR-0037).
 	otto.floor_height = rules.floor_height
-	_start_the_slide(landing)
 	otto.died.connect(_on_otto_died)
 	GameState.instance().alarm_raised.connect(_on_alarm_raised)
 	if GameState.instance().alarm.raised:
 		# Здание заведено уже при включённой сирене — редкость, но бывает.
 		_on_alarm_raised()
-	otto.apply_camera_bounds(Rect2(0.0, 0.0, rules.width, rules.total_height()))
+	_arrival.begin(self, otto, landing, Rect2(0.0, 0.0, rules.width, rules.total_height()))
 
 
 ## Гасит всё, что уехало из кадра. Ламп в здании тридцать, а в кадр влезает
@@ -289,8 +276,8 @@ func garage() -> Garage:
 
 ## Ждёт, пока Otto съедет по тросу и встанет на крышу; true — встал.
 ##
-## Здание начинается вступлением: Otto приезжает сверху и первые полсекунды не
-## слушается ввода (ADR-0017, решение 4). Ждать его надо по состоянию, а не
+## Здание начинается вступлением: вертолёт привозит Otto, и до приземления он не
+## слушается ввода (ADR-0038, решение 1). Ждать его надо по состоянию, а не
 ## выдержкой: длина вступления ещё поменяется, а под [member Engine.time_scale]
 ## выдержка и вовсе врёт. Одно место на съёмку и тесты — копии этого цикла
 ## разъезжались по проекту вчетвером.
@@ -300,6 +287,22 @@ func wait_for_the_landing(patience: int = LANDING_PATIENCE) -> bool:
 		await get_tree().physics_frame
 		left -= 1
 	return otto.is_grounded()
+
+
+## Пропускает вступление: Otto сразу на крыше, вертолёт уходит. Возвращает,
+## шло ли вступление, — по этому [Main] решает, пауза это или пропуск.
+func skip_the_intro() -> bool:
+	return _arrival.skip()
+
+
+## Идёт ли вступление.
+func is_in_the_intro() -> bool:
+	return _arrival.is_playing()
+
+
+## Вертолёт вступления; null, когда он улетел.
+func helicopter() -> Helicopter:
+	return _arrival.helicopter()
 
 
 ## Погашен ли этаж целиком — все его зоны. Гаснут они навсегда: сбитая лампа
@@ -344,24 +347,6 @@ func _spawn_shafts() -> void:
 		_shaft_hums.add(shaft, _shafts.top_of(shaft), rules.floor_surface(shaft.bottom))
 
 
-## Вступление: Otto съезжает по тросу на крышу.
-##
-## Пока едет, он «на эскалаторе» — ввод не действует, физика молчит, и коорди-
-## натой распоряжается уровень. Тот же приём, что у двери и эскалатора: своего
-## состояния ради одного кадра вступления заводить незачем.
-func _start_the_slide(landing: Vector2) -> void:
-	_rope_target = landing.y
-	_sliding = true
-	otto.ride(true)
-
-	_rope = GreyboxLook.box(
-		Vector3(ROPE_WIDTH, landing.y, ROPE_WIDTH), GreyboxLook.surface(GreyboxLook.WALL)
-	)
-	_rope.position = WorldSpace.to_scene(Vector2(landing.x, landing.y * 0.5))
-	_rope.position.z = -0.3
-	add_child(_rope)
-
-
 ## Ход здания: вступление, отъезд машины, агенты у дверей.
 ##
 ## Всё это — физика, а не кадр, и раньше жило в [method Node._process]. Разница
@@ -370,9 +355,10 @@ func _start_the_slide(landing: Vector2) -> void:
 ## быстрой машине их выходит больше за тот же шаг бота, и один и тот же сид
 ## давал то четыре смерти, то пять. Ровно этот долг тянулся с M18a.
 func _physics_process(delta: float) -> void:
-	if _sliding:
-		_slide_along(delta)
+	if _arrival.is_playing():
+		_arrival.advance(delta)
 		return
+	_arrival.linger()
 
 	# Кадр правил, а не сглаженный кадр игрока: тот едет в _process по настенным
 	# часам, и полоса выпуска агентов после скачка Otto зависела от скорости
@@ -387,29 +373,6 @@ func _physics_process(delta: float) -> void:
 	# своей паузы, и пропустив шаг смены, она не выпустила бы никого до следующей.
 	if spawn_agents:
 		_tend_agents(VisibleFloors.around(rules, view), delta)
-
-
-## Довозит Otto по тросу и убирает трос: он часть вступления, а не здания.
-##
-## Трос ведёт Otto, только пока тот выше крыши. Переставили ниже — вступление
-## кончилось само: так инструменты съёмки и тесты ставят его куда им надо,
-## не зная про трос вовсе.
-func _slide_along(delta: float) -> void:
-	var at := WorldSpace.to_plane(otto.global_position)
-	if at.y < _rope_target:
-		at.y = minf(at.y + ROPE_SPEED * delta, _rope_target)
-		otto.global_position = WorldSpace.to_scene(at)
-	if at.y >= _rope_target:
-		_finish_the_slide()
-
-
-## Отдаёт управление игроку и убирает трос.
-func _finish_the_slide() -> void:
-	_sliding = false
-	otto.ride(false)
-	if _rope != null:
-		_rope.queue_free()
-		_rope = null
 
 
 ## Нижний ярус двухэтажной пары: этажом ниже ведущего и на его ходу.
