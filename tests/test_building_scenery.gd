@@ -245,10 +245,12 @@ func _fingerprint(blocks: Array[CityPlan.Block]) -> String:
 	return "|".join(parts)
 
 
-## Машина у выхода встаёт так, что по всей длине не задевает ни проём выхода, ни
-## портал шахты (замечание пользователя на кадре гаража M20), ни внутреннюю
-## стену, ни пролёт эскалатора, спускающегося в гараж, и стоит в стенах
-## здания (авторевью M20).
+## Машина у выхода встаёт так, что по всей длине не задевает ни портал шахты
+## (замечание пользователя на кадре гаража M20), ни внутреннюю стену, ни пролёт
+## эскалатора, спускающегося в гараж, и стоит в стенах здания (авторевью M20).
+##
+## С M24b выход — сама машина у ворот (ADR-0038, решение 3): место Otto у
+## водительской двери приходится на неё, а не рядом.
 func test_the_car_parks_clear_of_shafts_and_the_exit() -> void:
 	for skill: int in SKILLS:
 		var rules := _rules(skill)
@@ -259,9 +261,7 @@ func test_the_car_parks_clear_of_shafts_and_the_exit() -> void:
 			var x := ExitCar.spot(plan.exit_x, rules, plan)
 			var car := Vector2(x - ExitCar.LENGTH * 0.5, x + ExitCar.LENGTH * 0.5)
 			var label := "навык %d, сид %d" % [skill, building_seed]
-			var exit_half := BuildingShell.EXIT_WIDTH * 0.5
-			var exit := Vector2(plan.exit_x - exit_half, plan.exit_x + exit_half)
-			_assert_apart(car, exit, "%s: машина на проёме выхода" % label)
+			assert_between(plan.exit_x, car.x, car.y, "%s: выход не у машины" % label)
 			assert_between(
 				x,
 				bounds.x + BuildingShell.WALL_WIDTH + ExitCar.LENGTH * 0.5,

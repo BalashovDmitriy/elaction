@@ -19,7 +19,7 @@ const SPEED: float = 9.6
 ## Otto проходил перед ней, а не сквозь.
 const Z: float = -0.6
 
-## Куда машина уезжает: -1 влево, +1 вправо. Та же сторона, с которой она стоит.
+## Куда машина уезжает: -1 влево, +1 вправо. С M24b всегда влево — в ворота.
 var towards: float = 1.0
 
 var _leaving: bool = false
@@ -32,13 +32,11 @@ var _hubs := PackedVector3Array()
 var _wheel_radius: float = 0.3
 
 
-## Ставит машину у проёма выхода: [param exit_x] — его середина, [param floor_y] —
-## пол нижнего этажа в координатах правил.
+## Ставит машину у ворот паркинга: [param exit_x] — середина выхода, [param
+## floor_y] — пол нижнего этажа в координатах правил.
 ##
-## Место — ближайшее к выходу свободное ([method spot]): на кадрах M20 седан,
-## поставленный на фиксированном зазоре, загораживал портал соседней шахты.
-## Уезжает от выхода — в ту сторону, где
-## стоит: мимо проёма, в который вошёл Otto, она не едет.
+## Место — у ворот в левом торце ([method spot]), капотом к ним: машина Otto в
+## ROM всегда слева, и уезжает она в ворота (ADR-0038, решение 3).
 ##
 ## [param choice] — какая машина и какого цвета ([method CarModel.choose]).
 func park(
@@ -50,7 +48,7 @@ func park(
 ) -> void:
 	name = "ExitCar"
 	var x := spot(exit_x, rules, plan)
-	towards = -1.0 if x < exit_x else 1.0
+	towards = -1.0
 	position = WorldSpace.to_scene(Vector2(x, floor_y))
 	position.z = Z
 	# Модель стоит колёсами в своём нуле, капотом в +X; в другую сторону она
@@ -69,16 +67,39 @@ func park(
 			_wheel_radius = maxf(box.size.y * 0.5, 0.05)
 
 
-## Где машине встать: середина ближайшего к выходу места на нижнем этаже, где
-## она по всей длине с зазором [constant GAP] не задевает ни проём выхода, ни
-## шахту, ни внутреннюю стену, ни пролёт эскалатора и не выходит за стены.
-## Места нет — вплотную справа от проёма.
+## Где машина стоит у ворот: пара «левый край, правый край» по бамперам.
+##
+## Вплотную к левому торцу нижнего этажа, с зазором [constant GAP] от стены: в
+## торце ворота паркинга, и машина уезжает в них (ADR-0038, решение 3). По этой
+## полосе раскладка держит шахту в подвал подальше от машины
+## ([method clears_shaft]) и ставит выход — место Otto у водительской двери.
+static func parked_span(rules: BuildingRules) -> Vector2:
+	var bounds := rules.floor_span(rules.floors - 1)
+	var left := bounds.x + BuildingShell.WALL_WIDTH + GAP
+	return Vector2(left, left + LENGTH)
+
+
+## Не задевает ли шахта в [param shaft_x] машину у ворот — порталом, с зазором
+## [constant GAP].
+##
+## Раскладка спрашивает до того, как шахте дойти до подвала: машина стоит у
+## торца всегда, и уступать место должна шахта, а не она.
+static func clears_shaft(rules: BuildingRules, shaft_x: float) -> bool:
+	var half_shaft := rules.shaft_width * 0.5 + BuildingShafts.PORTAL_JAMB
+	return shaft_x - half_shaft >= parked_span(rules).y + GAP - 0.001
+
+
+## Где машине встать: у ворот в левом торце ([method parked_span]), если там
+## свободно, — раскладка это обещает. Иначе — левее всего, где она по всей длине
+## с зазором [constant GAP] не задевает ни шахту, ни внутреннюю стену, ни пролёт
+## эскалатора и не выходит за стены. Места нет вовсе — на самом выходе
+## [param exit_x].
+##
+## Проём выхода больше не мешает: выход — это сама машина, Otto садится в неё.
 static func spot(exit_x: float, rules: BuildingRules, plan: BuildingPlan) -> float:
 	var bottom := rules.floors - 1
 	var bounds := rules.floor_span(bottom)
-	var busy: Array[Vector2] = [
-		Vector2(exit_x - BuildingShell.EXIT_WIDTH * 0.5, exit_x + BuildingShell.EXIT_WIDTH * 0.5)
-	]
+	var busy: Array[Vector2] = []
 	var half_shaft := rules.shaft_width * 0.5 + BuildingShafts.PORTAL_JAMB
 	for shaft in plan.shafts:
 		if shaft.top <= bottom and bottom <= shaft.bottom:
@@ -94,15 +115,13 @@ static func spot(exit_x: float, rules: BuildingRules, plan: BuildingPlan) -> flo
 			var gap := escalator.gap(rules)
 			busy.append(Vector2(minf(gap.x, landing), maxf(gap.y, landing)))
 	var half := LENGTH * 0.5 + GAP
-	# Кандидаты — вплотную к краю каждого занятого места с обеих сторон: ближе
-	# к выходу свободного места быть не может.
-	var candidates: Array[float] = []
+	# Кандидаты — у ворот и вплотную к правому краю каждого занятого места:
+	# левее свободного места быть не может.
+	var parked := parked_span(rules)
+	var candidates: Array[float] = [(parked.x + parked.y) * 0.5]
 	for zone in busy:
-		candidates.append(zone.x - half)
 		candidates.append(zone.y + half)
-	candidates.sort_custom(
-		func(a: float, b: float) -> bool: return absf(a - exit_x) < absf(b - exit_x)
-	)
+	candidates.sort()
 	for x: float in candidates:
 		if x - half < bounds.x + BuildingShell.WALL_WIDTH - 0.001:
 			continue
@@ -115,7 +134,7 @@ static func spot(exit_x: float, rules: BuildingRules, plan: BuildingPlan) -> flo
 				break
 		if clear:
 			return x
-	return exit_x + BuildingShell.EXIT_WIDTH * 0.5 + half
+	return exit_x
 
 
 ## Otto сел в машину: она трогается.
