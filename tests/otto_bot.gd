@@ -19,6 +19,11 @@ extends RefCounted
 ## есть защита от огня (ADR-0006, пункт 3), и стоящий под выстрелом бот доказывал
 ## бы только то, что стоять под выстрелом нельзя.
 ##
+## С M24a пуля агента втрое быстрее ROM (ADR-0037, решение 5), и бот, как и игрок,
+## уходит от выстрела по лучу прицела, а не по самой пуле: луч горит весь замах
+## ROM, на высоте будущей пули. Высокий — присесть сразу, низкий — прыгнуть так,
+## чтобы пуля пришла, пока ноги над ней.
+##
 ## Подошедшего вплотную агента бот не обходит, а встречает: приседает, поворачивается
 ## и стреляет. Пока он проходил мимо, размен на считанных сантиметрах был мгновенным
 ## и уклонение там не помогало — этим и кончались все замеры M11.
@@ -49,11 +54,21 @@ const SAME_LINE: float = 0.72
 ## Бот, который стоит до победы, не уходит с этажа никогда.
 const DUEL_PATIENCE: float = 2.0
 
-## За сколько метров до попадания бот начинает уклоняться.
+## За сколько секунд до попадания бот замечает летящую пулю.
 ##
-## Присед мгновенный, но прыжок — нет: чтобы тело успело подняться над низкой
-## пулей, прыгать надо заранее. Отсюда запас, а не «в последний кадр».
-const DODGE_SIGHT: float = 2.88
+## Прежние 2.88 м при пуле ROM, 8.88 м/с, — это 0.32 с; пуля втрое быстрее, и
+## мерить её надо временем, а не метрами (ADR-0037, решение 5). Главный знак
+## теперь луч прицела, а пуля в полёте — запасной: луч мог упереться в стену
+## между ними, а бот — не успеть по нему.
+const DODGE_SIGHT: float = 0.32
+
+## За сколько секунд до попадания бот прыгает через низкую пулю.
+##
+## Ступни Otto поднимаются над низкой пулей ROM (0.68 м) через 0.1 с после
+## толчка и держатся над ней до 0.85 с (прыжок 7.9 м/с при тяжести 16.6). Решает
+## бот раз в два кадра под [member Engine.time_scale] 4, то есть раз в 0.13 с, —
+## прыгнув при 0.55 с до пули, он встречает её с ногами наверху при любом шаге.
+const JUMP_LEAD: float = 0.55
 
 ## Половина ширины тела Otto, м.
 ##
@@ -100,6 +115,20 @@ const CAR_ALIGNED: float = 0.12
 ## потом нажимается снова.
 const TAPS: Array[StringName] = [&"jump", &"shoot"]
 
+## За сколько секунд до попадания бот в кабине уводит её с линии огня.
+const CAR_DODGE_SIGHT: float = 0.6
+
+## Ниже этой высоты над ногами пулю в кабине перепрыгивают: потолок кабины
+## не пускает прыжок выше.
+const CAR_LOW_BULLET: float = 0.6
+
+## Допуск на то, что луч дотянулся до Otto, м.
+const LASER_SLACK: float = 0.1
+
+## Ближе этого к этажу отпущенная кабина дотягивает сама
+## ([member ElevatorMotion.settle_distance]).
+const SETTLE_BY_ITSELF: float = 0.3
+
 var _level: GreyboxLevel
 var _rules: BuildingRules
 var _otto: Otto
@@ -125,6 +154,11 @@ var _riding_down: bool = true
 var _ride_shaft_x: float = INF
 ## Что бот решил последним разбором: для трассы прогона.
 var _decision: String = ""
+## Сколько ещё держать кабину в сторону, выбранную от пули, с. Решение
+## держится до пролёта пули: сменивший ход тут же выходит из-под луча, и
+## пересчёт на каждом шаге качал бы кабину туда-сюда прямо на линии огня.
+var _car_dodge_left: float = 0.0
+var _car_dodge_dir: float = 0.0
 
 
 func _init(level: GreyboxLevel) -> void:
@@ -154,19 +188,33 @@ func step() -> void:
 	# спуска, а вот стрелять она не мешает. Бот, который на время уклонения
 	# переставал делать всё остальное, вставал намертво — двери подсылают
 	# агентов без перерыва, и пуля в воздухе есть почти всегда.
-	var bullet_height := _incoming_height()
+	var incoming := _incoming()
+	var bullet_height := _dodge_height(incoming)
 	# Уклонение отменяет дуэль: нажата будет не сторона, а присед или прыжок.
-	# В кабине уклонения нет вовсе — там от пули не уйти, и остаётся стрелять.
+	# В кабине присесть нельзя, и уклонение там своё — увести кабину с линии
+	# ([method _dodge_in_car]). До M24a его не было вовсе: пуля ROM медленная,
+	# и бот успевал выстрелить первым. Втрое быстрая пуля по едущему вниз Otto
+	# — это половина смертей замера M24a.
 	#
-	# Разрешать его в стоящей кабине пробовали на M18: на этаже она тот же пол,
-	# и присед на ней работает. Замер это отверг — бот приседал вместо того,
-	# чтобы идти, и на одном сиде не собрал ни одного документа за весь прогон.
+	# Приседать в стоящей кабине пробовали на M18: замер это отверг — бот
+	# приседал вместо того, чтобы идти, и на одном сиде не собрал ни одного
+	# документа за весь прогон.
 	var dodging := bullet_height >= 0.0 and not _otto.is_riding()
+	var car := _car_of_otto() if _otto.is_riding() else null
+	_car_dodge_left = maxf(_car_dodge_left - _otto.get_physics_process_delta_time(), 0.0)
+	if car == null:
+		_car_dodge_left = 0.0
+	var car_dodging := (
+		car != null
+		and (_car_dodge_left > 0.0 or (incoming.x >= 0.0 and incoming.y <= CAR_DODGE_SIGHT))
+	)
 	# Повёрнут ли ствол к цели этим же кадром: в дуэли бот сам нажимает сторону,
 	# и целиться отдельным кадром не надо.
-	var aiming := not dodging and _duelling(threat)
+	var aiming := not dodging and not car_dodging and _duelling(threat)
 	if dodging:
 		_dodge(bullet_height)
+	elif car_dodging:
+		_dodge_in_car(car, incoming)
 	elif aiming:
 		_hold_the_line(threat)
 	else:
@@ -190,6 +238,15 @@ func _advance(floor_index: int) -> void:
 	if _riding_further():
 		_decision = "едем к этажу %d %s" % [_ride_to, "вниз" if _riding_down else "вверх"]
 		_ride_on()
+		return
+	if _otto.is_riding() and not _car_aligned_under_otto():
+		# Кабина стоит между этажами — увёл её с линии огня. Довести до этажа.
+		var nearest := _rules.floor_surface(floor_index)
+		_decision = "довожу кабину до этажа %d" % floor_index
+		# Вблизи этажа кабина дотягивает сама, стоит только отпустить: держать
+		# сторону — значит качать её вокруг этажа.
+		if absf(_at(_otto).y - nearest) > SETTLE_BY_ITSELF:
+			_press(&"move_down" if _at(_otto).y < nearest else &"move_up")
 		return
 
 	var goal := _goal()
@@ -286,11 +343,21 @@ func _threat() -> Enemy:
 	return closest
 
 
-## Высота ближайшей летящей в Otto пули над его ногами, м, или -1, если лететь
-## нечему. Считается так же, как у агента, — по группе пуль, а не по детям уровня.
-func _incoming_height() -> float:
-	var best := -1.0
-	var nearest := DODGE_SIGHT
+## Ближайшая угроза: высота будущей или летящей пули над ногами Otto, м, и через
+## сколько секунд она придёт. Нечему лететь — высота −1.
+##
+## Первым смотрится луч прицела: пуля втрое быстрее ROM, и видно её слишком
+## поздно, а луч горит весь замах (ADR-0037, решение 5) — и при злости 10 и выше
+## не короче [constant EnemyBrain.MIN_TELL]. Пуля в полёте — запасной знак: на
+## случай, когда луч бот пропустил.
+func _incoming() -> Vector2:
+	var best := Vector2(-1.0, INF)
+	for agent in _level.agents():
+		if agent.is_dead():
+			continue
+		var threat := _laser_threat(agent)
+		if threat.x >= 0.0 and threat.y < best.y:
+			best = threat
 	for node in _otto.get_tree().get_nodes_in_group(Bullet.GROUP):
 		var bullet := node as Bullet
 		if bullet == null or bullet.collision_mask != Bullet.FROM_ENEMY:
@@ -303,12 +370,55 @@ func _incoming_height() -> float:
 		# но не вышедшая из габарита хвостом, всё ещё попадает.
 		if -to_bullet.x * bullet.direction < -(BODY_HALF_WIDTH + bullet.half_length()):
 			continue
-		var reach := absf(to_bullet.x)
-		if reach > nearest:
+		var time := absf(to_bullet.x) / maxf(bullet.speed, 0.01)
+		if time > DODGE_SIGHT or time >= best.y:
 			continue
-		nearest = reach
-		best = -to_bullet.y
+		best = Vector2(-to_bullet.y, time)
 	return best
+
+
+## Луч прицела агента, если он смотрит в Otto: высота будущей пули над ногами
+## Otto, м, и секунды до попадания — замах и полёт. Иначе высота −1.
+##
+## Луч в Otto — это луч, который до него дотянулся: упёршийся в стену между
+## ними не в счёт. Присевший под высоким лучом его уже не перекрывает, и луч
+## уходит дальше, — поэтому мерится длина, а не то, во что он упёрся: иначе бот
+## вставал бы ровно под выстрел.
+func _laser_threat(agent: Enemy) -> Vector2:
+	var laser := agent.laser
+	if laser == null or not laser.is_on():
+		return Vector2(-1.0, INF)
+	var to_otto := _otto.global_position - laser.global_position
+	if signf(to_otto.x) != laser.direction:
+		return Vector2(-1.0, INF)
+	var gap := absf(to_otto.x)
+	# Луч, упёршийся в самого Otto, кончается ровно у края его тела, и сравнение
+	# без допуска отбрасывало его через раз — по погрешности плавающей точки.
+	if laser.length() < gap - BODY_HALF_WIDTH - LASER_SLACK:
+		return Vector2(-1.0, INF)
+	var height := -to_otto.y
+	var time := laser.time_to(gap)
+	# В кабине Otto сам едет на линию или с неё: мерится высота на момент, когда
+	# пуля придёт. Возвращается нынешняя — по ней решает [method _dodge_in_car].
+	var car := _car_of_otto() if _otto.is_riding() else null
+	var arriving := height + (car.speed_now() * time if car != null else 0.0)
+	var slack := 0.1 if car != null else 0.0
+	if arriving < -slack or arriving > Proportions.BODY + slack:
+		return Vector2(-1.0, INF)
+	return Vector2(height, time)
+
+
+## Высота, от которой уходить этим кадром, или −1.
+##
+## Под высокую пулю присесть можно сразу: присед мгновенный, и сидеть под лучом
+## безопасно весь замах. Через низкую прыгают вовремя: раньше [constant
+## JUMP_LEAD] бот приземлился бы прямо на неё.
+func _dodge_height(incoming: Vector2) -> float:
+	if incoming.x < 0.0:
+		return -1.0
+	if incoming.x > HIGH_BULLET or incoming.y <= JUMP_LEAD:
+		return incoming.x
+	return -1.0
 
 
 ## Уходит с линии огня: под высокую пулю приседает, через низкую прыгает.
@@ -567,3 +677,55 @@ func _release_all() -> void:
 		if TAPS.has(action):
 			_resting.append(action)
 	_pressed.clear()
+
+
+## Кабина, в которой едет Otto, или null.
+func _car_of_otto() -> ElevatorCar:
+	var here := _at(_otto)
+	for child in _level.get_children():
+		var car := child as ElevatorCar
+		if car == null or not car.has_rider():
+			continue
+		var at := _at(car)
+		if absf(at.x - here.x) > car.width() * 0.5 or absf(at.y - here.y) > 0.6:
+			continue
+		return car
+	return null
+
+
+## Стоит ли кабина Otto у этажа.
+func _car_aligned_under_otto() -> bool:
+	var car := _car_of_otto()
+	return car == null or car.is_aligned()
+
+
+## Уход от выстрела в кабине: присесть там нельзя, зато можно увести кабину.
+##
+## Кабина идёт ровным ходом без разгона, и за оставшееся до пули время она
+## сдвигает Otto на [code]скорость · время[/code]. Вниз — пуля уходит над
+## головой, вверх — под ноги, в днище. Берётся сторона с большим запасом;
+## низкую пулю в стоящей кабине проще перепрыгнуть.
+func _dodge_in_car(car: ElevatorCar, incoming: Vector2) -> void:
+	if _car_dodge_left > 0.0:
+		if car.can_go(_car_dodge_dir):
+			_press(&"move_down" if _car_dodge_dir > 0.0 else &"move_up")
+		return
+	var height := incoming.x
+	if (
+		height <= CAR_LOW_BULLET
+		and car.is_aligned()
+		and _otto.is_grounded()
+		and incoming.y <= JUMP_LEAD
+		and _press(&"jump")
+	):
+		return
+	var shift := car.speed * incoming.y
+	var over_head := height + shift - Proportions.BODY
+	var under_feet := shift - height
+	var down := over_head if car.can_go(1.0) else -INF
+	var up := under_feet if car.can_go(-1.0) else -INF
+	if is_inf(down) and is_inf(up):
+		return
+	_car_dodge_dir = 1.0 if down >= up else -1.0
+	_car_dodge_left = incoming.y + 0.1
+	_press(&"move_down" if _car_dodge_dir > 0.0 else &"move_up")

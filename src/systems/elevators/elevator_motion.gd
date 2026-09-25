@@ -60,6 +60,10 @@ var response_delay: float = 0.0
 
 var _pause_left: float = 0.0
 var _held: float = 0.0
+## Вёл ли кабину пассажир с тех пор, как вошёл. Между этажами встаёт только
+## остановленная им кабина: вошедший на ходу — на пол подъезжающей кабины —
+## её ещё не вёл, и она доезжает до этажа, куда шла (ADR-0037, решение 1).
+var _steered: bool = false
 
 
 ## Задаёт остановки и ставит кабину на один из этажей.
@@ -73,6 +77,7 @@ func setup(stops: PackedFloat32Array, start_floor: int = 0) -> void:
 	# На этаже кабина стоит — в том числе на том, с которого начинает.
 	_pause_left = floor_pause
 	_held = 0.0
+	_steered = false
 
 
 ## Двигает кабину за кадр и возвращает новую координату.
@@ -91,6 +96,7 @@ func update(delta: float, command: float, occupied: bool) -> float:
 		# Пустая кабина ничего не обдумывает: вошедший начинает отсчёт заново,
 		# иначе задержка по тревоге работала бы только на первую поездку.
 		_held = 0.0
+		_steered = false
 		_run_on_its_own(delta)
 	velocity = (position - previous) / delta if delta > 0.0 else 0.0
 	return position
@@ -146,6 +152,7 @@ func _drive(delta: float, command: float) -> void:
 			# Кабина ещё «думает»: команду слышит, но не трогается.
 			return
 		direction = signf(command)
+		_steered = true
 		_move_towards(_shaft_limit(direction), delta)
 		return
 
@@ -162,7 +169,7 @@ func _drive(delta: float, command: float) -> void:
 			direction = 0.0
 		return
 
-	if stops_between_floors:
+	if stops_between_floors and _steered:
 		direction = 0.0
 		return
 

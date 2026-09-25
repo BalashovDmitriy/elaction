@@ -37,7 +37,7 @@ func test_every_page_builds_and_takes_focus() -> void:
 
 func test_settings_have_every_choice() -> void:
 	# Громкость трижды, язык, сложность, графика, экран, разрешение, масштаб,
-	# кровь — и «назад».
+	# кровь, кадры в секунду — и «назад».
 	var menu := _menu()
 	menu.show_page(Menu.Page.SETTINGS)
 	var kinds: Array[int] = []
@@ -45,7 +45,7 @@ func test_settings_have_every_choice() -> void:
 		kinds.append(row.kind)
 	assert_eq(kinds.count(MenuRow.Kind.LEVEL), 3, "три громкости")
 	assert_eq(kinds.count(MenuRow.Kind.CHOICE), 6, "шесть переключателей")
-	assert_eq(kinds.count(MenuRow.Kind.TOGGLE), 1, "флажок крови")
+	assert_eq(kinds.count(MenuRow.Kind.TOGGLE), 2, "флажки крови и кадров в секунду")
 	assert_eq(kinds.count(MenuRow.Kind.ACTION), 1, "назад")
 
 
@@ -242,3 +242,33 @@ func _sources(dir: String) -> Array[String]:
 	for sub: String in DirAccess.get_directories_at(dir):
 		found.append_array(_sources(dir.path_join(sub)))
 	return found
+
+
+## Справку по управлению не находили: из главного меню она была, с паузы — нет
+## (ADR-0037, решение 9).
+func test_the_controls_open_from_the_pause_and_lead_back() -> void:
+	var menu := _menu()
+	menu.show_page(Menu.Page.PAUSE)
+	var found := _row_labelled(menu, tr("UI_CONTROLS"))
+	assert_not_null(found, "на паузе есть «Управление»")
+	if found == null:
+		return
+	found.pressed.emit()
+	assert_eq(menu.current_page(), Menu.Page.CONTROLS, "пункт открывает справку")
+	# «Назад» сохраняет настройки на диск: пустые тестовые затёрли бы настройки
+	# игрока.
+	menu.settings = null
+	var back := _row_labelled(menu, tr("UI_BACK"))
+	assert_not_null(back, "у справки есть «Назад»")
+	if back == null:
+		return
+	back.pressed.emit()
+	assert_eq(menu.current_page(), Menu.Page.PAUSE, "назад — на паузу, а не в главное меню")
+
+
+func _row_labelled(menu: Menu, text: String) -> MenuRow:
+	for row: MenuRow in menu.rows():
+		for label: Node in row.find_children("*", "Label", true, false):
+			if (label as Label).text == text:
+				return row
+	return null

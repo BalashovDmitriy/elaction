@@ -37,6 +37,15 @@ const WALK_PX: float = 2.0
 ## Пуля Otto, px за тик (table_50D8).
 const OTTO_BULLET_PX: float = 8.0
 
+## Во сколько раз пули летят быстрее ROM — у Otto и у агентов (ADR-0037,
+## решение 5). **Нарочный отход от оригинала**, решение пользователя: пуля ROM
+## идёт через кадр 2,6 с и читается ползущей. Таблицы ROM при этом не тронуты —
+## множитель стоит поверх них одним числом, и тесты ROM держат прежние значения.
+##
+## Вместе со скоростью растёт и дальность, с которой агент замечает пулю
+## ([method dodge_reach]): время на уклонение остаётся тем же, что в ROM.
+const BULLET_PACE: float = 3.0
+
 ## Кабина, px за тик (@45D8).
 const CAR_PX: float = 2.0
 
@@ -251,6 +260,25 @@ static func agent_bullet_speed(skill_level: int, alarmed: bool) -> float:
 	if alarmed:
 		step = mini(8, step + 1)
 	return speed(float(step))
+
+
+## Скорость пули в игре, м/с, по шагу ROM в пикселях за тик: ROM, умноженный
+## на [constant BULLET_PACE] (ADR-0037, решение 5).
+static func bullet_speed(px_per_tick: float) -> float:
+	return speed(px_per_tick) * BULLET_PACE
+
+
+## Скорость пули агента в игре, м/с: [method agent_bullet_speed] с
+## [constant BULLET_PACE].
+static func agent_shot_speed(skill_level: int, alarmed: bool) -> float:
+	return agent_bullet_speed(skill_level, alarmed) * BULLET_PACE
+
+
+## С какого расстояния агент замечает летящую в него пулю Otto, м: 20 px ROM
+## (@05F5), растянутые на [constant BULLET_PACE]. Пуля быстрее во столько же
+## раз, и от замеченной до попадания проходит то же время, что в ROM.
+static func dodge_reach() -> float:
+	return DODGE_REACH_PX * Proportions.PX * BULLET_PACE
 
 
 ## Поза выстрела по злости и броску 0..255. [param late] — агенты 3–4, у них

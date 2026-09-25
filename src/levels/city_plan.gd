@@ -13,6 +13,10 @@ extends RefCounted
 ## и в размытии читается городом, а не рядом коробок.
 enum Crown { FLAT, SETBACK, SPIRE, TANK, ANTENNA }
 
+## Что за дом (M24a): контора, жилой, стеклянная башня, кирпичный. От этого
+## тон фасада, переплёт окон и что за стеклом ([CityLook]).
+enum Kind { OFFICE, HOMES, GLASS, BRICK }
+
 
 ## Дом: коробка на земле и сетка окон на фасаде, обращённом к камере.
 class Block:
@@ -35,6 +39,11 @@ class Block:
 	var sign_colour := Color(0.0, 0.0, 0.0, 0.0)
 	var sign_size := Vector2.ZERO
 	var sign_y: float = 0.0
+	## Сдвиг вывески от середины фасада по x: вертикальная висит у угла.
+	var sign_x: float = 0.0
+	## Что за дом и какой у окон переплёт: 0 — нет, 1 — стойка, 2 — крест.
+	var kind: Kind = Kind.OFFICE
+	var mullions: int = 0
 
 
 ## Ряды по глубине: насколько ряд позади плоскости игры, м, и какой высоты там
@@ -85,6 +94,10 @@ const SIGN_COLOURS: Array[Color] = [
 	Color(0.75, 0.82, 1.0),
 ]
 
+## Доли типов домов ([enum Kind]) и шанс, что вывеска вертикальная.
+const KIND_WEIGHTS: Array[float] = [0.35, 0.3, 0.15, 0.2]
+const VERTICAL_SIGN_CHANCE: float = 0.4
+
 ## Смешивается с сидом, чтобы город не повторял жребий раскладки здания.
 const SALT: int = 0x0C17_7A11
 
@@ -111,7 +124,28 @@ static func generate(building_seed: int, from_x: float, to_x: float) -> Array[Bl
 			blocks.append(block)
 			x += block.width + rng.randf_range(GAP.x, GAP.y)
 	_dress_crowns(blocks, building_seed)
+	_dress_facades(blocks, building_seed)
 	return blocks
+
+
+## Тип дома, переплёт и вертикальные вывески — своим жребием, после верхов:
+## раскладка, верхи и горящие окна по сиду те же, что до M24a.
+static func _dress_facades(blocks: Array[Block], building_seed: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash([building_seed, SALT, "facades"])
+	for block in blocks:
+		block.kind = _weighted(rng, KIND_WEIGHTS) as Kind
+		block.mullions = rng.randi_range(0, 2)
+		if block.kind == Kind.GLASS:
+			block.mullions = 1
+		# Часть вывесок — вертикальные, у угла дома, как над входом в отель.
+		if block.sign_colour.a > 0.0 and rng.randf() < VERTICAL_SIGN_CHANCE:
+			var tall := minf(rng.randf_range(7.0, 14.0), block.height * 0.5)
+			var wide := minf(rng.randf_range(1.8, 3.0), block.width * 0.3)
+			block.sign_size = Vector2(wide, tall)
+			block.sign_y = clampf(block.sign_y, tall * 0.5 + 3.0, block.height - tall * 0.5)
+			var side := 1.0 if rng.randf() < 0.5 else -1.0
+			block.sign_x = side * (block.width * 0.5 - wide * 0.5 - 0.6)
 
 
 ## Верхи и вывески — своим жребием, после раскладки: раскладка кварталов по
@@ -145,13 +179,19 @@ static func _dress_crowns(blocks: Array[Block], building_seed: int) -> void:
 
 
 static func _weighted(rng: RandomNumberGenerator, weights: Array[float]) -> int:
+	return pick_weighted(weights, rng.randf())
+
+
+## Индекс по весам [param weights] и жребию [param roll] от 0 до 1. Общий на
+## город: здесь жребий из генератора, у [CityLook] — из хеша окна.
+static func pick_weighted(weights: Array, roll: float) -> int:
 	var total := 0.0
-	for weight in weights:
+	for weight: float in weights:
 		total += weight
-	var roll := rng.randf() * total
+	var left := roll * total
 	for index in weights.size():
-		roll -= weights[index]
-		if roll <= 0.0:
+		left -= float(weights[index])
+		if left <= 0.0:
 			return index
 	return weights.size() - 1
 

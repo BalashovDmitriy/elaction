@@ -161,30 +161,31 @@ static func beacons(blocks: Array[CityPlan.Block], ground: float) -> MultiMeshIn
 static func signs(blocks: Array[CityPlan.Block], ground: float) -> MultiMeshInstance3D:
 	var places: Array[Transform3D] = []
 	var colours: Array[Color] = []
+	var customs: Array[Color] = []
 	for block in blocks:
 		if block.sign_colour.a <= 0.0:
 			continue
 		var front := block.z + block.depth * 0.5 + 0.12
 		var size := Vector3(block.sign_size.x, block.sign_size.y, 1.0)
-		places.append(
-			Transform3D(Basis.from_scale(size), Vector3(block.x, ground + block.sign_y, front))
-		)
+		var at := Vector3(block.x + block.sign_x, ground + block.sign_y, front)
+		places.append(Transform3D(Basis.from_scale(size), at))
 		var fade := CityBackdrop.WINDOW_FADE[mini(block.row, CityBackdrop.WINDOW_FADE.size() - 1)]
 		colours.append(block.sign_colour * (0.9 * fade))
+		customs.append(CityLook.sign_custom(block))
 	var quad := QuadMesh.new()
-	var look := StandardMaterial3D.new()
-	look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	look.vertex_color_use_as_albedo = true
-	look.disable_fog = true
-	quad.material = look
+	# Подложка, трубка и буквы — шейдером (M24a): до того вывеска была ровным
+	# прямоугольником цвета.
+	quad.material = CityLook.signs()
 	var many := MultiMesh.new()
 	many.transform_format = MultiMesh.TRANSFORM_3D
 	many.use_colors = true
+	many.use_custom_data = true
 	many.mesh = quad
 	many.instance_count = places.size()
 	for index in places.size():
 		many.set_instance_transform(index, places[index])
 		many.set_instance_color(index, colours[index])
+		many.set_instance_custom_data(index, customs[index])
 	var node := MultiMeshInstance3D.new()
 	node.name = "Signs"
 	node.multimesh = many

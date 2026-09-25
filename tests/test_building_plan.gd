@@ -44,7 +44,7 @@ func test_another_seed_moves_the_documents() -> void:
 func test_building_holds_exactly_the_wanted_documents() -> void:
 	var rules := _rules()
 	var plan := BuildingPlan.generate(rules, 6)
-	assert_eq(plan.document_floors().size(), BuildingDocuments.count(rules))
+	assert_eq(plan.document_floors().size(), BuildingDocuments.count(rules, 6))
 
 
 func test_documents_lie_on_different_floors() -> void:

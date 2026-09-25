@@ -30,6 +30,7 @@ UI_WINDOW_MODE_2,Fullscreen,Полный экран
 UI_RESOLUTION,Resolution,Разрешение
 UI_RENDER_SCALE,Render scale,Масштаб рендера
 UI_BLOOD,Blood,Кровь
+UI_SHOW_FPS,Show FPS,Показывать FPS
 UI_DIFFICULTY,Difficulty,Сложность
 UI_DIFFICULTY_0,Easy,Лёгкая
 UI_DIFFICULTY_1,Normal,Обычная
@@ -47,7 +48,6 @@ UI_CROUCH,Crouch,Присед
 UI_JUMP,Jump,Прыжок
 UI_SHOOT,Shoot,Выстрел
 UI_PAUSE,Pause,Пауза
-UI_ACTION_HINT,"Up and down work by place: in a car they drive it, on an escalator pad they start the ride, on a doormat they open the door.","«Вверх» и «вниз» работают по месту: в кабине ведут её, на площадке эскалатора отправляют в поездку, на коврике открывают дверь."
 UI_REBIND_LATER,Rebinding comes later,Переназначение появится позже
 UI_GAMEPAD,Gamepad,Геймпад
 UI_DPAD,D-pad,Крестовина

@@ -1,12 +1,14 @@
 class_name Sparks
 extends Node3D
 
-## Искры от пули, попавшей в лампу (ADR-0031, решение 3; просьба пользователя).
+## Искры от пули, попавшей в лампу (ADR-0031, решение 3; просьба пользователя),
+## и от пули, ударившей в стену или дверь (ADR-0037, решение 5).
 ##
 ## Один выброс: горячие штрихи, вытянутые по скорости, разлетаются во все
 ## стороны с уклоном вниз, падают под тяжестью, желтеют, краснеют и тают.
-## Вместе с ними — вспышка света на десятую долю секунды. Картинка, а не
-## правило: на бой и темноту не влияет. Убирает себя сама.
+## У лампы вместе с ними — вспышка света на десятую долю секунды; у рикошета
+## света нет: пуль в перестрелке много, а источников на здание и так десятки.
+## Картинка, а не правило: на бой и темноту не влияет. Убирает себя сама.
 
 ## Сколько искр и сколько они живут, с.
 const COUNT: int = 70
@@ -30,8 +32,20 @@ const FLASH_TIME: float = 0.1
 ## Насколько искры ближе к камере, чем лампа, м: перед стеной, а не в ней.
 const FRONT: float = 0.3
 
+## Рикошет: сколько искр, их скорость и разброс, градусы. Мельче лампы — пуля
+## выбивает горсть, а не сноп.
+const RICOCHET_COUNT: int = 18
+const RICOCHET_SPEED := Vector2(2.0, 5.0)
+const RICOCHET_SPREAD: float = 55.0
+
 var _flash: OmniLight3D = null
 var _age: float = 0.0
+## Куда летят искры, сколько их, разброс и есть ли вспышка света.
+var _direction := Vector3(0.0, -1.0, 0.0)
+var _count: int = COUNT
+var _speed := SPEED
+var _spread: float = 75.0
+var _lit: bool = true
 
 
 ## Выбрасывает искры в точке [param at] сцены под узлом [param host].
@@ -43,8 +57,26 @@ static func burst(host: Node, at: Vector3) -> Sparks:
 	return sparks
 
 
+## Горсть искр от пули, ударившей в стену, в точке [param at]: летят назад, к
+## стрелку ([param towards] — ход пули, −1 влево, +1 вправо), с уклоном вверх.
+## Без вспышки света.
+static func ricochet(host: Node, at: Vector3, towards: float) -> Sparks:
+	var sparks := Sparks.new()
+	sparks.name = "Ricochet"
+	sparks._direction = Vector3(-signf(towards), 0.35, 0.0).normalized()
+	sparks._count = RICOCHET_COUNT
+	sparks._speed = RICOCHET_SPEED
+	sparks._spread = RICOCHET_SPREAD
+	sparks._lit = false
+	host.add_child(sparks)
+	sparks.global_position = at
+	return sparks
+
+
 func _ready() -> void:
 	add_child(_particles())
+	if not _lit:
+		return
 	_flash = OmniLight3D.new()
 	_flash.light_color = FLASH_COLOR
 	_flash.light_energy = FLASH_ENERGY
@@ -70,11 +102,11 @@ func _particles() -> GPUParticles3D:
 	var process := ParticleProcessMaterial.new()
 	# Вниз и в стороны, в плоскости игры: лампа висит у потолка, и искры,
 	# летящие вверх и вглубь, прятались в плите и за стеной (кадры M20).
-	process.direction = Vector3(0.0, -1.0, 0.0)
-	process.spread = 75.0
+	process.direction = _direction
+	process.spread = _spread
 	process.particle_flag_disable_z = true
-	process.initial_velocity_min = SPEED.x
-	process.initial_velocity_max = SPEED.y
+	process.initial_velocity_min = _speed.x
+	process.initial_velocity_max = _speed.y
 	process.gravity = Vector3(0.0, -GRAVITY, 0.0)
 	process.damping_min = 0.5
 	process.damping_max = 1.5
@@ -105,7 +137,7 @@ func _particles() -> GPUParticles3D:
 	streak.material = look
 
 	var particles := GPUParticles3D.new()
-	particles.amount = COUNT
+	particles.amount = _count
 	particles.lifetime = LIFETIME
 	particles.one_shot = true
 	particles.explosiveness = 1.0

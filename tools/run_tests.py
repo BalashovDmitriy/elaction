@@ -91,6 +91,7 @@ KNOWN_SLOW: dict[str, float] = {
     "test_agent_doors.gd": 36.0,
     "test_agent_lifts.gd": 30.0,
     "test_darkness.gd": 26.0,
+    "test_car_boarding.gd": 80.0,
     "test_elevator_control.gd": 26.0,
     "test_building_assembly.gd": 5.0,
     "test_building_shafts.gd": 5.0,

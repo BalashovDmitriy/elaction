@@ -34,6 +34,9 @@ const PORTAL_RECESS := Color(0.07, 0.08, 0.1)
 const PORTAL_LEAF := Color(0.5, 0.5, 0.48)
 ## Хром наличника: светлый металл, ловит блик лампы коридора.
 const PORTAL_TRIM := Color(0.78, 0.8, 0.83)
+## Насколько проём и створки портала не доходят до пола и перемычки, м: доля
+## пикселя, но грани разных материалов больше не в одной плоскости.
+const PORTAL_EPSILON: float = 0.004
 
 ## Лист во всю высоту шахты: насколько шире проёма и толщина, м.
 const PLATE_MARGIN: float = 0.05
@@ -73,6 +76,12 @@ const ROOF_LABEL := "R"
 ## Высота упора в конце полосы шахты, м.
 const BUFFER_HEIGHT: float = 0.24
 
+## Насколько упор уже и мельче направляющих, м (ADR-0037, решение 2). Упор
+## стоит между стойками и не доходит до их граней: грани разных материалов в
+## одной плоскости мерцали на ходу камеры — глубина у них одна, и какая из двух
+## ближе, решал случай.
+const BUFFER_INSET: float = 0.01
+
 ## Надстройка машинного отделения на крыше, м.
 const MACHINE_ROOM_SIZE := Vector2(2.16, 1.32)
 
@@ -87,8 +96,11 @@ const RAIL_Z: float = -0.45
 ## Домик не доходит до плоскости игры: его передняя грань кончается за спиной
 ## Otto (тело толщиной [constant WorldSpace.BODY_DEPTH] вокруг нуля), иначе он
 ## проходил бы сквозь стену домика, а не перед ней (авторевью M15).
+##
+## И на 4 см глубже направляющих: при 0.7 м его фасад вставал в одну плоскость
+## с передней гранью стоек, и верх шахты на крыше мерцал (ADR-0037, решение 2).
 const PANEL_THICKNESS: float = 0.08
-const MACHINE_ROOM_DEPTH: float = 0.7
+const MACHINE_ROOM_DEPTH: float = 0.74
 
 ## Столб света в шахте: радиус, яркость, цвет и вынос перед направляющими, м.
 ##
@@ -211,7 +223,8 @@ func _dress_shaft(shaft: BuildingPlan.ShaftSpot) -> void:
 	# столб сквозь здание, а не продолжение обоев коридора.
 	var plate_half := half + PORTAL_JAMB + PLATE_MARGIN
 	_add_part(
-		Rect2(shaft.x - plate_half, top, plate_half * 2.0, bottom - top),
+		# На миллиметры ниже дна: низ листа не в плоскости низа проёма.
+		Rect2(shaft.x - plate_half, top, plate_half * 2.0, bottom - top + PORTAL_EPSILON),
 		BuildingFinish.shaft_plates(),
 		WorldSpace.BACK_WALL_Z + PLATE_THICKNESS * 0.5 + 0.002,
 		PLATE_THICKNESS
@@ -242,6 +255,9 @@ func _build_portal(x: float, surface: float) -> void:
 	var leaf := GreyboxLook.metal(PORTAL_LEAF)
 	var trim := GreyboxLook.metal(PORTAL_TRIM)
 
+	# Створки и порог чуть не доходят до пола и перемычки: низ проёма, створок
+	# и порога ложился в одну плоскость (ADR-0037, решение 2). Проём — во всю
+	# высоту двери: по ней его узнают тесты одежды.
 	_add_part(
 		Rect2(x - half, surface - height, half * 2.0, height), recess, back_z, PANEL_THICKNESS
 	)
@@ -249,7 +265,12 @@ func _build_portal(x: float, surface: float) -> void:
 	for side: float in [-1.0, 1.0]:
 		var from := x - half if side < 0.0 else x + half - leaf_width
 		_add_part(
-			Rect2(from, surface - height, leaf_width, height), leaf, back_z + 0.03, PANEL_THICKNESS
+			Rect2(
+				from, surface - height + PORTAL_EPSILON, leaf_width, height - PORTAL_EPSILON * 3.0
+			),
+			leaf,
+			back_z + 0.03,
+			PANEL_THICKNESS
 		)
 		var jamb_from := x - half - PORTAL_JAMB if side < 0.0 else x + half
 		_add_part(
@@ -266,7 +287,7 @@ func _build_portal(x: float, surface: float) -> void:
 	)
 	_add_part(head, trim, back_z + 0.05, PANEL_THICKNESS)
 	_add_part(
-		Rect2(x - half, surface - PORTAL_SILL, half * 2.0, PORTAL_SILL),
+		Rect2(x - half, surface - PORTAL_SILL, half * 2.0, PORTAL_SILL - PORTAL_EPSILON),
 		BuildingFinish.tread_plate(),
 		back_z + 0.12,
 		0.2
@@ -498,18 +519,18 @@ func _light_the_shaft(x: float, index: int, surface: float) -> void:
 ##
 ## Нижний упор лежит на дне шахты, то есть над полом нижнего её этажа, а не
 ## в толще плиты, где его не видно вовсе.
+##
+## Упор — между стойками, уже и мельче их на [constant BUFFER_INSET]: во всю
+## ширину шахты его грани ложились на грани стоек (ADR-0037, решение 2).
 func _mark_shaft_ends(shaft: BuildingPlan.ShaftSpot) -> void:
-	var half := _rules.shaft_width * 0.5
+	var inner := _rules.shaft_width * 0.5 - RAIL_WIDTH - BUFFER_INSET
 	var top := top_of(shaft)
 	var bottom := _rules.floor_surface(shaft.bottom) - BUFFER_HEIGHT
 	var buffer := GreyboxLook.marker(GreyboxLook.DOOR)
+	var depth := RAIL_DEPTH - BUFFER_INSET * 2.0
 
-	_add_part(
-		Rect2(shaft.x - half, top, _rules.shaft_width, BUFFER_HEIGHT), buffer, RAIL_Z, RAIL_DEPTH
-	)
-	_add_part(
-		Rect2(shaft.x - half, bottom, _rules.shaft_width, BUFFER_HEIGHT), buffer, RAIL_Z, RAIL_DEPTH
-	)
+	for from: float in [top, bottom]:
+		_add_part(Rect2(shaft.x - inner, from, inner * 2.0, BUFFER_HEIGHT), buffer, RAIL_Z, depth)
 
 
 ## Кусок одежды шахты: коробка без тела на месте прямоугольника правил.

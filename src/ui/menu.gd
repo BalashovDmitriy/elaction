@@ -203,6 +203,8 @@ func _build_pause() -> void:
 	_action("UI_RESUME", func() -> void: resume_pressed.emit())
 	_action("UI_RESTART", func() -> void: restart_pressed.emit())
 	_action("UI_SETTINGS", func() -> void: show_page(Page.SETTINGS))
+	# Справка — и с паузы: из главного меню её не находили (ADR-0037, решение 9).
+	_action("UI_CONTROLS", func() -> void: show_page(Page.CONTROLS))
 	_action("UI_TO_MENU", func() -> void: to_menu_pressed.emit())
 
 
@@ -237,6 +239,7 @@ func _build_settings() -> void:
 		_resolution()
 		_render_scale()
 		_blood()
+		_fps()
 	_gap(10.0)
 	_back()
 
@@ -278,7 +281,8 @@ func _build_controls() -> void:
 		_cell(grid, _keys_of(actions), NeonStyle.INK, HORIZONTAL_ALIGNMENT_LEFT)
 	_column.add_child(grid)
 	_gap(6.0)
-	_note(tr("UI_ACTION_HINT"))
+	# Только клавиши, без объяснений игры: в неё разбираются по ходу, как в
+	# любой другой (решение пользователя, ADR-0037, решение 9).
 	_note(tr("UI_REBIND_LATER"))
 	_gap(10.0)
 	_back()
@@ -458,6 +462,17 @@ func _blood() -> void:
 	row.changed.connect(
 		func(value: Variant) -> void:
 			settings.blood = bool(value)
+			settings.apply()
+			settings.save_to()
+	)
+
+
+## Счётчик кадров в углу HUD.
+func _fps() -> void:
+	var row := _add_row(MenuRow.toggle(tr("UI_SHOW_FPS"), settings.show_fps))
+	row.changed.connect(
+		func(value: Variant) -> void:
+			settings.show_fps = bool(value)
 			settings.apply()
 			settings.save_to()
 	)

@@ -132,6 +132,8 @@ class WallSpot:
 
 
 var floors: int = 0
+## Сид, по которому план собран: из него тянется свой жребий числа документов.
+var seed_value: int = 0
 var shafts: Array[ShaftSpot] = []
 var escalators: Array[EscalatorSpot] = []
 var doors: Array[DoorSpot] = []
@@ -148,6 +150,7 @@ static func generate(rules: BuildingRules, seed_value: int) -> BuildingPlan:
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
+	plan.seed_value = seed_value
 
 	# Занятые места: этаж -> набор мест. Всё ставится в свободное, поэтому
 	# ничто не оказывается внутри шахты или на полотне эскалатора.
@@ -697,7 +700,7 @@ func _lay_doors(rules: BuildingRules, rng: RandomNumberGenerator, taken: Diction
 	#
 	# И только туда, куда ведёт маршрут: проём режет этаж надвое, и за дырой
 	# документ достаётся лишь прыжком через неё, а промах роняет этажом ниже.
-	var with_document := BuildingDocuments.lay(self, rules, rng, taken)
+	var with_document := BuildingDocuments.lay(self, rules, rng, taken, seed_value)
 
 	for index in floors:
 		var already := 1 if with_document.has(index) else 0

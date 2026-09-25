@@ -40,12 +40,22 @@ const PANEL := Color(0.07, 0.07, 0.09)
 const GLOW_ENERGY: float = 1.6
 const GLOW_RANGE: float = 9.0
 
+## Ореол неона в дожде: насколько шире щита и выше его, м, яркость и
+## насколько позади щита — за задней стеной здания, чтобы ореол не лёг в
+## коридоры.
+const HALO_MARGIN := Vector2(2.4, 2.0)
+const HALO_STRENGTH: float = 0.25
+const HALO_BEHIND: float = 1.6
+
 ## Мигание: раз в сколько секунд буква гаснет и на сколько.
 const FLICKER_EVERY: float = 3.7
 const FLICKER_FOR: float = 0.18
 
 var _letters: Array[Label3D] = []
 var _glow: OmniLight3D = null
+var _halo: MeshInstance3D = null
+## Высота щита, м: по ней ореол в дожде.
+var _height: float = 0.0
 var _flicker: Label3D = null
 var _clock: float = 0.0
 
@@ -59,6 +69,7 @@ func hang(rules: BuildingRules, identity: BuildingIdentity) -> void:
 	for line in lines:
 		count += line.length()
 	var height := (count + LINE_GAP * (lines.size() - 1)) * LETTER_STEP + MARGIN * 2.0
+	_height = height
 	var top := rules.floor_surface(BuildingRules.ROOF) - RISE
 	var x := rules.floor_span(0).y + STANDOFF
 
@@ -114,6 +125,25 @@ func hang(rules: BuildingRules, identity: BuildingIdentity) -> void:
 	add_child(glow)
 	add_to_group(Graphics.GROUP)
 	apply_graphics()
+
+
+## Ореол неона в дожде (ADR-0037, решение 3, дополнение): дождь у вывески
+## светится её цветом. Только в дождь — в ясную ночь воздух прозрачный.
+func glow_in_rain() -> void:
+	if _glow == null or _halo != null:
+		return
+	_halo = RainLook.halo(
+		Vector3(_glow.position.x, _glow.position.y, Z - HALO_BEHIND),
+		_glow.light_color,
+		HALO_STRENGTH,
+		Vector2(PANEL_WIDTH, _height) + HALO_MARGIN
+	)
+	add_child(_halo)
+
+
+## Ореол неона в дожде — для теста; вне дождя его нет.
+func halo() -> MeshInstance3D:
+	return _halo
 
 
 ## Отсвет неона в объёмном тумане — по уровню качества (ADR-0034, решение 1):

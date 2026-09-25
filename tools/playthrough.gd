@@ -247,7 +247,11 @@ func _play(
 ## смерти вырастает на весь экран. Интересны только те, кто до Otto достаёт.
 func _around(level: GreyboxLevel) -> String:
 	var here := _at(level.otto)
-	var near := level.agents()
+	# Трупы лежат до конца здания (ADR-0037, решение 6), а интересны живые.
+	var near: Array[Enemy] = []
+	for agent in level.agents():
+		if not agent.is_dead():
+			near.append(agent)
 	near.sort_custom(
 		func(a: Enemy, b: Enemy) -> bool: return here.distance_to(_at(a)) < here.distance_to(_at(b))
 	)

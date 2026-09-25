@@ -8,31 +8,66 @@ extends RefCounted
 ## зовёт [method lay] и получает этажи, на которых встали документы; сами двери
 ## ставит [method BuildingPlan.place_door] — тем же жребием, что и синие.
 
+## Самое малое и самое большое число документов в здании — столько, сколько
+## даёт таблица ROM на нулевом и на старшем навыке.
+const FEWEST: int = 5
+const MOST: int = 10
+
 
 ## Сколько красных дверей в здании: вручную
-## ([member BuildingRules.documents_cap]) или по ROM на навыке здания —
-## [method Arcade.red_doors], от 5 до 10.
-static func count(rules: BuildingRules) -> int:
-	return rules.documents_cap if rules.documents_cap >= 0 else Arcade.red_doors(rules.skill)
+## ([member BuildingRules.documents_cap]) или жребием от 5 до 10 по сиду здания
+## (ADR-0037, решение 8). Жребий свой, от сида с солью: общий генератор раскладки
+## сдвинул бы всё, что тянется после документов, — и здания тестов по сиду.
+static func count(rules: BuildingRules, building_seed: int) -> int:
+	if rules.documents_cap >= 0:
+		return rules.documents_cap
+	return _draw(building_seed).randi_range(FEWEST, MOST)
+
+
+## Столбец таблицы ROM, по которому ставятся документы здания: навык, у которого
+## красных дверей ровно столько, сколько выпало. Десять дают четыре навыка
+## подряд — тогда жребий между ними, и рисунок полос бывает разным.
+static func column(rules: BuildingRules, building_seed: int) -> int:
+	var wanted := count(rules, building_seed)
+	var fitting: Array[int] = []
+	for skill_level: int in Arcade.RED_DOOR_SKILL_TOP + 1:
+		if Arcade.red_doors(skill_level) == wanted:
+			fitting.append(skill_level)
+	if fitting.is_empty():
+		return clampi(rules.skill, 0, Arcade.RED_DOOR_SKILL_TOP)
+	var rng := _draw(building_seed)
+	rng.randi()
+	return fitting[rng.randi_range(0, fitting.size() - 1)]
+
+
+static func _draw(building_seed: int) -> RandomNumberGenerator:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash([building_seed, "documents"])
+	return rng
 
 
 ## Раскладывает красные двери: здание делится на полосы, и в каждой их столько,
 ## сколько велит правило. На этаже — не больше одной.
 ##
-## По ROM полосы и квоты — оригинала, по навыку здания ([method _rom_bands]):
-## в первом здании верх пуст, с навыком заполняются низ и верх (ADR-0028,
-## решение 3). Ручное число ([member BuildingRules.documents_cap]) делится
-## поровну по высоте, как до M18e.
+## По ROM полосы и квоты — оригинала, столбцом таблицы с выпавшим числом
+## ([method column], [method _rom_bands]): при пяти документах верх пуст, при
+## десяти заполнены и низ и верх (ADR-0028, решение 3; ADR-0037, решение 8).
+## Ручное число ([member BuildingRules.documents_cap]) делится поровну по
+## высоте, как до M18e.
 ##
 ## Внутри полосы этажи перебираются, пока дверь не встанет: на достижимой части
 ## этажа может не остаться места. Документ, которому в своей полосе места не
 ## нашлось, кладётся на любой этаж здания без документа, а не пропадает: собрать
 ## четыре из пяти нельзя.
 static func lay(
-	plan: BuildingPlan, rules: BuildingRules, rng: RandomNumberGenerator, taken: Dictionary
+	plan: BuildingPlan,
+	rules: BuildingRules,
+	rng: RandomNumberGenerator,
+	taken: Dictionary,
+	building_seed: int
 ) -> Dictionary:
 	var chosen: Dictionary = {}
-	var wanted := mini(count(rules), rules.floors)
+	var wanted := mini(count(rules, building_seed), rules.floors)
 	if wanted <= 0:
 		# Раньше проверки: маршрут — перебор всей раскладки, а в здании без
 		# документов он никому не нужен. Да и на здании в ноль этажей он падает.
@@ -43,7 +78,11 @@ static func lay(
 	var spans := BuildingRoute.segments(plan, rules)
 	var routed := BuildingRoute.reachable_in(plan, rules, spans)
 
-	var bands := _rom_bands(rules) if rules.documents_cap < 0 else _even_bands(rules.floors, wanted)
+	var bands := (
+		_rom_bands(rules, column(rules, building_seed))
+		if rules.documents_cap < 0
+		else _even_bands(rules.floors, wanted)
+	)
 	var left := 0
 	for band: Vector3i in bands:
 		var placed := _lay_in(
@@ -94,10 +133,10 @@ static func _lay_in(
 ## Полоса ROM переводится этажами, чей номер ROM в неё попадает
 ## ([method Arcade.rom_floor]). В здании ниже тридцати этажей полоса может
 ## не получить ни одного — её документы уходят в общий остаток.
-static func _rom_bands(rules: BuildingRules) -> Array[Vector3i]:
+static func _rom_bands(rules: BuildingRules, skill_level: int) -> Array[Vector3i]:
 	var bands: Array[Vector3i] = []
 	for band in Arcade.RED_DOOR_BANDS.size():
-		var quota := Arcade.red_doors_in_band(band, rules.skill)
+		var quota := Arcade.red_doors_in_band(band, skill_level)
 		if quota <= 0:
 			continue
 		var rom := Arcade.RED_DOOR_BANDS[band]
