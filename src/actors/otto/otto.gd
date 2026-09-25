@@ -53,11 +53,11 @@ const GRACE_BLINKS: float = 8.0
 ## В оригинале Otto приседает на месте. Оставлено переключателем для настройки.
 @export var can_move_while_crouching: bool = false
 
+## Чем звучит шаг: пол ставит здание — ковёр отеля, камень конторы и крыши.
+var step_sound: String = Sounds.STEP_CONCRETE
 ## Идёт ли передышка после возвращения в игру: пуля в Otto попадает, но не
 ## ранит. По этому [Bullet] решает, брызгать ли кровью. Свойством, а не методом:
 ## пуля спрашивает его через [method Object.get], не зная класса Otto.
-## Чем звучит шаг: пол ставит здание — ковёр отеля, камень конторы и крыши.
-var step_sound: String = Sounds.STEP_CONCRETE
 var invulnerable: bool:
 	get:
 		return _grace > 0.0

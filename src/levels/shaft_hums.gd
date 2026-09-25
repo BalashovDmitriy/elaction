@@ -39,7 +39,3 @@ func follow(height: float) -> void:
 ## Высота источника шахты номер [param index], м плоскости. Нужна тестам.
 func height_of(index: int) -> float:
 	return WorldSpace.to_plane(_holders[index].position).y
-
-
-func count() -> int:
-	return _holders.size()

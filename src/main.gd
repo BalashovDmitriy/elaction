@@ -98,22 +98,21 @@ func _just_pressed(action: StringName) -> bool:
 ## Главное меню: здание выбрасывается, за меню встаёт город, музыка остаётся.
 func _open_menu() -> void:
 	_playing = false
-	get_tree().paused = false
+	_unpause()
 	# Партия останавливается, а не просто прячется: без этого таймер сирены
 	# продолжал бы идти под главным меню, куда вышли с паузы.
 	GameState.instance().stop_game()
+	# Здание уходит вместе с Otto за дверью — глухоту двери снимает сама дверь.
 	_drop_level()
 	_raise_stage()
 	_hud.visible = false
 	_menu.show_page(Menu.Page.MAIN)
-	Sounds.muffle_music(Sounds.MUFFLE_PAUSE, false)
-	Sounds.muffle_music(Sounds.MUFFLE_DOOR, false)
 	Sounds.play_music(Sounds.MENU_THEME)
 
 
 func _start_game() -> void:
 	_playing = true
-	get_tree().paused = false
+	_unpause()
 	_drop_stage()
 	_menu.close()
 	_hud.visible = true
@@ -148,8 +147,15 @@ func _pause() -> void:
 
 func _resume() -> void:
 	_playing = true
-	get_tree().paused = false
+	_unpause()
 	_menu.close()
+
+
+## Снимает паузу, а с ней и глухую музыку паузы. Из паузы выходят не только
+## «продолжить»: «заново» и «в меню» оставляли музыку глухой на всю новую
+## партию (авторевью M23).
+func _unpause() -> void:
+	get_tree().paused = false
 	Sounds.muffle_music(Sounds.MUFFLE_PAUSE, false)
 
 
@@ -185,8 +191,6 @@ func _enter_building() -> void:
 		probe.start(_settings)
 	# Тема заводится на здание, а не на партию: после тревоги её надо вернуть,
 	# а сирена снимается только сменой здания (ADR-0009).
-	# Прежнее здание могло уйти вместе с Otto за красной дверью.
-	Sounds.muffle_music(Sounds.MUFFLE_DOOR, false)
 	# Трек здания и тревоги — жребием по сиду здания (ADR-0036, решение 3).
 	Sounds.play_music(
 		Sounds.ALARM_THEME if game.alarm.raised else Sounds.THEME, game.building_seed()

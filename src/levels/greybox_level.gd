@@ -214,7 +214,8 @@ func _ready() -> void:
 ## Гасит всё, что уехало из кадра. Ламп в здании тридцать, а в кадр влезает
 ## два с половиной этажа — ADR-0010, пункт 8.
 ##
-## Здесь только свет: он часть картинки, и считать его чаще кадра незачем.
+## Здесь свет и звук по месту Otto: оба — часть кадра, и считать их чаще кадра
+## незачем.
 func _process(_delta: float) -> void:
 	_listen_where_otto_is()
 	var span := VisibleFloors.around(rules, otto.camera_view())
@@ -676,25 +677,18 @@ func _agents_on(index: int) -> Array[Enemy]:
 	return found
 
 
+## Звук по месту Otto — правила в [PlaceSound]: на крыше и у выхода улица в
+## полную силу, на этажах — из-за стекла; шаг по полу здания.
+func _listen_where_otto_is() -> void:
+	var index := _floor_of(otto)
+	var at := WorldSpace.to_plane(otto.global_position)
+	Sounds.set_outdoors(PlaceSound.hears_street(rules, index, at.x, _exit_position.x))
+	otto.step_sound = PlaceSound.step_at(index == BuildingRules.ROOF, identity)
+	_shaft_hums.follow(at.y)
+
+
 ## Этаж, на котором стоит узел. Единственное место, где высота сцены снова
 ## становится высотой правил.
-## Звук по месту Otto (ADR-0036, решение 5): на крыше улица и дождь в полную
-## силу, на этажах — из-за стекла; шаг по крыше и конторе — камень, по отелю —
-## ковёр.
-func _listen_where_otto_is() -> void:
-	var on_roof := _floor_of(otto) == BuildingRules.ROOF
-	Sounds.set_outdoors(on_roof)
-	otto.step_sound = step_sound_at(on_roof, identity)
-	_shaft_hums.follow(WorldSpace.to_plane(otto.global_position).y)
-
-
-## Чем звучит шаг на крыше или на этаже здания [param building].
-static func step_sound_at(on_roof: bool, building: BuildingIdentity) -> String:
-	if on_roof or building == null or not building.is_hotel():
-		return Sounds.STEP_CONCRETE
-	return Sounds.STEP_CARPET
-
-
 func _floor_of(node: Node3D) -> int:
 	return rules.floor_index_near(WorldSpace.to_plane(node.global_position).y)
 

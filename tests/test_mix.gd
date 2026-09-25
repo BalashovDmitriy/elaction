@@ -148,9 +148,9 @@ func test_the_step_sounds_the_floor() -> void:
 	hotel.kind = BuildingIdentity.Kind.HOTEL
 	var office := BuildingIdentity.new()
 	office.kind = BuildingIdentity.Kind.OFFICE
-	assert_eq(GreyboxLevel.step_sound_at(false, hotel), Sounds.STEP_CARPET, "в отеле ковёр")
-	assert_eq(GreyboxLevel.step_sound_at(false, office), Sounds.STEP_CONCRETE, "в конторе камень")
-	assert_eq(GreyboxLevel.step_sound_at(true, hotel), Sounds.STEP_CONCRETE, "на крыше камень")
+	assert_eq(PlaceSound.step_at(false, hotel), Sounds.STEP_CARPET, "в отеле ковёр")
+	assert_eq(PlaceSound.step_at(false, office), Sounds.STEP_CONCRETE, "в конторе камень")
+	assert_eq(PlaceSound.step_at(true, hotel), Sounds.STEP_CONCRETE, "на крыше камень")
 
 
 func test_silence_mutes_the_bus_instead_of_going_to_minus_infinity() -> void:
@@ -167,7 +167,50 @@ func test_silence_mutes_the_bus_instead_of_going_to_minus_infinity() -> void:
 	assert_almost_eq(director.level_of(Sounds.SFX_BUS), 1.0, 0.001)
 
 
-## Зациклен ли поток. Форматов два, и у каждого свой способ об этом сказать.
+func test_a_loop_called_back_while_leaving_is_not_doubled() -> void:
+	# Otto съехал с крыши и тут же вернулся: улица ещё уходила, а новая петля
+	# заводилась поверх неё — старая, с убитым наплывом, звучала вполсилы до
+	# конца игры, и на каждом таком возвращении их становилось больше.
+	var director := AudioDirector.instance()
+	if director == null:
+		return
+	director.set_weather(Weather.Kind.RAIN)
+	director.set_outdoors(false)
+	director.set_outdoors(true)
+	director.set_outdoors(false)
+	director.set_outdoors(true)
+	assert_eq(_players_of(director, Sounds.CITY), 1, "улица звучит одна")
+	assert_eq(_players_of(director, Sounds.ROOM_TONE), 1, "и тишина коридора, уходя, одна")
+
+
+func test_the_street_is_heard_on_the_roof_and_at_the_exit() -> void:
+	# ADR-0036, решение 5: на крыше, у выхода и в меню — улица в полную силу.
+	var rules := BuildingRules.new()
+	var bottom := rules.floors - 1
+	var exit_x := 20.0
+	var near := exit_x + PlaceSound.STREET_REACH * 0.5
+	var far := exit_x + PlaceSound.STREET_REACH * 2.0
+	assert_true(PlaceSound.hears_street(rules, BuildingRules.ROOF, far, exit_x), "на крыше")
+	assert_true(PlaceSound.hears_street(rules, bottom, near, exit_x), "у выхода")
+	assert_false(PlaceSound.hears_street(rules, bottom, far, exit_x), "в глубине нижнего этажа")
+	assert_false(PlaceSound.hears_street(rules, 0, exit_x, exit_x), "на этаже — из-за стекла")
+
+
+func test_the_thunder_of_a_gone_city_does_not_arrive() -> void:
+	# Гром ждёт своей задержки на таймере дерева, а не у молнии: из меню или
+	# прежнего здания он приходил в следующее, хоть там и ясная ночь.
+	var director := AudioDirector.instance()
+	if director == null:
+		return
+	director.set_weather(Weather.Kind.RAIN)
+	director.thunder(0.0)
+	await wait_seconds(AudioDirector.THUNDER_DELAY.x + 0.2)
+	assert_true(_rumbling(director), "гром пришёл за вспышкой")
+	director.reset()
+	director.thunder(0.0)
+	director.set_weather(Weather.Kind.CLEAR)
+	await wait_seconds(AudioDirector.THUNDER_DELAY.x + 0.2)
+	assert_false(_rumbling(director), "а к новому городу — нет")
 
 
 func test_the_shaft_hum_rides_the_shaft_with_otto() -> void:
@@ -188,3 +231,24 @@ func _sorted(names: Variant) -> PackedStringArray:
 	var list := PackedStringArray(names)
 	list.sort()
 	return list
+
+
+## Сколько живых источников директора играют петлю [param name].
+func _players_of(director: AudioDirector, name: String) -> int:
+	var stream := Sounds.stream(name)
+	var count := 0
+	for child: Node in director.get_children():
+		var player := child as AudioStreamPlayer
+		if player != null and player.stream == stream and not player.is_queued_for_deletion():
+			count += 1
+	return count
+
+
+## Звучит ли сейчас ближний раскат.
+func _rumbling(director: AudioDirector) -> bool:
+	var near := Sounds.stream(Sounds.THUNDER_NEAR)
+	for child: Node in director.get_children():
+		var player := child as AudioStreamPlayer
+		if player != null and player.stream == near and player.playing:
+			return true
+	return false

@@ -118,6 +118,26 @@ func test_a_free_door_still_takes_otto_in() -> void:
 	assert_true(_is_indoors(otto), "в свободную дверь Otto заходит как прежде")
 
 
+## Здание выбросили, пока Otto за дверью, — «заново» с паузы, выход в меню.
+## Глухую музыку двери снимает сама дверь: помнить об этом каждому, кто
+## выбрасывает здание, — значит однажды забыть (авторевью M23).
+func test_a_door_gone_with_otto_inside_brings_the_music_back() -> void:
+	var director := AudioDirector.instance()
+	if director == null:
+		return
+	director.reset()
+	var door := _bare_door()
+	var otto := _guest_at(door)
+
+	Input.action_press(&"move_up")
+	await wait_physics_frames(KNOCK_FRAMES)
+	Input.action_release(&"move_up")
+	assert_true(_is_indoors(otto), "Otto за дверью")
+	assert_true(director.music_muffled(), "музыка из-за стены")
+	remove_child(door)
+	assert_false(director.music_muffled(), "дверь ушла — звук вернулся")
+
+
 func test_no_agent_ever_shows_up_in_front_of_a_shut_door() -> void:
 	var level := _build(3)
 	await _wait_for_the_landing(level)

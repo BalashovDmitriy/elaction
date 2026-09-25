@@ -135,12 +135,6 @@ static func names() -> PackedStringArray:
 	return all
 
 
-## Путь к первому файлу звука или пустая строка, если его нет.
-static func path_of(name: String) -> String:
-	var paths := variant_paths(name)
-	return paths[0] if not paths.is_empty() else ""
-
-
 ## Файлы вариантов звука по порядку: `имя`, `имя.2`, `имя.3`… Счёт идёт до
 ## первого пропуска — вариант за пропуском игра бы не нашла.
 static func variant_paths(name: String) -> PackedStringArray:

@@ -294,10 +294,12 @@ def build(names: list[str]) -> None:
     credits = json.loads(credits_path.read_text(encoding="utf-8")) if credits_path.exists() else {}
     for name in names:
         # Прежние варианты этого имени уходят: число вариантов могло сократиться.
+        removed = []
         for old in list(OUT.glob(f"{name}.*")):
             if old.suffix in (".wav", ".ogg") and old.stem.split(".")[0] == name:
                 old.unlink()
                 credits.pop(old.stem, None)
+                removed.append(old)
         for index, source in enumerate(SOUNDS[name]):
             signal, rate = _read(source)
             shaped = _shape(source, signal, rate)
@@ -314,6 +316,12 @@ def build(names: list[str]) -> None:
                 "url": source.page,
             }
             print(f"{target.name:28s} {len(shaped) / rate:6.1f} с  {source.author}")
+        # Настройки импорта файла, которого больше нет (вариантов стало меньше,
+        # WAV сменился на OGG), остались бы в репозитории сиротой. У переписанного
+        # файла они свои и остаются — вместе с его uid.
+        for old in removed:
+            if not old.exists():
+                old.with_name(old.name + ".import").unlink(missing_ok=True)
     ordered = dict(sorted(credits.items()))
     credits_path.write_bytes((json.dumps(ordered, ensure_ascii=False, indent=1) + "\n").encode())
 

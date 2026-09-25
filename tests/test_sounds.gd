@@ -65,10 +65,13 @@ func test_the_folder_holds_nothing_but_the_listed_sounds() -> void:
 func test_every_file_has_its_author() -> void:
 	# CC-BY требует указать автора, и указан он должен быть там, где его увидят:
 	# в credits.json для сборки и в CREDITS.md, который едет с игрой.
-	var credits := JSON.parse_string(FileAccess.get_file_as_string(CREDITS_JSON)) as Dictionary
-	assert_not_null(credits, "credits.json читается")
-	if credits == null:
+	# Разбор через Variant: `as Dictionary` на сломанном файле не даёт null,
+	# и проверка «читается» не срабатывала бы никогда.
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(CREDITS_JSON))
+	assert_true(parsed is Dictionary, "credits.json читается")
+	if not parsed is Dictionary:
 		return
+	var credits: Dictionary = parsed
 	var page := FileAccess.get_file_as_string(CREDITS_MD)
 	for file: String in _audio_files():
 		var stem := file.get_basename()
@@ -153,6 +156,7 @@ func test_an_always_on_source_starts_by_itself() -> void:
 	assert_true(player.playing, "неон гудит без приглашения")
 
 
+## Зациклен ли поток. Форматов два, и у каждого свой способ об этом сказать.
 func _loops(stream: AudioStream) -> bool:
 	var wav := stream as AudioStreamWAV
 	if wav != null:

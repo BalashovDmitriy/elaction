@@ -232,6 +232,14 @@ func _release() -> void:
 	Sounds.muffle_music(Sounds.MUFFLE_DOOR, false)
 
 
+## Здание выбросили, пока Otto за дверью, — новая партия с паузы, выход в меню.
+## Глухую музыку снимает сама дверь: иначе это пришлось бы помнить каждому, кто
+## выбрасывает здание.
+func _exit_tree() -> void:
+	if _guest != null:
+		Sounds.muffle_music(Sounds.MUFFLE_DOOR, false)
+
+
 ## Ведёт створку по ходу [DoorCycle].
 ##
 ## Створка поворачивается на петлях у левого края внутрь комнаты — на четверть

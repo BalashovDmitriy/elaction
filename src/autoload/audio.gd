@@ -69,6 +69,10 @@ var _music_fades: Array[Tween] = [null, null]
 
 ## Петли фона по имени и разовые звуки фона — гром.
 var _ambience: Dictionary = {}
+## Петли, которые сейчас уходят в тишину. Отдельно от звучащих: позванная
+## снова, уходящая петля возвращается сама, а не заводится второй поверх неё —
+## та, первая, осталась бы звучать вполсилы навсегда (авторевью M23).
+var _leaving: Dictionary = {}
 var _ambience_shot: AudioStreamPlayer = null
 var _ambience_fades: Dictionary = {}
 
@@ -77,6 +81,9 @@ var _ambience_fades: Dictionary = {}
 var _muffled_by: Dictionary = {}
 var _outdoors: bool = true
 var _weather: Weather.Kind = Weather.Kind.CLEAR
+## Какой по счёту город звучит. Гром назначается городу, и к следующему — в
+## меню, в другое здание — он уже не приходит (авторевью M23).
+var _city: int = 0
 var _tweens: Dictionary = {}
 ## Когда кончится джингл, который сейчас приглушает трек, по часам движка, с.
 var _duck_until: float = 0.0
@@ -113,6 +120,9 @@ func _enter_tree() -> void:
 
 	_ambience_shot = AudioStreamPlayer.new()
 	_ambience_shot.bus = Sounds.AMBIENCE_BUS
+	# Раскат длится секунд девять, а серии идут чаще: второй гром не обрывает
+	# первый.
+	_ambience_shot.max_polyphony = 2
 	add_child(_ambience_shot)
 
 
@@ -205,27 +215,27 @@ func music_muffled() -> bool:
 func set_ambience(names: PackedStringArray) -> void:
 	for name: String in _ambience.keys():
 		if not names.has(name):
-			_fade_ambience(name, SILENT_DB, true)
+			_leaving[name] = _ambience[name]
+			_ambience.erase(name)
+			_fade_ambience(name, _leaving[name] as AudioStreamPlayer, SILENT_DB, true)
 	for name: String in names:
-		if _ambience.has(name):
-			_fade_ambience(name, 0.0, false)
+		var player := _ambience.get(name) as AudioStreamPlayer
+		if player == null:
+			player = _leaving.get(name) as AudioStreamPlayer
+			_leaving.erase(name)
+		if player == null:
+			player = _loop(name)
+		if player == null:
 			continue
-		var stream := Sounds.stream(name)
-		if stream == null:
-			continue
-		var player := AudioStreamPlayer.new()
-		player.bus = Sounds.AMBIENCE_BUS
-		player.stream = stream
-		player.volume_db = SILENT_DB
-		add_child(player)
-		player.play()
 		_ambience[name] = player
-		_fade_ambience(name, 0.0, false)
+		_fade_ambience(name, player, 0.0, false)
 
 
-## Погода вокруг: снаружи и внутри звучат свои петли.
+## Погода вокруг: снаружи и внутри звучат свои петли. Зовёт её город, когда
+## строится, — и гром прежнего города с этим отменяется.
 func set_weather(weather: Weather.Kind) -> void:
 	_weather = weather
+	_city += 1
 	set_ambience(Sounds.weather_loops(_weather, _outdoors))
 
 
@@ -247,15 +257,12 @@ func set_outdoors(on: bool) -> void:
 	_gain(Sounds.AMBIENCE_BUS, 0.0 if on else INDOOR_AMBIENCE_DB, MUFFLE_TIME)
 
 
-func outdoors() -> bool:
-	return _outdoors
-
-
 ## Гром от разряда в [param distance] метрах: с задержкой, как от настоящего.
 ## Таймер встаёт на паузе игры — гром не приходит к замершей вспышке.
 func thunder(distance: float) -> void:
 	var name := Sounds.THUNDER_NEAR if distance < THUNDER_NEAR else Sounds.THUNDER_FAR
-	get_tree().create_timer(thunder_delay(distance), false).timeout.connect(_rumble.bind(name))
+	var timer := get_tree().create_timer(thunder_delay(distance), false)
+	timer.timeout.connect(_rumble.bind(name, _city))
 
 
 ## Задержка грома для разряда в [param distance] метрах, с.
@@ -263,7 +270,11 @@ static func thunder_delay(distance: float) -> float:
 	return clampf(distance / SOUND_SPEED, THUNDER_DELAY.x, THUNDER_DELAY.y)
 
 
-func _rumble(name: String) -> void:
+## Раскат грома, назначенный городу номер [param city]. Город с тех пор
+## сменился — молнии, от которой он шёл, уже нет.
+func _rumble(name: String, city: int) -> void:
+	if city != _city:
+		return
 	var stream := Sounds.stream(name)
 	if stream == null:
 		return
@@ -290,22 +301,29 @@ func level_of(bus: String) -> float:
 	return float(_levels.get(bus, 1.0))
 
 
-## Сбрасывает приглушения и фон. Нужен тестам: автолоад один на все файлы.
+## Сбрасывает приглушения, фон и назначенный гром. Нужен тестам: автолоад один
+## на все файлы.
 func reset() -> void:
-	for name: String in _ambience.keys():
-		(_ambience[name] as AudioStreamPlayer).queue_free()
+	for player: AudioStreamPlayer in _ambience.values() + _leaving.values():
+		player.queue_free()
 	_ambience.clear()
+	_leaving.clear()
+	for fade: Tween in _ambience_fades.values():
+		fade.kill()
+	_ambience_fades.clear()
 	for key: String in _tweens.keys():
 		(_tweens[key] as Tween).kill()
 	_tweens.clear()
 	_muffled_by.clear()
 	_outdoors = true
+	_weather = Weather.Kind.CLEAR
+	_duck_until = 0.0
+	_city += 1
+	_ambience_shot.stop()
 	for bus: String in [Sounds.MUSIC_BUS, Sounds.AMBIENCE_BUS]:
-		var index := AudioServer.get_bus_index(bus)
-		var muffle := AudioServer.get_bus_effect(index, MUFFLE_EFFECT) as AudioEffectLowPassFilter
-		muffle.cutoff_hz = OPEN_HZ
-		AudioServer.set_bus_effect_enabled(index, MUFFLE_EFFECT, false)
-		(AudioServer.get_bus_effect(index, DUCK_EFFECT) as AudioEffectAmplify).volume_db = 0.0
+		_muffle_of(bus).cutoff_hz = OPEN_HZ
+		AudioServer.set_bus_effect_enabled(AudioServer.get_bus_index(bus), MUFFLE_EFFECT, false)
+		_gain_of(bus).volume_db = 0.0
 
 
 func _fade_music(index: int, target_db: float, seconds: float, stop_after: bool) -> void:
@@ -320,24 +338,45 @@ func _fade_music(index: int, target_db: float, seconds: float, stop_after: bool)
 	_music_fades[index] = fade
 
 
-func _fade_ambience(name: String, target_db: float, drop_after: bool) -> void:
+## Заводит петлю фона [param name] из тишины; null — файла нет.
+func _loop(name: String) -> AudioStreamPlayer:
+	var stream := Sounds.stream(name)
+	if stream == null:
+		return null
+	var player := AudioStreamPlayer.new()
+	player.bus = Sounds.AMBIENCE_BUS
+	player.stream = stream
+	player.volume_db = SILENT_DB
+	add_child(player)
+	player.play()
+	return player
+
+
+func _fade_ambience(
+	name: String, player: AudioStreamPlayer, target_db: float, drop_after: bool
+) -> void:
 	var previous := _ambience_fades.get(name) as Tween
 	if previous != null:
 		previous.kill()
-	var player := _ambience[name] as AudioStreamPlayer
 	var fade := create_tween()
 	fade.tween_property(player, "volume_db", target_db, MUSIC_FADE)
 	if drop_after:
-		_ambience.erase(name)
-		fade.tween_callback(player.queue_free)
+		fade.tween_callback(_drop_loop.bind(name, player))
 	_ambience_fades[name] = fade
+
+
+## Петля ушла в тишину — источник больше не нужен.
+func _drop_loop(name: String, player: AudioStreamPlayer) -> void:
+	if _leaving.get(name) == player:
+		_leaving.erase(name)
+	player.queue_free()
 
 
 ## Ведёт срез фильтра шины к [param hz]. На открытом звуке фильтр выключается:
 ## на 20 кГц он не слышен, но стоит времени микшера.
 func _sweep(bus: String, hz: float) -> void:
 	var index := AudioServer.get_bus_index(bus)
-	var muffle := AudioServer.get_bus_effect(index, MUFFLE_EFFECT) as AudioEffectLowPassFilter
+	var muffle := _muffle_of(bus)
 	AudioServer.set_bus_effect_enabled(index, MUFFLE_EFFECT, true)
 	var sweep := _restart(bus + "/muffle")
 	# Срез слышится по октавам, а не по герцам: линейный ход от 20 кГц до
@@ -353,9 +392,7 @@ func _sweep(bus: String, hz: float) -> void:
 
 
 func _gain(bus: String, target_db: float, seconds: float) -> void:
-	var index := AudioServer.get_bus_index(bus)
-	var gain := AudioServer.get_bus_effect(index, DUCK_EFFECT) as AudioEffectAmplify
-	_restart(bus + "/gain").tween_property(gain, "volume_db", target_db, seconds)
+	_restart(bus + "/gain").tween_property(_gain_of(bus), "volume_db", target_db, seconds)
 
 
 ## Приглушает трек на [param seconds] секунд. Джингл поверх джингла продлевает
@@ -363,8 +400,7 @@ func _gain(bus: String, target_db: float, seconds: float) -> void:
 func _duck(seconds: float) -> void:
 	var now := Time.get_ticks_msec() / 1000.0
 	_duck_until = maxf(_duck_until, now + seconds)
-	var index := AudioServer.get_bus_index(Sounds.MUSIC_BUS)
-	var gain := AudioServer.get_bus_effect(index, DUCK_EFFECT) as AudioEffectAmplify
+	var gain := _gain_of(Sounds.MUSIC_BUS)
 	var duck := _restart(Sounds.MUSIC_BUS + "/gain")
 	duck.tween_property(gain, "volume_db", DUCK_DB, DUCK_IN)
 	duck.tween_interval(maxf(_duck_until - now - DUCK_IN, 0.0))
@@ -378,3 +414,15 @@ func _restart(key: String) -> Tween:
 	var tween := create_tween()
 	_tweens[key] = tween
 	return tween
+
+
+## Фильтр «из-за стены» шины [param bus] — первый эффект в [code]buses.tres[/code].
+static func _muffle_of(bus: String) -> AudioEffectLowPassFilter:
+	var index := AudioServer.get_bus_index(bus)
+	return AudioServer.get_bus_effect(index, MUFFLE_EFFECT) as AudioEffectLowPassFilter
+
+
+## Ручка громкости шины [param bus] — второй эффект: приглушение и фон на этажах.
+static func _gain_of(bus: String) -> AudioEffectAmplify:
+	var index := AudioServer.get_bus_index(bus)
+	return AudioServer.get_bus_effect(index, DUCK_EFFECT) as AudioEffectAmplify
