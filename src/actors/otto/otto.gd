@@ -38,6 +38,9 @@ const GRACE_BLINKS: float = 8.0
 ## не падение: без этого поставленный этажом ниже разбивался бы на ровном месте.
 const TELEPORT_GAP: float = 0.5
 
+## Кнопки, нажатие которых может уйти на пропуск вступления ([method ride]).
+const PRESS_ACTIONS: Array[StringName] = [&"jump", &"shoot"]
+
 ## Ходьба и пуля — по ROM: 2 и 8 px за тик логики (ADR-0027, решение 4); пуля
 ## втрое быстрее ROM ([constant Arcade.BULLET_PACE], ADR-0037, решение 5).
 @export var walk_speed: float = Arcade.speed(Arcade.WALK_PX)
@@ -117,6 +120,9 @@ var _was_grounded: bool = true
 var _last_position := Vector3.ZERO
 ## Сколько ещё держится передышка после возвращения в игру, с.
 var _grace: float = 0.0
+## Кнопки, нажатие которых потрачено на пропуск вступления ([method ride]):
+## пока их держат, Otto их не слышит, отпустили — снова слышит.
+var _spent_actions: Array[StringName] = []
 
 @onready var _standing_shape: CollisionShape3D = $StandingShape
 @onready var _crouching_shape: CollisionShape3D = $CrouchingShape
@@ -158,6 +164,8 @@ func _physics_process(delta: float) -> void:
 		# Переставили — уровень, тест или съёмка: с новой точки и считаем.
 		_rest_here()
 	_snapshot.read_actions()
+	if not _spent_actions.is_empty():
+		_forget_spent_presses()
 	if _car != null:
 		# В кабине «вверх/вниз» ведут её, а присесть внутри нельзя.
 		_car.drive(vertical_intent())
@@ -253,6 +261,17 @@ func is_hidden() -> bool:
 	return _states.state == OttoStateMachine.State.INDOORS
 
 
+## Снимает из снимка ввода нажатия, потраченные на пропуск, пока кнопку держат.
+func _forget_spent_presses() -> void:
+	for action: StringName in _spent_actions.duplicate():
+		if not Input.is_action_pressed(action):
+			_spent_actions.erase(action)
+		elif action == &"jump":
+			_snapshot.jump_pressed = false
+		else:
+			_snapshot.shoot_pressed = false
+
+
 ## Возвращает Otto в игру после смерти. Ставить его на место — дело уровня,
 ## поэтому зовут это уже после переноса: опора, от которой считается падение,
 ## берётся отсюда.
@@ -306,11 +325,23 @@ func stay_indoors(inside: bool) -> void:
 ## Otto встал на эскалатор или сошёл с него: пока едет, ввод игрока не
 ## действует, а позицией распоряжается эскалатор. Трос вступления пользуется
 ## тем же — Otto на нём тоже везут.
-func ride(on: bool) -> void:
+##
+## [param presses_spent] — отпуская, не слышать прыжка и выстрела, которые
+## держат прямо сейчас, пока их не отпустят. Так отпускает вступление, когда его
+## пропустили прыжком или выстрелом: то же нажатие иначе дошло бы и до Otto —
+## пропуск выстрелом стрелял бы, а пропуск прыжком прыгал. Глушится именно
+## нажатие, а не шаг физики: вступление видит кнопку по своему краю «отпущена —
+## нажата», а Otto — по [method Input.is_action_just_pressed], и шаг, в котором
+## нажатие видит каждый, не обязан совпасть.
+func ride(on: bool, presses_spent: bool = false) -> void:
 	if on:
 		_states.ride()
 	else:
 		_states.stop_riding()
+	if presses_spent:
+		for action: StringName in PRESS_ACTIONS:
+			if Input.is_action_pressed(action) and not _spent_actions.has(action):
+				_spent_actions.append(action)
 	_repose()
 
 

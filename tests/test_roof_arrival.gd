@@ -286,6 +286,37 @@ func test_a_shot_skips_but_a_held_button_does_not() -> void:
 	_drop(level)
 
 
+## Нажатие, пропустившее вступление, на этом и кончается: Otto не стреляет
+## и не прыгает от той же кнопки. Иначе пропуск выстрелом — это ещё и выстрел
+## в пустоту, а пропуск прыжком — прыжок с места приземления.
+func test_the_skipping_press_does_not_reach_otto() -> void:
+	for action: StringName in [&"shoot", &"jump"]:
+		var level := _build(4)
+		await wait_physics_frames(SETTLE_FRAMES * 3)
+		assert_true(level.is_in_the_intro(), "%s: вертолёт ещё летит" % action)
+		Input.action_press(action)
+		await wait_physics_frames(1)
+		Input.action_release(action)
+		assert_false(level.is_in_the_intro(), "%s: вступление пропущено" % action)
+		for _frame: int in 3:
+			assert_eq(
+				level.find_children("*", "Bullet", true, false).size(),
+				0,
+				"%s: пропуск не стреляет" % action
+			)
+			assert_true(level.otto.is_grounded(), "%s: пропуск не прыгает" % action)
+			await wait_physics_frames(1)
+		# Следующее нажатие — уже Otto: пропуск глушит одно нажатие, а не кнопку.
+		if action == &"shoot":
+			Input.action_press(action)
+			await wait_physics_frames(1)
+			Input.action_release(action)
+			assert_eq(
+				level.find_children("*", "Bullet", true, false).size(), 1, "второе нажатие стреляет"
+			)
+		_drop(level)
+
+
 ## Переставленный Otto — тестом или съёмкой — кончает вступление сам и стоит,
 ## где поставили: так инструменты работают, ничего не зная про вертолёт.
 func test_moving_otto_ends_the_intro_where_he_was_put() -> void:

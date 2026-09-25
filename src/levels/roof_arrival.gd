@@ -183,7 +183,9 @@ func advance(delta: float) -> void:
 		_let_go()
 		return
 	if _skip_pressed():
-		_land()
+		# Нажатие потрачено на пропуск: Otto, отпущенный в этом же шаге, его
+		# уже не получит — ни выстрела, ни прыжка с места приземления.
+		_land(true)
 		return
 
 	match _step:
@@ -221,9 +223,12 @@ func _slide(delta: float) -> void:
 ## Конец вступления приездом или пропуском: Otto стоит на месте приземления и
 ## слушается, вертолёт уходит, а кадр вступления держится, пока он не улетел
 ## ([method linger]).
-func _land() -> void:
+##
+## [param presses_spent] — вступление пропущено нажатием, и Otto его не слышит
+## ([method Otto.ride]).
+func _land(presses_spent: bool = false) -> void:
 	_otto.global_position = WorldSpace.to_scene(_landing)
-	_release()
+	_release(presses_spent)
 
 
 ## Отпускает Otto там, где его поставили, — тест, съёмка, возвращение после
@@ -234,11 +239,11 @@ func _let_go() -> void:
 	_camera_held = false
 
 
-func _release() -> void:
+func _release(presses_spent: bool = false) -> void:
 	var sliding := _step == Step.SLIDE
 	_step = Step.DONE
 	_otto.visible = true
-	_otto.ride(false)
+	_otto.ride(false, presses_spent)
 	if is_instance_valid(_helicopter):
 		# Приехал — звук троса доигрывает сам, он короче спуска; сорвали
 		# посреди спуска — обрывается.
