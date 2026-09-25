@@ -56,6 +56,8 @@ const GRACE_BLINKS: float = 8.0
 ## Идёт ли передышка после возвращения в игру: пуля в Otto попадает, но не
 ## ранит. По этому [Bullet] решает, брызгать ли кровью. Свойством, а не методом:
 ## пуля спрашивает его через [method Object.get], не зная класса Otto.
+## Чем звучит шаг: пол ставит здание — ковёр отеля, камень конторы и крыши.
+var step_sound: String = Sounds.STEP_CONCRETE
 var invulnerable: bool:
 	get:
 		return _grace > 0.0
@@ -196,6 +198,7 @@ func kill(crushed: bool = false) -> void:
 	_states.kill()
 	_falling_over = FALLING_TIME
 	Sounds.play(Sounds.OTTO_DEATH)
+	Sounds.play(Sounds.DEATH_JINGLE)
 	_repose()
 	died.emit()
 
@@ -506,7 +509,7 @@ func _step_sound() -> void:
 	if frame == _stepped_on or frame == 1 or not is_on_floor():
 		return
 	_stepped_on = frame
-	Sounds.play(Sounds.STEP)
+	Sounds.play(step_sound)
 
 
 static func _shape_size(shape: CollisionShape3D) -> Vector3:

@@ -17,6 +17,8 @@ extends Node3D
 const LETTER_STEP: float = 0.82
 const LETTER_SIZE: float = 0.7
 const MARGIN: float = 0.3
+## Докуда слышно гудение неона, м.
+const BUZZ_REACH: float = 9.0
 const PANEL_WIDTH: float = 1.1
 const PANEL_DEPTH: float = 0.18
 ## Пробел между строками (имя и HOTEL), в шагах буквы.
@@ -66,6 +68,8 @@ func hang(rules: BuildingRules, identity: BuildingIdentity) -> void:
 	panel.position = WorldSpace.to_scene(Vector2(x, top + height * 0.5))
 	panel.position.z = Z
 	add_child(panel)
+	# Неон гудит там, где висит (ADR-0036): слышно на крыше и верхних этажах.
+	Sounds.source(panel, Sounds.NEON_BUZZ, BUZZ_REACH, true)
 	# Кронштейны к стене: сверху и снизу.
 	for share: float in [0.12, 0.88]:
 		var arm := GreyboxLook.box(

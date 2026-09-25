@@ -1,4 +1,4 @@
-# Только для перерисовки ассетов: tools/render_audio.py (ADR-0012),
+# Только для перерисовки ассетов: tools/build_audio.py (ADR-0036),
 # tools/render_icon.py (ADR-0013) и tools/build_textures.py (ADR-0033), — и для tools/compare_original.py, кадра
 # вехи рядом с оригиналом (ADR-0026). Модели актёров собирает Blender
 # (tools/build_actors.py, ADR-0022), pip ему не нужен.

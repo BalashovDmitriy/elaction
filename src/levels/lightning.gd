@@ -9,7 +9,8 @@ extends Node3D
 ## Изредка виден сам разряд — ломаная над дальним рядом. Источников света не
 ## добавляет: вспышка — яркость неба, стёкол и окружающего света, а не лампа.
 ##
-## Гром — M23, вместе со всем звуком.
+## Гром (M23) идёт за каждой серией с задержкой по дальности: видимый разряд
+## бьёт в дальний ряд города, невидимый — за горизонтом (ADR-0036, решение 5).
 
 ## Пауза между сериями, с.
 const PAUSE := Vector2(5.0, 13.0)
@@ -24,6 +25,13 @@ const DARK: float = 0.002
 ## С каким шансом серию видно разрядом.
 const BOLT_CHANCE: float = 0.55
 const BOLT_COLOUR := Color(0.85, 0.9, 1.0)
+## Где ударил разряд, которого не видно, м: за горизонтом города.
+const UNSEEN_DISTANCE := Vector2(1500.0, 3200.0)
+## Глубина дальнего ряда, где встаёт видимый разряд, м.
+const BOLT_DEPTH: float = 560.0
+
+## Где ударила последняя серия, м. Нужен тестам.
+var last_distance: float = 0.0
 
 var _rng := RandomNumberGenerator.new()
 var _wait: float = 0.0
@@ -63,7 +71,10 @@ func advance(delta: float) -> void:
 			_pulse = 0
 			_pulse_clock = 0.0
 			if _rng.randf() < BOLT_CHANCE:
-				_strike()
+				last_distance = _strike()
+			else:
+				last_distance = _rng.randf_range(UNSEEN_DISTANCE.x, UNSEEN_DISTANCE.y)
+			Sounds.thunder(last_distance)
 		return
 	var pulse := PULSES[_pulse]
 	_pulse_clock += delta
@@ -85,8 +96,9 @@ func _process(delta: float) -> void:
 	advance(delta)
 
 
-## Разряд: ломаная от неба к крыше дальнего ряда, с отростком.
-func _strike() -> void:
+## Разряд: ломаная от неба к крыше дальнего ряда, с отростком. Возвращает,
+## как далеко он от середины города, м.
+func _strike() -> float:
 	if _bolt == null:
 		_bolt = MeshInstance3D.new()
 		var look := StandardMaterial3D.new()
@@ -117,8 +129,10 @@ func _strike() -> void:
 	_segment(mesh, fork, fork + Vector2(_rng.randf_range(-40.0, 40.0), -60.0), 0.8)
 	mesh.surface_end()
 	_bolt.mesh = mesh
-	_bolt.position.z = -560.0
+	_bolt.position.z = -BOLT_DEPTH
 	_bolt.visible = true
+	var aside := x - (_span.x + _span.y) * 0.5
+	return sqrt(BOLT_DEPTH * BOLT_DEPTH + aside * aside)
 
 
 static func _segment(mesh: ImmediateMesh, a: Vector2, b: Vector2, width: float) -> void:

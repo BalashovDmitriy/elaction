@@ -1,0 +1,260 @@
+{
+ "agent_death": {
+  "title": "thud",
+  "author": "Breviceps",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/Breviceps/sounds/447922/"
+ },
+ "alarm_theme": {
+  "title": "Fast Talkin",
+  "author": "Kevin MacLeod (incompetech.com)",
+  "licence": "CC-BY 4.0",
+  "url": "https://incompetech.com/music/royalty-free/licenses/"
+ },
+ "alarm_theme.2": {
+  "title": "Private Eye",
+  "author": "Kevin MacLeod (incompetech.com)",
+  "licence": "CC-BY 4.0",
+  "url": "https://incompetech.com/music/royalty-free/licenses/"
+ },
+ "alarm_theme.3": {
+  "title": "On the Cool Side",
+  "author": "Kevin MacLeod (incompetech.com)",
+  "licence": "CC-BY 4.0",
+  "url": "https://incompetech.com/music/royalty-free/licenses/"
+ },
+ "building_bonus": {
+  "title": "Rollin at 5 (фрагмент)",
+  "author": "Kevin MacLeod (incompetech.com)",
+  "licence": "CC-BY 4.0",
+  "url": "https://incompetech.com/music/royalty-free/licenses/"
+ },
+ "car_away": {
+  "title": "car drive away",
+  "author": "soundmary",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/soundmary/sounds/128190/"
+ },
+ "city": {
+  "title": "city night hum",
+  "author": "klankbeeld",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/klankbeeld/sounds/361088/"
+ },
+ "death_jingle": {
+  "title": "horn_fail_wahwah_3",
+  "author": "TaranP",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/TaranP/sounds/362204/"
+ },
+ "document": {
+  "title": "Music Jingles: SAX16",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/music-jingles"
+ },
+ "door_close": {
+  "title": "wooden door close",
+  "author": "joedeshon",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/joedeshon/sounds/117415/"
+ },
+ "door_open": {
+  "title": "Door, Front, Opening",
+  "author": "InspectorJ",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/InspectorJ/sounds/431117/"
+ },
+ "elevator_hum": {
+  "title": "hotel elevator ride",
+  "author": "Filmscore",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/Filmscore/sounds/825478/"
+ },
+ "escalator_hum": {
+  "title": "escalator",
+  "author": "roachpowder",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/roachpowder/sounds/170231/"
+ },
+ "extra_life": {
+  "title": "Inquisitive Vibraphone 09",
+  "author": "nomiqbomi",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/nomiqbomi/sounds/578401/"
+ },
+ "game_over": {
+  "title": "Hard Boiled (фрагмент)",
+  "author": "Kevin MacLeod (incompetech.com)",
+  "licence": "CC-BY 4.0",
+  "url": "https://incompetech.com/music/royalty-free/licenses/"
+ },
+ "game_over_theme": {
+  "title": "Just As Soon",
+  "author": "Kevin MacLeod (incompetech.com)",
+  "licence": "CC-BY 4.0",
+  "url": "https://incompetech.com/music/royalty-free/licenses/"
+ },
+ "kick": {
+  "title": "punch",
+  "author": "thefsoundman",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/thefsoundman/sounds/118513/"
+ },
+ "lamp_break": {
+  "title": "glass break small",
+  "author": "Natty23",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/Natty23/sounds/322602/"
+ },
+ "lamp_crash": {
+  "title": "lamp dropped (condenser)",
+  "author": "youandbiscuitme",
+  "licence": "CC-BY 3.0",
+  "url": "https://freesound.org/people/youandbiscuitme/sounds/258242/"
+ },
+ "menu_theme": {
+  "title": "Cool Vibes",
+  "author": "Kevin MacLeod (incompetech.com)",
+  "licence": "CC-BY 4.0",
+  "url": "https://incompetech.com/music/royalty-free/licenses/"
+ },
+ "neon_buzz": {
+  "title": "bulb buzz loop",
+  "author": "Nox_Sound",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/Nox_Sound/sounds/553075/"
+ },
+ "otto_death": {
+  "title": "male death",
+  "author": "Blankened",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/Blankened/sounds/554443/"
+ },
+ "rain": {
+  "title": "steady rain in the city",
+  "author": "roofusj",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/roofusj/sounds/217236/"
+ },
+ "rain_window": {
+  "title": "Rain on Windows, Interior",
+  "author": "InspectorJ",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/InspectorJ/sounds/346642/"
+ },
+ "room_tone": {
+  "title": "hotel corridor",
+  "author": "addiofbaddi",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/addiofbaddi/sounds/241659/"
+ },
+ "shaft_hum": {
+  "title": "low hum control room",
+  "author": "gchase",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/gchase/sounds/144046/"
+ },
+ "shot": {
+  "title": "9mm pistol shot",
+  "author": "michorvath",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/michorvath/sounds/427592/"
+ },
+ "step_carpet": {
+  "title": "footstep-carpet.wav",
+  "author": "swuing",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/swuing/sounds/38872/"
+ },
+ "step_concrete": {
+  "title": "Impact Sounds: footstep_concrete_000",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/impact-sounds"
+ },
+ "step_concrete.2": {
+  "title": "Impact Sounds: footstep_concrete_001",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/impact-sounds"
+ },
+ "step_concrete.3": {
+  "title": "Impact Sounds: footstep_concrete_002",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/impact-sounds"
+ },
+ "step_concrete.4": {
+  "title": "Impact Sounds: footstep_concrete_003",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/impact-sounds"
+ },
+ "step_concrete.5": {
+  "title": "Impact Sounds: footstep_concrete_004",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/impact-sounds"
+ },
+ "theme": {
+  "title": "Spy Glass",
+  "author": "Kevin MacLeod (incompetech.com)",
+  "licence": "CC-BY 4.0",
+  "url": "https://incompetech.com/music/royalty-free/licenses/"
+ },
+ "theme.2": {
+  "title": "Hard Boiled",
+  "author": "Kevin MacLeod (incompetech.com)",
+  "licence": "CC-BY 4.0",
+  "url": "https://incompetech.com/music/royalty-free/licenses/"
+ },
+ "theme.3": {
+  "title": "Covert Affair",
+  "author": "Kevin MacLeod (incompetech.com)",
+  "licence": "CC-BY 4.0",
+  "url": "https://incompetech.com/music/royalty-free/licenses/"
+ },
+ "theme.4": {
+  "title": "Dances and Dames",
+  "author": "Kevin MacLeod (incompetech.com)",
+  "licence": "CC-BY 4.0",
+  "url": "https://incompetech.com/music/royalty-free/licenses/"
+ },
+ "thunder_far": {
+  "title": "distant dry thunderclap",
+  "author": "Shuhmi",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/Shuhmi/sounds/855569/"
+ },
+ "thunder_near": {
+  "title": "close-up thunder strike",
+  "author": "loganzsound",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/loganzsound/sounds/840628/"
+ },
+ "ui_back": {
+  "title": "UI Audio: mouserelease1",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/ui-audio"
+ },
+ "ui_move": {
+  "title": "UI Audio: click1",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/ui-audio"
+ },
+ "ui_select": {
+  "title": "Interface Sounds: confirmation_001",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/interface-sounds"
+ },
+ "wind": {
+  "title": "rushing air, distant skyline",
+  "author": "kyles",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/kyles/sounds/454072/"
+ }
+}

@@ -29,6 +29,8 @@ override.cfg
 .venv/
 venv/
 __pycache__/
+# Скачанные исходники звука (tools/build_audio.py)
+/.cache/
 *.py[cod]
 
 # --- IDE ---

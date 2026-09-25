@@ -2,13 +2,13 @@
 
 importer="wav"
 type="AudioStreamWAV"
-uid="uid://byqjyiy7vygbv"
-path="res://.godot/imported/step.wav-7c1afa4d3561f9fd67ecf320728c68cf.sample"
+uid="uid://pepkk6n4eerw"
+path="res://.godot/imported/otto_death.wav-5b7b8549216b08e02352325c88c40436.sample"
 
 [deps]
 
-source_file="res://assets/audio/step.wav"
-dest_files=["res://.godot/imported/step.wav-7c1afa4d3561f9fd67ecf320728c68cf.sample"]
+source_file="res://assets/audio/otto_death.wav"
+dest_files=["res://.godot/imported/otto_death.wav-5b7b8549216b08e02352325c88c40436.sample"]
 
 [params]
 

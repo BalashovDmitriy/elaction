@@ -212,6 +212,7 @@ func _admit(visitor: Otto) -> void:
 	_cycle.travel_time = open_time
 	_cycle.open()
 	Sounds.play(Sounds.DOOR_OPEN)
+	Sounds.muffle_music(Sounds.MUFFLE_DOOR, true)
 
 	if not has_document:
 		return
@@ -228,6 +229,7 @@ func _release() -> void:
 	_visit.release()
 	_cycle.close()
 	Sounds.play(Sounds.DOOR_CLOSE)
+	Sounds.muffle_music(Sounds.MUFFLE_DOOR, false)
 
 
 ## Ведёт створку по ходу [DoorCycle].
