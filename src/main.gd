@@ -18,6 +18,9 @@ const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 ## Скрипт автолоада съёмки: имя автолоада при разборе одного файла не видно,
 ## а статический вопрос «идёт ли съёмка» задать надо.
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
+## Сколько бонус висит на кадре после того, как машина ушла, прежде чем кадр
+## уйдёт в чёрное, с. Бонус набегает, пока машина уезжает; здесь — дочитать.
+const BONUS_HOLD: float = 0.8
 
 var _level: GreyboxLevel = null
 ## Город за главным меню (ADR-0035). Живёт, пока открыто меню, а не партия.
@@ -33,6 +36,8 @@ var _held: Dictionary = {}
 ## до [method _process], и по одной текущей странице то же нажатие тут же снимало
 ## бы паузу (авторевью M22b).
 var _page_before: Menu.Page = Menu.Page.MAIN
+## Затемнение между зданиями (ADR-0038, решение 4).
+var _curtain: FadeCurtain = null
 
 @onready var _menu: Menu = $Menu
 @onready var _hud: Hud = $Hud
@@ -52,6 +57,8 @@ func _ready() -> void:
 	_settings.apply()
 	# Виньетка — под HUD и меню, над сценой (ADR-0030, решение 3).
 	add_child(Vignette.new())
+	_curtain = FadeCurtain.new()
+	add_child(_curtain)
 	_records = Records.load_from()
 
 	_menu.settings = _settings
@@ -102,6 +109,7 @@ func _just_pressed(action: StringName) -> bool:
 func _open_menu() -> void:
 	_playing = false
 	_unpause()
+	_drop_the_curtain()
 	# Партия останавливается, а не просто прячется: без этого таймер сирены
 	# продолжал бы идти под главным меню, куда вышли с паузы.
 	GameState.instance().stop_game()
@@ -116,6 +124,7 @@ func _open_menu() -> void:
 func _start_game() -> void:
 	_playing = true
 	_unpause()
+	_drop_the_curtain()
 	_drop_stage()
 	_menu.close()
 	_hud.visible = true
@@ -180,6 +189,7 @@ func _enter_building() -> void:
 	# не останавливала бы ничего — игра шла бы дальше с надписью «пауза».
 	_level.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(_level)
+	_level.car_started.connect(_on_car_started)
 	_level.building_cleared.connect(_on_building_cleared)
 	# HUD берёт у здания имя, цвет вывески и этаж Otto (M22).
 	_hud.follow(_level)
@@ -232,11 +242,29 @@ func _drop_level() -> void:
 	_level = null
 
 
-func _on_building_cleared() -> void:
+## Otto сел в машину, она тронулась: бонус здания набегает поверх сцены.
+func _on_car_started() -> void:
 	Sounds.play(Sounds.BUILDING_BONUS)
+	_hud.count_bonus(Arcade.building_bonus(GameState.instance().building))
+
+
+## Машина ушла из кадра: бонус в счёт, затемнение, под ним — следующее здание.
+func _on_building_cleared() -> void:
 	GameState.instance().finish_building()
-	# Отложенно: сигнал приходит из зоны выхода, посреди разбора перекрытий.
-	_enter_building.call_deferred()
+	# Здание меняется под чёрным, из твина затемнения, — не из шага физики
+	# уходящего здания, в котором пришёл сигнал.
+	_curtain.cover(BONUS_HOLD, _next_building)
+
+
+func _next_building() -> void:
+	_hud.hide_bonus()
+	_enter_building()
+
+
+## Бросает смену здания на полпути: меню, новая партия, конец игры.
+func _drop_the_curtain() -> void:
+	_curtain.cancel()
+	_hud.hide_bonus()
 
 
 func _on_extra_life() -> void:
@@ -245,6 +273,7 @@ func _on_extra_life() -> void:
 
 func _on_game_over() -> void:
 	_playing = false
+	_drop_the_curtain()
 	# Джингл приглушает трек на время звучания, и трек конца партии входит
 	# из-под него (ADR-0036, решение 6).
 	Sounds.play(Sounds.GAME_OVER)

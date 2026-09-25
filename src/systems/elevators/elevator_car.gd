@@ -276,6 +276,34 @@ func can_go(towards: float) -> bool:
 	return _leader.can_go(towards) if _leader != null else _motion.can_go(towards)
 
 
+## Запирает или открывает нижнюю остановку шахты ([member ElevatorMotion.bottom_locked]).
+##
+## У яруса пары своего хода нет — запирает ведущий: у двухэтажной пары его
+## нижняя остановка и есть та, где нижний ярус стоит на дне шахты.
+func lock_bottom_stop(locked: bool) -> void:
+	if _leader != null:
+		_leader.lock_bottom_stop(locked)
+		return
+	_motion.bottom_locked = locked
+
+
+## Заперта ли нижняя остановка шахты.
+func is_bottom_locked() -> bool:
+	return _leader.is_bottom_locked() if _leader != null else _motion.bottom_locked
+
+
+## Докуда пара спускается, в плоскости правил: пол нижнего яруса на нижней
+## остановке ведущего. У одиночной кабины — просто её нижняя остановка; NAN —
+## остановок нет.
+func bottom_reach() -> float:
+	if _leader != null:
+		return _leader.bottom_reach()
+	if _motion.floors.is_empty():
+		return NAN
+	var lowest := _motion.floors[_motion.floors.size() - 1]
+	return lowest + (_deck._deck_drop if _deck != null else 0.0)
+
+
 ## Задержка отклика на команду, с. По тревоге кабина слушается хуже.
 ##
 ## У яруса пары своего хода нет, и задержку принимает ведущий: в списке кабин

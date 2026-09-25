@@ -14,7 +14,27 @@ extends Node3D
 ## из кадра. [CarModel] приводит к ней любую машину жребия (ADR-0032, решение 7).
 const LENGTH: float = CarModel.LENGTH
 const GAP: float = 0.36
+## Отъезд: трогается с места и разгоняется до [constant SPEED], м/с и м/с².
+## С места, а не сразу на полном ходу: машина уезжает, а не исчезает.
 const SPEED: float = 9.6
+const START_SPEED: float = 1.2
+const ACCELERATION: float = 7.2
+## Водительская дверь — на столько от середины машины к капоту, м: над передним
+## сиденьем. У неё Otto садится в машину (ADR-0038, решение 4).
+const DOOR_OFFSET: float = LENGTH * 0.08
+## Как машина качнулась, приняв водителя: наклон, рад, и сколько длится, с.
+const ROCK_ANGLE: float = 0.025
+const ROCK_TIME: float = 0.5
+## Фары и стоп-сигналы: насколько светятся заглушённые и заведённые.
+const LIGHTS_OFF: float = 0.15
+const LIGHTS_ON: float = 5.0
+## Высота фар от земли, м, и их луч: дальность, м, и угол, градусы.
+const BEAM_HEIGHT: float = 0.5
+const BEAM_RANGE: float = 9.0
+const BEAM_ANGLE: float = 28.0
+const BEAM_ENERGY: float = 4.0
+## Докуда слышно машину, м: дверцу, стартер и отъезд — они звучат у машины.
+const SOUND_REACH: float = 24.0
 ## Машина стоит снаружи здания: за плоскостью игры, но перед стеной, чтобы
 ## Otto проходил перед ней, а не сквозь.
 const Z: float = -0.6
@@ -23,6 +43,15 @@ const Z: float = -0.6
 var towards: float = 1.0
 
 var _leaving: bool = false
+## Скорость отъезда прямо сейчас, м/с.
+var _speed: float = 0.0
+## Сколько ещё качается машина, принявшая водителя, с.
+var _rocking: float = 0.0
+## Свои копии материалов фар и стоп-сигналов: общие из кэша [GreyboxLook] у
+## машин всех зданий одни, и заведённая машина зажгла бы фары и следующей.
+var _lamps: Array[StandardMaterial3D] = []
+var _lamp_glow: Array[float] = []
+var _beam: SpotLight3D = null
 var _wheels: Array[Node3D] = []
 ## Середина каждого колеса в его собственных координатах: вокруг неё оно и
 ## крутится. Начало узла колеса у пака не на оси, а в нуле машины, и поворот
@@ -137,10 +166,72 @@ static func spot(exit_x: float, rules: BuildingRules, plan: BuildingPlan) -> flo
 	return exit_x
 
 
-## Otto сел в машину: она трогается.
+## Где водительская дверь, по горизонтали в плоскости правил: там Otto садится.
+func door_x() -> float:
+	return position.x + towards * DOOR_OFFSET
+
+
+## Otto сел: машина качнулась под ним и хлопнула дверцей.
+func take_the_driver() -> void:
+	_rocking = ROCK_TIME
+	_say(Sounds.CAR_DOOR)
+
+
+## Стартер заводит мотор, и загораются фары.
+func start_engine() -> void:
+	set_lights(true)
+	_say(Sounds.CAR_START)
+
+
+## Горят ли фары: заглушённая машина стоит с тёмными, заведённая зажигает их и
+## светит лучом вперёд. Луч — один источник без тени, и только на отъезде.
+func set_lights(on: bool) -> void:
+	if _lamps.is_empty():
+		_own_the_lamps()
+	for index in _lamps.size():
+		var glow := LIGHTS_ON if on else LIGHTS_OFF
+		_lamps[index].emission_energy_multiplier = _lamp_glow[index] * glow
+	if on and _beam == null:
+		_beam = SpotLight3D.new()
+		_beam.name = "Beam"
+		_beam.light_color = CarModel.HEADLIGHT
+		_beam.light_energy = BEAM_ENERGY
+		_beam.spot_range = BEAM_RANGE
+		_beam.spot_angle = BEAM_ANGLE
+		_beam.shadow_enabled = false
+		# Луч вдоль капота: прожектор светит по своей -Z, капот смотрит в towards.
+		_beam.position = Vector3(towards * LENGTH * 0.5, BEAM_HEIGHT, 0.0)
+		_beam.rotation.y = PI * 0.5 if towards < 0.0 else -PI * 0.5
+		add_child(_beam)
+	if _beam != null:
+		_beam.visible = on
+
+
+## Горят ли фары прямо сейчас.
+func lights_on() -> bool:
+	return _beam != null and _beam.visible
+
+
+## Машина тронулась, увозя Otto: мотор, фары и разгон с места.
 func drive_away() -> void:
 	_leaving = true
-	Sounds.play(Sounds.CAR_AWAY)
+	_speed = START_SPEED
+	set_lights(true)
+	_say(Sounds.CAR_AWAY)
+
+
+## Едет ли машина.
+func is_leaving() -> bool:
+	return _leaving
+
+
+## Качает машину, принявшую водителя: затухающий наклон вдоль кузова.
+func settle(delta: float) -> void:
+	if _rocking <= 0.0:
+		return
+	_rocking = maxf(_rocking - delta, 0.0)
+	var left := _rocking / ROCK_TIME
+	rotation.z = sin((1.0 - left) * TAU * 2.0) * ROCK_ANGLE * left
 
 
 ## Везёт машину. Возвращает true в тот кадр, когда она уехала из кадра
@@ -150,12 +241,13 @@ func drive_away() -> void:
 func advance(delta: float, view: Rect2) -> bool:
 	if not _leaving:
 		return false
-	position.x += towards * SPEED * delta
+	_speed = minf(_speed + ACCELERATION * delta, SPEED)
+	position.x += towards * _speed * delta
 	# Колёса катятся вокруг своих осей: угол — путь, делённый на радиус. Капот
 	# в +X, и колесо, катящееся вперёд, идёт по часовой, если смотреть с +Z, —
 	# это минус вокруг +Z. Модель, развёрнутая назад, катит их в своей системе
 	# вперёд, поэтому знак один.
-	var spin := Basis(Vector3.BACK, -SPEED * delta / _wheel_radius)
+	var spin := Basis(Vector3.BACK, -_speed * delta / _wheel_radius)
 	for index in _wheels.size():
 		var hub := _hubs[index]
 		_wheels[index].transform *= Transform3D(spin, hub - spin * hub)
@@ -164,3 +256,27 @@ func advance(delta: float, view: Rect2) -> bool:
 		_leaving = false
 		return true
 	return false
+
+
+## Звук на месте машины: позиционный источник, который уезжает вместе с ней.
+func _say(sound: String) -> void:
+	var player := Sounds.source(self, sound, SOUND_REACH)
+	player.finished.connect(player.queue_free)
+	player.play()
+
+
+## Заводит свои копии материалов фар и стоп-сигналов вместо общих из кэша.
+func _own_the_lamps() -> void:
+	var shared: Array[StandardMaterial3D] = [
+		GreyboxLook.light(CarModel.HEADLIGHT), GreyboxLook.light(CarModel.TAILLIGHT)
+	]
+	for node in find_children("*", "MeshInstance3D", true, false):
+		var mesh := node as MeshInstance3D
+		for surface in mesh.get_surface_override_material_count():
+			var material := mesh.get_surface_override_material(surface) as StandardMaterial3D
+			if material == null or not shared.has(material):
+				continue
+			var own := material.duplicate() as StandardMaterial3D
+			mesh.set_surface_override_material(surface, own)
+			_lamps.append(own)
+			_lamp_glow.append(material.emission_energy_multiplier)
