@@ -16,6 +16,9 @@ extends Node3D
 ## Запуск:
 ##     godot --path . res://tools/light_bench.tscn
 ##     godot --path . res://tools/light_bench.tscn -- --whole
+##     godot --path . res://tools/light_bench.tscn -- --whole --seed=2
+##
+## Сид по умолчанию — 1, туман. Дождь (M24a) меряется на сиде 2.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
@@ -41,6 +44,9 @@ func _ready() -> void:
 		return
 	level.rules = BuildingRules.new()
 	level.building_seed = 1
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with("--seed="):
+			level.building_seed = argument.trim_prefix("--seed=").to_int()
 	add_child(level)
 
 	# Не крыша, а широкий этаж: три лампы, двери с табло и агенты у них —
@@ -59,6 +65,12 @@ func _ready() -> void:
 func _run_whole(level: GreyboxLevel) -> void:
 	var viewport := get_viewport().get_viewport_rid()
 	RenderingServer.viewport_set_measure_render_time(viewport, true)
+	# Город рисуется своим видом (ADR-0029): его кадр меряется отдельно и
+	# прибавляется — в замере корневого окна его нет (M24a).
+	var city := level.get_node_or_null("Scenery/City/CityView") as SubViewport
+	var city_rid := city.get_viewport_rid() if city != null else RID()
+	if city_rid.is_valid():
+		RenderingServer.viewport_set_measure_render_time(city_rid, true)
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	Engine.max_fps = 0
 	level.spawn_agents = false
@@ -73,6 +85,9 @@ func _run_whole(level: GreyboxLevel) -> void:
 		var samples := 0
 		var worst := 0.0
 		var worst_floor := 0
+		# Крыша — отдельной строкой: на ней город, погода и дождь (M24a), и в
+		# среднем по тридцати этажам она тонет.
+		var roof := 0.0
 		for index in range(BuildingRules.ROOF, rules.floors):
 			level.otto.global_position = WorldSpace.to_scene(
 				Vector2(level.plan().safe_x(rules, index), rules.floor_surface(index))
@@ -82,8 +97,15 @@ func _run_whole(level: GreyboxLevel) -> void:
 			for _frame in FLOOR_FRAMES:
 				await get_tree().process_frame
 				var spent := RenderingServer.viewport_get_measured_render_time_gpu(viewport)
+				if (
+					city_rid.is_valid()
+					and city.render_target_update_mode != SubViewport.UPDATE_DISABLED
+				):
+					spent += RenderingServer.viewport_get_measured_render_time_gpu(city_rid)
 				total += spent
 				samples += 1
+				if index == BuildingRules.ROOF:
+					roof += spent / float(FLOOR_FRAMES)
 				if spent > worst:
 					worst = spent
 					worst_floor = index
@@ -91,8 +113,18 @@ func _run_whole(level: GreyboxLevel) -> void:
 		failed = failed or worst > BUDGET_MS
 		print(
 			(
-				"  уровень %d: GPU %.2f мс в среднем, худший %.2f на этаже %s, бюджет %.1f"
-				% [quality, mean, worst, str(FloorSigns.number_of(rules, worst_floor)), BUDGET_MS]
+				(
+					"  уровень %d: GPU %.2f мс в среднем, худший %.2f на этаже %s, крыша %.2f,"
+					+ " бюджет %.1f"
+				)
+				% [
+					quality,
+					mean,
+					worst,
+					str(FloorSigns.number_of(rules, worst_floor)),
+					roof,
+					BUDGET_MS,
+				]
 			)
 		)
 	get_tree().quit(1 if failed else 0)

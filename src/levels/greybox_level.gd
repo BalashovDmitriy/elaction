@@ -195,6 +195,7 @@ func _ready() -> void:
 	scenery.name = "Scenery"
 	add_child(scenery)
 	scenery.build(rules, _plan, building_seed, identity)
+	scenery.catch_rain([_shell, _shafts, _ribs] as Array[Node])
 
 	# Otto начинает с крыши, как в оригинале, и там, где нет проёмов. Крыша —
 	# свой уровень над зданием, а не нулевой этаж: ADR-0014, пункт 1.
