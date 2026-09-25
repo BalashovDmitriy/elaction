@@ -82,12 +82,6 @@ const THUNDER_FAR := "thunder_far"
 const SHAFT_HUM := "shaft_hum"
 const NEON_BUZZ := "neon_buzz"
 
-## Гул вертолёта вступления — позиционной петлёй на самом вертолёте
-## (ADR-0038, решение 1). Звук подбирается: файла ещё нет, и в [constant EFFECTS]
-## имя встанет вместе с файлом — тест требует файл у каждого имени списка. Петлёй
-## оно помечено уже сейчас, а [Helicopter] молчит, пока файла нет.
-const HELICOPTER := "helicopter"
-
 const EFFECTS: PackedStringArray = [
 	STEP_CARPET,
 	STEP_CONCRETE,
@@ -142,7 +136,6 @@ const LOOPED: PackedStringArray = [
 	ROOM_TONE,
 	SHAFT_HUM,
 	NEON_BUZZ,
-	HELICOPTER,
 ]
 
 ## Больше стольких вариантов одного имени не бывает: дальше тест не ищет.

@@ -135,9 +135,22 @@ const CABIN_COLOR := Color(1.0, 0.78, 0.5)
 const CABIN_ENERGY: float = 1.6
 const CABIN_RANGE: float = 3.4
 
-## Гул слышен на столько метров. Файла звука пока нет — звук подбирается, и
-## вертолёт молчит, пока его нет ([method _start_engine]).
-const ENGINE_REACH: float = 45.0
+## Звук: петля висения звучит всю сценку, громче всего в висении и тише на
+## ходу; пролёт — второй слой, он слышен на ходу и молкнет в висении. Оба на
+## самом вертолёте — позиционно, слышно на [constant ENGINE_REACH] метров.
+const ENGINE_REACH: float = 50.0
+## Громкость петли висения на месте и на полном ходу, дБ; тон на полном ходу.
+const HOVER_DB: float = 0.0
+const HOVER_DB_MOVING: float = -7.0
+const HOVER_PITCH_MOVING: float = 1.06
+## С какой скорости пролёт звучит в полную силу, м/с, и его громкость, дБ.
+const PASS_FULL_SPEED: float = 9.0
+const PASS_DB: float = -2.0
+## Ниже этого слой считается замолкшим, дБ.
+const SILENT_DB: float = -60.0
+## Как быстро громкость идёт за скоростью, 1/с: без сглаживания рывок
+## торможения был бы слышен щелчком.
+const VOLUME_EASE: float = 4.0
 
 var _phase: Phase = Phase.ARRIVING
 var _time: float = 0.0
@@ -162,6 +175,10 @@ var _strobe: Node3D = null
 var _search: SpotLight3D = null
 var _cabin: OmniLight3D = null
 var _engine: AudioStreamPlayer3D = null
+var _pass: AudioStreamPlayer3D = null
+var _rope_voice: AudioStreamPlayer3D = null
+## Доля хода для громкости слоёв, 0 — висит, 1 — полный ход; сглаженная.
+var _motion: float = 1.0
 ## Габарит корпуса со стрелой лебёдки и габарит диска винта в координатах узла,
 ## при нулевом наклоне; и они же со всеми наклонами до [constant TILT_MAX].
 var _hull_local := AABB()
@@ -308,6 +325,7 @@ func _physics_process(delta: float) -> void:
 	_lean(acceleration, delta)
 	_wind_rope(delta)
 	_blink()
+	_mix_engine(delta)
 
 
 func _process(delta: float) -> void:
@@ -385,13 +403,42 @@ func _blink() -> void:
 	_strobe.visible = strobe < FLASH or (strobe > FLASH * 2.5 and strobe < FLASH * 3.5)
 
 
-## Гул мотора — позиционной петлёй, если звук уже есть. Нет — вертолёт молчит:
-## звук подбирается, и имя [constant Sounds.HELICOPTER] ждёт свой файл.
+## Звук скольжения Otto по тросу — на крюке, откуда трос идёт. [param on] —
+## начать; false — оборвать, если Otto уже внизу или сценку пропустили.
+func rope_slide(on: bool) -> void:
+	if _rope_voice == null:
+		return
+	if on:
+		_rope_voice.global_position = hook()
+		_rope_voice.play()
+	else:
+		_rope_voice.stop()
+
+
+## Заводит петлю висения и слой пролёта: оба звучат с прилёта до ухода, а
+## громкость между ними делит [method _mix_engine].
 func _start_engine() -> void:
-	if _engine != null or Sounds.variant_paths(Sounds.HELICOPTER).is_empty():
+	if _engine != null:
 		return
 	_engine = Sounds.source(self, Sounds.HELICOPTER, ENGINE_REACH)
+	_engine.volume_db = HOVER_DB_MOVING
 	_engine.play()
+	_pass = Sounds.source(self, Sounds.HELICOPTER_PASS, ENGINE_REACH)
+	_pass.volume_db = PASS_DB
+	_pass.play()
+	_rope_voice = Sounds.source(self, Sounds.ROPE_SLIDE, ENGINE_REACH)
+	_rope_voice.top_level = true
+
+
+## Громкость по ходу: чем быстрее летит, тем тише висение и громче пролёт.
+func _mix_engine(delta: float) -> void:
+	if _engine == null:
+		return
+	var wanted := clampf(absf(_velocity.x) / PASS_FULL_SPEED, 0.0, 1.0)
+	_motion = lerpf(_motion, wanted, 1.0 - exp(-VOLUME_EASE * delta))
+	_engine.volume_db = lerpf(HOVER_DB, HOVER_DB_MOVING, _motion)
+	_engine.pitch_scale = lerpf(1.0, HOVER_PITCH_MOVING, _motion)
+	_pass.volume_db = maxf(PASS_DB + linear_to_db(maxf(_motion, 0.0001)), SILENT_DB)
 
 
 ## Собирает вид: корпус, винт отдельным мешем, лебёдку с тросом, огни и прожектор.

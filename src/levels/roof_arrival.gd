@@ -198,6 +198,7 @@ func advance(delta: float) -> void:
 			_wait -= delta
 			if _wait <= 0.0 and _helicopter.rope_is_down():
 				_step = Step.SLIDE
+				_helicopter.rope_slide(true)
 		Step.SLIDE:
 			_slide(delta)
 
@@ -234,10 +235,15 @@ func _let_go() -> void:
 
 
 func _release() -> void:
+	var sliding := _step == Step.SLIDE
 	_step = Step.DONE
 	_otto.visible = true
 	_otto.ride(false)
 	if is_instance_valid(_helicopter):
+		# Приехал — звук троса доигрывает сам, он короче спуска; сорвали
+		# посреди спуска — обрывается.
+		if not sliding or _otto.global_position.distance_to(_placed) > 0.01:
+			_helicopter.rope_slide(false)
 		_helicopter.leave(LINGER)
 
 

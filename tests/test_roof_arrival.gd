@@ -196,6 +196,43 @@ func test_the_flight_clears_everything_on_the_roof() -> void:
 		_drop(level)
 
 
+## Звук вертолёта: петля висения и слой пролёта звучат с прилёта; на подлёте
+## громче пролёт, в висении — петля висения; трос звучит, пока Otto едет.
+func test_the_helicopter_sounds_its_flight() -> void:
+	var level := _build(1)
+	await wait_physics_frames(SETTLE_FRAMES)
+	var voices := _voices(level.helicopter())
+	assert_true(voices.has(Sounds.HELICOPTER), "петля висения есть")
+	assert_true(voices.has(Sounds.HELICOPTER_PASS), "слой пролёта есть")
+	if not voices.has(Sounds.HELICOPTER) or not voices.has(Sounds.HELICOPTER_PASS):
+		_drop(level)
+		return
+	var hover := voices[Sounds.HELICOPTER] as AudioStreamPlayer3D
+	var flyby := voices[Sounds.HELICOPTER_PASS] as AudioStreamPlayer3D
+	var rope := voices[Sounds.ROPE_SLIDE] as AudioStreamPlayer3D
+	assert_true(hover.playing and flyby.playing, "оба слоя звучат с прилёта")
+	assert_gt(flyby.volume_db, hover.volume_db, "на подлёте громче пролёт")
+
+	var heard_rope := false
+	while level.is_in_the_intro():
+		heard_rope = heard_rope or rope.playing
+		await wait_physics_frames(1)
+	assert_true(heard_rope, "трос звучал, пока Otto ехал")
+	assert_gt(hover.volume_db, flyby.volume_db, "в висении громче петля висения")
+	_drop(level)
+
+
+## Звуки вертолёта по именам: поток каждого источника узнаётся по файлу.
+func _voices(helicopter: Helicopter) -> Dictionary:
+	var found := {}
+	for node: Node in helicopter.find_children("*", "AudioStreamPlayer3D", true, false):
+		var player := node as AudioStreamPlayer3D
+		for name: String in [Sounds.HELICOPTER, Sounds.HELICOPTER_PASS, Sounds.ROPE_SLIDE]:
+			if player.stream == Sounds.stream(name):
+				found[name] = player
+	return found
+
+
 ## Вступление — сценка, а не ожидание: от четырёх до шести секунд до управления.
 func test_the_intro_takes_four_to_six_seconds() -> void:
 	var level := _build(1)
