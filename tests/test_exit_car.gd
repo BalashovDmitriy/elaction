@@ -70,18 +70,19 @@ func test_the_exit_has_a_car() -> void:
 	var at := WorldSpace.to_plane(car.global_position)
 	assert_almost_eq(at.y, surface, TOLERANCE, "колёсами на полу")
 
-	# Место — ближайшее к выходу свободное (ADR-0031, решение 4); не ближе зазора.
+	# Место — у ворот в левом торце, капотом к ним (ADR-0038, решение 3).
 	var expected := ExitCar.spot(exit_x, level.rules, level.plan())
 	assert_almost_eq(at.x, expected, TOLERANCE, "машина стоит на своём месте")
-	var gap := BuildingShell.EXIT_WIDTH * 0.5 + ExitCar.GAP + ExitCar.LENGTH * 0.5
-	assert_gte(absf(at.x - exit_x) + TOLERANCE, gap, "машина не в проёме выхода")
+	var parked := ExitCar.parked_span(level.rules)
+	assert_almost_eq(at.x, (parked.x + parked.y) * 0.5, TOLERANCE, "машина у ворот")
+	assert_eq((car as ExitCar).towards, -1.0, "капотом к воротам")
 
-	# Выход теперь — водительская дверь: туда идёт бот и туда ведёт уровень
+	# Выход — водительская дверь: туда идёт бот и там Otto садится
 	# (ADR-0038, решение 4).
 	var door := level.exit_position()
 	assert_almost_eq(door.x, (car as ExitCar).door_x(), TOLERANCE, "выход — у двери машины")
 	assert_almost_eq(door.y + GreyboxLevel.EXIT_HEIGHT * 0.5, surface, TOLERANCE)
-	assert_lt(absf(door.x - at.x), ExitCar.LENGTH * 0.5, "дверь — в длине машины")
+	assert_between(door.x, parked.x, parked.y, "дверь — в длине машины")
 
 
 func test_the_building_is_cleared_only_after_the_car_leaves() -> void:
