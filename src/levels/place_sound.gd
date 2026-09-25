@@ -6,13 +6,13 @@ extends RefCounted
 ## Правила — отдельно от [GreyboxLevel]: уровень только спрашивает их каждый
 ## кадр, а проверить их можно без здания.
 
-## Докуда от проёма выхода слышна улица, м: у выхода фон в полную силу, как на
-## крыше.
+## Докуда от ворот паркинга слышна улица, м: у ворот фон в полную силу, как на
+## крыше. С M24b выход — ворота в торце нижнего этажа (ADR-0038, решение 3).
 const STREET_REACH: float = 6.0
 
 
 ## Слышна ли улица с уровня [param index] в точке [param x]: на крыше — везде,
-## на нижнем этаже — у проёма выхода [param exit_x].
+## на нижнем этаже — у ворот паркинга [param exit_x] ([method Garage.gate_x]).
 static func hears_street(rules: BuildingRules, index: int, x: float, exit_x: float) -> bool:
 	if index == BuildingRules.ROOF:
 		return true
