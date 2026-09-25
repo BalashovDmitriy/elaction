@@ -170,6 +170,32 @@ func test_the_document_is_counted_on_the_way_out() -> void:
 	assert_false(door.is_pending(), "вышел — дверь обычная")
 
 
+## Пока Otto внутри, закрытая красная створка светится сама — красной, — а табло
+## над ней дышит: в тени коридора она не сливается с темнотой (кадр M24b).
+func test_the_occupied_red_door_glows_and_its_sign_breathes() -> void:
+	var door := _bare_door(true)
+	var leaf := door.get_node("Leaf") as MeshInstance3D
+	var sign_board := door.get_node("Sign") as MeshInstance3D
+	var plain := leaf.material_override as StandardMaterial3D
+	assert_false(plain.emission_enabled, "пустая дверь не светится")
+	var otto := _guest_at(door)
+	assert_true(await _knock(otto), "дверь взяла Otto")
+	assert_true(await _wait_hidden(otto))
+	await _wait_game(0.4)
+	var glowing := leaf.material_override as StandardMaterial3D
+	assert_true(glowing.emission_enabled, "занятая створка светится")
+	assert_true(glowing.albedo_color.is_equal_approx(GreyboxLook.DOOR_RED), "и остаётся красной")
+	var first := (sign_board.material_override as StandardMaterial3D).emission_energy_multiplier
+	await _wait_game(Door.OCCUPIED_PULSE * 0.5)
+	var later := (sign_board.material_override as StandardMaterial3D).emission_energy_multiplier
+	assert_ne(first, later, "табло дышит")
+	await _wait_out(otto)
+	await _wait_game(0.1)
+	assert_false(
+		(leaf.material_override as StandardMaterial3D).emission_enabled, "вышел — не светится"
+	)
+
+
 func test_the_corridor_is_muffled_while_otto_is_inside() -> void:
 	var director := AudioDirector.instance()
 	if director == null:

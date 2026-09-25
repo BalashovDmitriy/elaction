@@ -507,7 +507,7 @@ func _spawn_car(exit_x: float, surface: float) -> void:
 	add_child(_car)
 	# Заглушённая машина стоит с тёмными фарами: зажигаются они на отъезде.
 	_car.set_lights(false)
-	_boarding = ExitBoarding.new(_car, surface, _garage)
+	_boarding = ExitBoarding.new(_car, surface, _garage, ExitBoarding.exit_frame(rules))
 	_exit_position = _boarding.door_point()
 
 

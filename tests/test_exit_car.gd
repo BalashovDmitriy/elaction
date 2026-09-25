@@ -17,9 +17,10 @@ const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const SETTLE_FRAMES: int = 5
 const PATIENCE: int = 480
 ## Сколько шагов физики ждать, пока Otto сядет и машина тронется: шаг к двери,
-## полсекунды посадки ([constant ExitBoarding.SEAT_TIME]) и две секунды стартера
-## ([constant ExitBoarding.START_TIME]) — 150 шагов, остальное запас.
-const BOARDING_PATIENCE: int = 240
+## посадка с дверцей ([constant ExitBoarding.GET_IN_TIME], 0.85 с), полсекунды
+## в машине ([constant ExitBoarding.SEAT_TIME]) и две секунды стартера
+## ([constant ExitBoarding.START_TIME]) — около 200 шагов, остальное запас.
+const BOARDING_PATIENCE: int = 300
 
 ## Допуск на положение машины, м: полсантиметра. Машина стоит колёсами ровно на
 ## полу и ровно в зазоре от проёма; широкий допуск пропускал бы и машину,
@@ -316,3 +317,62 @@ func test_the_body_takes_the_drawn_paint() -> void:
 			if override != null and override.albedo_color.is_equal_approx(CarModel.PAINTS[1]):
 				painted = true
 	assert_true(painted, "кузов в краске жребия")
+
+
+## Посадку видно (ADR-0038, решение 4): Otto поворачивается к машине, дверца
+## распахивается, он шагает в глубину к борту и скрывается, дверца захлопывается.
+## Раньше он пропадал перед кузовом, шагнув к двери.
+func test_otto_gets_in_through_the_open_driver_door() -> void:
+	var level := await _building()
+	var car := _car_of(level) as ExitCar
+	var boarding := level.get(&"_boarding") as ExitBoarding
+	assert_eq(car.door_openness(), 0.0, "у стоящей машины дверца закрыта")
+	var hinge := car.get_node("DoorHinge") as Node3D
+	assert_false(hinge.visible, "закрытую дверцу рисует сама модель")
+	_stand_at_the_door(level)
+	var widest := 0.0
+	var deepest := WorldSpace.PLAY_Z
+	var hidden_behind_door := false
+	for _frame: int in BOARDING_PATIENCE:
+		await get_tree().physics_frame
+		if boarding.phase == ExitBoarding.Phase.GETTING_IN:
+			widest = maxf(widest, car.door_openness())
+			if not level.otto.is_hidden():
+				deepest = minf(deepest, level.otto.global_position.z)
+			elif car.door_openness() > 0.0:
+				hidden_behind_door = true
+		if car.is_leaving():
+			break
+	assert_gt(widest, 0.95, "дверца распахнулась")
+	assert_lt(deepest, car.seat_z() + 0.05, "Otto шагнул в глубину к борту")
+	assert_true(hidden_behind_door, "скрылся, пока дверца ещё открыта")
+	assert_true(car.is_leaving(), "машина тронулась")
+	assert_eq(car.door_openness(), 0.0, "дверца захлопнулась")
+	assert_false(hinge.visible)
+
+
+## С посадки кадр раздвигается влево за торец: ворота, площадка и пандус в
+## кадре, а машина уходит из него, поднявшись по пандусу, а не в край кадра.
+func test_the_car_drives_up_the_ramp_in_the_widened_frame() -> void:
+	var level := await _building()
+	var car := _car_of(level) as ExitCar
+	var rules := level.rules
+	var gate := rules.floor_span(rules.floors - 1).x
+	var floor_y := car.position.y
+	var cleared := [false]
+	level.building_cleared.connect(func() -> void: cleared[0] = true)
+	var before := level.otto.camera_view(true)
+	assert_gte(before.position.x, 0.0, "до посадки кадр — в границах здания")
+	_stand_at_the_door(level)
+	assert_true(await _wait_for_the_start(level))
+	var view := level.otto.camera_view(true)
+	assert_lt(
+		view.position.x, gate - GarageGate.RAMP_APRON - GarageGate.RAMP_RUN * 0.5, "пандус в кадре"
+	)
+	assert_gt(view.end.x, car.position.x + ExitCar.LENGTH * 0.5, "и машина у ворот")
+	var waited := 0
+	while not cleared[0] and waited < PATIENCE:
+		await get_tree().physics_frame
+		waited += 1
+	assert_true(cleared[0], "машина ушла из кадра")
+	assert_gt(car.position.y, floor_y + rules.floor_height * 0.5, "уходит, поднявшись по пандусу")

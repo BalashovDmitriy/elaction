@@ -62,6 +62,18 @@ const KICK_PLATE := Vector2(1.08, 0.2)
 const FRAME_WIDTH: float = 0.08
 const FRAME_DEPTH: float = 0.05
 const SIGN_RISE: float = 0.2
+## Пока Otto за красной дверью, закрытая створка в тени коридора сливалась с
+## темнотой (кадр `door_02_inside_closed`). Теперь створка чуть светится сама —
+## красным, как была, — а табло над ней медленно дышит: раз в столько секунд,
+## от своей обычной яркости до этой доли сверху. Источников света не прибавляет.
+const OCCUPIED_PULSE: float = 1.6
+const OCCUPIED_GLOW: float = 1.8
+## Насколько занятая створка светится сама: доля её цвета. Маркер
+## ([method GreyboxLook.marker]) горел плоским розовым пятном ярче всех дверей.
+const OCCUPIED_LEAF_GLOW: float = 0.14
+
+## Краски занятой створки по тону: их две на все двери (створка и филёнки).
+static var _occupied_paints: Dictionary = {}
 
 ## Сколько Otto сидит внутри, с: 70 тиков ROM, считая от стука.
 @export var hide_time: float = Arcade.seconds(Arcade.ROOM_TICKS)
@@ -93,7 +105,12 @@ var _voice: AudioStreamPlayer3D = null
 ## трогать трансформ полсотни раз на ровном месте.
 var _shown: float = -1.0
 var _shown_red: bool = false
+var _shown_occupied: bool = false
 var _sign: MeshInstance3D = null
+## Своё табло на время, пока Otto внутри: общий материал огонька дышал бы у всех
+## красных дверей здания разом. И часы дыхания — по физике: на паузе оно стоит.
+var _pulse: StandardMaterial3D = null
+var _pulse_clock: float = 0.0
 ## Филёнки створки: их тон идёт за створкой — красной или обычной.
 var _panels: Array[MeshInstance3D] = []
 
@@ -133,6 +150,7 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	_cycle.tick(delta)
 	_refresh_look()
+	_breathe(delta)
 
 	if _stepping_out != null:
 		_see_out()
@@ -313,10 +331,16 @@ func _exit_tree() -> void:
 ## здания, а меняется положение только пока дверь ходит.
 func _refresh_look() -> void:
 	var along := _cycle.openness()
-	if is_equal_approx(along, _shown) and has_document == _shown_red:
+	var occupied := _occupied()
+	if (
+		is_equal_approx(along, _shown)
+		and has_document == _shown_red
+		and occupied == _shown_occupied
+	):
 		return
 	_shown = along
 	_shown_red = has_document
+	_shown_occupied = occupied
 	var angle := along * PI * 0.5
 	var half := LEAF_SIZE.x * 0.5
 	# Поворот вокруг Y на +угол уводит правый край створки в −Z, то есть
@@ -325,12 +349,47 @@ func _refresh_look() -> void:
 	_leaf.position.x = -half + cos(angle) * half
 	_leaf.position.z = WorldSpace.BACK_WALL_Z + LEAF_STANDOFF - sin(angle) * half
 	var tone := GreyboxLook.DOOR_RED if has_document else GreyboxLook.DOOR
-	_leaf.material_override = GreyboxLook.surface(tone)
-	var relief := GreyboxLook.surface(tone.darkened(0.14))
+	# Занятая створка светится сама, неярко: маркер, а не краска.
+	_leaf.material_override = _paint(tone, occupied)
+	var relief := _paint(tone.darkened(0.14), occupied)
 	for panel in _panels:
 		panel.material_override = relief
 	var glow := GreyboxLook.SIGN_RED if has_document else GreyboxLook.SIGN_WARM
 	_sign.material_override = GreyboxLook.light(glow)
+	_pulse_clock = 0.0
+
+
+## Краска створки: занятая светится сама, неярко, — красной остаётся и в тени.
+static func _paint(tone: Color, occupied: bool) -> StandardMaterial3D:
+	var plain := GreyboxLook.surface(tone)
+	if not occupied:
+		return plain
+	var found: Variant = _occupied_paints.get(tone)
+	if found != null:
+		return found as StandardMaterial3D
+	var glowing := plain.duplicate() as StandardMaterial3D
+	glowing.emission_enabled = true
+	glowing.emission = tone
+	glowing.emission_energy_multiplier = OCCUPIED_LEAF_GLOW
+	_occupied_paints[tone] = glowing
+	return glowing
+
+
+## Otto за этой дверью: вошёл и ещё не вышел.
+func _occupied() -> bool:
+	return _guest != null and _visit.is_hiding()
+
+
+## Табло над занятой дверью медленно дышит, пока Otto внутри.
+func _breathe(delta: float) -> void:
+	if not _shown_occupied:
+		return
+	if _pulse == null:
+		_pulse = GreyboxLook.light(GreyboxLook.SIGN_RED).duplicate() as StandardMaterial3D
+	_pulse_clock += delta
+	var phase := 0.5 - 0.5 * cos(_pulse_clock * TAU / OCCUPIED_PULSE)
+	_pulse.emission_energy_multiplier = GreyboxLook.LIGHT_GLOW * lerpf(1.0, OCCUPIED_GLOW, phase)
+	_sign.material_override = _pulse
 
 
 ## Детали створки: две филёнки, ручка с розеткой у свободного края и отбойная

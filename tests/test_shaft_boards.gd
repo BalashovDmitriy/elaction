@@ -102,6 +102,16 @@ func test_the_roof_is_not_a_floor_number() -> void:
 	assert_eq(BuildingShafts.floor_label(rules, 0), str(rules.floors))
 
 
+## Нижний этаж — паркинг: табло шахт пишет «P», как табличка этажа и колонны
+## паркинга, а этаж над ним остаётся вторым (ADR-0038, решение 3).
+func test_the_parking_is_p_on_the_boards() -> void:
+	var rules := BuildingRules.new()
+	var bottom := rules.floors - 1
+	assert_eq(BuildingShafts.floor_label(rules, bottom), "P")
+	assert_eq(BuildingShafts.floor_label(rules, bottom - 1), "2")
+	assert_eq(Garage.LEVEL_MARK, "P", "колонны паркинга — P-01, P-02…")
+
+
 ## Панель кнопок не встаёт на наличник двери соседнего места и на её табличку —
 ## на любом здании. Проёма выхода в задней стене с M24b нет: выход — ворота
 ## паркинга в торце ([GarageGate]).

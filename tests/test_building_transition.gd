@@ -1,8 +1,9 @@
 extends GutTest
 
 ## Смена здания после выхода (ADR-0038, решение 4): бонус набегает поверх
-## сцены, пока машина уезжает, потом кадр уходит в чёрное, под чёрным
-## собирается следующее здание, и кадр выходит из чёрного на нём.
+## сцены, пока машина уезжает, досчитывается и висит, потом кадр уходит в
+## чёрное, и только под чёрным бонус идёт в счёт, раунд — дальше и собирается
+## следующее здание; кадр выходит из чёрного на нём.
 
 const HUD_SCENE := preload("res://src/ui/hud.tscn")
 const MAIN_SCENE := preload("res://src/main.tscn")
@@ -80,22 +81,35 @@ func test_main_builds_the_next_building_under_the_curtain() -> void:
 	var curtain := main.get(&"_curtain") as FadeCurtain
 	assert_not_null(first)
 
+	var game := GameState.instance()
+	var bonus := Hud.format_score(Arcade.building_bonus(1))
 	first.car_started.emit()
 	assert_true(hud.bonus_shown(), "машина тронулась — бонус на кадре")
-	var score := GameState.instance().score
+	var score := game.score
 	first.building_cleared.emit()
-	assert_eq(GameState.instance().score, score + Arcade.building_bonus(1), "бонус здания — в счёт")
-	assert_eq(GameState.instance().building, 2, "следующее здание")
 	assert_same(main.get(&"_level"), first, "здание меняется не встык")
 
+	# Пока кадр не чёрный, партия прежняя: счёт без бонуса, раунд первый, здание
+	# старое. Бонус на плашке досчитывается раньше, чем кадр начал темнеть.
+	var counted_before_fade := false
+	var changed_before_black := false
 	var darkest := 0.0
 	var frames := 0
 	while main.get(&"_level") == first and frames < PATIENCE:
-		darkest = maxf(darkest, curtain.opacity())
+		var opacity := curtain.opacity()
+		darkest = maxf(darkest, opacity)
+		if opacity <= 0.0 and hud.bonus_text() == bonus:
+			counted_before_fade = true
+		if opacity < 0.999 and (game.score != score or game.building != 1):
+			changed_before_black = true
 		await get_tree().process_frame
 		frames += 1
+	assert_true(counted_before_fade, "бонус досчитан до затемнения")
+	assert_false(changed_before_black, "счёт и раунд не меняются, пока кадр не чёрный")
 	assert_ne(main.get(&"_level"), first, "следующее здание собрано")
 	assert_almost_eq(darkest, 1.0, 0.05, "под чёрным")
+	assert_eq(game.score, score + Arcade.building_bonus(1), "под чёрным бонус здания — в счёт")
+	assert_eq(game.building, 2, "и следующий раунд")
 	assert_false(hud.bonus_shown(), "бонус ушёл вместе со старым зданием")
 	frames = 0
 	while curtain.is_running() and frames < PATIENCE:

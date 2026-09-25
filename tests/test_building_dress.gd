@@ -254,13 +254,13 @@ func test_every_floor_wears_its_number() -> void:
 	assert_eq(signs.get_child_count(), rules.floors, "по табличке на этаж, у крыши нет")
 	var half := Proportions.FLOOR_SIGN * 0.5
 	for index in rules.floors:
-		var number := FloorSigns.number_of(rules, index)
-		var plate := signs.get_node("Floor%d" % number) as Node3D
-		assert_not_null(plate, "этаж %d без таблички" % number)
+		var number := FloorSigns.label_of(rules, index)
+		var plate := signs.get_node("Floor%s" % number) as Node3D
+		assert_not_null(plate, "этаж %s без таблички" % number)
 		if plate == null:
 			continue
 		var label := plate.get_child(1) as Label3D
-		assert_eq(label.text, str(number), "на табличке свой номер")
+		assert_eq(label.text, number, "на табличке свой номер")
 		var at := WorldSpace.to_plane(plate.position)
 		var span := rules.floor_span(index)
 		assert_lt(at.x + half.x, span.y - BuildingShell.WALL_WIDTH, "внутри стен")
@@ -276,8 +276,10 @@ func test_every_floor_wears_its_number() -> void:
 				assert_gt(
 					at.x - half.x,
 					shaft.x + rules.shaft_width * 0.5,
-					"этаж %d: табличка над шахтой" % number
+					"этаж %s: табличка над шахтой" % number
 				)
 	assert_eq(FloorSigns.number_of(rules, 0), rules.floors, "верхний этаж — старший номер")
-	assert_eq(FloorSigns.number_of(rules, rules.floors - 1), 1, "нижний — первый")
+	assert_eq(FloorSigns.number_of(rules, rules.floors - 2), 2, "над паркингом — второй")
+	assert_eq(FloorSigns.label_of(rules, rules.floors - 1), "P", "нижний — паркинг, «P»")
+	assert_eq(FloorSigns.label_of(rules, rules.floors - 2), "2", "остальные не сдвинулись")
 	_drop(level)

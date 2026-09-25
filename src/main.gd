@@ -18,8 +18,8 @@ const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 ## Скрипт автолоада съёмки: имя автолоада при разборе одного файла не видно,
 ## а статический вопрос «идёт ли съёмка» задать надо.
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
-## Сколько бонус висит на кадре после того, как машина ушла, прежде чем кадр
-## уйдёт в чёрное, с. Бонус набегает, пока машина уезжает; здесь — дочитать.
+## Сколько досчитанный бонус висит на кадре, прежде чем кадр уйдёт в чёрное, с:
+## дочитать число.
 const BONUS_HOLD: float = 0.8
 
 var _level: GreyboxLevel = null
@@ -248,16 +248,25 @@ func _on_car_started() -> void:
 	_hud.count_bonus(Arcade.building_bonus(GameState.instance().building))
 
 
-## Машина ушла из кадра: бонус в счёт, затемнение, под ним — следующее здание.
+## Машина ушла из кадра: бонус досчитывается на плашке, висит [constant
+## BONUS_HOLD], кадр уходит в чёрное, и только под чёрным бонус идёт в счёт,
+## раунд — дальше и собирается следующее здание.
+##
+## Раньше счёт и раунд менялись в тот же кадр, что уходила машина: старое здание
+## ещё на экране, а HUD уже пишет «РАУНД 2» и счёт с бонусом, пока плашка
+## бонуса только набегает.
 func _on_building_cleared() -> void:
-	GameState.instance().finish_building()
+	if not _hud.bonus_shown():
+		_on_car_started()
 	# Здание меняется под чёрным, из твина затемнения, — не из шага физики
 	# уходящего здания, в котором пришёл сигнал.
-	_curtain.cover(BONUS_HOLD, _next_building)
+	_curtain.cover(_hud.bonus_time_left() + BONUS_HOLD, _next_building)
 
 
+## Под чёрным: бонус в счёт, следующий раунд и его здание.
 func _next_building() -> void:
 	_hud.hide_bonus()
+	GameState.instance().finish_building()
 	_enter_building()
 
 
