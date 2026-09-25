@@ -11,9 +11,14 @@ extends GutTest
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
-## Сколько кадров дать зданию собраться и сколько ждать отъезда.
+## Сколько кадров дать зданию собраться и сколько ждать отъезда. Машина с M24b
+## трогается с места и разгоняется, а не уходит сразу на полном ходу: из кадра
+## она уезжает за полторы-две секунды, запас — вдвое.
 const SETTLE_FRAMES: int = 5
-const PATIENCE: int = 240
+const PATIENCE: int = 480
+## Сколько шагов физики ждать, пока Otto сядет и машина тронется: шаг к двери,
+## полсекунды посадки ([constant ExitBoarding.SEAT_TIME]) — остальное запас.
+const BOARDING_PATIENCE: int = 120
 
 ## Допуск на положение машины, м: полсантиметра. Машина стоит колёсами ровно на
 ## полу и ровно в зазоре от проёма; широкий допуск пропускал бы и машину,
@@ -29,12 +34,12 @@ func after_each() -> void:
 	GameState.instance().start_game()
 
 
-func _building() -> GreyboxLevel:
+func _building(documents: int = 0) -> GreyboxLevel:
 	var rules := BuildingRules.new()
 	rules.floors = 4
 	# Без красных дверей здание сдано сразу, как только Otto дошёл до выхода:
 	# документы здесь не проверяются, проверяется машина.
-	rules.documents_cap = 0
+	rules.documents_cap = documents
 
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
 	level.rules = rules
@@ -60,16 +65,23 @@ func test_the_exit_has_a_car() -> void:
 
 	# Числа берутся у здания, а не выписываются в тест. Машина стоит в сцене, а
 	# выход задан в плоскости правил — сравниваем в плоскости правил.
-	var exit_at := level.exit_position()
-	var surface := exit_at.y + GreyboxLevel.EXIT_HEIGHT * 0.5
+	var exit_x := level.plan().exit_x
+	var surface := level.rules.floor_surface(level.rules.floors - 1)
 	var at := WorldSpace.to_plane(car.global_position)
 	assert_almost_eq(at.y, surface, TOLERANCE, "колёсами на полу")
 
 	# Место — ближайшее к выходу свободное (ADR-0031, решение 4); не ближе зазора.
-	var expected := ExitCar.spot(exit_at.x, level.rules, level.plan())
+	var expected := ExitCar.spot(exit_x, level.rules, level.plan())
 	assert_almost_eq(at.x, expected, TOLERANCE, "машина стоит на своём месте")
 	var gap := BuildingShell.EXIT_WIDTH * 0.5 + ExitCar.GAP + ExitCar.LENGTH * 0.5
-	assert_gte(absf(at.x - exit_at.x) + TOLERANCE, gap, "машина не в проёме выхода")
+	assert_gte(absf(at.x - exit_x) + TOLERANCE, gap, "машина не в проёме выхода")
+
+	# Выход теперь — водительская дверь: туда идёт бот и туда ведёт уровень
+	# (ADR-0038, решение 4).
+	var door := level.exit_position()
+	assert_almost_eq(door.x, (car as ExitCar).door_x(), TOLERANCE, "выход — у двери машины")
+	assert_almost_eq(door.y + GreyboxLevel.EXIT_HEIGHT * 0.5, surface, TOLERANCE)
+	assert_lt(absf(door.x - at.x), ExitCar.LENGTH * 0.5, "дверь — в длине машины")
 
 
 func test_the_building_is_cleared_only_after_the_car_leaves() -> void:
@@ -83,12 +95,12 @@ func test_the_building_is_cleared_only_after_the_car_leaves() -> void:
 	level.building_cleared.connect(func() -> void: cleared[0] = true)
 
 	var parked_at := car.position.x
-	level.otto.global_position = WorldSpace.to_scene(level.exit_position())
-	# Ждём не выдержку, а состояние: зона выхода замечает тело на своём шаге
+	_stand_at_the_door(level)
+	# Ждём не выдержку, а состояние: посадку уровень замечает на своём шаге
 	# физики, и ждать «один кадр» здесь — та же ошибка, что водить съёмку
 	# секундомером (docs/testing.md).
 	var started := 0
-	while is_equal_approx(car.position.x, parked_at) and started < SETTLE_FRAMES * 6:
+	while is_equal_approx(car.position.x, parked_at) and started < BOARDING_PATIENCE:
 		await get_tree().physics_frame
 		started += 1
 
@@ -100,6 +112,103 @@ func test_the_building_is_cleared_only_after_the_car_leaves() -> void:
 		await get_tree().process_frame
 		waited += 1
 	assert_true(cleared[0], "здание сдано, когда машина уехала")
+
+
+## Ставит Otto на пол подвала у водительской двери.
+func _stand_at_the_door(level: GreyboxLevel) -> void:
+	var door := level.exit_position()
+	var feet := Vector2(door.x, door.y + GreyboxLevel.EXIT_HEIGHT * 0.5)
+	level.otto.global_position = WorldSpace.to_scene(feet)
+
+
+## Ждёт, пока машина тронется; true — тронулась.
+func _wait_for_the_start(level: GreyboxLevel) -> bool:
+	var car := _car_of(level) as ExitCar
+	for _frame: int in BOARDING_PATIENCE:
+		if car.is_leaving():
+			return true
+		await get_tree().physics_frame
+	return car.is_leaving()
+
+
+## Без всех документов у двери ничего не происходит: машина не ждёт, Otto свой.
+## Попасть в подвал без документов нельзя вовсе ([BasementLock]), но правило
+## выхода от этого не зависит — Otto здесь ставит тест.
+func test_the_car_does_not_take_otto_without_every_document() -> void:
+	var level := await _building(1)
+	assert_false(GameState.instance().all_documents_collected(), "документ ещё за дверью")
+	_stand_at_the_door(level)
+	for _frame: int in BOARDING_PATIENCE:
+		await get_tree().physics_frame
+	var car := _car_of(level) as ExitCar
+	assert_false(car.is_leaving(), "машина стоит")
+	assert_true(level.otto.is_on_foot(), "Otto свой — управление не забрали")
+	assert_false(level.otto.is_hidden())
+
+
+## Севший Otto заперт и недосягаем: ввода нет, тела нет, агентам его не видно.
+func test_the_seated_otto_is_locked_and_out_of_reach() -> void:
+	var level := await _building()
+	var started := [false]
+	level.car_started.connect(func() -> void: started[0] = true)
+	_stand_at_the_door(level)
+	assert_true(await _wait_for_the_start(level), "Otto сел, машина тронулась")
+	assert_true(started[0], "уровень сказал, что машина тронулась")
+
+	var otto := level.otto
+	assert_true(otto.is_hidden(), "Otto в машине: снаружи его нет")
+	assert_false(otto.is_on_foot(), "управление забрано")
+	assert_eq(otto.vertical_intent(), 0.0, "ввод не доходит")
+	# Формы тела выключаются отложенно — к отъезду машины они давно выключены.
+	var standing := otto.get_node("StandingShape") as CollisionShape3D
+	var crouching := otto.get_node("CrouchingShape") as CollisionShape3D
+	assert_true(standing.disabled and crouching.disabled, "пуле попасть не во что")
+	var door := level.exit_position()
+	assert_almost_eq(
+		WorldSpace.to_plane(otto.global_position).x, door.x, 0.01, "сел у водительской двери"
+	)
+
+
+## Машина уезжает в свою сторону и разгоняется, с зажжёнными фарами.
+func test_the_car_leaves_accelerating_with_its_lights_on() -> void:
+	var level := await _building()
+	var car := _car_of(level) as ExitCar
+	assert_false(car.lights_on(), "заглушённая машина стоит без фар")
+	_stand_at_the_door(level)
+	assert_true(await _wait_for_the_start(level))
+	assert_true(car.lights_on(), "фары горят")
+
+	var before := car.position.x
+	await get_tree().physics_frame
+	var first := (car.position.x - before) * car.towards
+	for _frame: int in 20:
+		await get_tree().physics_frame
+	before = car.position.x
+	await get_tree().physics_frame
+	var later := (car.position.x - before) * car.towards
+	assert_gt(first, 0.0, "едет туда, куда смотрит капот")
+	assert_gt(later, first, "разгоняется")
+
+
+## Ворота гаража открываются, когда Otto садится, — если гараж есть. Гараж
+## строит обстановка паркинга; уровень зовёт у него только [code]open_gate[/code].
+func test_the_garage_gate_opens_for_the_car() -> void:
+	var level := await _building()
+	var script := GDScript.new()
+	var source := PackedStringArray(
+		["extends Node", "var opened: int = 0", "func open_gate() -> void:", "\topened += 1", ""]
+	)
+	script.source_code = "\n".join(source)
+	script.reload()
+	var garage := Node.new()
+	garage.set_script(script)
+	garage.name = ExitBoarding.GARAGE
+	var host := Node3D.new()
+	level.add_child(host)
+	host.add_child(garage)
+	_stand_at_the_door(level)
+	assert_true(await _wait_for_the_start(level))
+	assert_eq(int(garage.get(&"opened")), 1, "ворота открылись один раз")
 
 
 ## Габарит машины по всем её мешам, в системе самой машины.

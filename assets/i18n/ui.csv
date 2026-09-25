@@ -16,6 +16,7 @@ UI_NEW_RECORD,New record!,Новый рекорд!
 UI_NO_RECORDS,No records yet,Рекордов пока нет
 UI_SCORE,Score,Очки
 UI_ROUND,Round,Раунд
+UI_BONUS,Bonus,Бонус
 UI_FLOOR,Floor,Этаж
 UI_ROOF,Roof,Крыша
 UI_ALARM,ALARM,ТРЕВОГА
