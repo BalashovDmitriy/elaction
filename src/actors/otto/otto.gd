@@ -10,7 +10,7 @@ extends CharacterBody3D
 ## возвращается туда после каждого шага физики (ADR-0021, решение 1). Ходить
 ## вглубь Otto не будет — глубина это свойство картинки, а не движения.
 
-## Otto погиб: пулей, падением в шахту или под кабиной.
+## Otto погиб: пулей, падением больше чем на этаж или под кабиной.
 signal died
 
 const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
@@ -31,6 +31,12 @@ const RESPAWN_GRACE: float = 1.5
 ## Как часто мигает неуязвимый Otto, раз в секунду. Мигание — единственное, чем
 ## передышка себя показывает: без него игрок не знает, что она вообще была.
 const GRACE_BLINKS: float = 8.0
+
+## Насколько Otto может сместиться между двумя своими кадрами физики, м, и это
+## ещё не перестановка. Сам он двигается только внутри своего кадра; между
+## кадрами его переносят — уровень, тест, инструмент съёмки, — и такой перенос
+## не падение: без этого поставленный этажом ниже разбивался бы на ровном месте.
+const TELEPORT_GAP: float = 0.5
 
 ## Ходьба и пуля — по ROM: 2 и 8 px за тик логики (ADR-0027, решение 4).
 @export var walk_speed: float = Arcade.speed(Arcade.WALK_PX)
@@ -55,6 +61,9 @@ const GRACE_BLINKS: float = 8.0
 
 ## Чем звучит шаг: пол ставит здание — ковёр отеля, камень конторы и крыши.
 var step_sound: String = Sounds.STEP_CONCRETE
+## Шаг этажа здания, м: упавший больше чем на этаж разбивается (ADR-0037,
+## решение 7). Ставит уровень из своих правил; по умолчанию — стандартный этаж.
+var floor_height: float = Proportions.FLOOR
 ## Идёт ли передышка после возвращения в игру: пуля в Otto попадает, но не
 ## ранит. По этому [Bullet] решает, брызгать ли кровью. Свойством, а не методом:
 ## пуля спрашивает его через [method Object.get], не зная класса Otto.
@@ -87,9 +96,15 @@ var _crushed: bool = false
 ## На каком кадре ходьбы уже прозвучал шаг.
 var _stepped_on: int = -1
 var _gun := Gun.new()
-## Верхняя точка текущего полёта: от неё считается глубина падения. В сцене Y
-## растёт вверх, поэтому верхняя точка — это наибольший Y, а не наименьший.
-var _apex_y: float = 0.0
+## Высота последней опоры: от неё считается глубина падения, м сцены.
+##
+## От опоры, а не от верхней точки полёта: свой прыжок ничего к падению не
+## прибавляет — спрыгнуть этажом ниже можно и с разбега, и с прыжка.
+var _support_y: float = 0.0
+## Стоял ли Otto на опоре в прошлом кадре: приземление — это переход.
+var _was_grounded: bool = true
+## Где Otto закончил прошлый кадр физики: по этому видно перестановку.
+var _last_position := Vector3.ZERO
 ## Сколько ещё держится передышка после возвращения в игру, с.
 var _grace: float = 0.0
 
@@ -122,13 +137,16 @@ func _ready() -> void:
 	var standing := _shape_size(_standing_shape)
 	var crouching := _shape_size(_crouching_shape)
 	_headroom = standing.y - crouching.y
-	_apex_y = global_position.y
+	_rest_here()
 	_camera.follow(self)
 	_repose()
 
 
 func _physics_process(delta: float) -> void:
 	_grace = maxf(_grace - delta, 0.0)
+	if global_position.distance_to(_last_position) > TELEPORT_GAP:
+		# Переставили — уровень, тест или съёмка: с новой точки и считаем.
+		_rest_here()
 	_snapshot.read_actions()
 	if _car != null:
 		# В кабине «вверх/вниз» ведут её, а присесть внутри нельзя.
@@ -144,7 +162,7 @@ func _physics_process(delta: float) -> void:
 	if state == OttoStateMachine.State.RIDE or state == OttoStateMachine.State.INDOORS:
 		velocity = Vector3.ZERO
 		# Его несут, а не роняют: падение с этой высоты не копится.
-		_apex_y = global_position.y
+		_rest_here()
 		_apply_pose(state)
 		_update_look(delta)
 		return
@@ -176,11 +194,12 @@ func _physics_process(delta: float) -> void:
 	if state == OttoStateMachine.State.JUMP or state == OttoStateMachine.State.FALL:
 		_kick_enemies()
 	_track_fall()
+	_last_position = global_position
 	_apply_pose(_states.state)
 	_update_look(delta)
 
 
-## Убивает Otto: пуля, падение на дно шахты, сдавливание кабиной.
+## Убивает Otto: пуля, падение больше чем на этаж, сдавливание кабиной.
 ##
 ## Во время передышки после возвращения в игру не делает ничего: неуязвимость
 ## общая на все причины, а не только на пули — воскреснуть под кабиной так же
@@ -225,15 +244,16 @@ func is_hidden() -> bool:
 
 
 ## Возвращает Otto в игру после смерти. Ставить его на место — дело уровня,
-## поэтому зовут это уже после переноса: верхняя точка полёта берётся отсюда.
+## поэтому зовут это уже после переноса: опора, от которой считается падение,
+## берётся отсюда.
 ##
-## Без сброса [member _apex_y] упавший в шахту возвращался бы с чужой глубиной
-## падения за спиной и разбивался бы на ровном месте.
+## Без сброса [member _support_y] упавший в шахту возвращался бы с чужой
+## глубиной падения за спиной и разбивался бы на ровном месте.
 func revive() -> void:
 	_crushed = false
 	_states.reset()
 	velocity = Vector3.ZERO
-	_apex_y = global_position.y
+	_rest_here()
 	_grace = RESPAWN_GRACE
 	# Камера приезжает к воскресшему сразу: иначе полсекунды сглаживания игрок
 	# смотрит туда, где его убили.
@@ -252,12 +272,12 @@ func vertical_intent() -> float:
 	return 0.0 if _states.is_world_driven() else _snapshot.vertical
 
 
-## Сколько Otto уже пролетел вниз от верхней точки полёта, м. На опоре — ноль.
+## На сколько Otto ниже своей последней опоры, м. На опоре — ноль.
 func fall_height() -> float:
-	return maxf(_apex_y - global_position.y, 0.0)
+	return maxf(_support_y - global_position.y, 0.0)
 
 
-## На сколько поднимает прыжок. Падение глубже — уже не свой прыжок.
+## На сколько поднимает прыжок, м.
 func jump_height() -> float:
 	return jump_speed * jump_speed / (2.0 * gravity)
 
@@ -418,10 +438,27 @@ func _can_stand_up() -> bool:
 	return not test_move(global_transform, Vector3(0.0, _headroom, 0.0))
 
 
-## Запоминает верхнюю точку полёта: на опоре она сбрасывается, в воздухе ползёт
-## вверх. Вверх — это рост Y: сцена считает не так, как правила.
+## Следит за падением: на опоре запоминает её высоту, а приземлившись, решает,
+## не разбился ли (ADR-0037, решение 7).
+##
+## Правило одно на пол, крышу кабины и дно шахты — всё это опора под ногами.
+## В кабине опора едет вместе с Otto: пол кабины под ним каждый кадр, и спуск
+## в ней падением не копится, даже если движок на кадр потеряет пол под ногами.
 func _track_fall() -> void:
-	_apex_y = global_position.y if is_on_floor() else maxf(_apex_y, global_position.y)
+	var grounded := is_on_floor()
+	if grounded and not _was_grounded:
+		if ShaftHazards.is_deadly_fall(fall_height(), floor_height):
+			kill()
+	_was_grounded = grounded
+	if grounded or _car != null:
+		_support_y = global_position.y
+
+
+## Считает опорой то место, где Otto сейчас: сюда его поставили или донесли.
+func _rest_here() -> void:
+	_support_y = global_position.y
+	_last_position = global_position
+	_was_grounded = true
 
 
 func _horizontal_speed(input: OttoInput, state: OttoStateMachine.State) -> float:

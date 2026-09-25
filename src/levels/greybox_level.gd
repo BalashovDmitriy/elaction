@@ -37,9 +37,6 @@ const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 const LAMP_SCENE := preload("res://src/systems/lighting/lamp.tscn")
 
-## Дно шахты: сюда падает тот, кто шагнул в пустой проём.
-const PIT_HEIGHT: float = 0.6
-
 ## На сколько ниже потолка висит середина лампы, м.
 ##
 ## Под потолком, как в оригинале: при просвете 3.0 м низ лампы на 2.52 —
@@ -202,6 +199,8 @@ func _ready() -> void:
 	var roof := BuildingRules.ROOF
 	var landing := Vector2(_plan.safe_x(rules, roof), rules.floor_surface(roof))
 	otto.global_position = WorldSpace.to_scene(landing - Vector2(0.0, ROPE_DROP))
+	# Разбивается упавший больше чем на этаж — этаж этого здания (ADR-0037).
+	otto.floor_height = rules.floor_height
 	_start_the_slide(landing)
 	otto.died.connect(_on_otto_died)
 	GameState.instance().alarm_raised.connect(_on_alarm_raised)
@@ -332,7 +331,6 @@ func _spawn_shafts() -> void:
 		_shafts.watch(car, shaft)
 		if shaft.double_deck:
 			_spawn_lower_deck(car, shaft)
-		_spawn_shaft_pit(shaft)
 		_shaft_hums.add(shaft, _shafts.top_of(shaft), rules.floor_surface(shaft.bottom))
 
 
@@ -417,18 +415,6 @@ func _spawn_lower_deck(leader: ElevatorCar, shaft: BuildingPlan.ShaftSpot) -> vo
 	# Ярус идёт в общий список наравне с ведущим: агент садится в тот, что стоит
 	# вровень с его этажом, и какой это из двух — не его дело.
 	_cars.append(deck)
-
-
-## Дно шахты: упавший сюда разбивается, вошедший ногами с этажа — нет.
-func _spawn_shaft_pit(shaft: BuildingPlan.ShaftSpot) -> void:
-	var surface := rules.floor_surface(shaft.bottom)
-	var pit := _zone(
-		Rect2(
-			shaft.x - rules.shaft_width * 0.5, surface - PIT_HEIGHT, rules.shaft_width, PIT_HEIGHT
-		)
-	)
-	pit.body_entered.connect(_on_pit_entered)
-	add_child(pit)
 
 
 func _spawn_escalators() -> void:
@@ -958,17 +944,6 @@ func _safest_x(index: int) -> float:
 			best_gap = gap
 			best = x
 	return best
-
-
-func _on_pit_entered(body: Node3D) -> void:
-	var victim := body as Otto
-	if victim == null:
-		return
-	var deadly := ShaftHazards.is_deadly_fall(
-		victim.is_grounded(), victim.is_riding(), victim.fall_height(), victim.jump_height()
-	)
-	if deadly:
-		victim.kill()
 
 
 ## Зона на месте прямоугольника правил, ловящая Otto. Толщиной в тело: она

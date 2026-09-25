@@ -42,6 +42,10 @@ const INNER_INSET: float = 0.12
 ## высоту кабина берёт из правил здания, а не из сцены.
 const SLAB_THICKNESS: float = 0.18
 
+## Насколько ступни могут отстоять от пола кабины, чтобы Otto считался стоящим
+## на нём, м: на прижим к полу у движка и на кадр хода кабины, и только на них.
+const BOARD_REACH: float = 0.08
+
 ## Просвет этажа и ширина шахты по умолчанию, м — те же, что у стандартных
 ## правил. Кабина строится по ним, пока уровень не сказал своё — так одиночная
 ## кабина, поднятая тестом без здания, всё равно собрана целиком.
@@ -93,7 +97,6 @@ var _detail: CarDetail = null
 
 
 func _ready() -> void:
-	_interior.body_entered.connect(_on_body_entered)
 	_interior.body_exited.connect(_on_body_exited)
 	_hum = Sounds.source(self, Sounds.ELEVATOR_HUM, HUM_REACH)
 	# Кабина — то, на чём стоят и в чём едут: читаться она обязана и на
@@ -185,6 +188,7 @@ static func _resize(shape: CollisionShape3D, box_width: float, box_height: float
 
 
 func _physics_process(delta: float) -> void:
+	_admit_riders()
 	if _leader != null:
 		_ride_along()
 		return
@@ -391,12 +395,40 @@ func _crush_those_underneath(speed: float) -> void:
 			victim.kill(true)
 
 
-func _on_body_entered(body: Node3D) -> void:
-	var rider := body as Otto
-	if rider == null:
+## Сажает Otto, если он в проёме и в кабину можно войти (ADR-0037, решение 1).
+##
+## Одного перекрытия мало: проём кабины высотой в просвет, и тело заходит в него
+## задолго до того, как кабина подъехала. Раньше этого хватало — и Otto
+## становился пассажиром кабины, стоящей на пару метров ниже этажа. Занятая
+## кабина без команды стоит, а невровень с этажом из неё не шагнуть: оба
+## застывали навсегда. А сверху занятость ещё и спасала от сдавливания того,
+## кто стоит под днищем.
+##
+## Поэтому пассажир — тот, кто вошёл в стоящую вровень кабину или уже стоит на
+## её полу. Перекрытие проверяется каждый кадр, пока кабина пуста: вход в зону
+## случается один раз, а войти можно и позже — когда кабина доедет.
+func _admit_riders() -> void:
+	if _occupant != null:
 		return
-	_occupant = rider
-	rider.board(self)
+	for body: Node3D in _interior.get_overlapping_bodies():
+		var rider := body as Otto
+		if rider == null or rider.is_dead() or not _can_board(rider):
+			continue
+		_occupant = rider
+		rider.board(self)
+		return
+
+
+## Можно ли Otto войти в кабину прямо сейчас: она вровень с этажом или он уже
+## стоит на её полу.
+##
+## Стоит на полу — значит ступни у верха днища в пределах [constant
+## BOARD_REACH]; тот, кто в проёме над опущенной кабиной, ещё падает на её
+## пол и сядет, когда встанет.
+func _can_board(rider: Otto) -> bool:
+	if is_aligned():
+		return true
+	return rider.is_grounded() and absf(to_local(rider.global_position).y) <= BOARD_REACH
 
 
 func _on_body_exited(body: Node3D) -> void:

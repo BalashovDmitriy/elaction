@@ -8,6 +8,7 @@ extends GutTest
 
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
+const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
 
 ## Сколько шагов физики ждать, пока кабина доедет вниз: пауза у этажа плюс
 ## перегон, с запасом.
@@ -63,3 +64,29 @@ func test_a_descending_car_crushes_the_agent_under_it() -> void:
 
 	assert_true(agent.is_dead(), "кабина раздавила агента под днищем")
 	assert_eq(GameState.instance().score - before, GameState.CRUSH_SCORE, "300 очков")
+
+
+## Кабина давит и Otto, который стоит под ней на полу, — он не пассажир.
+##
+## До M24a Otto становился пассажиром, едва голова заходила в проём опускающейся
+## кабины: занятость спасала его от сдавливания, а занятая кабина без команды
+## вставала между этажами — оба застывали навсегда (ADR-0037, решение 1).
+func test_a_descending_car_crushes_otto_under_it() -> void:
+	GameState.instance().start_game()
+	_floor_at(-Proportions.FLOOR)
+	var car := CAR_SCENE.instantiate() as ElevatorCar
+	add_child_autofree(car)
+	car.setup(PackedFloat32Array([0.0, Proportions.FLOOR]), 0)
+	var otto := OTTO_SCENE.instantiate() as Otto
+	add_child_autofree(otto)
+	otto.global_position = Vector3(0.0, -Proportions.FLOOR, WorldSpace.PLAY_Z)
+
+	var boarded := false
+	for _frame: int in RIDE_FRAMES:
+		await wait_physics_frames(1)
+		boarded = boarded or otto.is_riding()
+		if otto.is_dead() or boarded:
+			break
+
+	assert_false(boarded, "стоящий под кабиной — не пассажир")
+	assert_true(otto.is_dead(), "кабина раздавила Otto под днищем")
