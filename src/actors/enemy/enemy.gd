@@ -37,9 +37,6 @@ const SHOOT_POSE_TIME: float = 0.25
 @export var shot_height: float = Proportions.AGENT_SHOT
 @export var muzzle_offset: float = Proportions.MUZZLE
 
-## Сколько тело лежит, прежде чем исчезнуть, с.
-@export var corpse_time: float = 0.5
-
 ## Настройки решений, которые не зависят от здания: сколько агент выбирается из
 ## двери и какой разброс по высоте считается «на одной линии». Узел держит их у
 ## себя и отдаёт [EnemyBrain] — так же, как дверь отдаёт свои [DoorVisit].
@@ -49,13 +46,18 @@ const SHOOT_POSE_TIME: float = 0.25
 @export var emerge_time: float = 0.6
 @export var same_line: float = 0.45
 
+## Луч прицела: горит, пока агент замахивается. По нему от выстрела уходит
+## игрок — и бот тестов (ADR-0037, решение 5). Ставит сам агент.
+var laser: AimLaser = null
+
 ## Правила здания, из которого вышел агент. Пустых не бывает: без них он
 ## достаёт значения по умолчанию — те же, что у здания по умолчанию.
 var _rules: BuildingRules = null
 
 var _brain := EnemyBrain.new()
 var _target: Otto = null
-var _corpse_left: float = 0.0
+## Тело легло и больше не двигается: физика и поза уснули (ADR-0037, решение 6).
+var _at_rest: bool = false
 var _in_the_dark: bool = false
 ## Стоит ли Otto в темноте. От этого, а не от собственной тени агента, зависит,
 ## видит ли он Otto: из тени освещённого видно, освещённый в тень не видит.
@@ -109,19 +111,14 @@ func _ready() -> void:
 	# разъехавшись, они дали бы агента, который уклоняется не своим телом.
 	_brain.stand_height = (_shape.shape as BoxShape3D).size.y
 	_refresh_brain()
+	laser = AimLaser.make()
+	laser.mask = Bullet.FROM_ENEMY
+	add_child(laser)
 
 
 func _physics_process(delta: float) -> void:
 	if _brain.is_dead():
-		# Тело доезжает до пола. Сам агент не прыгает — ни в оригинале, ни у нас
-		# (ADR-0026), — но в воздухе бывает: кабина ушла из-под пассажира или
-		# вытолкнула его снизу, и убитый в этот миг не должен в нём зависать.
-		_apply_gravity(delta)
-		move_and_slide()
-		_hold_the_plane()
-		_walking = false
-		_rot(delta)
-		_update_look(delta)
+		_lie(delta)
 		return
 
 	var alive_target := _target != null and not _target.is_dead()
@@ -149,6 +146,7 @@ func _physics_process(delta: float) -> void:
 	_fit_shape()
 	if _brain.fired():
 		_fire()
+	_show_the_aim()
 
 	# Из проёма агент выходит шагом. EMERGING — это «выйти», а не «постоять»:
 	# раньше он эти доли секунды стоял на коврике перед закрытой створкой, и
@@ -365,8 +363,14 @@ func kill(crushed: bool = false) -> void:
 	_crushed = crushed
 	_brain.kill()
 	velocity = Vector3.ZERO
-	_corpse_left = corpse_time
 	_falling_over = FALLING_TIME
+	# Труп лежит до конца здания (ADR-0037, решение 6), и пули сквозь него
+	# пролетают: он сходит со слоя врагов. Маска остаётся — тело лежит на полу,
+	# а не проваливается сквозь него.
+	set_collision_layer_value(ENEMY_LAYER, false)
+	if laser != null:
+		laser.put_out()
+	_fall_onto_the_floor()
 	Sounds.play(Sounds.AGENT_DEATH)
 	died.emit(self)
 
@@ -421,8 +425,9 @@ func _hold_the_plane() -> void:
 ## них ему незачем, и маска у них та же на всех агентов.
 func _incoming_height() -> float:
 	var best := -1.0
-	# Дальше 20 px ROM агент пулю не замечает (@05F5).
-	var nearest := Arcade.DODGE_REACH_PX * Proportions.PX
+	# Дальше 20 px ROM агент пулю не замечает (@05F5); пуля втрое быстрее ROM, и
+	# дальность растёт с ней — время на увёртку то же (ADR-0037, решение 5).
+	var nearest := Arcade.dodge_reach()
 	for node in get_tree().get_nodes_in_group(Bullet.GROUP):
 		var bullet := node as Bullet
 		if bullet == null or bullet.collision_mask != Bullet.FROM_OTTO:
@@ -519,11 +524,6 @@ func _building_rules() -> BuildingRules:
 	return _rules
 
 
-## Скорость пули этого агента: по навыку здания, в тревоге на шаг быстрее (@463D).
-func _bullet_speed() -> float:
-	return Arcade.agent_bullet_speed(_skill, _alarmed)
-
-
 ## В кадре ли агент: в ROM дальности огня нет, этаж целиком на экране, и у нас
 ## достаёт тот, кого игрок видит (ADR-0027, решение 3а). Кадр — правил, а не
 ## камеры: тот едет по настенным часам и шире на широком окне.
@@ -563,22 +563,112 @@ func _update_look(delta: float) -> void:
 
 
 func _pose() -> String:
+	# Замах — поза выстрела: пистолет вскинут, пока горит луч (ADR-0037,
+	# решение 5).
 	return ActorPose.of_agent(
 		_brain.is_dead(),
 		_walking,
 		_crushed,
 		_falling_over > 0.0,
-		_shooting > 0.0,
+		_shooting > 0.0 or _brain.is_winding_up(),
 		_walk_phase,
 		_brain.stance
 	)
 
 
-## Досчитывает время, которое тело лежит на полу, и убирает его.
-func _rot(delta: float) -> void:
-	_corpse_left -= delta
-	if _corpse_left <= 0.0:
-		queue_free()
+## Луч прицела: горит, пока агент замахивается, от ствола на высоте будущей
+## пули и до того, во что она придёт.
+func _show_the_aim() -> void:
+	if not _brain.is_winding_up():
+		laser.put_out()
+		return
+	laser.position = Vector3(_brain.facing * muzzle_offset, _shot_height(), 0.0)
+	laser.reach = Bullet.RANGE
+	laser.shot_in = _brain.wind_up_left()
+	laser.shot_speed = _shot_speed()
+	laser.aim(_brain.facing)
+
+
+## Скорость пули этого агента, м/с: по навыку здания, в тревоге на шаг быстрее
+## (@463D), втрое быстрее ROM (ADR-0037, решение 5).
+func _shot_speed() -> float:
+	return Arcade.agent_shot_speed(_skill, _alarmed)
+
+
+## Труп: доезжает до пола и засыпает (ADR-0037, решение 6).
+##
+## Сам агент не прыгает — ни в оригинале, ни у нас (ADR-0026), — но в воздухе
+## бывает: кабина ушла из-под пассажира или вытолкнула его снизу, и убитый в
+## этот миг не должен в нём зависать. Лёгшее тело больше не двигается: физика
+## и поза выключаются, и лежащие до конца здания трупы ничего не стоят кадру.
+##
+## Убитый в кабине едет с ней: тело переходит в узел кабины. Раздавленный
+## засыпает сразу, где лежит: под днищем кабины физика только дёргала бы его,
+## выталкивая из-под пола.
+func _lie(delta: float) -> void:
+	if _at_rest:
+		# Поза доходит до конца перехода, и риг тоже засыпает.
+		if _body.settled():
+			_body.set_process(false)
+			set_physics_process(false)
+		return
+	_walking = false
+	if not _crushed:
+		_apply_gravity(delta)
+		move_and_slide()
+		_hold_the_plane()
+	_update_look(delta)
+	if _falling_over > 0.0 or not (_crushed or is_on_floor()):
+		return
+	_at_rest = true
+	velocity = Vector3.ZERO
+	# Раздавленный лежит под днищем, а не в кабине: с ней он не едет.
+	var car: ElevatorCar = null if _crushed else _car_underneath()
+	if car != null:
+		# Не в этом кадре: узел физики нельзя переносить посреди её шага.
+		reparent.call_deferred(car)
+
+
+## Разворачивает падающего так, чтобы тело легло на пол, а не над проёмом.
+##
+## Клип смерти роняет тело навзничь, на рост назад. Пока труп исчезал за
+## полсекунды, это было не видно; лежащий до конца здания у края шахты висел бы
+## над пустотой на весь рост. Есть пол за спиной — падает как падал; нет, а
+## впереди есть — падает вперёд.
+func _fall_onto_the_floor() -> void:
+	if not is_inside_tree():
+		return
+	var back := -_brain.facing * Proportions.BODY * 0.9
+	if not _floor_at(back) and _floor_at(-back):
+		_brain.face(-_brain.facing)
+
+
+## Есть ли пол в [param dx] метрах от ног по горизонтали.
+func _floor_at(dx: float) -> bool:
+	var from := global_position + Vector3(dx, Proportions.PRONE, 0.0)
+	var query := PhysicsRayQueryParameters3D.create(
+		from, from - Vector3(0.0, Proportions.PRONE * 2.0, 0.0), collision_mask
+	)
+	query.exclude = [get_rid()]
+	return not get_world_3d().direct_space_state.intersect_ray(query).is_empty()
+
+
+## Кабина, на полу или крыше которой лежит тело, или null.
+##
+## Спрашивается лучом вниз из середины тела, а не контактами последнего шага:
+## лёгшее тело стоит на месте, и контактов у [method move_and_slide] может не
+## оказаться вовсе. Середина решает и за тело на краю проёма: лежит серединой
+## на кабине — едет с ней, на плите — остаётся на этаже.
+func _car_underneath() -> ElevatorCar:
+	var from := global_position + Vector3(0.0, Proportions.PRONE, 0.0)
+	var query := PhysicsRayQueryParameters3D.create(
+		from, from - Vector3(0.0, Proportions.PRONE * 3.0, 0.0), collision_mask
+	)
+	query.exclude = [get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return null
+	return hit["collider"] as ElevatorCar
 
 
 func _fire() -> void:
@@ -586,7 +676,7 @@ func _fire() -> void:
 	Sounds.play(Sounds.SHOT)
 	var bullet := BULLET_SCENE.instantiate() as Bullet
 	bullet.direction = _brain.facing
-	bullet.speed = _bullet_speed()
+	bullet.speed = _shot_speed()
 	bullet.collision_mask = Bullet.FROM_ENEMY
 	bullet.hit_target.connect(_on_bullet_hit)
 	get_parent().add_child(bullet)

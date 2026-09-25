@@ -1,43 +1,38 @@
 class_name BulletLook
 extends Node3D
 
-## Вид пули: трассер с хвостом и вспышка у ствола (M21, замечание пользователя —
-## «пуля выглядит квадратиком»).
+## Вид пули: тонкий длинный трассер (M21, замечание пользователя — «пуля
+## выглядит квадратиком»; M24a — пуля втрое быстрее, ADR-0037, решение 5).
 ##
 ## Модель пули здесь не помогла бы: настоящая пуля на нашем масштабе меньше
 ## пикселя. Пулю в кадре видно так же, как в кино, — по трассеру: яркое вытянутое
 ## ядро и тающий хвост позади. Всё светится эмиссией — пулю видно и на погашенном
-## этаже, а источников света она не добавляет, кроме вспышки выстрела у [Bullet].
+## этаже, а источников света она не добавляет. Вспышка и дымок выстрела стоят
+## у ствола и живут своим временем — это [ShotFx], а не вид летящей пули.
 ##
 ## Только вид: коллизия пули — её `Shape`, и высоты ROM держит она, а не хвост.
 ##
 ## Хвост растёт с пройденным путём: сразу после выстрела он торчал бы из стрелка
-## назад. Вспышка стоит на месте выстрела — узел едет с пулей, и вспышка
-## отодвигается назад ровно на пройденный путь.
+## назад. Длинный и тонкий: пуля проходит полметра за кадр, и короткий хвост
+## читался бы точкой, прыгающей по кадру, а не росчерком.
 
 ## Ядро: длина и толщина, м.
-const CORE_LENGTH: float = 0.26
-const CORE_RADIUS: float = 0.034
+const CORE_LENGTH: float = 0.36
+const CORE_RADIUS: float = 0.024
 ## Хвост: полная длина и толщина у головы, м.
-const TRAIL_LENGTH: float = 1.1
-const TRAIL_THICKNESS: float = 0.055
-## Вспышка у ствола: размер и путь, за который она гаснет, м.
-const FLASH_SIZE: float = 0.34
-const FLASH_FADE: float = 0.6
+const TRAIL_LENGTH: float = 2.6
+const TRAIL_THICKNESS: float = 0.042
 
 const CORE := Color(1.0, 0.96, 0.82)
 const TRAIL := Color(1.0, 0.72, 0.35)
-const FLASH := Color(1.0, 0.84, 0.5)
 ## Насколько ярко светится ядро: ярче кадра, чтобы грейдинг его не притушил.
 const GLOW: float = 6.0
 
 static var _core_material: StandardMaterial3D = null
 static var _trail_material: StandardMaterial3D = null
-static var _flash_material: StandardMaterial3D = null
 
 var _direction: float = 1.0
 var _trail: MeshInstance3D = null
-var _flash: MeshInstance3D = null
 
 
 ## Собирает вид пули, летящей в сторону [param direction] (−1 влево, +1 вправо).
@@ -49,19 +44,13 @@ static func make(direction: float) -> BulletLook:
 	return look
 
 
-## Обновляет хвост и вспышку по пройденному пулей пути, м.
+## Обновляет хвост по пройденному пулей пути, м.
 func follow(travelled: float) -> void:
 	var length := minf(travelled, TRAIL_LENGTH)
 	_trail.visible = length > 0.01
 	if _trail.visible:
 		_trail.scale.x = length
 		_trail.position.x = -_direction * (length * 0.5 + CORE_LENGTH * 0.3)
-	var left := 1.0 - travelled / FLASH_FADE
-	_flash.visible = left > 0.0
-	if _flash.visible:
-		_flash.position.x = -_direction * travelled
-		_flash.scale = Vector3.ONE * (0.6 + 0.4 * left)
-		_flash.transparency = 1.0 - left
 
 
 func _build() -> void:
@@ -92,15 +81,6 @@ func _build() -> void:
 	if _direction < 0.0:
 		_trail.rotation.y = PI
 	add_child(_trail)
-
-	_flash = MeshInstance3D.new()
-	_flash.name = "Flash"
-	var star := QuadMesh.new()
-	star.size = Vector2(FLASH_SIZE, FLASH_SIZE)
-	_flash.mesh = star
-	_flash.material_override = _flash_mat()
-	_flash.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(_flash)
 	follow(0.0)
 
 
@@ -121,7 +101,7 @@ static func _trail_mat() -> StandardMaterial3D:
 	if _trail_material == null:
 		var gradient := Gradient.new()
 		gradient.set_color(0, Color(TRAIL, 0.0))
-		gradient.set_color(1, Color(CORE, 0.85))
+		gradient.set_color(1, Color(CORE, 1.0))
 		var texture := GradientTexture1D.new()
 		texture.gradient = gradient
 		texture.width = 64
@@ -133,28 +113,3 @@ static func _trail_mat() -> StandardMaterial3D:
 		_trail_material.albedo_texture = texture
 		_trail_material.albedo_color = Color(1.0, 1.0, 1.0, 1.0)
 	return _trail_material
-
-
-## Вспышка: круглое пятно, мягкое к краю, всегда лицом к камере.
-static func _flash_mat() -> StandardMaterial3D:
-	if _flash_material == null:
-		var gradient := Gradient.new()
-		gradient.set_color(0, Color(1.0, 1.0, 0.95, 1.0))
-		gradient.set_color(1, Color(FLASH, 0.0))
-		gradient.add_point(0.35, Color(FLASH, 0.8))
-		var texture := GradientTexture2D.new()
-		texture.gradient = gradient
-		texture.fill = GradientTexture2D.FILL_RADIAL
-		texture.fill_from = Vector2(0.5, 0.5)
-		texture.fill_to = Vector2(0.5, 0.0)
-		texture.width = 64
-		texture.height = 64
-		_flash_material = StandardMaterial3D.new()
-		_flash_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_flash_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		_flash_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-		_flash_material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-		# Без этого билборд теряет масштаб узла, и вспышка не сжималась бы.
-		_flash_material.billboard_keep_scale = true
-		_flash_material.albedo_texture = texture
-	return _flash_material

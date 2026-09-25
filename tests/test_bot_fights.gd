@@ -84,6 +84,62 @@ func test_the_bot_shoots_the_agent_in_its_way() -> void:
 	remove_child(level)
 
 
+## Бот уходит от выстрела по лучу прицела, а не по пуле (ADR-0037, решение 5):
+## под высоким приседает сразу, через низкий прыгает, только когда пуля вот-вот
+## придёт, — прыгнув раньше, он приземлился бы прямо на неё.
+##
+## Луч зажигается руками, а агент заморожен: проверяется, как бот читает луч, а
+## не жребий позы выстрела.
+func test_the_bot_answers_the_aiming_laser() -> void:
+	var level := _build()
+	await wait_physics_frames(SETTLE_FRAMES)
+	var rules := level.rules
+	var pair := _closest_pair(level.plan().safe_spots(rules, FLOOR))
+	var surface := rules.floor_surface(FLOOR)
+	level.otto.global_position = WorldSpace.to_scene(Vector2(pair.x, surface))
+	# Агент стоит и не стреляет, пока тест не заморозит его: иначе он подошёл бы
+	# вплотную или выстрелил бы сам.
+	rules.agents_hold_fire = true
+	var agent := ENEMY_SCENE.instantiate() as Enemy
+	agent.walk_speed = 0.0
+	level.add_child(agent)
+	agent.global_position = WorldSpace.to_scene(Vector2(pair.y, surface))
+	agent.apply_rules(rules)
+	agent.setup(level.otto, -1.0)
+	await wait_physics_frames(SETTLE_FRAMES * 4)
+	# Замёрзший агент луч не гасит: его зажигает тест.
+	agent.process_mode = Node.PROCESS_MODE_DISABLED
+	var bot := OttoBot.new(level)
+
+	_aim(agent, Proportions.SHOT_HIGH, 1.0)
+	bot.step()
+	assert_true(Input.is_action_pressed(&"move_down"), "под высоким лучом — присесть")
+	assert_false(Input.is_action_pressed(&"move_right"), "а не драться, повернувшись")
+	bot.release()
+	await wait_physics_frames(2)
+
+	_aim(agent, Proportions.SHOT_LOW, 2.0)
+	bot.step()
+	assert_false(Input.is_action_pressed(&"jump"), "низкий луч, пуля не скоро — рано прыгать")
+	bot.release()
+	await wait_physics_frames(2)
+
+	_aim(agent, Proportions.SHOT_LOW, 0.2)
+	bot.step()
+	assert_true(Input.is_action_pressed(&"jump"), "пуля вот-вот — прыжок")
+	bot.release()
+	remove_child(level)
+
+
+## Зажигает луч агента на высоте [param height] над полом: пуля уйдёт через
+## [param shot_in] секунд.
+func _aim(agent: Enemy, height: float, shot_in: float) -> void:
+	agent.laser.position = Vector3(-Proportions.MUZZLE, height, 0.0)
+	agent.laser.shot_in = shot_in
+	agent.laser.shot_speed = Arcade.agent_shot_speed(0, false)
+	agent.laser.aim(-1.0)
+
+
 ## Два ближайших друг к другу места этажа: слева и справа.
 func _closest_pair(spots: PackedFloat64Array) -> Vector2:
 	var best := Vector2(spots[0], spots[1])

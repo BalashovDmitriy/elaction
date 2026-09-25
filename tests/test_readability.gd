@@ -147,14 +147,16 @@ func test_lamps_glow_themselves() -> void:
 	remove_child(level)
 
 
-## Актёры — модели: их держит обводка вторым проходом на каждом меше.
+## Актёры — модели: их держит обводка вторым проходом на каждом меше. Меши
+## фигуры — под её ригом, [code]Body[/code]: луч прицела агента тоже меш, но
+## светящаяся нить, а не тело, и обводка ему не нужна.
 func test_actors_wear_an_outline() -> void:
 	var level := _build(1)
 	var agent := ENEMY_SCENE.instantiate() as Enemy
 	level.add_child(agent)
 	await wait_physics_frames(SETTLE_FRAMES)
 	for actor: Node in [level.otto, agent]:
-		var meshes := actor.find_children("*", "MeshInstance3D", true, false)
+		var meshes := actor.get_node("Body").find_children("*", "MeshInstance3D", true, false)
 		assert_gt(meshes.size(), 0, "у актёра есть меши")
 		for node in meshes:
 			var mesh := node as MeshInstance3D

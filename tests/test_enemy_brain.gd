@@ -57,6 +57,20 @@ func test_a_calm_agent_takes_aim() -> void:
 	assert_gte(float(frames) * STEP, Arcade.wind_up(0) - STEP, "не раньше замаха")
 
 
+## Замах виден: пока пуля не ушла, агент замахивается, и уровень зажигает луч
+## прицела (ADR-0037, решение 5). Вылетела пуля — замаха больше нет.
+func test_the_wind_up_is_visible_until_the_shot() -> void:
+	var brain := _brain(0)
+	_run(brain, 0.4, FAR_ABOVE)
+	brain.update(STEP, IN_FRONT, true)
+	assert_true(brain.is_winding_up(), "решил стрелять — замахивается")
+	assert_almost_eq(brain.wind_up_left(), Arcade.wind_up(0), STEP * 1.5, "замах ROM")
+	var frames := _frames_to_shot(brain, IN_FRONT)
+	assert_gt(frames, -1, "выстрелил")
+	assert_false(brain.is_winding_up(), "пуля ушла — луча нет")
+	assert_eq(brain.wind_up_left(), 0.0)
+
+
 ## Злой — без замаха: при злости 10 и выше пуля уходит сразу.
 func test_a_mean_agent_fires_at_once() -> void:
 	var brain := _brain(12)
