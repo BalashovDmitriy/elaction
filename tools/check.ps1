@@ -16,11 +16,14 @@ try {
     }
 
     Write-Host '== gdformat --check ==' -ForegroundColor Cyan
-    & (Join-Path $bin 'gdformat.exe') --check src tests tools
+    # Модулем, а не gdformat.exe и gdlint.exe: неподписанные обёртки pip
+    # блокирует управление приложениями Windows (WinError 4551), см.
+    # .pre-commit-config.yaml. python.exe из того же окружения не блокируется.
+    & (Join-Path $bin 'python.exe') -m gdtoolkit.formatter --check src tests tools
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     Write-Host '== gdlint ==' -ForegroundColor Cyan
-    & (Join-Path $bin 'gdlint.exe') src tests tools
+    & (Join-Path $bin 'python.exe') -m gdtoolkit.linter src tests tools
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     Write-Host '== godot --headless --import ==' -ForegroundColor Cyan
