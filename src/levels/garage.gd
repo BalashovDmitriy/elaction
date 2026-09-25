@@ -80,6 +80,9 @@ const TUBE_LIGHT_RANGE: float = 4.6
 const TUBE_LIGHT_ANGLE: float = 62.0
 ## Наклон конуса от вертикали в глубину зала, градусы.
 const TUBE_LIGHT_TILT: float = 38.0
+## Над машиной Otto у ворот светильник светит не в зал, а на проезд: машина
+## стоит перед ним, и в темноте у торца её было не разглядеть.
+const EXIT_CAR_TILT: float = -24.0
 ## Трубы вдоль зала: радиус, середина по глубине и отступ от кромки на
 ## экране, м. Идут сквозь колонны — там их закрывает бетон.
 const PIPE_RADIUS: float = 0.06
@@ -251,17 +254,20 @@ static func bays(rules: BuildingRules, plan: BuildingPlan) -> Array[Vector2]:
 	return found
 
 
-## Куда чужой машине нельзя: к проёму выхода и к месту машины Otto — с её
+## Куда чужой машине нельзя: к выходу и к машине Otto — к её месту
+## ([method ExitCar.spot]) и полосе у ворот ([method ExitCar.parked_span]), с
 ## зазором. Машина Otto стоит в проезде, чужие — в зале, но в кадре они одна
 ## над другой, и место Otto должно читаться свободным.
 static func keep_out(rules: BuildingRules, plan: BuildingPlan) -> Array[Vector2]:
 	var exit_half := Proportions.EXIT_WIDTH * 0.5
 	var spot := ExitCar.spot(plan.exit_x, rules, plan)
 	var car_half := CarModel.LENGTH * 0.5 + ExitCar.GAP
+	var at_gate := ExitCar.parked_span(rules)
 	return (
 		[
 			Vector2(plan.exit_x - exit_half, plan.exit_x + exit_half),
 			Vector2(spot - car_half, spot + car_half),
+			Vector2(at_gate.x - ExitCar.GAP, at_gate.y + ExitCar.GAP),
 		]
 		as Array[Vector2]
 	)
@@ -468,7 +474,7 @@ func _build_columns() -> void:
 		_box(
 			Vector3(COLUMN + 0.02, 0.9, COLUMN + 0.02),
 			yellow,
-			_at(x, _surface - 0.003 - 0.45, COLUMN_Z),
+			_at(x, _surface - 0.005 - 0.45, COLUMN_Z),
 			false
 		)
 		for rise: float in [0.25, 0.6]:
@@ -563,6 +569,7 @@ func _build_fixtures(building_seed: int) -> void:
 	var taken := PackedFloat64Array()
 	for car in parked(_rules, _plan, building_seed):
 		taken.append(car.x)
+	var at_gate := ExitCar.parked_span(_rules)
 	var body := GreyboxLook.metal(FIXTURE_BODY)
 	var tube := GreyboxLook.light(TUBE)
 	var front := FIXTURE_Z + FIXTURE.z * 0.5
@@ -589,10 +596,11 @@ func _build_fixtures(building_seed: int) -> void:
 		var fixture := Fixture.new()
 		fixture.tube = glow
 		fixture.pool = _light_pool()
-		fixture.pool.position = _at(x, _surface - 0.006, FIXTURE_Z - POOL.y * 0.5 + 0.2)
+		fixture.pool.position = _at(x, _surface - 0.012, FIXTURE_Z - POOL.y * 0.5 + 0.2)
 		add_child(fixture.pool)
-		if taken.has((bay.x + bay.y) * 0.5):
-			fixture.light = _tube_light()
+		var over_car := bay.y > at_gate.x and bay.x < at_gate.y
+		if taken.has((bay.x + bay.y) * 0.5) or over_car:
+			fixture.light = _tube_light(EXIT_CAR_TILT if over_car else TUBE_LIGHT_TILT)
 			fixture.light.position = _at(x, fixture_top + FIXTURE.y + DIFFUSER.y, FIXTURE_Z)
 			add_child(fixture.light)
 		_fixtures.append(fixture)
@@ -604,8 +612,9 @@ func _build_fixtures(building_seed: int) -> void:
 		_tubes[owner] = list
 
 
-## Свет трубки над занятым местом: конус без тени вниз и в зал.
-static func _tube_light() -> SpotLight3D:
+## Свет трубки над занятым местом или машиной Otto: конус без тени вниз,
+## наклонённый на [param tilt] градусов.
+static func _tube_light(tilt: float) -> SpotLight3D:
 	var light := SpotLight3D.new()
 	light.light_color = TUBE
 	light.light_energy = TUBE_LIGHT_ENERGY
@@ -614,8 +623,8 @@ static func _tube_light() -> SpotLight3D:
 	light.shadow_enabled = false
 	light.light_volumetric_fog_energy = 0.0
 	# Конус светит вдоль своей -Z: поворот вокруг X опускает его вниз и
-	# наклоняет в глубину зала.
-	light.rotation.x = deg_to_rad(TUBE_LIGHT_TILT - 90.0)
+	# наклоняет — плюс в глубину зала, минус к проезду.
+	light.rotation.x = deg_to_rad(tilt - 90.0)
 	return light
 
 
@@ -686,25 +695,28 @@ func _mark_the_floor(building_seed: int) -> void:
 			stop,
 			_at((bay.x + bay.y) * 0.5, _surface - 0.05, BAY_BACK_Z + 0.2)
 		)
+	# Краска — на два миллиметра над полом: полоса уходит под колонну и
+	# стену, и низ её иначе лёг бы в одну плоскость с их низом.
 	for edge in edges:
 		_box(
-			Vector3(0.1, 0.006, depth),
+			Vector3(0.1, 0.005, depth),
 			white,
-			_at(edge, _surface - 0.003, BAY_FRONT_Z - depth * 0.5),
+			_at(edge, _surface - 0.0045, BAY_FRONT_Z - depth * 0.5),
 			false
 		)
 
 	# Край проезда — жёлтая линия вдоль передней линии мест.
 	for span in BuildingPlan.spans_between(busy_spans(_rules, _plan), _inner):
 		_box(
-			Vector3(span.y - span.x, 0.006, 0.1),
+			Vector3(span.y - span.x, 0.005, 0.1),
 			yellow,
-			_at((span.x + span.y) * 0.5, _surface - 0.003, WorldSpace.BACK_WALL_Z + 0.1),
+			_at((span.x + span.y) * 0.5, _surface - 0.0045, WorldSpace.BACK_WALL_Z + 0.1),
 			false
 		)
 
 	# Стрелки к воротам по проезду: одна у ворот, дальше — через пролёт.
-	var arrow_x := _inner.x + GATE_BAY + 1.2
+	# Первая — сразу за машиной Otto у ворот: под ней стрелку не видно.
+	var arrow_x := ExitCar.parked_span(_rules).y + 1.2
 	while arrow_x < _inner.y - 1.0:
 		_paint_arrow(arrow_x, white)
 		arrow_x += COLUMN_PITCH * 2.0
@@ -724,7 +736,7 @@ func _mark_the_floor(building_seed: int) -> void:
 ## Стрелка на полу проезда остриём к воротам: древко и наконечник.
 func _paint_arrow(x: float, paint: StandardMaterial3D) -> void:
 	var z := WorldSpace.CORRIDOR_DEPTH * 0.25
-	_box(Vector3(0.9, 0.006, 0.16), paint, _at(x + 0.35, _surface - 0.003, z), false)
+	_box(Vector3(0.9, 0.005, 0.16), paint, _at(x + 0.35, _surface - 0.0045, z), false)
 	var head := PrismMesh.new()
 	head.size = Vector3(0.5, 0.45, 0.006)
 	var part := MeshInstance3D.new()
@@ -734,7 +746,7 @@ func _paint_arrow(x: float, paint: StandardMaterial3D) -> void:
 	# Треугольник призмы — в плоскости XY остриём вверх; лечь на пол остриём
 	# влево — поворот вокруг X на пол, затем вокруг Y.
 	part.basis = Basis(Vector3.UP, PI * 0.5) * Basis(Vector3.RIGHT, -PI * 0.5)
-	part.position = _at(x - 0.3, _surface - 0.003, z)
+	part.position = _at(x - 0.3, _surface - 0.0045, z)
 	add_child(part)
 
 

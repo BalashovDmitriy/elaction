@@ -116,7 +116,8 @@ func test_the_exit_wears_a_green_sign() -> void:
 	for building_seed: int in SEEDS:
 		var level := _build(building_seed)
 		await wait_physics_frames(SETTLE_FRAMES)
-		var board := level.get_node_or_null("ExitSign")
+		# С M24b вывеска — над воротами паркинга в левом торце ([GarageGate]).
+		var board := level.get_node_or_null("Garage/Gate/ExitSign")
 		assert_not_null(board, "сид %d: над выходом вывеска" % building_seed)
 		if board != null:
 			assert_eq(
@@ -130,9 +131,8 @@ func test_the_exit_wears_a_green_sign() -> void:
 				level.rules.floor_surface(bottom),
 				"сид %d: под потолком нижнего этажа" % building_seed
 			)
-			assert_almost_eq(
-				at.x, level.plan().exit_x, 0.001, "сид %d: над проёмом" % building_seed
-			)
+			var left := level.rules.floor_span(bottom).x
+			assert_between(at.x, left, left + 1.0, "сид %d: над воротами" % building_seed)
 		remove_child(level)
 
 

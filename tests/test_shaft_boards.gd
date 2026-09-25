@@ -102,9 +102,10 @@ func test_the_roof_is_not_a_floor_number() -> void:
 	assert_eq(BuildingShafts.floor_label(rules, 0), str(rules.floors))
 
 
-## Панель кнопок не встаёт на наличник двери соседнего места, на её табличку и
-## на проём выхода — на любом здании.
-func test_the_call_panel_keeps_off_doors_and_the_exit() -> void:
+## Панель кнопок не встаёт на наличник двери соседнего места и на её табличку —
+## на любом здании. Проёма выхода в задней стене с M24b нет: выход — ворота
+## паркинга в торце ([GarageGate]).
+func test_the_call_panel_keeps_off_doors() -> void:
 	var door_left := Door.LEAF_SIZE.x * 0.5 + Door.FRAME_WIDTH
 	var door_right := Door.LEAF_SIZE.x * 0.5 + BuildingProps.PLATE_GAP + BuildingProps.PLATE.x
 	var panels := 0
@@ -123,9 +124,6 @@ func test_the_call_panel_keeps_off_doors_and_the_exit() -> void:
 					for door in plan.doors:
 						if door.floor_index == index:
 							busy.append(Vector2(door.x - door_left, door.x + door_right))
-					if index == rules.floors - 1:
-						var exit_half := Proportions.EXIT_WIDTH * 0.5
-						busy.append(Vector2(plan.exit_x - exit_half, plan.exit_x + exit_half))
 					for zone in busy:
 						assert_true(
 							panel.y <= zone.x or panel.x >= zone.y,
