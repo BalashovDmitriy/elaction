@@ -68,11 +68,14 @@ var _beacon: MeshInstance3D = null
 var _voice: AudioStreamPlayer3D = null
 ## Выезд за воротами: у него фонарь, который горит, пока нижний этаж в кадре.
 var _ramp: GarageRamp = null
+## Сид здания: по нему улица за выездом и её погода.
+var _seed: int = 1
 
 
 ## Собирает ворота у левой стены нижнего этажа.
-func build(rules: BuildingRules) -> void:
+func build(rules: BuildingRules, building_seed: int = 1) -> void:
 	_rules = rules
+	_seed = building_seed
 	var bottom := rules.floors - 1
 	_surface = rules.floor_surface(bottom)
 	_top = rules.story_top(bottom)
@@ -261,14 +264,19 @@ func _build_frame() -> void:
 func _build_ramp() -> void:
 	_ramp = GarageRamp.new()
 	add_child(_ramp)
-	_ramp.build(_rules)
+	_ramp.build(_rules, _seed)
 
 
-## Свет выезда — фонарь над пандусом — горит, пока нижний этаж в кадре, как
-## светильники паркинга ([method Garage.show_lights]).
-func show_lights(in_view: bool) -> void:
+## Свет выезда — фонарь над пандусом и отсвет неона — горит, пока выезд в
+## кадре: камера за торцом здания, а нижние этажи в кадре. Зовёт уровень.
+func show_street(in_view: bool) -> void:
 	if _ramp != null:
 		_ramp.show_light(in_view)
+
+
+## Выезд за воротами: тоннель, пандус и улица.
+func ramp() -> GarageRamp:
+	return _ramp
 
 
 ## Вывеска EXIT на перемычке над воротами, лицом к камере.

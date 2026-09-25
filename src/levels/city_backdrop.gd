@@ -310,7 +310,7 @@ func _windows(blocks: Array[CityPlan.Block]) -> MultiMeshInstance3D:
 			var tone := WINDOW_COLD if cold else WINDOW_WARM
 			var fade := WINDOW_FADE[mini(block.row, WINDOW_FADE.size() - 1)]
 			colors.append(Color(tone.r * fade, tone.g * fade, tone.b * fade))
-	return _window_quads("Windows", places, colors, customs, true)
+	return window_quads("Windows", places, colors, customs, true)
 
 
 ## Погасшие окна — вся остальная сетка фасада — своим мультимешем.
@@ -335,7 +335,7 @@ func _dark_windows(blocks: Array[CityPlan.Block]) -> MultiMeshInstance3D:
 				places.append(_window_place(block, cell))
 				colors.append(WINDOW_DARK)
 				customs.append(CityLook.window_custom(block, cell, false))
-	return _window_quads("DarkWindows", places, colors, customs, false)
+	return window_quads("DarkWindows", places, colors, customs, false)
 
 
 ## Где на фасаде дома [param block] окно [param cell] сетки: колонка и этаж.
@@ -350,7 +350,7 @@ func _window_place(block: CityPlan.Block, cell: Vector2i) -> Transform3D:
 
 ## Окна одним мультимешем: квад на окно, цвет — вершинный, что за стеклом —
 ## в данных окна ([CityLook]). [param lit] — горящие: мимо дымки города.
-static func _window_quads(
+static func window_quads(
 	title: String,
 	places: Array[Transform3D],
 	colors: Array[Color],

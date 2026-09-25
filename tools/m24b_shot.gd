@@ -12,7 +12,8 @@ extends Node
 ## 2. Подвал: над подвалом, у шахты вниз — створки закрыты; все документы
 ##    собраны — створки расходятся и разошлись.
 ## 3. Выход: Otto у машины, садится — дверца открыта, он шагает к борту, —
-##    фары и ворота, машина уезжает по пандусу, бонус на HUD, затемнение.
+##    фары и ворота, машина уезжает по пандусу, кадр едет за ней на улицу,
+##    бонус на HUD, затемнение.
 ##
 ## Otto ставится по раскладке, как в [code]garage_shot.gd[/code]; к двери и к
 ## машине его подводят игровыми действиями. Агент у двери ставится руками: жребий
@@ -209,6 +210,13 @@ func _exit() -> void:
 	await _until(func() -> bool: return boarding.phase == ExitBoarding.Phase.LEAVING)
 	await _seconds(0.45)
 	await _shoot("exit_04_driving")
+	# Кадр едет за машиной: подъём по пандусу и выезд на улицу.
+	await _seconds(0.9)
+	if car.is_leaving():
+		await _shoot("exit_04b_ramp")
+	await _seconds(0.9)
+	if car.is_leaving():
+		await _shoot("exit_04c_street")
 	# Бонус досчитан: машина к этому времени уже ушла, здание сдано.
 	await _until(func() -> bool: return _hud.bonus_text() == Hud.format_score(bonus))
 	await _shoot("exit_05_bonus")

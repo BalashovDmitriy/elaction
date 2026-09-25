@@ -15,9 +15,12 @@ extends RefCounted
 ## пропадал перед кузовом. Теперь посадку видно: поворот, дверца, шаг в глубину.
 ##
 ## С посадки кадр раздвигается влево за торец здания ([method exit_frame]):
-## ворота, их свет и пандус за ними — в кадре, и машина уезжает по пандусу у
-## всех на виду, а не в край кадра. Границы вернёт следующее здание — у него
-## свой Otto и своя камера.
+## ворота и тоннель за ними — в кадре. Машина трогается, и кадр едет за ней
+## ([method _follow_the_car]): через тоннель, вверх по пандусу — низ кадра
+## поднимается вместе с ней — и на ночную улицу ([ExitStreet]), где машина и
+## уходит из кадра. Сначала кадр показывал полпандуса и голую стену над ним;
+## теперь снаружи в кадре ровно то, по чему едет машина. Границы вернёт
+## следующее здание — у него свой Otto и своя камера.
 ##
 ## С шага к двери Otto недосягаем: сначала его «везут», как на эскалаторе, —
 ## формы тела выключены, — потом он в машине, и снаружи его нет вовсе. Агенты
@@ -54,11 +57,16 @@ const GET_IN_TIME: float = STEP_BACK_FROM + STEP_BACK_TIME + DOOR_CLOSE_TIME
 ## Сколько Otto садится, с: от хлопка дверцы до стартера.
 const SEAT_TIME: float = 0.5
 ## Середина кадра на выезде — насколько правее торца здания, м. Кадр ставится
-## серединой, а не краем, и в кадре 16:9 от торца влево — 10.75 м: ворота,
-## площадка и больше половины подъёма ([constant GarageGate.RAMP_APRON] +
-## [constant GarageGate.RAMP_RUN]), а справа — машина у ворот и паркинг.
-## Машина уходит из кадра на подъёме, у всех на виду.
-const FRAME_SHIFT: float = 1.0
+## серединой, а не краем, и в кадре 16:9 от торца влево — 8 м: ворота,
+## площадка, тоннель и начало подъёма ([constant GarageGate.RAMP_APRON],
+## [constant GarageRamp.TUNNEL]), а справа — машина у ворот и паркинг.
+const FRAME_SHIFT: float = 3.5
+## Кадр за машиной: сколько она проезжает, прежде чем кадр тронется, м, — ворота
+## и тоннель успевают побыть в кадре, — и насколько кадр уходит влево, м. Край
+## кадра 16:9 доходит до улицы левее верха пандуса, и машина уходит из кадра уже
+## по ней.
+const FOLLOW_AFTER: float = 1.5
+const FOLLOW_SPAN: float = 13.0
 ## Сколько мотор заводится, с: стартер и газовка ([constant Sounds.CAR_START],
 ## 2.8 с) — машина трогается на газовке, не дожидаясь её конца.
 const START_TIME: float = 2.0
@@ -76,6 +84,9 @@ var _garage: Garage = null
 var _frame := Rect2()
 ## Сколько идёт посадка, с.
 var _getting_in: float = 0.0
+## Где машина стояла, когда тронулась, в плоскости правил: от этого места кадр
+## едет за ней.
+var _start_x: float = 0.0
 
 
 func _init(car: ExitCar, surface: float, garage: Garage = null, frame: Rect2 = Rect2()) -> void:
@@ -146,6 +157,7 @@ func step(delta: float, otto: Otto, documents_done: bool, view: Rect2) -> Event:
 			_seat_left -= delta
 			if _seat_left <= 0.0:
 				_car.drive_away()
+				_start_x = _car.position.x
 				phase = Phase.LEAVING
 				return Event.STARTED
 		Phase.LEAVING:
@@ -153,7 +165,23 @@ func step(delta: float, otto: Otto, documents_done: bool, view: Rect2) -> Event:
 			if _car.advance(delta, view):
 				phase = Phase.GONE
 				return Event.LEFT
+			_follow_the_car(otto)
 	return Event.NONE
+
+
+## Кадр выезда, едущий за машиной: влево, пока она проехала не больше
+## [constant FOLLOW_AFTER] + [constant FOLLOW_SPAN], и вверх — ровно на столько,
+## на сколько она поднялась по пандусу. Низ полосы кадра поднимается, а цель
+## камеры — Otto в машине — внизу, у пола подвала, и камера встаёт на этот низ.
+func _follow_the_car(otto: Otto) -> void:
+	if not _frame.has_area():
+		return
+	var moved := clampf(_start_x - _car.position.x - FOLLOW_AFTER, 0.0, FOLLOW_SPAN)
+	var rise := maxf(_surface - WorldSpace.to_plane(_car.position).y, 0.0)
+	var frame := Rect2(
+		_frame.position.x - moved, _frame.position.y, _frame.size.x, maxf(_frame.size.y - rise, 1.0)
+	)
+	otto.apply_camera_bounds(frame, false)
 
 
 ## Ведёт Otto к двери шагом; true — дошёл.
