@@ -269,6 +269,13 @@ static func muffle_music(reason: String, on: bool) -> void:
 		director.muffle_music(reason, on)
 
 
+## Звуки мира из-за стены: Otto за красной дверью слышит коридор глухо.
+static func muffle_world(on: bool) -> void:
+	var director := AudioDirector.instance()
+	if director != null:
+		director.muffle_world(on)
+
+
 ## Погода вокруг: по ней директор выбирает петли фона снаружи и внутри.
 static func set_weather(weather: Weather.Kind) -> void:
 	var director := AudioDirector.instance()

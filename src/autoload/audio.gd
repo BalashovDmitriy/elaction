@@ -31,6 +31,10 @@ const SILENT_DB: float = -60.0
 const MUSIC_MUFFLED_HZ: float = 900.0
 const AMBIENCE_MUFFLED_HZ: float = 1600.0
 const OPEN_HZ: float = 20000.0
+## Коридор из-за красной двери: шаги, выстрелы и двери глухо и тише
+## (ADR-0038, решение 2).
+const SFX_MUFFLED_HZ: float = 700.0
+const SFX_MUFFLED_DB: float = -6.0
 ## Как быстро звук уходит за стену и возвращается, с.
 const MUFFLE_TIME: float = 0.35
 ## Фон на этажах тише, чем на крыше, дБ.
@@ -79,6 +83,7 @@ var _ambience_fades: Dictionary = {}
 ## Почему музыка сейчас из-за стены: пауза, красная дверь. Пока есть хоть
 ## одна причина — глухо; пауза посреди визита не возвращает звук на выходе из неё.
 var _muffled_by: Dictionary = {}
+var _world_muffled: bool = false
 var _outdoors: bool = true
 var _weather: Weather.Kind = Weather.Kind.CLEAR
 ## Какой по счёту город звучит. Гром назначается городу, и к следующему — в
@@ -209,6 +214,19 @@ func music_muffled() -> bool:
 	return not _muffled_by.is_empty()
 
 
+## Звуки мира из-за стены — Otto за красной дверью.
+func muffle_world(on: bool) -> void:
+	if _world_muffled == on:
+		return
+	_world_muffled = on
+	_sweep(Sounds.SFX_BUS, SFX_MUFFLED_HZ if on else OPEN_HZ)
+	_gain(Sounds.SFX_BUS, SFX_MUFFLED_DB if on else 0.0, MUFFLE_TIME)
+
+
+func world_muffled() -> bool:
+	return _world_muffled
+
+
 ## Петли фона: улица, дождь, ветер. Лишние уходят, новые входят наплывом,
 ## те, что уже звучат, не перезапускаются — иначе дождь прерывался бы на
 ## каждом здании.
@@ -315,12 +333,13 @@ func reset() -> void:
 		(_tweens[key] as Tween).kill()
 	_tweens.clear()
 	_muffled_by.clear()
+	_world_muffled = false
 	_outdoors = true
 	_weather = Weather.Kind.CLEAR
 	_duck_until = 0.0
 	_city += 1
 	_ambience_shot.stop()
-	for bus: String in [Sounds.MUSIC_BUS, Sounds.AMBIENCE_BUS]:
+	for bus: String in [Sounds.MUSIC_BUS, Sounds.AMBIENCE_BUS, Sounds.SFX_BUS]:
 		_muffle_of(bus).cutoff_hz = OPEN_HZ
 		AudioServer.set_bus_effect_enabled(AudioServer.get_bus_index(bus), MUFFLE_EFFECT, false)
 		_gain_of(bus).volume_db = 0.0
