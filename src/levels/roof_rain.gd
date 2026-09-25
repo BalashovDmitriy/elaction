@@ -18,6 +18,12 @@ extends Node3D
 ## коридора и задними ступенями кровли; рядом с башней идёт дождь города
 ## ([RainLook.city]) — он позади здания.
 ##
+## Дождь виден светом (решение 3, дополнение): капли светятся от лампы над
+## крышей и несут размытую копию фона ([RainLook]), над настилом — тонкая
+## дымка с водяной пылью у самого настила, в которой у лампы виден конус, а
+## вокруг лампы — ореол, разбитый на струи. Дымка — объёмный туман, её нет на
+## низком; ореол и капли — на любом уровне.
+##
 ## Карта высот снимается один раз и только со слоя [constant LAYER]: на него
 ## [method catch_on] переводит неподвижное на крыше. Otto и агенты в ней не
 ## числятся — снятые на месте, где стояли при сборке, они оставили бы в дожде
@@ -31,12 +37,18 @@ const LAYER: int = 1 << 19
 ## Капель на «высоком» ([method Graphics.rain_share]), высота неба над
 ## настилом, скорость, м/с, и снос на метр падения. Падают быстрее настоящего
 ## дождя: при 9 м/с струя за кадр — точка, и дождь читается снегом.
-const DROPS: int = 560
+const DROPS: int = 1100
 const HEIGHT: float = 8.0
 const SPEED := Vector2(15.0, 19.0)
 const SLANT: float = 0.08
-const DROP := Vector2(0.022, 0.75)
-const ALPHA: float = 0.34
+const DROP := Vector2(0.018, 0.8)
+## Вид капли ([RainLook.drop_look]): свет лампы вдвое и гаснет круче лампы —
+## светятся капли у неё, а не по всей крыше; две бегущие волны порывов.
+const DROP_LOOK := {"lit_gain": 2.0, "falloff": 2.5, "back_gain": 1.4, "gust_amount": 1.0}
+## Брызги и капель: тусклее капель и без ближних, широких.
+const SPRAY_LOOK := {
+	"lit_gain": 0.6, "back_gain": 0.6, "base": 0.03, "opacity": 1.0, "near_share": 0.0
+}
 
 ## Где по глубине идёт дождь: от задних ступеней кровли до передней грани
 ## коридора — не дальше, иначе капли вставали бы перед плитой крыши.
@@ -53,7 +65,9 @@ const TICKS: int = 120
 ## Брызги: сколько капелек на удар, их размер и прозрачность, взлёт, м/с.
 const SPLASH_PER_HIT: int = 4
 const SPLASH := Vector2(0.024, 0.12)
-const SPLASH_ALPHA: float = 0.7
+## Какая доля ударов успевает дать брызги: при тысяче капель брызги от каждой
+## читались бы кипением.
+const SPLASH_SHARE: float = 0.4
 const SPLASH_SPEED := Vector2(0.9, 2.1)
 const SPLASH_LIFE: float = 0.3
 
@@ -75,19 +89,30 @@ const PUDDLE := Color(0.012, 0.014, 0.02, 0.9)
 const WET_ROUGHNESS: float = 0.32
 const PUDDLE_ROUGHNESS: float = 0.04
 
+## Дымка над крышей: густота, во сколько раз гуще у настила, высота. Густота
+## мала нарочно: гуще — и дымка проявила бы плоские щиты позади крыши.
+const MIST_DENSITY: float = 0.009
+const MIST_SPRAY: float = 4.0
+const MIST_HEIGHT: float = 9.0
+const MIST_SHADER := preload("res://src/levels/rain_mist.gdshader")
+## Сколько света лампы над крышей уходит в туман в дождь: конус в дымке.
+const LAMP_IN_FOG: float = 2.0
+
 var _drops: GPUParticles3D = null
 var _splashes: GPUParticles3D = null
 var _ripples: GPUParticles3D = null
 var _drips: GPUParticles3D = null
+var _mist: FogVolume = null
+var _halo: MeshInstance3D = null
 var _catcher: GPUParticlesCollisionHeightField3D = null
 var _lids: Array[GPUParticlesCollisionBox3D] = []
 ## Где идёт дождь, в координатах сцены: карта высот снимается с этой коробки.
 var _box := AABB()
 
 
-## Собирает дождь над крышей здания по правилам и плану. [param glow_at] —
-## лампа над крышей: у неё капли светлеют.
-func build(rules: BuildingRules, plan: BuildingPlan, glow_at: Vector3, glow_colour: Color) -> void:
+## Собирает дождь над крышей здания по правилам и плану. [param lamp] —
+## лампа над крышей: у неё ореол, её конус виден в дымке.
+func build(rules: BuildingRules, plan: BuildingPlan, lamp: OmniLight3D) -> void:
 	var bounds := rules.floor_span(BuildingRules.ROOF)
 	var deck := WorldSpace.height_to_scene(rules.floor_surface(BuildingRules.ROOF))
 	var edge := BuildingShell.COPING_OVERHANG + 0.1
@@ -97,11 +122,13 @@ func build(rules: BuildingRules, plan: BuildingPlan, glow_at: Vector3, glow_colo
 	)
 	_catch(rules)
 	_cover_the_gaps(rules, plan, deck)
-	_rain(rules, deck, glow_at, glow_colour)
+	_rain(rules, deck)
 	_splash()
 	_ripple(rules, deck)
 	_drip(rules, plan, deck)
 	_wet(rules, deck)
+	_fog(rules, deck)
+	_glow(lamp)
 	add_to_group(Graphics.GROUP)
 	apply_graphics()
 
@@ -123,7 +150,7 @@ func catch_on(roots: Array[Node]) -> void:
 
 ## Сколько капель, брызг и кругов по уровню качества. На низком кругов и
 ## капели нет: там и капель вчетверо меньше, и круги на тонкой полосе настила
-## читались бы мельканием.
+## читались бы мельканием. Дымка — только там, где есть объёмный туман.
 func apply_graphics() -> void:
 	var share := Graphics.rain_share()
 	RainLook.scale_amount(_drops, share)
@@ -134,6 +161,7 @@ func apply_graphics() -> void:
 	_ripples.visible = rich
 	_drips.emitting = rich
 	_drips.visible = rich
+	_mist.visible = Graphics.volumetric_fog()
 
 
 ## Крышки над проёмами крыши, о которые гаснут капли, — для теста.
@@ -149,6 +177,16 @@ func drops() -> GPUParticles3D:
 ## Карта высот дождя: с чего она снимается.
 func catcher() -> GPUParticlesCollisionHeightField3D:
 	return _catcher
+
+
+## Дымка над крышей — для теста.
+func mist() -> FogVolume:
+	return _mist
+
+
+## Ореол лампы над крышей — для теста.
+func halo() -> MeshInstance3D:
+	return _halo
 
 
 func _catch(rules: BuildingRules) -> void:
@@ -182,7 +220,7 @@ func _cover_the_gaps(rules: BuildingRules, plan: BuildingPlan, deck: float) -> v
 		_lids.append(lid)
 
 
-func _rain(rules: BuildingRules, deck: float, glow_at: Vector3, glow_colour: Color) -> void:
+func _rain(rules: BuildingRules, deck: float) -> void:
 	var bounds := rules.floor_span(BuildingRules.ROOF)
 	# Сыплются между краями отливов и со сдвигом против сноса: капля не
 	# выносится за парапет и не падает мимо крыши вниз по фасаду.
@@ -197,7 +235,7 @@ func _rain(rules: BuildingRules, deck: float, glow_at: Vector3, glow_colour: Col
 		SPEED,
 		SLANT,
 		DROP,
-		ALPHA
+		RainLook.drop_look(DROP_LOOK)
 	)
 	_drops.name = "Drops"
 	_drops.position = Vector3((from + to) * 0.5, deck + HEIGHT, (FRONT_Z + BACK_Z) * 0.5)
@@ -211,10 +249,6 @@ func _rain(rules: BuildingRules, deck: float, glow_at: Vector3, glow_colour: Col
 	process.collision_mode = ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT
 	process.sub_emitter_mode = ParticleProcessMaterial.SUB_EMITTER_AT_COLLISION
 	process.sub_emitter_amount_at_collision = SPLASH_PER_HIT
-	var look := (_drops.draw_pass_1 as QuadMesh).material as ShaderMaterial
-	look.set_shader_parameter("glow_at", glow_at)
-	look.set_shader_parameter("glow_colour", Color(glow_colour * 0.5, 1.0))
-	look.set_shader_parameter("glow_range", 3.5)
 	add_child(_drops)
 
 
@@ -231,10 +265,17 @@ func _splash() -> void:
 	process.gravity = Vector3(0.0, -9.8, 0.0)
 	process.scale_min = 0.6
 	process.scale_max = 1.3
-	process.color_ramp = RainLook.ramp(Color.WHITE, Color(1.0, 1.0, 1.0, 0.0))
+	# Брызги гаснут к концу жизни, а не с первого кадра: иначе в среднем их
+	# вдвое меньше видно.
+	var fade := Gradient.new()
+	fade.offsets = PackedFloat32Array([0.0, 0.6, 1.0])
+	fade.colors = PackedColorArray([Color.WHITE, Color.WHITE, Color(1.0, 1.0, 1.0, 0.0)])
+	var fade_ramp := GradientTexture1D.new()
+	fade_ramp.gradient = fade
+	process.color_ramp = fade_ramp
 
 	var hits := float(DROPS) / ((HEIGHT + 1.0) / SPEED.x)
-	var amount := int(hits * SPLASH_LIFE * float(SPLASH_PER_HIT) * 0.8)
+	var amount := int(hits * SPLASH_LIFE * float(SPLASH_PER_HIT) * SPLASH_SHARE)
 	_splashes = GPUParticles3D.new()
 	_splashes.name = "Splashes"
 	_splashes.amount = amount
@@ -245,7 +286,7 @@ func _splash() -> void:
 	_splashes.interpolate = true
 	_splashes.transform_align = GPUParticles3D.TRANSFORM_ALIGN_Z_BILLBOARD_Y_TO_VELOCITY
 	_splashes.process_material = process
-	_splashes.draw_pass_1 = RainLook.streak_mesh(SPLASH, SPLASH_ALPHA, 0.5)
+	_splashes.draw_pass_1 = RainLook.streak_mesh(SPLASH, RainLook.drop_look(SPRAY_LOOK))
 	_splashes.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_splashes.visibility_aabb = _local(_box)
 	add_child(_splashes)
@@ -335,7 +376,7 @@ func _drip(rules: BuildingRules, plan: BuildingPlan, deck: float) -> void:
 	_drips.collision_base_size = 0.02
 	_drips.transform_align = GPUParticles3D.TRANSFORM_ALIGN_Z_BILLBOARD_Y_TO_VELOCITY
 	_drips.process_material = process
-	_drips.draw_pass_1 = RainLook.streak_mesh(DRIP, 0.6, 0.4)
+	_drips.draw_pass_1 = RainLook.streak_mesh(DRIP, RainLook.drop_look(SPRAY_LOOK))
 	_drips.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_drips.visibility_aabb = _local(_box)
 	add_child(_drips)
@@ -371,6 +412,32 @@ func _wet(rules: BuildingRules, deck: float) -> void:
 	wet.upper_fade = 0.05
 	wet.lower_fade = 0.05
 	add_child(wet)
+
+
+## Дымка над крышей: объёмный туман над всем настилом, гуще у него самого.
+## Нижний край — чуть под настилом: этажи под крышей в дымку не попадают.
+func _fog(rules: BuildingRules, deck: float) -> void:
+	var bounds := rules.floor_span(BuildingRules.ROOF)
+	var look := ShaderMaterial.new()
+	look.shader = MIST_SHADER
+	look.set_shader_parameter("density", MIST_DENSITY)
+	look.set_shader_parameter("deck_boost", MIST_SPRAY)
+	look.set_shader_parameter("deck_y", deck)
+	look.set_shader_parameter("back_z", _box.position.z)
+	_mist = FogVolume.new()
+	_mist.name = "Mist"
+	_mist.shape = RenderingServer.FOG_VOLUME_SHAPE_BOX
+	_mist.size = Vector3(bounds.y - bounds.x + 1.0, MIST_HEIGHT, 5.0)
+	_mist.position = Vector3((bounds.x + bounds.y) * 0.5, deck + MIST_HEIGHT * 0.5 - 0.1, -0.8)
+	_mist.material = look
+	add_child(_mist)
+
+
+## Ореол лампы в дожде и её конус в дымке.
+func _glow(lamp: OmniLight3D) -> void:
+	lamp.light_volumetric_fog_energy = LAMP_IN_FOG
+	_halo = RainLook.halo(lamp.position + Vector3(0.0, 0.0, -1.5), lamp.light_color)
+	add_child(_halo)
 
 
 ## Лужи по шуму: сухое до середины шума, лужа — выше неё.

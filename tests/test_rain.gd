@@ -160,3 +160,71 @@ func test_the_city_rains_in_layers_only_when_it_rains() -> void:
 	assert_eq(clear_city.find_children("Layer*", "GPUParticles3D", true, false).size(), 0)
 	assert_null(_rain_of(clear), "дождь над крышей в сухую погоду")
 	remove_child(clear)
+
+
+## Режимы отрисовки шейдера: что стоит в его [code]render_mode[/code].
+func _render_modes(look: ShaderMaterial) -> PackedStringArray:
+	for line in look.shader.code.split("\n"):
+		if line.begins_with("render_mode"):
+			var modes := PackedStringArray()
+			for mode in line.trim_prefix("render_mode").trim_suffix(";").split(","):
+				modes.append(mode.strip_edges())
+			return modes
+	return PackedStringArray()
+
+
+## Капли видны светом (решение 3, дополнение): шейдер со светом ламп, а не
+## своего цвета, и без тумана — сложение с туманом высветляло город вдвое.
+## Так у капель над крышей, у брызг, у капели и у струй города.
+func test_drops_are_lit_and_fog_free() -> void:
+	var level := _level(_rainy_seeds(1)[0])
+	var rain := _rain_of(level)
+	var looks: Array[ShaderMaterial] = []
+	for particles: GPUParticles3D in [
+		rain.drops(), rain.get_node("Splashes"), rain.get_node("Drips")
+	]:
+		looks.append((particles.draw_pass_1 as QuadMesh).material as ShaderMaterial)
+	var city := level.get_node("Scenery/City/CityView") as SubViewport
+	for node: Node in city.find_children("Layer*", "GPUParticles3D", true, false):
+		looks.append(((node as GPUParticles3D).draw_pass_1 as QuadMesh).material as ShaderMaterial)
+	for look in looks:
+		var modes := _render_modes(look)
+		assert_false(modes.has("unshaded"), "капля своего цвета, а не светом ламп")
+		assert_true(modes.has("fog_disabled"), "на каплю ложится туман")
+		assert_true(modes.has("blend_add"), "капля не светится поверх фона")
+	for node: Node in city.find_children("Curtain*", "MeshInstance3D", true, false):
+		var curtain := ((node as MeshInstance3D).mesh as QuadMesh).material as ShaderMaterial
+		assert_true(_render_modes(curtain).has("fog_disabled"), "на завесу ложится туман")
+	remove_child(level)
+
+
+## Дымка над крышей — объёмный туман, и её нет там, где тумана нет: на низком.
+## Ореол у лампы над крышей и у неона — на любом уровне.
+func test_mist_and_halos_follow_the_quality_level() -> void:
+	var level := _level(_rainy_seeds(1)[0])
+	var rain := _rain_of(level)
+	var sign_board := level.find_children("VerticalSign", "", true, false)
+	assert_eq(sign_board.size(), 1, "вывески нет")
+	for quality: Graphics.Quality in [
+		Graphics.Quality.LOW, Graphics.Quality.MEDIUM, Graphics.Quality.HIGH, Graphics.Quality.ULTRA
+	]:
+		Graphics.broadcast(quality)
+		assert_eq(rain.mist().visible, Graphics.volumetric_fog(), "дымка на уровне %d" % quality)
+		assert_true(rain.halo().visible, "ореола лампы нет на уровне %d" % quality)
+	assert_not_null((sign_board[0] as VerticalSign).halo(), "у неона в дожде нет ореола")
+	var box := AABB(rain.mist().global_position - rain.mist().size * 0.5, rain.mist().size)
+	var deck := WorldSpace.height_to_scene(level.rules.floor_surface(BuildingRules.ROOF))
+	assert_gt(box.position.y, deck - 0.3, "дымка уходит в этажи под крышей")
+	Graphics.broadcast(Graphics.Quality.HIGH)
+	remove_child(level)
+
+
+## В сухую погоду ни дымки, ни ореолов: воздух прозрачный.
+func test_no_mist_or_halos_when_dry() -> void:
+	var dry := 1
+	while Weather.is_raining(Weather.of_seed(dry)):
+		dry += 1
+	var level := _level(dry)
+	assert_eq(level.find_children("Mist", "FogVolume", true, false).size(), 0, "дымка в сухую")
+	assert_eq(level.find_children("Halo", "MeshInstance3D", true, false).size(), 0, "ореол в сухую")
+	remove_child(level)
