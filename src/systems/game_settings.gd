@@ -29,6 +29,11 @@ var window_mode: int = DisplayModes.Mode.WINDOWED
 var resolution: Vector2i = DisplayModes.DEFAULT_RESOLUTION
 ## Масштаб 3D-рендера, доля разрешения окна (FSR ниже единицы).
 var render_scale: float = 1.0
+## Предел кадров — один из [constant DisplayModes.FRAME_LIMITS]. По умолчанию
+## «по монитору»: как было до настройки, кадры держит синхронизация.
+var frame_limit: int = DisplayModes.FRAME_MONITOR
+## Вертикальная синхронизация. Включена, как в проекте по умолчанию.
+var vsync: bool = true
 ## Уровень сложности — DIP-переключатель автомата, 0–3: стартовый навык партии,
 ## к которому прибавляются пройденные здания (ADR-0027, решение 8).
 var difficulty: int = 0
@@ -45,6 +50,9 @@ var show_fps: bool = false
 ## Режим и размер, уже поставленные окну: [method apply] зовётся на любую
 ## настройку, а окно трогается только тогда, когда они сменились.
 var _window_applied: Array = []
+## Синхронизация, уже поставленная окну: смена её пересоздаёт цепочку кадров,
+## и делать это на каждое [method apply] незачем. Пусто — ещё не ставилась.
+var _vsync_applied: Array = []
 
 
 ## Настройки с диска. Файла нет — значения по умолчанию, язык по локали системы.
@@ -80,6 +88,10 @@ static func load_from(path: String = PATH) -> GameSettings:
 		DisplayModes.RENDER_SCALES[-1],
 		1.0
 	)
+	var limit := int(file.get_value(SECTION, "frame_limit", settings.frame_limit))
+	if DisplayModes.FRAME_LIMITS.has(limit):
+		settings.frame_limit = limit
+	settings.vsync = bool(file.get_value(SECTION, "vsync", settings.vsync))
 	settings.blood = bool(file.get_value(SECTION, "blood", settings.blood))
 	settings.show_fps = bool(file.get_value(SECTION, "show_fps", settings.show_fps))
 	settings.difficulty = clampi(
@@ -115,6 +127,8 @@ func save_to(path: String = PATH) -> void:
 	file.set_value(SECTION, "window_mode", window_mode)
 	file.set_value(SECTION, "resolution", resolution)
 	file.set_value(SECTION, "render_scale", render_scale)
+	file.set_value(SECTION, "frame_limit", frame_limit)
+	file.set_value(SECTION, "vsync", vsync)
 	file.set_value(SECTION, "difficulty", difficulty)
 	file.set_value(SECTION, "quality", quality)
 	file.set_value(SECTION, "quality_measured", quality_measured)
@@ -123,7 +137,7 @@ func save_to(path: String = PATH) -> void:
 	file.save(path)
 
 
-## Применяет настройки к игре: шины, язык, окно и графику.
+## Применяет настройки к игре: шины, язык, окно, кадры и графику.
 ##
 ## Один метод на всё, потому что применять их надо вместе и в одном порядке:
 ## иначе меню меняет громкость, а язык остаётся от прошлого запуска.
@@ -145,6 +159,11 @@ func apply() -> void:
 		var tree := Engine.get_main_loop() as SceneTree
 		if tree != null:
 			DisplayModes.apply_scale(render_scale, tree.root)
+		if _vsync_applied != [vsync]:
+			DisplayModes.apply_vsync(vsync)
+			_vsync_applied = [vsync]
+	# Предел кадров — у движка, а не у окна: ставится и без него.
+	DisplayModes.apply_frame_limit(frame_limit, vsync)
 	Graphics.broadcast(quality as Graphics.Quality)
 	Blood.enabled = blood
 	Hud.show_fps = show_fps

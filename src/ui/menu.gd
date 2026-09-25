@@ -238,6 +238,8 @@ func _build_settings() -> void:
 		_window_mode()
 		_resolution()
 		_render_scale()
+		_frame_limit()
+		_vsync()
 		_blood()
 		_fps()
 	_gap(10.0)
@@ -453,6 +455,44 @@ func _render_scale() -> void:
 		func(value: Variant) -> void:
 			settings.render_scale = DisplayModes.RENDER_SCALES[int(value)]
 			settings.apply()
+	)
+
+
+## Предел кадров: по монитору, числом или без предела. Частоты монитора в
+## списке нет — Godot их не перечисляет и не меняет ([constant DisplayModes.FRAME_LIMITS]).
+func _frame_limit() -> void:
+	var names: Array[String] = []
+	for limit: int in DisplayModes.FRAME_LIMITS:
+		names.append(frame_limit_name(limit))
+	var current := maxi(DisplayModes.FRAME_LIMITS.find(settings.frame_limit), 0)
+	var row := _add_row(MenuRow.choice(tr("UI_FRAME_LIMIT"), names, current))
+	row.changed.connect(
+		func(value: Variant) -> void:
+			settings.frame_limit = DisplayModes.FRAME_LIMITS[int(value)]
+			settings.apply()
+			settings.save_to()
+	)
+
+
+## Подпись предела кадров: числа — как счётчик в углу HUD, «144 FPS».
+func frame_limit_name(limit: int) -> String:
+	match limit:
+		DisplayModes.FRAME_MONITOR:
+			return tr("UI_FRAME_LIMIT_MONITOR")
+		DisplayModes.FRAME_UNLIMITED:
+			return tr("UI_FRAME_LIMIT_NONE")
+		_:
+			return "%d FPS" % limit
+
+
+## Вертикальная синхронизация: без неё кадров больше, но бывают разрывы.
+func _vsync() -> void:
+	var row := _add_row(MenuRow.toggle(tr("UI_VSYNC"), settings.vsync))
+	row.changed.connect(
+		func(value: Variant) -> void:
+			settings.vsync = bool(value)
+			settings.apply()
+			settings.save_to()
 	)
 
 
