@@ -148,6 +148,8 @@ func play(name: String) -> void:
 
 	var player := _sfx[_next]
 	_next = (_next + 1) % _sfx.size()
+	# Голоса общие, а шина у звука своя: меню и джинглы мимо глушения коридора.
+	player.bus = Sounds.bus_of(name)
 	player.stream = stream
 	player.play()
 	if Sounds.JINGLES.has(name):
@@ -214,7 +216,8 @@ func music_muffled() -> bool:
 	return not _muffled_by.is_empty()
 
 
-## Звуки мира из-за стены — Otto за красной дверью.
+## Звуки мира из-за стены — Otto за красной дверью. Глушится шина эффектов с
+## фоном; меню и джинглы идут мимо неё ([constant Sounds.INTERFACE_BUS]).
 func muffle_world(on: bool) -> void:
 	if _world_muffled == on:
 		return
@@ -309,8 +312,19 @@ func set_level(bus: String, level: float) -> void:
 	# настройкам громкость шины, которой нет.
 	var value := clampf(level, 0.0, 1.0)
 	_levels[bus] = value
-	# Тишина — это не «минус восемьдесят децибел», а выключенная шина: на малых
-	# громкостях логарифм уходит в минус бесконечность и трещит по дороге.
+	_apply_level(index, value)
+	# Интерфейс и джинглы — мимо шины эффектов, но под её ползунком: в
+	# настройках их громкость всегда была громкостью эффектов, и своей шиной
+	# они обзавелись ради глушения за дверью, а не ради ещё одного ползунка.
+	if bus == Sounds.SFX_BUS:
+		var interface := AudioServer.get_bus_index(Sounds.INTERFACE_BUS)
+		if interface >= 0:
+			_apply_level(interface, value)
+
+
+## Тишина — это не «минус восемьдесят децибел», а выключенная шина: на малых
+## громкостях логарифм уходит в минус бесконечность и трещит по дороге.
+static func _apply_level(index: int, value: float) -> void:
 	AudioServer.set_bus_mute(index, is_zero_approx(value))
 	AudioServer.set_bus_volume_db(index, linear_to_db(maxf(value, 0.0001)))
 
