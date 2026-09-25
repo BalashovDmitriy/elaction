@@ -16,14 +16,6 @@ const ROOF_LIGHT_ENERGY: float = 2.4
 const ROOF_LIGHT_RANGE: float = 14.0
 const ROOF_LIGHT_HEIGHT: float = 4.0
 
-## Дождь над крышей: сколько капель и с какой высоты над настилом они падают.
-## Внутри здания погоды нет, а крыша — снаружи.
-const ROOF_RAIN_DROPS: int = 140
-const ROOF_RAIN_HEIGHT: float = 7.0
-## Наклон капель над крышей (снос вбок на метр падения) и разброс, градусы.
-const ROOF_RAIN_SLANT: float = 0.1
-const ROOF_RAIN_SPREAD: float = 2.0
-
 ## Во сколько раз светлеет окружающий свет здания во вспышке молнии.
 const FLASH_AMBIENT: float = 2.5
 
@@ -34,7 +26,10 @@ var identity: BuildingIdentity = null
 
 ## Воздух здания и дождь над крышей: их перестраивает [method apply_graphics].
 var _air: WorldEnvironment = null
-var _rain_node: GPUParticles3D = null
+var _rain_node: RoofRain = null
+var _roof_light: OmniLight3D = null
+## Крыша и её техника: с них снимается карта высот дождя.
+var _roof_parts: Array[Node] = []
 var _city: CityBackdrop = null
 ## Окружающий свет воздуха без вспышки: от него считается вспышка молнии.
 var _ambient: float = 0.0
@@ -66,6 +61,7 @@ func build(
 	kit.name = "RoofKit"
 	add_child(kit)
 	kit.build(rules, plan, building_seed)
+	_roof_parts = [roof, kit] as Array[Node]
 	var sign_board := VerticalSign.new()
 	add_child(sign_board)
 	sign_board.hang(rules, identity)
@@ -87,8 +83,12 @@ func build(
 	add_child(city)
 	city.build(rules, building_seed, weather)
 	if Weather.is_raining(weather):
-		_rain_node = _roof_rain(rules)
+		# Капли гаснут о крышу, а не по таймеру (ADR-0037, решение 3).
+		_rain_node = RoofRain.new()
+		_rain_node.name = "RoofRain"
 		add_child(_rain_node)
+		_rain_node.build(rules, plan, _roof_light.position, ROOF_LIGHT_COLOR)
+		_rain_node.catch_on(_roof_parts)
 	# Молнии — только в дождь: в ясную ночь и в туман воздух покадрово не трогается.
 	set_process(Weather.is_raining(weather))
 	add_to_group(Graphics.GROUP)
@@ -103,14 +103,25 @@ func _process(_delta: float) -> void:
 	_air.environment.ambient_light_energy = _ambient * (1.0 + _city.flash_level() * FLASH_AMBIENT)
 
 
-## Отражения, контактные тени, объёмный туман и доля капель над крышей по уровню
-## качества (ADR-0030, решение 5). Уровень меняют посреди партии, и применяется
-## он к этому зданию, а не со следующего: воздух собран на всё здание один раз.
+## Дождь над крышей гаснет и о то, что на ней построили другие строители
+## уровня: плиту и парапеты, машинное отделение, торцы плит ([RoofRain]).
+func catch_rain(roots: Array[Node]) -> void:
+	if _rain_node != null:
+		_rain_node.catch_on(roots)
+
+
+## Дождь над крышей — чтобы тест мог проверить, где гаснут капли.
+func roof_rain() -> RoofRain:
+	return _rain_node
+
+
+## Отражения, контактные тени и объёмный туман по уровню качества (ADR-0030,
+## решение 5). Уровень меняют посреди партии, и применяется он к этому
+## зданию, а не со следующего: воздух собран на всё здание один раз. Долю
+## капель дождь над крышей пересчитывает сам ([RoofRain]).
 func apply_graphics() -> void:
 	if _air != null:
 		Graphics.apply_to(_air.environment)
-	if _rain_node != null:
-		_rain_node.amount = maxi(int(float(ROOF_RAIN_DROPS) * Graphics.rain_share()), 1)
 
 
 ## Лампа над крышей. Светлой зону делает собственный источник, а не отсутствие
@@ -128,35 +139,4 @@ func _light_the_roof(rules: BuildingRules) -> void:
 	sky_light.omni_range = ROOF_LIGHT_RANGE
 	sky_light.position = WorldSpace.to_scene(over_roof)
 	add_child(sky_light)
-
-
-## Капли над крышей: падают с неба до настила и там кончаются — время жизни
-## ровно на эту высоту, столкновения частицам не нужны.
-##
-## Сыплются между парапетами и со сдвигом против сноса: из коробки во всю
-## ширину крыши капли у правого парапета выносило за стену, и они гасли в
-## воздухе снаружи башни, на высоте настила (авторевью M19).
-func _roof_rain(rules: BuildingRules) -> GPUParticles3D:
-	var span := rules.floor_span(BuildingRules.ROOF)
-	var width := span.y - span.x
-	var inner := Vector2(span.x + BuildingShell.WALL_WIDTH, span.y - BuildingShell.WALL_WIDTH)
-	var drift := ROOF_RAIN_HEIGHT * (ROOF_RAIN_SLANT + tan(deg_to_rad(ROOF_RAIN_SPREAD)))
-	var emitting := Vector2(inner.x, maxf(inner.y - drift, inner.x))
-	var rain := CityBackdrop.rain_particles(
-		ROOF_RAIN_DROPS,
-		ROOF_RAIN_HEIGHT / CityBackdrop.RAIN_SPEED,
-		Vector3((emitting.y - emitting.x) * 0.5, 0.2, WorldSpace.CORRIDOR_DEPTH * 0.5),
-		Vector3(ROOF_RAIN_SLANT, -1.0, 0.0),
-		ROOF_RAIN_SPREAD,
-		Vector2(CityBackdrop.RAIN_SPEED, CityBackdrop.RAIN_SPEED)
-	)
-	rain.name = "RoofRain"
-	var surface := rules.floor_surface(BuildingRules.ROOF)
-	rain.position = WorldSpace.to_scene(
-		Vector2((emitting.x + emitting.y) * 0.5, surface - ROOF_RAIN_HEIGHT)
-	)
-	rain.visibility_aabb = AABB(
-		Vector3(-width, -ROOF_RAIN_HEIGHT - 1.0, -2.0),
-		Vector3(width * 2.0, ROOF_RAIN_HEIGHT + 2.0, 4.0)
-	)
-	return rain
+	_roof_light = sky_light

@@ -23,12 +23,22 @@ const CANVAS_LAYER: int = -1
 ## относительно дальнего.
 const CAMERA_DISTANCE: float = 30.0
 
+## Ближняя и дальняя плоскости камеры города, м. Ближе шестидесяти метров в
+## городе ничего нет, а точность глубины растёт с ближней плоскостью.
+const LENS_NEAR: float = 1.0
+const CITY_FAR: float = 700.0
+
 ## Расфокус города (ADR-0030, решение 2): резко до ближнего ряда, дальше —
 ## размыто, и тем сильнее, чем дальше. Плоскость игры не трогается — у основной
 ## камеры глубины резкости нет.
-const BLUR_FROM: float = 90.0
-const BLUR_OVER: float = 140.0
-const BLUR_AMOUNT: float = 0.06
+##
+## Отсчёт — от камеры города, а она в тридцати метрах перед плоскостью игры:
+## ближний ряд ([constant CityPlan.ROWS]) стоит от 90 до 102 м от неё. При
+## начале расфокуса на 90 м граница резала ближний ряд по фасаду, и половина
+## его окон была резкой, половина — нет (ADR-0037, решение 4).
+const BLUR_FROM: float = 106.0
+const BLUR_OVER: float = 120.0
+const BLUR_AMOUNT: float = 0.035
 
 ## Дом — тёмная коробка: его видно дымкой и окнами, а не гранями.
 const FACADE := Color(0.012, 0.014, 0.022)
@@ -46,14 +56,6 @@ const WINDOW_FADE: Array[float] = [1.0, 0.75, 0.55, 0.4]
 ## сеткой окон, а не россыпью огней (ADR-0031, решение 6).
 const WINDOW_DARK := Color(0.05, 0.06, 0.09)
 
-## Дождь: сколько капель в виду, их вид и скорость, м/с. Редкий и прозрачный:
-## на первых кадрах густой дождь над крышей закрывал Otto — погода фон, а не
-## занавес.
-const RAIN_DROPS: int = 900
-const RAIN_DROP := Vector2(0.025, 1.1)
-const RAIN_COLOR := Color(0.65, 0.72, 0.9, 0.16)
-const RAIN_SPEED: float = 28.0
-
 ## Во сколько раз небо ярче во вспышке молнии, и как сильно загораются стёкла.
 const FLASH_SKY: float = 4.0
 const FLASH_GLASS := Color(0.55, 0.6, 0.75)
@@ -62,9 +64,10 @@ var _view: SubViewport = null
 var _camera: Camera3D = null
 var _ground: float = 0.0
 var _rules: BuildingRules = null
-var _rain_node: GPUParticles3D = null
+## Струи дождя у камеры города: их долю пересчитывает уровень качества.
+var _rain_layers: Array[GPUParticles3D] = []
 var _city_air: Environment = null
-var _dark_glass: StandardMaterial3D = null
+var _dark_glass: ShaderMaterial = null
 var _fog_banks: Node3D = null
 var _lightning: Lightning = null
 ## Вспышка, которая сейчас стоит на небе и в стёклах.
@@ -89,8 +92,9 @@ func build(rules: BuildingRules, building_seed: int, weather: Weather.Kind) -> v
 	_view.add_child(air)
 
 	_camera = Camera3D.new()
-	_camera.projection = Camera3D.PROJECTION_PERSPECTIVE
-	_camera.far = 700.0
+	_camera.projection = Camera3D.PROJECTION_FRUSTUM
+	_camera.near = LENS_NEAR
+	_camera.far = CITY_FAR
 	_camera.current = true
 	var focus := CameraAttributesPractical.new()
 	focus.dof_blur_far_enabled = true
@@ -101,15 +105,13 @@ func build(rules: BuildingRules, building_seed: int, weather: Weather.Kind) -> v
 	_view.add_child(_camera)
 
 	var blocks := CityPlan.generate(building_seed, 0.0, rules.width)
-	var facades := _facades(blocks)
-	_view.add_child(facades)
+	_view.add_child(_facades(blocks))
 	_view.add_child(_windows(blocks))
 	var dark := _dark_windows(blocks)
-	_dark_glass = (dark.multimesh.mesh as QuadMesh).material as StandardMaterial3D
+	_dark_glass = (dark.multimesh.mesh as QuadMesh).material as ShaderMaterial
 	_view.add_child(dark)
 	# Детали города (M22): верхи, огни, неон, зарево улиц.
-	var facade_look := (facades.multimesh.mesh as BoxMesh).material
-	_view.add_child(CityDetails.crowns(blocks, _ground, facade_look))
+	_view.add_child(CityDetails.crowns(blocks, _ground, _unshaded(FACADE)))
 	_view.add_child(CityDetails.beacons(blocks, _ground))
 	_view.add_child(CityDetails.signs(blocks, _ground))
 	_view.add_child(CityDetails.street_glow(_ground, 0.0, rules.width))
@@ -120,8 +122,9 @@ func build(rules: BuildingRules, building_seed: int, weather: Weather.Kind) -> v
 			_fog_banks = CityDetails.fog_banks(building_seed, 0.0, rules.width, _ground)
 			_view.add_child(_fog_banks)
 		Weather.Kind.RAIN:
-			_rain_node = _rain()
-			_camera.add_child(_rain_node)
+			# Слои струй у камеры и завесы между рядами (ADR-0037, решение 3).
+			_view.add_child(RainLook.city(_camera, _ground, 0.0, rules.width))
+			_rain_layers = RainLook.city_layers(_camera)
 			_lightning = Lightning.new()
 			_lightning.setup(building_seed, Vector2(0.0, rules.width), _ground)
 			_view.add_child(_lightning)
@@ -150,41 +153,6 @@ static func show_behind(environment: Environment) -> void:
 	environment.background_canvas_max_layer = CANVAS_LAYER
 
 
-## Капли дождя: частицы из коробки [param extents], падают в мире, а не за
-## излучателем. Одни на город и крышу — у дождя один вид, и собирать его
-## дважды значило бы развести капли при первой правке.
-static func rain_particles(
-	amount: int,
-	lifetime: float,
-	extents: Vector3,
-	direction: Vector3,
-	spread: float,
-	speed: Vector2
-) -> GPUParticles3D:
-	var process := ParticleProcessMaterial.new()
-	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	process.emission_box_extents = extents
-	process.direction = direction
-	process.spread = spread
-	process.initial_velocity_min = speed.x
-	process.initial_velocity_max = speed.y
-	process.gravity = Vector3.ZERO
-
-	var drop := QuadMesh.new()
-	drop.size = RAIN_DROP
-	var look := _unshaded(RAIN_COLOR)
-	look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	drop.material = look
-
-	var rain := GPUParticles3D.new()
-	rain.amount = amount
-	rain.lifetime = lifetime
-	rain.local_coords = false
-	rain.process_material = process
-	rain.draw_pass_1 = drop
-	return rain
-
-
 ## Повторяет ход основной камеры: те же x, y и наклон, своя глубина и угол
 ## обзора, при котором плоскость игры видна в том же масштабе.
 func _process(delta: float) -> void:
@@ -197,7 +165,7 @@ func _process(delta: float) -> void:
 			_flash_shown = flash
 			_city_air.background_energy_multiplier = 1.0 + flash * (FLASH_SKY - 1.0)
 			# Отсвет молнии в стёклах: погасшие окна загораются отражённым небом.
-			_dark_glass.albedo_color = Color.WHITE.lerp(Color.WHITE + FLASH_GLASS * 6.0, flash)
+			_dark_glass.set_shader_parameter("flash", flash)
 	var main := get_viewport().get_camera_3d()
 	if main == null or _camera == null:
 		return
@@ -210,14 +178,33 @@ func _process(delta: float) -> void:
 	)
 	if not visible:
 		return
-	var place := main.global_position
-	# На оси основной камеры, только дальше от плоскости игры: основная стоит
-	# выше цели на свой наклон, и камера города, поставленная прямо против
-	# цели, сдвигала бы город на 3.5 м вниз (авторевью M19).
+	follow(main)
+
+
+## Ставит камеру города по основной [param main]: на её оси, дальше от
+## плоскости игры, и смотрит ровно вглубь (ADR-0037, решение 4).
+##
+## На оси основной, потому что основная стоит выше цели на свой наклон, и
+## камера города, поставленная прямо против цели, сдвигала бы город на 3.5 м
+## вниз (авторевью M19). Ровно, а не с наклоном основной: у перспективы с
+## наклоном вертикали сходятся, края окон идут ступенькой, и на ходу ступеньки
+## ползут по рядам окон. Вид сверху даёт сдвиг объектива — кадр смещается вниз
+## в той же плоскости, и вертикали остаются вертикалями.
+func follow(main: Camera3D) -> void:
 	var back := main.global_basis.z * (CAMERA_DISTANCE - SideCamera.DISTANCE)
-	_camera.global_transform = Transform3D(main.global_basis, place + back)
-	if main.projection == Camera3D.PROJECTION_ORTHOGONAL:
-		_camera.fov = rad_to_deg(2.0 * atan(main.size * 0.5 / CAMERA_DISTANCE))
+	var place := main.global_position + back
+	_camera.global_transform = Transform3D(Basis.IDENTITY, place)
+	# Куда смотрела ось основной камеры — там середина кадра: на плоскости игры
+	# она ниже камеры на глубину, помноженную на наклон.
+	var ahead := -main.global_basis.z
+	var depth := maxf(place.z, 1.0)
+	var drop := ahead.y / maxf(-ahead.z, 0.01)
+	var height := main.size
+	if main.projection != Camera3D.PROJECTION_ORTHOGONAL:
+		height = 2.0 * CAMERA_DISTANCE * tan(deg_to_rad(main.fov) * 0.5)
+	_camera.set_frustum(
+		height * LENS_NEAR / depth, Vector2(0.0, drop * LENS_NEAR), LENS_NEAR, CITY_FAR
+	)
 
 
 ## Виден ли город в кадре [param view] (координаты правил): да, если в кадр
@@ -241,8 +228,9 @@ func flash_level() -> float:
 ## Разрешение и дождь по уровню качества (ADR-0030, решение 5).
 func apply_graphics() -> void:
 	_fit_view()
-	if _rain_node != null:
-		_rain_node.amount = maxi(int(float(RAIN_DROPS) * Graphics.rain_share()), 1)
+	Graphics.smooth(_view)
+	for layer in _rain_layers:
+		RainLook.scale_amount(layer, Graphics.rain_share())
 
 
 func _fit_view() -> void:
@@ -282,11 +270,14 @@ static func _unshaded(color: Color, vertex_colors: bool = false) -> StandardMate
 
 
 ## Коробки домов одним мультимешем: их сотни, и по узлу на дом не нужно.
+## Пояса, простенки и карниз рисует шейдер ([CityLook]), тон — тип дома.
 func _facades(blocks: Array[CityPlan.Block]) -> MultiMeshInstance3D:
 	var box := BoxMesh.new()
-	box.material = _unshaded(FACADE)
+	box.material = CityLook.facade()
 	var many := MultiMesh.new()
 	many.transform_format = MultiMesh.TRANSFORM_3D
+	many.use_colors = true
+	many.use_custom_data = true
 	many.mesh = box
 	many.instance_count = blocks.size()
 	for index in blocks.size():
@@ -294,6 +285,8 @@ func _facades(blocks: Array[CityPlan.Block]) -> MultiMeshInstance3D:
 		var basis := Basis.from_scale(Vector3(block.width, block.height, block.depth))
 		var centre := Vector3(block.x, _ground + block.height * 0.5, block.z)
 		many.set_instance_transform(index, Transform3D(basis, centre))
+		many.set_instance_color(index, CityLook.facade_tone(block))
+		many.set_instance_custom_data(index, CityLook.facade_custom(block))
 	var node := MultiMeshInstance3D.new()
 	node.name = "Facades"
 	node.multimesh = many
@@ -304,16 +297,18 @@ func _facades(blocks: Array[CityPlan.Block]) -> MultiMeshInstance3D:
 func _windows(blocks: Array[CityPlan.Block]) -> MultiMeshInstance3D:
 	var places: Array[Transform3D] = []
 	var colors: Array[Color] = []
+	var customs: Array[Color] = []
 	for block in blocks:
 		for window: Vector2i in block.lit:
 			places.append(_window_place(block, window))
+			customs.append(CityLook.window_custom(block, window, true))
 			# Холодное окно — по хешу окна и дома, а не по диагонали сетки: иначе
 			# по всему городу шёл один и тот же узор (авторевью M19).
 			var cold := hash([block.x, window]) % 3 == 0
 			var tone := WINDOW_COLD if cold else WINDOW_WARM
 			var fade := WINDOW_FADE[mini(block.row, WINDOW_FADE.size() - 1)]
 			colors.append(Color(tone.r * fade, tone.g * fade, tone.b * fade))
-	return _window_quads("Windows", places, colors, false)
+	return _window_quads("Windows", places, colors, customs, true)
 
 
 ## Погасшие окна — вся остальная сетка фасада — своим мультимешем.
@@ -324,6 +319,7 @@ func _windows(blocks: Array[CityPlan.Block]) -> MultiMeshInstance3D:
 func _dark_windows(blocks: Array[CityPlan.Block]) -> MultiMeshInstance3D:
 	var places: Array[Transform3D] = []
 	var colors: Array[Color] = []
+	var customs: Array[Color] = []
 	for block in blocks:
 		var grid := CityPlan.window_grid(block)
 		var burning: Dictionary = {}
@@ -336,7 +332,8 @@ func _dark_windows(blocks: Array[CityPlan.Block]) -> MultiMeshInstance3D:
 					continue
 				places.append(_window_place(block, cell))
 				colors.append(WINDOW_DARK)
-	return _window_quads("DarkWindows", places, colors, true)
+				customs.append(CityLook.window_custom(block, cell, false))
+	return _window_quads("DarkWindows", places, colors, customs, false)
 
 
 ## Где на фасаде дома [param block] окно [param cell] сетки: колонка и этаж.
@@ -346,45 +343,32 @@ func _window_place(block: CityPlan.Block, cell: Vector2i) -> Transform3D:
 	var x := left + float(cell.x) * CityPlan.WINDOW_STEP.x
 	var y := _ground + CityPlan.WINDOW_STEP.y * (float(cell.y) + 1.0)
 	var front := block.z + block.depth * 0.5 + 0.05
-	return Transform3D(Basis.IDENTITY, Vector3(x, y, front))
+	return Transform3D(Basis.from_scale(CityLook.window_scale(block)), Vector3(x, y, front))
 
 
-## Окна одним мультимешем: квад на окно, цвет — вершинный. [param fogged] —
-## берут ли они дымку города.
+## Окна одним мультимешем: квад на окно, цвет — вершинный, что за стеклом —
+## в данных окна ([CityLook]). [param lit] — горящие: мимо дымки города.
 static func _window_quads(
-	title: String, places: Array[Transform3D], colors: Array[Color], fogged: bool
+	title: String,
+	places: Array[Transform3D],
+	colors: Array[Color],
+	customs: Array[Color],
+	lit: bool
 ) -> MultiMeshInstance3D:
 	var quad := QuadMesh.new()
 	quad.size = WINDOW_SIZE
-	var look := _unshaded(Color.WHITE, true)
-	look.disable_fog = not fogged
-	quad.material = look
+	quad.material = CityLook.windows(lit)
 	var many := MultiMesh.new()
 	many.transform_format = MultiMesh.TRANSFORM_3D
 	many.use_colors = true
+	many.use_custom_data = true
 	many.mesh = quad
 	many.instance_count = places.size()
 	for index in places.size():
 		many.set_instance_transform(index, places[index])
 		many.set_instance_color(index, colors[index])
+		many.set_instance_custom_data(index, customs[index])
 	var node := MultiMeshInstance3D.new()
 	node.name = title
 	node.multimesh = many
 	return node
-
-
-## Дождь перед камерой города: частицы едут вместе с ней, но падают в мире.
-func _rain() -> GPUParticles3D:
-	var rain := rain_particles(
-		RAIN_DROPS,
-		1.6,
-		Vector3(40.0, 2.0, 30.0),
-		Vector3(0.15, -1.0, 0.0),
-		3.0,
-		Vector2(RAIN_SPEED, RAIN_SPEED * 1.2)
-	)
-	rain.name = "Rain"
-	# Облако капель — над кадром и перед камерой: падают они сквозь весь вид.
-	rain.position = Vector3(0.0, 20.0, -35.0)
-	rain.visibility_aabb = AABB(Vector3(-60.0, -80.0, -60.0), Vector3(120.0, 120.0, 120.0))
-	return rain

@@ -19,8 +19,12 @@ enum Quality { LOW, MEDIUM, HIGH, ULTRA }
 const GROUP := &"graphics"
 
 ## Доля разрешения окна, в которой рисуется город, по уровню. Он в дымке и
-## размыт по замыслу, а второй кадр в полном разрешении стоил бы вдвое.
-const CITY_SHARE: Array[float] = [0.34, 0.5, 0.5, 0.67]
+## размыт по замыслу, и на низких уровнях второй кадр в полном разрешении
+## стоил бы вдвое. С M24a у ближнего ряда рамы, переплёты и жизнь за стеклом
+## (ADR-0037, решение 4): на высоком город рисуется в три четверти окна, на
+## «Ультра» — в полное. Сам город дёшев — коробки и квады без света, — и
+## замер кадра разницу почти не видит.
+const CITY_SHARE: Array[float] = [0.34, 0.5, 0.75, 1.0]
 
 ## Доля капель дождя по уровню.
 const RAIN_SHARE: Array[float] = [0.25, 0.5, 1.0, 1.0]
@@ -105,13 +109,7 @@ static func apply_to(environment: Environment) -> void:
 
 ## Сглаживание и тени — свойства окна, а не воздуха: ставятся на корневое окно.
 static func apply_to_viewport(viewport: Viewport) -> void:
-	viewport.msaa_3d = MSAA[quality]
-	viewport.screen_space_aa = (
-		Viewport.SCREEN_SPACE_AA_FXAA
-		if quality == Quality.LOW
-		else Viewport.SCREEN_SPACE_AA_DISABLED
-	)
-	viewport.use_taa = false
+	smooth(viewport)
 	viewport.positional_shadow_atlas_size = SHADOW_ATLAS[quality]
 	RenderingServer.positional_soft_shadow_filter_set_quality(
 		(
@@ -122,6 +120,19 @@ static func apply_to_viewport(viewport: Viewport) -> void:
 	)
 	var grid := FOG_GRID[quality]
 	RenderingServer.environment_set_volumetric_fog_volume_size(grid.x, grid.y)
+
+
+## Сглаживание окна по уровню: и корневого, и вида города (ADR-0037,
+## решение 4). Вид города без него рисовался ступеньками, а растянутый на экран
+## вдвое — ступеньками вдвое крупнее.
+static func smooth(viewport: Viewport) -> void:
+	viewport.msaa_3d = MSAA[quality]
+	viewport.screen_space_aa = (
+		Viewport.SCREEN_SPACE_AA_FXAA
+		if quality == Quality.LOW
+		else Viewport.SCREEN_SPACE_AA_DISABLED
+	)
+	viewport.use_taa = false
 
 
 ## Ставит уровень и перестраивает всех, кому он важен.
