@@ -58,9 +58,9 @@ var _travelled: float = 0.0
 var _look: BulletLook = null
 ## Пуля уже во что-то попала и доживает до конца кадра.
 var _spent: bool = false
-## Вспышка у ствола уже дана. Даётся первым кадром физики, а не в
-## [method _ready]: стрелок ставит пулю на место уже после того, как добавил её
-## в дерево.
+## Вспышка у ствола уже дана. Даётся первым кадром физики или попаданием в
+## упор, если оно раньше, — но не в [method _ready]: стрелок ставит пулю на
+## место уже после того, как добавил её в дерево.
 var _flashed: bool = false
 
 
@@ -96,11 +96,7 @@ func half_length() -> float:
 func _physics_process(delta: float) -> void:
 	if _spent:
 		return
-	if not _flashed:
-		# Вспышка и дымок — у ствола, откуда пуля вышла: вешаются на хозяина пули и
-		# остаются на месте, пока она летит (ADR-0037, решение 5).
-		_flashed = true
-		ShotFx.muzzle(get_parent(), global_position, direction)
+	_flash_once()
 	# Дальше дальности пуля не идёт и последним шагом: иначе на быстром кадре
 	# она доставала бы на полшага дальше своей дальности.
 	var length := minf(speed * delta, max_range - _travelled)
@@ -132,22 +128,42 @@ func _sweep(step: float) -> bool:
 	var fractions := space.cast_motion(query)
 	if fractions.size() < 2 or fractions[1] >= 1.0:
 		return false
-	# Встаёт туда, где коснулась, — брызги и искры ложатся по месту удара.
+	# Что задето, спрашивается на месте касания, но пуля туда переставляется,
+	# только когда тело нашлось: иначе она ушла бы на долю пути и сверх неё
+	# ещё на целый шаг — сквозь ту самую тонкую стену.
 	var unsafe: float = fractions[1]
-	global_position.x += step * unsafe
-	_travelled += absf(step * unsafe)
-	_look.follow(_travelled)
-	query.transform = global_transform
+	var contact := global_transform.translated(Vector3(step * unsafe, 0.0, 0.0))
+	query.transform = contact
 	query.motion = Vector3.ZERO
+	var point := contact.origin + Vector3(signf(step) * half_length(), 0.0, 0.0)
+	var body: Node3D = null
 	var rest := space.get_rest_info(query)
-	var body := (
-		instance_from_id(int(rest.get("collider_id", 0))) as Node3D if not rest.is_empty() else null
-	)
+	if not rest.is_empty():
+		body = instance_from_id(int(rest.get("collider_id", 0))) as Node3D
+		point = rest.get("point", point)
+	if body == null:
+		# Касание мельче порога [method PhysicsDirectSpaceState3D.get_rest_info]:
+		# тот же вопрос перекрытием, без глубины.
+		var touching := space.intersect_shape(query, 1)
+		if not touching.is_empty():
+			body = touching[0].get("collider") as Node3D
 	if body == null:
 		return false
-	var point: Vector3 = rest.get("point", global_position)
+	# Встаёт туда, где коснулась, — брызги и искры ложатся по месту удара.
+	global_position = contact.origin
+	_travelled += absf(step * unsafe)
+	_look.follow(_travelled)
 	_hit(body, point)
 	return true
+
+
+## Вспышка и дымок — у ствола, откуда пуля вышла: вешаются на хозяина пули и
+## остаются на месте, пока она летит (ADR-0037, решение 5). Один раз на пулю.
+func _flash_once() -> void:
+	if _flashed:
+		return
+	_flashed = true
+	ShotFx.muzzle(get_parent(), global_position, direction)
 
 
 func _on_body_entered(body: Node3D) -> void:
@@ -161,6 +177,9 @@ func _hit(body: Node3D, point: Vector3) -> void:
 	# приносила очки за каждого.
 	if _spent:
 		return
+	# В упор пуля попадает раньше своего первого кадра физики: перекрытие ловится
+	# уже на шаге, в котором её выпустили. Вспышка у ствола — и тогда.
+	_flash_once()
 	_spent = true
 	# Слой, а не класс: [Otto] и [Enemy] сами грузят сцену пули, и ссылка отсюда
 	# на них замкнула бы загрузку в кольцо — сцена переставала бы читаться вовсе.

@@ -201,7 +201,9 @@ func follow(main: Camera3D) -> void:
 	var drop := ahead.y / maxf(-ahead.z, 0.01)
 	var height := main.size
 	if main.projection != Camera3D.PROJECTION_ORTHOGONAL:
-		height = 2.0 * CAMERA_DISTANCE * tan(deg_to_rad(main.fov) * 0.5)
+		# Кадр перспективы на плоскости игры — с расстояния основной камеры, а
+		# не города: иначе город в кадре мельче в CAMERA_DISTANCE / DISTANCE раз.
+		height = 2.0 * SideCamera.DISTANCE * tan(deg_to_rad(main.fov) * 0.5)
 	_camera.set_frustum(
 		height * LENS_NEAR / depth, Vector2(0.0, drop * LENS_NEAR), LENS_NEAR, CITY_FAR
 	)

@@ -200,12 +200,3 @@ static func _curtain(spec: Vector3, ground: float, from_x: float, to_x: float) -
 	curtain.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	curtain.position = Vector3((from_x + to_x) * 0.5, ground + CURTAIN_HEIGHT * 0.5, -spec.x)
 	return curtain
-
-
-static func ramp(from: Color, to: Color) -> GradientTexture1D:
-	var gradient := Gradient.new()
-	gradient.set_color(0, from)
-	gradient.set_color(1, to)
-	var texture := GradientTexture1D.new()
-	texture.gradient = gradient
-	return texture

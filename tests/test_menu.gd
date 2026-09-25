@@ -249,10 +249,26 @@ func _sources(dir: String) -> Array[String]:
 func test_the_controls_open_from_the_pause_and_lead_back() -> void:
 	var menu := _menu()
 	menu.show_page(Menu.Page.PAUSE)
-	var wanted := tr("UI_CONTROLS")
-	var found: MenuRow = null
+	var found := _row_labelled(menu, tr("UI_CONTROLS"))
+	assert_not_null(found, "на паузе есть «Управление»")
+	if found == null:
+		return
+	found.pressed.emit()
+	assert_eq(menu.current_page(), Menu.Page.CONTROLS, "пункт открывает справку")
+	# «Назад» сохраняет настройки на диск: пустые тестовые затёрли бы настройки
+	# игрока.
+	menu.settings = null
+	var back := _row_labelled(menu, tr("UI_BACK"))
+	assert_not_null(back, "у справки есть «Назад»")
+	if back == null:
+		return
+	back.pressed.emit()
+	assert_eq(menu.current_page(), Menu.Page.PAUSE, "назад — на паузу, а не в главное меню")
+
+
+func _row_labelled(menu: Menu, text: String) -> MenuRow:
 	for row: MenuRow in menu.rows():
 		for label: Node in row.find_children("*", "Label", true, false):
-			if (label as Label).text == wanted:
-				found = row
-	assert_not_null(found, "на паузе есть «Управление»")
+			if (label as Label).text == text:
+				return row
+	return null

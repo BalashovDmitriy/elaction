@@ -105,7 +105,6 @@ var _drips: GPUParticles3D = null
 var _mist: FogVolume = null
 var _halo: MeshInstance3D = null
 var _catcher: GPUParticlesCollisionHeightField3D = null
-var _lids: Array[GPUParticlesCollisionBox3D] = []
 ## Где идёт дождь, в координатах сцены: карта высот снимается с этой коробки.
 var _box := AABB()
 
@@ -120,7 +119,7 @@ func build(rules: BuildingRules, plan: BuildingPlan, lamp: OmniLight3D) -> void:
 		Vector3(bounds.x - edge, deck - 0.6, BACK_Z - 0.3),
 		Vector3(bounds.y - bounds.x + edge * 2.0, HEIGHT + 1.0, FRONT_Z - BACK_Z + 0.6)
 	)
-	_catch(rules)
+	_catch()
 	_cover_the_gaps(rules, plan, deck)
 	_rain(rules, deck)
 	_splash()
@@ -164,11 +163,6 @@ func apply_graphics() -> void:
 	_mist.visible = Graphics.volumetric_fog()
 
 
-## Крышки над проёмами крыши, о которые гаснут капли, — для теста.
-func lids() -> Array[GPUParticlesCollisionBox3D]:
-	return _lids
-
-
 ## Капли, которые гаснут о крышу, — чтобы тест мог проверить коллизию.
 func drops() -> GPUParticles3D:
 	return _drops
@@ -189,7 +183,7 @@ func halo() -> MeshInstance3D:
 	return _halo
 
 
-func _catch(rules: BuildingRules) -> void:
+func _catch() -> void:
 	_catcher = GPUParticlesCollisionHeightField3D.new()
 	_catcher.name = "RainCatcher"
 	_catcher.size = _box.size
@@ -197,7 +191,6 @@ func _catch(rules: BuildingRules) -> void:
 	_catcher.resolution = GPUParticlesCollisionHeightField3D.RESOLUTION_1024
 	_catcher.update_mode = GPUParticlesCollisionHeightField3D.UPDATE_MODE_WHEN_MOVED
 	_catcher.heightfield_mask = LAYER
-	_catcher.set_meta(&"width", rules.floor_width(BuildingRules.ROOF))
 	add_child(_catcher)
 
 
@@ -217,7 +210,6 @@ func _cover_the_gaps(rules: BuildingRules, plan: BuildingPlan, deck: float) -> v
 		var top := deck + SPEED.y / float(TICKS)
 		lid.position = Vector3((gap.x + gap.y) * 0.5, top - LID_DEPTH * 0.5, _box.get_center().z)
 		add_child(lid)
-		_lids.append(lid)
 
 
 func _rain(rules: BuildingRules, deck: float) -> void:

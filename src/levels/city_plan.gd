@@ -179,13 +179,19 @@ static func _dress_crowns(blocks: Array[Block], building_seed: int) -> void:
 
 
 static func _weighted(rng: RandomNumberGenerator, weights: Array[float]) -> int:
+	return pick_weighted(weights, rng.randf())
+
+
+## Индекс по весам [param weights] и жребию [param roll] от 0 до 1. Общий на
+## город: здесь жребий из генератора, у [CityLook] — из хеша окна.
+static func pick_weighted(weights: Array, roll: float) -> int:
 	var total := 0.0
-	for weight in weights:
+	for weight: float in weights:
 		total += weight
-	var roll := rng.randf() * total
+	var left := roll * total
 	for index in weights.size():
-		roll -= weights[index]
-		if roll <= 0.0:
+		left -= float(weights[index])
+		if left <= 0.0:
 			return index
 	return weights.size() - 1
 

@@ -61,15 +61,18 @@ static func make() -> AimLaser:
 func aim(towards: float) -> void:
 	direction = signf(towards) if not is_zero_approx(towards) else 1.0
 	visible = true
+	set_process(true)
 	_length = _trace()
 	_beam.scale.x = maxf(_length, 0.001)
 	_beam.position.x = direction * _length * 0.5
 	_dot.position.x = direction * _length
 
 
-## Гасит луч: выстрел ушёл, замах сорван или агент убит.
+## Гасит луч: выстрел ушёл, замах сорван или агент убит. Погашенный луч кадра
+## не ест: луч есть у каждого агента и у каждого трупа до конца здания.
 func put_out() -> void:
 	visible = false
+	set_process(false)
 
 
 ## Горит ли луч.
@@ -86,6 +89,12 @@ func time_to(distance: float) -> float:
 ## Длина луча, м: до стены, до Otto или до дальности пули.
 func length() -> float:
 	return _length if visible else 0.0
+
+
+func _ready() -> void:
+	# Движок включает [method _process] на входе в дерево сам: собранный
+	# погашенным луч выключает его обратно.
+	set_process(visible)
 
 
 func _process(delta: float) -> void:

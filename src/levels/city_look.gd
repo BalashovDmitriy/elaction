@@ -96,7 +96,9 @@ static func window_custom(block: CityPlan.Block, cell: Vector2i, lit: bool) -> C
 	var roll := _unit(hash([block.x, cell, "window"]))
 	var inside := 0
 	if lit:
-		inside = _pick(INSIDE_WEIGHTS[block.kind], _unit(hash([block.x, cell, "inside"])))
+		inside = CityPlan.pick_weighted(
+			INSIDE_WEIGHTS[block.kind], _unit(hash([block.x, cell, "inside"]))
+		)
 	return Color(roll, float(inside), float(block.mullions), 1.0 if lit else 0.0)
 
 
@@ -107,15 +109,3 @@ static func sign_custom(block: CityPlan.Block) -> Color:
 
 static func _unit(value: int) -> float:
 	return float(absi(value) % 10007) / 10007.0
-
-
-static func _pick(weights: Array, roll: float) -> int:
-	var total := 0.0
-	for weight: float in weights:
-		total += weight
-	var left := roll * total
-	for index in weights.size():
-		left -= float(weights[index])
-		if left <= 0.0:
-			return index
-	return weights.size() - 1

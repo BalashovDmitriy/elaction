@@ -44,6 +44,11 @@ const GEOMETRY: int = 1
 static var _holes: Array[Decal] = []
 static var _hole_texture: Texture2D = null
 static var _flash_material: StandardMaterial3D = null
+## Клубки дыма и пыли ([method _puff]): ход — по стороне и цвету, квад — по
+## размеру, материал пятна — один.
+static var _puff_processes: Dictionary = {}
+static var _puff_meshes: Dictionary = {}
+static var _puff_look: StandardMaterial3D = null
 
 var _light: OmniLight3D = null
 var _flash: MeshInstance3D = null
@@ -175,9 +180,32 @@ static func _forget_freed_holes() -> void:
 
 ## Клубок частиц: дым у ствола или пыль у стены. Медленные мягкие пятна,
 ## всплывают и тают.
+##
+## Материалы и сетка — одни на все выстрелы: их вариантов четыре (дым и пыль,
+## влево и вправо), а собирать их заново значило бы растрировать фактуры на
+## каждую пулю перестрелки.
 static func _puff(
 	count: int, lifetime: float, size: float, heading: Vector3, colour: Color
 ) -> GPUParticles3D:
+	var particles := GPUParticles3D.new()
+	particles.amount = count
+	particles.lifetime = lifetime
+	particles.one_shot = true
+	particles.explosiveness = 0.9
+	particles.local_coords = false
+	particles.process_material = _puff_process(heading, colour)
+	particles.draw_pass_1 = _puff_mesh(size)
+	particles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	particles.visibility_aabb = AABB(Vector3(-2.0, -2.0, -2.0), Vector3(4.0, 4.0, 4.0))
+	particles.emitting = true
+	return particles
+
+
+## Ход клубка: разлёт по [param heading], рост и таяние цвета [param colour].
+static func _puff_process(heading: Vector3, colour: Color) -> ParticleProcessMaterial:
+	var key := "%s|%s" % [heading, colour]
+	if _puff_processes.has(key):
+		return _puff_processes[key] as ParticleProcessMaterial
 	var process := ParticleProcessMaterial.new()
 	process.direction = heading.normalized()
 	process.spread = 40.0
@@ -203,29 +231,26 @@ static func _puff(
 	var ramp := GradientTexture1D.new()
 	ramp.gradient = fade
 	process.color_ramp = ramp
+	_puff_processes[key] = process
+	return process
 
-	var look := StandardMaterial3D.new()
-	look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	look.vertex_color_use_as_albedo = true
-	look.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	look.albedo_texture = _soft_dot()
+
+## Квад клубка размером [param size]: мягкое пятно цвета частицы лицом к камере.
+static func _puff_mesh(size: float) -> QuadMesh:
+	if _puff_meshes.has(size):
+		return _puff_meshes[size] as QuadMesh
+	if _puff_look == null:
+		_puff_look = StandardMaterial3D.new()
+		_puff_look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_puff_look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_puff_look.vertex_color_use_as_albedo = true
+		_puff_look.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		_puff_look.albedo_texture = _soft_dot()
 	var quad := QuadMesh.new()
 	quad.size = Vector2(size, size)
-	quad.material = look
-
-	var particles := GPUParticles3D.new()
-	particles.amount = count
-	particles.lifetime = lifetime
-	particles.one_shot = true
-	particles.explosiveness = 0.9
-	particles.local_coords = false
-	particles.process_material = process
-	particles.draw_pass_1 = quad
-	particles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	particles.visibility_aabb = AABB(Vector3(-2.0, -2.0, -2.0), Vector3(4.0, 4.0, 4.0))
-	particles.emitting = true
-	return particles
+	quad.material = _puff_look
+	_puff_meshes[size] = quad
+	return quad
 
 
 ## Мягкое круглое пятно: белое в середине, прозрачное к краю.
