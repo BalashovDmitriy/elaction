@@ -37,7 +37,7 @@ func test_every_page_builds_and_takes_focus() -> void:
 
 func test_settings_have_every_choice() -> void:
 	# Громкость трижды, язык, сложность, графика, экран, разрешение, масштаб,
-	# кровь — и «назад».
+	# кровь, кадры в секунду — и «назад».
 	var menu := _menu()
 	menu.show_page(Menu.Page.SETTINGS)
 	var kinds: Array[int] = []
@@ -45,7 +45,7 @@ func test_settings_have_every_choice() -> void:
 		kinds.append(row.kind)
 	assert_eq(kinds.count(MenuRow.Kind.LEVEL), 3, "три громкости")
 	assert_eq(kinds.count(MenuRow.Kind.CHOICE), 6, "шесть переключателей")
-	assert_eq(kinds.count(MenuRow.Kind.TOGGLE), 1, "флажок крови")
+	assert_eq(kinds.count(MenuRow.Kind.TOGGLE), 2, "флажки крови и кадров в секунду")
 	assert_eq(kinds.count(MenuRow.Kind.ACTION), 1, "назад")
 
 

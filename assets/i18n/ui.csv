@@ -30,6 +30,7 @@ UI_WINDOW_MODE_2,Fullscreen,Полный экран
 UI_RESOLUTION,Resolution,Разрешение
 UI_RENDER_SCALE,Render scale,Масштаб рендера
 UI_BLOOD,Blood,Кровь
+UI_SHOW_FPS,Show FPS,Показывать FPS
 UI_DIFFICULTY,Difficulty,Сложность
 UI_DIFFICULTY_0,Easy,Лёгкая
 UI_DIFFICULTY_1,Normal,Обычная

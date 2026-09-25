@@ -239,6 +239,7 @@ func _build_settings() -> void:
 		_resolution()
 		_render_scale()
 		_blood()
+		_fps()
 	_gap(10.0)
 	_back()
 
@@ -461,6 +462,17 @@ func _blood() -> void:
 	row.changed.connect(
 		func(value: Variant) -> void:
 			settings.blood = bool(value)
+			settings.apply()
+			settings.save_to()
+	)
+
+
+## Счётчик кадров в углу HUD.
+func _fps() -> void:
+	var row := _add_row(MenuRow.toggle(tr("UI_SHOW_FPS"), settings.show_fps))
+	row.changed.connect(
+		func(value: Variant) -> void:
+			settings.show_fps = bool(value)
 			settings.apply()
 			settings.save_to()
 	)

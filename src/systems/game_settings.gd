@@ -39,6 +39,8 @@ var quality: int = Graphics.Quality.HIGH
 var quality_measured: bool = false
 ## Показывать ли кровь при попадании пули (ADR-0031).
 var blood: bool = true
+## Показывать ли в углу HUD кадры в секунду (просьба пользователя, M24a).
+var show_fps: bool = false
 
 ## Режим и размер, уже поставленные окну: [method apply] зовётся на любую
 ## настройку, а окно трогается только тогда, когда они сменились.
@@ -79,6 +81,7 @@ static func load_from(path: String = PATH) -> GameSettings:
 		1.0
 	)
 	settings.blood = bool(file.get_value(SECTION, "blood", settings.blood))
+	settings.show_fps = bool(file.get_value(SECTION, "show_fps", settings.show_fps))
 	settings.difficulty = clampi(
 		int(file.get_value(SECTION, "difficulty", settings.difficulty)), 0, DIFFICULTIES - 1
 	)
@@ -116,6 +119,7 @@ func save_to(path: String = PATH) -> void:
 	file.set_value(SECTION, "quality", quality)
 	file.set_value(SECTION, "quality_measured", quality_measured)
 	file.set_value(SECTION, "blood", blood)
+	file.set_value(SECTION, "show_fps", show_fps)
 	file.save(path)
 
 
@@ -143,6 +147,7 @@ func apply() -> void:
 			DisplayModes.apply_scale(render_scale, tree.root)
 	Graphics.broadcast(quality as Graphics.Quality)
 	Blood.enabled = blood
+	Hud.show_fps = show_fps
 
 
 ## Громкость шины по её имени. Нужна меню: ползунков три, а полей тоже три,

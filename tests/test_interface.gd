@@ -240,3 +240,29 @@ func test_the_round_sits_in_the_middle_plate() -> void:
 		assert_eq(shown.get_index(), 0, "первой строкой")
 		assert_eq(box.get_child_count(), 3, "в плашке раунд, здание и этаж")
 	game.reset()
+
+
+## Кадры в секунду — по флажку настроек, в углу HUD; флажок переживает перезапуск.
+func test_the_fps_counter_follows_the_setting() -> void:
+	var settings := GameSettings.new()
+	settings.show_fps = true
+	var path := "user://test_fps.cfg"
+	settings.save_to(path)
+	var loaded := GameSettings.load_from(path)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	assert_true(loaded.show_fps, "флажок сохраняется")
+	var hud := HUD_SCENE.instantiate() as Hud
+	add_child_autofree(hud)
+	Hud.show_fps = loaded.show_fps
+	await get_tree().process_frame
+	assert_true(_fps_label_visible(hud), "включили — счётчик виден")
+	Hud.show_fps = false
+	await get_tree().process_frame
+	assert_false(_fps_label_visible(hud), "выключили — пропал")
+
+
+func _fps_label_visible(hud: Hud) -> bool:
+	for label: Node in hud.find_children("*", "Label", true, false):
+		if (label as Label).text.ends_with("FPS"):
+			return (label as Label).is_visible_in_tree()
+	return false

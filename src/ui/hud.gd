@@ -32,6 +32,12 @@ const PLATE := NeonStyle.PLATE
 
 ## Кромка, если здание не сказало своего цвета: неон первого здания — отеля.
 const DEFAULT_NEON := VerticalSign.NEON_HOTEL
+## Как часто переписывается счётчик кадров, с: каждый кадр цифры мельтешили бы.
+const FPS_EVERY: float = 0.25
+
+## Показывать ли счётчик кадров. Статическое, как [member Blood.enabled]: его
+## ставят настройки, а HUD читает, не зная, кто их держит.
+static var show_fps: bool = false
 
 var _neon := DEFAULT_NEON
 var _score_caption: Label = null
@@ -47,6 +53,9 @@ var _alarm_label: Label = null
 var _plates: Array[PanelContainer] = []
 var _level: GreyboxLevel = null
 var _shown_floor: int = -2
+var _fps_plate: PanelContainer = null
+var _fps: Label = null
+var _fps_next: float = 0.0
 
 
 func _ready() -> void:
@@ -62,6 +71,7 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_follow_floor()
+	_count_frames()
 	if not _alarm.visible:
 		return
 	# Мигание считается от времени, а не накопителем: HUD живёт и на паузе,
@@ -221,7 +231,26 @@ func _build() -> void:
 		_lives.append(icon)
 	_lives_more = _label(34, INK, 700)
 	lives.add_child(_lives_more)
+	# Справа снизу: кадры в секунду, если их просили показывать. Мелко и
+	# приглушённо — это справка, а не часть игры.
+	_fps_plate = _plate(root, Control.PRESET_BOTTOM_RIGHT)
+	_fps = _label(22, INK_DIM, 600)
+	_fps_plate.add_child(_fps)
+	_fps_plate.visible = show_fps
 	_restyle()
+
+
+## Показывает кадры в секунду раз в [constant FPS_EVERY]. По настенным часам,
+## а не по delta: HUD живёт и на паузе.
+func _count_frames() -> void:
+	_fps_plate.visible = show_fps
+	if not show_fps:
+		return
+	var now := Time.get_ticks_msec() / 1000.0
+	if now < _fps_next:
+		return
+	_fps_next = now + FPS_EVERY
+	_fps.text = "%d FPS" % roundi(Engine.get_frames_per_second())
 
 
 ## Плашка у угла или края [param preset] с отступом [constant MARGIN].
