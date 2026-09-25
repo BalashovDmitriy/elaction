@@ -151,7 +151,8 @@ func _physics_process(delta: float) -> void:
 		_incoming_height(),
 		alive_target and _in_frame() and not _building_rules().agents_hold_fire,
 		not is_instance_valid(_bullet),
-		alive_target and _target.is_crouching()
+		alive_target and _target.is_crouching(),
+		alive_target and _target.hittable
 	)
 	_fit_shape()
 	if _brain.fired():

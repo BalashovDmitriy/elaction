@@ -22,6 +22,11 @@ const MASTER_BUS := "Master"
 ## Фон — дочерняя шина эффектов: громкость эффектов в настройках ведёт и его
 ## (ADR-0036, решение 5).
 const AMBIENCE_BUS := "Ambience"
+## Интерфейс и джинглы — мимо шины эффектов, прямо в общую: глушение коридора
+## за красной дверью их не трогает — щелчок меню и джингл документа звучат не
+## в коридоре. Громкость ведёт тот же ползунок эффектов ([method
+## AudioDirector.set_level]).
+const INTERFACE_BUS := "Interface"
 
 ## Причины, по которым музыка звучит из-за стены.
 const MUFFLE_PAUSE := "pause"
@@ -120,6 +125,9 @@ const AMBIENCE: PackedStringArray = [
 ## Джинглы: на время звучания приглушают трек (ADR-0036, решение 6).
 const JINGLES: PackedStringArray = [DOCUMENT, EXTRA_LIFE, BUILDING_BONUS, GAME_OVER, DEATH_JINGLE]
 
+## Звуки меню: как и джинглы, идут в [constant INTERFACE_BUS].
+const INTERFACE: PackedStringArray = [UI_MOVE, UI_SELECT, UI_BACK]
+
 ## Звуки, которые звучат петлёй, пока длится то, что их вызвало. Трек конца
 ## партии не зациклен: он доигрывает под экраном рекорда и молкнет.
 const LOOPED: PackedStringArray = [
@@ -142,6 +150,12 @@ const LOOPED: PackedStringArray = [
 const MAX_VARIANTS: int = 9
 
 static var _cache: Dictionary = {}
+
+
+## Шина, в которую идёт эффект [param name]: меню и джинглы — в
+## [constant INTERFACE_BUS], всё остальное, звуки мира, — в [constant SFX_BUS].
+static func bus_of(name: String) -> String:
+	return INTERFACE_BUS if INTERFACE.has(name) or JINGLES.has(name) else SFX_BUS
 
 
 ## Все имена разом: по ним ходит тест.

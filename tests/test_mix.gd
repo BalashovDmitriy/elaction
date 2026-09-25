@@ -252,3 +252,72 @@ func _rumbling(director: AudioDirector) -> bool:
 		if player != null and player.stream == near and player.playing:
 			return true
 	return false
+
+
+## Шина, в которую звучит эффект [param name]: голос, которому он достался
+## последним. Голоса разбираются по кругу, так что ищется с конца круга.
+func _bus_of_voice(director: AudioDirector, name: String) -> String:
+	var stream := Sounds.stream(name)
+	for child: Node in director.get_children():
+		var voice := child as AudioStreamPlayer
+		if voice != null and voice.stream == stream:
+			return String(voice.bus)
+	return ""
+
+
+## Слышно ли шину [param bus] из-за стены: включён ли фильтр «из-за стены» на
+## ней или на любой шине, куда она уходит, вплоть до общей.
+func _behind_the_wall(bus: String) -> bool:
+	var index := AudioServer.get_bus_index(bus)
+	while index > 0:
+		for effect: int in AudioServer.get_bus_effect_count(index):
+			var filter := AudioServer.get_bus_effect(index, effect) as AudioEffectLowPassFilter
+			if filter != null and AudioServer.is_bus_effect_enabled(index, effect):
+				return true
+		index = AudioServer.get_bus_index(AudioServer.get_bus_send(index))
+	return false
+
+
+## Otto за красной дверью: коридор глухо, а меню и джингл документа — нет.
+## Щелчок меню на паузе и джингл, который звучит на самом выходе, — звуки не
+## коридора, и глушить их вместе с ним значило бы глушить сам интерфейс.
+func test_the_red_door_muffles_the_corridor_but_not_the_interface() -> void:
+	var director := AudioDirector.instance()
+	if director == null:
+		return
+	director.muffle_world(true)
+	for name: String in [Sounds.UI_SELECT, Sounds.UI_MOVE, Sounds.DOCUMENT, Sounds.SHOT]:
+		director.play(name)
+
+	for name: String in [Sounds.UI_SELECT, Sounds.UI_MOVE, Sounds.DOCUMENT]:
+		var bus := _bus_of_voice(director, name)
+		assert_eq(bus, Sounds.INTERFACE_BUS, "%s — в шину интерфейса" % name)
+		assert_false(_behind_the_wall(bus), "%s за дверью не глушится" % name)
+	var shot := _bus_of_voice(director, Sounds.SHOT)
+	assert_eq(shot, Sounds.SFX_BUS, "выстрел — звук мира")
+	assert_true(_behind_the_wall(shot), "коридор за дверью глухо")
+	assert_true(_behind_the_wall(Sounds.AMBIENCE_BUS), "и фон — он уходит в эффекты")
+
+	director.muffle_world(false)
+	await wait_seconds(AudioDirector.MUFFLE_TIME + 0.2)
+	assert_false(_behind_the_wall(shot), "вышел — коридор слышно")
+
+
+## Своей шиной интерфейс обзавёлся ради двери, а не ради ползунка: громкость
+## ему по-прежнему ставит ползунок эффектов, и в общую он идёт мимо эффектов.
+func test_the_interface_follows_the_effects_volume() -> void:
+	var director := AudioDirector.instance()
+	if director == null:
+		return
+	var interface := AudioServer.get_bus_index(Sounds.INTERFACE_BUS)
+	assert_gt(interface, -1, "шина интерфейса есть")
+	assert_eq(String(AudioServer.get_bus_send(interface)), Sounds.MASTER_BUS, "идёт в общую")
+	director.set_level(Sounds.SFX_BUS, 0.5)
+	assert_almost_eq(
+		AudioServer.get_bus_volume_db(interface), linear_to_db(0.5), 0.01, "громкость эффектов"
+	)
+	director.set_level(Sounds.SFX_BUS, 0.0)
+	assert_true(AudioServer.is_bus_mute(interface), "эффекты выключены — и интерфейс")
+	director.set_level(Sounds.SFX_BUS, 1.0)
+	assert_false(AudioServer.is_bus_mute(interface))
+	assert_almost_eq(AudioServer.get_bus_volume_db(interface), 0.0, 0.01)
