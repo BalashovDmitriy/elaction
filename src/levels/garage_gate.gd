@@ -45,6 +45,12 @@ const OUTSIDE := Color(0.78, 0.5, 0.2)
 const EXIT_SIGN := Vector3(0.9, 0.24, 0.06)
 const EXIT_INK := Color(0.02, 0.12, 0.05)
 
+## Мотор шторы ([constant Sounds.GARAGE_GATE]): докуда слышно, м, и за сколько
+## он стихает, когда штора дошла до верха, с. Запись длиннее подъёма — мотор
+## гасится по штору, а не доигрывает впустую.
+const VOICE_REACH: float = 16.0
+const VOICE_FADE: float = 0.4
+
 ## Насколько открыты ворота: 0 — штора внизу, 1 — поднята в короб.
 var openness: float = 0.0:
 	set = set_openness
@@ -58,6 +64,8 @@ var _shutter_bar: MeshInstance3D = null
 var _outside: MeshInstance3D = null
 ## Маячок над воротами: горит, пока штора ходит.
 var _beacon: MeshInstance3D = null
+## Мотор шторы: позиционный источник у проёма, заводится при первом подъёме.
+var _voice: AudioStreamPlayer3D = null
 
 
 ## Собирает ворота у левой стены нижнего этажа.
@@ -74,14 +82,37 @@ func build(rules: BuildingRules) -> void:
 	set_openness(openness)
 
 
-## Поднимает штору за [param duration] секунд. Идёт шагами физики, как всё в
-## сдаче здания: исход не должен зависеть от частоты кадров. Возвращает твин —
-## его [signal Tween.finished] и есть «ворота открыты».
+## Поднимает штору за [param duration] секунд под мотор ворот. Идёт шагами
+## физики, как всё в сдаче здания: исход не должен зависеть от частоты кадров.
+## Возвращает твин — его [signal Tween.finished] и есть «ворота открыты».
 func open(duration: float = OPEN_TIME) -> Tween:
+	_start_the_motor()
 	var tween := create_tween()
 	tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
 	tween.tween_property(self, "openness", 1.0, duration)
+	tween.finished.connect(_stop_the_motor)
 	return tween
+
+
+## Мотор шторы звучит от проёма: слышно его рядом с воротами, а не по всему
+## зданию.
+func _start_the_motor() -> void:
+	if _voice == null:
+		var host := Node3D.new()
+		host.name = "Voice"
+		host.position = _at(Garage.gate_x(_rules), _surface - HEIGHT * 0.5, 0.0)
+		add_child(host)
+		_voice = Sounds.source(host, Sounds.GARAGE_GATE, VOICE_REACH)
+	_voice.volume_db = 0.0
+	_voice.play()
+
+
+func _stop_the_motor() -> void:
+	if _voice == null or not _voice.playing:
+		return
+	var fade := create_tween()
+	fade.tween_property(_voice, "volume_db", -60.0, VOICE_FADE)
+	fade.tween_callback(_voice.stop)
 
 
 ## Открыты ли ворота целиком.

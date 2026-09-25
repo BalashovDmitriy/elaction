@@ -164,6 +164,10 @@ func test_the_gate_opens() -> void:
 	await wait_physics_frames(30)
 	assert_false(tween.is_running(), "штора всё ещё едет")
 	assert_true(garage.is_gate_open(), "ворота не открылись")
+	var voice := garage.gate.find_children("*", "AudioStreamPlayer3D", true, false)
+	assert_eq(voice.size(), 1, "у ворот нет мотора")
+	if voice.size() == 1:
+		assert_not_null((voice[0] as AudioStreamPlayer3D).stream, "мотор ворот без записи")
 	remove_child(level)
 
 

@@ -377,7 +377,9 @@ func lights() -> Array[SpotLight3D]:
 	return found
 
 
-## Поднимает штору ворот за [param duration] секунд — см. [method GarageGate.open].
+## Поднимает штору ворот за [param duration] секунд под мотор ворот — см.
+## [method GarageGate.open]. Звук ворот играет здесь, сдача здания его не
+## повторяет.
 func open_gate(duration: float = GarageGate.OPEN_TIME) -> Tween:
 	return gate.open(duration)
 
