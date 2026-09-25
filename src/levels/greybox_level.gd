@@ -49,15 +49,9 @@ const LAMP_SCENE := preload("res://src/systems/lighting/lamp.tscn")
 ## иначе вешал бы лампу в плиту или посреди комнаты.
 const LAMP_DROP: float = Proportions.LAMP_CORD + Proportions.LAMP.y * 0.5
 
-## Высота зоны выхода из здания. Ширина — [constant BuildingShell.EXIT_WIDTH]:
-## ей же оболочка режет проём в задней стене. Выросла вместе с Otto
-## (ADR-0026, решение 7).
+## Высота зоны выхода из здания. Ширина — [constant BuildingShell.EXIT_WIDTH].
+## Выросла вместе с Otto (ADR-0026, решение 7).
 const EXIT_HEIGHT: float = Proportions.BODY * 0.95
-
-## Вывеска над выходом: габарит и на сколько выше проёма стены висит её
-## середина, м (ADR-0023, решение 6).
-const EXIT_SIGN_SIZE := Vector3(1.2, 0.18, 0.06)
-const EXIT_SIGN_RISE: float = 0.3
 
 ## Насколько хуже слушается кабина по тревоге, с.
 const ALARM_CAR_DELAY: float = 0.6
@@ -153,6 +147,8 @@ var _cleared: bool = false
 ## Машина у выхода: пока она едет, здание ещё не сдано.
 var _car: ExitCar = null
 var _exit_position := Vector2.ZERO
+## Паркинг нижнего этажа: ворота, светильники, чужие машины (ADR-0038).
+var _garage: Garage = null
 ## Трос вступления и докуда по нему ехать, в плоскости правил. Пока едет —
 ## Otto не слушается ввода.
 var _rope: MeshInstance3D = null
@@ -186,6 +182,7 @@ func _ready() -> void:
 	_spawn_escalators()
 	_spawn_doors()
 	_spawn_lamps()
+	_build_garage()
 	_spawn_exit()
 	# Воздух, крыша, обстановка, город и погода — окружение без геймплея (ADR-0029).
 	var scenery := BuildingScenery.new()
@@ -231,6 +228,9 @@ func _process(_delta: float) -> void:
 	# Столбы шахт — тем же правилом: их в здании втрое больше, чем ламп.
 	if _shafts != null:
 		_shafts.light_span(span)
+	# Свет трубок паркинга — тоже.
+	if _garage != null:
+		_garage.show_lights(VisibleFloors.covers(span, rules.floors - 1))
 	# Эскалатор светит в проём между двумя этажами: горит, пока в кадре хоть
 	# один из них.
 	for escalator: Escalator in _escalators:
@@ -276,6 +276,11 @@ func door_of(agent: Enemy) -> Door:
 ## Где стоит выход из здания, в плоскости правил.
 func exit_position() -> Vector2:
 	return _exit_position
+
+
+## Паркинг нижнего этажа: у него ворота ([method Garage.open_gate]).
+func garage() -> Garage:
+	return _garage
 
 
 ## Ждёт, пока Otto съедет по тросу и встанет на крышу; true — встал.
@@ -495,9 +500,8 @@ func _spawn_lamps() -> void:
 ## Выход из здания. Не запирается: без всех документов он отправляет обратно
 ## наверх, к несобранной двери (ADR-0005, пункт 5).
 ##
-## Сам проём вырезан в задней стене ([method _build_room]); здесь — зона, порог,
-## вывеска и машина. Вывеска горит своим светом: выход — цель, и читаться он
-## обязан на погашенном этаже (ADR-0019, решение 5; ADR-0023, решение 6).
+## Здесь — зона и машина. Ворота, в которые она уезжает, и зелёная вывеска
+## над ними — [Garage] (ADR-0038, решение 3).
 func _spawn_exit() -> void:
 	var bottom := rules.floors - 1
 	var surface := rules.floor_surface(bottom)
@@ -513,24 +517,16 @@ func _spawn_exit() -> void:
 	zone.body_entered.connect(_on_exit_entered)
 	add_child(zone)
 	_exit_position = area.get_center()
-
-	var threshold := GreyboxLook.box(
-		Vector3(BuildingShell.EXIT_WIDTH, 0.05, BuildingShell.PANEL_THICKNESS),
-		GreyboxLook.metal(GreyboxLook.TRIM)
-	)
-	threshold.position = WorldSpace.to_scene(Vector2(centre, surface - 0.025))
-	threshold.position.z = WorldSpace.BACK_WALL_Z + BuildingShell.PANEL_THICKNESS
-	add_child(threshold)
-
-	# Не `sign`: так зовут встроенную функцию, и местная переменная её заслонила бы.
-	var board := GreyboxLook.box(EXIT_SIGN_SIZE, GreyboxLook.light(GreyboxLook.SIGN_GREEN))
-	board.name = "ExitSign"
-	board.position = WorldSpace.to_scene(
-		Vector2(centre, surface - Door.LEAF_SIZE.y - EXIT_SIGN_RISE)
-	)
-	board.position.z = WorldSpace.BACK_WALL_Z + EXIT_SIGN_SIZE.z * 0.5
-	add_child(board)
 	_spawn_car(area)
+
+
+## Паркинг на нижнем этаже — вид, без тел: зал, колонны, светильники, чужие
+## машины и ворота в левом торце (ADR-0038, решение 3).
+func _build_garage() -> void:
+	_garage = Garage.new()
+	_garage.name = "Garage"
+	add_child(_garage)
+	_garage.build(rules, _plan, building_seed)
 
 
 ## Машина у выхода: ставит её [ExitCar] у проёма, на пол нижнего этажа.
@@ -587,6 +583,9 @@ func _on_lamp_crushed(agent: Enemy) -> void:
 ## запомнить темноту; кто в ней стоит, пересчитает [method _shroud_agents].
 func _on_lamp_fell(index: int, x: float) -> void:
 	_lighting.darken(index, x)
+	if index == rules.floors - 1 and _garage != null:
+		# Светильники паркинга в зоне лампы гаснут вместе с ней.
+		_garage.darken(x)
 	_shroud_agents()
 
 
@@ -664,12 +663,12 @@ func _agents_on(index: int) -> Array[Enemy]:
 	return found
 
 
-## Звук по месту Otto — правила в [PlaceSound]: на крыше и у выхода улица в
-## полную силу, на этажах — из-за стекла; шаг по полу здания.
+## Звук по месту Otto — правила в [PlaceSound]: на крыше и у ворот паркинга
+## улица в полную силу, на этажах — из-за стекла; шаг по полу здания.
 func _listen_where_otto_is() -> void:
 	var index := _floor_of(otto)
 	var at := WorldSpace.to_plane(otto.global_position)
-	Sounds.set_outdoors(PlaceSound.hears_street(rules, index, at.x, _exit_position.x))
+	Sounds.set_outdoors(PlaceSound.hears_street(rules, index, at.x, Garage.gate_x(rules)))
 	otto.step_sound = PlaceSound.step_at(index == BuildingRules.ROOF, identity)
 	_shaft_hums.follow(at.y)
 

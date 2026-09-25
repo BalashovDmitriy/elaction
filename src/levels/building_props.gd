@@ -41,8 +41,6 @@ const PIPE_CLEARANCE: float = 0.1
 const PIPE_MIN_LENGTH: float = 0.3
 
 const PIPE := Color(0.22, 0.22, 0.24)
-const GARAGE_STRIPE := Color(0.75, 0.75, 0.7)
-const GARAGE_STOP := Color(0.6, 0.5, 0.15)
 
 var _rules: BuildingRules = null
 
@@ -104,27 +102,6 @@ func build(
 	_plate_the_doors(plan, identity)
 	for index: int in dressing.pipes:
 		_lay_pipe(plan, index)
-	_mark_garage(plan)
-
-
-## Разметка гаража — этажа выхода (ADR-0031, решение 4): белые полосы между
-## местами и колёсные упоры у стены, в обход шахт и выхода — их места
-## [method BuildingPlan.safe_spots] и так не отдаёт.
-func _mark_garage(plan: BuildingPlan) -> void:
-	var index := _rules.floors - 1
-	var surface := _rules.floor_surface(index)
-	var stripe := GreyboxLook.surface(GARAGE_STRIPE)
-	var stop := GreyboxLook.surface(GARAGE_STOP)
-	var step := _rules.slot_x(1) - _rules.slot_x(0)
-	var depth := WorldSpace.CORRIDOR_DEPTH * 0.8
-	for x: float in plan.safe_spots(_rules, index):
-		var line := GreyboxLook.box(Vector3(0.08, 0.01, depth), stripe)
-		line.position = WorldSpace.to_scene(Vector2(x - step * 0.5, surface - 0.005))
-		add_child(line)
-		var block := GreyboxLook.box(Vector3(step * 0.45, 0.08, 0.14), stop)
-		block.position = WorldSpace.to_scene(Vector2(x, surface - 0.04))
-		block.position.z = WorldSpace.BACK_WALL_Z + STANDOFF + 0.2
-		add_child(block)
 
 
 ## Мебель у стены: перед пилястрами, на полу этажа.

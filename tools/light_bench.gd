@@ -17,8 +17,13 @@ extends Node3D
 ##     godot --path . res://tools/light_bench.tscn
 ##     godot --path . res://tools/light_bench.tscn -- --whole
 ##     godot --path . res://tools/light_bench.tscn -- --whole --seed=2
+##     godot --path . res://tools/light_bench.tscn -- --garage --x=16
 ##
 ## Сид по умолчанию — 1, туман. Дождь (M24a) меряется на сиде 2.
+##
+## `--garage` (M24b) меряет нижний этаж — паркинг со светильниками и чужими
+## машинами; `--x=` ставит Otto в нужную точку этажа, иначе — на безопасное
+## место, как на широком этаже.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
@@ -55,9 +60,15 @@ func _ready() -> void:
 		_run_whole(level)
 		return
 	var index := level.rules.floors - 3
-	level.otto.global_position = WorldSpace.to_scene(
-		Vector2(level.plan().safe_x(level.rules, index), level.rules.floor_surface(index))
-	)
+	var x := NAN
+	for argument: String in OS.get_cmdline_user_args():
+		if argument == "--garage":
+			index = level.rules.floors - 1
+		elif argument.begins_with("--x="):
+			x = argument.trim_prefix("--x=").to_float()
+	if is_nan(x):
+		x = level.plan().safe_x(level.rules, index)
+	level.otto.global_position = WorldSpace.to_scene(Vector2(x, level.rules.floor_surface(index)))
 	_run(level)
 
 

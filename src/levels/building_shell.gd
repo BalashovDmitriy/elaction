@@ -18,9 +18,9 @@ const WALL_WIDTH: float = 0.48
 ## Толщина стены, у которой нет тела: её только видно.
 const PANEL_THICKNESS: float = 0.1
 
-## Ширина выхода из здания, м. Здесь, а не в уровне: оболочка режет ею проём
-## в задней стене, а уровень ставит в этот проём саму дверь выхода и вывеску —
-## и мерить один проём двумя числами нельзя.
+## Ширина выхода из здания, м — зоны, в которой уровень ловит Otto у машины.
+## До M24b оболочка резала ею проём в задней стене; с M24b выход — ворота
+## паркинга в торце ([Garage]), и проёма в задней стене нет.
 ##
 ## С Otto в M18c не вырос, а сузился: шире его не пускает шаг места. Кабина
 ## соседней шахты начинается в 0.9 м от середины выхода, и прежние 1.92 м
@@ -42,10 +42,6 @@ const STORY_SHARE: float = 0.45
 ## Кадры M18e: на сумрачной башне тёмный этаж без ламп отличался от светлого
 ## слабо — стена отражала общий тон так же, как на светлом.
 const UNLIT_SHADE: float = 0.45
-
-## Стена гаража — этажа выхода: бетон вместо конторской стены (ADR-0031,
-## решение 4).
-const GARAGE_WALL := Color(0.24, 0.24, 0.25)
 
 ## Парапет крыши: видимая высота, отлив сверху и его свес, м (ADR-0031, решение 2).
 const PARAPET_HEIGHT: float = 1.05
@@ -139,7 +135,11 @@ func _build_side_walls(
 	if index == BuildingRules.ROOF:
 		_build_parapets(surface, bounds, top, material)
 		return
-	_build_solid(Rect2(bounds.x, top, WALL_WIDTH, height), material)
+	# Левая стена паркинга — тело без вида: в ней ворота, и видимые куски
+	# вокруг проёма ставит [Garage] (ADR-0038, решение 3). Otto в ворота не
+	# выходит — тело целое.
+	var garage := index == _rules.floors - 1
+	_build_solid(Rect2(bounds.x, top, WALL_WIDTH, height), material, not garage)
 	_build_solid(Rect2(bounds.y - WALL_WIDTH, top, WALL_WIDTH, height), material)
 
 
@@ -172,6 +172,8 @@ func _build_parapets(
 ## ровно свою ширину, над ней — перемычка до потолка.
 ##
 ## Крыша стены не получает: над ней небо, а за ней — город ([CityBackdrop]).
+## Нижний этаж — тоже: он паркинг, и зал за проездом строит [Garage]
+## (ADR-0038, решение 3).
 func _build_room() -> void:
 	# Стена — фактура типа здания в тоне этажа (ADR-0033, решение 5): рисунок
 	# даёт фактура, цвет — раунд.
@@ -186,15 +188,13 @@ func _build_room() -> void:
 	var far_z := WorldSpace.BACK_WALL_Z - WorldSpace.ROOM_DEPTH
 
 	for index: int in _rules.levels():
-		if index == BuildingRules.ROOF:
+		if index == BuildingRules.ROOF or index == _rules.floors - 1:
 			continue
 		var surface := _rules.floor_surface(index)
 		var top := _rules.story_top(index)
 		var bounds := _rules.floor_span(index)
 		var inner := Vector2(bounds.x + WALL_WIDTH, bounds.y - WALL_WIDTH)
 		var back := unlit_back if _rules.is_unlit(index) else lit_back
-		if index == _rules.floors - 1:
-			back = GreyboxLook.surface(GARAGE_WALL)
 
 		var openings := _openings_on(index)
 		var lintel_top := surface - Door.LEAF_SIZE.y
@@ -209,16 +209,14 @@ func _build_room() -> void:
 		_build_panel(Rect2(inner.x, top, inner.y - inner.x, surface - top), far, far_z)
 
 
-## Проёмы в задней стене этажа: двери и, на нижнем, выход.
+## Проёмы дверей в задней стене этажа. Выход с M24b — ворота паркинга в
+## торце ([Garage]), а не проём в задней стене.
 func _openings_on(index: int) -> Array[Vector2]:
 	var openings: Array[Vector2] = []
 	var half := Door.LEAF_SIZE.x * 0.5
 	for spot in _plan.doors:
 		if spot.floor_index == index:
 			openings.append(Vector2(spot.x - half, spot.x + half))
-	if index == _rules.floors - 1:
-		var exit_half := EXIT_WIDTH * 0.5
-		openings.append(Vector2(_plan.exit_x - exit_half, _plan.exit_x + exit_half))
 	return openings
 
 
