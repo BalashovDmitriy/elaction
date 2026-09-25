@@ -119,8 +119,8 @@ func _lamps_on(plan: BuildingPlan, floor_index: int) -> int:
 	return count
 
 
-## Красных дверей столько, сколько по таблице ROM на навыке, по одной на этаж,
-## и в каждой полосе — её квота.
+## Красных дверей столько, сколько выпало жребием, по одной на этаж, и в каждой
+## полосе — квота столбца ROM с этим числом (ADR-0037, решение 8).
 func test_documents_follow_the_rom_bands() -> void:
 	for skill: int in SKILLS:
 		var rules := _rules(skill)
@@ -128,7 +128,10 @@ func test_documents_follow_the_rom_bands() -> void:
 			var plan := BuildingPlan.generate(rules, building_seed)
 			var floors := plan.document_floors()
 			var where := "навык %d, сид %d" % [skill, building_seed]
-			assert_eq(floors.size(), Arcade.red_doors(skill), where + ": документов")
+			var wanted := BuildingDocuments.count(rules, building_seed)
+			var column := BuildingDocuments.column(rules, building_seed)
+			assert_eq(floors.size(), wanted, where + ": документов")
+			assert_eq(Arcade.red_doors(column), wanted, where + ": столбец ROM с тем же числом")
 			var per_band: Dictionary = {}
 			var seen: Dictionary = {}
 			for index: int in floors:
@@ -142,7 +145,7 @@ func test_documents_follow_the_rom_bands() -> void:
 			for band: int in Arcade.RED_DOOR_BANDS.size():
 				assert_eq(
 					int(per_band.get(band, 0)),
-					Arcade.red_doors_in_band(band, skill),
+					Arcade.red_doors_in_band(band, column),
 					where + ": полоса %d" % band
 				)
 
@@ -213,3 +216,18 @@ func test_dense_doors_leave_room_for_walls_in_the_tower() -> void:
 				if not rules.is_wide(wall.floor_index):
 					tower += 1
 	assert_gte(tower, 20, "стен на башне %d — двери их вытеснили" % tower)
+
+
+## Документов 5–10 жребием по сиду, с первого здания (ADR-0037, решение 8):
+## на любом навыке выпадает весь разброс, и одно здание повторяется.
+func test_the_document_count_is_drawn_per_building() -> void:
+	for skill: int in [0, 8]:
+		var rules := _rules(skill)
+		var seen: Dictionary = {}
+		for building_seed: int in 200:
+			var wanted := BuildingDocuments.count(rules, building_seed)
+			assert_between(wanted, BuildingDocuments.FEWEST, BuildingDocuments.MOST)
+			assert_eq(wanted, BuildingDocuments.count(rules, building_seed), "сид повторяет число")
+			seen[wanted] = true
+		for wanted: int in range(BuildingDocuments.FEWEST, BuildingDocuments.MOST + 1):
+			assert_true(seen.has(wanted), "навык %d: выпадает и %d" % [skill, wanted])

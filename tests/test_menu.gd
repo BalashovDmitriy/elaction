@@ -242,3 +242,23 @@ func _sources(dir: String) -> Array[String]:
 	for sub: String in DirAccess.get_directories_at(dir):
 		found.append_array(_sources(dir.path_join(sub)))
 	return found
+
+
+## Справку по управлению не находили: из главного меню она была, с паузы — нет
+## (ADR-0037, решение 9).
+func test_the_controls_open_from_the_pause_and_lead_back() -> void:
+	var menu := _menu()
+	menu.show_page(Menu.Page.PAUSE)
+	var wanted := tr("UI_CONTROLS")
+	var found: MenuRow = null
+	for row: MenuRow in menu.rows():
+		for label: Node in row.find_children("*", "Label", true, false):
+			if (label as Label).text == wanted:
+				found = row
+	assert_not_null(found, "на паузе есть «Управление»")
+	menu.show_page(Menu.Page.CONTROLS)
+	var notes: Array[String] = []
+	for label: Node in menu.find_children("*", "Label", true, false):
+		notes.append((label as Label).text)
+	assert_has(notes, tr("UI_FALL_RULE"), "правило падения — на экране управления")
+	assert_has(notes, tr("UI_AIM_HINT"), "и луч прицела")

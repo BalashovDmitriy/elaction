@@ -203,6 +203,8 @@ func _build_pause() -> void:
 	_action("UI_RESUME", func() -> void: resume_pressed.emit())
 	_action("UI_RESTART", func() -> void: restart_pressed.emit())
 	_action("UI_SETTINGS", func() -> void: show_page(Page.SETTINGS))
+	# Справка — и с паузы: из главного меню её не находили (ADR-0037, решение 9).
+	_action("UI_CONTROLS", func() -> void: show_page(Page.CONTROLS))
 	_action("UI_TO_MENU", func() -> void: to_menu_pressed.emit())
 
 
@@ -279,6 +281,8 @@ func _build_controls() -> void:
 	_column.add_child(grid)
 	_gap(6.0)
 	_note(tr("UI_ACTION_HINT"))
+	_note(tr("UI_FALL_RULE"))
+	_note(tr("UI_AIM_HINT"))
 	_note(tr("UI_REBIND_LATER"))
 	_gap(10.0)
 	_back()

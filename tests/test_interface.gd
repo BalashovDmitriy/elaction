@@ -220,3 +220,23 @@ func test_the_hud_draws_a_folder_per_document() -> void:
 				shown += 1
 		assert_eq(shown, total, "документов %d — столько и папок" % total)
 	game.reset()
+
+
+## Раунд — в центре HUD, первой строкой: в углу его не находили (ADR-0037).
+func test_the_round_sits_in_the_middle_plate() -> void:
+	var hud := HUD_SCENE.instantiate() as Hud
+	add_child_autofree(hud)
+	var game := GameState.instance()
+	game.start_game(0)
+	hud.refresh()
+	var wanted := "%s %d" % [tr("UI_ROUND").to_upper(), game.building]
+	var shown: Label = null
+	for label: Node in hud.find_children("*", "Label", true, false):
+		if (label as Label).text == wanted:
+			shown = label as Label
+	assert_not_null(shown, "номер раунда показан")
+	if shown != null:
+		var box := shown.get_parent()
+		assert_eq(shown.get_index(), 0, "первой строкой")
+		assert_eq(box.get_child_count(), 3, "в плашке раунд, здание и этаж")
+	game.reset()

@@ -77,7 +77,7 @@ func test_every_door_carries_a_sign_that_tells_red_from_plain() -> void:
 			)
 		assert_eq(
 			red,
-			BuildingDocuments.count(level.rules),
+			BuildingDocuments.count(level.rules, level.building_seed),
 			"сид %d: красных табло столько же, сколько документов" % building_seed
 		)
 		remove_child(level)

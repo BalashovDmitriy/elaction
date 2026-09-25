@@ -181,11 +181,15 @@ func _build() -> void:
 		docs.add_child(icon)
 		_documents.append(icon)
 
-	# По центру сверху: здание и этаж.
+	# По центру сверху: раунд, здание и этаж. Раунд — первой строкой: в углу,
+	# мелким и тусклым, его не находили (замечание пользователя, ADR-0037).
 	var middle := _plate(root, Control.PRESET_CENTER_TOP)
 	var middle_box := VBoxContainer.new()
 	middle_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	middle.add_child(middle_box)
+	_round = _label(24, INK, 700)
+	_round.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	middle_box.add_child(_round)
 	_building = _label(26, _neon, 600)
 	_building.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	middle_box.add_child(_building)
@@ -217,11 +221,6 @@ func _build() -> void:
 		_lives.append(icon)
 	_lives_more = _label(34, INK, 700)
 	lives.add_child(_lives_more)
-
-	# Справа снизу: раунд.
-	var corner := _plate(root, Control.PRESET_BOTTOM_RIGHT)
-	_round = _label(30, INK_DIM, 600)
-	corner.add_child(_round)
 	_restyle()
 
 

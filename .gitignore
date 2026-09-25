@@ -41,3 +41,6 @@ __pycache__/
 # --- ОС ---
 .DS_Store
 Thumbs.db
+
+# Рабочие копии агентов Claude Code
+/.claude/worktrees/
