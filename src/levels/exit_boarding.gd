@@ -5,8 +5,8 @@ extends RefCounted
 ##
 ## До машины он идёт сам. У водительской двери со всеми документами управление
 ## забирают: Otto делает последний шаг к двери, садится — машина качнулась и
-## хлопнула дверью, — ворота гаража открываются, загораются фары, и машина
-## уезжает, разгоняясь. Здание сдано, когда она ушла из кадра: следующее
+## хлопнула дверцей, — ворота гаража открываются, стартер заводит мотор,
+## загораются фары, и машина уезжает, разгоняясь. Здание сдано, когда она ушла из кадра: следующее
 ## собирается после отъезда, а не в тот же кадр (ADR-0011, пункт 14).
 ##
 ## С шага к двери Otto недосягаем: сначала его «везут», как на эскалаторе, —
@@ -20,7 +20,7 @@ extends RefCounted
 ## Что случилось за шаг: ничего, машина тронулась, машина ушла из кадра.
 enum Event { NONE, STARTED, LEFT }
 
-enum Phase { WAITING, STEPPING_IN, SEATING, LEAVING, GONE }
+enum Phase { WAITING, STEPPING_IN, SEATING, STARTING, LEAVING, GONE }
 
 ## Ширина места у водительской двери, где Otto садится, м. Шире шага бота за
 ## кадр ([constant OttoBot.REACHED] и его последний шаг), но уже машины: садятся
@@ -29,8 +29,11 @@ const DOOR_REACH: float = 0.9
 ## Насколько ступни могут быть выше или ниже пола подвала, м: садится стоящий,
 ## а не пролетающий мимо в прыжке.
 const FOOTING: float = 0.2
-## Сколько Otto садится, с: от шага в машину до того, как она тронулась.
+## Сколько Otto садится, с: от хлопка дверцы до стартера.
 const SEAT_TIME: float = 0.5
+## Сколько мотор заводится, с: стартер и газовка ([constant Sounds.CAR_START],
+## 2.8 с) — машина трогается на газовке, не дожидаясь её конца.
+const START_TIME: float = 2.0
 ## Как зовут гараж, чьи ворота открываются перед машиной, и что у него звать.
 ## Гаража может не быть — тогда машина просто уезжает.
 const GARAGE := "Garage"
@@ -87,6 +90,13 @@ func step(delta: float, otto: Otto, documents_done: bool, view: Rect2) -> Event:
 				_seat_left = SEAT_TIME
 				phase = Phase.SEATING
 		Phase.SEATING:
+			_car.settle(delta)
+			_seat_left -= delta
+			if _seat_left <= 0.0:
+				_car.start_engine()
+				_seat_left = START_TIME
+				phase = Phase.STARTING
+		Phase.STARTING:
 			_car.settle(delta)
 			_seat_left -= delta
 			if _seat_left <= 0.0:

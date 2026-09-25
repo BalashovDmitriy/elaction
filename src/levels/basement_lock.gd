@@ -22,8 +22,9 @@ extends Node3D
 const LID_SINK: float = 0.005
 ## За сколько створки расходятся, с.
 const OPEN_TIME: float = 0.6
-## Звук створок. Свой звук подбирает пользователь; пока — створка двери.
-const OPEN_SOUND := Sounds.DOOR_OPEN
+## Звук створок — зуммер лифта, на месте шахты; докуда слышно, м.
+const OPEN_SOUND := Sounds.BASEMENT_OPEN
+const SOUND_REACH: float = 24.0
 
 var _cars: Array[ElevatorCar] = []
 var _hatches: Array[StaticBody3D] = []
@@ -99,7 +100,12 @@ func unlock() -> void:
 			car.lock_bottom_stop(false)
 	if _hatches.is_empty():
 		return
-	Sounds.play(OPEN_SOUND)
+	# Источник — на узле замка, а не на створках: створки убираются раньше,
+	# чем зуммер доиграет.
+	var buzzer := Sounds.source(self, OPEN_SOUND, SOUND_REACH)
+	buzzer.position = _hatches[0].position
+	buzzer.finished.connect(buzzer.queue_free)
+	buzzer.play()
 	var tween := create_tween().set_parallel()
 	for hatch in _hatches:
 		hatch.collision_layer = 0

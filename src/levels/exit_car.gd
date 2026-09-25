@@ -33,6 +33,8 @@ const BEAM_HEIGHT: float = 0.5
 const BEAM_RANGE: float = 9.0
 const BEAM_ANGLE: float = 28.0
 const BEAM_ENERGY: float = 4.0
+## Докуда слышно машину, м: дверцу, стартер и отъезд — они звучат у машины.
+const SOUND_REACH: float = 24.0
 ## Машина стоит снаружи здания: за плоскостью игры, но перед стеной, чтобы
 ## Otto проходил перед ней, а не сквозь.
 const Z: float = -0.6
@@ -169,10 +171,16 @@ func door_x() -> float:
 	return position.x + towards * DOOR_OFFSET
 
 
-## Otto сел: машина качнулась под ним и хлопнула дверью.
+## Otto сел: машина качнулась под ним и хлопнула дверцей.
 func take_the_driver() -> void:
 	_rocking = ROCK_TIME
-	Sounds.play(Sounds.DOOR_CLOSE)
+	_say(Sounds.CAR_DOOR)
+
+
+## Стартер заводит мотор, и загораются фары.
+func start_engine() -> void:
+	set_lights(true)
+	_say(Sounds.CAR_START)
 
 
 ## Горят ли фары: заглушённая машина стоит с тёмными, заведённая зажигает их и
@@ -209,7 +217,7 @@ func drive_away() -> void:
 	_leaving = true
 	_speed = START_SPEED
 	set_lights(true)
-	Sounds.play(Sounds.CAR_AWAY)
+	_say(Sounds.CAR_AWAY)
 
 
 ## Едет ли машина.
@@ -248,6 +256,13 @@ func advance(delta: float, view: Rect2) -> bool:
 		_leaving = false
 		return true
 	return false
+
+
+## Звук на месте машины: позиционный источник, который уезжает вместе с ней.
+func _say(sound: String) -> void:
+	var player := Sounds.source(self, sound, SOUND_REACH)
+	player.finished.connect(player.queue_free)
+	player.play()
 
 
 ## Заводит свои копии материалов фар и стоп-сигналов вместо общих из кэша.

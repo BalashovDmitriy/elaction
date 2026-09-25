@@ -17,8 +17,9 @@ const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const SETTLE_FRAMES: int = 5
 const PATIENCE: int = 480
 ## Сколько шагов физики ждать, пока Otto сядет и машина тронется: шаг к двери,
-## полсекунды посадки ([constant ExitBoarding.SEAT_TIME]) — остальное запас.
-const BOARDING_PATIENCE: int = 120
+## полсекунды посадки ([constant ExitBoarding.SEAT_TIME]) и две секунды стартера
+## ([constant ExitBoarding.START_TIME]) — 150 шагов, остальное запас.
+const BOARDING_PATIENCE: int = 240
 
 ## Допуск на положение машины, м: полсантиметра. Машина стоит колёсами ровно на
 ## полу и ровно в зазоре от проёма; широкий допуск пропускал бы и машину,
