@@ -419,7 +419,7 @@ func _window_mode() -> void:
 
 ## Размер окна — из тех, что держит монитор игрока.
 func _resolution() -> void:
-	var area := DisplayModes.window_area().size
+	var area := DisplayModes.screen_rect().size
 	var sizes := DisplayModes.available(area)
 	var current := DisplayModes.nearest(settings.resolution, area)
 	var names: Array[String] = []

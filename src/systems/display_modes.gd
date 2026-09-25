@@ -62,6 +62,29 @@ static func window_area() -> Rect2i:
 	return DisplayServer.screen_get_usable_rect()
 
 
+## Экран целиком: по нему строится список размеров. По рабочей области его
+## строить нельзя — на 4K-мониторе она ниже 2160 на панель задач, и 4K из
+## списка пропадал (замечание пользователя, M24b).
+static func screen_rect() -> Rect2i:
+	return Rect2i(DisplayServer.screen_get_position(), DisplayServer.screen_get_size())
+
+
+## Где встанет окно размера [param resolution]: по середине рабочей области
+## [param usable], если влезает в неё с рамкой, иначе — по середине экрана
+## [param screen] без рамки. Так 4K на 4K-мониторе — окно во весь экран поверх
+## панели задач, а не окно с заголовком за краем.
+static func windowed_rect(resolution: Vector2i, screen: Rect2i, usable: Rect2i) -> Rect2i:
+	var size := nearest(resolution, screen.size)
+	if size.x <= usable.size.x and size.y <= usable.size.y:
+		return Rect2i(usable.position + (usable.size - size) / 2, size)
+	return Rect2i(screen.position + (screen.size - size) / 2, size)
+
+
+## Нужна ли окну рамка: не нужна, если оно не влезает в рабочую область.
+static func framed(frame: Rect2i, usable: Rect2i) -> bool:
+	return usable.encloses(frame)
+
+
 ## Применяет режим и размер к окну.
 static func apply_window(mode: Mode, resolution: Vector2i) -> void:
 	match mode:
@@ -74,12 +97,14 @@ static func apply_window(mode: Mode, resolution: Vector2i) -> void:
 			DisplayServer.window_set_size(DisplayServer.screen_get_size())
 			DisplayServer.window_set_position(DisplayServer.screen_get_position())
 		_:
+			var usable := window_area()
+			var frame := windowed_rect(resolution, screen_rect(), usable)
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
-			DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, false)
-			var area := window_area()
-			var size := nearest(resolution, area.size)
-			DisplayServer.window_set_size(size)
-			DisplayServer.window_set_position(area.position + (area.size - size) / 2)
+			DisplayServer.window_set_flag(
+				DisplayServer.WINDOW_FLAG_BORDERLESS, not framed(frame, usable)
+			)
+			DisplayServer.window_set_size(frame.size)
+			DisplayServer.window_set_position(frame.position)
 
 
 ## Применяет масштаб 3D-рендера к корневому виду.

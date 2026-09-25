@@ -64,6 +64,21 @@ func test_window_sizes_fit_the_screen() -> void:
 	)
 
 
+## 4K-монитор с панелью задач: рабочая область ниже 2160, а 4K в списке есть
+## и встаёт во весь экран без рамки. Раньше список строился по рабочей области,
+## и 4K пропадал (замечание пользователя, M24b).
+func test_4k_window_on_a_4k_screen_with_a_taskbar() -> void:
+	var screen := Rect2i(0, 0, 3840, 2160)
+	var usable := Rect2i(0, 0, 3840, 2112)
+	assert_has(DisplayModes.available(screen.size), Vector2i(3840, 2160), "4K в списке")
+	var frame := DisplayModes.windowed_rect(Vector2i(3840, 2160), screen, usable)
+	assert_eq(frame, screen, "окно 4K — во весь экран")
+	assert_false(DisplayModes.framed(frame, usable), "без рамки: с ней заголовок ушёл бы за край")
+	var small := DisplayModes.windowed_rect(Vector2i(1920, 1080), screen, usable)
+	assert_true(DisplayModes.framed(small, usable), "меньшее окно — с рамкой")
+	assert_eq(small.position, Vector2i(960, 516), "по середине рабочей области")
+
+
 func test_settings_without_a_file_take_the_system_language() -> void:
 	var settings := GameSettings.load_from("user://no_such_settings.cfg")
 	assert_true(GameSettings.LOCALES.has(settings.locale), "язык из списка известных")
