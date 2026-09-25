@@ -129,6 +129,7 @@ var _cars: Array[ElevatorCar] = []
 ## Одежда шахт отдельным узлом: полсотни частей на здание не должны попадать
 ## под каждый обход детей уровня. Стены комнаты — там же и по той же причине.
 var _shafts: BuildingShafts = null
+var _shaft_hums: ShaftHums = null
 ## Оболочка здания: перекрытия, стены и комната за коридором. Ставит их она,
 ## а уровень населяет готовое — ADR-0024 развёл это по узлам.
 var _shell: BuildingShell = null
@@ -213,8 +214,10 @@ func _ready() -> void:
 ## Гасит всё, что уехало из кадра. Ламп в здании тридцать, а в кадр влезает
 ## два с половиной этажа — ADR-0010, пункт 8.
 ##
-## Здесь только свет: он часть картинки, и считать его чаще кадра незачем.
+## Здесь свет и звук по месту Otto: оба — часть кадра, и считать их чаще кадра
+## незачем.
 func _process(_delta: float) -> void:
+	_listen_where_otto_is()
 	var span := VisibleFloors.around(rules, otto.camera_view())
 	if span == _lit_span:
 		return
@@ -305,6 +308,9 @@ func _spawn_shafts() -> void:
 	_shafts = BuildingShafts.new()
 	add_child(_shafts)
 	_shafts.dress(rules, _plan)
+	_shaft_hums = ShaftHums.new()
+	_shaft_hums.name = "ShaftHums"
+	add_child(_shaft_hums)
 	for shaft in _plan.shafts:
 		# Верхний ярус пары не спускается на нижний этаж шахты: нижний упёрся бы
 		# в дно. Поэтому остановки считаются по ведущему, а не по полосе.
@@ -327,6 +333,7 @@ func _spawn_shafts() -> void:
 		if shaft.double_deck:
 			_spawn_lower_deck(car, shaft)
 		_spawn_shaft_pit(shaft)
+		_shaft_hums.add(shaft, _shafts.top_of(shaft), rules.floor_surface(shaft.bottom))
 
 
 ## Вступление: Otto съезжает по тросу на крышу.
@@ -670,6 +677,16 @@ func _agents_on(index: int) -> Array[Enemy]:
 	return found
 
 
+## Звук по месту Otto — правила в [PlaceSound]: на крыше и у выхода улица в
+## полную силу, на этажах — из-за стекла; шаг по полу здания.
+func _listen_where_otto_is() -> void:
+	var index := _floor_of(otto)
+	var at := WorldSpace.to_plane(otto.global_position)
+	Sounds.set_outdoors(PlaceSound.hears_street(rules, index, at.x, _exit_position.x))
+	otto.step_sound = PlaceSound.step_at(index == BuildingRules.ROOF, identity)
+	_shaft_hums.follow(at.y)
+
+
 ## Этаж, на котором стоит узел. Единственное место, где высота сцены снова
 ## становится высотой правил.
 func _floor_of(node: Node3D) -> int:
@@ -871,7 +888,7 @@ func _release_agent(post: AgentPost) -> Enemy:
 func _on_alarm_raised() -> void:
 	# Сирена работает с M5b, а звучать ей было нечем: теперь вместо темы здания
 	# идёт мотив тревоги, и снять его можно только новым зданием.
-	Sounds.play_music(Sounds.ALARM_THEME)
+	Sounds.play_music(Sounds.ALARM_THEME, building_seed)
 	for car in _cars:
 		car.set_response_delay(ALARM_CAR_DELAY)
 	for agent in agents():

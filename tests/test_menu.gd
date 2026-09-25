@@ -207,6 +207,24 @@ func test_escape_from_settings_over_the_pause_stops_at_the_pause() -> void:
 	TranslationServer.set_locale(locale)
 
 
+func test_leaving_the_pause_brings_the_music_back() -> void:
+	# «Заново» с паузы снимало паузу дерева, но не глухую музыку паузы: вся
+	# новая партия звучала из-за стены (авторевью M23). Из паузы теперь выходят
+	# только через _unpause — «продолжить», «заново» и «в меню» разом.
+	var director := AudioDirector.instance()
+	if director == null:
+		return
+	director.reset()
+	var main := MAIN_SCENE.instantiate()
+	add_child_autofree(main)
+	main.call("_pause")
+	assert_true(director.music_muffled(), "на паузе музыка из-за стены")
+	main.call("_unpause")
+	assert_false(get_tree().paused, "пауза снята")
+	assert_false(director.music_muffled(), "и музыка вернулась")
+	Sounds.stop_music()
+
+
 func test_no_code_points_at_pixellari() -> void:
 	# ADR-0035, решение 3: один шрифт. Забытая ссылка на удалённый файл — это
 	# ошибка загрузки в той сцене, куда реже всего заглядывают.

@@ -1,6 +1,6 @@
 # Авторы ассетов
 
-Код проекта — MIT (см. README). Здесь — чужие модели, фактуры и шрифты, которые
+Код проекта — MIT (см. README). Здесь — чужие модели, фактуры, звуки и шрифты, которые
 лежат в репозитории, и их лицензии. CC0 авторства не требует, но мы указываем всех: так
 честно. CC-BY 3.0 требует указать автора — это и есть эта страница
 ([ADR-0033](docs/adr/0033-dressing-from-packs.md), решение 4).
@@ -82,6 +82,59 @@
 | `tread_plate` | [DiamondPlate008A](https://ambientcg.com/view?id=DiamondPlate008A) | ambientCG | CC0 1.0 |
 | `roof_gravel` | [Gravel043](https://ambientcg.com/view?id=Gravel043) | ambientCG | CC0 1.0 |
 | `hotel_wall` | своя, рисуется кодом | elaction | MIT |
+
+## Звук
+
+Собирает `tools/build_audio.py` в `assets/audio/` — обрезка, петля, громкость
+([ADR-0036](docs/adr/0036-sound-from-libraries.md)). `имя.2`, `имя.3` — варианты
+одного звука. «Фрагмент» — отрезок трека: концовка как джингл. Тест `test_sounds`
+сверяет: у каждого файла есть строка здесь и в `assets/audio/credits.json`.
+
+| Имя | Звук | Автор | Лицензия | Источник |
+|---|---|---|---|---|
+| `theme` | Spy Glass | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
+| `theme.2` | Hard Boiled | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
+| `theme.3` | Covert Affair | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
+| `theme.4` | Dances and Dames | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
+| `alarm_theme` | Fast Talkin | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
+| `alarm_theme.2` | Private Eye | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
+| `alarm_theme.3` | On the Cool Side | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
+| `menu_theme` | Cool Vibes | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
+| `game_over_theme` | Just As Soon | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
+| `document` | Music Jingles: SAX16 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/music-jingles) |
+| `extra_life` | Inquisitive Vibraphone 09 | nomiqbomi | CC0 1.0 | [freesound.org](https://freesound.org/people/nomiqbomi/sounds/578401/) |
+| `building_bonus` | Rollin at 5 (фрагмент) | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
+| `death_jingle` | horn_fail_wahwah_3 | TaranP | CC0 1.0 | [freesound.org](https://freesound.org/people/TaranP/sounds/362204/) |
+| `game_over` | Hard Boiled (фрагмент) | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
+| `step_carpet` | footstep-carpet.wav | swuing | CC-BY 4.0 | [freesound.org](https://freesound.org/people/swuing/sounds/38872/) |
+| `step_concrete` | Impact Sounds: footstep_concrete_000 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/impact-sounds) |
+| `step_concrete.2` | Impact Sounds: footstep_concrete_001 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/impact-sounds) |
+| `step_concrete.3` | Impact Sounds: footstep_concrete_002 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/impact-sounds) |
+| `step_concrete.4` | Impact Sounds: footstep_concrete_003 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/impact-sounds) |
+| `step_concrete.5` | Impact Sounds: footstep_concrete_004 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/impact-sounds) |
+| `shot` | 9mm pistol shot | michorvath | CC0 1.0 | [freesound.org](https://freesound.org/people/michorvath/sounds/427592/) |
+| `kick` | punch | thefsoundman | CC0 1.0 | [freesound.org](https://freesound.org/people/thefsoundman/sounds/118513/) |
+| `agent_death` | thud | Breviceps | CC0 1.0 | [freesound.org](https://freesound.org/people/Breviceps/sounds/447922/) |
+| `otto_death` | male death | Blankened | CC0 1.0 | [freesound.org](https://freesound.org/people/Blankened/sounds/554443/) |
+| `lamp_break` | glass break small | Natty23 | CC-BY 4.0 | [freesound.org](https://freesound.org/people/Natty23/sounds/322602/) |
+| `lamp_crash` | lamp dropped (condenser) | youandbiscuitme | CC-BY 3.0 | [freesound.org](https://freesound.org/people/youandbiscuitme/sounds/258242/) |
+| `elevator_hum` | hotel elevator ride | Filmscore | CC0 1.0 | [freesound.org](https://freesound.org/people/Filmscore/sounds/825478/) |
+| `escalator_hum` | escalator | roachpowder | CC0 1.0 | [freesound.org](https://freesound.org/people/roachpowder/sounds/170231/) |
+| `door_open` | Door, Front, Opening | InspectorJ | CC-BY 4.0 | [freesound.org](https://freesound.org/people/InspectorJ/sounds/431117/) |
+| `door_close` | wooden door close | joedeshon | CC-BY 4.0 | [freesound.org](https://freesound.org/people/joedeshon/sounds/117415/) |
+| `car_away` | car drive away | soundmary | CC-BY 4.0 | [freesound.org](https://freesound.org/people/soundmary/sounds/128190/) |
+| `ui_move` | UI Audio: click1 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/ui-audio) |
+| `ui_select` | Interface Sounds: confirmation_001 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/interface-sounds) |
+| `ui_back` | UI Audio: mouserelease1 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/ui-audio) |
+| `city` | city night hum | klankbeeld | CC-BY 4.0 | [freesound.org](https://freesound.org/people/klankbeeld/sounds/361088/) |
+| `rain` | steady rain in the city | roofusj | CC0 1.0 | [freesound.org](https://freesound.org/people/roofusj/sounds/217236/) |
+| `rain_window` | Rain on Windows, Interior | InspectorJ | CC-BY 4.0 | [freesound.org](https://freesound.org/people/InspectorJ/sounds/346642/) |
+| `wind` | rushing air, distant skyline | kyles | CC0 1.0 | [freesound.org](https://freesound.org/people/kyles/sounds/454072/) |
+| `thunder_near` | close-up thunder strike | loganzsound | CC0 1.0 | [freesound.org](https://freesound.org/people/loganzsound/sounds/840628/) |
+| `thunder_far` | distant dry thunderclap | Shuhmi | CC-BY 4.0 | [freesound.org](https://freesound.org/people/Shuhmi/sounds/855569/) |
+| `room_tone` | hotel corridor | addiofbaddi | CC0 1.0 | [freesound.org](https://freesound.org/people/addiofbaddi/sounds/241659/) |
+| `shaft_hum` | low hum control room | gchase | CC0 1.0 | [freesound.org](https://freesound.org/people/gchase/sounds/144046/) |
+| `neon_buzz` | bulb buzz loop | Nox_Sound | CC0 1.0 | [freesound.org](https://freesound.org/people/Nox_Sound/sounds/553075/) |
 
 ## Шрифты
 

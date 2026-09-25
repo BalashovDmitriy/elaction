@@ -34,6 +34,8 @@ var _time: float = 0.0
 func build(stage_seed: int) -> void:
 	_rules = BuildingRules.new()
 	weather = Weather.of_seed(stage_seed)
+	# Меню стоит на улице: фон в полную силу, как на крыше (ADR-0036, решение 5).
+	Sounds.set_outdoors(true)
 
 	var air := WorldEnvironment.new()
 	air.environment = Environment.new()

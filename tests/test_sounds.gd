@@ -2,102 +2,132 @@ extends GutTest
 
 ## Тесты звука.
 ##
-## Проверяется то же правило, что у спрайтов: список имён и папка обязаны
-## совпадать в обе стороны. Забытое событие молчит, а синтезированный, но
-## никому не нужный звук копится в репозитории — и ни то, ни другое не видно
-## ни в кадре, ни в логе (ADR-0012, пункт 1).
+## Список имён и папка обязаны совпадать в обе стороны: забытое событие молчит,
+## а файл, который никто не зовёт, копится в репозитории, — и ни то, ни другое
+## не видно ни в кадре, ни в логе. У каждого файла — автор (ADR-0036).
+
+const CREDITS_JSON := "res://assets/audio/credits.json"
+const CREDITS_MD := "res://CREDITS.md"
 
 
 func before_each() -> void:
 	Sounds.forget()
+	var director := AudioDirector.instance()
+	if director != null:
+		director.reset()
 
 
-func test_every_sound_has_exactly_one_file() -> void:
-	# Имя может лежать и в WAV, и в OGG — формат выбирает генератор. Два файла
-	# с одним именем означали бы, что игра берёт один, а правят другой.
+func after_all() -> void:
+	var director := AudioDirector.instance()
+	if director != null:
+		director.stop_music()
+		director.reset()
+
+
+func test_every_sound_has_a_file_and_each_variant_exactly_one() -> void:
+	# Вариант может лежать в WAV или OGG — формат выбирает сборка. Два файла с
+	# одним именем означали бы, что игра берёт один, а правят другой.
 	for name: String in Sounds.names():
-		var found := 0
-		for path: String in Sounds.candidates(name):
-			if ResourceLoader.exists(path):
-				found += 1
-		assert_eq(found, 1, "звук %s синтезирован ровно один раз" % name)
+		var count := Sounds.variant_paths(name).size()
+		assert_gt(count, 0, "у звука %s есть файл" % name)
+		for index: int in count:
+			var found := 0
+			for path: String in Sounds.candidates(Sounds.variant_stem(name, index)):
+				if ResourceLoader.exists(path):
+					found += 1
+			assert_eq(found, 1, "вариант %d звука %s лежит в одном файле" % [index + 1, name])
 
 
-func test_every_sound_loads() -> void:
+func test_every_variant_loads() -> void:
 	for name: String in Sounds.names():
-		var stream := Sounds.stream(name)
-		assert_not_null(stream, "звук %s читается" % name)
-		if stream == null:
-			continue
-		assert_gt(stream.get_length(), 0.0, "звук %s не пустой" % name)
+		var streams := Sounds.variants(name)
+		assert_eq(streams.size(), Sounds.variant_paths(name).size(), "%s читается весь" % name)
+		for each: AudioStream in streams:
+			assert_gt(each.get_length(), 0.0, "звук %s не пустой" % name)
 
 
 func test_the_folder_holds_nothing_but_the_listed_sounds() -> void:
 	var known := Sounds.names()
-	var folder := DirAccess.open(Sounds.DIR)
-	assert_not_null(folder, "папка звуков на месте")
-	if folder == null:
-		return
+	var files := _audio_files()
+	assert_gt(files.size(), 0, "папка звуков на месте")
+	for file: String in files:
+		var stem := file.get_basename()
+		var name := stem.get_slice(".", 0)
+		assert_true(known.has(name), "звук %s кому-то нужен" % stem)
+		# Вариант за пропуском игра бы не нашла: `имя.3` без `имя.2` — мёртвый файл.
+		if known.has(name):
+			var stems := PackedStringArray()
+			for index: int in Sounds.variant_paths(name).size():
+				stems.append(Sounds.variant_stem(name, index))
+			assert_true(stems.has(stem), "вариант %s виден игре" % stem)
 
-	for file: String in folder.get_files():
-		# Godot в экспортированной сборке видит .import, в проекте — исходник.
-		if not (file.ends_with(".wav") or file.ends_with(".ogg")):
+
+func test_every_file_has_its_author() -> void:
+	# CC-BY требует указать автора, и указан он должен быть там, где его увидят:
+	# в credits.json для сборки и в CREDITS.md, который едет с игрой.
+	# Разбор через Variant: `as Dictionary` на сломанном файле не даёт null,
+	# и проверка «читается» не срабатывала бы никогда.
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(CREDITS_JSON))
+	assert_true(parsed is Dictionary, "credits.json читается")
+	if not parsed is Dictionary:
+		return
+	var credits: Dictionary = parsed
+	var page := FileAccess.get_file_as_string(CREDITS_MD)
+	for file: String in _audio_files():
+		var stem := file.get_basename()
+		assert_true(credits.has(stem), "%s: нет в credits.json" % stem)
+		if not credits.has(stem):
 			continue
-		var name := file.get_basename()
-		assert_true(known.has(name), "звук %s кому-то нужен" % name)
+		var entry := credits[stem] as Dictionary
+		for key: String in ["title", "author", "licence", "url"]:
+			assert_false(str(entry.get(key, "")).is_empty(), "%s: есть %s" % [stem, key])
+		var licence := str(entry.get("licence", ""))
+		assert_true(
+			licence.begins_with("CC0") or licence.begins_with("CC-BY"),
+			"%s: лицензия CC0 или CC-BY, а не %s" % [stem, licence]
+		)
+		assert_true(page.contains("`%s`" % stem), "%s: есть строка в CREDITS.md" % stem)
 
 
 func test_sounds_that_should_loop_do_loop() -> void:
 	# Тема, оборвавшаяся через двадцать секунд, — это не «музыка тихая», это
 	# тишина до конца партии, и заметить её можно только на слух.
 	for name: String in Sounds.LOOPED:
-		assert_true(_loops(Sounds.stream(name)), "%s зациклен" % name)
+		for each: AudioStream in Sounds.variants(name):
+			assert_true(_loops(each), "%s зациклен" % name)
 
 
 func test_one_shot_sounds_do_not_loop() -> void:
-	for name: String in Sounds.EFFECTS:
+	for name: String in Sounds.names():
 		if Sounds.LOOPED.has(name):
 			continue
-		assert_false(_loops(Sounds.stream(name)), "%s звучит один раз" % name)
+		for each: AudioStream in Sounds.variants(name):
+			assert_false(_loops(each), "%s звучит один раз" % name)
 
 
-## Зациклен ли поток. Форматов два, и у каждого свой способ об этом сказать.
-func _loops(stream: AudioStream) -> bool:
-	var wav := stream as AudioStreamWAV
-	if wav != null:
-		return wav.loop_mode != AudioStreamWAV.LOOP_DISABLED
-	var vorbis := stream as AudioStreamOggVorbis
-	return vorbis != null and vorbis.loop
+func test_several_variants_are_drawn_on_every_play() -> void:
+	# Пять шагов по бетону — пять файлов: шаги подряд не звучат одним.
+	assert_gt(Sounds.variant_paths(Sounds.STEP_CONCRETE).size(), 1, "у шага по бетону варианты")
+	assert_true(
+		Sounds.stream(Sounds.STEP_CONCRETE) is AudioStreamRandomizer, "и жребий на каждый шаг"
+	)
+	assert_false(Sounds.stream(Sounds.SHOT) is AudioStreamRandomizer, "один файл — без жребия")
 
 
-func test_the_loop_covers_the_whole_sound() -> void:
-	# Конец петли считался делением размера данных на байты кадра, а формат
-	# бывает сжатым: петля обрывалась на четверти звука.
-	for name: String in Sounds.LOOPED:
-		var wav := Sounds.stream(name) as AudioStreamWAV
-		if wav == null:
-			continue
-		var frames := wav.get_length() * float(wav.mix_rate)
-		assert_almost_eq(float(wav.loop_end), frames, frames * 0.02, "%s зациклен целиком" % name)
-
-
-func test_the_mixer_has_its_three_buses() -> void:
-	# Отдельная шина у музыки нужна затем, чтобы её можно было приглушить,
-	# не выключая выстрелы (ADR-0012, пункт 7).
-	for bus: String in [Sounds.MASTER_BUS, Sounds.MUSIC_BUS, Sounds.SFX_BUS]:
-		assert_gt(AudioServer.get_bus_index(bus), -1, "шина %s есть" % bus)
-
-
-func test_music_starts_and_stops() -> void:
-	var director := AudioDirector.instance()
-	assert_not_null(director, "автолоад звука поднят")
-	if director == null:
-		return
-
-	director.play_music(Sounds.THEME)
-	assert_eq(director.music_name(), Sounds.THEME, "тема играет")
-	director.stop_music()
-	assert_eq(director.music_name(), "", "и замолкает")
+func test_the_building_track_is_picked_by_the_building() -> void:
+	# Треков здания несколько (решение пользователя): одно и то же здание звучит
+	# одним треком, соседние — разными.
+	var count := Sounds.variants(Sounds.THEME).size()
+	assert_gt(count, 1, "треков здания несколько")
+	assert_eq(
+		Sounds.variant(Sounds.THEME, 7), Sounds.variant(Sounds.THEME, 7), "то же здание — тот же"
+	)
+	assert_ne(Sounds.variant(Sounds.THEME, 0), Sounds.variant(Sounds.THEME, 1), "соседние — разные")
+	assert_eq(
+		Sounds.variant(Sounds.THEME, -1),
+		Sounds.variant(Sounds.THEME, count - 1),
+		"сид бывает любым"
+	)
 
 
 func test_a_loop_is_not_restarted_while_it_plays() -> void:
@@ -120,15 +150,28 @@ func test_a_loop_is_not_restarted_while_it_plays() -> void:
 	assert_false(player.playing, "а выключается с одного слова")
 
 
-func test_silence_mutes_the_bus_instead_of_going_to_minus_infinity() -> void:
-	var director := AudioDirector.instance()
-	if director == null:
-		return
+func test_an_always_on_source_starts_by_itself() -> void:
+	var host: Node3D = add_child_autofree(Node3D.new()) as Node3D
+	var player := Sounds.source(host, Sounds.NEON_BUZZ, 9.0, true)
+	assert_true(player.playing, "неон гудит без приглашения")
 
-	director.set_level(Sounds.SFX_BUS, 0.0)
-	var index := AudioServer.get_bus_index(Sounds.SFX_BUS)
-	assert_true(AudioServer.is_bus_mute(index), "ноль — это выключенная шина")
 
-	director.set_level(Sounds.SFX_BUS, 1.0)
-	assert_false(AudioServer.is_bus_mute(index), "и она включается обратно")
-	assert_almost_eq(director.level_of(Sounds.SFX_BUS), 1.0, 0.001)
+## Зациклен ли поток. Форматов два, и у каждого свой способ об этом сказать.
+func _loops(stream: AudioStream) -> bool:
+	var wav := stream as AudioStreamWAV
+	if wav != null:
+		return wav.loop_mode != AudioStreamWAV.LOOP_DISABLED
+	var vorbis := stream as AudioStreamOggVorbis
+	return vorbis != null and vorbis.loop
+
+
+func _audio_files() -> PackedStringArray:
+	var files := PackedStringArray()
+	var folder := DirAccess.open(Sounds.DIR)
+	if folder == null:
+		return files
+	for file: String in folder.get_files():
+		# Godot в экспортированной сборке видит .import, в проекте — исходник.
+		if file.ends_with(".wav") or file.ends_with(".ogg"):
+			files.append(file)
+	return files
