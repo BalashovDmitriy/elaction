@@ -507,7 +507,7 @@ func _spawn_car(exit_x: float, surface: float) -> void:
 	add_child(_car)
 	# Заглушённая машина стоит с тёмными фарами: зажигаются они на отъезде.
 	_car.set_lights(false)
-	_boarding = ExitBoarding.new(_car, surface, self)
+	_boarding = ExitBoarding.new(_car, surface, _garage)
 	_exit_position = _boarding.door_point()
 
 
@@ -545,12 +545,19 @@ func _shroud_agents() -> void:
 	var here := _floor_of(otto)
 	var otto_in_the_dark := _lighting.is_dark_at(here, otto.global_position.x)
 	_watch.start_frame()
+	# Преграды этажа, где спрятан Otto, — одни на всех его агентов: этаж такой
+	# один ([method DoorWatch.covers]), и считать их на каждого незачем.
+	var watch_blocks: Array[Vector2] = []
+	var blocks_counted := false
 	for agent in agents():
 		if agent.is_dead():
 			continue
 		var where := _floor_of(agent)
 		_shroud_agent(agent, where, agent.global_position.x, here, otto_in_the_dark)
-		_post_agent(agent, where)
+		if not blocks_counted and _watch.covers(where):
+			watch_blocks = _plan.blocks_on(rules, where)
+			blocks_counted = true
+		_post_agent(agent, where, watch_blocks)
 		if _alert_left > 0.0:
 			agent.alert_for(_alert_left)
 
@@ -591,11 +598,9 @@ func _shroud_agent(agent: Enemy, where: int, x: float, here: int, target_in_the_
 ## Ставит агента ждать у двери, за которой Otto, или снимает с поста
 ## ([DoorWatch]). Только из покадрового прохода, не при выпуске: жребий бросается
 ## при первом взгляде на агента, и только что вышедший получит его кадром позже —
-## пока он в проёме, место у двери ему всё равно ни к чему.
-func _post_agent(agent: Enemy, where: int) -> void:
-	var blocks: Array[Vector2] = []
-	if _watch.covers(where):
-		blocks = _plan.blocks_on(rules, where)
+## пока он в проёме, место у двери ему всё равно ни к чему. [param blocks] —
+## преграды этажа Otto; на других этажах [DoorWatch] их не смотрит.
+func _post_agent(agent: Enemy, where: int, blocks: Array[Vector2]) -> void:
 	var x := WorldSpace.to_plane(agent.global_position).x
 	agent.watch_at = _watch.post_for(agent.get_instance_id(), where, x, blocks)
 	agent.watch_door = _watch.door_x()
@@ -634,7 +639,8 @@ func _listen_where_otto_is() -> void:
 	var index := _floor_of(otto)
 	var at := WorldSpace.to_plane(otto.global_position)
 	Sounds.set_outdoors(PlaceSound.hears_street(rules, index, at.x, Garage.gate_x(rules)))
-	otto.step_sound = PlaceSound.step_at(index == BuildingRules.ROOF, identity)
+	var on_concrete := index == BuildingRules.ROOF or index == rules.floors - 1
+	otto.step_sound = PlaceSound.step_at(on_concrete, identity)
 	_shaft_hums.follow(at.y)
 
 

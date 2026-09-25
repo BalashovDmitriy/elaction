@@ -245,8 +245,9 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "walking_on", "actions": ["move_left"], "hold": 1.6},
 	],
 	# M24b: вертолёт привозит Otto (сценку снимает tools/intro_shot.tscn), дальше
-	# тот же спуск: крыша, кабина, этаж. Дверь, подвал и выход — tools/m24b_shot.tscn,
-	# паркинг — tools/garage_shot.tscn.
+	# тот же спуск: крыша, кабина, этаж. Паркинг — tools/garage_shot.tscn; до
+	# двери, подвала и выхода сценарий по времени не доходит, своего инструмента
+	# съёмки у них пока нет.
 	"M24B":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},

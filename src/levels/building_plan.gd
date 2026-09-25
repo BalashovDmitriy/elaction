@@ -179,8 +179,10 @@ static func _generate_once(rules: BuildingRules, seed_value: int, attempt: int) 
 	var taken: Dictionary = {}
 	plan._lay_shafts(rules, rng, taken)
 	plan._lay_escalators(rules, rng, taken)
-	if plan._unbridged >= 0 and attempt < SHAFT_ATTEMPTS - 1:
-		# Дальше раскладывать незачем: здание всё равно собирается заново.
+	var locked := plan._unbridged >= 0 or BuildingBasement.shaft_of(plan) == null
+	if locked and attempt < SHAFT_ATTEMPTS - 1:
+		# Дальше раскладывать незачем: здание всё равно собирается заново — и
+		# стены с их проверкой достижимости, самое дорогое здесь, не строятся.
 		return plan
 	plan._lay_exit(rules, taken)
 	plan._lay_doors(rules, rng, taken)

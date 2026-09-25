@@ -34,10 +34,6 @@ const SEAT_TIME: float = 0.5
 ## Сколько мотор заводится, с: стартер и газовка ([constant Sounds.CAR_START],
 ## 2.8 с) — машина трогается на газовке, не дожидаясь её конца.
 const START_TIME: float = 2.0
-## Как зовут гараж, чьи ворота открываются перед машиной, и что у него звать.
-## Гаража может не быть — тогда машина просто уезжает.
-const GARAGE := "Garage"
-const OPEN_GATE := &"open_gate"
 
 var phase: Phase = Phase.WAITING
 
@@ -45,15 +41,15 @@ var _car: ExitCar = null
 ## Пол подвала в плоскости правил.
 var _surface: float = 0.0
 var _seat_left: float = 0.0
-## Где искать гараж: уровень. Ищется, когда пора открывать ворота, а не при
-## сборке: гараж строит обстановка, и порядок сборки уровню не обещан.
-var _site: Node = null
+## Паркинг, чьи ворота открываются перед машиной. Его строит уровень до
+## машины ([method GreyboxLevel._build_garage]); нет его — машина просто уезжает.
+var _garage: Garage = null
 
 
-func _init(car: ExitCar, surface: float, site: Node = null) -> void:
+func _init(car: ExitCar, surface: float, garage: Garage = null) -> void:
 	_car = car
 	_surface = surface
-	_site = site
+	_garage = garage
 
 
 ## Где Otto садится в машину, в плоскости правил: у водительской двери, на
@@ -125,10 +121,7 @@ func _step_to_the_door(otto: Otto, delta: float) -> bool:
 	return false
 
 
-## Открывает ворота гаража, если гараж есть и умеет.
+## Открывает ворота паркинга, если он есть.
 func _open_the_gate() -> void:
-	if _site == null or not is_instance_valid(_site):
-		return
-	var garage := _site.find_child(GARAGE, true, false)
-	if garage != null and garage.has_method(OPEN_GATE):
-		garage.call(OPEN_GATE)
+	if _garage != null and is_instance_valid(_garage):
+		_garage.open_gate()

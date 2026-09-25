@@ -19,9 +19,10 @@ static func hears_street(rules: BuildingRules, index: int, x: float, exit_x: flo
 	return index == rules.floors - 1 and absf(x - exit_x) <= STREET_REACH
 
 
-## Чем звучит шаг на крыше или на этаже здания [param building]: ковёр отеля,
-## камень конторы и крыши.
-static func step_at(on_roof: bool, building: BuildingIdentity) -> String:
-	if on_roof or building == null or not building.is_hotel():
+## Чем звучит шаг на этаже здания [param building]: ковёр отеля, камень конторы.
+## [param on_concrete] — Otto на голом бетоне: на крыше или в паркинге нижнего
+## этажа (ADR-0038, решение 3), там ковра нет и в отеле.
+static func step_at(on_concrete: bool, building: BuildingIdentity) -> String:
+	if on_concrete or building == null or not building.is_hotel():
 		return Sounds.STEP_CONCRETE
 	return Sounds.STEP_CARPET

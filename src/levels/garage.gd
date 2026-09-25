@@ -162,6 +162,11 @@ var _fixtures: Array[Fixture] = []
 ## В кадре ли этаж: свет трубок горит только тогда ([method show_lights]).
 var _in_view: bool = true
 var _lamp_xs := PackedFloat64Array()
+## Раскладка зала, посчитанная один раз на сборку: её спрашивает каждая часть.
+var _cores: Array[Vector2] = []
+var _columns := PackedFloat64Array()
+var _bays: Array[Vector2] = []
+var _parked: Array[Parked] = []
 
 
 ## Середина ворот по горизонтали: в толще левой стены нижнего этажа.
@@ -317,21 +322,27 @@ func build(rules: BuildingRules, plan: BuildingPlan, building_seed: int) -> void
 	for lamp in plan.lamps:
 		if lamp.floor_index == _bottom:
 			_lamp_xs.append(lamp.x)
+	_cores = cores(rules, plan)
+	_columns = column_xs(rules, plan)
+	_bays = bays(rules, plan)
+	_parked = parked(rules, plan, building_seed)
 
 	_build_walls()
 	_build_columns()
 	_build_ceiling()
-	_build_fixtures(building_seed)
+	_build_fixtures()
 	_mark_the_floor(building_seed)
-	_park_cars(building_seed)
+	_park_cars()
 	gate = GarageGate.new()
 	gate.name = "Gate"
 	add_child(gate)
 	gate.build(rules)
 	_hang_signs()
+	# Тёмному этажу ламп не дают вовсе ([method BuildingRules.lamps_on]), и
+	# гасить по зонам ламп там нечего: гаснут все светильники разом.
 	if rules.is_unlit(_bottom):
-		for lamp_x in _lamp_xs:
-			darken(lamp_x)
+		for fixture in _fixtures:
+			_put_out(fixture)
 
 
 ## Гасит трубки в зоне лампы, ближайшей к [param x] — туда, где она висела.
@@ -342,11 +353,15 @@ func darken(x: float) -> void:
 	if is_nan(nearest):
 		return
 	for fixture: Fixture in _tubes.get(nearest, []):
-		fixture.lit = false
-		fixture.tube.material_override = GreyboxLook.surface(TUBE_OFF)
-		fixture.pool.visible = false
-		if fixture.light != null:
-			fixture.light.visible = false
+		_put_out(fixture)
+
+
+func _put_out(fixture: Fixture) -> void:
+	fixture.lit = false
+	fixture.tube.material_override = GreyboxLook.surface(TUBE_OFF)
+	fixture.pool.visible = false
+	if fixture.light != null:
+		fixture.light.visible = false
 
 
 ## Горит ли трубка светильника над [param x]; false — светильника там нет.
@@ -409,7 +424,7 @@ func _build_walls() -> void:
 	# Полоса краски по дальней стене и номера мест над ней — у пола: верх
 	# стены в глубине закрывает кромка перекрытия.
 	var band := GreyboxLook.surface(PAINT_BAND)
-	for span in BuildingPlan.spans_between(cores(_rules, _plan), _inner):
+	for span in BuildingPlan.spans_between(_cores, _inner):
 		_box(
 			Vector3(span.y - span.x, 0.5, 0.01),
 			band,
@@ -417,7 +432,7 @@ func _build_walls() -> void:
 			false
 		)
 	var number := 0
-	for bay in bays(_rules, _plan):
+	for bay in _bays:
 		number += 1
 		var digits := label("%02d" % number, 800, 0.34, PAINT_WHITE)
 		digits.position = _at((bay.x + bay.y) * 0.5, _surface - 1.1, far_front + 0.004)
@@ -426,7 +441,7 @@ func _build_walls() -> void:
 	# Ядро шахты — бетон от передней линии до дальней стены: портал, лист и
 	# кнопки шахты висят на его передней грани, как висели на задней стене.
 	var core_depth := WorldSpace.BACK_WALL_Z - far_front
-	for core in cores(_rules, _plan):
+	for core in _cores:
 		_box(
 			Vector3(core.y - core.x, height, core_depth),
 			_concrete,
@@ -468,7 +483,7 @@ func _build_columns() -> void:
 	var blue := GreyboxLook.surface(SIGN_BLUE)
 	var front := COLUMN_Z + COLUMN * 0.5
 	var number := 0
-	for x in column_xs(_rules, _plan):
+	for x in _columns:
 		number += 1
 		_box(Vector3(COLUMN, height, COLUMN), _concrete, _at(x, _top + height * 0.5, COLUMN_Z))
 		# Краска обёрткой чуть шире колонны и чуть выше пола — ни одна грань
@@ -502,7 +517,7 @@ func _build_ceiling() -> void:
 	var far_front := FAR_Z + FAR_THICKNESS * 0.5
 	# Торцы балок — зубцами под кромкой перекрытия: через проезд, над
 	# колонной. Над лампой балка начинается за передней линией.
-	for x in column_xs(_rules, _plan):
+	for x in _columns:
 		var front := WorldSpace.CORRIDOR_DEPTH * 0.5 - 0.02
 		for lamp_x in _lamp_xs:
 			if absf(lamp_x - x) < BEAM_LAMP_CLEARANCE:
@@ -518,7 +533,7 @@ func _build_ceiling() -> void:
 	var duct := GreyboxLook.surface(DUCT_METAL)
 	var duct_front := DUCT_Z + DUCT.x * 0.5
 	var duct_top := _top + FloorSigns.hidden_band(duct_front) + DUCT_DROP
-	for span in BuildingPlan.spans_between(cores(_rules, _plan), _inner):
+	for span in BuildingPlan.spans_between(_cores, _inner):
 		if span.y - span.x < 1.0:
 			continue
 		_box(
@@ -540,7 +555,7 @@ func _build_ceiling() -> void:
 	# Трубы вдоль зала: красная спринклерная и серая под ней. Разрывы — у
 	# ядер шахт и простенка таблички: трубы уходят в бетон.
 	var cuts: Array[Vector2] = [pier(_rules)]
-	cuts.append_array(cores(_rules, _plan))
+	cuts.append_array(_cores)
 	var pipe_top := _top + FloorSigns.hidden_band(PIPE_Z + PIPE_RADIUS) + PIPE_DROP
 	var pipes: Array[Array] = [
 		[GreyboxLook.metal(PIPE_RED), pipe_top + PIPE_RADIUS, PIPE_RADIUS],
@@ -567,9 +582,9 @@ func _build_ceiling() -> void:
 ## Люминесцентные светильники над местами: корпус на подвесах, трубка —
 ## эмиссия, под ней на полу — пятно света, над занятым местом — слабый свет
 ## без тени. Всё это гаснет вместе с зоной ближайшей лампы.
-func _build_fixtures(building_seed: int) -> void:
+func _build_fixtures() -> void:
 	var taken := PackedFloat64Array()
-	for car in parked(_rules, _plan, building_seed):
+	for car in _parked:
 		taken.append(car.x)
 	var at_gate := ExitCar.parked_span(_rules)
 	var body := GreyboxLook.metal(FIXTURE_BODY)
@@ -577,7 +592,7 @@ func _build_fixtures(building_seed: int) -> void:
 	var front := FIXTURE_Z + FIXTURE.z * 0.5
 	var fixture_top := _top + FloorSigns.hidden_band(front) + 0.03
 	var reach := (FIXTURE.x - 0.1) * 0.5
-	for bay in bays(_rules, _plan):
+	for bay in _bays:
 		var x := _fixture_x(bay)
 		if is_nan(x):
 			continue
@@ -688,7 +703,7 @@ func _mark_the_floor(building_seed: int) -> void:
 	var oil := GreyboxLook.polished(OIL)
 	var depth := BAY_FRONT_Z - BAY_BACK_Z
 	var edges := PackedFloat64Array()
-	for bay in bays(_rules, _plan):
+	for bay in _bays:
 		for edge: float in [bay.x, bay.y]:
 			if not edges.has(edge):
 				edges.append(edge)
@@ -725,7 +740,7 @@ func _mark_the_floor(building_seed: int) -> void:
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([building_seed, SALT, "oil"])
-	for bay in bays(_rules, _plan):
+	for bay in _bays:
 		for _stain in rng.randi_range(0, 2):
 			var x := rng.randf_range(bay.x + 0.4, bay.y - 0.4)
 			var z := rng.randf_range(BAY_BACK_Z + 0.8, BAY_FRONT_Z - 1.2)
@@ -771,11 +786,11 @@ func _stain_at(x: float, z: float, radius: float, material: StandardMaterial3D) 
 
 ## Чужие машины: модели паков, раздвинутые до настоящей ширины и повёрнутые
 ## носом в зал или к проезду. Фары и стоп-сигналы не горят: машины стоят.
-func _park_cars(building_seed: int) -> void:
+func _park_cars() -> void:
 	var cars := Node3D.new()
 	cars.name = "ParkedCars"
 	add_child(cars)
-	for spot in parked(_rules, _plan, building_seed):
+	for spot in _parked:
 		var model := CarModel.build(spot.choice)
 		model.name = "Parked"
 		model.scale = Vector3(1.0, 1.0, CAR_WIDTH / _depth_of(model))
@@ -858,8 +873,20 @@ static func _at(x: float, y: float, z: float) -> Vector3:
 	return scene_point(x, y, z)
 
 
-## Коробка без тела в точке [param centre]. Мелочь — разметка, краска, таблички —
-## теней не кладёт: теней в кадре она не прибавляет, а проходов теней стоит.
+## Коробка без тела в точке [param centre] под [param parent]. Мелочь — разметка,
+## краска, таблички — теней не кладёт: теней в кадре она не прибавляет, а
+## проходов теней стоит. Статическая: так же собираются ворота ([GarageGate]).
+static func put_box(
+	parent: Node, size: Vector3, material: StandardMaterial3D, centre: Vector3, shadow: bool
+) -> MeshInstance3D:
+	var part := GreyboxLook.box(size, material)
+	part.position = centre
+	if not shadow:
+		part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(part)
+	return part
+
+
 func _box(
 	size: Vector3,
 	material: StandardMaterial3D,
@@ -867,9 +894,4 @@ func _box(
 	shadow: bool = true,
 	parent: Node = null
 ) -> MeshInstance3D:
-	var part := GreyboxLook.box(size, material)
-	part.position = centre
-	if not shadow:
-		part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	(parent if parent != null else self).add_child(part)
-	return part
+	return put_box(parent if parent != null else self, size, material, centre, shadow)

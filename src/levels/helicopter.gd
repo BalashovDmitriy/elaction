@@ -152,6 +152,10 @@ const SILENT_DB: float = -60.0
 ## торможения был бы слышен щелчком.
 const VOLUME_EASE: float = 4.0
 
+## Ободок — один на все вертолёты: шейдер компилируется раз за запуск, а не на
+## каждое здание, когда вертолёт влетает в кадр.
+static var _rim_material: ShaderMaterial = null
+
 var _phase: Phase = Phase.ARRIVING
 var _time: float = 0.0
 var _hover := Vector3.ZERO
@@ -667,14 +671,16 @@ static func _paint(index: int, source: Mesh) -> Material:
 
 ## Второй проход корпуса — холодный ободок по краям силуэта.
 static func _rim() -> ShaderMaterial:
+	if _rim_material != null:
+		return _rim_material
 	var shader := Shader.new()
 	shader.code = RIM_SHADER
-	var rim := ShaderMaterial.new()
-	rim.shader = shader
-	rim.set_shader_parameter(&"rim_color", RIM_COLOR)
-	rim.set_shader_parameter(&"rim_power", RIM_POWER)
-	rim.set_shader_parameter(&"rim_strength", RIM_STRENGTH)
-	return rim
+	_rim_material = ShaderMaterial.new()
+	_rim_material.shader = shader
+	_rim_material.set_shader_parameter(&"rim_color", RIM_COLOR)
+	_rim_material.set_shader_parameter(&"rim_power", RIM_POWER)
+	_rim_material.set_shader_parameter(&"rim_strength", RIM_STRENGTH)
+	return _rim_material
 
 
 static func _surface_middle(mesh: Mesh, index: int) -> Vector3:

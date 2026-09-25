@@ -159,5 +159,8 @@ func _on_documents_changed(collected: int, total: int) -> void:
 	# его на ноль из нуля, и замок прошлого открывался бы с зуммером в пустоту.
 	if not is_inside_tree():
 		return
-	if collected >= total:
+	# «Ноль из нуля» — не последний документ, а сброс партии: запертое здание
+	# документы имеет всегда ([method setup]). Новая партия с паузы сбрасывает
+	# счёт, пока старое здание ещё в дереве, — и замок открывался бы под снос.
+	if total > 0 and collected >= total:
 		unlock()

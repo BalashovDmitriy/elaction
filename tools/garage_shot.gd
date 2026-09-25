@@ -75,8 +75,8 @@ func _run() -> void:
 	get_tree().quit(0)
 
 
-## Точка рядом с [param x], где Otto не встанет в зону выхода: без документов
-## она отправила бы его к красной двери.
+## Точка рядом с [param x], где Otto не встанет у водительской двери машины:
+## кадр паркинга снимается без Otto, садящегося в машину.
 func _clear_x(x: float) -> float:
 	var exit_x := _level.plan().exit_x
 	if absf(x - exit_x) < BuildingShell.EXIT_WIDTH + 0.5:

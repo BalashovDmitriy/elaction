@@ -312,9 +312,4 @@ func _box(
 	shadow: bool = true,
 	parent: Node = null
 ) -> MeshInstance3D:
-	var part := GreyboxLook.box(size, material)
-	part.position = centre
-	if not shadow:
-		part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	(parent if parent != null else self).add_child(part)
-	return part
+	return Garage.put_box(parent if parent != null else self, size, material, centre, shadow)
