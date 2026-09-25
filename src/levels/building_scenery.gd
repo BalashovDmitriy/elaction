@@ -87,8 +87,9 @@ func build(
 		_rain_node = RoofRain.new()
 		_rain_node.name = "RoofRain"
 		add_child(_rain_node)
-		_rain_node.build(rules, plan, _roof_light.position, ROOF_LIGHT_COLOR)
+		_rain_node.build(rules, plan, _roof_light)
 		_rain_node.catch_on(_roof_parts)
+		sign_board.glow_in_rain()
 	# Молнии — только в дождь: в ясную ночь и в туман воздух покадрово не трогается.
 	set_process(Weather.is_raining(weather))
 	add_to_group(Graphics.GROUP)
