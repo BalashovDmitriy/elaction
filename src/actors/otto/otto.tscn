@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://src/actors/otto/otto.gd" id="1_otto"]
 [ext_resource type="Script" path="res://src/systems/side_camera.gd" id="2_camera"]
@@ -7,9 +7,6 @@
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_stand"]
 size = Vector3(0.72, 1.68, 0.4)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_kick"]
-size = Vector3(1.2, 1.68, 0.4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_crouch"]
 size = Vector3(0.72, 1.08, 0.4)
@@ -35,11 +32,3 @@ model = ExtResource("4_model")
 [node name="Camera" type="Camera3D" parent="."]
 top_level = true
 script = ExtResource("2_camera")
-
-[node name="KickZone" type="Area3D" parent="."]
-collision_layer = 0
-collision_mask = 4
-
-[node name="KickShape" type="CollisionShape3D" parent="KickZone"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.84, 0)
-shape = SubResource("BoxShape3D_kick")

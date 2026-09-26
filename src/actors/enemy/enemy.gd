@@ -20,6 +20,8 @@ signal left_building(agent: Enemy)
 const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
 ## Слой врагов в `project.godot`. Агент сходит с него, пока стоит в проёме.
 const ENEMY_LAYER: int = 3
+## Группа агентов здания: по ней Otto ищет, кого достаёт вплотную (ADR-0040).
+const GROUP := &"agents"
 ## Сколько агент падает, прежде чем лечь: смерть — две позы (ADR-0011, п. 12).
 const FALLING_TIME: float = 0.25
 
@@ -60,6 +62,48 @@ var laser: AimLaser = null
 var watch_at: float = NAN
 var watch_door: float = NAN
 
+## Можно ли добить агента: живой, вышел из двери и не в сценке уже. Свойствами,
+## а не методами: методы узла упёрлись в предел линтера.
+var takedown_ready: bool:
+	get:
+		return (
+			is_inside_tree()
+			and not _held
+			and not _brain.is_dead()
+			and not _brain.is_emerging()
+			and not Takedown.rides_a_car(self)
+		)
+## Над агентом идёт сценка добивания (ADR-0040): мозг и шаги стоят, луч гаснет,
+## агент сразу смотрит в [member held_facing]. Отпущенный живой — снова в бою,
+## мёртвый — ложится. Ставит и снимает режиссёр.
+var held: bool:
+	get:
+		return _held
+	set(value):
+		_held = value
+		set_physics_process(not value)
+		if not value:
+			# Труп сценки лёг, как его уронила сценка, — навзничь или отброшенным
+			# назад. Спереди у края шахты это над пустотой: разворачивается к
+			# полу, как всякий убитый, но только теперь — посреди сценки
+			# разворот сломал бы постановку.
+			if _brain.is_dead():
+				_fall_onto_the_floor()
+			return
+		velocity = Vector3.ZERO
+		_walking = false
+		if laser != null:
+			laser.put_out()
+		_brain.face(held_facing)
+		_faced = _brain.facing
+		_body.face(held_facing, true)
+## Куда агент смотрит в сценке: −1 влево, +1 вправо. Ставится до [member held].
+var held_facing: float = 1.0
+## Фигура агента: режиссёр сценки ставит ей позы и темп.
+var figure: FigureRig:
+	get:
+		return _body
+
 ## Правила здания, из которого вышел агент. Пустых не бывает: без них он
 ## достаёт значения по умолчанию — те же, что у здания по умолчанию.
 var _rules: BuildingRules = null
@@ -87,6 +131,9 @@ var _faced: float = 0.0
 var _shooting: float = 0.0
 var _falling_over: float = 0.0
 var _crushed: bool = false
+## Поза трупа, если агента добили сценкой: в чём лёг, в том и лежит (ADR-0040).
+var _corpse: String = ""
+var _held: bool = false
 ## С какой злостью агент вышел и сколько он уже живёт, с: злость растёт с
 ## возрастом (@5AFC). Навык здания — для скорости пули, тревога — сирена.
 var _spawn_anger: int = 0
@@ -119,6 +166,7 @@ func _notification(what: int) -> void:
 
 
 func _ready() -> void:
+	add_to_group(GROUP)
 	_brain.emerge_time = emerge_time
 	_brain.same_line = same_line
 	# Стоячий рост берётся у самой формы, а не записывается вторым числом:
@@ -381,10 +429,13 @@ func take_bullet() -> void:
 
 ## Убивает агента: пулей, ногой или упавшей лампой в M4b.
 ## [param crushed] — придавило упавшей лампой: у такой смерти своя поза.
-func kill(crushed: bool = false) -> void:
+## [param corpse] — поза трупа от сценки добивания: к полу тело разворачивается
+## не здесь, а когда сценка его отпустит ([member held]).
+func kill(crushed: bool = false, corpse: String = "") -> void:
 	if _brain.is_dead() or _brain.is_emerging():
 		return
 	_crushed = crushed
+	_corpse = corpse
 	_brain.kill()
 	velocity = Vector3.ZERO
 	_falling_over = FALLING_TIME
@@ -394,7 +445,8 @@ func kill(crushed: bool = false) -> void:
 	set_collision_layer_value(ENEMY_LAYER, false)
 	if laser != null:
 		laser.put_out()
-	_fall_onto_the_floor()
+	if _corpse.is_empty():
+		_fall_onto_the_floor()
 	Sounds.play(Sounds.AGENT_DEATH)
 	died.emit(self)
 
@@ -598,6 +650,8 @@ func _update_look(delta: float) -> void:
 
 
 func _pose() -> String:
+	if _brain.is_dead() and not _corpse.is_empty():
+		return _corpse
 	# Замах — поза выстрела: пистолет вскинут, пока горит луч (ADR-0037,
 	# решение 5).
 	return ActorPose.of_agent(

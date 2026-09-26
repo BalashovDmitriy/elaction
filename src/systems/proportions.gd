@@ -64,9 +64,8 @@ const SHOT_PRONE: float = 3.0 * PX
 ## Пуля агента стоя — та же, что у Otto.
 const AGENT_SHOT: float = SHOT_HIGH
 
-## Вынос ствола вперёд от середины тела и ширина зоны удара ногой.
+## Вынос ствола вперёд от середины тела.
 const MUZZLE: float = 7.0 * PX
-const KICK_WIDTH: float = 16.0 * PX
 
 ## Створка двери: 16×28 px, верх в 12 px от потолка. Коврик — две трети створки.
 const DOOR := Vector2(16.0 * PX, 28.0 * PX)

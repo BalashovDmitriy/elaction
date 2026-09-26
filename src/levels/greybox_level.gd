@@ -157,6 +157,8 @@ func _ready() -> void:
 	_spawn.rng.seed = building_seed
 	# Свой генератор, не выпуска: иначе вход в дверь менял бы и выпуск агентов.
 	_watch.rng.seed = building_seed * 31 + 7
+	# И свой у сценок добивания — по той же причине (ADR-0040).
+	otto.takedown_rng.seed = building_seed * 17 + 3
 	# Отель или офис: от этого отделка стен, обстановка и вывеска (ADR-0033).
 	identity = BuildingIdentity.of(GameState.instance().building, building_seed)
 

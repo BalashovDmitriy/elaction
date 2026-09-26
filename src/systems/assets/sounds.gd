@@ -37,7 +37,8 @@ const MUFFLE_DOOR := "door"
 const STEP_CARPET := "step_carpet"
 const STEP_CONCRETE := "step_concrete"
 const SHOT := "shot"
-const KICK := "kick"
+## Удар в сценке добивания (ADR-0040). Файл — прежний удар ногой.
+const BLOW := "kick"
 const LAMP_BREAK := "lamp_break"
 const LAMP_CRASH := "lamp_crash"
 const ELEVATOR_HUM := "elevator_hum"
@@ -91,7 +92,7 @@ const EFFECTS: PackedStringArray = [
 	STEP_CARPET,
 	STEP_CONCRETE,
 	SHOT,
-	KICK,
+	BLOW,
 	LAMP_BREAK,
 	LAMP_CRASH,
 	ELEVATOR_HUM,

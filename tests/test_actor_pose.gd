@@ -135,7 +135,7 @@ func test_an_agent_dodging_prone_counts_as_down() -> void:
 
 func test_the_living_and_upright_are_not_down() -> void:
 	for pose: String in [
-		"idle", "walk_0", "walk_1", "walk_2", "jump", "kick", "shoot", ActorPose.CROUCH
+		"idle", "walk_0", "walk_1", "walk_2", "jump", "fall", "shoot", ActorPose.CROUCH
 	]:
 		assert_false(ActorPose.is_down(pose), "%s — это не лежащий" % pose)
 

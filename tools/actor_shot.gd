@@ -34,11 +34,17 @@ const POSES: PackedStringArray = [
 	"crouch",
 	"jump",
 	"land",
-	"kick",
+	"fall",
 	"prone",
 	"dead_0",
 	"dead_1",
-	"crushed"
+	"crushed",
+	"whip_raise",
+	"whip_strike",
+	"choke_hold",
+	"choked",
+	"snap_broken",
+	"pounce_strike",
 ]
 
 ## Высоты пуль ROM, м: линии на кадре, чтобы видеть, кто под какой пулей.

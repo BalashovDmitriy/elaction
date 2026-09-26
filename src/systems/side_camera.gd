@@ -37,6 +37,9 @@ const DISTANCE: float = 20.0
 ## масштабе, и правило «этаж — полоса кадра» пришлось бы пересчитывать.
 const TILT_DEGREES: float = 10.0
 
+## Во сколько раз уже кадр на крупном плане сценки добивания (ADR-0040).
+const CLOSE_UP_SIZE: float = 0.38
+
 ## Скорость сглаживания. Число то же, что стояло у [Camera2D] в 2D-сцене.
 @export var smoothing_speed: float = 8.0
 
@@ -55,6 +58,9 @@ var _centre := Vector2.ZERO
 ## не попавший в дерево, никто не освобождает — сцена Otto, поднятая тестом ради
 ## размера формы и тут же выброшенная, оставляла бы его сиротой.
 var _listener: AudioListener3D = null
+## Крупный план: насколько наехали, 0–1, и на что. Ведёт его режиссёр сценки.
+var _close: float = 0.0
+var _close_point := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -78,8 +84,13 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if _target == null:
 		return
-	var wanted := _bounds.clamp_centre(_target_point())
-	_centre = CameraBounds.smoothed(_centre, wanted, smoothing_speed, delta)
+	var wanted := _bounds.clamp_centre(_target_point().lerp(_close_point, _close))
+	# На крупном плане ход задаёт режиссёр плавной кривой, а мир вокруг замедлен:
+	# сглаживание по замедленным часам волокло бы кадр позади пары.
+	if _close > 0.0:
+		_centre = wanted
+	else:
+		_centre = CameraBounds.smoothed(_centre, wanted, smoothing_speed, delta)
 	global_position = _perch(_centre)
 
 
@@ -88,6 +99,17 @@ func follow(target: Node3D) -> void:
 	_target = target
 	if target != null:
 		snap_to(_target_point())
+
+
+## Крупный план сценки добивания (ADR-0040): [param amount] 0 — обычный кадр,
+## 1 — уже в [constant CLOSE_UP_SIZE] раза и с серединой в [param point]
+## (координаты сцены). Кадр боя ([method rule_view]) крупный план не трогает:
+## кто кого видит, решает он, и наезд камеры бой менять не должен.
+func close_up(amount: float, point: Vector2) -> void:
+	_close = clampf(amount, 0.0, 1.0)
+	_close_point = point
+	size = DEFAULT_HALF_HEIGHT * 2.0 * lerpf(1.0, CLOSE_UP_SIZE, _close)
+	_read_frame()
 
 
 ## Ставит камеру на место без сглаживания.
