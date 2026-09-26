@@ -85,6 +85,11 @@ func _ready() -> void:
 func advance(delta: float) -> void:
 	if _scene == null:
 		return
+	# Агента или Otto выбросили посреди сценки — ушёл за дверь, здание сменилось,
+	# тест разобрал сцену: сценка снимается, а не обращается к освобождённому.
+	if not is_instance_valid(_agent) or not is_instance_valid(_otto):
+		_abort()
+		return
 	_time += delta / SLOW if _slowed else delta
 	var align := clampf(_time / ALIGN_TIME, 0.0, 1.0)
 	var at := _agent.global_position
@@ -185,7 +190,8 @@ func _abort() -> void:
 	var agent := _agent
 	var otto := _otto
 	_release()
-	otto.takedown = null
+	if is_instance_valid(otto):
+		otto.takedown = null
 	if is_instance_valid(agent):
 		agent.held = false
 	queue_free()
@@ -198,7 +204,7 @@ func _release() -> void:
 	var camera := _camera()
 	if camera != null:
 		camera.close_up(0.0, Vector2.ZERO)
-	if _otto != null and _otto.died.is_connected(_abort):
+	if is_instance_valid(_otto) and _otto.died.is_connected(_abort):
 		_otto.died.disconnect(_abort)
 	_scene = null
 

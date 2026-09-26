@@ -336,3 +336,20 @@ func test_the_director_does_not_push_the_agent_into_a_wall() -> void:
 	assert_not_null(_director(), "сценка началась")
 	await wait_seconds(0.2)
 	assert_lt(agent.global_position.x, 0.75 - 0.3, "агент у стены, а не в ней")
+
+
+func test_a_freed_agent_ends_the_scene_quietly() -> void:
+	# Агента выбросили посреди сценки — сценка снимается, мир в своём темпе, и
+	# никто не обращается к освобождённому узлу.
+	_floor()
+	var otto := _otto_at(0.0)
+	await wait_physics_frames(4)
+	var agent := _agent_at(otto, 0.7, -1.0)
+	await wait_physics_frames(3)
+	await _press_shoot()
+	assert_not_null(_director(), "сценка началась")
+	agent.free()
+	await wait_physics_frames(3)
+	assert_null(_director(), "сценка снята")
+	assert_null(otto.takedown, "Otto отпущен")
+	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "мир в своём темпе")
