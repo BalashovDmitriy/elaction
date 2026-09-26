@@ -291,7 +291,7 @@ func _ready() -> void:
 		for surface in mesh_instance.mesh.get_surface_count():
 			_surfaces.append(SkinnedSurface.of(mesh_instance, surface))
 
-	_stand = _clip_frame(FigurePoses.CLIP_IDLE, 0.0)
+	_stand = _clip_frame(FigurePoses.CLIP_STAND, 0.0)
 	_stand_globals = _globals(_stand)
 	_current = _wanted()
 	_settled = true

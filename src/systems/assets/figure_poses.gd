@@ -101,11 +101,32 @@ class Clip:
 
 
 ## Имена клипов в `.glb` — те, что пишет `tools/build_actors.py`.
+## С M24c клипы — из Universal Animation Library, перенесённые на скелет пака
+## (ADR-0039, решение 1).
+##
+## Нейтральная стойка, руки вниз: основа поз кодом. В кадре она не играет —
+## стойка в игре держит пистолет двумя руками, и углы рук от неё ничего бы не
+## значили.
+const CLIP_STAND := "stand"
 const CLIP_IDLE := "idle"
 const CLIP_WALK := "walk"
 const CLIP_SHOOT := "shoot"
 const CLIP_DEATH := "death"
-const CLIP_NAMES: PackedStringArray = [CLIP_IDLE, CLIP_WALK, CLIP_SHOOT, CLIP_DEATH]
+const CLIP_JUMP_START := "jump_start"
+const CLIP_JUMP_AIR := "jump_air"
+const CLIP_JUMP_LAND := "jump_land"
+const CLIP_CROUCH := "crouch"
+const CLIP_NAMES: PackedStringArray = [
+	CLIP_STAND,
+	CLIP_IDLE,
+	CLIP_WALK,
+	CLIP_SHOOT,
+	CLIP_DEATH,
+	CLIP_JUMP_START,
+	CLIP_JUMP_AIR,
+	CLIP_JUMP_LAND,
+	CLIP_CROUCH,
+]
 
 ## С какой скоростью идёт клип ходьбы относительно записанной. Пак шагает
 ## прогулочно, а Otto и агент идут 2.2 м/с (`Arcade.WALK_PX`): на родной
