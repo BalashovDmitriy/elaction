@@ -263,6 +263,24 @@ func test_a_settled_corpse_lies_on_the_floor() -> void:
 	assert_lt(floor_level, 0.03, "и не висит над ним")
 
 
+## Долетевший до клипа риг не заземляет его вовсе: с M24c любой клип ставит на
+## пол `build_actors.py` (ADR-0039). Мерка — после шагов `advance`, как в игре, а
+## не после `snap`: снимок заземляет по всем вершинам и промаха сборки не видит.
+func test_every_clip_stands_on_the_floor_by_itself() -> void:
+	for model: PackedScene in [OTTO_MODEL, AGENT_MODEL]:
+		var rig := _rig(model)
+		var who := model.resource_path.get_file()
+		for pose_name: String in ["idle", "shoot", "jump", "land", "dead_0", "dead_1"]:
+			assert_not_null(FigurePoses.clip_of(pose_name), "%s — клип" % pose_name)
+			rig.show_pose(pose_name)
+			for _frame in 30:
+				rig.advance(FRAME)
+			assert_true(rig.settled(), "%s %s: переход кончился" % [who, pose_name])
+			var low := rig.skinned_aabb().position.y
+			assert_gt(low, -0.03, "%s %s: не в полу (%.3f)" % [who, pose_name, low])
+			assert_lt(low, 0.05, "%s %s: и не над ним (%.3f)" % [who, pose_name, low])
+
+
 ## Заземление на ходу — по крайним вершинам костей, а не по всем: расхождение
 ## низа с полным габаритом обязано быть в миллиметрах, иначе актёр висит или
 ## тонет. Верх по крайним не сверяется: риг берёт у них только низ.

@@ -65,6 +65,9 @@ var _vsync_applied: Array = []
 static func load_from(path: String = PATH) -> GameSettings:
 	var settings := GameSettings.new()
 	settings.locale = settings.system_locale()
+	# Прочитанное из своего файла туда и пишется: меню и замер качества зовут
+	# [method save_to] без пути.
+	settings.file_path = path
 
 	var file := ConfigFile.new()
 	if file.load(path) != OK:

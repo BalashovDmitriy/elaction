@@ -130,6 +130,8 @@ var _air_time: float = 0.0
 var _locks := MoveLocks.new()
 ## Сколько ещё показывать приземление, с.
 var _landing: float = 0.0
+## Нажат ли прыжок во время восстановления: он сработает, как оно кончится.
+var _jump_waiting: bool = false
 ## Где Otto закончил прошлый кадр физики: по этому видно перестановку.
 var _last_position := Vector3.ZERO
 ## Сколько ещё держится передышка после возвращения в игру, с.
@@ -302,8 +304,15 @@ func _hold_the_feet() -> void:
 		_facing = side
 	if not _locks.can_walk():
 		_snapshot.move = 0.0
+	# Прыжок, нажатый во время восстановления, не пропадает, а ждёт его конца:
+	# пауза в 0.15 с короче реакции, и потерянное нажатие читалось бы как
+	# несработавшая кнопка. Отпустил кнопку раньше — передумал.
 	if not _locks.can_jump():
+		_jump_waiting = _jump_waiting or _snapshot.jump_pressed
 		_snapshot.jump_pressed = false
+	elif _jump_waiting:
+		_snapshot.jump_pressed = Input.is_action_pressed(&"jump") or _snapshot.jump_pressed
+		_jump_waiting = false
 
 
 ## Возвращает Otto в игру после смерти. Ставить его на место — дело уровня,
@@ -316,6 +325,7 @@ func revive() -> void:
 	_crushed = false
 	_states.reset()
 	_locks.clear()
+	_jump_waiting = false
 	_landing = 0.0
 	velocity = Vector3.ZERO
 	_rest_here()
@@ -542,6 +552,9 @@ func _rest_here() -> void:
 	_support_y = global_position.y
 	_last_position = global_position
 	_was_grounded = true
+	# Полёт до перестановки или поездки не в счёт: иначе шаг с эскалатора в
+	# воздух дописывался бы к давнему прыжку и кончался приземлением.
+	_air_time = 0.0
 
 
 func _horizontal_speed(input: OttoInput, state: OttoStateMachine.State) -> float:

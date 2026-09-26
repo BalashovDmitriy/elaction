@@ -127,8 +127,10 @@ func test_apply_leaves_one_key_one_button_and_the_stick() -> void:
 		if event is InputEventKey:
 			keys += 1
 			assert_eq((event as InputEventKey).physical_keycode, KEY_A, "клавиша — назначенная")
+			assert_eq(event.device, KeyBindings.ALL_DEVICES, "клавиша с любой клавиатуры")
 		elif event is InputEventJoypadButton:
 			buttons += 1
+			assert_eq(event.device, KeyBindings.ALL_DEVICES, "кнопка с любого геймпада")
 		elif event is InputEventJoypadMotion:
 			axes += 1
 	assert_eq(keys, 1, "одна клавиша")

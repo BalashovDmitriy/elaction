@@ -127,6 +127,27 @@ func _strike() -> float:
 	return sqrt(BOLT_DEPTH * BOLT_DEPTH + aside * aside)
 
 
+## Разряд для прогрева шейдера ([ShaderWarmup]): та же ломаная тем же
+## [ImmediateMesh] и материалом, в том же окне города — иначе прогрелся бы не
+## тот конвейер. Прямой, без жребия: серии здания от прогрева не меняются.
+## Отдаёт узел; убрать его — дело прогрева.
+func warm_up() -> MeshInstance3D:
+	var bolt := MeshInstance3D.new()
+	bolt.name = "WarmBolt"
+	bolt.material_override = bolt_look()
+	var mesh := ImmediateMesh.new()
+	var x := (_span.x + _span.y) * 0.5
+	mesh.surface_begin(Mesh.PRIMITIVE_TRIANGLES)
+	_segment(mesh, Vector2(x, _ground + 420.0), Vector2(x, _ground + CityPlan.ROWS[-1].z), 1.4)
+	mesh.surface_end()
+	bolt.mesh = mesh
+	bolt.position.z = -BOLT_DEPTH
+	# Как у настоящего разряда посреди вспышки: прозрачность сама меняет конвейер.
+	bolt.transparency = 0.5
+	add_child(bolt)
+	return bolt
+
+
 ## Материал разряда. Отдельно — его прогревает [ShaderWarmup]: разряд виден
 ## редко, и первый собирал бы шейдер посреди грозы.
 static func bolt_look() -> StandardMaterial3D:

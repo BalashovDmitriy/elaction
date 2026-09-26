@@ -49,6 +49,11 @@ const DEFAULT_PADS: Dictionary = {
 const RESERVED_KEYS: Array[Key] = [KEY_ESCAPE, KEY_F12]
 const RESERVED_PADS: Array[JoyButton] = [JOY_BUTTON_START, JOY_BUTTON_BACK]
 
+## Событие действия слушает все устройства, как в `project.godot`. Своё событие
+## по умолчанию привязано к одному: клавиатура — к 16, геймпад — к нулевому, и
+## второй геймпад или геймпад не под номером 0 без этого не жал бы ничего.
+const ALL_DEVICES: int = -1
+
 var _keys: Dictionary = DEFAULT_KEYS.duplicate()
 var _pads: Dictionary = DEFAULT_PADS.duplicate()
 
@@ -126,9 +131,11 @@ func apply() -> void:
 			if event is InputEventKey or event is InputEventJoypadButton:
 				InputMap.action_erase_event(action, event)
 		var key := InputEventKey.new()
+		key.device = ALL_DEVICES
 		key.physical_keycode = key_of(action)
 		InputMap.action_add_event(action, key)
 		var button := InputEventJoypadButton.new()
+		button.device = ALL_DEVICES
 		button.button_index = pad_of(action)
 		InputMap.action_add_event(action, button)
 

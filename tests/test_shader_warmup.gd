@@ -11,8 +11,22 @@ func test_every_rare_effect_is_shown_once() -> void:
 	for node: Node in shown:
 		var script := node.get_script() as Script
 		kinds[node.get_class() if script == null else String(script.get_global_name())] = true
-	for kind: String in ["ShotFx", "Sparks", "Blood", "BulletLook", "AimLaser", "MeshInstance3D"]:
+	for kind: String in ["ShotFx", "Sparks", "Blood", "BulletLook", "AimLaser"]:
 		assert_true(kinds.has(kind), "%s прогревается" % kind)
+
+
+func test_the_bolt_warms_where_the_lightning_lives() -> void:
+	# Разряд рисуется в окне города, и греть его надо там же, под молнией.
+	var host := Node3D.new()
+	add_child_autofree(host)
+	var lightning := Lightning.new()
+	lightning.setup(1, Vector2(0.0, 40.0), 0.0)
+	host.add_child(lightning)
+	var shown := ShaderWarmup.spawn(host, Vector3.ZERO)
+	var bolts := shown.filter(func(node: Node) -> bool: return node.get_parent() == lightning)
+	assert_eq(bolts.size(), 1, "разряд встал под молнию")
+	var bolt := bolts[0] as MeshInstance3D
+	assert_true(bolt.mesh is ImmediateMesh, "той же сеткой, что настоящий")
 
 
 func test_the_blood_setting_survives_the_warmup() -> void:

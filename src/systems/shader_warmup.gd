@@ -45,7 +45,8 @@ static func run(host: Node3D) -> bool:
 ## Ставит в точку [param at] под узлом [param host] по одному каждого редкого
 ## эффекта и отдаёт всё поставленное. Без проверок — тестам.
 static func spawn(host: Node3D, at: Vector3) -> Array[Node]:
-	var before := host.get_children()
+	# Новые дети встают в конец: всё поставленное — хвост списка после этой отметки.
+	var before := host.get_child_count()
 	ShotFx.muzzle(host, at, 1.0)
 	ShotFx.impact(host, at, -1.0, null)
 	Sparks.burst(host, at)
@@ -63,14 +64,10 @@ static func spawn(host: Node3D, at: Vector3) -> Array[Node]:
 	laser.visible = true
 	host.add_child(laser)
 	laser.global_position = at
-	var bolt := MeshInstance3D.new()
-	bolt.name = "Bolt"
-	bolt.mesh = QuadMesh.new()
-	bolt.material_override = Lightning.bolt_look()
-	host.add_child(bolt)
-	bolt.global_position = at
-	var shown: Array[Node] = []
-	for child: Node in host.get_children():
-		if not before.has(child):
-			shown.append(child)
+	var shown := host.get_children().slice(before)
+	# Разряд живёт в окне города, со своим миром и кадром: греть его надо там.
+	# В сухую погоду молнии нет, и греть нечего.
+	for node: Node in host.find_children("Lightning", "", true, false):
+		if node is Lightning:
+			shown.append((node as Lightning).warm_up())
 	return shown

@@ -30,6 +30,20 @@ func test_a_landing_holds_walk_and_jump() -> void:
 	assert_true(locks.can_jump(), "и прыгает")
 
 
+func test_the_pauses_end_on_their_frame() -> void:
+	# Физика шагает по 1/60: пауза в 0.1 с — это шесть кадров, а не семь из-за
+	# остатка float, и 0.15 с — девять.
+	var locks := MoveLocks.new()
+	locks.turn()
+	for _frame in roundi(MoveLocks.TURN_TIME * 60.0):
+		locks.tick(1.0 / 60.0)
+	assert_true(locks.can_walk(), "разворот кончился на своём кадре")
+	locks.land()
+	for _frame in roundi(MoveLocks.LAND_TIME * 60.0):
+		locks.tick(1.0 / 60.0)
+	assert_true(locks.can_jump(), "восстановление — тоже")
+
+
 func test_a_repeated_turn_restarts_the_pause() -> void:
 	var locks := MoveLocks.new()
 	locks.turn()

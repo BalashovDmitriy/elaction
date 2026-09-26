@@ -124,7 +124,6 @@ const CLIP_SHOOT := "shoot"
 const CLIP_DEATH := "death"
 const CLIP_JUMP_START := "jump_start"
 const CLIP_JUMP_LAND := "jump_land"
-const CLIP_CROUCH := "crouch"
 const CLIP_NAMES: PackedStringArray = [
 	CLIP_STAND,
 	CLIP_IDLE,
@@ -133,7 +132,6 @@ const CLIP_NAMES: PackedStringArray = [
 	CLIP_DEATH,
 	CLIP_JUMP_START,
 	CLIP_JUMP_LAND,
-	CLIP_CROUCH,
 ]
 
 ## С какой скоростью идёт клип ходьбы относительно записанной. Пак шагает

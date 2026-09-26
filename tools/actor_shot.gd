@@ -129,7 +129,11 @@ func _run() -> void:
 		rig.set_walk_phase(0.0 if pose == "walk_0" else 1.2)
 		rig.face(1.0)
 		# Клипы «один раз» снимаются на середине: падение, а не лежащий.
-		if pose == "dead_0" or pose == "shoot" or pose == "jump" or pose == "land":
+		# Приземление в игре идёт лишь [constant FigurePoses.LAND_SHOW]: за 0.4 с
+		# вдвое ускоренный клип дошёл бы до конца, и в кадре стояла бы стойка.
+		if pose == "land":
+			rig.advance(FigurePoses.LAND_SHOW * 0.5)
+		elif pose == "dead_0" or pose == "shoot" or pose == "jump":
 			rig.advance(0.4)
 		rig.snap()
 		rig.set_process(false)

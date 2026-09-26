@@ -676,6 +676,8 @@ func _fall_onto_the_floor() -> void:
 	var back := -_brain.facing * Proportions.BODY * 0.9
 	if not _floor_at(back) and _floor_at(-back):
 		_brain.face(-_brain.facing)
+		# Труп не разворачивается телом, как живой, а сразу лежит той стороной.
+		_body.face(_brain.facing, true)
 
 
 ## Есть ли пол в [param dx] метрах от ног по горизонтали.

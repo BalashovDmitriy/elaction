@@ -76,3 +76,30 @@ func test_a_landing_holds_walk_and_jump() -> void:
 	Input.action_release(&"jump")
 	await wait_seconds(MoveLocks.LAND_TIME + 0.15)
 	assert_gt(otto.global_position.x, start.x + 0.05, "восстановился — идёт")
+
+
+func test_a_jump_held_through_the_landing_fires_after_it() -> void:
+	# Нажатие во время восстановления не пропадает: держат кнопку — прыжок
+	# случается, как только пауза кончилась.
+	var otto := await _standing_otto()
+	await _jump_and_land(otto)
+	var floor_y := otto.global_position.y
+	Input.action_press(&"jump")
+	await wait_seconds(MoveLocks.LAND_TIME * 0.4)
+	assert_almost_eq(otto.global_position.y, floor_y, 0.01, "в паузе не прыгает")
+	await wait_seconds(MoveLocks.LAND_TIME + 0.1)
+	assert_gt(otto.global_position.y, floor_y + 0.1, "пауза кончилась — прыгнул")
+
+
+func _jump_and_land(otto: Otto) -> void:
+	Input.action_press(&"jump")
+	await wait_physics_frames(2)
+	Input.action_release(&"jump")
+	var left := 240
+	while left > 0 and otto.is_grounded():
+		await wait_physics_frames(1)
+		left -= 1
+	while left > 0 and not otto.is_grounded():
+		await wait_physics_frames(1)
+		left -= 1
+	assert_true(otto.is_grounded(), "приземлился")

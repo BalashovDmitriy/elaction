@@ -360,9 +360,13 @@ func set_walk_phase(phase: float) -> void:
 ## [constant MoveLocks.TURN_TIME]: столько же актёр стоит на месте. Зовётся
 ## каждый кадр; поворот копится по часам рига, а ставится здесь, чтобы актёр
 ## мог довернуть тело поверх (Otto у машины поворачивается спиной к камере).
-func face(direction: float) -> void:
+##
+## [param instant] — встать сразу, без разворота: так ложится убитый, которого
+## [Enemy] переворачивает, чтобы тело упало на пол, а не над проёмом. Разворот —
+## движение живого, и труп, крутящийся волчком в падении, был бы ошибкой.
+func face(direction: float, instant: bool = false) -> void:
 	var wanted := FACE_RIGHT if direction >= 0.0 else -FACE_RIGHT
-	if not _faced:
+	if not _faced or instant:
 		_faced = true
 		_yaw_from = wanted
 		_yaw_to = wanted
@@ -388,7 +392,8 @@ func snap() -> void:
 	_current = _wanted()
 	_settled = true
 	_turned = MoveLocks.TURN_TIME
-	rotation.y = _yaw_to if _faced else rotation.y
+	if _faced:
+		rotation.y = _yaw_to
 	_apply(_current, true)
 
 
@@ -572,12 +577,17 @@ func _is_still() -> bool:
 	return false
 
 
-## Стоит ли поза на полу сама: любой клип — да. С M24c `build_actors.py`
-## ставит на пол каждый кадр каждого клипа по вершинам (ADR-0039), и лежащий в
-## конце смерти больше не уходит в пол на 6 см, как у клипа пака.
+## Стоит ли поза на полу сама: стойка и ходьба — да. С M24c `build_actors.py`
+## ставит на пол каждый кадр каждого клипа по вершинам (ADR-0039), но делает это
+## до того, как агенту надевают федору: стоя она сверху и ничего не меняет, а
+## лежащий на спине агент уходил полями в пол на 9 см (авторевью M24c). Клипы
+## «один раз» и конец клипа заземляются, как поза кодом: на ходу это крайние
+## вершины, а доигранный клип риг больше не раскладывает вовсе.
 func _grounded_by_the_clip() -> bool:
 	var clip := FigurePoses.clip_of(_pose_name)
-	return clip != null and _clips.has(clip.name)
+	if clip == null or not _clips.has(clip.name):
+		return false
+	return clip.mode == FigurePoses.Clip.LOOP or clip.mode == FigurePoses.Clip.WALK
 
 
 ## Кадр позы кодом: стойка, на которую легли углы [FigurePoses.Pose].
@@ -660,9 +670,10 @@ func _globals(frame: Frame) -> Array[Transform3D]:
 ## Раскладывает кадр по костям и по самой модели.
 ##
 ## [param exact] — заземлять по всем вершинам, а не по крайним: для снимков и
-## тестов. На ходу хватает крайних, а клип, в который риг уже пришёл, не
-## заземляется вовсе — его поставил на пол `build_actors.py`. Заземляются поза
-## кодом и переход: смесь двух кадров на полу сама не стоит.
+## тестов. На ходу хватает крайних, а стойка и ходьба, в которые риг уже пришёл,
+## не заземляются вовсе — их поставил на пол `build_actors.py`. Заземляются поза
+## кодом, клипы «один раз» и конец клипа ([method _grounded_by_the_clip]) и
+## переход: смесь двух кадров на полу сама не стоит.
 func _apply(frame: Frame, exact: bool) -> void:
 	for bone in frame.rotations.size():
 		_skeleton.set_bone_pose_rotation(bone, frame.rotations[bone])

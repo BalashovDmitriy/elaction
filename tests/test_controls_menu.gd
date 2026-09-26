@@ -3,11 +3,33 @@ extends GutTest
 ## Экран управления: переназначение клавиш из меню (ADR-0039, решение 7).
 
 const MENU_SCENE := preload("res://src/ui/menu.tscn")
+## Куда экран управления сохраняет схему в тестах: настройки игрока не трогаются.
+const TEMP := "user://test_menu_bindings.cfg"
+
+## События игровых действий в [InputMap]: экран управления меняет их для всего
+## процесса, и тест обязан вернуть как было — даже если упал посередине.
+var _saved: Dictionary = {}
+
+
+func before_each() -> void:
+	_saved.clear()
+	for action: StringName in KeyBindings.ACTIONS:
+		_saved[action] = InputMap.action_get_events(action)
+
+
+func after_each() -> void:
+	for action: StringName in _saved:
+		InputMap.action_erase_events(action)
+		for event: InputEvent in _saved[action]:
+			InputMap.action_add_event(action, event)
+	if FileAccess.file_exists(TEMP):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(TEMP))
 
 
 func _menu() -> Menu:
 	var menu := MENU_SCENE.instantiate() as Menu
 	menu.settings = GameSettings.new()
+	menu.settings.file_path = TEMP
 	menu.records = Records.new()
 	add_child_autofree(menu)
 	return menu
@@ -24,9 +46,7 @@ func _row_labelled(menu: Menu, text: String) -> MenuRow:
 ## Экран управления переназначает клавиши (ADR-0039, решение 7): нажал строку —
 ## она ждёт, первая нажатая клавиша встаёт на место, занятая меняется местами.
 func test_the_controls_rebind_a_key_and_swap_a_taken_one() -> void:
-	var saved := _input_map()
 	var menu := _menu()
-	menu.settings.file_path = "user://test_menu_bindings.cfg"
 	menu.show_page(Menu.Page.CONTROLS)
 	var bindings := _binding_rows(menu)
 	assert_eq(bindings.size(), KeyBindings.ACTIONS.size(), "строка на каждое действие")
@@ -41,15 +61,11 @@ func test_the_controls_rebind_a_key_and_swap_a_taken_one() -> void:
 		bindings[1].value_text().begins_with(OS.get_keycode_string(KEY_LEFT)),
 		"строка соседа переписана вместе с обменом"
 	)
-	assert_true(FileAccess.file_exists(menu.settings.file_path), "схема сохранена")
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(menu.settings.file_path))
-	_restore(saved)
+	assert_true(FileAccess.file_exists(TEMP), "схема сохранена")
 
 
 func test_escape_cancels_listening_and_reset_restores_defaults() -> void:
-	var saved := _input_map()
 	var menu := _menu()
-	menu.settings.file_path = "user://test_menu_bindings.cfg"
 	menu.show_page(Menu.Page.CONTROLS)
 	var bindings := _binding_rows(menu)
 	bindings[4].pressed.emit()
@@ -62,8 +78,6 @@ func test_escape_cancels_listening_and_reset_restores_defaults() -> void:
 	if reset != null:
 		reset.pressed.emit()
 	assert_true(menu.settings.bindings.is_default(), "сброс вернул схему по умолчанию")
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(menu.settings.file_path))
-	_restore(saved)
 
 
 func _binding_rows(menu: Menu) -> Array[MenuRow]:
@@ -79,19 +93,3 @@ func _key(code: Key) -> InputEventKey:
 	event.physical_keycode = code
 	event.pressed = true
 	return event
-
-
-## События игровых действий в [InputMap]: экран управления меняет их для
-## всего процесса, и тест обязан вернуть как было.
-func _input_map() -> Dictionary:
-	var saved := {}
-	for action: StringName in KeyBindings.ACTIONS:
-		saved[action] = InputMap.action_get_events(action)
-	return saved
-
-
-func _restore(saved: Dictionary) -> void:
-	for action: StringName in saved:
-		InputMap.action_erase_events(action)
-		for event: InputEvent in saved[action]:
-			InputMap.action_add_event(action, event)

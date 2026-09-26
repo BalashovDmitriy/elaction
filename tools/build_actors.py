@@ -88,7 +88,6 @@ UAL_CLIPS: dict[str, str] = {
     "Death01": "death",
     "Jump_Start": "jump_start",
     "Jump_Land": "jump_land",
-    "Crouch_Idle_Loop": "crouch",
 }
 
 # Кость пака — кость UAL. Скелет UAL собран по Rigify, и кость к кости ложится

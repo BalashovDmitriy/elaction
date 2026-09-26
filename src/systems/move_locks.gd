@@ -15,6 +15,9 @@ extends RefCounted
 const TURN_TIME: float = 0.1
 ## Сколько длится восстановление после приземления, с.
 const LAND_TIME: float = 0.15
+## Остаток паузы, который уже не пауза, с. 0.1 минус шесть кадров по 1/60 в
+## float — не ноль, а 3e-17, и разворот держал бы ноги седьмой кадр.
+const SPENT: float = 1e-6
 
 var _turn: float = 0.0
 var _land: float = 0.0
@@ -38,13 +41,13 @@ func tick(delta: float) -> void:
 
 ## Можно ли идти: не разворачивается и не восстанавливается.
 func can_walk() -> bool:
-	return _turn <= 0.0 and _land <= 0.0
+	return _turn < SPENT and _land < SPENT
 
 
 ## Можно ли прыгнуть: не восстанавливается после приземления. Прыжок с
 ## разворота разрешён — прыгают туда, куда уже смотрят.
 func can_jump() -> bool:
-	return _land <= 0.0
+	return _land < SPENT
 
 
 ## Снимает обе паузы: возвращение в игру, перестановка уровнем.
