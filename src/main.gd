@@ -38,6 +38,13 @@ var _held: Dictionary = {}
 var _page_before: Menu.Page = Menu.Page.MAIN
 ## Затемнение между зданиями (ADR-0038, решение 4).
 var _curtain: FadeCurtain = null
+## Идущее демо (ADR-0041) или null. Сколько главное меню простояло без нажатий и
+## с какой точки пойдёт следующее демо.
+var _demo: DemoRun = null
+var _idle: float = 0.0
+var _demo_point: int = DemoPlan.Point.ROOF
+## Демо уходит в затемнение: второе нажатие его уже не кончает.
+var _demo_ending: bool = false
 
 @onready var _menu: Menu = $Menu
 @onready var _hud: Hud = $Hud
@@ -81,7 +88,8 @@ func _ready() -> void:
 		_open_menu()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	_count_idle(delta)
 	if _just_pressed(&"pause"):
 		# Пауза во вступлении его пропускает, а не открывает меню (ADR-0038).
 		if _playing and _level != null and _level.skip_the_intro():
@@ -91,6 +99,66 @@ func _process(_delta: float) -> void:
 		elif _page_before == Menu.Page.PAUSE and _menu.current_page() == Menu.Page.PAUSE:
 			_resume()
 	_page_before = _menu.current_page()
+
+
+## Любое нажатие: в меню сбрасывает отсчёт до демо, в демо — кончает его
+## (ADR-0041, решение 5). Нажатие, кончившее демо, в игру и меню не проходит.
+func _input(event: InputEvent) -> void:
+	var pressed := (
+		(event is InputEventKey and event.is_pressed() and not event.is_echo())
+		or (event is InputEventJoypadButton and event.is_pressed())
+		or (event is InputEventMouseButton and event.is_pressed())
+	)
+	if _demo != null:
+		if pressed:
+			get_viewport().set_input_as_handled()
+			_end_demo()
+		return
+	if pressed or event is InputEventMouseMotion:
+		_idle = 0.0
+
+
+## Главное меню без нажатий [constant DemoPlan.IDLE_TIME] секунд — демо. Только
+## главное: на паузе, в настройках и в партии отсчёта нет.
+func _count_idle(delta: float) -> void:
+	var waiting := (
+		_demo == null
+		and not _playing
+		and _menu.visible
+		and _menu.current_page() == Menu.Page.MAIN
+		and not SCREENSHOTTER.capturing()
+	)
+	if not waiting:
+		_idle = 0.0
+		return
+	_idle += delta
+	if _idle >= DemoPlan.IDLE_TIME:
+		_start_demo()
+
+
+## Демо (ADR-0041): здание своей солью, бот за Otto, точка — следующая по кругу.
+func _start_demo() -> void:
+	_idle = 0.0
+	_demo_ending = false
+	_drop_the_curtain()
+	_drop_stage()
+	_menu.close()
+	_hud.visible = true
+	GameState.instance().start_game(_new_salt())
+	_enter_building(true)
+	_demo = DemoRun.start(_level, _demo_point)
+	_demo.finished.connect(_end_demo)
+	_demo_point = DemoPlan.next(_demo_point)
+
+
+## Конец демо: здание замирает, кадр уходит в чёрное, из чёрного — главное меню.
+func _end_demo() -> void:
+	if _demo == null or _demo_ending:
+		return
+	_demo_ending = true
+	_demo.stop()
+	_level.process_mode = Node.PROCESS_MODE_DISABLED
+	_curtain.cover(0.0, _open_menu.bind(true))
 
 
 ## Нажато ли действие именно в этом кадре.
@@ -106,10 +174,18 @@ func _just_pressed(action: StringName) -> bool:
 
 
 ## Главное меню: здание выбрасывается, за меню встаёт город, музыка остаётся.
-func _open_menu() -> void:
+## [param from_demo] — из затемнения конца демо: оно само выведет кадр из чёрного,
+## и снимать его здесь нельзя.
+func _open_menu(from_demo: bool = false) -> void:
 	_playing = false
+	_demo = null
+	_demo_ending = false
+	_idle = 0.0
 	_unpause()
-	_drop_the_curtain()
+	if from_demo:
+		_hud.hide_bonus()
+	else:
+		_drop_the_curtain()
 	# Партия останавливается, а не просто прячется: без этого таймер сирены
 	# продолжал бы идти под главным меню, куда вышли с паузы.
 	GameState.instance().stop_game()
@@ -122,6 +198,7 @@ func _open_menu() -> void:
 
 
 func _start_game() -> void:
+	_demo = null
 	_playing = true
 	_unpause()
 	_drop_the_curtain()
@@ -181,8 +258,9 @@ func _quit() -> void:
 
 
 ## Собирает очередное здание. Старое выбрасывается целиком вместе с Otto:
-## партия живёт в [GameState], уровень — нет.
-func _enter_building() -> void:
+## партия живёт в [GameState], уровень — нет. [param demo] — здание демо: замер
+## качества оно не заводит (ADR-0041, решение 6).
+func _enter_building(demo: bool = false) -> void:
 	_drop_level()
 
 	var game := GameState.instance()
@@ -202,7 +280,7 @@ func _enter_building() -> void:
 	# Замер — под зданием, а не под main: здание выбросили посреди замера (новая
 	# партия, выход в меню) — замер уходит с ним, не мерит меню и не пишет его
 	# уровень, а следующее здание заводит свой, один (авторевью M22).
-	if QualityProbe.needed(_settings) and not SCREENSHOTTER.capturing():
+	if QualityProbe.needed(_settings) and not SCREENSHOTTER.capturing() and not demo:
 		var probe := QualityProbe.new()
 		_level.add_child(probe)
 		probe.start(_settings)
@@ -260,6 +338,10 @@ func _on_car_started() -> void:
 ## ещё на экране, а HUD уже пишет «РАУНД 2» и счёт с бонусом, пока плашка
 ## бонуса только набегает.
 func _on_building_cleared() -> void:
+	# Демо, доехавшее до выхода, кончается, а не собирает следующее здание.
+	if _demo != null:
+		_end_demo()
+		return
 	if not _hud.bonus_shown():
 		_on_car_started()
 	# Здание меняется под чёрным, из твина затемнения, — не из шага физики
@@ -285,6 +367,10 @@ func _on_extra_life() -> void:
 
 
 func _on_game_over() -> void:
+	# Демо рекордов не пишет и конца партии не показывает (ADR-0041, решение 6).
+	if _demo != null:
+		_end_demo()
+		return
 	_playing = false
 	_drop_the_curtain()
 	# Джингл приглушает трек на время звучания, и трек конца партии входит
