@@ -165,11 +165,14 @@ func building_seed() -> int:
 	return building if salt == 0 else hash([building, salt])
 
 
-## Засчитывает поднятый документ вместе с очками за него.
-func collect_document() -> void:
+## Засчитывает поднятый документ вместе с очками за него. [param scored] =
+## false — без очков: так демо снизу засчитывает документы этажей выше, которых
+## бот не поднимал (ADR-0041).
+func collect_document(scored: bool = true) -> void:
 	documents_collected += 1
 	documents_changed.emit(documents_collected, documents_total)
-	add_score(DOCUMENT_SCORE)
+	if scored:
+		add_score(DOCUMENT_SCORE)
 
 
 ## Снимает жизнь. Возвращает true, если Otto ещё может вернуться в игру.

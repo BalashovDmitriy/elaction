@@ -140,6 +140,46 @@ func _aim(agent: Enemy, height: float, shot_in: float) -> void:
 	agent.laser.aim(-1.0)
 
 
+## Агента спиной к себе бот не расстреливает, а подкрадывается и добивает сзади
+## (ADR-0040): так дороже, и так он показывает добивания в демо (ADR-0041).
+func test_the_bot_takes_down_an_agent_from_behind() -> void:
+	var level := _build()
+	await wait_physics_frames(SETTLE_FRAMES)
+	var rules := level.rules
+	var pair := _closest_pair(level.plan().safe_spots(rules, FLOOR))
+	var surface := rules.floor_surface(FLOOR)
+	level.otto.global_position = WorldSpace.to_scene(Vector2(pair.x, surface))
+	rules.agents_hold_fire = true
+	var agent := ENEMY_SCENE.instantiate() as Enemy
+	agent.walk_speed = 0.0
+	level.add_child(agent)
+	agent.global_position = WorldSpace.to_scene(
+		Vector2(minf(pair.y, pair.x + OttoBot.TAKEDOWN_SNEAK * 0.6), surface)
+	)
+	agent.apply_rules(rules)
+	# Спиной к Otto: смотрит от него, вправо.
+	agent.setup(level.otto, 1.0)
+	await wait_physics_frames(SETTLE_FRAMES * 4)
+	var before := GameState.instance().score
+	var bot := OttoBot.new(level)
+	var frames := 0
+	var took := false
+	while not agent.is_dead() and frames < DUEL_FRAMES:
+		bot.step()
+		took = took or level.otto.takedown != null
+		await wait_physics_frames(1)
+		frames += 1
+	bot.release()
+	assert_true(took, "бот добил, а не застрелил")
+	assert_true(agent.is_dead(), "агент добит")
+	assert_eq(
+		GameState.instance().score - before,
+		Takedown.score(Takedown.Side.BACK, agent.is_in_the_dark()),
+		"сзади"
+	)
+	remove_child(level)
+
+
 ## Два ближайших друг к другу места этажа: слева и справа.
 func _closest_pair(spots: PackedFloat64Array) -> Vector2:
 	var best := Vector2(spots[0], spots[1])
