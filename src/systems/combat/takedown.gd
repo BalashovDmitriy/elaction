@@ -5,10 +5,10 @@ extends RefCounted
 ## сценкой и за сколько очков.
 ##
 ## С M24d удара ногой нет. Кнопка выстрела вдали стреляет, а вплотную к агенту
-## на том же этаже — добивает; упавший на агента сверху добивает сам. Сценка —
-## короткая постановка двоих: кто в какой позе с какого момента, где стоит
-## агент, когда он погибает. Вариант берётся случайно из подходящих к стороне,
-## без повтора подряд.
+## на том же этаже — добивает; упавший на агента сверху — с этажа выше или с
+## крыши кабины — добивает сам. Сценка — короткая постановка двоих: кто в какой
+## позе с какого момента, где стоит агент, когда он погибает. Вариант берётся
+## случайно из подходящих к стороне, без повтора подряд.
 ##
 ## Правило без узлов, как [OttoStateMachine]: проверяется без сцены. Ведёт
 ## сценку в игре [TakedownScene].
@@ -73,6 +73,18 @@ static func can_reach(otto: Vector2, facing: float, agent: Vector2) -> bool:
 	return ahead >= -0.05 and ahead <= REACH
 
 
+## Стоит ли тело на кабине — на её полу или крыше. Таких не добивают и такие не
+## добивают: сценка замораживает обоих, а кабина едет дальше и уезжает из-под
+## пары (авторевью M24d).
+static func rides_a_car(body: CharacterBody3D) -> bool:
+	if not body.is_on_floor():
+		return false
+	for index in body.get_slide_collision_count():
+		if body.get_slide_collision(index).get_collider() is ElevatorCar:
+			return true
+	return false
+
+
 ## С какой стороны агента Otto: агент смотрит на него — спереди, иначе сзади.
 static func side_of(otto_x: float, agent_x: float, agent_facing: float) -> int:
 	var towards := signf(otto_x - agent_x)
@@ -87,6 +99,13 @@ static func is_above(otto_feet: Vector2, agent_feet: Vector2, agent_height: floa
 		otto_feet.y > agent_feet.y + agent_height
 		and absf(otto_feet.x - agent_feet.x) <= POUNCE_REACH
 	)
+
+
+## Падает ли Otto на агента сверху: последняя опора выше этажа агента — этаж над
+## ним или крыша кабины (ADR-0040, решение 4). Свой прыжок с того же пола не в
+## счёт: вершина прыжка выше макушки, и он добивал бы сам.
+static func fell_onto(support_y: float, agent_y: float) -> bool:
+	return support_y - agent_y > SAME_FLOOR
 
 
 ## Очки за добивание.

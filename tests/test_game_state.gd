@@ -98,7 +98,14 @@ func test_kill_in_the_light_costs_its_face_value() -> void:
 ## добиваний надбавка своя — test_takedown.gd.
 func test_kill_in_the_dark_is_worth_more() -> void:
 	assert_eq(GameState.kill_score(GameState.ENEMY_SHOT_SCORE, true), 150)
-	assert_eq(GameState.kill_score(GameState.ENEMY_SHOT_SCORE, false), 100)
+
+
+## Плоская и одинаковая для всех способов из таблицы: удвоение вернулось бы
+## здесь первым — у дорогих лампы и кабины.
+func test_the_dark_bonus_is_the_same_whatever_the_kill() -> void:
+	var shot := GameState.kill_score(GameState.ENEMY_SHOT_SCORE, true) - GameState.ENEMY_SHOT_SCORE
+	for base: int in [GameState.LAMP_SCORE, GameState.CRUSH_SCORE]:
+		assert_eq(GameState.kill_score(base, true) - base, shot, "надбавка за %d" % base)
 
 
 func test_game_starts_in_the_first_building() -> void:

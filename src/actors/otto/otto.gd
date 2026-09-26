@@ -106,6 +106,10 @@ var takedown: TakedownScene:
 var figure: FigureRig:
 	get:
 		return _body
+## Жребий сценки добивания. Сеет уровень от сида здания: от сценки зависят её
+## длина и миг смерти агента, и несеянный жребий делал бы прогон бота
+## неповторимым (`docs/testing.md`, правило из M18b).
+var takedown_rng := RandomNumberGenerator.new()
 
 var _states := OttoStateMachine.new()
 ## Один снимок ввода на всё время жизни: перечитывается, а не создаётся заново.
@@ -156,7 +160,6 @@ var _takedown: TakedownScene = null
 var _pounce_target: Enemy = null
 ## Какая сценка была прошлой: та же подряд не повторяется.
 var _last_scene: String = ""
-var _scene_rng := RandomNumberGenerator.new()
 ## Где Otto закончил прошлый кадр физики: по этому видно перестановку.
 var _last_position := Vector3.ZERO
 ## Сколько ещё держится передышка после возвращения в игру, с.
@@ -260,6 +263,9 @@ func _physics_process(delta: float) -> void:
 	if not is_on_floor() and velocity.y < 0.0:
 		_watch_for_a_pounce()
 	_track_fall()
+	if _takedown != null:
+		# Приземлился на агента: позу уже ставит режиссёр, своя её перебила бы.
+		return
 	_last_position = global_position
 	_apply_pose(_states.state)
 	_update_look(delta)
@@ -376,9 +382,10 @@ func revive() -> void:
 ## Пока Otto не свой — мёртв, едет на эскалаторе или сидит за дверью — он не
 ## просит ничего: иначе он продолжал бы вести кабину и просился бы в дверь
 ## оттуда, где его уже нет. Снять такое состояние может только тот, кто его
-## поставил, а не игрок.
+## поставил, а не игрок. В сценке добивания — тоже: снимок ввода в ней не
+## перечитывается, и застывшее «вверх» впустило бы Otto в дверь посреди сценки.
 func vertical_intent() -> float:
-	return 0.0 if _states.is_world_driven() else _snapshot.vertical
+	return 0.0 if _states.is_world_driven() or _takedown != null else _snapshot.vertical
 
 
 ## На сколько Otto ниже своей последней опоры, м. На опоре — ноль.
@@ -537,7 +544,7 @@ func _award_for(agent: Enemy, base: int) -> void:
 ## на своих ногах — не в кабине, не присев, не в полёте, — живого и вышедшего
 ## из двери; из нескольких — ближайшего.
 func _reachable_agent(state: OttoStateMachine.State) -> Enemy:
-	if _car != null or not is_on_floor():
+	if _car != null or not is_on_floor() or Takedown.rides_a_car(self):
 		return null
 	if state != OttoStateMachine.State.IDLE and state != OttoStateMachine.State.WALK:
 		return null
@@ -558,7 +565,9 @@ func _reachable_agent(state: OttoStateMachine.State) -> Enemy:
 	return best
 
 
-## Падающий Otto над агентом: запоминает его — упадёт рядом, напрыгнет.
+## Падающий Otto над агентом: запоминает его — упадёт рядом, напрыгнет. Падать
+## надо с опоры выше этажа агента (ADR-0040, решение 4): вершина своего прыжка
+## выше макушки, и прыжок рядом с агентом иначе добивал бы сам.
 func _watch_for_a_pounce() -> void:
 	var feet := Vector2(global_position.x, global_position.y)
 	for node: Node in get_tree().get_nodes_in_group(Enemy.GROUP):
@@ -566,7 +575,7 @@ func _watch_for_a_pounce() -> void:
 		if agent == null or not agent.takedown_ready:
 			continue
 		var at := Vector2(agent.global_position.x, agent.global_position.y)
-		if Takedown.is_above(feet, at, Proportions.BODY):
+		if Takedown.is_above(feet, at, Proportions.BODY) and Takedown.fell_onto(_support_y, at.y):
 			_pounce_target = agent
 
 
@@ -575,6 +584,9 @@ func _watch_for_a_pounce() -> void:
 func _land_on_a_target() -> bool:
 	var agent := _pounce_target
 	_pounce_target = null
+	# Убитый в полёте падает телом, а не напрыгивает.
+	if _states.is_dead():
+		return false
 	if agent == null or not is_instance_valid(agent) or not agent.takedown_ready:
 		return false
 	if absf(agent.global_position.y - global_position.y) > Takedown.SAME_FLOOR:
@@ -590,7 +602,7 @@ func _land_on_a_target() -> bool:
 
 
 func _take_down(agent: Enemy, side: int) -> void:
-	var scene := Takedown.pick(side, _last_scene, _scene_rng)
+	var scene := Takedown.pick(side, _last_scene, takedown_rng)
 	_last_scene = scene.name
 	TakedownScene.play(self, agent, scene)
 
@@ -636,6 +648,9 @@ func _rest_here() -> void:
 	# Полёт до перестановки или поездки не в счёт: иначе шаг с эскалатора в
 	# воздух дописывался бы к давнему прыжку и кончался приземлением.
 	_air_time = 0.0
+	# И агент, над которым пролетал до неё: разбившийся и вернувшийся в игру
+	# напрыгивал бы на него на первом же приземлении рядом.
+	_pounce_target = null
 
 
 func _horizontal_speed(input: OttoInput, state: OttoStateMachine.State) -> float:

@@ -13,6 +13,7 @@ const SCENE_WAIT: float = 3.0
 
 func after_each() -> void:
 	Input.action_release(&"shoot")
+	Input.action_release(&"jump")
 	Engine.time_scale = 1.0
 	GameState.instance().reset()
 
@@ -39,6 +40,15 @@ func test_above_means_feet_over_the_head() -> void:
 	assert_true(Takedown.is_above(Vector2(0.2, 2.0), agent, 1.68), "над макушкой — сверху")
 	assert_false(Takedown.is_above(Vector2(0.2, 1.0), agent, 1.68), "ниже макушки — нет")
 	assert_false(Takedown.is_above(Vector2(1.5, 2.0), agent, 1.68), "в стороне — нет")
+
+
+func test_a_pounce_is_a_fall_from_above_not_a_jump() -> void:
+	# ADR-0040, решение 4: с этажа выше или с крыши кабины. Вершина своего прыжка
+	# (1.88 м) выше макушки агента (1.68), и без условия на опору прыжок рядом с
+	# агентом добивал бы сам.
+	assert_true(Takedown.fell_onto(3.0, 0.0), "с этажа выше — сверху")
+	assert_false(Takedown.fell_onto(0.0, 0.0), "прыжок с того же пола — нет")
+	assert_false(Takedown.fell_onto(0.1, 0.0), "и с ковра того же этажа — нет")
 
 
 func test_scores_by_side_with_the_dark_bonus() -> void:
@@ -76,6 +86,7 @@ func test_every_scene_is_playable() -> void:
 		assert_lt(scene.kill_at, scene.duration, "%s: и до конца сценки" % scene.name)
 		assert_lte(scene.duration, 1.5, "%s: сценка короткая" % scene.name)
 		assert_true(FigurePoses.knows(scene.corpse), "%s: труп %s" % [scene.name, scene.corpse])
+		assert_true(ActorPose.is_down(scene.corpse), "%s: труп лежит" % scene.name)
 		for track: Array[Array] in [scene.otto, scene.agent]:
 			var previous := -1.0
 			for key: Array in track:
@@ -261,15 +272,67 @@ func test_falling_onto_an_agent_pounces_by_itself() -> void:
 	await _wait_for_the_end(agent)
 
 
-func test_the_jump_no_longer_kicks() -> void:
-	# С M24d прыжок — просто прыжок (ADR-0040, решение 1).
+func test_a_dead_otto_does_not_pounce() -> void:
+	# Убитый в полёте падает телом: напрыгивает только живой.
 	_floor()
-	var otto := _otto_at(0.0)
-	await wait_physics_frames(4)
-	var agent := _agent_at(otto, 0.5, -1.0)
+	_wall(-0.9)
+	_wall(0.9)
+	var otto := _otto_at(-6.0)
+	var agent := _agent_at(otto, 0.0, -1.0)
+	var wait := 120
+	while wait > 0 and not agent.takedown_ready:
+		await wait_physics_frames(1)
+		wait -= 1
+	otto.global_position = Vector3(agent.global_position.x, 2.6, WorldSpace.PLAY_Z)
 	await wait_physics_frames(3)
+	otto.kill()
+	await wait_seconds(1.0)
+	assert_true(otto.is_grounded(), "тело упало")
+	assert_null(_director(), "мёртвый не напрыгивает")
+	assert_false(agent.is_dead(), "агент жив")
+
+
+func test_the_jump_no_longer_kicks() -> void:
+	# С M24d прыжок — просто прыжок (ADR-0040, решения 1 и 4): ни удара, ни
+	# напрыгивания. Вершина прыжка выше макушки, а агент в загоне всё время под
+	# Otto, — поэтому смотреть надо и после приземления, а не только в полёте.
+	_floor()
+	_wall(-0.9)
+	_wall(0.9)
+	var otto := _otto_at(0.0)
+	var agent := _agent_at(otto, 0.0, -1.0)
+	# Прыгают с пола: поставленный Otto сперва долетает до него.
+	var wait := 120
+	while wait > 0 and not (agent.takedown_ready and otto.is_grounded()):
+		await wait_physics_frames(1)
+		wait -= 1
 	Input.action_press(&"jump")
 	await wait_physics_frames(2)
 	Input.action_release(&"jump")
-	await wait_seconds(0.4)
+	var highest := otto.global_position.y
+	for _step in 90:
+		await wait_physics_frames(1)
+		highest = maxf(highest, otto.global_position.y)
+	assert_gt(highest, agent.global_position.y + Proportions.BODY, "прыжок выше макушки агента")
+	assert_true(otto.is_grounded(), "прыжок кончился")
+	assert_null(_director(), "прыжок рядом с агентом — не добивание")
 	assert_false(agent.is_dead(), "прыжок рядом с агентом его не убивает")
+
+
+func test_the_director_does_not_push_the_agent_into_a_wall() -> void:
+	# Агента, прижатого к стене, режиссёр ставит у стены, а не в неё (авторевью
+	# M24d): сценка спереди просит 0.62–0.72 м, а до стены меньше.
+	_floor()
+	_wall(0.75)
+	var otto := _otto_at(0.0)
+	await wait_physics_frames(4)
+	var agent := _agent_at(otto, 0.45, -1.0)
+	var wait := 120
+	while wait > 0 and not agent.takedown_ready:
+		await wait_physics_frames(1)
+		wait -= 1
+	agent.global_position.x = 0.45
+	await _press_shoot()
+	assert_not_null(_director(), "сценка началась")
+	await wait_seconds(0.2)
+	assert_lt(agent.global_position.x, 0.75 - 0.3, "агент у стены, а не в ней")

@@ -614,7 +614,7 @@ func _code_frame(pose_name: String) -> Frame:
 		_swing(frame, bone_name, pose.lean * float(LEAN_SHARE[bone_name]))
 	for bone_name: String in HEAD_SHARE:
 		_swing(frame, bone_name, pose.head * float(HEAD_SHARE[bone_name]))
-		_turn(frame, bone_name, pose.twist * float(HEAD_SHARE[bone_name]))
+		_turn(frame, bone_name, Vector3.UP, pose.twist * float(HEAD_SHARE[bone_name]))
 	_follow_feet(frame)
 	frame.tilt = pose.tilt
 	frame.lift = pose.lift
@@ -633,24 +633,22 @@ func _code_frame(pose_name: String) -> Frame:
 ## «Вперёд» у кости, растущей вверх (корпус, голова), — поворот вокруг +X, у
 ## растущей вниз (ноги, руки) — вокруг −X: тот же поворот уводил бы её назад.
 func _swing(frame: Frame, bone_name: String, degrees: float) -> void:
+	if not _bones.has(bone_name):
+		return
+	var bone: int = _bones[bone_name]
+	var upward := _stand_globals[bone].basis.y.y >= 0.0
+	_turn(frame, bone_name, Vector3.RIGHT if upward else Vector3.LEFT, degrees)
+
+
+## Поворачивает кость вокруг оси фигуры [param model_axis] — оси модели,
+## переведённой в систему кости по её положению в стойке. Вперёд — это
+## [method _swing]; вокруг вертикали — поворот головы вбок, свёрнутая шея
+## (ADR-0040).
+func _turn(frame: Frame, bone_name: String, model_axis: Vector3, degrees: float) -> void:
 	if not _bones.has(bone_name) or is_zero_approx(degrees):
 		return
 	var bone: int = _bones[bone_name]
-	var basis := _stand_globals[bone].basis
-	var upward := basis.y.y >= 0.0
-	var axis := basis.inverse() * (Vector3.RIGHT if upward else Vector3.LEFT)
-	frame.rotations[bone] = (
-		frame.rotations[bone] * Quaternion(axis.normalized(), deg_to_rad(degrees))
-	)
-
-
-## Поворачивает кость вбок вокруг вертикали фигуры — Y модели, переведённого в
-## систему кости по её положению в стойке. Нужен свёрнутой шее (ADR-0040).
-func _turn(frame: Frame, bone_name: String, degrees: float) -> void:
-	if not _bones.has(bone_name) or is_zero_approx(degrees):
-		return
-	var bone: int = _bones[bone_name]
-	var axis := _stand_globals[bone].basis.inverse() * Vector3.UP
+	var axis := _stand_globals[bone].basis.inverse() * model_axis
 	frame.rotations[bone] = (
 		frame.rotations[bone] * Quaternion(axis.normalized(), deg_to_rad(degrees))
 	)

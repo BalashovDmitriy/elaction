@@ -24,6 +24,9 @@ const CLOSE_HEIGHT: float = 1.0
 ## На сколько фигура Otto отходит от камеры в сценке сзади, м: тела стоят
 ## вплотную в одной плоскости, и агент должен быть спереди, а руки Otto — за ним.
 const BEHIND_DEPTH: float = 0.14
+## На какой высоте щуп ищет стену перед местом агента, м: на уровне колена — ниже
+## любого проёма и выше порога.
+const WALL_PROBE: float = 0.4
 ## За сколько агент встаёт на своё место перед Otto, с (своего времени сценки).
 const ALIGN_TIME: float = 0.12
 
@@ -70,7 +73,7 @@ func _ready() -> void:
 	_agent.held_facing = -_facing if _scene.faces_otto else _facing
 	_agent.held = true
 	_from_x = _agent.global_position.x
-	_to_x = _otto.global_position.x + _facing * _scene.offset
+	_to_x = _free_spot(_otto.global_position.x + _facing * _scene.offset)
 	_otto.died.connect(_abort)
 	if _scene.side == Takedown.Side.BACK:
 		_otto.figure.position.z = -BEHIND_DEPTH
@@ -78,8 +81,7 @@ func _ready() -> void:
 	_show(0.0)
 
 
-## Ведёт сценку на [param delta] секунд мира. Отдан наружу тестам: длина кадра
-## в headless-прогоне — «сколько получится».
+## Ведёт сценку на [param delta] секунд мира. Отдан наружу тестам.
 func advance(delta: float) -> void:
 	if _scene == null:
 		return
@@ -96,7 +98,10 @@ func advance(delta: float) -> void:
 		_finish()
 
 
-func _process(delta: float) -> void:
+## Шагами физики, а не кадрами: смерть агента, очки и конец сценки решают исход
+## партии, и по настенным часам прогон бота переставал бы повторяться
+## (`docs/testing.md`, правило из M18b).
+func _physics_process(delta: float) -> void:
 	advance(delta)
 
 
@@ -120,6 +125,24 @@ func _show(time: float) -> void:
 	_agent.figure.show_pose(Takedown.Scene.pose_at(_scene.agent, time))
 
 
+## Где агенту встать перед Otto: на [param wanted], если до него нет стены, или
+## у самой стены. Режиссёр ставит агента руками, мимо физики, и без проверки
+## прижатый к стене агент уходил бы в неё на четверть метра (авторевью M24d).
+func _free_spot(wanted: float) -> float:
+	var space := _otto.get_world_3d().direct_space_state
+	var height := Vector3(0.0, WALL_PROBE, 0.0)
+	var from := _otto.global_position + height
+	var to := Vector3(wanted, from.y, from.z)
+	var reach := to + Vector3(signf(wanted - from.x) * Proportions.BODY_WIDTH * 0.5, 0.0, 0.0)
+	var query := PhysicsRayQueryParameters3D.create(from, reach, 1)
+	query.exclude = [_otto.get_rid(), _agent.get_rid()]
+	var hit := space.intersect_ray(query)
+	if hit.is_empty():
+		return wanted
+	var wall: Vector3 = hit["position"]
+	return wall.x - signf(wanted - from.x) * Proportions.BODY_WIDTH * 0.5
+
+
 ## Крупный план по ходу сценки: наезд, крупно до ключевого кадра, отъезд.
 func _frame(time: float) -> void:
 	var camera := _camera()
@@ -138,6 +161,9 @@ func _camera() -> SideCamera:
 
 func _kill() -> void:
 	_killed = true
+	# Агента уже убило посреди сценки — лампой, кабиной: очки за него взяты там.
+	if _agent.is_dead():
+		return
 	var score := Takedown.score(_scene.side, _agent.is_in_the_dark())
 	_agent.kill(false, _scene.corpse)
 	GameState.instance().add_score(score)

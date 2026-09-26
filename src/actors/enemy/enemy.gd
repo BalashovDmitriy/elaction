@@ -66,7 +66,13 @@ var watch_door: float = NAN
 ## а не методами: методы узла упёрлись в предел линтера.
 var takedown_ready: bool:
 	get:
-		return is_inside_tree() and not _held and not _brain.is_dead() and not _brain.is_emerging()
+		return (
+			is_inside_tree()
+			and not _held
+			and not _brain.is_dead()
+			and not _brain.is_emerging()
+			and not Takedown.rides_a_car(self)
+		)
 ## Над агентом идёт сценка добивания (ADR-0040): мозг и шаги стоят, луч гаснет,
 ## агент сразу смотрит в [member held_facing]. Отпущенный живой — снова в бою,
 ## мёртвый — ложится. Ставит и снимает режиссёр.
@@ -77,6 +83,12 @@ var held: bool:
 		_held = value
 		set_physics_process(not value)
 		if not value:
+			# Труп сценки лёг, как его уронила сценка, — навзничь или отброшенным
+			# назад. Спереди у края шахты это над пустотой: разворачивается к
+			# полу, как всякий убитый, но только теперь — посреди сценки
+			# разворот сломал бы постановку.
+			if _brain.is_dead():
+				_fall_onto_the_floor()
 			return
 		velocity = Vector3.ZERO
 		_walking = false
@@ -417,8 +429,8 @@ func take_bullet() -> void:
 
 ## Убивает агента: пулей, ногой или упавшей лампой в M4b.
 ## [param crushed] — придавило упавшей лампой: у такой смерти своя поза.
-## [param corpse] — поза трупа от сценки добивания: тело уже легло, как легло,
-## и разворачивать его к полу незачем.
+## [param corpse] — поза трупа от сценки добивания: к полу тело разворачивается
+## не здесь, а когда сценка его отпустит ([member held]).
 func kill(crushed: bool = false, corpse: String = "") -> void:
 	if _brain.is_dead() or _brain.is_emerging():
 		return
