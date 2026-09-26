@@ -37,11 +37,6 @@ static func start(level: GreyboxLevel, point: int) -> DemoRun:
 	return run
 
 
-## С какой точки идёт демо. Тестам.
-func point() -> int:
-	return _point
-
-
 func _ready() -> void:
 	_level.otto.died.connect(_finish)
 	if _point != DemoPlan.Point.ROOF:
@@ -78,19 +73,22 @@ func _physics_process(delta: float) -> void:
 		_bot.step()
 
 
-## Середина и низ: вступление пропущено, Otto — у шахты, чья кабина начинает с
-## этого этажа, возле этажа ROM. Кабины стартуют с верхней остановки своей шахты:
-## Otto посреди случайного этажа ждал кабину полдемо стоя (кадры M24E). Снизу
-## подвал открыт: документы с этажей выше засчитаны, и бот идёт к выходу, а не
-## наверх за ними.
+## Середина и низ: Otto — у шахты, чья кабина начинает с этого этажа, возле этажа
+## ROM. Кабины стартуют с верхней остановки своей шахты: Otto посреди случайного
+## этажа ждал кабину полдемо стоя (кадры M24E). Снизу подвал открыт: документы с
+## этажей выше засчитаны, и бот идёт к выходу, а не наверх за ними.
+##
+## Вступление снимает сама перестановка, а не [method GreyboxLevel.skip_the_intro]:
+## переставленного вступление отпускает и ставит кадр на него снимком. Пропуск
+## оставлял кадр вступления на крыше, и камера ехала к Otto через всё здание
+## (авторевью M24e).
 func _place() -> void:
-	_level.skip_the_intro()
 	var rules := _level.rules
 	var wanted := DemoPlan.floor_of(_point, rules.floors)
 	var index := wanted
 	var near_x := NAN
 	var best := DemoPlan.SHAFT_SEARCH + 1
-	for shaft in _level.plan().shafts:
+	for shaft: BuildingPlan.ShaftSpot in _level.plan().shafts:
 		var gap := absi(shaft.top - wanted)
 		if shaft.top >= 0 and gap < best:
 			best = gap
@@ -99,12 +97,13 @@ func _place() -> void:
 	_start_level = index
 	var spots := _level.plan().safe_spots(rules, index)
 	if spots.is_empty():
+		_level.skip_the_intro()
 		return
 	var x: float = spots[spots.size() / 2]
 	if not is_nan(near_x):
 		# Место рядом с шахтой: там, где бот и ждёт кабину.
 		var closest := INF
-		for spot in spots:
+		for spot: float in spots:
 			var gap := absf(absf(spot - near_x) - OttoBot.WAIT_ASIDE)
 			if gap < closest:
 				closest = gap

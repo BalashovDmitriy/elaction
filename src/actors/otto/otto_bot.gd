@@ -456,6 +456,10 @@ func _dodge(bullet_height: float) -> void:
 ## Стоит ли идти добивать [param threat] (ADR-0040): стоя на своих ногах, не в
 ## кабине, агент готов к добиванию и не целится — и близко: спиной — до
 ## [constant TAKEDOWN_SNEAK], лицом — до [constant TAKEDOWN_RUSH].
+##
+## И только на своём куске этажа. Нагоняет бот напрямик, мимо графа, а между ним
+## и агентом бывает проём шахты или глухая стена: шагнувший в пустую шахту гибнет,
+## упёршийся в стену стоит до конца прогона (авторевью M24e).
 func _worth_a_takedown(threat: Enemy) -> bool:
 	if threat == null or not threat.takedown_ready:
 		return false
@@ -465,6 +469,8 @@ func _worth_a_takedown(threat: Enemy) -> bool:
 		return false
 	var here := _at(_otto)
 	var there := _at(threat)
+	if not _same_piece(_rules.floor_index_near(here.y), here.x, there.x):
+		return false
 	var side := Takedown.side_of(_otto.global_position.x, threat.global_position.x, threat.facing())
 	var reach := TAKEDOWN_SNEAK if side == Takedown.Side.BACK else TAKEDOWN_RUSH
 	return absf(there.x - here.x) <= reach
@@ -482,6 +488,16 @@ func _close_in(threat: Enemy) -> void:
 		return
 	_decision = "иду добивать"
 	_press(&"move_right" if side > 0.0 else &"move_left")
+
+
+## На одном ли куске этажа [param floor_index] точки [param a] и [param b]: дойти
+## от одной до другой можно пешком, без кабины и эскалатора.
+func _same_piece(floor_index: int, a: float, b: float) -> bool:
+	var pieces: Dictionary = _graph["pieces"]
+	for piece: Vector2 in pieces.get(floor_index, []):
+		if a >= piece.x and a <= piece.y:
+			return b >= piece.x and b <= piece.y
+	return false
 
 
 ## С какой стороны от Otto стоит агент: -1 слева, +1 справа.

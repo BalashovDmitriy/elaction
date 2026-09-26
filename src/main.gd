@@ -110,11 +110,19 @@ func _input(event: InputEvent) -> void:
 		or (event is InputEventMouseButton and event.is_pressed())
 	)
 	if _demo != null:
-		if pressed:
+		# Кадр F12 снимается и с демо: main слышит ввод раньше автолоада съёмки, и
+		# нажатие, кончившее демо, до него бы уже не дошло (авторевью M24e).
+		if pressed and not event.is_action(&"screenshot"):
 			get_viewport().set_input_as_handled()
 			_end_demo()
 		return
-	if pressed or event is InputEventMouseMotion:
+	# Стик — тоже ход по меню: стрелками меню ходят и им (авторевью M24e).
+	var stick := event as InputEventJoypadMotion
+	if (
+		pressed
+		or event is InputEventMouseMotion
+		or (stick != null and absf(stick.axis_value) > 0.5)
+	):
 		_idle = 0.0
 
 
@@ -158,6 +166,14 @@ func _end_demo() -> void:
 	_demo_ending = true
 	_demo.stop()
 	_level.process_mode = Node.PROCESS_MODE_DISABLED
+	# Сценка добивания держит свой режим PAUSABLE и под выключенным зданием шла бы
+	# дальше: добивала агента со звуком, водила камеру и держала мир замедленным —
+	# с ним и затемнение (авторевью M24e). Уход из дерева возвращает миру ход.
+	var director := _level.otto.takedown
+	if director != null:
+		_level.otto.takedown = null
+		director.get_parent().remove_child(director)
+		director.queue_free()
 	_curtain.cover(0.0, _open_menu.bind(true))
 
 

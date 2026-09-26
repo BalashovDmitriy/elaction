@@ -38,16 +38,16 @@ func _run() -> void:
 	var main := MAIN_SCENE.instantiate()
 	add_child(main)
 	await get_tree().process_frame
-	for point in POINT_NAMES.size():
+	for point: int in POINT_NAMES.size():
 		main.set("_demo_point", point)
 		main.call("_start_demo")
 		var shown := 0.0
-		for moment in MOMENTS:
+		for moment: float in MOMENTS:
 			await get_tree().create_timer(moment - shown).timeout
 			shown = moment
 			if main.get("_demo") == null:
 				break
-			for _frame in 2:
+			for _frame: int in 2:
 				await RenderingServer.frame_post_draw
 			var image := get_viewport().get_texture().get_image()
 			var path := "res://screens/%s/demo_%s_%02d.jpg" % [_folder, POINT_NAMES[point], moment]

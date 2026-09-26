@@ -19,7 +19,7 @@ func after_each() -> void:
 func test_the_points_go_round() -> void:
 	var point := DemoPlan.Point.ROOF
 	var seen: Array[int] = []
-	for _round in DemoPlan.Point.size():
+	for _round: int in DemoPlan.Point.size():
 		seen.append(point)
 		point = DemoPlan.next(point)
 	assert_eq(point, DemoPlan.Point.ROOF, "три точки — и снова крыша")
@@ -93,6 +93,21 @@ func test_the_demo_writes_no_records() -> void:
 	assert_true(main.get("_demo_ending"), "а уходит в меню")
 
 
+func test_a_screenshot_does_not_end_the_demo() -> void:
+	var main := MAIN_SCENE.instantiate()
+	add_child_autofree(main)
+	await wait_physics_frames(2)
+	main.call("_start_demo")
+	await wait_physics_frames(2)
+	var shot := InputEventKey.new()
+	shot.physical_keycode = KEY_F12
+	shot.pressed = true
+	assert_true(shot.is_action(&"screenshot"), "F12 — это кадр")
+	main._input(shot)
+	assert_false(main.get("_demo_ending"), "кадр снимается, демо идёт дальше")
+	main.call("_end_demo")
+
+
 # --- Точки ---------------------------------------------------------------------
 
 
@@ -111,16 +126,59 @@ func test_the_bottom_point_opens_the_basement() -> void:
 	# Старт — у шахты, чья кабина начинает с этого этажа, возле этажа ROM.
 	assert_lte(absi(index - wanted), DemoPlan.SHAFT_SEARCH, "Otto внизу, возле этажа ROM")
 	var starts_here := false
-	for shaft in level.plan().shafts:
+	for shaft: BuildingPlan.ShaftSpot in level.plan().shafts:
 		starts_here = starts_here or shaft.top == index
 	assert_true(starts_here, "на этаже старта начинает кабина")
 	assert_false(level.is_in_the_intro(), "вступление пропущено")
+	# Кадр встаёт на Otto снимком, а не едет к нему с крыши через всё здание.
+	var feet := WorldSpace.to_plane(level.otto.global_position)
+	assert_true(level.otto.camera_view().has_point(feet), "Otto в кадре с первого шага")
 	var pending := 0
 	for door: Door in level.doors():
 		if door.is_pending() and level.rules.floor_index_near(door.mat_position().y) < index:
 			pending += 1
 	assert_eq(pending, 0, "документов выше старта не осталось — бот идёт вниз, а не наверх")
 	run.stop()
+	remove_child(level)
+
+
+## Кабину у старта демо держит и за ярус пары: своего хода у яруса нет, и стоять
+## должен ведущий — иначе пара уезжает по расписанию.
+func test_holding_a_deck_holds_its_pair() -> void:
+	GameState.instance().start_game()
+	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
+	level.rules = BuildingRules.new()
+	level.building_seed = 1
+	level.spawn_agents = false
+	add_child_autofree(level)
+	await wait_physics_frames(4)
+	var deck: ElevatorCar = null
+	var leader: ElevatorCar = null
+	for child: Node in level.get_children():
+		var car := child as ElevatorCar
+		if car != null and car.is_deck():
+			deck = car
+	if deck == null:
+		pending("в здании нет двухэтажной пары")
+		remove_child(level)
+		return
+	# Ведущий — ближайшая сверху кабина того же столбца: в одном столбце бывают и
+	# две шахты на разной высоте.
+	var closest := INF
+	for child: Node in level.get_children():
+		var car := child as ElevatorCar
+		if car == null or car.is_deck() or not is_equal_approx(car.position.x, deck.position.x):
+			continue
+		var above := car.position.y - deck.position.y
+		if above > 0.0 and above < closest:
+			closest = above
+			leader = car
+	assert_not_null(leader, "у яруса есть ведущий")
+	var before := leader.position.y
+	deck.hold(DemoRun.CAR_WAIT)
+	# Дольше обычной стоянки на этаже ([member ElevatorCar.floor_pause]).
+	await wait_physics_frames(int((leader.floor_pause + 1.0) * Engine.physics_ticks_per_second))
+	assert_almost_eq(leader.position.y, before, 0.01, "пара стоит, пока держат ярус")
 	remove_child(level)
 
 
