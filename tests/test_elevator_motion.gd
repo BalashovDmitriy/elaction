@@ -174,3 +174,12 @@ func test_arrival_is_not_lost_to_float_noise() -> void:
 	motion.update(STEP, 0.0, false)
 	assert_eq(motion.aligned_floor(), 1, "и стоит на нём паузу, а не касается и уходит")
 	assert_true(motion.is_stopped(), "стоит, а не едет")
+
+
+## Демо с крыши придерживает пустую кабину на этаже (ADR-0041): она стоит, сколько
+## велено, и уходит по расписанию потом.
+func test_a_held_car_waits_then_goes() -> void:
+	var motion := _shaft()
+	motion.hold(3.0)
+	assert_eq(_run(motion, 2.5, 0.0, false), TOP, "придержанная стоит дольше обычной паузы")
+	assert_gt(_run(motion, 1.5, 0.0, false), TOP, "и уходит, когда срок вышел")

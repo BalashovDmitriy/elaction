@@ -21,6 +21,10 @@ const LENGTH: float = 30.0
 ## у здания.
 const ROM_FLOORS: Dictionary = {Point.MIDDLE: 18, Point.BOTTOM: 5}
 
+## На сколько этажей от этажа ROM демо ищет шахту, чья кабина начинает с этого
+## этажа: там бот садится сразу, а не ждёт кабину полдемо.
+const SHAFT_SEARCH: int = 4
+
 
 ## Следующая точка по кругу.
 static func next(point: int) -> int:

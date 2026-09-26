@@ -24,9 +24,11 @@ extends RefCounted
 ## ROM, на высоте будущей пули. Высокий — присесть сразу, низкий — прыгнуть так,
 ## чтобы пуля пришла, пока ноги над ней.
 ##
-## Подошедшего вплотную агента бот не обходит, а встречает: приседает, поворачивается
-## и стреляет. Пока он проходил мимо, размен на считанных сантиметрах был мгновенным
-## и уклонение там не помогало — этим и кончались все замеры M11.
+## Подошедшего вплотную агента бот не обходит, а встречает. С M24d — добиванием
+## (ADR-0040): агента, который не целится, бот нагоняет стоя и жмёт выстрел в
+## упор, а выстрел вплотную и есть добивание. Спиной к нему агента подкарауливают
+## издалека — сзади добивание дороже; лицом — только совсем рядом, иначе выстрел
+## придёт раньше. Целящегося бот, как и прежде, встречает дуэлью из приседа.
 ##
 ## Думает бот в координатах правил — там же, где раскладка и этажи. Из сцены он
 ## переводит в одном месте, [method _at]: сцена считает Y вверх, правила вниз, и
@@ -45,6 +47,14 @@ const ENGAGE: float = SideCamera.DEFAULT_HALF_HEIGHT * 16.0 / 9.0
 ## Насколько агент должен совпадать с Otto по высоте, чтобы считаться целью, м.
 ## Пуля летит по горизонтали, и агент этажом ниже — не цель, а трата патрона.
 const SAME_LINE: float = 0.72
+
+## С какого расстояния бот идёт добивать агента, стоящего к нему спиной, м.
+## Дальше агент успеет обернуться: он бродит с паузами (ADR-0027, решение 3а).
+const TAKEDOWN_SNEAK: float = 5.0
+
+## С какого расстояния бот бросается добивать агента, смотрящего на него, м. Два
+## шага: дольше идти под взглядом агента — дать ему замахнуться.
+const TAKEDOWN_RUSH: float = 2.2
 
 ## Сколько бот готов драться, не сходя с места, с игрового времени.
 ##
@@ -208,13 +218,18 @@ func step() -> void:
 		car != null
 		and (_car_dodge_left > 0.0 or (incoming.x >= 0.0 and incoming.y <= CAR_DODGE_SIGHT))
 	)
+	# Добить важнее, чем дуэль: агента, который не целится, бот нагоняет стоя.
+	var closing := not dodging and not car_dodging and _worth_a_takedown(threat)
 	# Повёрнут ли ствол к цели этим же кадром: в дуэли бот сам нажимает сторону,
 	# и целиться отдельным кадром не надо.
-	var aiming := not dodging and not car_dodging and _duelling(threat)
+	var aiming := not dodging and not car_dodging and not closing and _duelling(threat)
 	if dodging:
 		_dodge(bullet_height)
 	elif car_dodging:
 		_dodge_in_car(car, incoming)
+	elif closing:
+		_close_in(threat)
+		return
 	elif aiming:
 		_hold_the_line(threat)
 	else:
@@ -436,6 +451,37 @@ func _dodge(bullet_height: float) -> void:
 	if _otto.is_grounded() and _press(&"jump"):
 		return
 	_press(&"move_down")
+
+
+## Стоит ли идти добивать [param threat] (ADR-0040): стоя на своих ногах, не в
+## кабине, агент готов к добиванию и не целится — и близко: спиной — до
+## [constant TAKEDOWN_SNEAK], лицом — до [constant TAKEDOWN_RUSH].
+func _worth_a_takedown(threat: Enemy) -> bool:
+	if threat == null or not threat.takedown_ready:
+		return false
+	if _otto.is_riding() or not _otto.is_grounded() or _otto.takedown != null:
+		return false
+	if threat.laser != null and threat.laser.is_on():
+		return false
+	var here := _at(_otto)
+	var there := _at(threat)
+	var side := Takedown.side_of(_otto.global_position.x, threat.global_position.x, threat.facing())
+	var reach := TAKEDOWN_SNEAK if side == Takedown.Side.BACK else TAKEDOWN_RUSH
+	return absf(there.x - here.x) <= reach
+
+
+## Нагоняет агента стоя и в упор жмёт выстрел: вплотную он и есть добивание.
+## Пока не вплотную, бот идёт и не стреляет — пуля забрала бы агента дешевле.
+func _close_in(threat: Enemy) -> void:
+	var side := _side_of(threat)
+	var gap := absf(threat.global_position.x - _otto.global_position.x)
+	var facing_it := is_equal_approx(_otto.facing(), side) or is_zero_approx(side)
+	if facing_it and gap <= Takedown.REACH * 0.85:
+		_decision = "добиваю"
+		_press(&"shoot")
+		return
+	_decision = "иду добивать"
+	_press(&"move_right" if side > 0.0 else &"move_left")
 
 
 ## С какой стороны от Otto стоит агент: -1 слева, +1 справа.

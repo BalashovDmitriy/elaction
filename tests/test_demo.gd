@@ -106,9 +106,14 @@ func test_the_bottom_point_opens_the_basement() -> void:
 	await wait_physics_frames(4)
 	var run := DemoRun.start(level, DemoPlan.Point.BOTTOM)
 	await wait_physics_frames(2)
-	var index := DemoPlan.floor_of(DemoPlan.Point.BOTTOM, level.rules.floors)
-	var where := level.rules.floor_index_near(WorldSpace.to_plane(level.otto.global_position).y)
-	assert_eq(where, index, "Otto на нижнем этаже старта")
+	var wanted := DemoPlan.floor_of(DemoPlan.Point.BOTTOM, level.rules.floors)
+	var index := level.rules.floor_index_near(WorldSpace.to_plane(level.otto.global_position).y)
+	# Старт — у шахты, чья кабина начинает с этого этажа, возле этажа ROM.
+	assert_lte(absi(index - wanted), DemoPlan.SHAFT_SEARCH, "Otto внизу, возле этажа ROM")
+	var starts_here := false
+	for shaft in level.plan().shafts:
+		starts_here = starts_here or shaft.top == index
+	assert_true(starts_here, "на этаже старта начинает кабина")
 	assert_false(level.is_in_the_intro(), "вступление пропущено")
 	var pending := 0
 	for door: Door in level.doors():

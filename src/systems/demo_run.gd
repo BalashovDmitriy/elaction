@@ -11,10 +11,18 @@ extends Node
 ## Демо кончилось само: время вышло или Otto погиб.
 signal finished
 
+## Сколько кабины у уровня старта стоят после того, как бот пошёл, с: дорога
+## к шахте с запасом. С крыши демо идёт через
+## вертолёт, и за вступление кабины уезжали вниз по расписанию — бот потом ждал
+## их у шахты по двадцать секунд, полдемо стоя.
+const CAR_WAIT: float = 8.0
+
 var _level: GreyboxLevel = null
 var _bot: OttoBot = null
 var _point: int = DemoPlan.Point.ROOF
 var _time: float = 0.0
+## Уровень старта: у него стоянка кабин продлевается, пока Otto не пошёл.
+var _start_level: int = BuildingRules.ROOF
 var _frame: int = 0
 var _done: bool = false
 
@@ -51,6 +59,10 @@ func stop() -> void:
 func _physics_process(delta: float) -> void:
 	if _done:
 		return
+	# Кабины встают на остановки уже в дереве, не к [method Node._ready] демо, —
+	# поэтому стоянка у уровня старта продлевается каждый шаг, пока бот не пошёл.
+	if _bot == null:
+		_hold_cars_at(_start_level)
 	_time += delta
 	if _time >= DemoPlan.LENGTH:
 		_finish()
@@ -66,24 +78,54 @@ func _physics_process(delta: float) -> void:
 		_bot.step()
 
 
-## Середина и низ: вступление пропущено, Otto — на свободном месте этажа старта.
-## Снизу подвал открыт: документы с этажей выше засчитаны, и бот идёт к выходу,
-## а не наверх за ними.
+## Середина и низ: вступление пропущено, Otto — у шахты, чья кабина начинает с
+## этого этажа, возле этажа ROM. Кабины стартуют с верхней остановки своей шахты:
+## Otto посреди случайного этажа ждал кабину полдемо стоя (кадры M24E). Снизу
+## подвал открыт: документы с этажей выше засчитаны, и бот идёт к выходу, а не
+## наверх за ними.
 func _place() -> void:
 	_level.skip_the_intro()
 	var rules := _level.rules
-	var index := DemoPlan.floor_of(_point, rules.floors)
+	var wanted := DemoPlan.floor_of(_point, rules.floors)
+	var index := wanted
+	var near_x := NAN
+	var best := DemoPlan.SHAFT_SEARCH + 1
+	for shaft in _level.plan().shafts:
+		var gap := absi(shaft.top - wanted)
+		if shaft.top >= 0 and gap < best:
+			best = gap
+			index = shaft.top
+			near_x = shaft.x
+	_start_level = index
 	var spots := _level.plan().safe_spots(rules, index)
 	if spots.is_empty():
 		return
 	var x: float = spots[spots.size() / 2]
+	if not is_nan(near_x):
+		# Место рядом с шахтой: там, где бот и ждёт кабину.
+		var closest := INF
+		for spot in spots:
+			var gap := absf(absf(spot - near_x) - OttoBot.WAIT_ASIDE)
+			if gap < closest:
+				closest = gap
+				x = spot
 	_level.otto.global_position = WorldSpace.to_scene(Vector2(x, rules.floor_surface(index)))
 	if _point == DemoPlan.Point.BOTTOM:
 		var game := GameState.instance()
 		for door: Door in _level.doors():
 			if door.is_pending() and rules.floor_index_near(door.mat_position().y) < index:
 				door.has_document = false
-				game.collect_document()
+				game.collect_document(false)
+
+
+## Кабины у уровня [param level] стоят, пока идёт вступление и бот идёт к шахте.
+## Кабина при этом живая: севшего она видит и везёт.
+func _hold_cars_at(level: int) -> void:
+	var surface := _level.rules.floor_surface(level)
+	for child: Node in _level.get_children():
+		var car := child as ElevatorCar
+		if car != null and absf(WorldSpace.to_plane(car.global_position).y - surface) < 0.5:
+			car.hold(CAR_WAIT)
 
 
 func _finish() -> void:

@@ -383,6 +383,11 @@ func _ride_along() -> void:
 ## Скорость кабины за последний кадр: её спрашивает нижний ярус, чтобы решить,
 ## давит ли он. У яруса пары своего хода нет — отвечает за него ведущий, иначе
 ## едущий вниз ярус отчитывался бы нулём и никого не придавил.
+## Постоять на этаже ещё не меньше [param seconds] — см. [method ElevatorMotion.hold].
+func hold(seconds: float) -> void:
+	_motion.hold(seconds)
+
+
 func speed_now() -> float:
 	return _leader.speed_now() if _leader != null else _motion.velocity
 
