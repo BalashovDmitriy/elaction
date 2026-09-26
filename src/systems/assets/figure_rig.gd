@@ -81,14 +81,9 @@ const HULL_DIRECTIONS: Array[Vector3] = [
 	Vector3(-1, -1, -1),
 ]
 
-## Какая доля пути перехода остаётся, когда риг встаёт в цель ровно: экспонента
-## сама по себе не доходит никогда. Тысячная — для удара ногой в 90° это десятая
-## градуса, глазу не видно; при [member smoothing] 16 переход длится 0.43 с.
-##
-## Порог — доля пути, а не угол между кадрами: `Quaternion.angle_to` у двух
-## равных кватернионов float32 отдаёт шум до 0.001 рад, и порог в углах мельче
-## шума не срабатывал никогда (авторевью M21).
-const SETTLE_LEFT: float = 0.001
+## Куда смотрит модель, повёрнутая лицом вправо и влево: поворот на четверть
+## оборота кладёт взгляд вдоль этажа, а в покое она смотрит в камеру (+Z).
+const FACE_RIGHT: float = PI * 0.5
 
 
 ## Поверхность меша, снятая один раз: вершины, привязка к костям и веса.
@@ -212,11 +207,6 @@ class ClipTracks:
 		return animation.length
 
 
-## Скорость сглаживания, 1/с. Переход между позами укладывается в несколько
-## кадров: медленнее — и удар ногой опаздывает к удару, быстрее — и это уже
-## подмена картинки.
-@export var smoothing: float = 16.0
-
 ## Модель актёра. Без неё риг — пустой узел, и это ошибка сцены.
 @export var model: PackedScene
 
@@ -252,6 +242,15 @@ var _walk_phase: float = 0.0
 var _current: Frame = null
 ## Кадр, в котором риг стоял, когда сменилась поза: из него идёт переход.
 var _from: Frame = null
+## Сколько длится переход в текущую позу, с ([method FigurePoses.blend_time]).
+var _blend: float = FigurePoses.BLEND_DEFAULT
+## Разворот (ADR-0039, решение 3): откуда и куда поворачивается тело и сколько
+## секунд он уже идёт. Поворот идёт через «лицом в камеру», а не спиной к ней.
+var _yaw_from: float = FACE_RIGHT
+var _yaw_to: float = FACE_RIGHT
+var _turned: float = MoveLocks.TURN_TIME
+## Смотрел ли риг уже куда-нибудь: первый взгляд ставится сразу, без разворота.
+var _faced: bool = false
 ## Переход кончился: риг стоит в кадре позы. У неподвижной цели (поза кодом,
 ## конец клипа) раскладывать больше нечего — стоящих и лежащих каждый кадр
 ## перебирали бы вершины впустую; клип стойки и ходьбы риг дальше просто играет.
@@ -304,7 +303,7 @@ func _process(delta: float) -> void:
 
 
 ## Шаг перехода: кости идут от кадра, где риг стоял при смене позы, к кадру
-## позы; остаток пути гаснет экспонентой по [member smoothing].
+## позы за время перехода, по сглаженной кривой — и приходят ровно в срок.
 ## Зовётся из [method Node._process]; тестам отдан наружу, потому что длина
 ## кадра в headless-прогоне не 1/60, а «сколько получится».
 func advance(delta: float) -> void:
@@ -315,6 +314,7 @@ func advance(delta: float) -> void:
 	var frozen := _settled and _is_still()
 	_pose_time += delta
 	_clock += delta
+	_turned += delta
 	if frozen:
 		return
 	var wanted := _wanted()
@@ -322,10 +322,10 @@ func advance(delta: float) -> void:
 		# Переход — смесь кадра, из которого риг ушёл, с живым кадром цели. Клип
 		# идёт своим ходом и во время перехода: гоняясь за ним сглаживанием, риг
 		# волочился бы за ходьбой с отставанием в 15° и не догонял бы никогда.
-		var left := exp(-smoothing * _pose_time)
-		_settled = _from == null or left < SETTLE_LEFT
+		var progress := _pose_time / _blend if _blend > 0.0 else 1.0
+		_settled = _from == null or progress >= 1.0
 		if not _settled:
-			wanted = _from.blend(wanted, 1.0 - left)
+			wanted = _from.blend(wanted, smoothstep(0.0, 1.0, progress))
 	_current = wanted
 	_apply(_current, false)
 
@@ -342,6 +342,7 @@ func show_pose(pose_name: String) -> void:
 		return
 	_from = _current
 	_pose_time = 0.0
+	_blend = FigurePoses.blend_time(pose_name)
 	_settled = false
 
 
@@ -355,10 +356,22 @@ func set_walk_phase(phase: float) -> void:
 	_walk_clock += step / ActorPose.WALK_FPS
 
 
-## Куда актёр смотрит: -1 влево, +1 вправо. Модель в покое смотрит в камеру
-## (+Z), поворот на четверть оборота кладёт взгляд вдоль этажа.
+## Куда актёр смотрит: -1 влево, +1 вправо. Смена стороны — разворот телом за
+## [constant MoveLocks.TURN_TIME]: столько же актёр стоит на месте. Зовётся
+## каждый кадр; поворот копится по часам рига, а ставится здесь, чтобы актёр
+## мог довернуть тело поверх (Otto у машины поворачивается спиной к камере).
 func face(direction: float) -> void:
-	rotation.y = PI * 0.5 if direction >= 0.0 else -PI * 0.5
+	var wanted := FACE_RIGHT if direction >= 0.0 else -FACE_RIGHT
+	if not _faced:
+		_faced = true
+		_yaw_from = wanted
+		_yaw_to = wanted
+	elif not is_equal_approx(wanted, _yaw_to):
+		_yaw_from = rotation.y
+		_yaw_to = wanted
+		_turned = 0.0
+	var progress := clampf(_turned / MoveLocks.TURN_TIME, 0.0, 1.0)
+	rotation.y = lerpf(_yaw_from, _yaw_to, smoothstep(0.0, 1.0, progress))
 
 
 ## Прозрачность всех мешей: 0 — сплошной, 1 — невидим. Так мигает неуязвимый.
@@ -374,6 +387,8 @@ func snap() -> void:
 		return
 	_current = _wanted()
 	_settled = true
+	_turned = MoveLocks.TURN_TIME
+	rotation.y = _yaw_to if _faced else rotation.y
 	_apply(_current, true)
 
 
@@ -533,9 +548,9 @@ func _wanted() -> Frame:
 	var time := 0.0
 	match clip.mode:
 		FigurePoses.Clip.LOOP:
-			time = fmod(_clock, length)
+			time = fmod(_clock * clip.rate, length)
 		FigurePoses.Clip.ONCE:
-			time = minf(_pose_time, length)
+			time = minf(clip.start + _pose_time * clip.rate, length)
 		FigurePoses.Clip.END:
 			time = length
 		FigurePoses.Clip.WALK:
@@ -553,17 +568,16 @@ func _is_still() -> bool:
 		FigurePoses.Clip.END:
 			return true
 		FigurePoses.Clip.ONCE:
-			return _pose_time >= (_clips[clip.name] as ClipTracks).length()
+			return clip.start + _pose_time * clip.rate >= (_clips[clip.name] as ClipTracks).length()
 	return false
 
 
-## Стоит ли клип позы на полу сам: стойка и ходьба пака — да, с точностью до
-## сантиметра. Конец клипа смерти — нет: тело уходит в пол на 6 см.
-func _grounded_by_the_pack() -> bool:
+## Стоит ли поза на полу сама: любой клип — да. С M24c `build_actors.py`
+## ставит на пол каждый кадр каждого клипа по вершинам (ADR-0039), и лежащий в
+## конце смерти больше не уходит в пол на 6 см, как у клипа пака.
+func _grounded_by_the_clip() -> bool:
 	var clip := FigurePoses.clip_of(_pose_name)
-	if clip == null or not _clips.has(clip.name):
-		return false
-	return clip.mode == FigurePoses.Clip.LOOP or clip.mode == FigurePoses.Clip.WALK
+	return clip != null and _clips.has(clip.name)
 
 
 ## Кадр позы кодом: стойка, на которую легли углы [FigurePoses.Pose].
@@ -646,9 +660,9 @@ func _globals(frame: Frame) -> Array[Transform3D]:
 ## Раскладывает кадр по костям и по самой модели.
 ##
 ## [param exact] — заземлять по всем вершинам, а не по крайним: для снимков и
-## тестов. На ходу хватает крайних, а стойка и ходьба, в которые риг уже пришёл,
-## не заземляются вовсе — их пак поставил на пол сам. Клипы «один раз» и конец
-## клипа заземляются, как поза кодом: лежащий в конце смерти уходит в пол.
+## тестов. На ходу хватает крайних, а клип, в который риг уже пришёл, не
+## заземляется вовсе — его поставил на пол `build_actors.py`. Заземляются поза
+## кодом и переход: смесь двух кадров на полу сама не стоит.
 func _apply(frame: Frame, exact: bool) -> void:
 	for bone in frame.rotations.size():
 		_skeleton.set_bone_pose_rotation(bone, frame.rotations[bone])
@@ -661,7 +675,7 @@ func _apply(frame: Frame, exact: bool) -> void:
 	_instance.rotation.x = deg_to_rad(frame.tilt)
 	_instance.scale = Vector3(widen, frame.squash, widen)
 	_instance.position.y = 0.0
-	if _settled and not exact and _grounded_by_the_pack():
+	if _settled and not exact and _grounded_by_the_clip():
 		return
 	_skeleton.force_update_all_bone_transforms()
 

@@ -4,9 +4,10 @@ extends RefCounted
 ## Позы фигуры: чем отыгрывается каждая поза [ActorPose].
 ##
 ## С M21 (ADR-0032, решение 1) поз две природы. Там, где ROM не диктует высот,
-## двигается клип пака Quaternius — стойка, ходьба, выстрел, смерть. Там, где
-## диктует, — поза кодом из этой таблицы: присед и залёгший под пулями ROM,
-## прыжок и удар ногой, которых в паке нет, раздавленный.
+## двигается клип — с M24c из Universal Animation Library (ADR-0039): стойка,
+## ходьба, выстрел, смерть, толчок и приземление. Там, где диктует, — поза
+## кодом из этой таблицы: присед и залёгший под пулями ROM, удар ногой, которого
+## в UAL нет, раздавленный.
 ##
 ## Поза кодом строится не от покоя скелета, а от первого кадра стойки: покой
 ## пака — T-поза с руками в стороны. Углы — в градусах, **положительный уводит
@@ -92,11 +93,20 @@ class Clip:
 
 	var name: String
 	var mode: int
+	## С какого момента клипа начинать, с: у толчка UAL в начале присед-замах,
+	## а прыжок в игре мгновенный.
+	var start: float = 0.0
+	## Во сколько раз быстрее записанного играть.
+	var rate: float = 1.0
 
-	static func make(clip_name: String, clip_mode: int) -> Clip:
+	static func make(
+		clip_name: String, clip_mode: int, from: float = 0.0, speed: float = 1.0
+	) -> Clip:
 		var clip := Clip.new()
 		clip.name = clip_name
 		clip.mode = clip_mode
+		clip.start = from
+		clip.rate = speed
 		return clip
 
 
@@ -113,7 +123,6 @@ const CLIP_WALK := "walk"
 const CLIP_SHOOT := "shoot"
 const CLIP_DEATH := "death"
 const CLIP_JUMP_START := "jump_start"
-const CLIP_JUMP_AIR := "jump_air"
 const CLIP_JUMP_LAND := "jump_land"
 const CLIP_CROUCH := "crouch"
 const CLIP_NAMES: PackedStringArray = [
@@ -123,7 +132,6 @@ const CLIP_NAMES: PackedStringArray = [
 	CLIP_SHOOT,
 	CLIP_DEATH,
 	CLIP_JUMP_START,
-	CLIP_JUMP_AIR,
 	CLIP_JUMP_LAND,
 	CLIP_CROUCH,
 ]
@@ -134,6 +142,35 @@ const CLIP_NAMES: PackedStringArray = [
 ## скорость опорной стопы в клипе: та едет назад 1.27 м/с, замер
 ## `tools/walk_stride.gd`.
 const WALK_CLIP_RATE: float = 1.75
+
+## Толчок UAL: первые три кадра (0.125 с) — присед перед отрывом. Прыжок в игре
+## мгновенный, и клип начинается с отрыва.
+const JUMP_FROM: float = 0.125
+## Приземление UAL сидит в глубоком приседе до 0.33 с и выпрямляется к 0.9 с —
+## то самое «медленно выпрямляется», на которое жаловался игрок. Втрое быстрее
+## присед мелькает, а стойка приходит к 0.36 с.
+const LAND_RATE: float = 2.5
+## Сколько показывать приземление, с: клип на [constant LAND_RATE] к этому
+## времени уже стоит. Дольше — стойка, раньше — шаг, если пауза кончилась.
+const LAND_SHOW: float = 0.36
+
+## Сколько длится переход в позу, с (ADR-0039, решение 5). Смесь идёт по
+## времени, а не гаснущей экспонентой: переход кончается, а не подползает.
+## В приземление и выстрел — почти сразу: они про момент; в стойку — мягче.
+const BLEND_DEFAULT: float = 0.12
+const BLEND_TIMES: Dictionary = {
+	"idle": 0.15,
+	"walk": 0.1,
+	"shoot": 0.05,
+	"jump": 0.06,
+	"kick": 0.1,
+	"land": 0.04,
+	"crouch": 0.08,
+	"prone": 0.12,
+	"dead_0": 0.08,
+	"dead_1": 0.3,
+	"crushed": 0.05,
+}
 
 ## Присед: ноги вперёд, колени сложены, корпус над коленями, голова вперёд из-под
 ## шляпы. С коленями это наконец «на корточках», а не «согнулся» (долг M18c).
@@ -171,11 +208,21 @@ static func knows(pose_name: String) -> bool:
 	return clip_of(pose_name) != null or _table.has(pose_name)
 
 
+## Сколько длится переход в позу, с. Кадры ходьбы — одна поза «walk».
+static func blend_time(pose_name: String) -> float:
+	var key := "walk" if pose_name.begins_with("walk_") else pose_name
+	return float(BLEND_TIMES.get(key, BLEND_DEFAULT))
+
+
 static func _build_clips() -> Dictionary:
 	return {
 		"idle": Clip.make(CLIP_IDLE, Clip.LOOP),
 		"walk": Clip.make(CLIP_WALK, Clip.WALK),
 		"shoot": Clip.make(CLIP_SHOOT, Clip.ONCE),
+		# Прыжок тремя фазами (ADR-0039): толчок клипом, в полёте удар ногой
+		# позой кодом — в оригинале прыжок и есть удар, — приземление клипом.
+		"jump": Clip.make(CLIP_JUMP_START, Clip.ONCE, JUMP_FROM),
+		"land": Clip.make(CLIP_JUMP_LAND, Clip.ONCE, 0.0, LAND_RATE),
 		# Смерть показывается двумя позами (ADR-0011, пункт 12): падение — клип
 		# с начала, лежащее тело — его последний кадр.
 		"dead_0": Clip.make(CLIP_DEATH, Clip.ONCE),
@@ -193,13 +240,6 @@ static func _build_table() -> Dictionary:
 		. make(Vector2(CROUCH_LEGS, CROUCH_LEGS), Vector2(20.0, 25.0))
 		. bent_at(Vector2(CROUCH_KNEES, CROUCH_KNEES), Vector2(30.0, 30.0))
 		. leaned(CROUCH_LEAN, CROUCH_HEAD)
-	)
-	# Прыжок: одна нога подобрана, другая чуть согнута, руки вскинуты.
-	table["jump"] = (
-		Pose
-		. make(Vector2(60.0, -10.0), Vector2(120.0, 130.0))
-		. bent_at(Vector2(90.0, 30.0), Vector2(20.0, 20.0))
-		. leaned(-6.0)
 	)
 	# Удар ногой: нога уходит вперёд почти горизонтально и прямая, опорная
 	# подогнута, корпус откинут.

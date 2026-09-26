@@ -304,6 +304,22 @@ func test_the_agent_stands_taller_by_his_hat() -> void:
 func test_facing_turns_the_figure_along_the_floor() -> void:
 	var rig := _rig(OTTO_MODEL)
 	rig.face(1.0)
-	assert_almost_eq(rig.rotation.y, PI * 0.5, 0.001, "вправо — четверть оборота")
+	assert_almost_eq(rig.rotation.y, PI * 0.5, 0.001, "вправо — четверть оборота, сразу")
 	rig.face(-1.0)
+	rig.snap()
 	assert_almost_eq(rig.rotation.y, -PI * 0.5, 0.001, "влево — в другую сторону")
+
+
+## Разворот — движение телом за паузу разворота, через «лицом в камеру»
+## (ADR-0039, решение 3), а не подмена стороны.
+func test_a_turn_swings_the_body_through_the_camera() -> void:
+	var rig := _rig(OTTO_MODEL)
+	rig.face(1.0)
+	rig.face(-1.0)
+	assert_almost_eq(rig.rotation.y, PI * 0.5, 0.001, "в первый кадр разворота ещё смотрит вправо")
+	rig.advance(MoveLocks.TURN_TIME * 0.5)
+	rig.face(-1.0)
+	assert_almost_eq(rig.rotation.y, 0.0, 0.05, "на полпути — лицом в камеру, не спиной")
+	rig.advance(MoveLocks.TURN_TIME * 0.5 + 0.001)
+	rig.face(-1.0)
+	assert_almost_eq(rig.rotation.y, -PI * 0.5, 0.001, "за паузу разворота — влево")

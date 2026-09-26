@@ -38,6 +38,10 @@ const GRACE_BLINKS: float = 8.0
 ## не падение: без этого поставленный этажом ниже разбивался бы на ровном месте.
 const TELEPORT_GAP: float = 0.5
 
+## Сколько надо пробыть в воздухе, чтобы касание пола было приземлением, с.
+## Прыжок длится около секунды, а кадр без опоры на уходящей вниз кабине — один.
+const LANDING_AIR_TIME: float = 0.15
+
 ## Кнопки, нажатие которых может уйти на пропуск вступления ([method ride]).
 const PRESS_ACTIONS: Array[StringName] = [&"jump", &"shoot"]
 
@@ -119,6 +123,13 @@ var _gun := Gun.new()
 var _support_y: float = 0.0
 ## Стоял ли Otto на опоре в прошлом кадре: приземление — это переход.
 var _was_grounded: bool = true
+## Сколько Otto уже в воздухе, с: приземлением считается только настоящий
+## полёт, а не кадр без опоры на крыше кабины, уходящей вниз.
+var _air_time: float = 0.0
+## Паузы разворота и приземления (ADR-0039, решение 4).
+var _locks := MoveLocks.new()
+## Сколько ещё показывать приземление, с.
+var _landing: float = 0.0
 ## Где Otto закончил прошлый кадр физики: по этому видно перестановку.
 var _last_position := Vector3.ZERO
 ## Сколько ещё держится передышка после возвращения в игру, с.
@@ -174,6 +185,10 @@ func _physics_process(delta: float) -> void:
 		_car.drive(vertical_intent())
 		_snapshot.crouch = false
 
+	_locks.tick(delta)
+	_landing = maxf(_landing - delta, 0.0)
+	_hold_the_feet()
+
 	# Машине состояний нужна скорость в координатах правил, где Y вниз:
 	# падение для неё положительно, как было в 2D.
 	var state := _states.update(_snapshot, is_on_floor(), -velocity.y, _can_stand_up())
@@ -188,12 +203,6 @@ func _physics_process(delta: float) -> void:
 		_update_look(delta)
 		return
 
-	# Мёртвый не поворачивается: труп лежит той стороной, которой упал. На цветной
-	# коробке этого было не видно, а модель разворачивается на глазах — и тыканье
-	# в стрелки крутило бы тело, пока идёт отсчёт до возвращения в игру.
-	var turning := absf(_snapshot.move) > OttoStateMachine.MOVE_THRESHOLD
-	if turning and state != OttoStateMachine.State.DEAD:
-		_facing = signf(_snapshot.move)
 	if _snapshot.shoot_pressed and state != OttoStateMachine.State.DEAD and _gun.can_fire():
 		_fire()
 
@@ -275,6 +284,28 @@ func _forget_spent_presses() -> void:
 			_snapshot.shoot_pressed = false
 
 
+## Разворот и приземление держат ноги (ADR-0039, решение 4): снимок ввода
+## теряет шаг, пока тело поворачивается, и прыжок, пока Otto восстанавливается.
+## Сторона берётся до этого — из того, что игрок нажал.
+##
+## Мёртвый не поворачивается: труп лежит той стороной, которой упал, — тыканье
+## в стрелки крутило бы тело, пока идёт отсчёт до возвращения в игру. Того, кого
+## везут или спрятали, ввод не касается вовсе. В воздухе поворачиваться лицом
+## можно без паузы (ROM @42A7): скорость полёта от этого не меняется.
+func _hold_the_feet() -> void:
+	if _states.is_dead() or _states.is_world_driven():
+		return
+	if absf(_snapshot.move) > OttoStateMachine.MOVE_THRESHOLD:
+		var side := signf(_snapshot.move)
+		if side != _facing and is_on_floor():
+			_locks.turn()
+		_facing = side
+	if not _locks.can_walk():
+		_snapshot.move = 0.0
+	if not _locks.can_jump():
+		_snapshot.jump_pressed = false
+
+
 ## Возвращает Otto в игру после смерти. Ставить его на место — дело уровня,
 ## поэтому зовут это уже после переноса: опора, от которой считается падение,
 ## берётся отсюда.
@@ -284,6 +315,8 @@ func _forget_spent_presses() -> void:
 func revive() -> void:
 	_crushed = false
 	_states.reset()
+	_locks.clear()
+	_landing = 0.0
 	velocity = Vector3.ZERO
 	_rest_here()
 	_grace = RESPAWN_GRACE
@@ -495,6 +528,10 @@ func _track_fall() -> void:
 	if grounded and not _was_grounded:
 		if ShaftHazards.is_deadly_fall(fall_height(), floor_height):
 			kill()
+		elif _air_time >= LANDING_AIR_TIME:
+			_locks.land()
+			_landing = FigurePoses.LAND_SHOW
+	_air_time = 0.0 if grounded else _air_time + get_physics_process_delta_time()
 	_was_grounded = grounded
 	if grounded or _car != null:
 		_support_y = global_position.y
@@ -553,7 +590,7 @@ func _apply_pose(state: OttoStateMachine.State) -> void:
 ## на скелете: между позами он интерполирует сам (ADR-0022, решение 2).
 func _pose() -> String:
 	return ActorPose.of_otto(
-		_states.state, _crushed, _falling_over > 0.0, _shooting > 0.0, _walk_phase
+		_states.state, _crushed, _falling_over > 0.0, _shooting > 0.0, _walk_phase, _landing > 0.0
 	)
 
 

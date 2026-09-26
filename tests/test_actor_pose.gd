@@ -32,11 +32,12 @@ func test_every_pose_of_otto_is_reachable() -> void:
 			for falling: bool in [false, true]:
 				for shooting: bool in [false, true]:
 					for phase: int in ActorPose.WALK_FRAMES:
-						var pose := ActorPose.of_otto(
-							state, crushed, falling, shooting, float(phase)
-						)
-						if not shown.has(pose):
-							shown.append(pose)
+						for landing: bool in [false, true]:
+							var pose := ActorPose.of_otto(
+								state, crushed, falling, shooting, float(phase), landing
+							)
+							if not shown.has(pose):
+								shown.append(pose)
 
 	for pose: String in ActorPose.OTTO_POSES:
 		assert_true(shown.has(pose), "поза %s кому-то нужна" % pose)
@@ -147,3 +148,18 @@ func test_the_knee_and_the_crouch_are_one_pose() -> void:
 	var crouching := ActorPose.of_otto(OttoStateMachine.State.CROUCH, false, false, false, 0.0)
 	assert_eq(kneeling, crouching)
 	assert_eq(kneeling, ActorPose.CROUCH)
+
+
+## Приземление показывается, только пока Otto стоит (ADR-0039): шагнул — идёт,
+## присел — сидит, выстрелил — стреляет.
+func test_landing_shows_only_while_standing() -> void:
+	var idle := OttoStateMachine.State.IDLE
+	assert_eq(
+		ActorPose.of_otto(idle, false, false, false, 0.0, true), "land", "стоит — приземляется"
+	)
+	assert_eq(
+		ActorPose.of_otto(idle, false, false, false, 0.0, false), "idle", "без приземления — стоит"
+	)
+	var walk := OttoStateMachine.State.WALK
+	assert_eq(ActorPose.of_otto(walk, false, false, false, 0.0, true), "walk_0", "шагнул — идёт")
+	assert_eq(ActorPose.of_otto(idle, false, false, true, 0.0, true), "shoot", "выстрел важнее")

@@ -101,15 +101,7 @@ func _process(delta: float) -> void:
 func _strike() -> float:
 	if _bolt == null:
 		_bolt = MeshInstance3D.new()
-		var look := StandardMaterial3D.new()
-		look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		look.albedo_color = BOLT_COLOUR
-		look.disable_fog = true
-		look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		# Ломаная идёт сверху вниз, и её треугольники обращены от камеры: с
-		# отсечением задних граней разряд не рисовался вовсе (авторевью M22).
-		look.cull_mode = BaseMaterial3D.CULL_DISABLED
-		_bolt.material_override = look
+		_bolt.material_override = bolt_look()
 		add_child(_bolt)
 	var mesh := ImmediateMesh.new()
 	var x := _rng.randf_range(_span.x - 80.0, _span.y + 80.0)
@@ -133,6 +125,20 @@ func _strike() -> float:
 	_bolt.visible = true
 	var aside := x - (_span.x + _span.y) * 0.5
 	return sqrt(BOLT_DEPTH * BOLT_DEPTH + aside * aside)
+
+
+## Материал разряда. Отдельно — его прогревает [ShaderWarmup]: разряд виден
+## редко, и первый собирал бы шейдер посреди грозы.
+static func bolt_look() -> StandardMaterial3D:
+	var look := StandardMaterial3D.new()
+	look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	look.albedo_color = BOLT_COLOUR
+	look.disable_fog = true
+	look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	# Ломаная идёт сверху вниз, и её треугольники обращены от камеры: с
+	# отсечением задних граней разряд не рисовался вовсе (авторевью M22).
+	look.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return look
 
 
 static func _segment(mesh: ImmediateMesh, a: Vector2, b: Vector2, width: float) -> void:

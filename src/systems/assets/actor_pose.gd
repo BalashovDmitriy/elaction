@@ -28,6 +28,7 @@ const OTTO_POSES: PackedStringArray = [
 	"crouch",
 	"jump",
 	"kick",
+	"land",
 	"shoot",
 	"dead_0",
 	"dead_1",
@@ -80,18 +81,23 @@ const BY_STATE: Dictionary = {
 ##
 ## [param shooting] и [param falling_over] — не состояния машины, а короткие
 ## таймеры: выстрел мгновенный, а показать его надо; смерть же показывается
-## двумя позами, падением и лежащим телом (ADR-0011, пункт 12).
+## двумя позами, падением и лежащим телом (ADR-0011, пункт 12). Так же и
+## [param landing]: только что приземлившийся и стоящий на месте показывает
+## приземление (ADR-0039), шагнул — идёт.
 static func of_otto(
 	state: OttoStateMachine.State,
 	crushed: bool,
 	falling_over: bool,
 	shooting: bool,
-	walk_phase: float
+	walk_phase: float,
+	landing: bool = false
 ) -> String:
 	if state == OttoStateMachine.State.DEAD:
 		return _death(crushed, falling_over)
 	if shooting:
 		return "shoot"
+	if landing and state == OttoStateMachine.State.IDLE:
+		return "land"
 	if state == OttoStateMachine.State.WALK:
 		return walk_frame(walk_phase)
 	return BY_STATE.get(state, "idle")

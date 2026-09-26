@@ -20,21 +20,22 @@ signal quit_pressed
 
 enum Page { MAIN, PAUSE, GAME_OVER, SETTINGS, RECORDS, CONTROLS }
 
-## Что показывает экран управления: подпись и действия, которые за ней стоят.
-## Клавиши берутся из [InputMap], а подписи оттуда не достать — они здесь.
-## Движение — четыре действия в одной строке: игроку интересна связка, а не то,
-## как она разложена внутри.
-const ACTIONS: Array[Array] = [
-	["UI_MOVE", ["move_left", "move_right", "move_up", "move_down"]],
-	["UI_CROUCH", ["move_down"]],
-	["UI_JUMP", ["jump"]],
-	["UI_SHOOT", ["shoot"]],
-	["UI_PAUSE", ["pause"]],
-]
+## Подписи действий экрана управления. Сами действия и их порядок — у
+## [KeyBindings]; подписей из [InputMap] не достать — они здесь. Присед — то же
+## «вниз», и подпись говорит об этом, а не заводит строку-дубль.
+const ACTION_NAMES: Dictionary = {
+	&"move_left": "UI_MOVE_LEFT",
+	&"move_right": "UI_MOVE_RIGHT",
+	&"move_up": "UI_MOVE_UP",
+	&"move_down": "UI_MOVE_DOWN",
+	&"jump": "UI_JUMP",
+	&"shoot": "UI_SHOOT",
+}
 
 ## Имена кнопок геймпада. В [InputMap] они лежат номерами, а номер игроку
 ## ничего не говорит — на коробке написаны буквы. Значения, начинающиеся с
-## `UI_`, переводятся: у крестовины имени на коробке нет.
+## `UI_`, переводятся: у крестовины имени на коробке нет. Стрелок нет ни в
+## одном шрифте игры (долг M22b), поэтому направление — словом.
 const PAD_NAMES: Dictionary = {
 	JOY_BUTTON_A: "A",
 	JOY_BUTTON_B: "B",
@@ -42,10 +43,14 @@ const PAD_NAMES: Dictionary = {
 	JOY_BUTTON_Y: "Y",
 	JOY_BUTTON_BACK: "Back",
 	JOY_BUTTON_START: "Start",
-	JOY_BUTTON_DPAD_UP: "UI_DPAD",
-	JOY_BUTTON_DPAD_DOWN: "UI_DPAD",
-	JOY_BUTTON_DPAD_LEFT: "UI_DPAD",
-	JOY_BUTTON_DPAD_RIGHT: "UI_DPAD",
+	JOY_BUTTON_LEFT_SHOULDER: "LB",
+	JOY_BUTTON_RIGHT_SHOULDER: "RB",
+	JOY_BUTTON_LEFT_STICK: "LS",
+	JOY_BUTTON_RIGHT_STICK: "RS",
+	JOY_BUTTON_DPAD_UP: "UI_DPAD_UP",
+	JOY_BUTTON_DPAD_DOWN: "UI_DPAD_DOWN",
+	JOY_BUTTON_DPAD_LEFT: "UI_DPAD_LEFT",
+	JOY_BUTTON_DPAD_RIGHT: "UI_DPAD_RIGHT",
 }
 
 ## Ширина колонки: пунктов и настроек, px.
@@ -80,6 +85,10 @@ var _back_to: Page = Page.MAIN
 ## каждая страница открывалась бы щелчком, которого игрок не делал.
 var _settling: bool = false
 var _page_tween: Tween = null
+## Действие, которому экран управления сейчас ждёт клавишу, и его пункт.
+## Пусто — никто не ждёт.
+var _listening: StringName = &""
+var _listen_row: MenuRow = null
 
 @onready var _column: VBoxContainer = %Page
 @onready var _version: Label = %Version
@@ -102,6 +111,8 @@ func _ready() -> void:
 ## иначе стрелками и геймпадом по меню не походить.
 func show_page(page: Page, focus: int = 0) -> void:
 	_page = page
+	_listening = &""
+	_listen_row = null
 	if page == Page.MAIN or page == Page.PAUSE or page == Page.GAME_OVER:
 		# Корневые страницы — те, с которых уходят в подстраницы. Последняя из них
 		# и есть то, куда вернёт «назад».
@@ -175,6 +186,32 @@ func rows() -> Array[MenuRow]:
 ## Вывеска — нужна тестам и снимкам, чтобы остановить мигание.
 func title() -> NeonTitle:
 	return _title
+
+
+## Ждущее назначение забирает следующее нажатие раньше, чем его увидит фокус
+## меню: иначе стрелка, которую назначают, ушла бы на соседний пункт.
+func _input(event: InputEvent) -> void:
+	if not visible or _listening == &"":
+		return
+	var key := event as InputEventKey
+	var button := event as InputEventJoypadButton
+	if key != null and key.pressed and not key.echo:
+		get_viewport().set_input_as_handled()
+		if key.physical_keycode == KEY_ESCAPE:
+			_stop_listening()
+		else:
+			_bound(settings.bindings.bind_key(_listening, key.physical_keycode))
+	elif button != null and button.pressed:
+		get_viewport().set_input_as_handled()
+		if button.button_index == JOY_BUTTON_START:
+			_stop_listening()
+		else:
+			_bound(settings.bindings.bind_pad(_listening, button.button_index))
+
+
+## Экран управления ждёт ли сейчас клавишу. Тестам.
+func is_listening() -> bool:
+	return _listening != &""
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -271,23 +308,73 @@ func _build_records() -> void:
 
 func _build_controls() -> void:
 	_caption("UI_CONTROLS")
+	if settings == null:
+		_back()
+		return
+	# Одна строка на действие: нажал — строка ждёт клавишу или кнопку, и первая
+	# нажатая встаёт на место (ADR-0039, решение 7). Только клавиши, без
+	# объяснений игры (решение пользователя, ADR-0037, решение 9).
+	for action: StringName in KeyBindings.ACTIONS:
+		var row := _add_row(
+			MenuRow.binding(tr(String(ACTION_NAMES[action])), _binding_text(action))
+		)
+		row.pressed.connect(_listen.bind(action, row))
+	# Пауза закреплена: без неё из игры не выйти, если назначить не то.
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 40)
-	grid.add_theme_constant_override("v_separation", 10)
-	for row: Array in ACTIONS:
-		var actions: Array[StringName] = []
-		for action: Variant in row[1] as Array:
-			actions.append(StringName(action))
-		_cell(grid, tr(String(row[0])), NeonStyle.INK_DIM, HORIZONTAL_ALIGNMENT_LEFT)
-		_cell(grid, _keys_of(actions), NeonStyle.INK, HORIZONTAL_ALIGNMENT_LEFT)
+	_cell(grid, tr("UI_PAUSE"), NeonStyle.INK_DIM, HORIZONTAL_ALIGNMENT_LEFT)
+	_cell(grid, "Esc   ·   %s: Start" % tr("UI_GAMEPAD"), NeonStyle.INK, HORIZONTAL_ALIGNMENT_LEFT)
 	_column.add_child(grid)
 	_gap(6.0)
-	# Только клавиши, без объяснений игры: в неё разбираются по ходу, как в
-	# любой другой (решение пользователя, ADR-0037, решение 9).
-	_note(tr("UI_REBIND_LATER"))
+	_action("UI_RESET_KEYS", _reset_keys)
 	_gap(10.0)
 	_back()
+
+
+## Клавиша и кнопка действия, как их видит схема.
+func _binding_text(action: StringName) -> String:
+	var bindings := settings.bindings
+	var pad := String(PAD_NAMES.get(bindings.pad_of(action), str(bindings.pad_of(action))))
+	if pad.begins_with("UI_"):
+		pad = tr(pad)
+	return "%s   ·   %s" % [OS.get_keycode_string(bindings.key_of(action)), pad]
+
+
+func _listen(action: StringName, row: MenuRow) -> void:
+	Sounds.play(Sounds.UI_SELECT)
+	if _listen_row != null:
+		_listen_row.show_text(_binding_text(_listening))
+	_listening = action
+	_listen_row = row
+	row.show_text(tr("UI_PRESS_KEY"))
+
+
+## Назначение прошло или нет — схема на диск и в [InputMap], строки заново.
+## Обмен меняет и чужую строку, поэтому переписываются все.
+func _bound(taken: bool) -> void:
+	Sounds.play(Sounds.UI_MOVE if taken else Sounds.UI_BACK)
+	if taken:
+		settings.bindings.apply()
+		settings.save_to()
+	_stop_listening()
+
+
+func _stop_listening() -> void:
+	_listening = &""
+	_listen_row = null
+	var index := 0
+	for row: MenuRow in rows():
+		if row.kind == MenuRow.Kind.BINDING:
+			row.show_text(_binding_text(KeyBindings.ACTIONS[index]))
+			index += 1
+
+
+func _reset_keys() -> void:
+	settings.bindings.reset()
+	settings.bindings.apply()
+	settings.save_to()
+	_stop_listening()
 
 
 ## Возвращает на страницу, с которой ушли, и записывает настройки на диск:
@@ -516,39 +603,6 @@ func _fps() -> void:
 			settings.apply()
 			settings.save_to()
 	)
-
-
-## Клавиши и кнопки действий, как их видит [InputMap].
-##
-## Читается, но не меняется: переназначение отложено до после релиза (ADR-0012,
-## пункт 10), а показать раскладку надо уже сейчас — иначе её негде узнать.
-func _keys_of(actions: Array[StringName]) -> String:
-	var keys: Array[String] = []
-	var pads: Array[String] = []
-	for action: StringName in actions:
-		if not InputMap.has_action(action):
-			continue
-		for event: InputEvent in InputMap.action_get_events(action):
-			var key := event as InputEventKey
-			if key != null:
-				var label := OS.get_keycode_string(key.physical_keycode)
-				if not keys.has(label):
-					keys.append(label)
-				continue
-			var button := event as InputEventJoypadButton
-			if button != null:
-				var pad := String(PAD_NAMES.get(button.button_index, str(button.button_index)))
-				if pad.begins_with("UI_"):
-					pad = tr(pad)
-				if not pads.has(pad):
-					pads.append(pad)
-
-	var parts: Array[String] = []
-	if not keys.is_empty():
-		parts.append(", ".join(keys))
-	if not pads.is_empty():
-		parts.append("%s: %s" % [tr("UI_GAMEPAD"), ", ".join(pads)])
-	return "   ·   ".join(parts)
 
 
 ## Цвет неона: отеля, как у первого здания и у кромки HUD по умолчанию.

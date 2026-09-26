@@ -80,6 +80,10 @@ var _exit_x: float = NAN
 ## Фаза ходьбы, поза выстрела и падения, признак раздавленного — всё как у Otto.
 var _walk_phase: float = 0.0
 var _walking: bool = false
+## Пауза разворота, как у Otto (ADR-0039, решение 6), и сторона, в которую агент
+## смотрел прошлый кадр: смена стороны на полу и есть разворот.
+var _locks := MoveLocks.new()
+var _faced: float = 0.0
 var _shooting: float = 0.0
 var _falling_over: float = 0.0
 var _crushed: bool = false
@@ -202,6 +206,7 @@ func _physics_process(delta: float) -> void:
 			# Бродящий агент у края этажа поворачивает: за Otto он не гонится
 			# и у проёма его не караулит (ADR-0027, решение 3а).
 			_brain.turn_around()
+	walking = _turn_holds(delta, walking)
 	velocity.x = walk_speed * _brain.facing if walking else 0.0
 	_apply_gravity(delta)
 	move_and_slide()
@@ -564,6 +569,17 @@ func _shot_height() -> float:
 func _apply_gravity(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y = maxf(velocity.y - gravity * delta, -max_fall_speed)
+
+
+## Разворот на полу держит ноги агента, как держит Otto: тело поворачивается
+## за [constant MoveLocks.TURN_TIME], и всё это время агент стоит.
+func _turn_holds(delta: float, walking: bool) -> bool:
+	_locks.tick(delta)
+	if _brain.facing != _faced:
+		if is_on_floor() and _faced != 0.0:
+			_locks.turn()
+		_faced = _brain.facing
+	return walking and _locks.can_walk()
 
 
 ## Вид на этот кадр: поза, сторона и ход ходьбы. Устроено так же, как у Otto, —

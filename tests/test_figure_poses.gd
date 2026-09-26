@@ -25,8 +25,28 @@ func test_every_clip_a_pose_asks_for_is_one_the_model_carries() -> void:
 
 ## ADR-0032, решение 1: где ROM диктует высоту, там поза кодом.
 func test_the_rom_stances_are_poses_in_code() -> void:
-	for pose_name: String in [ActorPose.CROUCH, ActorPose.PRONE, "jump", "kick", "crushed"]:
+	for pose_name: String in [ActorPose.CROUCH, ActorPose.PRONE, "kick", "crushed"]:
 		assert_null(FigurePoses.clip_of(pose_name), "%s — поза кодом, не клип" % pose_name)
+
+
+func test_the_jump_takes_off_and_lands_with_clips() -> void:
+	# Прыжок тремя фазами (ADR-0039): толчок и приземление — клипы UAL, в полёте
+	# удар ногой позой кодом.
+	var jump := FigurePoses.clip_of("jump")
+	assert_eq(jump.name, FigurePoses.CLIP_JUMP_START, "толчок — клип")
+	assert_gt(jump.start, 0.0, "с отрыва, без приседа-замаха: прыжок в игре мгновенный")
+	var land := FigurePoses.clip_of("land")
+	assert_eq(land.name, FigurePoses.CLIP_JUMP_LAND, "приземление — клип")
+	assert_gt(land.rate, 1.0, "быстрее записанного: присед мелькает, а не держится")
+
+
+func test_every_transition_is_short_and_ends() -> void:
+	# Переход по времени (ADR-0039, решение 5): у каждой позы свой срок, и ни
+	# один не тянется дольше трети секунды — иначе движение снова вязкое.
+	for pose_name: String in ActorPose.OTTO_POSES + ActorPose.AGENT_POSES:
+		var time := FigurePoses.blend_time(pose_name)
+		assert_gt(time, 0.0, "%s: переход есть" % pose_name)
+		assert_lte(time, 0.3, "%s: и короткий" % pose_name)
 
 
 func test_walking_idle_shooting_and_dying_are_clips() -> void:

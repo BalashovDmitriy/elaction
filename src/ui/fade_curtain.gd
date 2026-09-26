@@ -44,6 +44,18 @@ func cover(hold: float, swap: Callable) -> void:
 	_tween.tween_property(_veil, "color:a", 0.0, FADE_IN)
 
 
+## Начинает с чёрного: держит его [param hold] секунд и выводит кадр. Так
+## открывается первое здание партии, пока под чёрным греются шейдеры
+## ([ShaderWarmup]).
+func reveal(hold: float) -> void:
+	cancel()
+	_veil.color.a = 1.0
+	_tween = create_tween()
+	_tween.set_pause_mode(Tween.TWEEN_PAUSE_STOP)
+	_tween.tween_interval(hold)
+	_tween.tween_property(_veil, "color:a", 0.0, FADE_IN)
+
+
 ## Снимает затемнение сразу: партию бросили в меню или начали заново посреди
 ## смены здания — менять здание уже незачем.
 func cancel() -> void:

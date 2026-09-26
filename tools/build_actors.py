@@ -87,8 +87,6 @@ UAL_CLIPS: dict[str, str] = {
     "Pistol_Shoot": "shoot",
     "Death01": "death",
     "Jump_Start": "jump_start",
-    # Не «jump_loop»: суффикс `_loop` импорт Godot срезает с имени клипа.
-    "Jump_Loop": "jump_air",
     "Jump_Land": "jump_land",
     "Crouch_Idle_Loop": "crouch",
 }

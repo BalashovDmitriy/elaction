@@ -4,7 +4,7 @@ extends Button
 ## Пункт меню — плашка в стиле HUD (ADR-0035, решение 4).
 ##
 ## Один класс на все виды пунктов: кнопка, переключатель «‹ значение ›», уровень
-## громкости и флажок. Выпадающие списки заменены переключателем: влево-вправо
+## громкости, флажок и назначение клавиши. Выпадающие списки заменены переключателем: влево-вправо
 ## листают, и с геймпада это одно нажатие, а не открытый поверх страницы список.
 ##
 ## Выбранный пункт загорается плавно: кромка шире, ореол ярче, текст чуть
@@ -14,7 +14,7 @@ extends Button
 ## Значение сменилось: индекс варианта, уровень 0..1 или флажок.
 signal changed(value: Variant)
 
-enum Kind { ACTION, CHOICE, LEVEL, TOGGLE }
+enum Kind { ACTION, CHOICE, LEVEL, TOGGLE, BINDING }
 
 ## Сколько длится вспышка выбора, с.
 const GLOW_TIME: float = 0.14
@@ -33,6 +33,8 @@ var options: Array[String] = []
 var index: int = 0
 var level: float = 0.0
 var on: bool = false
+## Что написано справа у назначения: клавиша и кнопка или «нажмите клавишу».
+var shown: String = ""
 ## Цвет кромки и ореола. Меню задаёт его уже собранному пункту, поэтому стиль
 ## пересобирается сразу, а не с первой вспышкой фокуса.
 var neon: Color = VerticalSign.NEON_HOTEL:
@@ -86,6 +88,22 @@ static func toggle(caption: String, value: bool) -> MenuRow:
 	row.on = value
 	row._build(caption, 30)
 	return row
+
+
+## Назначение: подпись действия слева, его клавиша и кнопка справа. Нажатие
+## не листает, а отдаётся меню — оно слушает следующую клавишу (ADR-0039).
+static func binding(caption: String, value: String) -> MenuRow:
+	var row := MenuRow.new()
+	row.kind = Kind.BINDING
+	row.shown = value
+	row._build(caption, 30)
+	return row
+
+
+## Меняет то, что написано справа у назначения.
+func show_text(value: String) -> void:
+	shown = value
+	_show_value()
 
 
 ## Что написано справа: вариант, проценты или «вкл/выкл». Нужно тестам.
@@ -158,7 +176,7 @@ func _build(caption: String, font_size: int) -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
-	if kind == Kind.ACTION:
+	if kind == Kind.ACTION or kind == Kind.BINDING:
 		return
 	# Громкость листается с повтором, как фокус вверх-вниз: двадцать делений
 	# по одному нажатию — это двадцать нажатий. Варианты — без повтора: смена
@@ -174,7 +192,7 @@ func _gui_input(event: InputEvent) -> void:
 
 func _on_pressed() -> void:
 	# Нажатие листает вперёд: мышью по переключателю, как по кнопке.
-	if kind != Kind.ACTION:
+	if kind != Kind.ACTION and kind != Kind.BINDING:
 		step_value(1)
 
 
@@ -199,6 +217,8 @@ func _show_value() -> void:
 			_value.text = "%d%%" % roundi(level * 100.0)
 		Kind.TOGGLE:
 			_value.text = "‹  %s  ›" % tr("UI_ON" if on else "UI_OFF")
+		Kind.BINDING:
+			_value.text = shown
 
 
 func _restyle() -> void:
