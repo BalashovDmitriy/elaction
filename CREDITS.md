@@ -14,6 +14,7 @@
 |---|---|---|---|
 | Ultimate Modular Men Pack (Otto, агенты) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/ultimatemodularcharacters.html) |
 | Cars Pack (машины у выхода) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/cars.html) |
+| Universal Animation Library (движение Otto и агентов) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/universalanimationlibrary.html) |
 | Helicopter (вертолёт вступления, `assets/models/aircraft/helicopter.glb`) | kazuma | CC0 1.0 | [poly.pizza](https://poly.pizza/m/EQJ2MECUbx) |
 
 ## Обстановка и крыша

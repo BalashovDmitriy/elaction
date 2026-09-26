@@ -49,14 +49,20 @@ UI_QUALITY_2,High,Высокая
 UI_QUALITY_3,Ultra,Ультра
 UI_LANGUAGE_RU,Русский,Русский
 UI_LANGUAGE_EN,English,English
-UI_MOVE,Move,Движение
-UI_CROUCH,Crouch,Присед
+UI_MOVE_LEFT,Left,Влево
+UI_MOVE_RIGHT,Right,Вправо
+UI_MOVE_UP,Up,Вверх
+UI_MOVE_DOWN,"Down, crouch","Вниз, присесть"
 UI_JUMP,Jump,Прыжок
 UI_SHOOT,Shoot,Выстрел
 UI_PAUSE,Pause,Пауза
-UI_REBIND_LATER,Rebinding comes later,Переназначение появится позже
+UI_RESET_KEYS,Reset to defaults,Сбросить по умолчанию
+UI_PRESS_KEY,Press a key or button,Нажмите клавишу или кнопку
 UI_GAMEPAD,Gamepad,Геймпад
-UI_DPAD,D-pad,Крестовина
+UI_DPAD_LEFT,D-pad left,Крестовина влево
+UI_DPAD_RIGHT,D-pad right,Крестовина вправо
+UI_DPAD_UP,D-pad up,Крестовина вверх
+UI_DPAD_DOWN,D-pad down,Крестовина вниз
 UI_ON,On,Вкл
 UI_OFF,Off,Выкл
 UI_HINT,"Enter — choose   Esc — back","Enter — выбрать   Esc — назад"

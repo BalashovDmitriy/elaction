@@ -4,3 +4,10 @@ https://poly.pizza/m/JFrLIKqvCH (Business Man)
 
 License: CC0 1.0 Universal (Public Domain Dedication)
 https://creativecommons.org/publicdomain/zero/1.0/
+
+Universal Animation Library (Standard) — Quaternius (ual_clips.glb: skeleton and the clips the game uses)
+https://quaternius.com/packs/universalanimationlibrary.html
+https://opengameart.org/content/universal-animation-library
+
+License: CC0 1.0 Universal (Public Domain Dedication)
+https://creativecommons.org/publicdomain/zero/1.0/

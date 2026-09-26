@@ -1,7 +1,7 @@
 class_name GameSettings
 extends RefCounted
 
-## Настройки игрока: громкости, язык, окно, графика.
+## Настройки игрока: громкости, язык, окно, графика, клавиши.
 ##
 ## Первое, что игра пишет на диск (ADR-0012). Лежат в `user://`, а не рядом
 ## с игрой: у собранной игры своя папка данных, и писать в неё — единственный
@@ -46,6 +46,12 @@ var quality_measured: bool = false
 var blood: bool = true
 ## Показывать ли в углу HUD кадры в секунду (просьба пользователя, M24a).
 var show_fps: bool = false
+## Схема управления: клавиша и кнопка на действие (ADR-0039, решение 7). Своей
+## секцией в том же файле.
+var bindings := KeyBindings.new()
+## Куда [method save_to] пишет без явного пути. Тесты меню подменяют его: экран
+## управления сохраняет схему сам, и настройки игрока не должны пострадать.
+var file_path: String = PATH
 
 ## Режим и размер, уже поставленные окну: [method apply] зовётся на любую
 ## настройку, а окно трогается только тогда, когда они сменились.
@@ -59,6 +65,9 @@ var _vsync_applied: Array = []
 static func load_from(path: String = PATH) -> GameSettings:
 	var settings := GameSettings.new()
 	settings.locale = settings.system_locale()
+	# Прочитанное из своего файла туда и пишется: меню и замер качества зовут
+	# [method save_to] без пути.
+	settings.file_path = path
 
 	var file := ConfigFile.new()
 	if file.load(path) != OK:
@@ -108,6 +117,7 @@ static func load_from(path: String = PATH) -> GameSettings:
 
 	var saved := String(file.get_value(SECTION, "locale", settings.locale))
 	settings.locale = saved if LOCALES.has(saved) else settings.locale
+	settings.bindings = KeyBindings.read_from(file)
 	return settings
 
 
@@ -118,7 +128,9 @@ func system_locale() -> String:
 	return system if LOCALES.has(system) else LOCALES[0]
 
 
-func save_to(path: String = PATH) -> void:
+func save_to(path: String = "") -> void:
+	if path.is_empty():
+		path = file_path
 	var file := ConfigFile.new()
 	file.set_value(SECTION, "master", master)
 	file.set_value(SECTION, "music", music)
@@ -134,10 +146,11 @@ func save_to(path: String = PATH) -> void:
 	file.set_value(SECTION, "quality_measured", quality_measured)
 	file.set_value(SECTION, "blood", blood)
 	file.set_value(SECTION, "show_fps", show_fps)
+	bindings.write_to(file)
 	file.save(path)
 
 
-## Применяет настройки к игре: шины, язык, окно, кадры и графику.
+## Применяет настройки к игре: шины, язык, окно, кадры, графику и клавиши.
 ##
 ## Один метод на всё, потому что применять их надо вместе и в одном порядке:
 ## иначе меню меняет громкость, а язык остаётся от прошлого запуска.
@@ -167,6 +180,7 @@ func apply() -> void:
 	Graphics.broadcast(quality as Graphics.Quality)
 	Blood.enabled = blood
 	Hud.show_fps = show_fps
+	bindings.apply()
 
 
 ## Громкость шины по её имени. Нужна меню: ползунков три, а полей тоже три,
