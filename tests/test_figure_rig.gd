@@ -123,16 +123,23 @@ func test_a_prone_agent_lies_under_the_crouching_shot() -> void:
 	assert_lt(lying.end.y, rig.skinned_aabb().end.y, "и ниже, чем на колене")
 
 
-func test_the_kick_puts_the_foot_forward() -> void:
+func test_the_choke_puts_the_arms_forward() -> void:
 	# Знак углов: «вперёд» обязано быть вперёд, куда бы ни смотрела локальная
 	# ось кости. В покое фигура смотрит в +Z, и мерка — относительно покоя.
+	# С M24d удара ногой нет (ADR-0040): знак проверяет захват за шею.
 	var rig := _rig(OTTO_MODEL)
+	rig.show_pose("stand")
 	rig.snap()
 	var standing := rig.skinned_aabb()
-	rig.show_pose("kick")
+	rig.show_pose("choke_hold")
 	rig.snap()
-	var kicking := rig.skinned_aabb()
-	assert_gt(kicking.end.z, standing.end.z + 0.1, "нога в ударе вынесена вперёд, за габарит тела")
+	var holding := rig.skinned_aabb()
+	assert_gt(holding.end.z, standing.end.z, "руки в захвате вынесены вперёд, за габарит тела")
+	# Рука вверх — тоже знак: пистолет, вскинутый для удара рукоятью, выше макушки
+	# (руки у модели пака короткие: вровень с полями шляпы, не выше).
+	rig.show_pose("whip_raise")
+	rig.snap()
+	assert_gt(rig.skinned_aabb().end.y, standing.end.y, "вскинутая рука выше макушки")
 
 
 func test_a_lying_figure_is_long_and_low() -> void:
@@ -165,10 +172,10 @@ func test_a_pose_change_is_a_motion_not_a_swap() -> void:
 	rig.show_pose("idle")
 	rig.snap()
 	var start := rig.bone_rotation(FigureRig.LEG_L)
-	rig.show_pose("kick")
+	rig.show_pose("crouch")
 	var target := rig.target_rotation(FigureRig.LEG_L)
 	var whole := start.angle_to(target)
-	assert_gt(whole, deg_to_rad(40.0), "удар уводит бедро далеко от стойки")
+	assert_gt(whole, deg_to_rad(40.0), "присед уводит бедро далеко от стойки")
 	# Шаг сглаживания задаётся здесь, а не ждётся кадром: в headless-прогоне
 	# кадр длится «сколько получится», и на нём риг успел бы долететь.
 	rig.advance(FRAME)
@@ -235,7 +242,7 @@ func test_the_walk_clip_keeps_its_feet_on_the_floor() -> void:
 func test_a_transition_ends_for_poses_and_clips() -> void:
 	var rig := _rig(OTTO_MODEL)
 	var phase := 0.0
-	for pose_name: String in ["kick", "idle", "walk_0", "crouch", "dead_1"]:
+	for pose_name: String in ["crouch", "idle", "walk_0", "choke_hold", "dead_1"]:
 		rig.show_pose(pose_name)
 		for _frame in 45:
 			phase = ActorPose.advance(phase, FRAME)
@@ -287,7 +294,7 @@ func test_every_clip_stands_on_the_floor_by_itself() -> void:
 func test_the_hull_grounds_like_the_whole_mesh() -> void:
 	for model: PackedScene in [OTTO_MODEL, AGENT_MODEL]:
 		var rig := _rig(model)
-		for pose_name: String in ActorPose.AGENT_POSES + PackedStringArray(["jump", "kick"]):
+		for pose_name: String in ActorPose.AGENT_POSES + PackedStringArray(["jump", "fall"]):
 			rig.show_pose(pose_name)
 			rig.snap()
 			var whole := rig.skinned_aabb()

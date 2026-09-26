@@ -27,7 +27,7 @@ const OTTO_POSES: PackedStringArray = [
 	"walk_2",
 	"crouch",
 	"jump",
-	"kick",
+	"fall",
 	"land",
 	"shoot",
 	"dead_0",
@@ -68,12 +68,11 @@ const DOWN: PackedStringArray = ["dead_0", "dead_1", "crushed", PRONE]
 ## словарь на каждый вызов: поза пересчитывается каждый физический кадр и на
 ## Otto, и на каждом агенте в кадре.
 ##
-## В воздухе Otto бьёт ногой всегда (ADR-0006, пункт 2), поэтому падение и есть
-## тот самый удар с разбега — отдельной позы падения нет.
+## С M24d удара ногой нет (ADR-0040): на спуске Otto просто летит — клип полёта.
 const BY_STATE: Dictionary = {
 	OttoStateMachine.State.CROUCH: CROUCH,
 	OttoStateMachine.State.JUMP: "jump",
-	OttoStateMachine.State.FALL: "kick",
+	OttoStateMachine.State.FALL: "fall",
 }
 
 

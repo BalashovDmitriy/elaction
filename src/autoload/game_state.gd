@@ -32,7 +32,6 @@ signal alarm_raised
 ## Таблица очков оригинала (ADR-0005, пункт 1 и ADR-0006, пункт 5).
 const DOCUMENT_SCORE: int = 500
 const ENEMY_SHOT_SCORE: int = 100
-const ENEMY_KICK_SCORE: int = 150
 const LAMP_SCORE: int = 300
 ## Агент, раздавленный кабиной, — 300, как в ROM (таблица очков @577B).
 const CRUSH_SCORE: int = 300

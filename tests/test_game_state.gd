@@ -93,21 +93,12 @@ func test_kill_in_the_light_costs_its_face_value() -> void:
 	assert_eq(GameState.kill_score(GameState.ENEMY_SHOT_SCORE, false), 100)
 
 
-## Надбавка плоская и одинаковая для обоих способов: 100 → 150 и 150 → 200.
-## Пока здесь стояло удвоение, вечная темнота была фермой очков (ADR-0010, пункт 6).
+## Надбавка плоская: 100 → 150. Пока здесь стояло удвоение, вечная темнота была
+## фермой очков (ADR-0010, пункт 6). Удара ногой с M24d нет (ADR-0040), у
+## добиваний надбавка своя — test_takedown.gd.
 func test_kill_in_the_dark_is_worth_more() -> void:
 	assert_eq(GameState.kill_score(GameState.ENEMY_SHOT_SCORE, true), 150)
-	assert_eq(GameState.kill_score(GameState.ENEMY_KICK_SCORE, true), 200)
-
-
-func test_the_dark_bonus_is_the_same_whatever_the_kill() -> void:
-	var shot := GameState.kill_score(GameState.ENEMY_SHOT_SCORE, true)
-	var kick := GameState.kill_score(GameState.ENEMY_KICK_SCORE, true)
-	assert_eq(
-		shot - GameState.ENEMY_SHOT_SCORE,
-		kick - GameState.ENEMY_KICK_SCORE,
-		"надбавка не зависит от способа убийства"
-	)
+	assert_eq(GameState.kill_score(GameState.ENEMY_SHOT_SCORE, false), 100)
 
 
 func test_game_starts_in_the_first_building() -> void:

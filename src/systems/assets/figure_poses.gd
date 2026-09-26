@@ -5,9 +5,10 @@ extends RefCounted
 ##
 ## С M21 (ADR-0032, решение 1) поз две природы. Там, где ROM не диктует высот,
 ## двигается клип — с M24c из Universal Animation Library (ADR-0039): стойка,
-## ходьба, выстрел, смерть, толчок и приземление. Там, где диктует, — поза
-## кодом из этой таблицы: присед и залёгший под пулями ROM, удар ногой, которого
-## в UAL нет, раздавленный.
+## ходьба, выстрел, смерть, толчок, полёт и приземление, удары и реакции сценок
+## добивания (ADR-0040). Там, где диктует, — поза кодом из этой таблицы: присед
+## и залёгший под пулями ROM, раздавленный; и позы добиваний, которых нет ни в
+## одной свободной библиотеке: захват, удушение, свёрнутая шея.
 ##
 ## Поза кодом строится не от покоя скелета, а от первого кадра стойки: покой
 ## пака — T-поза с руками в стороны. Углы — в градусах, **положительный уводит
@@ -31,6 +32,8 @@ class Pose:
 	var lean: float = 0.0
 	## Наклон головы вперёд относительно корпуса.
 	var head: float = 0.0
+	## Поворот головы вбок, вокруг вертикали: свёрнутая шея (ADR-0040).
+	var twist: float = 0.0
 	## Наклон всего тела вокруг пяток: 90 — лежит вперёд лицом.
 	var tilt: float = 0.0
 	## Подъём всего тела над полом, в долях роста — сверх заземления: риг сам
@@ -57,6 +60,11 @@ class Pose:
 		head = head_tilt
 		return self
 
+	## Поворот головы вбок.
+	func twisted(head_twist: float) -> Pose:
+		twist = head_twist
+		return self
+
 	## Наклон тела целиком вокруг пяток.
 	func tilted(body_tilt: float) -> Pose:
 		tilt = body_tilt
@@ -75,7 +83,7 @@ class Pose:
 	## Своя копия: таблица поз общая, а актёр работает со своей.
 	func copy() -> Pose:
 		var twin := Pose.make(legs, arms).bent_at(knees, elbows).leaned(lean, head)
-		return twin.tilted(tilt).lifted(lift).squashed(squash)
+		return twin.twisted(twist).tilted(tilt).lifted(lift).squashed(squash)
 
 
 ## Клип пака: какой и как его играть.
@@ -123,7 +131,14 @@ const CLIP_WALK := "walk"
 const CLIP_SHOOT := "shoot"
 const CLIP_DEATH := "death"
 const CLIP_JUMP_START := "jump_start"
+const CLIP_JUMP_AIR := "jump_air"
 const CLIP_JUMP_LAND := "jump_land"
+## Клипы сценок добивания (ADR-0040): удары Otto и реакции агента.
+const CLIP_PUNCH_JAB := "punch_jab"
+const CLIP_PUNCH_CROSS := "punch_cross"
+const CLIP_HIT_HEAD := "hit_head"
+const CLIP_HIT_CHEST := "hit_chest"
+const CLIP_KNOCKBACK := "knockback"
 const CLIP_NAMES: PackedStringArray = [
 	CLIP_STAND,
 	CLIP_IDLE,
@@ -131,7 +146,13 @@ const CLIP_NAMES: PackedStringArray = [
 	CLIP_SHOOT,
 	CLIP_DEATH,
 	CLIP_JUMP_START,
+	CLIP_JUMP_AIR,
 	CLIP_JUMP_LAND,
+	CLIP_PUNCH_JAB,
+	CLIP_PUNCH_CROSS,
+	CLIP_HIT_HEAD,
+	CLIP_HIT_CHEST,
+	CLIP_KNOCKBACK,
 ]
 
 ## С какой скоростью идёт клип ходьбы относительно записанной. Пак шагает
@@ -164,13 +185,17 @@ const BLEND_TIMES: Dictionary = {
 	"walk": 0.1,
 	"shoot": 0.05,
 	"jump": 0.06,
-	"kick": 0.1,
+	"fall": 0.15,
 	"land": 0.04,
 	"crouch": 0.08,
 	"prone": 0.12,
 	"dead_0": 0.08,
 	"dead_1": 0.3,
 	"crushed": 0.05,
+	"whip_raise": 0.16,
+	"whip_strike": 0.06,
+	"punch_jab": 0.06,
+	"punch_cross": 0.06,
 }
 
 ## Присед: ноги вперёд, колени сложены, корпус над коленями, голова вперёд из-под
@@ -223,12 +248,102 @@ static func _build_clips() -> Dictionary:
 		# Прыжок тремя фазами (ADR-0039): толчок клипом, в полёте удар ногой
 		# позой кодом — в оригинале прыжок и есть удар, — приземление клипом.
 		"jump": Clip.make(CLIP_JUMP_START, Clip.ONCE, JUMP_FROM),
+		# С M24d удара ногой нет (ADR-0040): на спуске — клип полёта UAL.
+		"fall": Clip.make(CLIP_JUMP_AIR, Clip.LOOP),
 		"land": Clip.make(CLIP_JUMP_LAND, Clip.ONCE, LAND_FROM, LAND_RATE),
+		# Сценки добивания (ADR-0040). Удары — с разгона стойки, без замаха в
+		# начале клипа: сценка короткая.
+		"punch_jab": Clip.make(CLIP_PUNCH_JAB, Clip.ONCE, 0.05, 1.3),
+		"punch_cross": Clip.make(CLIP_PUNCH_CROSS, Clip.ONCE, 0.05, 1.3),
+		"hit_head": Clip.make(CLIP_HIT_HEAD, Clip.ONCE, 0.0, 1.2),
+		"hit_chest": Clip.make(CLIP_HIT_CHEST, Clip.ONCE, 0.0, 1.2),
+		"knockback": Clip.make(CLIP_KNOCKBACK, Clip.ONCE, 0.0, 1.4),
+		# Лежит, отброшенный ударом: конец отброса — труп сценки.
+		"knocked": Clip.make(CLIP_KNOCKBACK, Clip.END),
 		# Смерть показывается двумя позами (ADR-0011, пункт 12): падение — клип
 		# с начала, лежащее тело — его последний кадр.
 		"dead_0": Clip.make(CLIP_DEATH, Clip.ONCE),
 		"dead_1": Clip.make(CLIP_DEATH, Clip.END),
 	}
+
+
+## Позы добиваний (ADR-0040): захват, удушение, свёрнутая шея, добивание сверху.
+## Сценка ставит агента вплотную к Otto, и позы рассчитаны на это расстояние:
+## руки Otto — на высоте шеи агента того же роста.
+static func _add_takedown_poses(table: Dictionary) -> void:
+	# Удушение сзади: руки Otto вперёд на уровень шеи, локти согнуты — предплечья
+	# охватывают горло; корпус откинут, ноги в упоре.
+	table["choke_hold"] = (
+		Pose
+		. make(Vector2(15.0, -12.0), Vector2(78.0, 72.0))
+		. bent_at(Vector2(20.0, 25.0), Vector2(95.0, 100.0))
+		. leaned(-10.0, 5.0)
+	)
+	# Душимый: руки к горлу, голова запрокинута, ноги подгибаются.
+	table["choked"] = (
+		Pose
+		. make(Vector2(12.0, -6.0), Vector2(125.0, 118.0))
+		. bent_at(Vector2(25.0, 12.0), Vector2(115.0, 120.0))
+		. leaned(-12.0, -28.0)
+	)
+	# Душимый бьётся: нога брыкается вперёд.
+	table["choked_kick"] = (
+		Pose
+		. make(Vector2(40.0, -18.0), Vector2(110.0, 128.0))
+		. bent_at(Vector2(45.0, 8.0), Vector2(105.0, 120.0))
+		. leaned(-16.0, -32.0)
+	)
+	# Свёрнутая шея: Otto берёт голову двумя руками...
+	table["snap_grab"] = (
+		Pose
+		. make(Vector2(12.0, -10.0), Vector2(98.0, 92.0))
+		. bent_at(Vector2(15.0, 20.0), Vector2(55.0, 65.0))
+		. leaned(4.0)
+	)
+	# ...и рвёт её вбок: руки проходят вниз, корпус подаётся вперёд.
+	table["snap_twist"] = (
+		Pose
+		. make(Vector2(15.0, -12.0), Vector2(70.0, 110.0))
+		. bent_at(Vector2(20.0, 25.0), Vector2(35.0, 80.0))
+		. leaned(12.0, 8.0)
+	)
+	# Агент в захвате за голову: руки дёрнулись, голова чуть запрокинута.
+	table["snap_held"] = (
+		Pose
+		. make(Vector2(5.0, -5.0), Vector2(35.0, 30.0))
+		. bent_at(Vector2(10.0, 10.0), Vector2(40.0, 35.0))
+		. leaned(-4.0, -12.0)
+	)
+	# Шея свёрнута: голова повёрнута вбок и уронена, колени подломились.
+	table["snap_broken"] = (
+		Pose
+		. make(Vector2(10.0, 0.0), Vector2(10.0, 5.0))
+		. bent_at(Vector2(35.0, 30.0), Vector2(15.0, 10.0))
+		. leaned(6.0, 22.0)
+		. twisted(78.0)
+	)
+	# Удар рукоятью: пистолет вскинут над головой, свободная рука держит за
+	# ворот...
+	table["whip_raise"] = (
+		Pose
+		. make(Vector2(10.0, -8.0), Vector2(62.0, 170.0))
+		. bent_at(Vector2(15.0, 15.0), Vector2(40.0, 8.0))
+		. leaned(-6.0, -4.0)
+	)
+	# ...и рушится вниз: рука с рукоятью проходит перед грудью, корпус следом.
+	table["whip_strike"] = (
+		Pose
+		. make(Vector2(28.0, -12.0), Vector2(45.0, 52.0))
+		. bent_at(Vector2(32.0, 18.0), Vector2(35.0, 5.0))
+		. leaned(20.0, 10.0)
+	)
+	# Напрыгнувший сверху добивает: присел над поверженным, бьёт вниз.
+	table["pounce_strike"] = (
+		Pose
+		. make(Vector2(75.0, 35.0), Vector2(55.0, -15.0))
+		. bent_at(Vector2(110.0, 85.0), Vector2(10.0, 35.0))
+		. leaned(42.0, 10.0)
+	)
 
 
 static func _build_table() -> Dictionary:
@@ -242,14 +357,7 @@ static func _build_table() -> Dictionary:
 		. bent_at(Vector2(CROUCH_KNEES, CROUCH_KNEES), Vector2(30.0, 30.0))
 		. leaned(CROUCH_LEAN, CROUCH_HEAD)
 	)
-	# Удар ногой: нога уходит вперёд почти горизонтально и прямая, опорная
-	# подогнута, корпус откинут.
-	table["kick"] = (
-		Pose
-		. make(Vector2(85.0, -20.0), Vector2(-25.0, 15.0))
-		. bent_at(Vector2(0.0, 40.0), Vector2(30.0, 30.0))
-		. leaned(-14.0, 8.0)
-	)
+	_add_takedown_poses(table)
 	# Раздавленный кабиной или лампой: ноги и руки врозь, сплющен по высоте.
 	table["crushed"] = (
 		Pose

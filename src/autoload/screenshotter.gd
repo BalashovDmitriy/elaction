@@ -258,8 +258,8 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
 		{"label": "floor", "actions": [], "hold": 1.5},
 	],
-	# M24c: движение клипами UAL. Тот же спуск, а на этаже — толчок, удар в
-	# полёте, приземление, разворот посередине и шаг. Все позы рядом, с линиями
+	# M24c: движение клипами UAL. Тот же спуск, а на этаже — толчок, полёт,
+	# приземление, разворот посередине и шаг. Все позы рядом, с линиями
 	# пуль ROM, снимает tools/actor_shot.tscn -- --folder=M24C.
 	"M24C":
 	[
@@ -271,7 +271,7 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
 		{"label": "floor", "actions": [], "hold": 0.6},
 		{"label": "takeoff", "actions": ["jump"], "hold": 0.2},
-		{"label": "kick", "actions": [], "hold": 0.45},
+		{"label": "falling", "actions": [], "hold": 0.45},
 		{"label": "landing", "actions": [], "hold": 0.4},
 		{"label": "turning", "actions": ["move_right"], "hold": 0.05},
 		{"label": "walking_on", "actions": ["move_right"], "hold": 1.0},

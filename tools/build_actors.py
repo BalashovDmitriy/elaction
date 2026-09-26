@@ -66,28 +66,57 @@ SOURCE = PROJECT_ROOT / "assets/source/quaternius/business_man.glb"
 # выбрасываются: в файле они весили бы больше самой модели. Те же имена ждёт
 # `FigureRig` — разойдясь, риг встанет в позу кодом и скажет об этом ошибкой.
 #
-# С M24c движение приходит из UAL (`UAL_CLIPS`), а у пака не берётся ни одного
+# С M24c движение приходит из UAL (`UAL_LIBRARIES`), а у пака не берётся ни одного
 # клипа: словарь оставлен, чтобы клип пака можно было вернуть одной строкой.
 CLIPS: dict[str, str] = {}
 
 # Движение с M24c — из Universal Animation Library (Quaternius, CC0), перенесённое
-# на скелет пака (ADR-0039, решение 1). В репозитории лежит урезанный исходник:
-# скелет и нужные клипы без манекена — полный файл больше предела хука. Урезает
-# команда `ual`: python tools/build_actors.py ual <AnimationLibrary_Godot_Standard.glb>
-UAL_SOURCE = PROJECT_ROOT / "assets/source/quaternius/ual_clips.glb"
-UAL_URL = "https://opengameart.org/content/universal-animation-library"
-
-# Клипы UAL и их имена в игре. Имена ждёт `FigurePoses`.
-UAL_CLIPS: dict[str, str] = {
-    # Нейтральная стойка, руки вниз: основа поз кодом (`FigurePoses`), сама
-    # в кадре не играет. Стойка с пистолетом в обеих руках для этого не годится.
-    "Idle_Loop": "stand",
-    "Pistol_Idle_Loop": "idle",
-    "Walk_Loop": "walk",
-    "Pistol_Shoot": "shoot",
-    "Death01": "death",
-    "Jump_Start": "jump_start",
-    "Jump_Land": "jump_land",
+# на скелет пака (ADR-0039, решение 1); с M24d к ней добавлена вторая часть,
+# UAL 2, — удары и реакции для сценок добивания (ADR-0040). В репозитории лежат
+# урезанные исходники: скелет и нужные клипы без манекена — полные файлы больше
+# предела хука. Урезает команда `ual`, библиотеку она узнаёт по скелету:
+#     python tools/build_actors.py ual <AnimationLibrary_Godot_Standard.glb>
+#     python tools/build_actors.py ual <UAL2_Standard.glb>
+#
+# Скелет у обеих частей один и тот же, до миллиметра в покое, — разные только
+# имена костей: у первой по Rigify, у второй по манекену Unreal. Поэтому кости
+# пака сопоставлены именам первой (`UAL_BONES`), а вторая переводит их своей
+# таблицей (`names`).
+UAL_LIBRARIES: dict[str, dict] = {
+    "ual": {
+        "source": PROJECT_ROOT / "assets/source/quaternius/ual_clips.glb",
+        "url": "https://opengameart.org/content/universal-animation-library",
+        # По этой кости `ual` узнаёт библиотеку.
+        "marker": "DEF-hips",
+        # Клипы и их имена в игре. Имена ждёт `FigurePoses`.
+        "clips": {
+            # Нейтральная стойка, руки вниз: основа поз кодом (`FigurePoses`),
+            # сама в кадре не играет. Стойка с пистолетом для этого не годится.
+            "Idle_Loop": "stand",
+            "Pistol_Idle_Loop": "idle",
+            "Walk_Loop": "walk",
+            "Pistol_Shoot": "shoot",
+            "Death01": "death",
+            "Jump_Start": "jump_start",
+            # Не «jump_loop»: суффикс `_loop` импорт Godot срезает с имени.
+            "Jump_Loop": "jump_air",
+            "Jump_Land": "jump_land",
+            "Punch_Jab": "punch_jab",
+            "Punch_Cross": "punch_cross",
+            "Hit_Head": "hit_head",
+            "Hit_Chest": "hit_chest",
+        },
+        "names": {},
+    },
+    "ual2": {
+        "source": PROJECT_ROOT / "assets/source/quaternius/ual2_clips.glb",
+        "url": "https://opengameart.org/content/universal-animation-library-2",
+        "marker": "pelvis",
+        "clips": {
+            "Hit_Knockback": "knockback",
+        },
+        "names": {},
+    },
 }
 
 # Кость пака — кость UAL. Скелет UAL собран по Rigify, и кость к кости ложится
@@ -119,6 +148,32 @@ for _side in ("L", "R"):
             UAL_BONES[f"{_finger}{_joint}.{_side}"] = f"DEF-f_{_finger.lower()}.0{_joint}.{_side}"
     for _joint in (1, 2, 3):
         UAL_BONES[f"Thumb{_joint}.{_side}"] = f"DEF-thumb.0{_joint}.{_side}"
+
+# Имена костей UAL 2 по именам UAL 1.
+_UAL2_NAMES: dict[str, str] = {
+    "DEF-hips": "pelvis",
+    "DEF-spine.001": "spine_01",
+    "DEF-spine.002": "spine_02",
+    "DEF-spine.003": "spine_03",
+    "DEF-neck": "neck_01",
+    "DEF-head": "Head",
+}
+for _side, _low in (("L", "l"), ("R", "r")):
+    _UAL2_NAMES |= {
+        f"DEF-shoulder.{_side}": f"clavicle_{_low}",
+        f"DEF-upper_arm.{_side}": f"upperarm_{_low}",
+        f"DEF-forearm.{_side}": f"lowerarm_{_low}",
+        f"DEF-hand.{_side}": f"hand_{_low}",
+        f"DEF-thigh.{_side}": f"thigh_{_low}",
+        f"DEF-shin.{_side}": f"calf_{_low}",
+        f"DEF-foot.{_side}": f"foot_{_low}",
+    }
+    for _finger in ("index", "middle", "ring", "pinky"):
+        for _joint in (1, 2, 3):
+            _UAL2_NAMES[f"DEF-f_{_finger}.0{_joint}.{_side}"] = f"{_finger}_0{_joint}_{_low}"
+    for _joint in (1, 2, 3):
+        _UAL2_NAMES[f"DEF-thumb.0{_joint}.{_side}"] = f"thumb_0{_joint}_{_low}"
+UAL_LIBRARIES["ual2"]["names"] = _UAL2_NAMES
 
 # Стопы пака прицеплены к корню (скелет под IK): в перенесённом клипе стопа
 # встаёт на конец голени — туда, где она была в покое относительно голени.
@@ -310,14 +365,22 @@ def _stage_clips(armature) -> None:
         track.strips.new(action.name, 0, action)
 
 
-def _strip_ual(full: Path) -> None:
-    """Урезает полный файл UAL до `UAL_SOURCE`: скелет и клипы `UAL_CLIPS`.
+def _strip_ual(full: Path) -> str:
+    """Урезает полный файл UAL до исходника своей библиотеки: скелет и её клипы.
+    Библиотеку узнаёт по скелету и возвращает её имя.
 
-    Манекен и остальные клипы в игру не идут, а полный файл (6.5 МБ) больше
+    Манекен и остальные клипы в игру не идут, а полный файл (6.5–8 МБ) больше
     предела хука на крупные файлы.
     """
     bpy.ops.import_scene.gltf(filepath=str(full))
     rig = next(obj for obj in bpy.context.scene.objects if obj.type == "ARMATURE")
+    kind = next(
+        (name for name, library in UAL_LIBRARIES.items() if library["marker"] in rig.data.bones),
+        None,
+    )
+    if kind is None:
+        raise RuntimeError("не узнаю библиотеку по скелету: " + full.name)
+    wanted = UAL_LIBRARIES[kind]["clips"]
     for obj in list(bpy.context.scene.objects):
         if obj is not rig:
             bpy.data.objects.remove(obj, do_unlink=True)
@@ -326,19 +389,20 @@ def _strip_ual(full: Path) -> None:
         data.nla_tracks.remove(track)
     data.action = None
     for action in list(bpy.data.actions):
-        if action.name not in UAL_CLIPS:
+        if action.name not in wanted:
             bpy.data.actions.remove(action)
-    missing = set(UAL_CLIPS) - {action.name for action in bpy.data.actions}
+    missing = set(wanted) - {action.name for action in bpy.data.actions}
     if missing:
-        raise RuntimeError("в UAL нет клипов: " + ", ".join(sorted(missing)))
+        raise RuntimeError(f"в {kind} нет клипов: " + ", ".join(sorted(missing)))
     _stage_clips(rig)
-    _export(UAL_SOURCE)
+    _export(UAL_LIBRARIES[kind]["source"])
+    return kind
 
 
-def _import_ual():
+def _import_ual(source: Path):
     """Урезанный исходник UAL в сцену: арматура и клипы по исходным именам."""
     before = set(bpy.data.actions)
-    bpy.ops.import_scene.gltf(filepath=str(UAL_SOURCE))
+    bpy.ops.import_scene.gltf(filepath=str(source))
     rig = next(
         obj for obj in bpy.context.scene.objects if obj.type == "ARMATURE" and obj.name != "CharacterArmature"
     )
@@ -379,7 +443,14 @@ def _lowest(meshes) -> float:
 
 
 def _retarget_ual(armature, meshes) -> None:
-    """Переносит клипы UAL на скелет пака и запекает их в его действия.
+    """Переносит клипы обеих частей UAL на скелет пака."""
+    for library in UAL_LIBRARIES.values():
+        _retarget_library(armature, meshes, library)
+
+
+def _retarget_library(armature, meshes, library: dict) -> None:
+    """Переносит клипы одной библиотеки UAL на скелет пака и запекает их в его
+    действия.
 
     Обе фигуры стоят в покое в T-позе лицом в −Y мира, поэтому поворот кости в
     клипе — её поворот в мире, отсчитанный от покоя, — годится для парной кости
@@ -401,10 +472,15 @@ def _retarget_ual(armature, meshes) -> None:
     """
     from mathutils import Matrix, Vector
 
-    rig, clips = _import_ual()
+    rig, clips = _import_ual(library["source"])
+    names = library["names"]
+
+    def twin_of(bone_name: str) -> str:
+        return names.get(UAL_BONES[bone_name], UAL_BONES[bone_name])
+
     source = {bone.name: bone for bone in rig.data.bones}
     target = sorted(armature.data.bones, key=_depth)
-    hips_rest = source[UAL_BONES["Hips"]].head_local
+    hips_rest = source[twin_of("Hips")].head_local
     to_world = rig.matrix_world.to_3x3()
     from_world = armature.matrix_world.to_3x3().inverted()
     height = (armature.matrix_world @ armature.data.bones["Hips"].head_local).z
@@ -416,7 +492,7 @@ def _retarget_ual(armature, meshes) -> None:
         return bone.matrix_local.copy()
 
     armature.animation_data_create()
-    for ual_name, game_name in UAL_CLIPS.items():
+    for ual_name, game_name in library["clips"].items():
         clip = clips[ual_name]
         rig.animation_data.action = clip
         first, last = (int(round(frame)) for frame in clip.frame_range)
@@ -434,7 +510,7 @@ def _retarget_ual(armature, meshes) -> None:
                 # Как в покое за своим родителем — основа для любой кости.
                 matrix = parent_pose @ parent_rest.inverted() @ rest(bone)
                 if name in UAL_BONES:
-                    twin = rig.pose.bones[UAL_BONES[name]]
+                    twin = rig.pose.bones[twin_of(name)]
                     delta = twin.matrix.to_3x3() @ rest(source[twin.name]).to_3x3().inverted()
                     turn = across @ delta @ across.inverted() @ rest(bone).to_3x3()
                     head = matrix.translation
@@ -443,7 +519,7 @@ def _retarget_ual(armature, meshes) -> None:
                         head = posed[anchor.name] @ rest(anchor).inverted() @ bone.head_local
                     matrix = Matrix.Translation(head) @ turn.normalized().to_4x4()
                 elif name == UAL_CARRIER:
-                    moved = from_world @ to_world @ (rig.pose.bones[UAL_BONES["Hips"]].head - hips_rest) * scale
+                    moved = from_world @ to_world @ (rig.pose.bones[twin_of("Hips")].head - hips_rest) * scale
                     matrix = Matrix.Translation(bone.head_local + moved) @ rest(bone).to_3x3().to_4x4()
                 posed[name] = matrix
                 pose_bone = armature.pose.bones[name]
@@ -850,8 +926,8 @@ def _build_inside_blender(out_dir: Path, wanted: list[str]) -> None:
     actors = _actors()
     if wanted and wanted[0] == "ual":
         _reset_scene()
-        _strip_ual(Path(wanted[1]))
-        print(f"  {UAL_SOURCE.name}")
+        kind = _strip_ual(Path(wanted[1]))
+        print("  " + UAL_LIBRARIES[kind]["source"].name)
         return
     for name in wanted:
         if name == "cars":
@@ -899,7 +975,8 @@ def main() -> int:
     wanted = arguments.names or _names()
     if wanted[0] == "ual":
         if len(wanted) != 2 or not Path(wanted[1]).is_file():
-            print(f"Нужен путь к AnimationLibrary_Godot_Standard.glb — архив на {UAL_URL}")
+            urls = ", ".join(library["url"] for library in UAL_LIBRARIES.values())
+            print(f"Нужен путь к .glb библиотеки для Godot — архивы на {urls}")
             return 2
         wanted = ["ual", str(Path(wanted[1]).resolve())]
     unknown = [name for name in wanted if name not in _names() and wanted[0] != "ual"]

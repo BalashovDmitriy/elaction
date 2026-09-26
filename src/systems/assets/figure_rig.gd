@@ -210,6 +210,10 @@ class ClipTracks:
 ## Модель актёра. Без неё риг — пустой узел, и это ошибка сцены.
 @export var model: PackedScene
 
+## Во сколько раз быстрее мира идут часы рига. Сценка добивания замедляет мир,
+## а двое в ней двигаются в своём темпе (ADR-0040).
+var speed: float = 1.0
+
 ## Наклон вперёд «вокруг пяток» и подъём над полом идут не костям, а самой
 ## модели: у скелета нет кости, которой можно уложить тело целиком.
 var _instance: Node3D = null
@@ -299,7 +303,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	advance(delta)
+	advance(delta * speed)
 
 
 ## Шаг перехода: кости идут от кадра, где риг стоял при смене позы, к кадру
@@ -610,6 +614,7 @@ func _code_frame(pose_name: String) -> Frame:
 		_swing(frame, bone_name, pose.lean * float(LEAN_SHARE[bone_name]))
 	for bone_name: String in HEAD_SHARE:
 		_swing(frame, bone_name, pose.head * float(HEAD_SHARE[bone_name]))
+		_turn(frame, bone_name, pose.twist * float(HEAD_SHARE[bone_name]))
 	_follow_feet(frame)
 	frame.tilt = pose.tilt
 	frame.lift = pose.lift
@@ -634,6 +639,18 @@ func _swing(frame: Frame, bone_name: String, degrees: float) -> void:
 	var basis := _stand_globals[bone].basis
 	var upward := basis.y.y >= 0.0
 	var axis := basis.inverse() * (Vector3.RIGHT if upward else Vector3.LEFT)
+	frame.rotations[bone] = (
+		frame.rotations[bone] * Quaternion(axis.normalized(), deg_to_rad(degrees))
+	)
+
+
+## Поворачивает кость вбок вокруг вертикали фигуры — Y модели, переведённого в
+## систему кости по её положению в стойке. Нужен свёрнутой шее (ADR-0040).
+func _turn(frame: Frame, bone_name: String, degrees: float) -> void:
+	if not _bones.has(bone_name) or is_zero_approx(degrees):
+		return
+	var bone: int = _bones[bone_name]
+	var axis := _stand_globals[bone].basis.inverse() * Vector3.UP
 	frame.rotations[bone] = (
 		frame.rotations[bone] * Quaternion(axis.normalized(), deg_to_rad(degrees))
 	)
