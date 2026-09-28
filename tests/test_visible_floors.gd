@@ -65,3 +65,18 @@ func test_a_tall_building_lights_no_more_than_a_short_one() -> void:
 	var tall := VisibleFloors.around(rules, _view_at(rules, 15))
 	var small := VisibleFloors.around(short_rules, _view_at(short_rules, 4))
 	assert_eq(tall.y - tall.x, small.y - small.x, "высота здания на число горящих не влияет")
+
+
+## В кадре — этажи, видные хотя бы краем, без запаса: их лампы кладут тени,
+## запасные горят без тени (ADR-0042, решение 2).
+func test_seen_floors_are_the_frame_without_the_margin() -> void:
+	var rules := _rules()
+	var view := _view_at(rules, 10)
+	var seen := VisibleFloors.seen(rules, view)
+	var lit := VisibleFloors.around(rules, view)
+	assert_true(VisibleFloors.covers(seen, 10), "этаж под ногами в кадре")
+	assert_true(seen.x >= lit.x and seen.y <= lit.y, "в кадре — не шире горящих")
+	assert_lt(seen.y - seen.x, lit.y - lit.x, "запас в кадр не входит")
+	# Кромка кадра на 10 px ниже пола этажа 11 — в кадре уже кусок этажа 12.
+	var edge := Rect2(0.0, rules.floor_surface(11) - 350.0, 640.0, 360.0)
+	assert_true(VisibleFloors.covers(VisibleFloors.seen(rules, edge), 12), "видный краем — в кадре")
