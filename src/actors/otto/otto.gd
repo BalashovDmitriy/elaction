@@ -156,8 +156,6 @@ var _landing: float = 0.0
 ## Нажат ли прыжок во время восстановления: он сработает, как оно кончится.
 var _jump_waiting: bool = false
 var _takedown: TakedownScene = null
-## Агент, над которым пролетал падающий Otto: упадёт на него — напрыгнет.
-var _pounce_target: Enemy = null
 ## Какая сценка была прошлой: та же подряд не повторяется.
 var _last_scene: String = ""
 ## Где Otto закончил прошлый кадр физики: по этому видно перестановку.
@@ -260,8 +258,6 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_hold_the_plane()
 
-	if not is_on_floor() and velocity.y < 0.0:
-		_watch_for_a_pounce()
 	_track_fall()
 	if _takedown != null:
 		# Приземлился на агента: позу уже ставит режиссёр, своя её перебила бы.
@@ -565,33 +561,25 @@ func _reachable_agent(state: OttoStateMachine.State) -> Enemy:
 	return best
 
 
-## Падающий Otto над агентом: запоминает его — упадёт рядом, напрыгнет. Падать
-## надо с опоры выше этажа агента (ADR-0040, решение 4): вершина своего прыжка
-## выше макушки, и прыжок рядом с агентом иначе добивал бы сам.
-func _watch_for_a_pounce() -> void:
-	var feet := Vector2(global_position.x, global_position.y)
-	for node: Node in get_tree().get_nodes_in_group(Enemy.GROUP):
-		var agent := node as Enemy
-		if agent == null or not agent.takedown_ready:
-			continue
-		var at := Vector2(agent.global_position.x, agent.global_position.y)
-		if Takedown.is_above(feet, at, Proportions.BODY) and Takedown.fell_onto(_support_y, at.y):
-			_pounce_target = agent
-
-
-## Приземлился — если на агента, под которым пролетал, то напрыгнул (ADR-0040,
-## решение 4): сценка сама, без кнопки.
+## Приземлился вплотную к агенту — напрыгнул (ADR-0042, решение 9): сценка
+## сама, без кнопки. Приземление — только после настоящего полёта: кадр без
+## опоры на крыше уходящей вниз кабины не в счёт.
 func _land_on_a_target() -> bool:
-	var agent := _pounce_target
-	_pounce_target = null
 	# Убитый в полёте падает телом, а не напрыгивает.
-	if _states.is_dead():
+	if _states.is_dead() or _air_time < LANDING_AIR_TIME:
 		return false
-	if agent == null or not is_instance_valid(agent) or not agent.takedown_ready:
-		return false
-	if absf(agent.global_position.y - global_position.y) > Takedown.SAME_FLOOR:
-		return false
-	if absf(agent.global_position.x - global_position.x) > Takedown.REACH:
+	var feet := Vector2(global_position.x, global_position.y)
+	var agent: Enemy = null
+	var best_gap := INF
+	for node: Node in get_tree().get_nodes_in_group(Enemy.GROUP):
+		var candidate := node as Enemy
+		if candidate == null or not candidate.takedown_ready:
+			continue
+		var at := Vector2(candidate.global_position.x, candidate.global_position.y)
+		if Takedown.lands_on(feet, at) and absf(at.x - feet.x) < best_gap:
+			best_gap = absf(at.x - feet.x)
+			agent = candidate
+	if agent == null:
 		return false
 	# Лицом к агенту: сценка ставит его перед Otto.
 	var towards := agent.global_position.x - global_position.x
@@ -648,9 +636,6 @@ func _rest_here() -> void:
 	# Полёт до перестановки или поездки не в счёт: иначе шаг с эскалатора в
 	# воздух дописывался бы к давнему прыжку и кончался приземлением.
 	_air_time = 0.0
-	# И агент, над которым пролетал до неё: разбившийся и вернувшийся в игру
-	# напрыгивал бы на него на первом же приземлении рядом.
-	_pounce_target = null
 
 
 func _horizontal_speed(input: OttoInput, state: OttoStateMachine.State) -> float:
