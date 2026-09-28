@@ -25,10 +25,9 @@ var sfx: float = 1.0
 var locale: String = ""
 ## Режим окна — [enum DisplayModes.Mode]: окно, без рамки, полный экран.
 var window_mode: int = DisplayModes.Mode.WINDOWED
-## Размер окна в режиме окна. Полный экран и окно без рамки — в разрешении экрана.
+## Размер окна в режиме окна; в полном экране и без рамки — разрешение 3D, окно
+## там в разрешении экрана ([method DisplayModes.share]).
 var resolution: Vector2i = DisplayModes.DEFAULT_RESOLUTION
-## Масштаб 3D-рендера, доля разрешения окна (FSR ниже единицы).
-var render_scale: float = 1.0
 ## Предел кадров — один из [constant DisplayModes.FRAME_LIMITS]. По умолчанию
 ## «по монитору»: как было до настройки, кадры держит синхронизация.
 var frame_limit: int = DisplayModes.FRAME_MONITOR
@@ -92,11 +91,6 @@ static func load_from(path: String = PATH) -> GameSettings:
 	var size: Variant = file.get_value(SECTION, "resolution", settings.resolution)
 	if size is Vector2i:
 		settings.resolution = size
-	settings.render_scale = clampf(
-		float(file.get_value(SECTION, "render_scale", settings.render_scale)),
-		DisplayModes.RENDER_SCALES[-1],
-		1.0
-	)
 	var limit := int(file.get_value(SECTION, "frame_limit", settings.frame_limit))
 	if DisplayModes.FRAME_LIMITS.has(limit):
 		settings.frame_limit = limit
@@ -138,7 +132,6 @@ func save_to(path: String = "") -> void:
 	file.set_value(SECTION, "locale", locale)
 	file.set_value(SECTION, "window_mode", window_mode)
 	file.set_value(SECTION, "resolution", resolution)
-	file.set_value(SECTION, "render_scale", render_scale)
 	file.set_value(SECTION, "frame_limit", frame_limit)
 	file.set_value(SECTION, "vsync", vsync)
 	file.set_value(SECTION, "difficulty", difficulty)
@@ -165,13 +158,18 @@ func apply() -> void:
 		# Окно ставится заново, только если сменились режим или размер: иначе
 		# переключение крови или языка возвращало бы в центр окно, отодвинутое
 		# игроком, и заново входило в полный экран (авторевью M22).
-		var window := [window_mode, resolution]
+		# В полном экране и без рамки разрешение — это доля 3D, а не окно: смена
+		# его не входит в полный экран заново.
+		var windowed := window_mode == DisplayModes.Mode.WINDOWED
+		var window := [window_mode, resolution if windowed else Vector2i.ZERO]
 		if window != _window_applied:
 			DisplayModes.apply_window(window_mode as DisplayModes.Mode, resolution)
 			_window_applied = window
 		var tree := Engine.get_main_loop() as SceneTree
 		if tree != null:
-			DisplayModes.apply_scale(render_scale, tree.root)
+			var screen := DisplayServer.screen_get_size()
+			var share := DisplayModes.share(window_mode as DisplayModes.Mode, resolution, screen)
+			DisplayModes.apply_scale(share, tree.root)
 		if _vsync_applied != [vsync]:
 			DisplayModes.apply_vsync(vsync)
 			_vsync_applied = [vsync]

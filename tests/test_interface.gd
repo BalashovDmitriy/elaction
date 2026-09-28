@@ -30,7 +30,6 @@ func test_settings_survive_a_restart() -> void:
 	settings.locale = "en"
 	settings.window_mode = DisplayModes.Mode.BORDERLESS
 	settings.resolution = Vector2i(2560, 1440)
-	settings.render_scale = 0.67
 	settings.save_to(TEMP)
 
 	var loaded := GameSettings.load_from(TEMP)
@@ -40,7 +39,6 @@ func test_settings_survive_a_restart() -> void:
 	assert_eq(loaded.locale, "en")
 	assert_eq(loaded.window_mode, DisplayModes.Mode.BORDERLESS)
 	assert_eq(loaded.resolution, Vector2i(2560, 1440))
-	assert_almost_eq(loaded.render_scale, 0.67, 0.001)
 
 
 ## Настройки до M22 хранили флажок «полный экран»: он становится режимом окна.

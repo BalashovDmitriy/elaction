@@ -274,7 +274,6 @@ func _build_settings() -> void:
 		_quality()
 		_window_mode()
 		_resolution()
-		_render_scale()
 		_frame_limit()
 		_vsync()
 		_blood()
@@ -506,11 +505,17 @@ func _window_mode() -> void:
 	)
 
 
-## Размер окна — из тех, что держит монитор игрока.
+## Размер окна — из тех, что держит монитор игрока; в полном экране и без рамки
+## — разрешение 3D ([method DisplayModes.share]).
 func _resolution() -> void:
 	var area := DisplayModes.screen_rect().size
-	var sizes := DisplayModes.available(area)
-	var current := DisplayModes.nearest(settings.resolution, area)
+	var mode := settings.window_mode as DisplayModes.Mode
+	var sizes := DisplayModes.choices(mode, area)
+	var current := (
+		area
+		if settings.resolution == area and sizes.has(area)
+		else DisplayModes.nearest(settings.resolution, area)
+	)
 	var names: Array[String] = []
 	var selected := 0
 	for index: int in sizes.size():
@@ -522,26 +527,7 @@ func _resolution() -> void:
 		func(value: Variant) -> void:
 			settings.resolution = sizes[int(value)]
 			settings.apply()
-	)
-
-
-## Масштаб 3D-рендера: на 4K слабая карта рисует сцену меньше, интерфейс — нет.
-func _render_scale() -> void:
-	var names: Array[String] = []
-	# Отмечается ближайший масштаб, а не равный: в файле может стоять любой, и
-	# без отметки список показывался пустым (авторевью M22).
-	var closest := 0
-	for index: int in DisplayModes.RENDER_SCALES.size():
-		var share := DisplayModes.RENDER_SCALES[index]
-		names.append("%d%%" % roundi(share * 100.0))
-		var gap := absf(share - settings.render_scale)
-		if gap < absf(DisplayModes.RENDER_SCALES[closest] - settings.render_scale):
-			closest = index
-	var row := _add_row(MenuRow.choice(tr("UI_RENDER_SCALE"), names, closest))
-	row.changed.connect(
-		func(value: Variant) -> void:
-			settings.render_scale = DisplayModes.RENDER_SCALES[int(value)]
-			settings.apply()
+			settings.save_to()
 	)
 
 

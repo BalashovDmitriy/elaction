@@ -6,10 +6,14 @@ extends RefCounted
 ##
 ## Сцена рисуется в настоящем разрешении окна: интерфейс растягивается от
 ## базовых 1920×1080 (`stretch = canvas_items`), а 3D — нет, поэтому на 4K
-## кадр честный, не растянутый. Полный экран — в родном разрешении монитора;
-## окно — одного из стандартных размеров, которые монитор держит. Масштаб
-## рендера рисует сцену меньше и растягивает FSR: на слабой карте 4K
-## выдерживается, а интерфейс остаётся чётким — он масштабом не задет.
+## кадр честный, не растянутый. Окно — одного из стандартных размеров, которые
+## монитор держит.
+##
+## Полный экран и окно без рамки — всегда в родном разрешении монитора: Godot
+## не переключает его видеорежим. Там выбранное разрешение — это разрешение 3D:
+## сцена рисуется меньше и растягивается FSR, а интерфейс остаётся чётким
+## (ADR-0042, решение 3). Отдельного масштаба рендера с M24f нет: доля — это
+## выбранное разрешение к родному.
 ##
 ## Без узлов: что предложить и как применить, проверяется тестом.
 
@@ -25,8 +29,8 @@ const RESOLUTIONS: Array[Vector2i] = [
 	Vector2i(3840, 2160),
 ]
 
-## Масштаб 3D-рендера, доли разрешения окна. Сто процентов — без FSR.
-const RENDER_SCALES: Array[float] = [1.0, 0.77, 0.67, 0.5]
+## Меньше этой доли родного разрешения 3D не рисуется: 720p на 4K — треть.
+const MIN_SHARE: float = 0.33
 
 ## Размер окна по умолчанию — базовый размер проекта.
 const DEFAULT_RESOLUTION := Vector2i(1920, 1080)
@@ -53,6 +57,16 @@ static func available(screen: Vector2i) -> Array[Vector2i]:
 	if fitting.is_empty():
 		fitting.append(RESOLUTIONS[0])
 	return fitting
+
+
+## Разрешения на выбор в режиме [param mode]: в окне — размеры, что влезают на
+## экран; в полном экране и без рамки — они же и сам экран, если его размер не
+## из стандартных (3440×1440): иначе родное разрешение не выбрать.
+static func choices(mode: Mode, screen: Vector2i) -> Array[Vector2i]:
+	var sizes := available(screen)
+	if mode != Mode.WINDOWED and not sizes.has(screen):
+		sizes.append(screen)
+	return sizes
 
 
 ## Ближайший к [param wanted] размер из тех, что влезают на экран: монитор
@@ -146,9 +160,19 @@ static func apply_frame_limit(limit: int, vsync: bool) -> void:
 	Engine.max_fps = max_fps(limit, vsync, DisplayServer.screen_get_refresh_rate())
 
 
-## Применяет масштаб 3D-рендера к корневому виду.
-static func apply_scale(render_scale: float, root: Viewport) -> void:
-	var share := clampf(render_scale, RENDER_SCALES[-1], 1.0)
+## Доля родного разрешения, в которой рисуется 3D: в окне — всё окно, в полном
+## экране и без рамки — выбранное разрешение [param resolution] к экрану
+## [param screen].
+static func share(mode: Mode, resolution: Vector2i, screen: Vector2i) -> float:
+	if mode == Mode.WINDOWED or screen.y <= 0 or resolution == screen:
+		return 1.0
+	var size := nearest(resolution, screen)
+	return clampf(float(size.y) / float(screen.y), MIN_SHARE, 1.0)
+
+
+## Применяет долю 3D-рендера [param render_share] к корневому виду.
+static func apply_scale(render_share: float, root: Viewport) -> void:
+	var share := clampf(render_share, MIN_SHARE, 1.0)
 	root.scaling_3d_mode = (
 		Viewport.SCALING_3D_MODE_BILINEAR
 		if is_equal_approx(share, 1.0)

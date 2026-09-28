@@ -30,7 +30,6 @@ UI_WINDOW_MODE_0,Window,Окно
 UI_WINDOW_MODE_1,Borderless,Без рамки
 UI_WINDOW_MODE_2,Fullscreen,Полный экран
 UI_RESOLUTION,Resolution,Разрешение
-UI_RENDER_SCALE,Render scale,Масштаб рендера
 UI_FRAME_LIMIT,Frame limit,Предел кадров
 UI_FRAME_LIMIT_MONITOR,Monitor,По монитору
 UI_FRAME_LIMIT_NONE,Unlimited,Без предела

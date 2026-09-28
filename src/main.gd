@@ -90,6 +90,11 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_count_idle(delta)
+	# Курсор — только в меню: в партии и в демо он висел поверх кадра, и полный
+	# экран читался растянутым окном (ADR-0042, решение 4).
+	var cursor := Input.MOUSE_MODE_VISIBLE if _menu.visible else Input.MOUSE_MODE_HIDDEN
+	if Input.mouse_mode != cursor:
+		Input.mouse_mode = cursor
 	if _just_pressed(&"pause"):
 		# Пауза во вступлении его пропускает, а не открывает меню (ADR-0038).
 		if _playing and _level != null and _level.skip_the_intro():
