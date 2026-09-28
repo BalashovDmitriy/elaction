@@ -30,8 +30,8 @@ const CITY_SHARE: Array[float] = [0.34, 0.5, 0.75, 1.0]
 const RAIN_SHARE: Array[float] = [0.25, 0.5, 1.0, 1.0]
 
 ## Сглаживание по уровню (ADR-0034, решение 2): MSAA на окне, FXAA — только
-## низкому. TAA нет ни на одном: он размывал обводку актёров, на которой держится
-## читаемость на погашенном этаже.
+## низкому. TAA нет ни на одном: он размывал огоньки и обводку актёров — та
+## держала читаемость на погашенном этаже до M24f.
 const MSAA: Array[Viewport.MSAA] = [
 	Viewport.MSAA_DISABLED, Viewport.MSAA_2X, Viewport.MSAA_2X, Viewport.MSAA_4X
 ]

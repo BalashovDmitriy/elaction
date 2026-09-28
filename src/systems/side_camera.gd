@@ -39,6 +39,10 @@ const TILT_DEGREES: float = 10.0
 
 ## Во сколько раз уже кадр на крупном плане сценки добивания (ADR-0040).
 const CLOSE_UP_SIZE: float = 0.38
+## Свет камеры на фигуры: холодный, как лунный, и слабый — силуэт, а не
+## освещённая фигура.
+const ACTOR_FILL_COLOR := Color(0.62, 0.7, 0.95)
+const ACTOR_FILL_ENERGY: float = 0.35
 
 ## Скорость сглаживания. Число то же, что стояло у [Camera2D] в 2D-сцене.
 @export var smoothing_speed: float = 8.0
@@ -74,6 +78,8 @@ func _ready() -> void:
 	_read_frame()
 	get_viewport().size_changed.connect(_read_frame)
 
+	add_child(actor_fill())
+
 	_listener = AudioListener3D.new()
 	# По оси камеры до плоскости игры: с наклоном это дальше, чем [constant DISTANCE].
 	_listener.position = Vector3(0.0, 0.0, -DISTANCE / cos(_tilt()))
@@ -92,6 +98,22 @@ func _process(delta: float) -> void:
 	else:
 		_centre = CameraBounds.smoothed(_centre, wanted, smoothing_speed, delta)
 	global_position = _perch(_centre)
+
+
+## Свет камеры на фигуры: слабый, по оси взгляда, только на слой фигур
+## ([constant FigureRig.RENDER_LAYER]). Им, а не обводкой, Otto и агенты
+## читаются на погашенном этаже (ADR-0042, решение 7): окружение ему не
+## подчиняется, и темнота этажа остаётся темнотой. Без тени и мимо тумана.
+static func actor_fill() -> DirectionalLight3D:
+	var light := DirectionalLight3D.new()
+	light.name = "ActorFill"
+	light.light_color = ACTOR_FILL_COLOR
+	light.light_energy = ACTOR_FILL_ENERGY
+	light.light_cull_mask = FigureRig.RENDER_LAYER
+	light.shadow_enabled = false
+	light.light_volumetric_fog_energy = 0.0
+	light.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY
+	return light
 
 
 ## За кем ехать. Обычно это Otto.
