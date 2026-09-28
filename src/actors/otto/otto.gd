@@ -564,9 +564,15 @@ func _reachable_agent(state: OttoStateMachine.State) -> Enemy:
 ## Приземлился вплотную к агенту — напрыгнул (ADR-0042, решение 9): сценка
 ## сама, без кнопки. Приземление — только после настоящего полёта: кадр без
 ## опоры на крыше уходящей вниз кабины не в счёт.
+##
+## Приземлившийся в кабину или на её крышу не напрыгивает — по той же причине,
+## что и не добивает кнопкой ([method _reachable_agent]): сценка замораживает
+## обоих, а кабина уезжает из-под пары (авторевью M24d).
 func _land_on_a_target() -> bool:
 	# Убитый в полёте падает телом, а не напрыгивает.
 	if _states.is_dead() or _air_time < LANDING_AIR_TIME:
+		return false
+	if _car != null or Takedown.rides_a_car(self):
 		return false
 	var feet := Vector2(global_position.x, global_position.y)
 	var agent: Enemy = null

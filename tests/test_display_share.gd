@@ -39,3 +39,15 @@ func test_an_odd_native_screen_is_on_the_list() -> void:
 	assert_eq(DisplayModes.share(DisplayModes.Mode.FULLSCREEN, wide, wide), 1.0, "и оно — 100%")
 	var windowed := DisplayModes.choices(DisplayModes.Mode.WINDOWED, wide)
 	assert_false(windowed.has(wide), "окно размером с экран — это без рамки, не окно")
+
+
+## Файл до M24f в полном экране хранил размер окна по умолчанию: с M24f это доля
+## 3D, и игрок на 4K получил бы половину. Такой файл переходит на родное.
+func test_old_full_screen_settings_move_to_the_native_resolution() -> void:
+	var uhd := Vector2i(3840, 2160)
+	var hd := Vector2i(1920, 1080)
+	var full := DisplayModes.Mode.FULLSCREEN
+	assert_eq(GameSettings.migrated_resolution(true, full, hd, uhd), uhd, "старый — на родное")
+	assert_eq(GameSettings.migrated_resolution(false, full, hd, uhd), hd, "новый не трогается")
+	var windowed := DisplayModes.Mode.WINDOWED
+	assert_eq(GameSettings.migrated_resolution(true, windowed, hd, uhd), hd, "окно — тоже")

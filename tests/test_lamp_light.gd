@@ -50,6 +50,34 @@ func test_a_margin_lamp_lights_its_own_floor_only() -> void:
 		assert_lt(spot.spot_range, HANG + Proportions.SLAB, "и не глубже плиты под своим полом")
 
 
+## Обстановка в тень заливки не попадает: маска теней берёт предмет по любому
+## общему слою, и предмет, оставшийся и на первом, заливка не отпустила бы
+## (авторевью M24f).
+func test_props_cast_no_fill_shadow() -> void:
+	var lamp := _lamp()
+	var fill: OmniLight3D = null
+	for light: Light3D in _lights(lamp):
+		if light is OmniLight3D:
+			fill = light as OmniLight3D
+	assert_not_null(fill, "у лампы есть заливка")
+	if fill == null:
+		return
+	var checked := 0
+	# Несколько предметов, а не весь каталог: слой ставит одна функция сборки.
+	for entry: PropCatalog.Entry in PropCatalog.entries().slice(0, 4):
+		var prop := PropCatalog.make(entry.name)
+		if prop == null:
+			continue
+		for node: Node in prop.find_children("*", "VisualInstance3D", true, false):
+			var visual := node as VisualInstance3D
+			assert_eq(
+				visual.layers & fill.shadow_caster_mask, 0, "%s: не в тени заливки" % entry.name
+			)
+			checked += 1
+		prop.free()
+	assert_gt(checked, 0, "предметы проверены")
+
+
 func test_back_in_frame_the_lamp_is_whole_again() -> void:
 	var lamp := _lamp()
 	lamp.set_light_visible(true, false)

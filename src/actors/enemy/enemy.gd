@@ -826,6 +826,10 @@ func _still(supports: Array[Object]) -> bool:
 	var ground := supports[1]
 	if ground == null or ground is ElevatorCar:
 		return false
+	# Люк подвала уходит из-под тела, когда собраны документы.
+	var node := ground as Node
+	if node != null and node.is_in_group(BasementLock.HATCH_GROUP):
+		return false
 	return supports[0] == ground and supports[2] == ground
 
 
@@ -842,16 +846,31 @@ func _vanish() -> void:
 ##
 ## Клип смерти роняет тело навзничь, на рост назад. Пока труп исчезал за
 ## полсекунды, это было не видно; лежащий до конца здания у края шахты висел бы
-## над пустотой на весь рост. Есть пол за спиной — падает как падал; нет, а
+## над пустотой на весь рост. Есть место за спиной — падает как падал; нет, а
 ## впереди есть — падает вперёд.
 func _fall_onto_the_floor() -> void:
 	if not is_inside_tree():
 		return
 	var back := -_brain.facing * Proportions.BODY * LYING_LENGTH
-	if not _floor_at(back) and _floor_at(-back):
+	if not _room_at(back) and _room_at(-back):
 		_brain.face(-_brain.facing)
 		# Труп не разворачивается телом, как живой, а сразу лежит той стороной.
 		_body.face(_brain.facing, true)
+
+
+## Есть ли где лечь до [param dx] метров от ног: пол под концом тела и ни стены
+## по дороге к нему. Лежачая форма ([method _lie_down]) длиной почти в рост:
+## вошедшую в стену физика выталкивала бы из неё рывком, и труп отъезжал бы от
+## стены, у которой упал (авторевью M24f).
+func _room_at(dx: float) -> bool:
+	if not _floor_at(dx):
+		return false
+	var from := global_position + Vector3(0.0, Proportions.PRONE * 0.5, 0.0)
+	var query := PhysicsRayQueryParameters3D.create(
+		from, from + Vector3(dx, 0.0, 0.0), collision_mask
+	)
+	query.exclude = [get_rid()]
+	return get_world_3d().direct_space_state.intersect_ray(query).is_empty()
 
 
 ## Есть ли пол в [param dx] метрах от ног по горизонтали.

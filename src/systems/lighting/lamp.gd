@@ -186,9 +186,14 @@ func shoot_down() -> void:
 ## здания запасные лампы давали треть проходов теней (ADR-0042, решение 2).
 ## Заливка там не горит: без тени она светила бы сквозь потолок на этаж выше.
 func set_light_visible(on: bool, shadowed: bool = true) -> void:
-	_shadowed = shadowed
 	_spot.visible = on
 	_fill.visible = on and shadowed
+	# Уровень зовёт это всем лампам разом, как только кадр сменил этажи. Запись
+	# дальности или тени, даже прежней, помечает карту теней грязной, и лампы, у
+	# которых ничего не сменилось, перерисовывали бы тени в тот же кадр.
+	if shadowed == _shadowed:
+		return
+	_shadowed = shadowed
 	apply_graphics()
 
 

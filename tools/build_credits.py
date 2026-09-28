@@ -88,7 +88,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--check", action="store_true", help="только сверить")
     args = parser.parse_args()
-    wanted = render(parse(SOURCE.read_text(encoding="utf-8")))
+    sections = parse(SOURCE.read_text(encoding="utf-8"))
+    wanted = render(sections)
     if args.check:
         current = TARGET.read_text(encoding="utf-8") if TARGET.exists() else ""
         if current != wanted:
@@ -97,7 +98,7 @@ def main() -> int:
         print("assets/credits.json совпадает с CREDITS.md")
         return 0
     TARGET.write_bytes(wanted.encode("utf-8"))
-    count = sum(len(section["authors"]) for section in parse(SOURCE.read_text(encoding="utf-8")))
+    count = sum(len(section["authors"]) for section in sections)
     print(f"assets/credits.json: разделов {len(SECTIONS)}, авторов {count}")
     return 0
 

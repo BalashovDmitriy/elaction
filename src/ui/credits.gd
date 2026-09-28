@@ -47,9 +47,11 @@ static func load_sections(path: String = PATH) -> Array[Section]:
 	if not data is Dictionary:
 		return found
 	for raw: Variant in (data as Dictionary).get("sections", []):
-		var entry := raw as Dictionary
-		if entry == null:
+		# Проверка типом, а не `as`: словарь не бывает null, и приведение чужого
+		# значения к нему упало бы, а не пропустило раздел.
+		if not raw is Dictionary:
 			continue
+		var entry := raw as Dictionary
 		var section := Section.new()
 		section.key = String(entry.get("key", ""))
 		for author: Variant in entry.get("authors", []):

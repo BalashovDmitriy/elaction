@@ -172,15 +172,12 @@ func show_page(page: Page, focus: int = 0) -> void:
 ## начатое ещё в игре, не должно выбрать пункт (ADR-0042, решение 5). Фокус
 ## остаётся на месте — выключенный пункт его держит, а не отдаёт.
 func hold_rows(seconds: float) -> void:
-	var rows: Array[MenuRow] = []
-	for child: Node in _column.get_children():
-		var row := child as MenuRow
-		if row != null:
-			row.disabled = true
-			rows.append(row)
+	var held := rows()
+	for row: MenuRow in held:
+		row.disabled = true
 	var page := _page
 	await get_tree().create_timer(seconds, true, false, true).timeout
-	for row: MenuRow in rows:
+	for row: MenuRow in held:
 		if is_instance_valid(row) and _page == page:
 			row.disabled = false
 
@@ -545,6 +542,10 @@ func _window_mode() -> void:
 			settings.window_mode = int(value)
 			settings.apply()
 			settings.save_to()
+			# Список разрешений зависит от режима ([method DisplayModes.choices]):
+			# страница собирается заново, фокус остаётся на режиме — иначе в полном
+			# экране не выбрать родное нестандартное, а в окне оставалось бы оно.
+			show_page(_page, rows().find(row))
 	)
 
 
@@ -555,8 +556,8 @@ func _resolution() -> void:
 	var mode := settings.window_mode as DisplayModes.Mode
 	var sizes := DisplayModes.choices(mode, area)
 	var current := (
-		area
-		if settings.resolution == area and sizes.has(area)
+		settings.resolution
+		if sizes.has(settings.resolution)
 		else DisplayModes.nearest(settings.resolution, area)
 	)
 	var names: Array[String] = []

@@ -219,3 +219,34 @@ func test_game_over_waits_for_the_last_death() -> void:
 	assert_true(get_tree().paused, "здание замерло")
 	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "темп вернулся")
 	assert_true(menu.rows()[0].disabled, "пункты пока не нажимаются")
+
+
+## Esc во время последней смерти партию не продолжает (авторевью M24f): закрытое
+## меню помнит страницу паузы, и после паузы в этой партии Esc «продолжал» игру
+## с мёртвым Otto — конец партии так и не показывался.
+func test_escape_during_the_last_death_does_not_resume() -> void:
+	var main := MAIN_SCENE.instantiate()
+	add_child_autofree(main)
+	await wait_physics_frames(2)
+	var records := Records.new()
+	for _row: int in Records.LIMIT:
+		records.rows.append({Records.SCORE: 1000000, Records.DATE: "2026-01-01"})
+	main.set("_records", records)
+	main.call("_start_game")
+	await wait_physics_frames(4)
+	main.call("_pause")
+	main.call("_resume")
+	await get_tree().process_frame
+	GameState.instance().game_over.emit()
+	await get_tree().process_frame
+	Input.action_press(&"pause")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	Input.action_release(&"pause")
+	var until := Time.get_ticks_msec() + int((LastDeath.DURATION + 0.5) * 1000.0)
+	while Time.get_ticks_msec() < until:
+		await get_tree().process_frame
+	var menu := main.get_node("Menu") as Menu
+	assert_true(menu.visible, "конец партии показан")
+	assert_eq(menu.current_page(), Menu.Page.GAME_OVER)
+	assert_false(main.get("_playing"), "партия не продолжилась")

@@ -103,7 +103,14 @@ func _process(delta: float) -> void:
 			pass
 		elif _playing:
 			_pause()
-		elif _page_before == Menu.Page.PAUSE and _menu.current_page() == Menu.Page.PAUSE:
+		elif (
+			_menu.visible
+			and _page_before == Menu.Page.PAUSE
+			and _menu.current_page() == Menu.Page.PAUSE
+		):
+			# Только открытая пауза: закрытое меню помнит последнюю страницу, и
+			# Esc во время последней смерти «продолжал» бы игру после паузы в
+			# этой партии — конец партии так и не показывался (авторевью M24f).
 			_resume()
 	_page_before = _menu.current_page()
 

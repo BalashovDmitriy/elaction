@@ -24,6 +24,9 @@ enum Fit { HOTEL, OFFICE, ANY }
 ## видна, а рисовать обстановку лишний раз в её карту теней стоило внизу
 ## здания, где ламп втрое больше, трети кадра (ADR-0042, решение 2). Тень под
 ## конусом лампы у предметов остаётся.
+##
+## Слой свой вместо первого, а не вдобавок к нему: маска теней берёт предмет, если
+## совпал хоть один слой, и на первом слое маска заливки его бы не отпустила.
 const RENDER_LAYER: int = 1 << 10
 const DIR := "res://assets/models/props"
 
@@ -172,12 +175,13 @@ static func make(prop_name: String) -> Node3D:
 	return holder
 
 
-## Ставит мешам модели слой обстановки [constant RENDER_LAYER] поверх их
-## обычного: заливка ламп обстановку в свою тень не берёт (ADR-0042, решение 2).
+## Переводит меши модели с первого слоя на слой обстановки [constant
+## RENDER_LAYER]: заливка ламп обстановку в свою тень не берёт (ADR-0042,
+## решение 2).
 static func _mark_as_props(model: Node) -> void:
 	for node: Node in model.find_children("*", "VisualInstance3D", true, false):
 		var visual := node as VisualInstance3D
-		visual.layers |= RENDER_LAYER
+		visual.layers = (visual.layers & ~1) | RENDER_LAYER
 
 
 ## Габарит собранного предмета, м: ширина, рост, глубина — с лампой сверху.

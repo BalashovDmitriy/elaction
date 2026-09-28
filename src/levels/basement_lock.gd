@@ -16,6 +16,8 @@ extends Node3D
 ## Дверей в подвале нет ([method BuildingRules.doors_on]), поэтому запертый
 ## подвал ничего не отрезает: всё, за чем Otto идёт до выхода, — выше.
 
+## Группа люков: опора, которая однажды исчезнет.
+const HATCH_GROUP := &"basement_hatches"
 ## Насколько вид створок ниже их тела, м. Тело — вровень с полом, иначе у края
 ## кабины вырос бы порожек; а вид вровень с полом кабины мерцал бы с ним,
 ## когда кабина стоит над створками.
@@ -162,6 +164,9 @@ func _build_hatch(rect: Rect2) -> StaticBody3D:
 	var depth := WorldSpace.CORRIDOR_DEPTH + WorldSpace.ROOM_DEPTH
 	var body := StaticBody3D.new()
 	body.name = "Hatch"
+	# Люк уходит, когда собраны документы: лежащий на нём труп не засыпает и
+	# падает вместе с ним, а не висит в воздухе (авторевью M24f).
+	body.add_to_group(HATCH_GROUP)
 	body.position = WorldSpace.to_scene(rect.get_center())
 	body.position.z = WorldSpace.CORRIDOR_DEPTH * 0.5 - depth * 0.5
 

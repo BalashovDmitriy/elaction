@@ -60,6 +60,19 @@ var _window_applied: Array = []
 var _vsync_applied: Array = []
 
 
+## Разрешение из файла до M24f. Там в полном экране и без рамки разрешение не
+## значило ничего, и в файле стоял размер окна по умолчанию, а с M24f это доля
+## 3D: игрок на 4K после обновления молча получил бы половину (авторевью M24f).
+## Файл до M24f узнаётся по ключу масштаба рендера [param legacy]; в полном
+## экране и без рамки он переходит на родное разрешение экрана [param screen].
+static func migrated_resolution(
+	legacy: bool, mode: int, resolution: Vector2i, screen: Vector2i
+) -> Vector2i:
+	if not legacy or mode == DisplayModes.Mode.WINDOWED or screen.x <= 0 or screen.y <= 0:
+		return resolution
+	return screen
+
+
 ## Настройки с диска. Файла нет — значения по умолчанию, язык по локали системы.
 static func load_from(path: String = PATH) -> GameSettings:
 	var settings := GameSettings.new()
@@ -91,6 +104,12 @@ static func load_from(path: String = PATH) -> GameSettings:
 	var size: Variant = file.get_value(SECTION, "resolution", settings.resolution)
 	if size is Vector2i:
 		settings.resolution = size
+	settings.resolution = migrated_resolution(
+		file.has_section_key(SECTION, "render_scale"),
+		settings.window_mode,
+		settings.resolution,
+		DisplayServer.screen_get_size()
+	)
 	var limit := int(file.get_value(SECTION, "frame_limit", settings.frame_limit))
 	if DisplayModes.FRAME_LIMITS.has(limit):
 		settings.frame_limit = limit
