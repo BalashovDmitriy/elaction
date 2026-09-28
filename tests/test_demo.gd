@@ -187,3 +187,35 @@ func _key() -> InputEventKey:
 	event.physical_keycode = KEY_SPACE
 	event.pressed = true
 	return event
+
+
+## Конец партии — не в кадр смерти (ADR-0042, решение 5): сперва замедление и
+## наезд, потом страница, и та пункты отдаёт не сразу.
+func test_game_over_waits_for_the_last_death() -> void:
+	var main := MAIN_SCENE.instantiate()
+	add_child_autofree(main)
+	await wait_physics_frames(2)
+	# Таблица полна большими счетами: нулевой в неё не попадёт и файл игрока
+	# не тронет.
+	var records := Records.new()
+	for _row: int in Records.LIMIT:
+		records.rows.append({Records.SCORE: 1000000, Records.DATE: "2026-01-01"})
+	main.set("_records", records)
+	main.call("_start_game")
+	await wait_physics_frames(4)
+	GameState.instance().game_over.emit()
+	await wait_physics_frames(2)
+	var menu := main.get_node("Menu") as Menu
+	assert_false(menu.visible, "в кадр смерти меню нет")
+	assert_false(get_tree().paused, "мир ещё идёт — медленно")
+	assert_lt(Engine.time_scale, 1.0, "замедлен")
+	# Кадрами дерева по настоящим часам: они идут и на паузе, а ожидание GUT
+	# под паузой встаёт вместе со зданием.
+	var until := Time.get_ticks_msec() + int((LastDeath.DURATION + 0.5) * 1000.0)
+	while Time.get_ticks_msec() < until:
+		await get_tree().process_frame
+	assert_true(menu.visible, "потом — конец партии")
+	assert_eq(menu.current_page(), Menu.Page.GAME_OVER)
+	assert_true(get_tree().paused, "здание замерло")
+	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "темп вернулся")
+	assert_true(menu.rows()[0].disabled, "пункты пока не нажимаются")
