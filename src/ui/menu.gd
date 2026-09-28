@@ -18,7 +18,7 @@ signal restart_pressed
 signal to_menu_pressed
 signal quit_pressed
 
-enum Page { MAIN, PAUSE, GAME_OVER, SETTINGS, RECORDS, CONTROLS }
+enum Page { MAIN, PAUSE, GAME_OVER, SETTINGS, RECORDS, CONTROLS, CREDITS }
 
 ## Подписи действий экрана управления. Сами действия и их порядок — у
 ## [KeyBindings]; подписей из [InputMap] не достать — они здесь. Присед — то же
@@ -135,7 +135,12 @@ func show_page(page: Page, focus: int = 0) -> void:
 	# «Esc — назад» только там, где Esc и правда ведёт назад: с корневых страниц
 	# уходят пунктами, а на паузе Esc её закрывает.
 	_hint.text = tr("UI_HINT_ROOT" if _is_root(page) else "UI_HINT")
-	var wide := page == Page.SETTINGS or page == Page.CONTROLS or page == Page.RECORDS
+	var wide := (
+		page == Page.SETTINGS
+		or page == Page.CONTROLS
+		or page == Page.RECORDS
+		or page == Page.CREDITS
+	)
 	_column.custom_minimum_size.x = WIDE_COLUMN if wide else COLUMN_WIDTH
 	# Контейнер сам не сужается: после широких настроек узкая страница осталась
 	# бы шириной настроек, и пункты тянулись бы через полэкрана.
@@ -156,6 +161,8 @@ func show_page(page: Page, focus: int = 0) -> void:
 			_build_records()
 		Page.CONTROLS:
 			_build_controls()
+		Page.CREDITS:
+			_build_credits()
 
 	_slide_in()
 	_focus_row.call_deferred(focus)
@@ -249,6 +256,7 @@ func _build_main() -> void:
 	_action("UI_RECORDS", func() -> void: show_page(Page.RECORDS))
 	_action("UI_SETTINGS", func() -> void: show_page(Page.SETTINGS))
 	_action("UI_CONTROLS", func() -> void: show_page(Page.CONTROLS))
+	_action("UI_CREDITS", func() -> void: show_page(Page.CREDITS))
 	_action("UI_QUIT", func() -> void: quit_pressed.emit())
 
 
@@ -318,6 +326,24 @@ func _build_records() -> void:
 			_cell(grid, Hud.format_score(int(row[Records.SCORE])), tint, HORIZONTAL_ALIGNMENT_RIGHT)
 			_cell(grid, String(row[Records.DATE]), NeonStyle.INK_DIM, HORIZONTAL_ALIGNMENT_LEFT)
 		_column.add_child(grid)
+	_gap(10.0)
+	_back()
+
+
+## Авторы чужих моделей, фактур, звуков и шрифтов — из `CREDITS.md` через
+## [Credits] (ADR-0042, решение 6). По разделу — строка имён с лицензиями.
+func _build_credits() -> void:
+	_caption("UI_CREDITS")
+	_note(tr("UI_CREDITS_ABOUT"))
+	for section: Credits.Section in Credits.load_sections():
+		var heading := NeonStyle.label(20, _neon(), 700)
+		heading.text = tr(section.key).to_upper()
+		_column.add_child(heading)
+		var names := NeonStyle.label(19, NeonStyle.INK, 500)
+		names.text = section.line()
+		names.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		names.custom_minimum_size = Vector2(_column.custom_minimum_size.x, 0.0)
+		_column.add_child(names)
 	_gap(10.0)
 	_back()
 

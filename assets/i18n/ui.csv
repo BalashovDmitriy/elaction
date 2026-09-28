@@ -5,6 +5,13 @@ UI_RECORDS,High scores,Рекорды
 UI_SETTINGS,Settings,Настройки
 UI_CONTROLS,Controls,Управление
 UI_QUIT,Quit,Выход
+UI_CREDITS,Credits,Авторы
+UI_CREDITS_ABOUT,"elaction — a fan remake of Elevator Action (Taito, 1983). Models, textures, sounds and fonts by:","elaction — любительский ремейк Elevator Action (Taito, 1983). Модели, фактуры, звуки и шрифты:"
+UI_CREDITS_ACTORS,People and cars,Люди и машины
+UI_CREDITS_PROPS,Furniture and roof,Обстановка и крыша
+UI_CREDITS_TEXTURES,Textures,Фактуры
+UI_CREDITS_SOUND,Music and sound,Музыка и звук
+UI_CREDITS_FONTS,Fonts,Шрифты
 UI_BACK,Back,Назад
 UI_RESUME,Resume,Продолжить
 UI_RESTART,Start over,Начать заново

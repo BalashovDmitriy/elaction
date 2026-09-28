@@ -74,6 +74,7 @@ func _run() -> void:
 		[Menu.Page.SETTINGS, "settings"],
 		[Menu.Page.RECORDS, "records"],
 		[Menu.Page.CONTROLS, "controls"],
+		[Menu.Page.CREDITS, "credits"],
 		[Menu.Page.PAUSE, "pause"],
 		[Menu.Page.GAME_OVER, "game_over"],
 	]
