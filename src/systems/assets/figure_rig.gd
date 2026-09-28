@@ -17,8 +17,13 @@ extends Node3D
 ## Начало узла — в ногах актёра: актёр ставит риг на свой пол, а поворот к
 ## камере и наклон тела — дело рига.
 ##
-## Читаемость в темноте держит обводка ([method GreyboxLook.outline]) поверх
-## каждого меша: она не подчиняется свету (ADR-0022, решение 4).
+## Обводки с M24f нет (ADR-0042, решение 7): на свету она читалась неестественно.
+## Читаемость в темноте держит свет — меши фигуры лежат на своём слое
+## [constant RENDER_LAYER], и на него светит слабый свет камеры
+## ([method SideCamera.actor_fill]), которому окружение не подчиняется.
+
+## Слой рендера фигур: на него и только на него светит свет камеры.
+const RENDER_LAYER: int = 1 << 11
 
 ## Кости пака, которые двигают позы кодом. Те же имена у всех персонажей пака.
 const HIPS := "Hips"
@@ -289,7 +294,7 @@ func _ready() -> void:
 
 	for node in _instance.find_children("*", "MeshInstance3D", true, false):
 		var mesh_instance := node as MeshInstance3D
-		mesh_instance.material_overlay = GreyboxLook.outline()
+		mesh_instance.layers |= RENDER_LAYER
 		_meshes.append(mesh_instance)
 		for surface in mesh_instance.mesh.get_surface_count():
 			_surfaces.append(SkinnedSurface.of(mesh_instance, surface))

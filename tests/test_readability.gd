@@ -1,8 +1,8 @@
 extends GutTest
 
 ## Читаемость на погашенном этаже (ADR-0023, решение 6): у двери табло, у
-## кабины индикаторы, у выхода вывеска, светильник лампы светится сам, актёры в
-## обводке. Всё это эмиссия и обводка — свету сцены не подчиняются, поэтому
+## кабины индикаторы, у выхода вывеска, светильник лампы светится сам, актёров
+## высвечивает свет камеры на их слое. Всё это свету ламп не подчиняется, поэтому
 ## проверка структурная: кадр с погашенными лампами обязан это показывать.
 ##
 ## Здание настоящее, по правилам по умолчанию, на нескольких сидах: двери и
@@ -147,10 +147,10 @@ func test_lamps_glow_themselves() -> void:
 	remove_child(level)
 
 
-## Актёры — модели: их держит обводка вторым проходом на каждом меше. Меши
-## фигуры — под её ригом, [code]Body[/code]: луч прицела агента тоже меш, но
-## светящаяся нить, а не тело, и обводка ему не нужна.
-func test_actors_wear_an_outline() -> void:
+## Актёры — модели: обводки с M24f на них нет, их держит свет камеры на слое
+## фигур (ADR-0042, решение 7). Меши фигуры — под её ригом, [code]Body[/code]:
+## луч прицела агента тоже меш, но светящаяся нить, а не тело.
+func test_actors_are_lit_by_the_camera_fill() -> void:
 	var level := _build(1)
 	var agent := ENEMY_SCENE.instantiate() as Enemy
 	level.add_child(agent)
@@ -160,5 +160,8 @@ func test_actors_wear_an_outline() -> void:
 		assert_gt(meshes.size(), 0, "у актёра есть меши")
 		for node in meshes:
 			var mesh := node as MeshInstance3D
-			assert_eq(mesh.material_overlay, GreyboxLook.outline(), "на каждом меше обводка")
+			assert_null(mesh.material_overlay, "обводки нет")
+			assert_ne(mesh.layers & FigureRig.RENDER_LAYER, 0, "меш на слое фигур")
+	var fill := level.otto.get_viewport().get_camera_3d().get_node("ActorFill") as Light3D
+	assert_eq(fill.light_cull_mask, FigureRig.RENDER_LAYER, "свет камеры — только на фигуры")
 	remove_child(level)

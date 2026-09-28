@@ -36,15 +36,16 @@ func test_every_page_builds_and_takes_focus() -> void:
 
 
 func test_settings_have_every_choice() -> void:
-	# Громкость трижды, язык, сложность, графика, экран, разрешение, масштаб,
-	# предел кадров, синхронизация, кровь, кадры в секунду — и «назад».
+	# Громкость трижды, язык, сложность, графика, экран, разрешение, предел
+	# кадров, синхронизация, кровь, кадры в секунду — и «назад». Масштаба
+	# рендера с M24f нет: его долю задаёт разрешение (ADR-0042, решение 3).
 	var menu := _menu()
 	menu.show_page(Menu.Page.SETTINGS)
 	var kinds: Array[int] = []
 	for row: MenuRow in menu.rows():
 		kinds.append(row.kind)
 	assert_eq(kinds.count(MenuRow.Kind.LEVEL), 3, "три громкости")
-	assert_eq(kinds.count(MenuRow.Kind.CHOICE), 7, "семь переключателей")
+	assert_eq(kinds.count(MenuRow.Kind.CHOICE), 6, "шесть переключателей")
 	assert_eq(kinds.count(MenuRow.Kind.TOGGLE), 3, "синхронизация, кровь и кадры в секунду")
 	assert_eq(kinds.count(MenuRow.Kind.ACTION), 1, "назад")
 
@@ -306,3 +307,18 @@ func _row_labelled(menu: Menu, text: String) -> MenuRow:
 			if (label as Label).text == text:
 				return row
 	return null
+
+
+## Конец партии не принимает нажатий первые полторы секунды: давивший прыжок
+## игрок иначе жал бы «Заново» тем же пробелом (ADR-0042, решение 5).
+func test_game_over_rows_hold_still_at_first() -> void:
+	var menu := _menu()
+	menu.show_page(Menu.Page.GAME_OVER)
+	menu.hold_rows(0.3)
+	await wait_physics_frames(SETTLE_FRAMES)
+	for row: MenuRow in menu.rows():
+		assert_true(row.disabled, "пункт «%s» пока не нажимается" % row.text)
+	await wait_seconds(0.5)
+	for row: MenuRow in menu.rows():
+		assert_false(row.disabled, "а потом нажимается")
+	assert_true(menu.rows()[0].has_focus(), "фокус на месте")

@@ -123,6 +123,8 @@ var _lighting := FloorLighting.new()
 ## Пустой полосой служит (0, -1): у неё конец раньше начала, а (-1, -1) теперь
 ## означает «горит крыша» — это настоящий уровень, и совпадение молчало бы.
 var _lit_span := Vector2i(0, -1)
+## Этажи в кадре без запаса: их лампы кладут тени (ADR-0042, решение 2).
+var _shadowed_span := Vector2i(0, -1)
 ## Лампы здания: их свет гасится за пределами кадра. Упавшие лампы убирают себя
 ## сами, поэтому перед обращением проверяется живость.
 var _lamps: Array[Lamp] = []
@@ -226,15 +228,26 @@ func _process(_delta: float) -> void:
 				and (VisibleFloors.covers(span, bottom) or VisibleFloors.covers(span, bottom - 1))
 			)
 		)
-	if span == _lit_span:
+	var in_frame := VisibleFloors.seen(rules, seen)
+	if span == _lit_span and in_frame == _shadowed_span:
 		return
 
 	_lit_span = span
-	# Свет лампы кладёт тени, то есть стоит дорого, и горит только в кадре.
+	_shadowed_span = in_frame
+	# Свет лампы кладёт тени, то есть стоит дорого, и горит только в кадре; на
+	# запасных этажах — без тени (ADR-0042, решение 2).
 	for lamp: Lamp in _lamps:
 		if not is_instance_valid(lamp):
 			continue
-		lamp.set_light_visible(VisibleFloors.covers(span, lamp.floor_index))
+		lamp.set_light_visible(
+			VisibleFloors.covers(span, lamp.floor_index),
+			VisibleFloors.covers(in_frame, lamp.floor_index)
+		)
+	# Бра красных дверей — тем же правилом (ADR-0042, решение 8).
+	for door: Door in _doors:
+		if is_instance_valid(door):
+			var index := rules.floor_index_near(WorldSpace.to_plane(door.position).y)
+			door.set_light_in_view(VisibleFloors.covers(span, index))
 	# Столбы шахт — тем же правилом: их в здании втрое больше, чем ламп.
 	if _shafts != null:
 		_shafts.light_span(span)

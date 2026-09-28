@@ -18,7 +18,7 @@ signal restart_pressed
 signal to_menu_pressed
 signal quit_pressed
 
-enum Page { MAIN, PAUSE, GAME_OVER, SETTINGS, RECORDS, CONTROLS }
+enum Page { MAIN, PAUSE, GAME_OVER, SETTINGS, RECORDS, CONTROLS, CREDITS }
 
 ## Подписи действий экрана управления. Сами действия и их порядок — у
 ## [KeyBindings]; подписей из [InputMap] не достать — они здесь. Присед — то же
@@ -135,7 +135,12 @@ func show_page(page: Page, focus: int = 0) -> void:
 	# «Esc — назад» только там, где Esc и правда ведёт назад: с корневых страниц
 	# уходят пунктами, а на паузе Esc её закрывает.
 	_hint.text = tr("UI_HINT_ROOT" if _is_root(page) else "UI_HINT")
-	var wide := page == Page.SETTINGS or page == Page.CONTROLS or page == Page.RECORDS
+	var wide := (
+		page == Page.SETTINGS
+		or page == Page.CONTROLS
+		or page == Page.RECORDS
+		or page == Page.CREDITS
+	)
 	_column.custom_minimum_size.x = WIDE_COLUMN if wide else COLUMN_WIDTH
 	# Контейнер сам не сужается: после широких настроек узкая страница осталась
 	# бы шириной настроек, и пункты тянулись бы через полэкрана.
@@ -156,9 +161,25 @@ func show_page(page: Page, focus: int = 0) -> void:
 			_build_records()
 		Page.CONTROLS:
 			_build_controls()
+		Page.CREDITS:
+			_build_credits()
 
 	_slide_in()
 	_focus_row.call_deferred(focus)
+
+
+## Держит пункты страницы выключенными [param seconds] секунд: нажатие,
+## начатое ещё в игре, не должно выбрать пункт (ADR-0042, решение 5). Фокус
+## остаётся на месте — выключенный пункт его держит, а не отдаёт.
+func hold_rows(seconds: float) -> void:
+	var held := rows()
+	for row: MenuRow in held:
+		row.disabled = true
+	var page := _page
+	await get_tree().create_timer(seconds, true, false, true).timeout
+	for row: MenuRow in held:
+		if is_instance_valid(row) and _page == page:
+			row.disabled = false
 
 
 ## Прячет меню целиком — игра продолжается.
@@ -232,6 +253,7 @@ func _build_main() -> void:
 	_action("UI_RECORDS", func() -> void: show_page(Page.RECORDS))
 	_action("UI_SETTINGS", func() -> void: show_page(Page.SETTINGS))
 	_action("UI_CONTROLS", func() -> void: show_page(Page.CONTROLS))
+	_action("UI_CREDITS", func() -> void: show_page(Page.CREDITS))
 	_action("UI_QUIT", func() -> void: quit_pressed.emit())
 
 
@@ -274,7 +296,6 @@ func _build_settings() -> void:
 		_quality()
 		_window_mode()
 		_resolution()
-		_render_scale()
 		_frame_limit()
 		_vsync()
 		_blood()
@@ -302,6 +323,24 @@ func _build_records() -> void:
 			_cell(grid, Hud.format_score(int(row[Records.SCORE])), tint, HORIZONTAL_ALIGNMENT_RIGHT)
 			_cell(grid, String(row[Records.DATE]), NeonStyle.INK_DIM, HORIZONTAL_ALIGNMENT_LEFT)
 		_column.add_child(grid)
+	_gap(10.0)
+	_back()
+
+
+## Авторы чужих моделей, фактур, звуков и шрифтов — из `CREDITS.md` через
+## [Credits] (ADR-0042, решение 6). По разделу — строка имён с лицензиями.
+func _build_credits() -> void:
+	_caption("UI_CREDITS")
+	_note(tr("UI_CREDITS_ABOUT"))
+	for section: Credits.Section in Credits.load_sections():
+		var heading := NeonStyle.label(20, _neon(), 700)
+		heading.text = tr(section.key).to_upper()
+		_column.add_child(heading)
+		var names := NeonStyle.label(19, NeonStyle.INK, 500)
+		names.text = section.line()
+		names.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		names.custom_minimum_size = Vector2(_column.custom_minimum_size.x, 0.0)
+		_column.add_child(names)
 	_gap(10.0)
 	_back()
 
@@ -503,14 +542,24 @@ func _window_mode() -> void:
 			settings.window_mode = int(value)
 			settings.apply()
 			settings.save_to()
+			# Список разрешений зависит от режима ([method DisplayModes.choices]):
+			# страница собирается заново, фокус остаётся на режиме — иначе в полном
+			# экране не выбрать родное нестандартное, а в окне оставалось бы оно.
+			show_page(_page, rows().find(row))
 	)
 
 
-## Размер окна — из тех, что держит монитор игрока.
+## Размер окна — из тех, что держит монитор игрока; в полном экране и без рамки
+## — разрешение 3D ([method DisplayModes.share]).
 func _resolution() -> void:
 	var area := DisplayModes.screen_rect().size
-	var sizes := DisplayModes.available(area)
-	var current := DisplayModes.nearest(settings.resolution, area)
+	var mode := settings.window_mode as DisplayModes.Mode
+	var sizes := DisplayModes.choices(mode, area)
+	var current := (
+		settings.resolution
+		if sizes.has(settings.resolution)
+		else DisplayModes.nearest(settings.resolution, area)
+	)
 	var names: Array[String] = []
 	var selected := 0
 	for index: int in sizes.size():
@@ -522,26 +571,7 @@ func _resolution() -> void:
 		func(value: Variant) -> void:
 			settings.resolution = sizes[int(value)]
 			settings.apply()
-	)
-
-
-## Масштаб 3D-рендера: на 4K слабая карта рисует сцену меньше, интерфейс — нет.
-func _render_scale() -> void:
-	var names: Array[String] = []
-	# Отмечается ближайший масштаб, а не равный: в файле может стоять любой, и
-	# без отметки список показывался пустым (авторевью M22).
-	var closest := 0
-	for index: int in DisplayModes.RENDER_SCALES.size():
-		var share := DisplayModes.RENDER_SCALES[index]
-		names.append("%d%%" % roundi(share * 100.0))
-		var gap := absf(share - settings.render_scale)
-		if gap < absf(DisplayModes.RENDER_SCALES[closest] - settings.render_scale):
-			closest = index
-	var row := _add_row(MenuRow.choice(tr("UI_RENDER_SCALE"), names, closest))
-	row.changed.connect(
-		func(value: Variant) -> void:
-			settings.render_scale = DisplayModes.RENDER_SCALES[int(value)]
-			settings.apply()
+			settings.save_to()
 	)
 
 

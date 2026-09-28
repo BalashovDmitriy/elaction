@@ -72,6 +72,19 @@ const OCCUPIED_GLOW: float = 1.8
 ## ([method GreyboxLook.marker]) горел плоским розовым пятном ярче всех дверей.
 const OCCUPIED_LEAF_GLOW: float = 0.14
 
+## Бра красной двери (ADR-0042, решение 8): красная дверь в тени коридора
+## терялась, и её легко было пройти. Конус без тени, перед створкой у её верха,
+## смотрит вниз и к стене — пятно ложится на створку и пол перед ней. Горит и при
+## сбитой лампе, гаснет с документом. Дальше своего пола не светит: от высоты
+## бра до пола — меньше дальности, до плиты под полом — больше.
+const RED_LIGHT_COLOR := Color(1.0, 0.32, 0.26)
+const RED_LIGHT_ENERGY: float = 1.3
+const RED_LIGHT_RANGE: float = 3.0
+const RED_LIGHT_ANGLE: float = 42.0
+## Насколько бра перед стеной, м, и на сколько оно наклонено к ней от отвеса.
+const RED_LIGHT_OUT: float = 0.7
+const RED_LIGHT_TILT: float = 0.35
+
 ## Краски занятой створки по тону: их две на все двери (створка и филёнки).
 static var _occupied_paints: Dictionary = {}
 
@@ -107,6 +120,11 @@ var _shown: float = -1.0
 var _shown_red: bool = false
 var _shown_occupied: bool = false
 var _sign: MeshInstance3D = null
+## Бра красной двери; горит, пока за ней документ и этаж в кадре.
+var _red_light: SpotLight3D = null
+## Этаж двери в полосе горящих: за кадром бра не горит, как и лампы
+## ([method set_light_in_view]). Дверь вне уровня — в тестах — считается в кадре.
+var _in_view: bool = true
 ## Своё табло на время, пока Otto внутри: общий материал огонька дышал бы у всех
 ## красных дверей здания разом. И часы дыхания — по физике: на паузе оно стоит.
 var _pulse: StandardMaterial3D = null
@@ -142,6 +160,8 @@ func _ready() -> void:
 		0.0, LEAF_SIZE.y + SIGN_RISE, WorldSpace.BACK_WALL_Z + SIGN_SIZE.z * 0.5
 	)
 	add_child(_sign)
+	_red_light = _make_red_light()
+	add_child(_red_light)
 	_dress_leaf()
 	_frame_the_opening()
 	_refresh_look()
@@ -356,7 +376,37 @@ func _refresh_look() -> void:
 		panel.material_override = relief
 	var glow := GreyboxLook.SIGN_RED if has_document else GreyboxLook.SIGN_WARM
 	_sign.material_override = GreyboxLook.light(glow)
+	_red_light.visible = has_document and _in_view
 	_pulse_clock = 0.0
+
+
+## Этаж двери попал в полосу горящих или ушёл из неё. Зовёт уровень, отбирая
+## видимые этажи, как у ламп (ADR-0010, пункт 8).
+func set_light_in_view(on: bool) -> void:
+	_in_view = on
+	if _red_light != null:
+		_red_light.visible = has_document and on
+
+
+## Горит ли бра красной двери. Тестам.
+func is_red_light_on() -> bool:
+	return _red_light != null and _red_light.visible
+
+
+func _make_red_light() -> SpotLight3D:
+	var light := SpotLight3D.new()
+	light.name = "RedLight"
+	light.light_color = RED_LIGHT_COLOR
+	light.light_energy = RED_LIGHT_ENERGY
+	light.spot_range = RED_LIGHT_RANGE
+	light.spot_angle = RED_LIGHT_ANGLE
+	light.shadow_enabled = false
+	light.light_volumetric_fog_energy = 0.5
+	light.position = Vector3(0.0, LEAF_SIZE.y + SIGN_RISE, WorldSpace.BACK_WALL_Z + RED_LIGHT_OUT)
+	# Свет у Godot идёт вдоль −Z узла: отвес вниз и наклон к стене.
+	light.rotation.x = -PI * 0.5 + RED_LIGHT_TILT
+	light.visible = false
+	return light
 
 
 ## Краска створки: занятая светится сама, неярко, — красной остаётся и в тени.

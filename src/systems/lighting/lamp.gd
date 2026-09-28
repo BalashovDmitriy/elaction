@@ -30,6 +30,8 @@ const SPOT_RANGE: float = 6.0
 const SPOT_ANGLE: float = 60.0
 const SPOT_ENERGY: float = 9.0
 const SPOT_BLUR: float = 1.6
+## Насколько конус без тени заходит в плиту под своим полом, м: меньше плиты.
+const FLOOR_REACH: float = 0.1
 
 ## Заливка вокруг: слабая и широкая. Один конус оставлял бы между лампами
 ## черноту при всех горящих — а зона считается освещённой целиком.
@@ -72,6 +74,10 @@ var floor_index: int = 0
 var _fall := LampFall.new()
 var _spot: SpotLight3D = null
 var _fill: OmniLight3D = null
+## Этаж лампы в кадре: свет с тенью. Иначе — запасной, конус до пола без тени.
+var _shadowed: bool = true
+## На какой высоте над своим полом висит лампа, м: [method hang].
+var _above_floor: float = SPOT_RANGE
 var _cord: MeshInstance3D = null
 ## Рассеиватель абажура: светится, пока лампа цела (ADR-0031, решение 3).
 var _diffuser: MeshInstance3D = null
@@ -128,6 +134,7 @@ func _physics_process(delta: float) -> void:
 ## держать копию размера из lamp.tscn и следить, чтобы та не разъехалась.
 ## Звать после добавления в дерево — форма берётся из узла.
 func hang(hang_height: float, headroom: float = 0.0) -> void:
+	_above_floor = hang_height
 	var box := _shape.shape as BoxShape3D
 	_fall.distance = maxf(hang_height - box.size.y * 0.5, 0.0)
 
@@ -173,9 +180,21 @@ func shoot_down() -> void:
 ## Гасит или зажигает свет лампы. Зовёт уровень, отбирая видимые этажи: конус
 ## кладёт тени и стоит дорого, поэтому за кадром ему гореть незачем
 ## (ADR-0010, пункт 8). Сама лампа при этом остаётся как была.
-func set_light_visible(on: bool) -> void:
+##
+## [param shadowed] — этаж в кадре. Запасной этаж за кромкой кадра горит только
+## конусом, без тени и не дальше своего пола: его тени никто не видит, а внизу
+## здания запасные лампы давали треть проходов теней (ADR-0042, решение 2).
+## Заливка там не горит: без тени она светила бы сквозь потолок на этаж выше.
+func set_light_visible(on: bool, shadowed: bool = true) -> void:
 	_spot.visible = on
-	_fill.visible = on
+	_fill.visible = on and shadowed
+	# Уровень зовёт это всем лампам разом, как только кадр сменил этажи. Запись
+	# дальности или тени, даже прежней, помечает карту теней грязной, и лампы, у
+	# которых ничего не сменилось, перерисовывали бы тени в тот же кадр.
+	if shadowed == _shadowed:
+		return
+	_shadowed = shadowed
+	apply_graphics()
 
 
 ## Тени ламп по уровню качества (ADR-0030, решение 5): на низком без теней,
@@ -183,7 +202,9 @@ func set_light_visible(on: bool) -> void:
 ## коридора (ADR-0034, решение 1); заливка светит в туман на четверть — иначе
 ## воздух вокруг лампы светился бы шаром, а не конусом.
 func apply_graphics() -> void:
-	_spot.shadow_enabled = Graphics.spot_shadows()
+	_spot.shadow_enabled = Graphics.spot_shadows() and _shadowed
+	# Конус без тени не держится полом: до пола и чуть в плиту, но не сквозь неё.
+	_spot.spot_range = SPOT_RANGE if _shadowed else minf(SPOT_RANGE, _above_floor + FLOOR_REACH)
 	_fill.shadow_enabled = Graphics.fill_shadows()
 	_spot.light_volumetric_fog_energy = Graphics.light_in_fog()
 	_fill.light_volumetric_fog_energy = Graphics.light_in_fog() * 0.25
@@ -254,6 +275,12 @@ func _make_fill() -> OmniLight3D:
 	light.light_energy = FILL_ENERGY
 	light.omni_range = FILL_RANGE
 	light.shadow_enabled = true
+	# Две полусферы, а не куб: вдвое-втрое меньше проходов тени. Заливка слабая
+	# и мягкая, шов полусфер на ней не виден, а внизу здания кубы ламп съедали
+	# две трети кадра на «Ультра» (ADR-0042, решение 2). Обстановку в свою тень
+	# заливка не берёт.
+	light.omni_shadow_mode = OmniLight3D.SHADOW_DUAL_PARABOLOID
+	light.shadow_caster_mask = ~PropCatalog.RENDER_LAYER
 	return light
 
 

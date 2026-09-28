@@ -35,20 +35,14 @@ func test_the_side_is_where_the_agent_looks() -> void:
 	assert_eq(Takedown.side_of(0.0, 0.7, 1.0), Takedown.Side.BACK, "агент спиной к Otto")
 
 
-func test_above_means_feet_over_the_head() -> void:
+func test_landing_next_to_an_agent_is_a_pounce() -> void:
+	# ADR-0042, решение 9: вплотную на том же этаже — с любой стороны, с прыжка
+	# или с этажа выше, неважно.
 	var agent := Vector2(0.0, 0.0)
-	assert_true(Takedown.is_above(Vector2(0.2, 2.0), agent, 1.68), "над макушкой — сверху")
-	assert_false(Takedown.is_above(Vector2(0.2, 1.0), agent, 1.68), "ниже макушки — нет")
-	assert_false(Takedown.is_above(Vector2(1.5, 2.0), agent, 1.68), "в стороне — нет")
-
-
-func test_a_pounce_is_a_fall_from_above_not_a_jump() -> void:
-	# ADR-0040, решение 4: с этажа выше или с крыши кабины. Вершина своего прыжка
-	# (1.88 м) выше макушки агента (1.68), и без условия на опору прыжок рядом с
-	# агентом добивал бы сам.
-	assert_true(Takedown.fell_onto(3.0, 0.0), "с этажа выше — сверху")
-	assert_false(Takedown.fell_onto(0.0, 0.0), "прыжок с того же пола — нет")
-	assert_false(Takedown.fell_onto(0.1, 0.0), "и с ковра того же этажа — нет")
+	assert_true(Takedown.lands_on(Vector2(0.2, 0.0), agent), "на агента — напрыгнул")
+	assert_true(Takedown.lands_on(Vector2(-0.8, 0.05), agent), "вплотную сзади — тоже")
+	assert_false(Takedown.lands_on(Vector2(1.5, 0.0), agent), "в стороне — нет")
+	assert_false(Takedown.lands_on(Vector2(0.2, 3.6), agent), "этажом выше — нет")
 
 
 func test_scores_by_side_with_the_dark_bonus() -> void:
@@ -292,10 +286,10 @@ func test_a_dead_otto_does_not_pounce() -> void:
 	assert_false(agent.is_dead(), "агент жив")
 
 
-func test_the_jump_no_longer_kicks() -> void:
-	# С M24d прыжок — просто прыжок (ADR-0040, решения 1 и 4): ни удара, ни
-	# напрыгивания. Вершина прыжка выше макушки, а агент в загоне всё время под
-	# Otto, — поэтому смотреть надо и после приземления, а не только в полёте.
+func test_a_jump_onto_an_agent_pounces() -> void:
+	# Отзыв после M24e: прыжок с приземлением на агента не добивал никогда —
+	# напрыгивание ждало опоры выше этажа агента. С M24f приземлился вплотную —
+	# напрыгнул (ADR-0042, решение 9).
 	_floor()
 	_wall(-0.9)
 	_wall(0.9)
@@ -309,14 +303,16 @@ func test_the_jump_no_longer_kicks() -> void:
 	Input.action_press(&"jump")
 	await wait_physics_frames(2)
 	Input.action_release(&"jump")
-	var highest := otto.global_position.y
-	for _step in 90:
+	var left := 120
+	while left > 0 and _director() == null:
 		await wait_physics_frames(1)
-		highest = maxf(highest, otto.global_position.y)
-	assert_gt(highest, agent.global_position.y + Proportions.BODY, "прыжок выше макушки агента")
-	assert_true(otto.is_grounded(), "прыжок кончился")
-	assert_null(_director(), "прыжок рядом с агентом — не добивание")
-	assert_false(agent.is_dead(), "прыжок рядом с агентом его не убивает")
+		left -= 1
+	var director := _director()
+	assert_not_null(director, "прыгнул на агента — напрыгнул")
+	if director == null:
+		return
+	assert_eq(director.scene().side, Takedown.Side.ABOVE, "сверху")
+	await _wait_for_the_end(agent)
 
 
 func test_the_director_does_not_push_the_agent_into_a_wall() -> void:

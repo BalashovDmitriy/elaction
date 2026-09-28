@@ -28,6 +28,22 @@ static func around(rules: BuildingRules, view: Rect2) -> Vector2i:
 	return Vector2i(maxi(first, BuildingRules.ROOF), mini(last, rules.floors - 1))
 
 
+## Этажи, которые видны в кадре хотя бы краем, — без запаса. Им свет с тенью;
+## запасным из [method around] — только конус до своего пола (ADR-0042,
+## решение 2).
+static func seen(rules: BuildingRules, view: Rect2) -> Vector2i:
+	return Vector2i(
+		maxi(_story_of(rules, view.position.y), BuildingRules.ROOF),
+		mini(_story_of(rules, view.end.y), rules.floors - 1)
+	)
+
+
+## Этаж, в высоту которого попадает [param y]: от пола этажа выше до своего пола.
+static func _story_of(rules: BuildingRules, y: float) -> int:
+	var raw := ceilf((y - rules.sky_height) / rules.floor_height) - 1.0
+	return clampi(int(raw), BuildingRules.ROOF, rules.floors - 1)
+
+
 ## Попадает ли этаж в кадр. Тот же счёт, что у [method around], только ответ
 ## про один этаж: уровню удобнее спрашивать так, когда он обходит все подряд.
 static func covers(span: Vector2i, index: int) -> bool:

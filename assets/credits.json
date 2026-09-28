@@ -1,0 +1,299 @@
+{
+ "sections": [
+  {
+   "key": "UI_CREDITS_ACTORS",
+   "authors": [
+    {
+     "name": "Quaternius",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "kazuma",
+     "licences": [
+      "CC0 1.0"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "UI_CREDITS_PROPS",
+   "authors": [
+    {
+     "name": "Quaternius",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "J-Toastie",
+     "licences": [
+      "CC-BY 3.0"
+     ]
+    },
+    {
+     "name": "Poly by Google",
+     "licences": [
+      "CC-BY 3.0"
+     ]
+    },
+    {
+     "name": "CreativeTrio",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "Dilan Shah",
+     "licences": [
+      "CC-BY 3.0"
+     ]
+    },
+    {
+     "name": "Tomáš Bayer",
+     "licences": [
+      "CC-BY 3.0"
+     ]
+    },
+    {
+     "name": "Bruno Oliveira",
+     "licences": [
+      "CC-BY 3.0"
+     ]
+    },
+    {
+     "name": "dook",
+     "licences": [
+      "CC-BY 3.0"
+     ]
+    },
+    {
+     "name": "Kenney",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "Jarlan Perez",
+     "licences": [
+      "CC-BY 3.0"
+     ]
+    },
+    {
+     "name": "jeremy",
+     "licences": [
+      "CC-BY 3.0"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "UI_CREDITS_TEXTURES",
+   "authors": [
+    {
+     "name": "ambientCG",
+     "licences": [
+      "CC0 1.0"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "UI_CREDITS_SOUND",
+   "authors": [
+    {
+     "name": "Kevin MacLeod (incompetech.com)",
+     "licences": [
+      "CC-BY 4.0"
+     ]
+    },
+    {
+     "name": "Kenney",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "nomiqbomi",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "TaranP",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "swuing",
+     "licences": [
+      "CC-BY 4.0"
+     ]
+    },
+    {
+     "name": "michorvath",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "thefsoundman",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "Breviceps",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "Blankened",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "Natty23",
+     "licences": [
+      "CC-BY 4.0"
+     ]
+    },
+    {
+     "name": "youandbiscuitme",
+     "licences": [
+      "CC-BY 3.0"
+     ]
+    },
+    {
+     "name": "Filmscore",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "roachpowder",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "InspectorJ",
+     "licences": [
+      "CC-BY 4.0"
+     ]
+    },
+    {
+     "name": "joedeshon",
+     "licences": [
+      "CC-BY 4.0"
+     ]
+    },
+    {
+     "name": "soundmary",
+     "licences": [
+      "CC-BY 4.0"
+     ]
+    },
+    {
+     "name": "Lydmakeren",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "beerbelly38",
+     "licences": [
+      "CC-BY 4.0"
+     ]
+    },
+    {
+     "name": "monotraum",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "snakebarney",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "freesoundjon01",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "TRP",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "klankbeeld",
+     "licences": [
+      "CC-BY 4.0"
+     ]
+    },
+    {
+     "name": "roofusj",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "kyles",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "loganzsound",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "Shuhmi",
+     "licences": [
+      "CC-BY 4.0"
+     ]
+    },
+    {
+     "name": "addiofbaddi",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "gchase",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "Nox_Sound",
+     "licences": [
+      "CC0 1.0"
+     ]
+    }
+   ]
+  },
+  {
+   "key": "UI_CREDITS_FONTS",
+   "authors": [
+    {
+     "name": "The Exo 2 Project Authors",
+     "licences": [
+      "SIL OFL 1.1"
+     ]
+    }
+   ]
+  }
+ ]
+}

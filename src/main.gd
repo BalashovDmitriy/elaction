@@ -21,6 +21,8 @@ const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 ## Сколько досчитанный бонус висит на кадре, прежде чем кадр уйдёт в чёрное, с:
 ## дочитать число.
 const BONUS_HOLD: float = 0.8
+## Сколько пункты конца партии не принимают нажатий, с (ADR-0042, решение 5).
+const GAME_OVER_HOLD: float = 1.5
 
 var _level: GreyboxLevel = null
 ## Город за главным меню (ADR-0035). Живёт, пока открыто меню, а не партия.
@@ -90,13 +92,25 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_count_idle(delta)
+	# Курсор — только в меню: в партии и в демо он висел поверх кадра, и полный
+	# экран читался растянутым окном (ADR-0042, решение 4).
+	var cursor := Input.MOUSE_MODE_VISIBLE if _menu.visible else Input.MOUSE_MODE_HIDDEN
+	if Input.mouse_mode != cursor:
+		Input.mouse_mode = cursor
 	if _just_pressed(&"pause"):
 		# Пауза во вступлении его пропускает, а не открывает меню (ADR-0038).
 		if _playing and _level != null and _level.skip_the_intro():
 			pass
 		elif _playing:
 			_pause()
-		elif _page_before == Menu.Page.PAUSE and _menu.current_page() == Menu.Page.PAUSE:
+		elif (
+			_menu.visible
+			and _page_before == Menu.Page.PAUSE
+			and _menu.current_page() == Menu.Page.PAUSE
+		):
+			# Только открытая пауза: закрытое меню помнит последнюю страницу, и
+			# Esc во время последней смерти «продолжал» бы игру после паузы в
+			# этой партии — конец партии так и не показывался (авторевью M24f).
 			_resume()
 	_page_before = _menu.current_page()
 
@@ -399,8 +413,26 @@ func _on_game_over() -> void:
 	if place >= 0:
 		_records.save_to()
 	_menu.remember(score, place)
+	# Сперва последняя смерть — замедление и наезд (ADR-0042, решение 5). Не в
+	# этом кадре: погибший посреди сценки добивания Otto её обрывает, и сценка,
+	# возвращая темп мира, сняла бы и замедление сцены.
+	_play_the_last_death.call_deferred()
 
+
+func _play_the_last_death() -> void:
+	if _level == null or not is_instance_valid(_level.otto):
+		_show_game_over()
+		return
+	LastDeath.play(self, _level.otto).finished.connect(_show_game_over)
+
+
+func _show_game_over() -> void:
+	# Вышли в меню, пока шла сцена, — показывать уже нечего.
+	if _level == null or _playing:
+		return
 	# Партия окончена — здание замирает, как на паузе. Иначе агенты продолжают
 	# приходить и стрелять под надписью «игра окончена».
 	get_tree().paused = true
 	_menu.show_page(Menu.Page.GAME_OVER)
+	# Пункты не сразу: давивший прыжок игрок иначе жал бы «Заново» тем же пробелом.
+	_menu.hold_rows(GAME_OVER_HOLD)

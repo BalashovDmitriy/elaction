@@ -15,7 +15,7 @@ extends RefCounted
 ## лампами дверь исчезла полностью — а дверь это цель игры. С M17 читаемость
 ## держат не светящиеся целиком коробки, а **огоньки** — [method light]: табло над
 ## дверью, индикаторы кабины, вывеска выхода. Светильник лампы и пуля светятся
-## сами — [method marker]; актёров держит [method outline].
+## сами — [method marker]; актёров — свет камеры ([method SideCamera.actor_fill]).
 
 ## Тона окружения. Подобраны так, чтобы соседние плоскости различались на глаз
 ## и в освещённом кадре, и в погашенном.
@@ -34,7 +34,7 @@ const SKIRTING := Color(0.17, 0.17, 0.19)
 const PILASTER := Color(0.40, 0.40, 0.42)
 
 ## Тона игровых объектов. Актёры и машина у выхода с M16 — модели со своими
-## материалами; их читаемость держит [method outline].
+## материалами; их читаемость в темноте держит свет камеры (ADR-0042, решение 7).
 const DOOR := Color(0.78, 0.66, 0.30)
 const DOOR_RED := Color(0.76, 0.24, 0.22)
 const LAMP := Color(1.0, 0.93, 0.72)
@@ -46,10 +46,6 @@ const SIGN_WARM := Color(1.0, 0.72, 0.35)
 const SIGN_RED := Color(1.0, 0.22, 0.16)
 const SIGN_GREEN := Color(0.30, 1.0, 0.50)
 const INDICATOR := Color(1.0, 0.25, 0.15)
-
-## Обводка актёров: светлый кант и его толщина, м.
-const OUTLINE := Color(0.92, 0.94, 1.0)
-const OUTLINE_WIDTH: float = 0.018
 
 ## Насколько ярко светятся маркеры — светильник и пуля. Не «фонарь», а ровно
 ## столько, чтобы силуэт читался на погашенном этаже: выше — и кадр
@@ -132,26 +128,6 @@ static func box(size: Vector3, material: StandardMaterial3D) -> MeshInstance3D:
 	part.mesh = mesh
 	part.material_override = material
 	return part
-
-
-## Обводка актёра: инвертированная оболочка вторым проходом.
-##
-## Лицевые грани отсечены, без затенения, чуть шире тела — рисуется задняя
-## сторона раздутого меша, и по контуру фигуры остаётся кант. Свету он не
-## подчиняется, поэтому виден и на погашенном этаже (ADR-0022, решение 4).
-## Rim-свет для этого не годится: он слагаемое освещения и гаснет вместе с ним.
-static func outline() -> StandardMaterial3D:
-	var found: Variant = _cache.get("outline")
-	if found != null:
-		return found as StandardMaterial3D
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.cull_mode = BaseMaterial3D.CULL_FRONT
-	material.grow = true
-	material.grow_amount = OUTLINE_WIDTH
-	material.albedo_color = OUTLINE
-	_cache["outline"] = material
-	return material
 
 
 ## Сбрасывает кэш. Нужен тестам: материалы живут в статике, а она переживает

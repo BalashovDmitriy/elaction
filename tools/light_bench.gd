@@ -18,6 +18,13 @@ extends Node3D
 ##     godot --path . res://tools/light_bench.tscn -- --whole
 ##     godot --path . res://tools/light_bench.tscn -- --whole --seed=2
 ##     godot --path . res://tools/light_bench.tscn -- --garage --x=16
+##     godot --path . res://tools/light_bench.tscn -- --floors --quality=3 --native
+##     godot --path . res://tools/light_bench.tscn -- --shot=screens/bench.png --index=15
+##
+## `--floors` (M24f) — таблица по этажам на одном уровне (`--quality=`, по
+## умолчанию «Ультра»): GPU и CPU рендера, полный кадр, источники с тенью и
+## вызовы отрисовки — видно, что растёт к низу здания. `--native` — окно без
+## рамки во весь экран, в родном разрешении, как у игрока в полном экране.
 ##
 ## Сид по умолчанию — 1, туман. Дождь (M24a) меряется на сиде 2.
 ##
@@ -69,6 +76,9 @@ func _ready() -> void:
 	if OS.get_cmdline_user_args().has("--whole"):
 		_run_whole(level)
 		return
+	if OS.get_cmdline_user_args().has("--floors"):
+		_run_floors(level)
+		return
 	var index := level.rules.floors - 3
 	var x := NAN
 	var exit_shift := NAN
@@ -83,6 +93,8 @@ func _ready() -> void:
 			index = level.rules.floors - 1
 		elif argument.begins_with("--lift="):
 			lift = argument.trim_prefix("--lift=").to_float()
+		elif argument.begins_with("--index="):
+			index = argument.trim_prefix("--index=").to_int()
 	if is_nan(x):
 		x = level.plan().safe_x(level.rules, index)
 	level.otto.global_position = WorldSpace.to_scene(Vector2(x, level.rules.floor_surface(index)))
@@ -162,6 +174,69 @@ func _run_whole(level: GreyboxLevel) -> void:
 	get_tree().quit(1 if failed else 0)
 
 
+## По этажам на одном уровне качества: строка на этаж.
+func _run_floors(level: GreyboxLevel) -> void:
+	var quality := Graphics.Quality.ULTRA
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with("--quality="):
+			quality = argument.trim_prefix("--quality=").to_int() as Graphics.Quality
+		elif argument == "--native":
+			DisplayModes.apply_window(DisplayModes.Mode.BORDERLESS, Vector2i.ZERO)
+	var viewport := get_viewport().get_viewport_rid()
+	RenderingServer.viewport_set_measure_render_time(viewport, true)
+	var city := level.get_node_or_null("Scenery/City/CityView") as SubViewport
+	var city_rid := city.get_viewport_rid() if city != null else RID()
+	if city_rid.is_valid():
+		RenderingServer.viewport_set_measure_render_time(city_rid, true)
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+	Engine.max_fps = 0
+	level.spawn_agents = false
+	Graphics.broadcast(quality)
+	for _frame in 60:
+		await get_tree().process_frame
+	var rules := level.rules
+	print("  окно %s, уровень %d" % [str(get_viewport().get_visible_rect().size), quality])
+	print("  этаж  GPU мс  CPU мс  кадр мс  светит  с тенью  вызовов")
+	for index in range(BuildingRules.ROOF, rules.floors):
+		level.otto.global_position = WorldSpace.to_scene(
+			Vector2(level.plan().safe_x(rules, index), rules.floor_surface(index))
+		)
+		for _frame in FLOOR_SETTLE:
+			await get_tree().process_frame
+		var gpu := 0.0
+		var cpu := 0.0
+		var frame := 0.0
+		var calls := 0.0
+		for _frame in FLOOR_FRAMES:
+			await get_tree().process_frame
+			var spent := RenderingServer.viewport_get_measured_render_time_gpu(viewport)
+			if (
+				city_rid.is_valid()
+				and city.render_target_update_mode != SubViewport.UPDATE_DISABLED
+			):
+				spent += RenderingServer.viewport_get_measured_render_time_gpu(city_rid)
+			gpu += spent
+			cpu += RenderingServer.viewport_get_measured_render_time_cpu(viewport)
+			frame += get_process_delta_time() * 1000.0
+			calls += Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
+		var n := float(FLOOR_FRAMES)
+		print(
+			(
+				"  %4s  %6.2f  %6.2f  %7.2f  %6d  %7d  %7d"
+				% [
+					str(FloorSigns.number_of(rules, index)),
+					gpu / n,
+					cpu / n,
+					frame / n,
+					_lit(level),
+					_shadowed(level),
+					int(calls / n),
+				]
+			)
+		)
+	get_tree().quit(0)
+
+
 func _run(level: GreyboxLevel) -> void:
 	var viewport := get_viewport().get_viewport_rid()
 	RenderingServer.viewport_set_measure_render_time(viewport, true)
@@ -180,6 +255,10 @@ func _run(level: GreyboxLevel) -> void:
 			level.otto.apply_camera_bounds(_exit_bounds)
 		await get_tree().physics_frame
 
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with("--shot="):
+			await RenderingServer.frame_post_draw
+			get_viewport().get_texture().get_image().save_png(argument.trim_prefix("--shot="))
 	var gpu := 0.0
 	var cpu := 0.0
 	var worst := 0.0
@@ -207,6 +286,15 @@ func _lit(level: GreyboxLevel) -> int:
 	var count := 0
 	for node: Node in level.find_children("*", "Light3D", true, false):
 		if (node as Light3D).is_visible_in_tree():
+			count += 1
+	return count
+
+
+func _shadowed(level: GreyboxLevel) -> int:
+	var count := 0
+	for node: Node in level.find_children("*", "Light3D", true, false):
+		var light := node as Light3D
+		if light.is_visible_in_tree() and light.shadow_enabled:
 			count += 1
 	return count
 

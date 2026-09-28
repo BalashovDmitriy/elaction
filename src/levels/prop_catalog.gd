@@ -19,6 +19,15 @@ enum Place { FLOOR, WALL, ROOF, TOP }
 ## Для какого здания: отель, офис, любое.
 enum Fit { HOTEL, OFFICE, ANY }
 
+## Слой рендера обстановки. Предметы видны, как все, но тень от заливки ламп не
+## отбрасывают: заливка — слабый широкий свет, её тень от стула на кадре не
+## видна, а рисовать обстановку лишний раз в её карту теней стоило внизу
+## здания, где ламп втрое больше, трети кадра (ADR-0042, решение 2). Тень под
+## конусом лампы у предметов остаётся.
+##
+## Слой свой вместо первого, а не вдобавок к нему: маска теней берёт предмет, если
+## совпал хоть один слой, и на первом слое маска заливки его бы не отпустила.
+const RENDER_LAYER: int = 1 << 10
 const DIR := "res://assets/models/props"
 
 ## Мебель стоит в стольких метрах от задней стены: перед пилястрами
@@ -153,6 +162,7 @@ static func make(prop_name: String) -> Node3D:
 	var holder := Node3D.new()
 	holder.name = prop_name
 	holder.add_child(sized)
+	_mark_as_props(model)
 	if item != null and not item.top.is_empty():
 		var on_top := make(item.top)
 		if on_top != null:
@@ -163,6 +173,15 @@ static func make(prop_name: String) -> Node3D:
 			on_top.position = Vector3(0.0, height, (depth - top_depth) * 0.5)
 			holder.add_child(on_top)
 	return holder
+
+
+## Переводит меши модели с первого слоя на слой обстановки [constant
+## RENDER_LAYER]: заливка ламп обстановку в свою тень не берёт (ADR-0042,
+## решение 2).
+static func _mark_as_props(model: Node) -> void:
+	for node: Node in model.find_children("*", "VisualInstance3D", true, false):
+		var visual := node as VisualInstance3D
+		visual.layers = (visual.layers & ~1) | RENDER_LAYER
 
 
 ## Габарит собранного предмета, м: ширина, рост, глубина — с лампой сверху.
