@@ -311,6 +311,24 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "turning", "actions": ["move_right"], "hold": 0.05},
 		{"label": "walking_on", "actions": ["move_right"], "hold": 1.0},
 	],
+	# M24f: баги и настройки. Маршрут партии тот же, что M24e; кадры света и
+	# темноты — tools/light_bench.tscn -- --shot=, меню с «Авторами» —
+	# tools/ui_shot.tscn -- --folder=M24F.
+	"M24F":
+	[
+		{"label": "roof", "actions": [], "hold": 1.2},
+		{"label": "roof_walk", "actions": ["move_right"], "hold": 2.5},
+		{"label": "to_the_shaft", "actions": ["move_right"], "hold": 2.9},
+		{"label": "riding_down", "actions": ["move_down"], "hold": 2.2},
+		{"label": "stopped", "actions": [], "hold": 1.6},
+		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
+		{"label": "floor", "actions": [], "hold": 0.6},
+		{"label": "takeoff", "actions": ["jump"], "hold": 0.2},
+		{"label": "falling", "actions": [], "hold": 0.45},
+		{"label": "landing", "actions": [], "hold": 0.4},
+		{"label": "turning", "actions": ["move_right"], "hold": 0.05},
+		{"label": "walking_on", "actions": ["move_right"], "hold": 1.0},
+	],
 	"M19":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},

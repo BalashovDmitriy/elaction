@@ -282,7 +282,8 @@ M24g, [ADR-0043](adr/0043-animation-and-look.md).
 - [x] Страница «Авторы» в меню: `CREDITS.md` → `tools/build_credits.py` →
       `assets/credits.json` → `Credits`; тест `test_credits` сверяет JSON с
       `CREDITS.md`
-- [ ] Кадры вехи, сравнение с оригиналом
+- [x] Кадры вехи: маршрут `capture.py M24F`, сравнение с оригиналом; свет и
+      темнота до и после — `light_bench -- --shot=`, меню — `ui_shot`
 - [ ] Авторевью, `check.ps1`, README
 - [ ] PR
 
