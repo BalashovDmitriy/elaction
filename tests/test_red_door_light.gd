@@ -38,3 +38,13 @@ func test_the_light_goes_out_with_the_document() -> void:
 	door.has_document = false
 	await wait_physics_frames(2)
 	assert_false(door.is_red_light_on(), "документ взят — бра погасло")
+
+
+## За кадром бра не горит, как и лампы: у здания красных дверей до десятка.
+func test_the_light_is_out_off_frame() -> void:
+	var door := _door(true)
+	await wait_physics_frames(2)
+	door.set_light_in_view(false)
+	assert_false(door.is_red_light_on(), "этаж ушёл из кадра — бра погасло")
+	door.set_light_in_view(true)
+	assert_true(door.is_red_light_on(), "вернулся — горит")

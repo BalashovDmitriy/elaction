@@ -95,7 +95,11 @@ func _lit(level: GreyboxLevel) -> int:
 	var count := 0
 	for node: Node in level.find_children("*", "Light3D", true, false):
 		var light := node as Light3D
-		if light != null and light.is_visible_in_tree():
+		# Свет камеры светит только на слой фигур: пятна на этаже он не даёт
+		# (ADR-0042, решение 7).
+		if light == null or light.light_cull_mask == FigureRig.RENDER_LAYER:
+			continue
+		if light.is_visible_in_tree():
 			count += 1
 	return count
 

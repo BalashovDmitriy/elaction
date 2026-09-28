@@ -120,8 +120,11 @@ var _shown: float = -1.0
 var _shown_red: bool = false
 var _shown_occupied: bool = false
 var _sign: MeshInstance3D = null
-## Бра красной двери; горит, пока за ней документ.
+## Бра красной двери; горит, пока за ней документ и этаж в кадре.
 var _red_light: SpotLight3D = null
+## Этаж двери в полосе горящих: за кадром бра не горит, как и лампы
+## ([method set_light_in_view]). Дверь вне уровня — в тестах — считается в кадре.
+var _in_view: bool = true
 ## Своё табло на время, пока Otto внутри: общий материал огонька дышал бы у всех
 ## красных дверей здания разом. И часы дыхания — по физике: на паузе оно стоит.
 var _pulse: StandardMaterial3D = null
@@ -373,8 +376,16 @@ func _refresh_look() -> void:
 		panel.material_override = relief
 	var glow := GreyboxLook.SIGN_RED if has_document else GreyboxLook.SIGN_WARM
 	_sign.material_override = GreyboxLook.light(glow)
-	_red_light.visible = has_document
+	_red_light.visible = has_document and _in_view
 	_pulse_clock = 0.0
+
+
+## Этаж двери попал в полосу горящих или ушёл из неё. Зовёт уровень, отбирая
+## видимые этажи, как у ламп (ADR-0010, пункт 8).
+func set_light_in_view(on: bool) -> void:
+	_in_view = on
+	if _red_light != null:
+		_red_light.visible = has_document and on
 
 
 ## Горит ли бра красной двери. Тестам.

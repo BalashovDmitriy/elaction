@@ -243,6 +243,11 @@ func _process(_delta: float) -> void:
 			VisibleFloors.covers(span, lamp.floor_index),
 			VisibleFloors.covers(in_frame, lamp.floor_index)
 		)
+	# Бра красных дверей — тем же правилом (ADR-0042, решение 8).
+	for door: Door in _doors:
+		if is_instance_valid(door):
+			var index := rules.floor_index_near(WorldSpace.to_plane(door.position).y)
+			door.set_light_in_view(VisibleFloors.covers(span, index))
 	# Столбы шахт — тем же правилом: их в здании втрое больше, чем ламп.
 	if _shafts != null:
 		_shafts.light_span(span)
