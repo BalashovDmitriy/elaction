@@ -63,10 +63,27 @@ func _run() -> void:
 		push_error("нет кабины без пары")
 		get_tree().quit(1)
 		return
+	await _escalator()
 	await _pile()
 	await _threshold(car)
 	await _bottom(car)
 	get_tree().quit()
+
+
+## Эскалатор из деталей модели и Otto, идущий по ступеням (решения 2 и 3).
+func _escalator() -> void:
+	var found := _level.find_children("*", "Escalator", true, false)
+	if found.is_empty():
+		return
+	var escalator := found[0] as Escalator
+	var top := escalator.get_node("TopPad") as Node3D
+	await _put_otto(top.global_position)
+	await _shoot("00_escalator_top")
+	Input.action_press(&"move_down")
+	await _until(func() -> bool: return escalator.is_busy())
+	Input.action_release(&"move_down")
+	await _frames(28)
+	await _shoot("00_escalator_riding")
 
 
 ## Кабина одиночной шахты, которая не ходит в подвал и дно которой светлое:
