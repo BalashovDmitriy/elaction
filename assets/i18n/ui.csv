@@ -8,6 +8,8 @@ UI_QUIT,Quit,Выход
 UI_CREDITS,Credits,Авторы
 UI_CREDITS_CREATOR,Idea & Development,Идея & разработка
 UI_CREDITS_CREATOR_NAME,Dmitriy Balashov,Дмитрий Балашов
+UI_CREDITS_ORIGINAL,Original game,Оригинальная игра
+UI_CREDITS_ORIGINAL_NAME,"Elevator Action — Taito, 1983","Elevator Action — Taito, 1983"
 UI_CREDITS_ABOUT,"elaction — a fan remake of Elevator Action (Taito, 1983). Models, textures, sounds and fonts by:","elaction — любительский ремейк Elevator Action (Taito, 1983). Модели, фактуры, звуки и шрифты:"
 UI_CREDITS_ACTORS,People and cars,Люди и машины
 UI_CREDITS_PROPS,Furniture and roof,Обстановка и крыша
