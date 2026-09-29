@@ -41,6 +41,12 @@ const TELEPORT_GAP: float = 0.5
 ## Сколько надо пробыть в воздухе, чтобы касание пола было приземлением, с.
 ## Прыжок длится около секунды, а кадр без опоры на уходящей вниз кабине — один.
 const LANDING_AIR_TIME: float = 0.15
+## Вид Otto в поездке ([member ride_look]): висит на тросе, идёт по ступеням.
+const LOOK_ROPE := "rope"
+const LOOK_WALK := "walk"
+## Качание на тросе: размах, радианы, и частота, рад/с.
+const ROPE_SWAY: float = 0.05
+const ROPE_SWAY_RATE: float = 2.2
 
 ## Кнопки, нажатие которых может уйти на пропуск вступления ([method ride]).
 const PRESS_ACTIONS: Array[StringName] = [&"jump", &"shoot"]
@@ -113,6 +119,13 @@ var takedown_rng := RandomNumberGenerator.new()
 ## Тело на суставах ([Corpse]): собирается с рождения, падает в миг смерти и
 ## встаёт при возвращении в игру (ADR-0043, решение 12).
 var corpse: Corpse = null
+## Как Otto выглядит, пока его везут ([method ride]), — ставит тот, кто везёт
+## (ADR-0043, решения 1 и 2): на тросе висит на руках, на эскалаторе идёт по
+## ступеням. Пусто — стоит.
+var ride_look: String = ""
+## Куда Otto смотрит, пока идёт по эскалатору: −1 влево, +1 вправо, 0 — куда
+## смотрел.
+var ride_facing: float = 0.0
 
 var _states := OttoStateMachine.new()
 ## Один снимок ввода на всё время жизни: перечитывается, а не создаётся заново.
@@ -433,6 +446,11 @@ func ride(on: bool, presses_spent: bool = false) -> void:
 		_states.ride()
 	else:
 		_states.stop_riding()
+		# С троса Otto встаёт на крышу клипом приземления (ADR-0043, решение 1).
+		if ride_look == LOOK_ROPE:
+			_landing = FigurePoses.LAND_SHOW
+		ride_look = ""
+		ride_facing = 0.0
 	if presses_spent:
 		for action: StringName in PRESS_ACTIONS:
 			if Input.is_action_pressed(action) and not _spent_actions.has(action):
@@ -695,6 +713,11 @@ func _apply_pose(state: OttoStateMachine.State) -> void:
 ## Выбирает её [ActorPose] — тот же, что выбирал спрайт, — а исполняет [FigureRig]
 ## на скелете: между позами он интерполирует сам (ADR-0022, решение 2).
 func _pose() -> String:
+	if _states.state == OttoStateMachine.State.RIDE:
+		if ride_look == LOOK_ROPE:
+			return ActorPose.ROPE
+		if ride_look == LOOK_WALK:
+			return ActorPose.walk_frame(_walk_phase)
 	return ActorPose.of_otto(
 		_states.state, _crushed, _falling_over > 0.0, _shooting > 0.0, _walk_phase, _landing > 0.0
 	)
@@ -713,16 +736,26 @@ func _grace_alpha() -> float:
 func _update_look(delta: float) -> void:
 	_shooting = maxf(_shooting - delta, 0.0)
 	_falling_over = maxf(_falling_over - delta, 0.0)
+	var riding := _states.state == OttoStateMachine.State.RIDE
 	if _states.state == OttoStateMachine.State.WALK:
 		_walk_phase = ActorPose.advance(_walk_phase, delta)
 		_step_sound()
+	elif riding and ride_look == LOOK_WALK:
+		_walk_phase = ActorPose.advance(_walk_phase, delta)
 	else:
 		_walk_phase = 0.0
 		_stepped_on = -1
 
+	if riding and ride_facing != 0.0:
+		_facing = ride_facing
 	_body.show_pose(_pose())
 	_body.set_walk_phase(_walk_phase)
 	_body.face(_facing)
+	# На тросе Otto чуть качается маятником в плоскости игры.
+	var sway := 0.0
+	if riding and ride_look == LOOK_ROPE:
+		sway = sin(Time.get_ticks_msec() * 0.001 * ROPE_SWAY_RATE) * ROPE_SWAY
+	_body.rotation.z = sway
 	if _depth_turn > 0.0:
 		_body.rotation.y = lerp_angle(_body.rotation.y, PI, _depth_turn)
 	_body.set_transparency(1.0 - _grace_alpha())

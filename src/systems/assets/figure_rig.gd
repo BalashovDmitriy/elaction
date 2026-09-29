@@ -700,6 +700,9 @@ func _code_frame(pose_name: String) -> Frame:
 	var frame := _stand.copy()
 	_swing(frame, LEG_L, pose.legs.x)
 	_swing(frame, LEG_R, pose.legs.y)
+	# Вбок — вокруг оси взгляда модели: левая нога уходит влево, правая вправо.
+	_turn(frame, LEG_L, Vector3.BACK, pose.spread)
+	_turn(frame, LEG_R, Vector3.BACK, -pose.spread)
 	# Колено сгибается назад: для кости, растущей вниз, это «вперёд» с минусом.
 	_swing(frame, KNEE_L, -pose.knees.x)
 	_swing(frame, KNEE_R, -pose.knees.y)
@@ -707,6 +710,8 @@ func _code_frame(pose_name: String) -> Frame:
 	_swing(frame, ARM_R, pose.arms.y)
 	_swing(frame, ELBOW_L, pose.elbows.x)
 	_swing(frame, ELBOW_R, pose.elbows.y)
+	_turn(frame, ARM_L, Vector3.BACK, -pose.reach_in)
+	_turn(frame, ARM_R, Vector3.BACK, pose.reach_in)
 	for bone_name: String in LEAN_SHARE:
 		_swing(frame, bone_name, pose.lean * float(LEAN_SHARE[bone_name]))
 	for bone_name: String in HEAD_SHARE:

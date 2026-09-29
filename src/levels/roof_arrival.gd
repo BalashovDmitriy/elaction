@@ -95,6 +95,7 @@ func begin(host: Node3D, otto: Otto, landing: Vector2, bounds: Rect2) -> void:
 
 	var hook := _helicopter.hook_at_hover(hover)
 	_otto.ride(true)
+	_otto.ride_look = Otto.LOOK_ROPE
 	_otto.visible = false
 	_place(Vector3(hook.x, hook.y - REACH, WorldSpace.PLAY_Z))
 	# Кадр встаёт сразу, снимком: первый кадр здания — уже кадр вступления.
