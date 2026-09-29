@@ -13,6 +13,15 @@ uniform vec3 frame_colour : source_color = vec3(0.012, 0.014, 0.02);
 // Вспышка молнии: погасшие стёкла загораются отражённым небом.
 uniform float flash = 0.0;
 uniform vec3 flash_colour : source_color = vec3(0.55, 0.6, 0.75);
+// Окна включаются и выключаются (M24g, ADR-0043, решение 6): такая доля окон
+// по своему жребию раз в свой период меняет состояние — горящее гаснет, тёмное
+// загорается. Период — от половины до полутора [code]switch_period[/code], с.
+uniform float switch_share = 0.14;
+uniform float switch_period = 40.0;
+// Чем загорается погасшее окно: у него своего цвета комнаты нет.
+uniform vec3 switch_tone : source_color = vec3(0.95, 0.72, 0.42);
+// Во сколько темнее своего света стекло погасшего окна.
+const float SWITCHED_OFF = 0.06;
 
 varying vec4 custom;
 varying vec3 tone;
@@ -32,8 +41,19 @@ float bar(float distance, float width) {
 	return 1.0 - smoothstep(width, width + blur * 1.5, abs(distance));
 }
 
-vec3 lit_room(vec2 uv, float seed, float inside) {
-	vec3 c = tone;
+// Переключено ли окно сейчас: 1 — наоборот своему состоянию. Жребий окна —
+// его, а не кадра: город по сиду повторяется и в том, кто когда гасит свет.
+float switched(float seed) {
+	if (hash1(seed * 91.7) > switch_share) {
+		return 0.0;
+	}
+	float period = switch_period * mix(0.5, 1.5, hash1(seed * 17.3));
+	float cycle = floor(TIME / period + hash1(seed * 5.9));
+	return step(0.5, hash1(cycle * 13.1 + seed * 71.0));
+}
+
+vec3 lit_room(vec2 uv, float seed, float inside, vec3 light) {
+	vec3 c = light;
 	// Свет с потолка и пятно лампы: комната, а не заливка.
 	float ceiling = mix(1.2, 0.72, uv.y);
 	float lamp_x = mix(0.25, 0.75, fract(seed * 7.13));
@@ -77,8 +97,8 @@ vec3 lit_room(vec2 uv, float seed, float inside) {
 	return mix(vec3(0.82, 0.93, 1.0), c, 0.35) * mix(0.2, 1.0, on);
 }
 
-vec3 dark_glass(vec2 uv, float seed) {
-	vec3 c = tone;
+vec3 dark_glass(vec2 uv, float seed, vec3 base) {
+	vec3 c = base;
 	// Небо в стекле сверху и косой блик.
 	c += vec3(0.018, 0.022, 0.034) * (1.0 - uv.y);
 	float sheen = 1.0 - smoothstep(0.0, 0.08, abs(uv.x + uv.y * 0.6 - fract(seed * 3.7) * 1.6));
@@ -102,7 +122,15 @@ void fragment() {
 	if (custom.z > 1.5) {
 		bars = max(bars, bar(uv.y - 0.34, 0.02));
 	}
-	vec3 glass = lit > 0.5 ? lit_room(uv, seed, custom.y) : dark_glass(uv, seed);
+	float was_lit = lit;
+	if (switched(seed) > 0.5) {
+		lit = 1.0 - lit;
+	}
+	// Своё горящее окно светит своим цветом, загоревшееся тёмное — тёплым.
+	vec3 light = was_lit > 0.5 ? tone : switch_tone;
+	// Погасшее своё горящее — тёмное стекло, а не комната его цвета.
+	vec3 base = was_lit > 0.5 ? tone * SWITCHED_OFF : tone;
+	vec3 glass = lit > 0.5 ? lit_room(uv, seed, custom.y, light) : dark_glass(uv, seed, base);
 	float cover = max(frame, bars) * detail;
 	ALBEDO = mix(glass, frame_colour, cover);
 }
