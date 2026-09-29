@@ -44,6 +44,11 @@ const LANDING_AIR_TIME: float = 0.15
 ## Вид Otto в поездке ([member ride_look]): висит на тросе, идёт по ступеням.
 const LOOK_ROPE := "rope"
 const LOOK_WALK := "walk"
+## Входит в красную дверь вглубь и выходит из неё (ADR-0043, решение 4).
+const LOOK_DOOR_IN := "door_in"
+const LOOK_DOOR_OUT := "door_out"
+## Насколько вглубь проёма Otto уходит, м: из плоскости игры за стену.
+const DOOR_WALK_DEPTH: float = 1.2
 ## Качание на тросе: размах, радианы, и частота, рад/с.
 const ROPE_SWAY: float = 0.05
 const ROPE_SWAY_RATE: float = 2.2
@@ -126,6 +131,9 @@ var ride_look: String = ""
 ## Куда Otto смотрит, пока идёт по эскалатору: −1 влево, +1 вправо, 0 — куда
 ## смотрел.
 var ride_facing: float = 0.0
+## Насколько Otto ушёл в проём двери: 0 — у коврика, 1 — внутри. Ставит дверь
+## по ходу створки.
+var ride_progress: float = 0.0
 
 var _states := OttoStateMachine.new()
 ## Один снимок ввода на всё время жизни: перечитывается, а не создаётся заново.
@@ -451,6 +459,7 @@ func ride(on: bool, presses_spent: bool = false) -> void:
 			_landing = FigurePoses.LAND_SHOW
 		ride_look = ""
 		ride_facing = 0.0
+		ride_progress = 0.0
 	if presses_spent:
 		for action: StringName in PRESS_ACTIONS:
 			if Input.is_action_pressed(action) and not _spent_actions.has(action):
@@ -716,7 +725,7 @@ func _pose() -> String:
 	if _states.state == OttoStateMachine.State.RIDE:
 		if ride_look == LOOK_ROPE:
 			return ActorPose.ROPE
-		if ride_look == LOOK_WALK:
+		if ride_look in [LOOK_WALK, LOOK_DOOR_IN, LOOK_DOOR_OUT]:
 			return ActorPose.walk_frame(_walk_phase)
 	return ActorPose.of_otto(
 		_states.state, _crushed, _falling_over > 0.0, _shooting > 0.0, _walk_phase, _landing > 0.0
@@ -740,7 +749,7 @@ func _update_look(delta: float) -> void:
 	if _states.state == OttoStateMachine.State.WALK:
 		_walk_phase = ActorPose.advance(_walk_phase, delta)
 		_step_sound()
-	elif riding and ride_look == LOOK_WALK:
+	elif riding and ride_look in [LOOK_WALK, LOOK_DOOR_IN, LOOK_DOOR_OUT]:
 		_walk_phase = ActorPose.advance(_walk_phase, delta)
 	else:
 		_walk_phase = 0.0
@@ -756,9 +765,26 @@ func _update_look(delta: float) -> void:
 	if riding and ride_look == LOOK_ROPE:
 		sway = sin(Time.get_ticks_msec() * 0.001 * ROPE_SWAY_RATE) * ROPE_SWAY
 	_body.rotation.z = sway
+	_walk_the_doorway(riding)
 	if _depth_turn > 0.0:
 		_body.rotation.y = lerp_angle(_body.rotation.y, PI, _depth_turn)
 	_body.set_transparency(1.0 - _grace_alpha())
+
+
+## Вход в дверь и выход (ADR-0043, решение 4): Otto поворачивается к двери и
+## уходит вглубь проёма, пока открывается створка; выходит на камеру, пока она
+## закрывается, и под конец поворачивается вдоль этажа. Двигается фигура, а не
+## тело: в плоскости игры Otto стоит на коврике.
+func _walk_the_doorway(riding: bool) -> void:
+	var depth := 0.0
+	if riding and ride_look == LOOK_DOOR_IN:
+		depth = ride_progress
+		_body.rotation.y = lerp_angle(_body.rotation.y, PI, clampf(ride_progress * 2.0, 0.0, 1.0))
+	elif riding and ride_look == LOOK_DOOR_OUT:
+		depth = ride_progress
+		# Лицом к камере, пока в проёме, вдоль этажа — вышедши.
+		_body.rotation.y = lerp_angle(_body.rotation.y, 0.0, clampf(ride_progress * 2.0, 0.0, 1.0))
+	_body.position.z = -DOOR_WALK_DEPTH * depth
 
 
 ## Шаг звучит на крайних кадрах ходьбы — тех, где нога ставится. На каждом

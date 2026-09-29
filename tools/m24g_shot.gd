@@ -64,10 +64,33 @@ func _run() -> void:
 		get_tree().quit(1)
 		return
 	await _escalator()
+	await _red_door()
 	await _pile()
 	await _threshold(car)
 	await _bottom(car)
 	get_tree().quit()
+
+
+## Вход в красную дверь вглубь и выход из неё (решение 4).
+func _red_door() -> void:
+	var door: Door = null
+	for node: Node in _level.find_children("*", "Door", true, false):
+		if (node as Door).has_document:
+			door = node as Door
+			break
+	if door == null:
+		print("нет красной двери")
+		return
+	await _put_otto(WorldSpace.to_scene(door.mat_position()))
+	print("у двери: ", _level.otto.global_position, " открыта ", door.openness())
+	Input.action_press(&"move_up")
+	await _until(func() -> bool: return door.openness() > 0.55)
+	Input.action_release(&"move_up")
+	await _shoot("00_door_going_in")
+	await _until(func() -> bool: return _level.otto.visible and door.openness() > 0.9)
+	await _until(func() -> bool: return door.openness() < 0.5)
+	await _shoot("00_door_coming_out")
+	await _frames(40)
 
 
 ## Эскалатор из деталей модели и Otto, идущий по ступеням (решения 2 и 3).
@@ -84,6 +107,7 @@ func _escalator() -> void:
 	Input.action_release(&"move_down")
 	await _frames(28)
 	await _shoot("00_escalator_riding")
+	await _until(func() -> bool: return not escalator.is_busy())
 
 
 ## Кабина одиночной шахты, которая не ходит в подвал и дно которой светлое:

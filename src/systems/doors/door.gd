@@ -91,8 +91,9 @@ static var _occupied_paints: Dictionary = {}
 ## Сколько Otto сидит внутри, с: 70 тиков ROM, считая от стука.
 @export var hide_time: float = Arcade.seconds(Arcade.ROOM_TICKS)
 
-## Сколько открывается створка перед гостем, с.
-@export var open_time: float = 0.25
+## Сколько открывается створка перед гостем, с: 7 тиков ROM — столько Otto
+## идёт в дверь, прежде чем пропасть (@3BDA–3C25, ADR-0043, решение 4).
+@export var open_time: float = Arcade.seconds(7)
 
 ## Сколько открывается створка перед агентом, с.
 ##
@@ -173,12 +174,17 @@ func _physics_process(delta: float) -> void:
 	_breathe(delta)
 
 	if _stepping_out != null:
+		# Выходит на камеру, пока створка закрывается.
+		_stepping_out.ride_progress = _cycle.openness()
 		_see_out()
 		return
 
 	if _guest == null:
 		_look_for_visitor()
 		return
+	if _guest.ride_look == Otto.LOOK_DOOR_IN:
+		# Уходит вглубь проёма, пока створка открывается.
+		_guest.ride_progress = _cycle.openness()
 
 	match _visit.tick(delta, _cycle.is_open()):
 		DoorVisit.Cue.HIDE:
@@ -274,6 +280,7 @@ func _admit(visitor: Otto) -> void:
 	_guest = visitor
 	visitor.global_position = _mat.global_position
 	visitor.ride(true)
+	visitor.ride_look = Otto.LOOK_DOOR_IN
 	_visit.admit()
 	_cycle.travel_time = open_time
 	_cycle.open()
@@ -301,6 +308,8 @@ func _release() -> void:
 	_guest.global_position = _mat.global_position
 	_guest.stay_indoors(false)
 	_guest.ride(true)
+	_guest.ride_look = Otto.LOOK_DOOR_OUT
+	_guest.ride_progress = 1.0
 	_stepping_out = _guest
 	_guest = null
 	_visit.release()
