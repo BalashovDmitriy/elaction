@@ -484,6 +484,10 @@ func _tear_across_the_walls(speed: float) -> void:
 		var corpse := Corpse.of(node)
 		if corpse == null or corpse.gone or corpse.torn or corpse.cut != null:
 			continue
+		# Трупов до конца здания много, а кабин в ходу — каждая: сперва
+		# дешёвая прикидка по одной части, габарит — только у близких.
+		if not corpse.near(x, _width):
+			continue
 		var reach := corpse.span()
 		if reach.y < x - _width or reach.x > x + _width:
 			continue

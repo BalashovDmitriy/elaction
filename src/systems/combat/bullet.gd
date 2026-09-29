@@ -212,7 +212,9 @@ func _hit(body: Node3D, point: Vector3) -> void:
 		if body.get(&"invulnerable") != true:
 			Blood.spray(get_parent(), global_position, direction)
 			# Куда ударила пуля: убитый ею падает телом по её ходу (ADR-0043,
-			# решение 12).
+			# решение 12). Метки — строками, а не константами [Corpse]: ссылка
+			# на него тянет кабину, а та — Otto со сценой этой пули, и загрузка
+			# замыкается в кольцо.
 			body.set_meta(&"hit_from", signf(direction))
 			body.set_meta(&"hit_at", global_position)
 	elif target == null or (target.collision_layer & LAMPS) == 0:

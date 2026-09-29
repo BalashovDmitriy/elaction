@@ -22,8 +22,6 @@ const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
 const ENEMY_LAYER: int = 3
 ## Группа агентов здания: по ней Otto ищет, кого достаёт вплотную (ADR-0040).
 const GROUP := &"agents"
-## Сколько агент падает, прежде чем лечь: смерть — две позы (ADR-0011, п. 12).
-const FALLING_TIME: float = 0.25
 
 ## Сколько держится поза выстрела, с.
 const SHOOT_POSE_TIME: float = 0.25
@@ -130,7 +128,6 @@ var _walking: bool = false
 var _locks := MoveLocks.new()
 var _faced: float = 0.0
 var _shooting: float = 0.0
-var _falling_over: float = 0.0
 var _crushed: bool = false
 ## Поза трупа, если агента добили сценкой: в чём лёг, в том и лежит (ADR-0040).
 var _corpse: String = ""
@@ -647,7 +644,6 @@ func _turn_holds(delta: float, walking: bool) -> bool:
 ## разница только в наборе поз: агент не приседает и не прыгает, зато ложится.
 func _update_look(delta: float) -> void:
 	_shooting = maxf(_shooting - delta, 0.0)
-	_falling_over = maxf(_falling_over - delta, 0.0)
 	if _walking:
 		_walk_phase = ActorPose.advance(_walk_phase, delta)
 	else:
@@ -667,12 +663,13 @@ func _pose() -> String:
 	if _brain.is_dead() and not _corpse.is_empty():
 		return _corpse
 	# Замах — поза выстрела: пистолет вскинут, пока горит луч (ADR-0037,
-	# решение 5).
+	# решение 5). Падения позой у агента нет: убитого роняет рэгдолл
+	# ([Corpse], ADR-0043, решение 12).
 	return ActorPose.of_agent(
 		_brain.is_dead(),
 		_walking,
 		_crushed,
-		_falling_over > 0.0,
+		false,
 		_shooting > 0.0 or _brain.is_winding_up(),
 		_walk_phase,
 		_brain.stance

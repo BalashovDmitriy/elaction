@@ -120,6 +120,16 @@ func vanish() -> void:
 	_holder.remove_from_group(GROUP)
 
 
+## Может ли тело лежать не дальше [param reach] от [param x] по этажу. Прикидка
+## по тазу: целое тело — ни срезанное, ни порванное — держат суставы, и дальше
+## роста от таза ни одна его часть не уходит.
+func near(x: float, reach: float) -> bool:
+	if ragdoll.parts.is_empty():
+		return false
+	var pelvis := ragdoll.parts.get("Body", ragdoll.parts.values()[0]) as PhysicalBone3D
+	return absf(Ragdoll.center_of(pelvis).x - x) < reach + Proportions.BODY
+
+
 ## Где тело лежит по X в мире: от и до.
 func span() -> Vector2:
 	var box := ragdoll.bounds()

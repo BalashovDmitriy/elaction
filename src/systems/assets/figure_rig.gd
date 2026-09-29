@@ -290,6 +290,9 @@ var _settled: bool = false
 var _carved := Vector4.ZERO
 ## Дуло пистолета в системе кисти [constant GUN_HAND]; NAN — пистолета нет.
 var _muzzle := Vector3(NAN, NAN, NAN)
+## Наведена ли рука в последнем разложенном кадре: застывший риг раскладывает
+## кадр ещё раз, когда наведение снимают, — иначе рука так и висела бы вскинутой.
+var _aim_shown: bool = false
 
 
 func _ready() -> void:
@@ -347,7 +350,9 @@ func advance(delta: float) -> void:
 		return
 	# Неподвижная цель — поза кодом, конец клипа: долетев до неё, риг замирает.
 	# Проверка до шага часов: клип «один раз» успевает встать в последний кадр.
-	var frozen := _settled and _is_still()
+	# Наводимая рука не замирает: присевший стреляет, не меняя позы (ADR-0043,
+	# решение 16), и опускает её, когда выстрел кончился.
+	var frozen := _settled and _is_still() and not _aims() and not _aim_shown
 	_pose_time += delta
 	_clock += delta
 	_turned += delta
@@ -468,6 +473,9 @@ func skeleton() -> Skeleton3D:
 func heal() -> void:
 	_carved = Vector4.ZERO
 	for mesh_instance in _meshes:
+		# Срез — параметр экземпляра, а не материала: снятый материал его не
+		# уносит, и следующий срез тела поднял бы и старый.
+		mesh_instance.set_instance_shader_parameter(&"carve", _carved)
 		for surface in mesh_instance.mesh.get_surface_count():
 			mesh_instance.set_surface_override_material(surface, null)
 
@@ -933,8 +941,14 @@ func _apply(frame: Frame, exact: bool) -> void:
 		_instance.position.y = -low + frame.lift * _height
 	# Руку наводят после заземления: точка вылета — над полом, а модель только
 	# что встала на пол. Низшую точку позы рука не меняет.
-	if not is_nan(aim_height) and not is_nan(_muzzle.x):
+	_aim_shown = _aims()
+	if _aim_shown:
 		_pose_bones(_aimed(frame))
+
+
+## Наводить ли руку: актёр стреляет, и пистолет у фигуры есть.
+func _aims() -> bool:
+	return not is_nan(aim_height) and not is_nan(_muzzle.x)
 
 
 func _pose_bones(frame: Frame) -> void:

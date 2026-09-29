@@ -257,6 +257,30 @@ func test_without_blood_a_leaving_car_does_not_tear() -> void:
 	assert_eq(_pieces().size(), 0, "кусков нет")
 
 
+## Кабина, идущая вверх, зажимает тело на своей крыше под верхом шахты: тела
+## больше нет, а не торчит сквозь крышу и плиту разом (ADR-0042).
+func test_a_corpse_on_the_roof_is_squeezed_away_at_the_shaft_top() -> void:
+	var car := CAR_SCENE.instantiate() as ElevatorCar
+	add_child_autofree(car)
+	# Стоит внизу и поедет вверх сама.
+	car.setup(PackedFloat32Array([0.0, Proportions.FLOOR]), 1)
+	car.hold(Engine.time_scale * SETTLE_FRAMES / 60.0 + 1.0)
+	await wait_physics_frames(2)
+	# Верх шахты: низ плиты — на 0.12 м выше крыши кабины на верхней остановке,
+	# тоньше лежащего тела.
+	_floor_at(ElevatorCar.DEFAULT_CLEAR_HEIGHT + 0.12 + 0.4)
+	var roof := car.global_position.y + ElevatorCar.DEFAULT_CLEAR_HEIGHT
+	var agent: Enemy = await _corpse_at(Vector3(car.global_position.x, roof + 0.02, 0.0))
+	await wait_physics_frames(SETTLE_FRAMES)
+	assert_false(agent.corpse.gone, "на крыше тело лежит")
+	for _frame: int in RIDE_FRAMES:
+		await wait_physics_frames(1)
+		if car.global_position.y >= -0.01 and is_zero_approx(car.speed_now()):
+			break
+	assert_almost_eq(car.global_position.y, 0.0, 0.02, "кабина дошла до верха")
+	assert_true(agent.corpse.gone, "зажатого тела нет")
+
+
 ## Otto под днищем режется, как агент; воскресший — целый (решения 9 и 12).
 func test_otto_under_the_car_is_cut_and_revives_whole() -> void:
 	_floor_at(-Proportions.FLOOR)

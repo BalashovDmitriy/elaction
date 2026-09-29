@@ -9,6 +9,7 @@ extends GutTest
 ## люке и проваливается, только когда подвал открыт.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
+const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 
 const TOP: float = 0.0
 const MIDDLE: float = 100.0
@@ -21,6 +22,8 @@ const SETTLE_FRAMES: int = 5
 ## Сколько шагов физики дать Otto упасть и встать: падение на этаж — меньше
 ## секунды, остальное запас.
 const FALL_FRAMES: int = 90
+## Сколько шагов физики ждать, пока труп уляжется и уснёт.
+const SLEEP_FRAMES: int = 600
 
 
 func before_each() -> void:
@@ -168,6 +171,14 @@ func _building(documents: int) -> GreyboxLevel:
 	return level
 
 
+## Спит ли тело для физики — не «медленно движется», а уснуло.
+func _sleeping(ragdoll: Ragdoll) -> bool:
+	for part: PhysicalBone3D in ragdoll.parts.values():
+		if not PhysicsServer3D.body_get_state(part.get_rid(), PhysicsServer3D.BODY_STATE_SLEEPING):
+			return false
+	return true
+
+
 func _lock_of(level: GreyboxLevel) -> BasementLock:
 	return level.get_node_or_null("BasementLock") as BasementLock
 
@@ -236,6 +247,40 @@ func test_the_hatch_holds_until_the_last_document() -> void:
 	assert_eq(rules.floor_index_near(at.y), rules.floors - 1, "провалился в подвал")
 	assert_false(level.otto.is_dead(), "этаж падения не убивает")
 	assert_eq(lock.find_children("Hatch", "", false, false).size(), 0, "створки разошлись и убраны")
+
+
+## Труп, уснувший на створках, падает в подвал вместе с ними: ушедшая опора
+## спящее тело сама не будит, и оно висело бы над проёмом (ADR-0043, решение 12).
+func test_a_corpse_asleep_on_the_hatch_falls_when_it_opens() -> void:
+	var level := await _building(1)
+	var rules := level.rules
+	var above := rules.floors - 2
+	var hatch := BasementLock.hatches(rules, level.plan())[0]
+	var feet := WorldSpace.to_scene(Vector2(hatch.get_center().x, rules.floor_surface(above)))
+	var agent := ENEMY_SCENE.instantiate() as Enemy
+	agent.apply_rules(rules)
+	agent.walk_speed = 0.0
+	level.add_child(agent)
+	agent.global_position = Vector3(feet.x, feet.y + 0.02, WorldSpace.PLAY_Z)
+	agent.setup(null, 1.0)
+	while agent.is_emerging():
+		await get_tree().physics_frame
+	agent.kill()
+	for _frame: int in SLEEP_FRAMES:
+		await get_tree().physics_frame
+		if _sleeping(agent.corpse.ragdoll):
+			break
+	var lying := agent.corpse.ragdoll.bounds().position.y
+	assert_true(_sleeping(agent.corpse.ragdoll), "труп уснул")
+	assert_almost_eq(lying, feet.y, 0.15, "лежит на створках")
+	GameState.instance().collect_document()
+	for _frame: int in FALL_FRAMES * 2:
+		await get_tree().physics_frame
+	assert_lt(
+		agent.corpse.ragdoll.bounds().position.y,
+		lying - rules.floor_height * 0.5,
+		"упал в подвал, а не висит над проёмом"
+	)
 
 
 ## Запертые створки — тяжёлая сталь, а не плитка пола (кадр M24b): зебра по

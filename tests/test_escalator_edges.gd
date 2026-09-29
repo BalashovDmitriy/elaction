@@ -109,3 +109,39 @@ func test_no_lamp_hangs_under_an_escalator_gap() -> void:
 					lamp.x > gap.x and lamp.x < gap.y,
 					"сид %d, этаж %d: лампа под проёмом" % [building_seed, lamp.floor_index]
 				)
+
+
+## Пролёт под 45° висит над этажом ниже от нижней площадки до верхней: стена
+## под ним прошла бы сквозь полотно.
+func test_no_wall_stands_under_a_flight() -> void:
+	var rules := _rules()
+	var half := rules.inner_wall_width * 0.5
+	for building_seed: int in SEEDS:
+		var plan := BuildingPlan.generate(rules, building_seed)
+		for escalator in plan.escalators:
+			var landing := escalator.landing(rules)
+			var low := minf(landing, escalator.x)
+			var high := maxf(landing, escalator.x)
+			for wall in plan.walls:
+				if wall.floor_index != escalator.floor_index + 1:
+					continue
+				assert_false(
+					wall.x + half > low and wall.x - half < high,
+					"сид %d, этаж %d: стена под пролётом" % [building_seed, wall.floor_index]
+				)
+
+
+## Под низом пролёта полотно ниже роста: обстановке там не место.
+func test_no_furniture_stands_under_the_low_flight() -> void:
+	var rules := _rules()
+	var under: Array[String] = []
+	for building_seed: int in SEEDS:
+		var plan := BuildingPlan.generate(rules, building_seed)
+		for escalator in plan.escalators:
+			var lower := escalator.floor_index + 1
+			var landing := escalator.landing(rules)
+			var start := landing - escalator.towards * rules.escalator_low_span
+			for x: float in BuildingDressing.free_spots(rules, plan, lower):
+				if x > minf(landing, start) and x < maxf(landing, start):
+					under.append("сид %d, этаж %d, x %.2f" % [building_seed, lower, x])
+	assert_eq(under, [] as Array[String], "места под низом пролёта")

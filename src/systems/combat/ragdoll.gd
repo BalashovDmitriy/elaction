@@ -248,6 +248,13 @@ func bounds() -> AABB:
 	return box
 
 
+## Будит части: опора ушла из-под улёгшегося тела — люк подвала открылся, — а
+## спящее тело физика сама не будит, и оно висело бы в воздухе.
+func wake() -> void:
+	for part: PhysicalBone3D in parts.values():
+		PhysicsServer3D.body_set_state(part.get_rid(), PhysicsServer3D.BODY_STATE_SLEEPING, false)
+
+
 ## Спят ли все части: тело улеглось.
 func asleep() -> bool:
 	for part: PhysicalBone3D in parts.values():
@@ -260,10 +267,15 @@ func asleep() -> bool:
 ## [PhysicalBone3D] его нет, — и езда на полу кабины. Кабину двигает код, и
 ## тело, лежащее на её полу, падало бы на уходящий пол раз за разом, сползая
 ## с него; часть на полу кабины берёт её ход по вертикали и едет с ней.
+##
+## Кабина, идущая вверх, зажимает лежащее на её крыше тело под верхом шахты —
+## тела тогда больше нет, как и до рэгдолла (ADR-0042): физика вдавила бы его
+## и в крышу, и в плиту разом.
 class SpeedLimit:
 	extends Node
 
-	## Насколько ниже поверхности части ищется пол кабины, м.
+	## Насколько ниже поверхности части ищется пол кабины и насколько выше —
+	## потолок, м.
 	const REACH: float = 0.08
 
 	var ragdoll: Ragdoll = null
@@ -271,14 +283,23 @@ class SpeedLimit:
 	func _physics_process(_delta: float) -> void:
 		var space := get_viewport().world_3d.direct_space_state
 		for part: PhysicalBone3D in ragdoll.parts.values():
+			# Уснувшая часть лежит на неподвижном: на кабине части не засыпают —
+			# её тело кинематическое и будит всё, что на нём лежит. Трупов до
+			# конца здания много, и луч под каждую часть каждый шаг стоил бы кадру.
+			if PhysicsServer3D.body_get_state(part.get_rid(), PhysicsServer3D.BODY_STATE_SLEEPING):
+				continue
 			if part.linear_velocity.length_squared() > MAX_SPEED * MAX_SPEED:
 				part.linear_velocity = part.linear_velocity.limit_length(MAX_SPEED)
 			var car := _car_under(space, part)
-			if car != null and not is_zero_approx(car.speed_now()):
-				var velocity := part.linear_velocity
-				velocity.y = -car.speed_now()
-				velocity.x *= 0.5
-				part.linear_velocity = velocity
+			if car == null or is_zero_approx(car.speed_now()):
+				continue
+			if car.speed_now() < 0.0 and _pinned(space, part, car):
+				ragdoll.corpse.vanish()
+				return
+			var velocity := part.linear_velocity
+			velocity.y = -car.speed_now()
+			velocity.x *= 0.5
+			part.linear_velocity = velocity
 
 	## Кабина, на полу которой лежит часть, или null.
 	func _car_under(space: PhysicsDirectSpaceState3D, part: PhysicalBone3D) -> ElevatorCar:
@@ -290,6 +311,17 @@ class SpeedLimit:
 		)
 		var hit := space.intersect_ray(query)
 		return hit.get("collider") as ElevatorCar if not hit.is_empty() else null
+
+	## Упёрлась ли часть, которую везёт вверх кабина [param car], в потолок.
+	func _pinned(space: PhysicsDirectSpaceState3D, part: PhysicalBone3D, car: ElevatorCar) -> bool:
+		var shape := part.get_child(0) as CollisionShape3D
+		var radius := (shape.shape as CapsuleShape3D).radius
+		var from := Ragdoll.center_of(part)
+		var query := PhysicsRayQueryParameters3D.create(
+			from, from + Vector3(0.0, radius + REACH, 0.0), Corpse.GEOMETRY_MASK
+		)
+		query.exclude = [car.get_rid()]
+		return not space.intersect_ray(query).is_empty()
 
 
 func _part(spec: Dictionary) -> PhysicalBone3D:

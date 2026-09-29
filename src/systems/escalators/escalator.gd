@@ -183,10 +183,10 @@ func _try_board(pad: Area3D, target: Area3D, towards: float) -> bool:
 		_passenger = rider
 		_path = _route_from(rider.global_position, target)
 		_progress = 0.0
-		rider.ride(true)
 		# По ступеням Otto идёт, лицом по ходу (ADR-0043, решение 2).
 		rider.ride_look = Otto.LOOK_WALK
 		rider.ride_facing = signf(target.global_position.x - rider.global_position.x)
+		rider.ride(true)
 		return true
 	return false
 

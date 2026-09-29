@@ -921,8 +921,14 @@ func _wall_blockers(rules: BuildingRules, index: int) -> Array[Vector2]:
 		if escalator.floor_index == index:
 			busy.append(Vector2(escalator.x - clearance, escalator.x + clearance))
 		elif escalator.floor_index == index - 1:
+			# Пролёт под 45° висит над этим этажом от площадки до верхней
+			# площадки на этаже выше (ADR-0043, решение 15): стена под ним
+			# прошла бы сквозь полотно. Зазор — у площадки; над другим концом
+			# уже целая плита этажа выше.
 			var landing := escalator.landing(rules)
-			busy.append(Vector2(landing - clearance, landing + clearance))
+			var low := minf(landing, escalator.x) - (clearance if escalator.towards < 0.0 else 0.0)
+			var high := maxf(landing, escalator.x) + (clearance if escalator.towards > 0.0 else 0.0)
+			busy.append(Vector2(low, high))
 
 	# Дверь за стеной — дверь, в которую не войти, а выход — непроходимое здание.
 	for door in doors:

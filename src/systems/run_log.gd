@@ -19,6 +19,8 @@ extends RefCounted
 
 const ENV := "ELACTION_LOG"
 const FLAG := "--log="
+## Место номера сида в пути журнала у инструментов прогона.
+const SEED_MARK := "{seed}"
 
 static var _file: FileAccess = null
 static var _clock: float = 0.0
@@ -35,7 +37,10 @@ static func open(path: String = "") -> bool:
 				target = argument.trim_prefix(FLAG)
 	if target.is_empty():
 		target = OS.get_environment(ENV)
-	if target.is_empty():
+	# Путь с {seed} — шаблон `tools/playthrough.gd`: журнал на каждый сид
+	# открывает он сам. Открытый здесь, при запуске игры, шаблон лёг бы лишним
+	# файлом с «{seed}» в имени.
+	if target.is_empty() or target.contains(SEED_MARK):
 		return false
 	DirAccess.make_dir_recursive_absolute(target.get_base_dir())
 	_file = FileAccess.open(target, FileAccess.WRITE)

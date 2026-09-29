@@ -38,9 +38,13 @@ static func lay(plan: BuildingPlan, rules: BuildingRules, taken: Dictionary) -> 
 		for slot in range(span.x, span.y + 1):
 			if not BuildingPlan.is_taken(taken, index, slot):
 				free.append(slot)
+		# Места без потолка отсеиваются до запасного хода, а не после: иначе этаж,
+		# все свободные места которого под проёмом эскалатора, оставался бы без
+		# единой лампы.
+		var ceiling := func(slot: int) -> bool: return _has_a_ceiling(plan, rules, index, slot)
+		free = free.filter(ceiling)
 		if free.is_empty():
-			free = _slots_beside_the_openings(plan, rules, index)
-		free = free.filter(func(slot: int) -> bool: return _has_a_ceiling(plan, rules, index, slot))
+			free = _slots_beside_the_openings(plan, rules, index).filter(ceiling)
 
 		var wanted := rules.lamps_on(index)
 		for number in wanted:
