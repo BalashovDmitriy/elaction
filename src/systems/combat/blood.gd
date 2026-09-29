@@ -20,8 +20,18 @@ const GRAVITY: float = 9.8
 ## Капля: размер, м.
 const DROP := Vector2(0.05, 0.09)
 
+## Пятно под кабиной (ADR-0043, решение 7): глубина по коридору и толщина
+## слоя, на который оно ложится, м; сторона фактуры, пиксели.
+const PUDDLE_DEPTH: float = 0.9
+const PUDDLE_REACH: float = 0.12
+const PUDDLE_SIZE: int = 128
+const PUDDLE_COLOR := Color(0.36, 0.01, 0.02, 0.92)
+
 ## Показывать ли кровь. Ставят настройки игрока; по умолчанию — да.
 static var enabled: bool = true
+
+## Фактура пятна: одна на игру, рисуется при первой нужде.
+static var _puddle_texture: ImageTexture = null
 
 var _age: float = 0.0
 
@@ -36,6 +46,42 @@ static func spray(host: Node, at: Vector3, towards: float) -> void:
 	host.add_child(blood)
 	blood.global_position = at
 	blood.add_child(blood._particles(towards))
+
+
+## Пятно крови на полу в точке [param at] шириной [param width] м по этажу.
+## Лежит до конца здания: уходит вместе с уровнем, в котором лежит.
+static func puddle(host: Node, at: Vector3, width: float) -> Decal:
+	if not enabled or host == null:
+		return null
+	var decal := Decal.new()
+	decal.name = "Puddle"
+	decal.size = Vector3(width, PUDDLE_REACH * 2.0, PUDDLE_DEPTH)
+	decal.texture_albedo = _puddle()
+	decal.modulate = PUDDLE_COLOR
+	decal.albedo_mix = 1.0
+	host.add_child(decal)
+	decal.global_position = at
+	return decal
+
+
+## Пятно с рваным краем: круг, край которого гуляет шумом.
+static func _puddle() -> ImageTexture:
+	if _puddle_texture != null:
+		return _puddle_texture
+	var noise := FastNoiseLite.new()
+	noise.seed = 7
+	noise.frequency = 0.08
+	var image := Image.create(PUDDLE_SIZE, PUDDLE_SIZE, false, Image.FORMAT_RGBA8)
+	var half := PUDDLE_SIZE * 0.5
+	for y: int in PUDDLE_SIZE:
+		for x: int in PUDDLE_SIZE:
+			var dx := (x - half) / half
+			var dy := (y - half) / half
+			var edge := 0.72 + 0.28 * noise.get_noise_2d(x, y)
+			var alpha := 1.0 - smoothstep(edge - 0.08, edge, sqrt(dx * dx + dy * dy))
+			image.set_pixel(x, y, Color(1.0, 1.0, 1.0, alpha))
+	_puddle_texture = ImageTexture.create_from_image(image)
+	return _puddle_texture
 
 
 func _process(delta: float) -> void:

@@ -86,6 +86,9 @@ const HULL_DIRECTIONS: Array[Vector3] = [
 	Vector3(-1, -1, -1),
 ]
 
+## Шейдер порванной фигуры (ADR-0043, решения 8 и 11).
+const CARVE_SHADER := preload("res://src/systems/combat/carve.gdshader")
+
 ## Куда смотрит модель, повёрнутая лицом вправо и влево: поворот на четверть
 ## оборота кладёт взгляд вдоль этажа, а в покое она смотрит в камеру (+Z).
 const FACE_RIGHT: float = PI * 0.5
@@ -212,6 +215,10 @@ class ClipTracks:
 		return animation.length
 
 
+## Материалы порванных фигур по исходным: один шейдер на материал пака, а срез у
+## каждой фигуры свой — параметрами экземпляра.
+static var _carve_materials: Dictionary = {}
+
 ## Модель актёра. Без неё риг — пустой узел, и это ошибка сцены.
 @export var model: PackedScene
 
@@ -264,6 +271,10 @@ var _faced: bool = false
 ## конец клипа) раскладывать больше нечего — стоящих и лежащих каждый кадр
 ## перебирали бы вершины впустую; клип стойки и ходьбы риг дальше просто играет.
 var _settled: bool = false
+## Что от тела отрезано: под днищем кабины — x от, x до, высота днища, и какая
+## полоса X осталась после разрыва по стенке. Пустые — не резано.
+var _carved := Vector4.ZERO
+var _kept := Vector2(-INF, INF)
 
 
 func _ready() -> void:
@@ -391,6 +402,78 @@ func face(direction: float, instant: bool = false) -> void:
 func set_transparency(value: float) -> void:
 	for mesh_instance in _meshes:
 		mesh_instance.transparency = value
+
+
+## Срезает всё, что между [param from_x] и [param to_x] выше [param bottom], в
+## координатах мира: так тело режет днище кабины ([CarCut]).
+func carve_under(from_x: float, to_x: float, bottom: float) -> void:
+	_carved = Vector4(from_x, to_x, bottom, 1.0)
+	_cut_materials()
+	for mesh_instance in _meshes:
+		mesh_instance.set_instance_shader_parameter(&"carve", _carved)
+
+
+## Оставляет от тела только полосу X от [param from_x] до [param to_x]: так
+## рвёт тело стенка кабины ([Corpse]).
+func keep_between(from_x: float, to_x: float) -> void:
+	_kept = Vector2(maxf(from_x, _kept.x), minf(to_x, _kept.y))
+	_cut_materials()
+	for mesh_instance in _meshes:
+		mesh_instance.set_instance_shader_parameter(&"keep", Vector4(_kept.x, _kept.y, 0.0, 1.0))
+
+
+## Полоса X, которая от тела осталась: без разрыва — вся.
+func kept() -> Vector2:
+	return _kept
+
+
+## Возвращает телу всё отрезанное: воскресший Otto целый.
+func heal() -> void:
+	_carved = Vector4.ZERO
+	_kept = Vector2(-INF, INF)
+	for mesh_instance in _meshes:
+		for surface in mesh_instance.mesh.get_surface_count():
+			mesh_instance.set_surface_override_material(surface, null)
+
+
+## Встаёт в позу [param other] кость в кость, с его срезами, и замирает: так
+## оторванный кусок остаётся тем, чем был в теле.
+func copy_pose_of(other: FigureRig) -> void:
+	if _skeleton == null or other._skeleton == null:
+		return
+	for bone in _skeleton.get_bone_count():
+		_skeleton.set_bone_pose(bone, other._skeleton.get_bone_pose(bone))
+	rotation = other.rotation
+	if other._carved.w > 0.0:
+		carve_under(other._carved.x, other._carved.y, other._carved.z)
+	if other._kept != Vector2(-INF, INF):
+		keep_between(other._kept.x, other._kept.y)
+	set_process(false)
+
+
+## Ставит мешам материалы со срезом вместо материалов пака — один раз.
+func _cut_materials() -> void:
+	for mesh_instance in _meshes:
+		if mesh_instance.get_surface_override_material(0) != null:
+			continue
+		for surface in mesh_instance.mesh.get_surface_count():
+			var source := mesh_instance.get_active_material(surface)
+			mesh_instance.set_surface_override_material(surface, _carve_material(source))
+
+
+static func _carve_material(source: Material) -> ShaderMaterial:
+	if _carve_materials.has(source):
+		return _carve_materials[source] as ShaderMaterial
+	var material := ShaderMaterial.new()
+	material.shader = CARVE_SHADER
+	var standard := source as BaseMaterial3D
+	if standard != null:
+		material.set_shader_parameter(&"albedo", standard.albedo_color)
+		material.set_shader_parameter(&"use_vertex_color", standard.vertex_color_use_as_albedo)
+		material.set_shader_parameter(&"roughness", standard.roughness)
+		material.set_shader_parameter(&"specular", standard.metallic_specular)
+	_carve_materials[source] = material
+	return material
 
 
 ## Доводит риг до целевой позы сразу, без сглаживания. Нужно тестам и съёмке:

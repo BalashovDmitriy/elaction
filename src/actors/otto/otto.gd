@@ -110,6 +110,9 @@ var figure: FigureRig:
 ## длина и миг смерти агента, и несеянный жребий делал бы прогон бота
 ## неповторимым (`docs/testing.md`, правило из M18b).
 var takedown_rng := RandomNumberGenerator.new()
+## Срез днищем кабины, если она прошла по погибшему (ADR-0043, решение 9).
+## Ставит кабина; воскресший Otto целый.
+var car_cut: CarCut = null
 
 var _states := OttoStateMachine.new()
 ## Один снимок ввода на всё время жизни: перечитывается, а не создаётся заново.
@@ -283,6 +286,9 @@ func kill(crushed: bool = false) -> void:
 		return
 	_crushed = crushed
 	_states.kill()
+	# Погибшего кабина может порвать стенкой, как труп агента (ADR-0043,
+	# решение 11): она ищет таких по группе лежащих.
+	add_to_group(Corpse.GROUP)
 	_falling_over = FALLING_TIME
 	Sounds.play(Sounds.OTTO_DEATH)
 	Sounds.play(Sounds.DEATH_JINGLE)
@@ -359,6 +365,9 @@ func _hold_the_feet() -> void:
 ## глубиной падения за спиной и разбивался бы на ровном месте.
 func revive() -> void:
 	_crushed = false
+	remove_from_group(Corpse.GROUP)
+	car_cut = null
+	_body.heal()
 	_states.reset()
 	_locks.clear()
 	_jump_waiting = false

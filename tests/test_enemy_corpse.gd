@@ -23,6 +23,7 @@ func before_all() -> void:
 
 func after_all() -> void:
 	Engine.time_scale = 1.0
+	Blood.enabled = true
 	GameState.instance().reset()
 
 
@@ -109,11 +110,13 @@ func _facing(agent: Enemy, facing: float) -> void:
 	agent.held = false
 
 
-## Убитый у края кабины падает туловищем на площадку: он съезжает на неё
-## целиком и остаётся на этаже, когда кабина уходит, — а не едет с ней сквозь
-## перекрытия, как ехал, пока решали ступни (ADR-0042, решение 1).
+## Убитый у края кабины падает туловищем на площадку: когда кабина уходит, он
+## съезжает на неё целиком и остаётся на этаже, — а не едет с ней сквозь
+## перекрытия, как ехал, пока решали ступни (ADR-0042, решение 1). Так — без
+## крови; с кровью его рвёт стенка кабины (ADR-0043, решение 11, `test_car_cut`).
 func test_a_corpse_across_the_car_edge_stays_on_the_landing() -> void:
 	GameState.instance().start_game()
+	Blood.enabled = false
 	var car := CAR_SCENE.instantiate() as ElevatorCar
 	add_child_autofree(car)
 	car.setup(PackedFloat32Array([0.0, Proportions.FLOOR]), 0)
@@ -133,6 +136,7 @@ func test_a_corpse_across_the_car_edge_stays_on_the_landing() -> void:
 	assert_gt(absf(car.global_position.y - start), Proportions.FLOOR * 0.5, "кабина уехала")
 	assert_almost_eq(agent.global_position.y, floor_y, 0.05, "труп остался на площадке")
 	assert_lt(agent.global_position.x, edge, "и лежит на ней, а не над шахтой")
+	Blood.enabled = true
 
 
 ## Убитый над пустой шахтой падает на её дно и засыпает там.
