@@ -718,4 +718,12 @@ func _on_bullet_hit(target: Node3D) -> void:
 	var victim := target as Otto
 	if victim == null:
 		return
+	if not victim.is_dead() and not victim.invulnerable:
+		# Кто стрелял и откуда — для журнала прогона.
+		victim.set_meta(&"shooter", RunLog.at(self))
+		victim.set_meta(&"death_cause", "bullet")
+		RunLog.write(
+			"hit_otto",
+			{"shooter": RunLog.at(self), "otto": RunLog.at(victim), "stance": _brain.stance}
+		)
 	victim.kill()

@@ -101,6 +101,13 @@ func _play(
 	var game := GameState.instance()
 	game.reset()
 	game.start_game()
+	# Журнал прогона по флагу `--log=путь`: `{seed}` в пути — номер сида.
+	for argument: String in OS.get_cmdline_user_args():
+		if argument.begins_with(RunLog.FLAG):
+			var path := argument.trim_prefix(RunLog.FLAG).replace("{seed}", str(building_seed))
+			RunLog.open(
+				ProjectSettings.globalize_path(path) if path.begins_with("res://") else path
+			)
 
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
 	level.rules = BuildingRules.new()

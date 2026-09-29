@@ -159,6 +159,7 @@ func _ready() -> void:
 	if rules == null:
 		rules = BuildingRules.new()
 	_plan = BuildingPlan.generate(rules, building_seed)
+	RunLog.write("building", {"seed": building_seed, "floors": rules.floors})
 	_spawn.rng.seed = building_seed
 	# Свой генератор, не выпуска: иначе вход в дверь менял бы и выпуск агентов.
 	_watch.rng.seed = building_seed * 31 + 7
@@ -390,6 +391,7 @@ func _spawn_shafts() -> void:
 ## быстрой машине их выходит больше за тот же шаг бота, и один и тот же сид
 ## давал то четыре смерти, то пять. Ровно этот долг тянулся с M18a.
 func _physics_process(delta: float) -> void:
+	RunLog.tick(delta)
 	if _arrival.is_playing():
 		_arrival.advance(delta)
 		return
@@ -867,6 +869,7 @@ func _release_agent(post: AgentPost) -> Enemy:
 		agent.alert_for(_alert_left)
 	agent.died.connect(_on_agent_died.bind(post))
 	agent.left_building.connect(_on_agent_left.bind(post))
+	RunLog.write("agent_spawn", {"at": mat, "floor": post.floor_index, "otto": RunLog.at(otto)})
 	return agent
 
 
@@ -881,7 +884,8 @@ func _on_alarm_raised() -> void:
 		agent.set_alarmed(true)
 
 
-func _on_agent_died(_agent: Enemy, post: AgentPost) -> void:
+func _on_agent_died(agent: Enemy, post: AgentPost) -> void:
+	RunLog.write("agent_death", {"at": RunLog.at(agent), "floor": post.floor_index})
 	# Ячейка освобождается со сменой по сложности (@3866): следующего выпустит
 	# жребий, а не эта же дверь.
 	_free_slot(post)
@@ -896,6 +900,23 @@ func _on_agent_left(agent: Enemy, post: AgentPost) -> void:
 
 
 func _on_otto_died() -> void:
+	# Причина — у Otto: кабина его сдавила или пуля, и чья (журнал прогона).
+	RunLog.write(
+		"otto_death",
+		{
+			"at": RunLog.at(otto),
+			"floor": _floor_of(otto),
+			"cause": otto.get_meta(&"death_cause", "fall"),
+			"shooter": otto.get_meta(&"shooter", []),
+			"riding": otto.is_riding(),
+			"agents":
+			(
+				agents()
+				. filter(func(a: Enemy) -> bool: return not a.is_dead())
+				. map(func(a: Enemy) -> Array: return RunLog.at(a))
+			),
+		}
+	)
 	# Жизнь снимается сразу, чтобы счётчик не врал, пока тело лежит.
 	if not GameState.instance().lose_life():
 		return
@@ -921,6 +942,7 @@ func _respawn_otto() -> void:
 	var surface := rules.floor_surface(index)
 	otto.global_position = WorldSpace.to_scene(Vector2(_safest_x(index), surface))
 	otto.revive()
+	RunLog.write("respawn", {"at": RunLog.at(otto), "floor": index})
 
 
 func _safest_x(index: int) -> float:

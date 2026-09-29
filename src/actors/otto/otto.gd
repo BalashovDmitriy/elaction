@@ -307,6 +307,10 @@ func kill(crushed: bool = false) -> void:
 	if _states.is_dead():
 		return
 	_crushed = crushed
+	if crushed:
+		set_meta(&"death_cause", "crushed")
+	elif not has_meta(&"shooter"):
+		set_meta(&"death_cause", "fall")
 	_states.kill()
 	corpse.fall(velocity)
 	_falling_over = FALLING_TIME
@@ -385,6 +389,9 @@ func _hold_the_feet() -> void:
 ## глубиной падения за спиной и разбивался бы на ровном месте.
 func revive() -> void:
 	_crushed = false
+	for key: StringName in [&"death_cause", &"shooter"]:
+		if has_meta(key):
+			remove_meta(key)
 	corpse.rise()
 	_states.reset()
 	_locks.clear()
@@ -450,6 +457,7 @@ func turn_into_depth(weight: float) -> void:
 ## нажата», а Otto — по [method Input.is_action_just_pressed], и шаг, в котором
 ## нажатие видит каждый, не обязан совпасть.
 func ride(on: bool, presses_spent: bool = false) -> void:
+	RunLog.write("ride", {"on": on, "look": ride_look, "at": RunLog.at(self)})
 	if on:
 		_states.ride()
 	else:
@@ -562,6 +570,7 @@ func _on_bullet_hit(target: Node3D) -> void:
 	var agent := target as Enemy
 	if agent == null or agent.is_dead():
 		return
+	RunLog.write("hit_agent", {"at": RunLog.at(agent), "otto": RunLog.at(self)})
 	agent.take_bullet()
 	_award_for(agent, GameState.ENEMY_SHOT_SCORE)
 
