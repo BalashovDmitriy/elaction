@@ -331,8 +331,10 @@ func _build_records() -> void:
 ## [Credits] (ADR-0042, решение 6). По разделу — строка имён с лицензиями.
 func _build_credits() -> void:
 	_caption("UI_CREDITS")
-	# Первым — автор идеи и разработки, потом — авторы ассетов из `CREDITS.md`.
+	# Первым — автор идеи и разработки, за ним — оригинал, по которому ремейк,
+	# потом — авторы ассетов из `CREDITS.md`.
 	_credit_line(tr("UI_CREDITS_CREATOR"), tr("UI_CREDITS_CREATOR_NAME"))
+	_credit_line(tr("UI_CREDITS_ORIGINAL"), tr("UI_CREDITS_ORIGINAL_NAME"))
 	_gap(10.0)
 	_note(tr("UI_CREDITS_ABOUT"))
 	for section: Credits.Section in Credits.load_sections():
