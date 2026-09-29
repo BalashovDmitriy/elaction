@@ -546,7 +546,9 @@ func _fire() -> void:
 	# Счётчик ведёт сам ствол: пуля кончается и попаданием, и на дальности.
 	bullet.tree_exited.connect(_gun.bullet_spent)
 	get_parent().add_child(bullet)
-	bullet.global_position = global_position + Vector3(_facing * muzzle_offset, height, 0.0)
+	var from := global_position + Vector3(0.0, height, 0.0)
+	var muzzle := from + Vector3(_facing * muzzle_offset, 0.0, 0.0)
+	bullet.global_position = Bullet.spawn_point(get_world_3d(), from, muzzle)
 	_gun.fired()
 
 

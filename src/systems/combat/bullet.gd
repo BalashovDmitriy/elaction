@@ -35,6 +35,10 @@ const FROM_ENEMY: int = 1 | 2
 
 ## Слои, попадание в которые слышно ударом по телу, а не стуком по стене.
 const LIVING: int = 2 | 4
+## Слой геометрии: стены, перекрытия, кабины.
+const GEOMETRY: int = 1
+## Насколько не доходя до стены рождается пуля, упёртая в неё, м.
+const WALL_STANDOFF: float = 0.02
 
 ## Слой ламп: в лампу пуля бьёт без искр и следа — их выбрасывает сама лампа.
 const LAMPS: int = 8
@@ -62,6 +66,19 @@ var _spent: bool = false
 ## упор, если оно раньше, — но не в [method _ready]: стрелок ставит пулю на
 ## место уже после того, как добавил её в дерево.
 var _flashed: bool = false
+
+
+## Где пуле родиться: у ствола [param muzzle], если между стрелком
+## [param from] и стволом нет стены, а если есть — у самой стены, и первым же
+## шагом пуля в неё ударит. Ствол впереди тела, и у стены он уходит в неё или
+## за неё: рождённая там пуля стену не видела и била сквозь неё (M24g, сид 3).
+static func spawn_point(world: World3D, from: Vector3, muzzle: Vector3) -> Vector3:
+	var query := PhysicsRayQueryParameters3D.create(from, muzzle, GEOMETRY)
+	var hit := world.direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return muzzle
+	var wall: Vector3 = hit["position"]
+	return wall - (muzzle - from).normalized() * WALL_STANDOFF
 
 
 func _ready() -> void:

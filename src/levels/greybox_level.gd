@@ -25,6 +25,9 @@ const LANDING_PATIENCE: int = 480
 
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 const ESCALATOR_SCENE := preload("res://src/systems/escalators/escalator.tscn")
+## Кусок этажа уже этого, м, — тупик, а не своя сторона: возвращение в игру
+## ищет место на всём этаже.
+const RESPAWN_POCKET: float = 3.0
 const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 const LAMP_SCENE := preload("res://src/systems/lighting/lamp.tscn")
@@ -924,9 +927,16 @@ func _safest_x(index: int) -> float:
 	var spots := _plan.safe_spots(rules, index)
 	if spots.is_empty():
 		return _plan.safe_x(rules, index)
-	# Своя сторона этажа, а не та, что за стеной или проёмом.
+	# Своя сторона этажа, а не та, что за стеной или проёмом. Но не карман:
+	# между стеной и шахтой бывает тупик в полтора метра, и вернувшийся туда Otto
+	# уходил бы из него только кабиной, под огнём из-за шахты, — и погибал там
+	# раз за разом (M24g, сид 3). Тогда — весь этаж.
 	var from_x := WorldSpace.to_plane(otto.global_position).x
-	spots = _plan.spots_on_the_same_piece(rules, index, from_x, spots)
+	var own := _plan.spots_on_the_same_piece(rules, index, from_x, spots)
+	var sorted := own.duplicate()
+	sorted.sort()
+	if not own.is_empty() and sorted[sorted.size() - 1] - sorted[0] >= RESPAWN_POCKET:
+		spots = own
 
 	var agents := _agents_on(index)
 	var best := spots[0]

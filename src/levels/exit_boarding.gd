@@ -66,7 +66,15 @@ const FRAME_SHIFT: float = 3.5
 ## кадра 16:9 доходит до улицы левее верха пандуса, и машина уходит из кадра уже
 ## по ней.
 const FOLLOW_AFTER: float = 1.5
-const FOLLOW_SPAN: float = 13.0
+const FOLLOW_SPAN: float = 20.0
+## Во сколько раз кадр обгоняет машину: она уходит к заднему краю кадра, и
+## дорога впереди, куда светят фары, остаётся в кадре до затемнения (ADR-0043,
+## решение 5). Шёл кадр вровень с машиной — и последние метры она ехала за
+## краем, светя в темноту, которой не видно.
+const FOLLOW_LEAD: float = 1.3
+## Сколько улицы под машиной держит кадр, м: низ кадра поднимается с машиной не
+## до её колёс — асфальт, на который ложится свет фар, остаётся в кадре.
+const STREET_VIEW: float = 1.5
 ## Сколько мотор заводится, с: стартер и газовка ([constant Sounds.CAR_START],
 ## 2.8 с) — машина трогается на газовке, не дожидаясь её конца.
 const START_TIME: float = 2.0
@@ -176,8 +184,8 @@ func step(delta: float, otto: Otto, documents_done: bool, view: Rect2) -> Event:
 func _follow_the_car(otto: Otto) -> void:
 	if not _frame.has_area():
 		return
-	var moved := clampf(_start_x - _car.position.x - FOLLOW_AFTER, 0.0, FOLLOW_SPAN)
-	var rise := maxf(_surface - WorldSpace.to_plane(_car.position).y, 0.0)
+	var moved := clampf((_start_x - _car.position.x - FOLLOW_AFTER) * FOLLOW_LEAD, 0.0, FOLLOW_SPAN)
+	var rise := maxf(_surface - WorldSpace.to_plane(_car.position).y - STREET_VIEW, 0.0)
 	var frame := Rect2(
 		_frame.position.x - moved, _frame.position.y, _frame.size.x, maxf(_frame.size.y - rise, 1.0)
 	)

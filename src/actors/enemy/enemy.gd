@@ -707,9 +707,9 @@ func _fire() -> void:
 	bullet.collision_mask = Bullet.FROM_ENEMY
 	bullet.hit_target.connect(_on_bullet_hit)
 	get_parent().add_child(bullet)
-	bullet.global_position = (
-		global_position + Vector3(_brain.facing * _muzzle_reach(), _shot_height(), 0.0)
-	)
+	var from := global_position + Vector3(0.0, _shot_height(), 0.0)
+	var muzzle := from + Vector3(_brain.facing * _muzzle_reach(), 0.0, 0.0)
+	bullet.global_position = Bullet.spawn_point(get_world_3d(), from, muzzle)
 	_bullet = bullet
 
 

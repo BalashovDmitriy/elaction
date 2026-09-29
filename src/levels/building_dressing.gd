@@ -130,7 +130,7 @@ static func free_spots(
 			busy.append(lamp.x)
 	for escalator in plan.escalators:
 		if escalator.floor_index + 1 == floor_index:
-			busy.append(escalator.x + escalator.towards * rules.escalator_run)
+			busy.append(escalator.landing(rules))
 
 	var free := PackedFloat64Array()
 	for x: float in plan.safe_spots(rules, floor_index):

@@ -7,6 +7,9 @@ extends RefCounted
 ## раскладка упёрлась в предел строк. Счёт прежний, перенесён без изменений
 ## (M24b).
 
+## Полуширина лампы с подвесом, м: край светильника не должен висеть над дырой.
+const LAMP_REACH: float = 0.3
+
 
 ## Раскладывает лампы: по ширине этажа и по серединам равных зон.
 ##
@@ -37,6 +40,7 @@ static func lay(plan: BuildingPlan, rules: BuildingRules, taken: Dictionary) -> 
 				free.append(slot)
 		if free.is_empty():
 			free = _slots_beside_the_openings(plan, rules, index)
+		free = free.filter(func(slot: int) -> bool: return _has_a_ceiling(plan, rules, index, slot))
 
 		var wanted := rules.lamps_on(index)
 		for number in wanted:
@@ -72,6 +76,20 @@ static func _slots_beside_the_openings(
 		if clear.has(rules.slot_x(slot)):
 			free.append(slot)
 	return free
+
+
+## Есть ли над местом потолок: над проёмом эскалатора с этажа выше лампе
+## висеть не на чем (ADR-0043, решение 15). Пролёт под 45° уходит проёмом до
+## края этажа, и под ним этаж ниже без потолка на два-три места.
+static func _has_a_ceiling(plan: BuildingPlan, rules: BuildingRules, index: int, slot: int) -> bool:
+	var x := rules.slot_x(slot)
+	for escalator in plan.escalators:
+		if escalator.floor_index != index - 1:
+			continue
+		var gap := escalator.gap(rules)
+		if x + LAMP_REACH > gap.x and x - LAMP_REACH < gap.y:
+			return false
+	return true
 
 
 ## Свободное место, ближайшее к желаемому. При равном расстоянии — левое.

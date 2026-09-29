@@ -208,6 +208,9 @@ func _exit() -> void:
 	await _seconds(0.8)
 	await _shoot("exit_03_lights_gate")
 	await _until(func() -> bool: return boarding.phase == ExitBoarding.Phase.LEAVING)
+	if OS.get_cmdline_user_args().has("--sequence"):
+		await _drive_sequence(car)
+		return
 	await _seconds(0.45)
 	await _shoot("exit_04_driving")
 	# Кадр едет за машиной: подъём по пандусу и выезд на улицу.
@@ -222,6 +225,32 @@ func _exit() -> void:
 	await _shoot("exit_05_bonus")
 	if await _until(func() -> bool: return _curtain.opacity() >= 0.5):
 		await _shoot("exit_06_fade")
+
+
+## Покадровый разбор отъезда (`--sequence`): кадр каждые 0.15 с, пока машина
+## едет и не упало затемнение, и строка о ней — где она, наклон, горят ли фары,
+## где камера. По этим строкам и кадрам видно, где свет фар перестаёт ложиться
+## на дорогу.
+func _drive_sequence(car: ExitCar) -> void:
+	var index := 0
+	while car.is_leaving() and _curtain.opacity() < 0.95 and index < 40:
+		await _shoot("drive_%02d" % index)
+		var camera := get_viewport().get_camera_3d()
+		print(
+			(
+				"  drive_%02d машина %s наклон %.1f° фары %s камера %s затемнение %.2f"
+				% [
+					index,
+					WorldSpace.to_plane(car.global_position),
+					rad_to_deg(car.rotation.z),
+					car.lights_on(),
+					camera.global_position if camera != null else Vector3.ZERO,
+					_curtain.opacity(),
+				]
+			)
+		)
+		await _seconds(0.15)
+		index += 1
 
 
 ## Красная дверь, у которой по обе стороны есть место для агента: без стен и

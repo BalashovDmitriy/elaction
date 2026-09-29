@@ -95,6 +95,11 @@ const FRAME_MARGIN: float = 0.12
 ## Сетки деталей по имени: одни на все эскалаторы здания.
 static var _meshes: Dictionary = {}
 
+## Скорость поездки, м/с по пути. До M24g поездка по короткому крутому пролёту
+## шла 1.1 с; с пологим пролётом M24g путь длиннее, и время считается по нему
+## ([method setup]), а скорость остаётся прежней.
+@export var ride_speed: float = 4.3
+
 ## Сколько секунд занимает поездка между площадками.
 @export var travel_time: float = 1.1
 
@@ -145,6 +150,7 @@ func setup(descent: Vector2, via: Vector2, gap: Vector2, slab: float) -> void:
 	_via = WorldSpace.direction_to_scene(via)
 	_has_via = true
 	_bottom_pad.position = down
+	travel_time = (_via.length() + (down - _via).length()) / ride_speed
 	_build(down, gap, slab)
 
 

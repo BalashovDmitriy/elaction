@@ -28,11 +28,23 @@ const ROCK_TIME: float = 0.5
 ## Фары и стоп-сигналы: насколько светятся заглушённые и заведённые.
 const LIGHTS_OFF: float = 0.15
 const LIGHTS_ON: float = 5.0
-## Высота фар от земли, м, и их луч: дальность, м, и угол, градусы.
+## Высота фар от земли, м, и их лучи (ADR-0043, решение 5): дальность, м, угол,
+## градусы, и насколько луч опущен к дороге, градусы. Лучи светят далеко вперёд
+## и ложатся на пандус и улицу до самого затемнения; фар две, по бортам.
 const BEAM_HEIGHT: float = 0.5
-const BEAM_RANGE: float = 9.0
-const BEAM_ANGLE: float = 28.0
-const BEAM_ENERGY: float = 4.0
+const BEAM_RANGE: float = 22.0
+const BEAM_ANGLE: float = 20.0
+const BEAM_DIP: float = 7.0
+const BEAM_ENERGY: float = 12.0
+## Насколько фары разнесены по бортам, м.
+const BEAM_SPREAD: float = 0.62
+## Ореол у самой фары: мягкое пятно света вокруг стекла, радиус, м, и яркость.
+## Луча-конуса в воздухе нет: геометрией он читался треугольником. Виден в
+## воздухе луч только там, где есть объёмный туман, — сам, как настоящий.
+const HALO_SIZE: float = 0.55
+const HALO_ALPHA: float = 0.55
+const HAZE_FOG: float = 2.0
+const HALO_SHADER := preload("res://src/levels/headlight_halo.gdshader")
 ## Докуда слышно машину, м: дверцу, стартер и отъезд — они звучат у машины.
 const SOUND_REACH: float = 24.0
 ## Машина стоит снаружи здания: за плоскостью игры, но перед стеной, чтобы
@@ -70,7 +82,7 @@ var _rocking: float = 0.0
 ## машин всех зданий одни, и заведённая машина зажгла бы фары и следующей.
 var _lamps: Array[StandardMaterial3D] = []
 var _lamp_glow: Array[float] = []
-var _beam: SpotLight3D = null
+var _beam: Node3D = null
 var _wheels: Array[Node3D] = []
 ## Середина каждого колеса в его собственных координатах: вокруг неё оно и
 ## крутится. Начало узла колеса у пака не на оси, а в нуле машины, и поворот
@@ -177,7 +189,7 @@ static func spot(exit_x: float, rules: BuildingRules, plan: BuildingPlan) -> flo
 			busy.append(wall.band(rules))
 	for escalator in plan.escalators:
 		if escalator.floor_index == bottom - 1:
-			var landing := escalator.x + escalator.towards * rules.escalator_run
+			var landing := escalator.landing(rules)
 			var gap := escalator.gap(rules)
 			busy.append(Vector2(minf(gap.x, landing), maxf(gap.y, landing)))
 	var half := LENGTH * 0.5 + GAP
@@ -245,7 +257,7 @@ func start_engine() -> void:
 
 
 ## Горят ли фары: заглушённая машина стоит с тёмными, заведённая зажигает их и
-## светит лучом вперёд. Луч — один источник без тени, и только на отъезде.
+## светит двумя лучами вперёд. Лучи без тени, и только на отъезде.
 func set_lights(on: bool) -> void:
 	if _lamps.is_empty():
 		_own_the_lamps()
@@ -253,19 +265,53 @@ func set_lights(on: bool) -> void:
 		var glow := LIGHTS_ON if on else LIGHTS_OFF
 		_lamps[index].emission_energy_multiplier = _lamp_glow[index] * glow
 	if on and _beam == null:
-		_beam = SpotLight3D.new()
+		_beam = Node3D.new()
 		_beam.name = "Beam"
-		_beam.light_color = CarModel.HEADLIGHT
-		_beam.light_energy = BEAM_ENERGY
-		_beam.spot_range = BEAM_RANGE
-		_beam.spot_angle = BEAM_ANGLE
-		_beam.shadow_enabled = false
-		# Луч вдоль капота: прожектор светит по своей -Z, капот смотрит в towards.
+		# Лучи вдоль капота, чуть к дороге: прожектор светит по своей -Z, капот
+		# смотрит в towards.
 		_beam.position = Vector3(towards * LENGTH * 0.5, BEAM_HEIGHT, 0.0)
 		_beam.rotation.y = PI * 0.5 if towards < 0.0 else -PI * 0.5
 		add_child(_beam)
+		for side: float in [-1.0, 1.0]:
+			_beam.add_child(_headlight(side))
 	if _beam != null:
 		_beam.visible = on
+
+
+## Одна фара: прожектор без тени, опущенный к дороге, и ореол у стекла.
+func _headlight(side: float) -> Node3D:
+	var lamp := Node3D.new()
+	lamp.position = Vector3(side * BEAM_SPREAD * 0.5, 0.0, 0.0)
+	lamp.rotation.x = -deg_to_rad(BEAM_DIP)
+	var spot := SpotLight3D.new()
+	spot.light_color = CarModel.HEADLIGHT
+	spot.light_energy = BEAM_ENERGY
+	spot.spot_range = BEAM_RANGE
+	spot.spot_angle = BEAM_ANGLE
+	# Край луча мягкий: пятно на дороге расплывается, а не обрезано конусом.
+	spot.spot_attenuation = 1.2
+	spot.spot_angle_attenuation = 0.4
+	spot.shadow_enabled = false
+	spot.light_volumetric_fog_energy = HAZE_FOG
+	lamp.add_child(spot)
+	lamp.add_child(_halo())
+	return lamp
+
+
+## Ореол у стекла фары: плоское пятно, всегда повёрнутое к камере, ярче к
+## середине и мягко сходящее на нет к краю.
+static func _halo() -> MeshInstance3D:
+	var quad := QuadMesh.new()
+	quad.size = Vector2(HALO_SIZE, HALO_SIZE)
+	var look := ShaderMaterial.new()
+	look.shader = HALO_SHADER
+	look.set_shader_parameter(&"tint", Color(CarModel.HEADLIGHT, HALO_ALPHA))
+	quad.material = look
+	var halo := MeshInstance3D.new()
+	halo.name = "Halo"
+	halo.mesh = quad
+	halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return halo
 
 
 ## Горят ли фары прямо сейчас.
@@ -382,14 +428,14 @@ func _climb() -> void:
 		return
 	var along := clampf((_ramp_start - position.x) / _ramp_run, 0.0, 1.0)
 	var at := WorldSpace.to_plane(position)
-	at.y = _floor_y - _ramp_rise * along
+	at.y = _floor_y - _ramp_rise * GarageRamp.rise_share(along)
 	var z := position.z
 	position = WorldSpace.to_scene(at)
 	position.z = z
 	# Капот смотрит влево, и нос на подъёме задирается: поворот вокруг +Z по
-	# часовой, если смотреть с камеры, — минус.
-	var slope := atan2(_ramp_rise, _ramp_run)
-	rotation.z = -slope if along > 0.0 and along < 1.0 else 0.0
+	# часовой, если смотреть с камеры, — минус. Наклон — по касательной к кривой
+	# подъёма: на её концах он сходит к нулю плавно, без перелома.
+	rotation.z = -atan(_ramp_rise / _ramp_run * GarageRamp.rise_slope(along))
 
 
 ## Звук на месте машины: позиционный источник, который уезжает вместе с ней.
