@@ -1,8 +1,9 @@
 shader_type spatial;
-// Материал фигуры, которую порвала кабина (ADR-0043, решения 8 и 11).
+// Материал фигуры, которую порвала кабина (ADR-0043, решения 8, 11 и 12).
 //
 // Повторяет материалы моделей пака — цвет, цвет вершин, шероховатость, без
-// фактур — и отбрасывает то, чего у тела больше нет, в координатах мира.
+// фактур — и отбрасывает то, чего у тела больше нет: срезанное днищем — в
+// координатах мира, оторванное стенкой — по костям скина.
 // Изнанка видна в срезе и показывается мясом, а не цветом костюма: грани не
 // отсекаются.
 render_mode cull_disabled;
@@ -15,15 +16,29 @@ uniform vec3 flesh : source_color = vec3(0.32, 0.02, 0.03);
 
 // Под днищем: между стенками кабины по X и выше днища по Y; w — включён ли.
 instance uniform vec4 carve = vec4(0.0, 0.0, 0.0, 0.0);
-// Разрыв по стенке: от тела осталась только полоса X между x и y; w — включён ли.
-instance uniform vec4 keep = vec4(0.0, 0.0, 0.0, 0.0);
+// Спрятанные кости рэгдолла (ADR-0043, решение 12): биты привязок скина, по
+// 32 в слове. Вершина, которую тянут спрятанные кости, пропадает.
+instance uniform uvec2 hidden_bones = uvec2(0u, 0u);
+
+varying float gone;
+
+void vertex() {
+	gone = 0.0;
+	for (int i = 0; i < 4; i++) {
+		uint bind = BONE_INDICES[i];
+		uint word = bind < 32u ? hidden_bones.x : hidden_bones.y;
+		if ((word & (1u << (bind & 31u))) != 0u) {
+			gone += BONE_WEIGHTS[i];
+		}
+	}
+}
 
 void fragment() {
-	vec3 world = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	if (carve.w > 0.5 && world.x > carve.x && world.x < carve.y && world.y > carve.z) {
+	if (gone > 0.5) {
 		discard;
 	}
-	if (keep.w > 0.5 && (world.x < keep.x || world.x > keep.y)) {
+	vec3 world = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	if (carve.w > 0.5 && world.x > carve.x && world.x < carve.y && world.y > carve.z) {
 		discard;
 	}
 	vec3 color = albedo.rgb;

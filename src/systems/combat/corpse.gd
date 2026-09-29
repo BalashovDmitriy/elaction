@@ -1,359 +1,228 @@
 class_name Corpse
 extends RefCounted
 
-## Лежащее тело: труп агента или оторванный от него кусок (ADR-0042,
-## решение 1; ADR-0043, решения 7–11).
+## Тело на суставах у агента, Otto и оторванного куска (ADR-0043, решения 7–12).
 ##
-## Физическое тело, пока под ним не плита. На полу кабины оно едет с ней, как
-## на платформе, — это делает [method CharacterBody3D.move_and_slide], а не
-## перенос в узел кабины: тот вёз тело сквозь перекрытия, если оно лежало
-## туловищем на площадке. Ушла кабина — тело падает в шахту; серединой над
-## пустотой или над другой опорой, чем концы, — съезжает на опору середины.
-## Засыпает только на неподвижной опоре: лежащие до конца здания трупы ничего
-## не стоят кадру.
+## Рэгдолл ([Ragdoll]) собирается с рождения актёра и ждёт выключенным: живой
+## ходит своей формой по правилам аркады, а части тела только повторяют позу и
+## ни с чем не сталкиваются. В миг смерти тело падает ([method fall]): части
+## включаются и летят от толчка пули, дальше всё решает физика — тело оседает,
+## ложится на другие трупы, едет на полу кабины, падает в шахту. Засыпают части
+## сами, когда улеглись: лежащие до конца здания трупы ничего не стоят кадру.
 ##
-## Трупы лежат на своём слое [constant LAYER] и видят друг друга: убитый рядом
-## с лежащим ложится на него (решение 10). Живые и Otto на этот слой не
-## смотрят и проходят сквозь.
+## Трупы лежат на своём слое [constant LAYER] и видят друг друга (решение 10).
+## Живые и Otto на этот слой не смотрят и проходят сквозь.
 ##
 ## Кабина режет тело двумя способами. Днищем сверху — [method cut_under]: что
 ## под днищем, пропадает. Стенкой — [method tear]: тело поперёк порога едущей
-## кабины рвётся по стенке, и часть внутри уезжает отдельным [CorpsePiece].
-## Без крови тело не рвётся: под днищем оно исчезает целиком, а с порога
-## съезжает на опору своей середины, как и раньше.
+## кабины рвётся, и части внутри уезжают отдельным [CorpsePiece]. Без крови
+## тело не рвётся: под днищем оно исчезает целиком.
 
-## Группа всех лежащих тел: по ней кабина ищет, кого рвать стенкой.
+## Группа упавших тел: по ней кабина ищет, кого рвать стенкой.
 const GROUP := &"corpses"
 ## Слой трупов в `project.godot`.
 const LAYER: int = 5
-## Слой геометрии: по нему, а не по трупам, тело ищет, есть ли где лечь.
+## Слой геометрии: пол, стены, кабины.
 const GEOMETRY_MASK: int = 1
-## Порядок шага физики трупа: после кабин, у которых он нулевой.
-const PRIORITY: int = 1
-## Как быстро труп съезжает с края на опору середины, м/с.
-const SLIDE_SPEED: float = 1.5
-## Насколько высоко над лежащим ищутся те, кто лежит на нём, м.
-const PILE_REACH: float = 1.0
-## Длина брызг лужицы у порога, м.
+## Толчок пули в туловище, Н·с, и насколько он поддаёт вверх. Без пули тело
+## толкает назад, от взгляда, вполсилы: обмякший столбом оседал бы сидя.
+const HIT_IMPULSE: float = 60.0
+const HIT_LIFT: float = 0.15
+const SLUMP: float = 1.0
+## Длина лужицы у порога, м.
 const TEAR_PUDDLE: float = 0.3
+## Метки, которыми пуля отмечает удар: куда (−1 влево, +1 вправо) и где.
+const HIT_META := &"hit_from"
+const HIT_POINT := &"hit_at"
 
-## Тело легло и больше не двигается: физика уснула.
-var at_rest: bool = false
-## Тело упало и лежит формой по длине, а не стоячей.
-var lying: bool = false
-## Тела больше нет: зажато или срезано целиком.
+## Тело упало и живёт физикой.
+var fallen: bool = false
+## Тела больше нет: срезано целиком или зажато.
 var gone: bool = false
-## Раздавлено лампой: засыпает сразу, где лежит, без физики.
-var crushed: bool = false
 ## Срез днищем кабины, если он начался.
 var cut: CarCut = null
+var ragdoll: Ragdoll = null
+## Тело уже порвано стенкой: второй раз кабина его не рвёт.
+var torn: bool = false
 
-var _body: CharacterBody3D
-var _shape: CollisionShape3D
+var _holder: Node3D
 var _figure: FigureRig
-var _gravity: float
-var _max_fall: float
-## Кабина, на которой лежит тело (или та, на которой лежит его опора), и
-## высота тела над ней, м.
-var _car: ElevatorCar = null
-var _car_offset: float = 0.0
-## Формы у тела не осталось: всё, что от него есть, — под днищем кабины.
-var _shapeless: bool = false
 
 
+## Собирает тело при фигуре [param figure] актёра [param holder]. [param only]
+## — только эти части (кусок); пусто — все.
 func _init(
-	body: CharacterBody3D,
-	shape: CollisionShape3D,
-	figure: FigureRig,
-	gravity: float,
-	max_fall: float
+	holder: Node3D, figure: FigureRig, only: PackedStringArray = PackedStringArray()
 ) -> void:
-	_body = body
-	_shape = shape
+	_holder = holder
 	_figure = figure
-	_gravity = gravity
-	_max_fall = max_fall
+	ragdoll = Ragdoll.new(figure, only)
+	ragdoll.corpse = self
 
 
-## Труп при теле [param node] — агента или куска, — или null у живого.
+## Тело при узле [param node] — актёре, куске или части тела, — или null.
 static func of(node: Object) -> Corpse:
-	var agent := node as Enemy
-	if agent != null:
-		return agent.corpse
-	var piece := node as CorpsePiece
-	if piece != null:
-		return piece.corpse
+	if node == null:
+		return null
+	var part := node as PhysicalBone3D
+	if part != null:
+		if part.has_meta(&"ragdoll"):
+			return (part.get_meta(&"ragdoll") as Ragdoll).corpse
+		return null
+	var found: Variant = node.get(&"corpse")
+	if found is Corpse:
+		return found as Corpse
 	return null
 
 
-## Делает тело трупом: слой трупов вместо прежнего, маска — пол и трупы. Пули
-## сквозь труп пролетают, а сам он лежит на полу и на других трупах.
-func enter() -> void:
-	_body.collision_layer = 1 << (LAYER - 1)
-	_body.set_collision_mask_value(LAYER, true)
-	# Шаг трупа — после шага кабин: лежащий на кабине берёт её высоту этого
-	# кадра, а не прошлого.
-	_body.process_physics_priority = PRIORITY
-	_body.add_to_group(GROUP)
-
-
-## Шаг лежащего. [param settled] — тело уже упало и может ложиться формой по
-## длине; ложится оно ногами к [param facing] — голова там, куда упала.
-func step(delta: float, settled: bool, facing: float) -> void:
-	if at_rest:
+## Тело падает: поза отпускает скелет, части летят со скоростью [param velocity]
+## и от толчка пули, если она отметила актёра ([constant HIT_META]). Толчок
+## приходит в ту часть, куда попала пуля, и в саму точку: в голову — голову
+## запрокидывает, в ноги — их выбивает, в корпус — отбрасывает всё тело.
+func fall(velocity: Vector3) -> void:
+	if fallen:
 		return
-	if crushed:
-		at_rest = settled
-		return
-	if not _body.is_on_floor():
-		_body.velocity.y = maxf(_body.velocity.y - _gravity * delta, -_max_fall)
-	var supports := _supports()
-	_body.velocity.x = _slide(supports) if _body.is_on_floor() else 0.0
-	_body.move_and_slide()
-	_body.velocity.z = 0.0
-	_body.global_position.z = WorldSpace.PLAY_Z
-	_ride(_carrier(supports[1]))
-	if not settled:
-		return
-	if not lying:
-		lie_down(facing)
-		return
-	if _body.is_on_floor() and _body.is_on_ceiling():
-		# Зажало между крышей кабины и верхом шахты: тела больше нет.
-		vanish()
-		return
-	if _body.is_on_floor() and _still(supports):
-		at_rest = true
-		_body.velocity = Vector3.ZERO
+	fallen = true
+	_figure.set_process(false)
+	var facing := signf(sin(_figure.rotation.y))
+	var hit := float(_holder.get_meta(HIT_META, -facing * SLUMP))
+	var impulse := Vector3(hit, HIT_LIFT * absf(hit), 0.0) * HIT_IMPULSE
+	var at: Variant = _holder.get_meta(HIT_POINT) if _holder.has_meta(HIT_POINT) else null
+	ragdoll.start(velocity, impulse, at)
+	_holder.add_to_group(GROUP)
 
 
-## Форма лежащего: коробка по длине тела от ступней туда, куда оно упало.
-func lie_down(facing: float) -> void:
-	var length := Proportions.BODY * Enemy.LYING_LENGTH
-	set_span(minf(0.0, -facing * length), maxf(0.0, -facing * length))
+## Тело встаёт: Otto воскрес. Скелет собирается заново — отрезанное кабиной
+## возвращается, — и поза снова ведёт фигуру.
+func rise() -> void:
+	ragdoll.dispose()
+	ragdoll = Ragdoll.new(_figure)
+	ragdoll.corpse = self
+	_figure.heal()
+	_figure.set_process(true)
+	_holder.visible = true
+	_holder.remove_from_group(GROUP)
+	_holder.remove_meta(HIT_META)
+	_holder.remove_meta(HIT_POINT)
+	fallen = false
+	gone = false
+	torn = false
+	cut = null
 
 
-## Лежачая форма от [param from_x] до [param to_x] по X от ступней, м.
-func set_span(from_x: float, to_x: float) -> void:
-	lying = true
-	var own := (_shape.shape as BoxShape3D).duplicate() as BoxShape3D
-	own.size = Vector3(to_x - from_x, Proportions.PRONE, own.size.z)
-	_shape.shape = own
-	_shape.position = Vector3((from_x + to_x) * 0.5, Proportions.PRONE * 0.5, 0.0)
-	# Кабина уходит вниз быстрее, чем тело успевает падать: без длинной
-	# привязки к полу оно отрывалось бы и догоняло пол прыжками.
-	_body.floor_snap_length = Proportions.PRONE
-
-
-## Кладёт тело на кабину [param car]: едет с ней с этого кадра, а не догоняет.
-func ride_on(car: ElevatorCar) -> void:
-	_car = car
-	_car_offset = _body.global_position.y - car.global_position.y
-
-
-## Где тело лежит по X в мире: от и до.
-func span() -> Vector2:
-	var half := (_shape.shape as BoxShape3D).size.x * 0.5
-	var middle := _body.global_position.x + _shape.position.x
-	return Vector2(middle - half, middle + half)
-
-
-## Будит уснувшее тело: из-под него ушла опора или его порвало.
-func wake() -> void:
-	if gone or not at_rest:
-		return
-	at_rest = false
-	crushed = false
-	_body.set_physics_process(true)
-
-
-## Тела больше нет: не видно, не сталкивается, лежавшие на нём падают.
+## Тела больше нет: не видно и не сталкивается.
 func vanish() -> void:
 	if gone:
 		return
 	gone = true
-	at_rest = true
-	_body.visible = false
-	_body.velocity = Vector3.ZERO
-	_shape.set_deferred("disabled", true)
-	_figure.set_process(false)
-	_body.set_physics_process(false)
-	_body.remove_from_group(GROUP)
-	_wake_the_pile()
+	_holder.visible = false
+	ragdoll.remove(ragdoll.names())
+	_holder.remove_from_group(GROUP)
 
 
-## Днище кабины [param car] проходит по телу сверху (решения 7–9).
+## Где тело лежит по X в мире: от и до.
+func span() -> Vector2:
+	var box := ragdoll.bounds()
+	return Vector2(box.position.x, box.end.x)
+
+
+## Днище кабины [param car] проходит по телу сверху (решения 7–9). Части, по
+## которым оно прошло до середины, пропадают; кабина сквозь тело не толкает —
+## иначе вдавливала бы его в пол.
 func cut_under(car: ElevatorCar) -> void:
-	if gone:
+	if not fallen or (gone and (cut == null or cut.done)):
+		return
+	if not Blood.enabled:
+		vanish()
 		return
 	var left := car.global_position.x - car.width() * 0.5
 	var right := car.global_position.x + car.width() * 0.5
 	var bottom := car.bottom()
-	var top := _body.global_position.y + (_shape.shape as BoxShape3D).size.y
-	if not Blood.enabled:
-		if bottom < top:
-			vanish()
-		return
 	if cut == null:
 		cut = CarCut.new()
-		_keep(cut.remains_of(span(), left, right))
-	cut.advance(_figure, _body.get_parent(), left, right, bottom)
-	if cut.done and _shapeless:
-		vanish()
+		# Режущая кабина тело не толкает вовсе: иначе заталкивала бы лежащее
+		# снаружи себе под днище, где его уже не видно.
+		for part: PhysicalBone3D in ragdoll.parts.values():
+			part.add_collision_exception_with(car)
+	# Срез идёт до пола и тогда, когда частей под днищем уже нет: пятно
+	# ложится, когда днище дошло до пола.
+	var reach := ragdoll.bounds() if not ragdoll.parts.is_empty() else AABB()
+	cut.advance(_figure, _holder.get_parent(), left, right, bottom, reach)
+	# Дойдя до пола, днище забирает всё, что в створе, — и то, что кабина в
+	# последний миг задвинула под себя.
+	var under := PackedStringArray()
+	for bone_name: String in ragdoll.parts:
+		var center := Ragdoll.center_of(ragdoll.parts[bone_name] as PhysicalBone3D)
+		if center.x > left and center.x < right and (cut.done or bottom < center.y):
+			under.append(bone_name)
+	ragdoll.remove(under)
+	if ragdoll.parts.is_empty() and not gone:
+		gone = true
+		_holder.remove_from_group(GROUP)
 
 
-## Рвёт тело стенкой кабины [param car] на [param wall_x]: что по сторону
-## [param inside] (−1 или +1), уезжает с кабиной отдельным куском, остальное
-## лежит где лежало.
-func tear(car: ElevatorCar, wall_x: float, inside: float) -> void:
-	var whole := span()
-	var piece_span := Vector2(wall_x, whole.y) if inside > 0.0 else Vector2(whole.x, wall_x)
-	var rest := Vector2(whole.x, wall_x) if inside > 0.0 else Vector2(wall_x, whole.y)
-	var host := _body.get_parent()
-	CorpsePiece.tear_off(_figure, host, piece_span, car)
-	_figure.keep_between(rest.x, rest.y)
-	# Снаружи тело кабине больше не принадлежит, даже если ехало с ней.
-	_car = null
-	_keep(rest)
-	Corpse.bleed(host, Vector3(wall_x, _body.global_position.y, WorldSpace.PLAY_Z), inside)
+## Части тела внутри кабины [param car], если оно лежит поперёк порога:
+## часть снаружи, между высотами [param low] и [param high], лежит на чём-то
+## неподвижном — на площадке. Свесившаяся над пустотой рука — не порог, и
+## тело тогда не рвётся. Внутри — всё, что в кабине по всей её высоте до
+## [param roof]: поднятая рука, оставшись у тела, утянула бы его за кабиной.
+## Пусто, если рвать нечего.
+func across(car: ElevatorCar, low: float, high: float, roof: float) -> PackedStringArray:
+	var left := car.global_position.x - car.width() * 0.5
+	var right := car.global_position.x + car.width() * 0.5
+	var inside := PackedStringArray()
+	var landed := false
+	for bone_name: String in ragdoll.parts:
+		var part := ragdoll.parts[bone_name] as PhysicalBone3D
+		var center := Ragdoll.center_of(part)
+		if center.x > left and center.x < right:
+			if center.y >= low and center.y <= roof:
+				inside.append(bone_name)
+		elif not landed and center.y >= low and center.y <= high:
+			landed = _rests_on_ground(part, car)
+	if not landed:
+		return PackedStringArray()
+	# Стопа там же, где её голень: одна она осталась бы на пороге обрубком.
+	for foot: String in Ragdoll.ANKLES:
+		var leg := String(Ragdoll.ANKLES[foot])
+		if inside.has(leg) != inside.has(foot) and ragdoll.parts.has(foot):
+			if inside.has(leg):
+				inside.append(foot)
+			else:
+				inside.remove_at(inside.find(foot))
+	return inside
 
 
-## Брызги и лужица у стенки, по которой порвалось тело.
+## Лежит ли часть [param part] на неподвижном — не на кабине [param car].
+func _rests_on_ground(part: PhysicalBone3D, car: ElevatorCar) -> bool:
+	var shape := part.get_child(0) as CollisionShape3D
+	var reach := (shape.shape as CapsuleShape3D).radius + 0.1
+	var from := Ragdoll.center_of(part)
+	var query := PhysicsRayQueryParameters3D.create(
+		from, from - Vector3(0.0, reach, 0.0), GEOMETRY_MASK
+	)
+	query.exclude = [car.get_rid()]
+	return not part.get_world_3d().direct_space_state.intersect_ray(query).is_empty()
+
+
+## Рвёт тело стенкой кабины [param car]: части [param inside] уезжают с ней
+## отдельным куском, остальные лежат где лежали (решение 11).
+func tear(car: ElevatorCar, inside: PackedStringArray) -> void:
+	torn = true
+	var host := _holder.get_parent()
+	var box := ragdoll.bounds()
+	CorpsePiece.tear_off(self, _figure, host, inside)
+	ragdoll.remove(inside)
+	var middle := car.global_position.x
+	var side := 1.0 if box.get_center().x < middle else -1.0
+	var wall := middle - side * car.width() * 0.5
+	Corpse.bleed(host, Vector3(wall, box.position.y, WorldSpace.PLAY_Z), side)
+
+
+## Брызги и лужица у стенки, по которой порвалось тело; [param inside] —
+## в какую сторону от стенки кабина.
 static func bleed(host: Node, at: Vector3, inside: float) -> void:
 	var spot := at + Vector3(0.0, Proportions.PRONE, 0.0)
 	Blood.spray(host, spot, inside)
 	Blood.spray(host, spot, -inside)
 	Blood.puddle(host, at - Vector3(inside * TEAR_PUDDLE * 0.5, 0.0, 0.0), TEAR_PUDDLE)
-
-
-## Оставляет телу форму только на отрезке [param part] по X в мире; пустой —
-## формы нет, тело держится одной картинкой, пока срез не кончится.
-func _keep(part: Vector2) -> void:
-	if part == Vector2.ZERO:
-		_shapeless = true
-		_shape.set_deferred("disabled", true)
-		at_rest = true
-		_body.set_physics_process(false)
-		_wake_the_pile()
-		return
-	var feet := _body.global_position.x
-	set_span(part.x - feet, part.y - feet)
-	wake()
-	_wake_the_pile()
-
-
-## Будит уснувших на этом теле: опора под ними поменялась.
-func _wake_the_pile() -> void:
-	if not _body.is_inside_tree():
-		return
-	var own := span()
-	for node: Node in _body.get_tree().get_nodes_in_group(GROUP):
-		var other := Corpse.of(node)
-		if other == null or other == self or not other.at_rest:
-			continue
-		var above := (node as Node3D).global_position.y - _body.global_position.y
-		if above < -0.01 or above > PILE_REACH:
-			continue
-		var theirs := other.span()
-		if theirs.y > own.x and theirs.x < own.y:
-			other.wake()
-
-
-## Держит лежащего на кабине [param car] вровень с ней. Тело кабины
-## ([member AnimatableBody3D.sync_to_physics]) встаёт на место к концу шага
-## физики, и [method move_and_slide] возил бы труп по вчерашнему полу — тот
-## парил бы над едущей вниз кабиной. Поэтому высоту, с которой тело на кабину
-## легло, держит кабина, а физика решает только, лежит ли оно на ней. Шаг трупа
-## идёт после шага кабин ([constant PRIORITY]).
-##
-## Лежит ли — решает луч под серединой, а не [method is_on_floor]: отставшая на
-## шаг кабина уходит из-под тела, и пол на этот шаг пропадает.
-func _ride(car: ElevatorCar) -> void:
-	if car == null:
-		_car = null
-		return
-	if car != _car:
-		if not _body.is_on_floor():
-			return
-		_car = car
-		_car_offset = _body.global_position.y - car.global_position.y
-		return
-	_body.global_position.y = car.global_position.y + _car_offset
-	_body.velocity.y = 0.0
-
-
-## Кабина, которая везёт опору [param support]: сама кабина или та, на которой
-## лежит труп под этим телом.
-func _carrier(support: Object) -> ElevatorCar:
-	var car := support as ElevatorCar
-	if car != null:
-		return car
-	var under := Corpse.of(support)
-	return under._car if under != null else null
-
-
-## Опоры под левым концом, серединой и правым концом лежащего тела: тело, в
-## которое упирается луч вниз, или null. Луч короткий — на толщину тела под
-## ступни: длинный цеплял бы кабину, проезжающую под площадкой.
-func _supports() -> Array[Object]:
-	var found: Array[Object] = []
-	var box := _shape.shape as BoxShape3D
-	var middle := _body.global_position.x + _shape.position.x
-	var half := box.size.x * 0.5 if lying else 0.0
-	var space := _body.get_world_3d().direct_space_state
-	for x: float in [middle - half, middle, middle + half]:
-		var y := _body.global_position.y
-		var from := Vector3(x, y + Proportions.PRONE, _body.global_position.z)
-		var query := PhysicsRayQueryParameters3D.create(
-			from, from - Vector3(0.0, Proportions.PRONE * 2.0, 0.0), _body.collision_mask
-		)
-		query.exclude = [_body.get_rid()]
-		var hit := space.intersect_ray(query)
-		found.append(null if hit.is_empty() else hit["collider"])
-	return found
-
-
-## Куда съезжать лежащему, м/с: с конца над пустотой — к опоре середины; с
-## середины над пустотой — в пустоту. Конец на другой опоре, чем середина,
-## держит тело, пока обе стоят: поперёк порога стоящей кабины оно лежит
-## спокойно. Тронулась кабина под одним из концов — тело съезжает на опору
-## середины; с кровью его до этого рвёт стенка ([method tear]).
-func _slide(supports: Array[Object]) -> float:
-	if not lying:
-		return 0.0
-	var left := supports[0]
-	var middle := supports[1]
-	var right := supports[2]
-	var off_left := left == null or (left != middle and _moving(left, middle))
-	var off_right := right == null or (right != middle and _moving(right, middle))
-	if middle == null:
-		off_left = left != null
-		off_right = right != null
-	if off_left == off_right:
-		return 0.0
-	return SLIDE_SPEED if off_left else -SLIDE_SPEED
-
-
-## Едет ли кабина под одной из двух опор.
-static func _moving(one: Object, other: Object) -> bool:
-	for support: Object in [one, other]:
-		var car := support as ElevatorCar
-		if car != null and not is_zero_approx(car.speed_now()):
-			return true
-	return false
-
-
-## Лежит ли тело на неподвижном: под обоими концами и серединой опора, и ни
-## одна не едет. Кабина везёт, и на ней засыпать нельзя; труп — опора, только
-## пока спит сам; люк подвала уходит из-под тела, когда собраны документы.
-func _still(supports: Array[Object]) -> bool:
-	for ground: Object in supports:
-		if ground == null or ground is ElevatorCar:
-			return false
-		var under := Corpse.of(ground)
-		if under != null and not under.at_rest:
-			return false
-		var node := ground as Node
-		if node != null and node.is_in_group(BasementLock.HATCH_GROUP):
-			return false
-	return true

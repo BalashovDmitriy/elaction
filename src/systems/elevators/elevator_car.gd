@@ -66,11 +66,10 @@ const TIE_SPREAD: float = 0.45
 const TIE_DEPTH: float = 0.6
 
 ## Ход кабины по ROM: 2 px за тик логики, этаж за 1.6 с (ADR-0027, решение 4).
-## Насколько ниже днища тело ещё считается лежащим на пороге, м: кабина,
-## стоящая на этаже, днищем уходит в плиту.
-const TEAR_REACH: float = SLAB_THICKNESS + 0.1
-## Тело ближе этого к стенке, м, рвать нечего: оно по одну её сторону.
-const TEAR_MARGIN: float = 0.06
+## Полоса над полом кабины, в которой части тела лежат на пороге, м: ниже —
+## на плиту, выше — на толщину лежащего тела.
+const TEAR_REACH: float = 0.25
+const TEAR_HEIGHT: float = 0.45
 
 @export var speed: float = Arcade.speed(Arcade.CAR_PX)
 @export var floor_pause: float = 1.5
@@ -425,15 +424,22 @@ func _place(height_in_plane: float) -> void:
 
 
 ## Давит тех, кто оказался под днищем едущей вниз кабины, и режет днищем
-## лежащих под ним (ADR-0043, решения 7–9).
+## тела под ним (ADR-0043, решения 7–9).
 func _crush_those_underneath(speed: float) -> void:
 	if speed <= 0.0:
 		return
 	for corpse: Corpse in _cutting.duplicate():
 		corpse.cut_under(self)
-		if corpse.gone or corpse.cut.done:
+		if corpse.cut == null or corpse.cut.done:
 			_cutting.erase(corpse)
 	for body: Node3D in _crush_zone.get_overlapping_bodies():
+		var part := body as PhysicalBone3D
+		if part != null:
+			# Часть упавшего тела под днищем, а не на полу кабины: у лежащей
+			# на полу середина выше днища на плиту и больше.
+			if Ragdoll.center_of(part).y < bottom():
+				_start_cutting(Corpse.of(part))
+			continue
 		var agent := body as Enemy
 		if agent != null:
 			# Кабина давит и агентов — 300 очков, как в ROM (ADR-0027, решение 6).
@@ -446,104 +452,44 @@ func _crush_those_underneath(speed: float) -> void:
 				# Надбавка за темноту — та же, что у пули, ноги и лампы (ADR-0010).
 				var points := GameState.kill_score(GameState.CRUSH_SCORE, agent.is_in_the_dark())
 				GameState.instance().add_score(points)
-			if agent.is_dead() and _under_the_car(agent):
-				_start_cutting(agent.corpse)
-			continue
-		var piece := body as CorpsePiece
-		if piece != null:
-			if _under_the_car(piece):
-				_start_cutting(piece.corpse)
 			continue
 		var victim := body as Otto
 		if victim == null:
 			continue
 		if ShaftHazards.crushes(speed, victim.is_grounded(), victim == _occupant):
 			victim.kill(true)
-		if victim.is_dead() and victim != _occupant:
-			_cut_otto(victim)
 
 
-## Начинает резать днищем лежащего [param corpse]; дальше срез ведёт список.
+## Начинает резать днищем тело [param corpse]; дальше срез ведёт список:
+## срезанная часть пропадает, и зона давки её уже не видит.
 func _start_cutting(corpse: Corpse) -> void:
-	if corpse.cut != null or corpse.gone:
+	if corpse == null or corpse.cut != null or corpse.gone:
 		return
 	corpse.cut_under(self)
 	if corpse.cut != null and not corpse.cut.done:
 		_cutting.append(corpse)
 
 
-## Лежит ли тело под днищем, а не на полу кабины. Ступни лежащего на полу
-## кабины — на плиту выше днища; под днищем их нет никогда, но днище,
-## дойдя до пола этажа, уходит в его плиту, и ступни лежащего под ним
-## оказываются выше днища — на толщину плиты, не больше.
-func _under_the_car(body: Node3D) -> bool:
-	return to_local(body.global_position).y < _under_the_floor() + SLAB_THICKNESS * 0.5
-
-
-## Режет днищем погибшего Otto. Без крови он гибнет позой «раздавлен», как
-## до M24g: срезать нечего.
-func _cut_otto(otto: Otto) -> void:
-	if not Blood.enabled:
-		return
-	if otto.car_cut == null:
-		otto.car_cut = CarCut.new()
-	var half := _width * 0.5
-	var x := global_position.x
-	otto.car_cut.advance(otto.figure, otto.get_parent(), x - half, x + half, bottom())
-
-
 ## Рвёт стенкой тела, лежащие поперёк порога едущей кабины (ADR-0043,
-## решение 11): часть внутри уезжает с кабиной, часть снаружи остаётся. Без
-## крови не рвёт — тело съезжает на опору своей середины ([Corpse]).
+## решение 11): части внутри уезжают с кабиной, части снаружи остаются. Без
+## крови не рвёт — тело тянут суставы.
 func _tear_across_the_walls(speed: float) -> void:
 	if not Blood.enabled or is_zero_approx(speed):
 		return
-	var low := bottom() - TEAR_REACH
-	var high := global_position.y + _roof_top()
+	var floor_top := bottom() + SLAB_THICKNESS
+	var low := floor_top - TEAR_REACH
+	var high := floor_top + TEAR_HEIGHT
 	var x := global_position.x
-	var half := _width * 0.5
 	for node: Node in get_tree().get_nodes_in_group(Corpse.GROUP):
-		var body := node as Node3D
-		var y := body.global_position.y
-		if y < low or y > high or absf(body.global_position.x - x) > _width + Proportions.BODY:
+		var corpse := Corpse.of(node)
+		if corpse == null or corpse.gone or corpse.torn or corpse.cut != null:
 			continue
-		var corpse := Corpse.of(body)
-		if corpse != null and (corpse.gone or corpse.cut != null):
+		var reach := corpse.span()
+		if reach.y < x - _width or reach.x > x + _width:
 			continue
-		var reach := corpse.span() if corpse != null else _figure_span(body as Otto)
-		if reach == Vector2.ZERO:
-			continue
-		for side: float in [-1.0, 1.0]:
-			var wall := x + side * half
-			if reach.x + TEAR_MARGIN >= wall or reach.y - TEAR_MARGIN <= wall:
-				continue
-			if corpse != null:
-				corpse.tear(self, wall, -side)
-			else:
-				_tear_otto(body as Otto, wall, -side, reach)
-			break
-
-
-## Где по X лежит погибший Otto: по крайним вершинам фигуры, в пределах того,
-## что от него уже осталось. Живого и того, кого режет днище, не рвёт.
-func _figure_span(otto: Otto) -> Vector2:
-	if otto == null or not otto.is_dead() or otto.car_cut != null:
-		return Vector2.ZERO
-	var figure := otto.figure
-	var box := figure.global_transform * figure.skinned_aabb(true)
-	var kept := figure.kept()
-	return Vector2(maxf(box.position.x, kept.x), minf(box.end.x, kept.y))
-
-
-func _tear_otto(otto: Otto, wall: float, inside: float, reach: Vector2) -> void:
-	var host := otto.get_parent()
-	var piece := Vector2(wall, reach.y) if inside > 0.0 else Vector2(reach.x, wall)
-	CorpsePiece.tear_off(otto.figure, host, piece, self)
-	if inside > 0.0:
-		otto.figure.keep_between(-INF, wall)
-	else:
-		otto.figure.keep_between(wall, INF)
-	Corpse.bleed(host, Vector3(wall, otto.global_position.y, WorldSpace.PLAY_Z), inside)
+		var inside := corpse.across(self, low, high, global_position.y + _roof_top())
+		if not inside.is_empty():
+			corpse.tear(self, inside)
 
 
 ## Сажает Otto, если он в проёме и в кабину можно войти (ADR-0037, решение 1).

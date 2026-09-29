@@ -271,10 +271,9 @@ var _faced: bool = false
 ## конец клипа) раскладывать больше нечего — стоящих и лежащих каждый кадр
 ## перебирали бы вершины впустую; клип стойки и ходьбы риг дальше просто играет.
 var _settled: bool = false
-## Что от тела отрезано: под днищем кабины — x от, x до, высота днища, и какая
-## полоса X осталась после разрыва по стенке. Пустые — не резано.
+## Что от тела отрезано под днищем кабины: x от, x до, высота днища. Пусто —
+## не резано.
 var _carved := Vector4.ZERO
-var _kept := Vector2(-INF, INF)
 
 
 func _ready() -> void:
@@ -413,31 +412,43 @@ func carve_under(from_x: float, to_x: float, bottom: float) -> void:
 		mesh_instance.set_instance_shader_parameter(&"carve", _carved)
 
 
-## Оставляет от тела только полосу X от [param from_x] до [param to_x]: так
-## рвёт тело стенка кабины ([Corpse]).
-func keep_between(from_x: float, to_x: float) -> void:
-	_kept = Vector2(maxf(from_x, _kept.x), minf(to_x, _kept.y))
-	_cut_materials()
+## Прячет кости [param names] и всё, что они тянут: так пропадает часть тела,
+## отрезанная от рэгдолла ([Ragdoll]). Пустой список — всё видно.
+func hide_bones(names: PackedStringArray) -> void:
+	if not names.is_empty():
+		_cut_materials()
 	for mesh_instance in _meshes:
-		mesh_instance.set_instance_shader_parameter(&"keep", Vector4(_kept.x, _kept.y, 0.0, 1.0))
+		var mask := Vector2i.ZERO
+		var skin := mesh_instance.skin
+		if skin != null:
+			for bind in skin.get_bind_count():
+				var bone := skin.get_bind_bone(bind)
+				var bone_name := (
+					_skeleton.get_bone_name(bone) if bone >= 0 else String(skin.get_bind_name(bind))
+				)
+				if names.has(bone_name):
+					if bind < 32:
+						mask.x |= 1 << bind
+					else:
+						mask.y |= 1 << (bind - 32)
+		mesh_instance.set_instance_shader_parameter(&"hidden_bones", mask)
 
 
-## Полоса X, которая от тела осталась: без разрыва — вся.
-func kept() -> Vector2:
-	return _kept
+## Скелет фигуры: на нём собирается рэгдолл.
+func skeleton() -> Skeleton3D:
+	return _skeleton
 
 
 ## Возвращает телу всё отрезанное: воскресший Otto целый.
 func heal() -> void:
 	_carved = Vector4.ZERO
-	_kept = Vector2(-INF, INF)
 	for mesh_instance in _meshes:
 		for surface in mesh_instance.mesh.get_surface_count():
 			mesh_instance.set_surface_override_material(surface, null)
 
 
-## Встаёт в позу [param other] кость в кость, с его срезами, и замирает: так
-## оторванный кусок остаётся тем, чем был в теле.
+## Встаёт в позу [param other] кость в кость, с его срезом, и замирает: так
+## оторванный кусок начинается тем, чем был в теле.
 func copy_pose_of(other: FigureRig) -> void:
 	if _skeleton == null or other._skeleton == null:
 		return
@@ -446,8 +457,6 @@ func copy_pose_of(other: FigureRig) -> void:
 	rotation = other.rotation
 	if other._carved.w > 0.0:
 		carve_under(other._carved.x, other._carved.y, other._carved.z)
-	if other._kept != Vector2(-INF, INF):
-		keep_between(other._kept.x, other._kept.y)
 	set_process(false)
 
 

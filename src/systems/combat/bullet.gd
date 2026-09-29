@@ -194,6 +194,10 @@ func _hit(body: Node3D, point: Vector3) -> void:
 		# У агента такого свойства нет, и [method Object.get] отдаёт null.
 		if body.get(&"invulnerable") != true:
 			Blood.spray(get_parent(), global_position, direction)
+			# Куда ударила пуля: убитый ею падает телом по её ходу (ADR-0043,
+			# решение 12).
+			body.set_meta(&"hit_from", signf(direction))
+			body.set_meta(&"hit_at", global_position)
 	elif target == null or (target.collision_layer & LAMPS) == 0:
 		# Стена, дверь, кабина: искры, пыль и след на передней грани (ADR-0037,
 		# решение 5). В лампу — без них: искры выбрасывает сама лампа.

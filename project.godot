@@ -128,3 +128,11 @@ locale/fallback="en"
 ; нетипизированное объявление — ошибка разбора: его ловит godot_check.py и CI.
 ; Вендоренный addons/ не задет — движок по умолчанию пропускает его предупреждения.
 gdscript/warnings/untyped_declaration=2
+
+[physics]
+
+; Jolt, а не встроенный движок: на рэгдолле трупов тот проталкивал части сквозь
+; плиту и не усыплял их (ADR-0043, решение 13). Запас на скругление форм нулевой:
+; с ним персонажи стояли на полу на сантиметр выше.
+3d/physics_engine="Jolt Physics"
+jolt_physics_3d/collisions/collision_margin_fraction=0.0

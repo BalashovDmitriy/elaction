@@ -24,8 +24,6 @@ const ENEMY_LAYER: int = 3
 const GROUP := &"agents"
 ## Сколько агент падает, прежде чем лечь: смерть — две позы (ADR-0011, п. 12).
 const FALLING_TIME: float = 0.25
-## Длина лежащего тела, доли роста: клип смерти роняет его навзничь почти на рост.
-const LYING_LENGTH: float = 0.9
 
 ## Сколько держится поза выстрела, с.
 const SHOOT_POSE_TIME: float = 0.25
@@ -85,12 +83,12 @@ var held: bool:
 		_held = value
 		set_physics_process(not value)
 		if not value:
-			# Труп сценки лёг, как его уронила сценка, — навзничь или отброшенным
-			# назад. Спереди у края шахты это над пустотой: разворачивается к
-			# полу, как всякий убитый, но только теперь — посреди сценки
-			# разворот сломал бы постановку.
+			# Труп сценки падает из позы, в которой его отпустила сценка: пока она
+			# шла, разворот или падение сломали бы постановку (ADR-0043,
+			# решение 12).
 			if _brain.is_dead():
-				_fall_onto_the_floor()
+				set_physics_process(false)
+				corpse.fall(Vector3.ZERO)
 			return
 		velocity = Vector3.ZERO
 		_walking = false
@@ -101,7 +99,8 @@ var held: bool:
 		_body.face(held_facing, true)
 ## Куда агент смотрит в сценке: −1 влево, +1 вправо. Ставится до [member held].
 var held_facing: float = 1.0
-## Труп агента: лежащее тело после смерти ([Corpse]); у живого — null.
+## Тело агента на суставах ([Corpse]): собирается с рождения, падает в миг
+## смерти (ADR-0043, решение 12).
 var corpse: Corpse = null
 ## Фигура агента: режиссёр сценки ставит ей позы и темп.
 var figure: FigureRig:
@@ -178,11 +177,11 @@ func _ready() -> void:
 	laser = AimLaser.make()
 	laser.mask = Bullet.FROM_ENEMY
 	add_child(laser)
+	corpse = Corpse.new(self, _body)
 
 
 func _physics_process(delta: float) -> void:
 	if _brain.is_dead():
-		_lie(delta)
 		return
 
 	var alive_target := _target != null and not _target.is_dead()
@@ -429,27 +428,29 @@ func take_bullet() -> void:
 	kill()
 
 
-## Убивает агента: пулей, ногой или упавшей лампой в M4b.
-## [param crushed] — придавило упавшей лампой: у такой смерти своя поза.
-## [param corpse_pose] — поза трупа от сценки добивания: к полу тело
-## разворачивается не здесь, а когда сценка его отпустит ([member held]).
+## Убивает агента: пулей, добиванием, упавшей лампой или кабиной.
+## [param crushed] — придавило сверху: тело бьёт вниз.
+## [param corpse_pose] — поза трупа от сценки добивания: в физику тело уходит
+## не здесь, а когда сценка его отпустит ([member held]).
 func kill(crushed: bool = false, corpse_pose: String = "") -> void:
 	if _brain.is_dead() or _brain.is_emerging():
 		return
 	_crushed = crushed
 	_corpse = corpse_pose
 	_brain.kill()
-	velocity = Vector3.ZERO
-	_falling_over = FALLING_TIME
-	# Труп лежит до конца здания (ADR-0037, решение 6), и пули сквозь него
-	# пролетают: он сходит со слоя врагов на слой трупов.
-	corpse = Corpse.new(self, _shape, _body, gravity, max_fall_speed)
-	corpse.crushed = crushed
-	corpse.enter()
+	# Труп лежит до конца здания (ADR-0037, решение 6) телом на суставах: сам
+	# агент сходит со всех слоёв, пули сквозь него пролетают. Сценка добивания
+	# роняет тело сама, отпустив его ([member held]).
+	collision_layer = 0
+	collision_mask = 0
+	_shape.set_deferred("disabled", true)
 	if laser != null:
 		laser.put_out()
-	if _corpse.is_empty():
-		_fall_onto_the_floor()
+	if not _held:
+		set_physics_process(false)
+		# Давит лампа — тело бьёт сверху.
+		corpse.fall(velocity + (Vector3.DOWN * 3.0 if crushed else Vector3.ZERO))
+	velocity = Vector3.ZERO
 	Sounds.play(Sounds.AGENT_DEATH)
 	died.emit(self)
 
@@ -685,64 +686,6 @@ func _show_the_aim() -> void:
 ## (@463D), втрое быстрее ROM (ADR-0037, решение 5).
 func _shot_speed() -> float:
 	return Arcade.agent_shot_speed(_skill, _alarmed)
-
-
-## Труп: лежащее тело ведёт [Corpse] (ADR-0042, решение 1), поза — агент.
-##
-## Сам агент не прыгает — ни в оригинале, ни у нас (ADR-0026), — но в воздухе
-## бывает: кабина ушла из-под пассажира или вытолкнула его снизу, и убитый в
-## этот миг не должен в нём зависать. Уснув, тело усыпляет и позу, когда та
-## доходит до конца перехода.
-func _lie(delta: float) -> void:
-	if corpse.at_rest:
-		if _body.settled():
-			_body.set_process(false)
-			set_physics_process(false)
-		return
-	_walking = false
-	_update_look(delta)
-	corpse.step(delta, _falling_over <= 0.0, _brain.facing)
-
-
-## Разворачивает падающего так, чтобы тело легло на пол, а не над проёмом.
-##
-## Клип смерти роняет тело навзничь, на рост назад. Пока труп исчезал за
-## полсекунды, это было не видно; лежащий до конца здания у края шахты висел бы
-## над пустотой на весь рост. Есть место за спиной — падает как падал; нет, а
-## впереди есть — падает вперёд.
-func _fall_onto_the_floor() -> void:
-	if not is_inside_tree():
-		return
-	var back := -_brain.facing * Proportions.BODY * LYING_LENGTH
-	if not _room_at(back) and _room_at(-back):
-		_brain.face(-_brain.facing)
-		# Труп не разворачивается телом, как живой, а сразу лежит той стороной.
-		_body.face(_brain.facing, true)
-
-
-## Есть ли где лечь до [param dx] метров от ног: пол под концом тела и ни стены
-## по дороге к нему. Лежачая форма ([method _lie_down]) длиной почти в рост:
-## вошедшую в стену физика выталкивала бы из неё рывком, и труп отъезжал бы от
-## стены, у которой упал (авторевью M24f).
-func _room_at(dx: float) -> bool:
-	if not _floor_at(dx):
-		return false
-	var from := global_position + Vector3(0.0, Proportions.PRONE * 0.5, 0.0)
-	var query := PhysicsRayQueryParameters3D.create(
-		from, from + Vector3(dx, 0.0, 0.0), Corpse.GEOMETRY_MASK
-	)
-	query.exclude = [get_rid()]
-	return get_world_3d().direct_space_state.intersect_ray(query).is_empty()
-
-
-## Есть ли пол в [param dx] метрах от ног по горизонтали.
-func _floor_at(dx: float) -> bool:
-	var from := global_position + Vector3(dx, Proportions.PRONE, 0.0)
-	var query := PhysicsRayQueryParameters3D.create(
-		from, from - Vector3(0.0, Proportions.PRONE * 2.0, 0.0), collision_mask
-	)
-	query.exclude = [get_rid()]
-	return not get_world_3d().direct_space_state.intersect_ray(query).is_empty()
 
 
 func _fire() -> void:
