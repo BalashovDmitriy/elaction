@@ -44,6 +44,11 @@ const KNEE_R := "LowerLeg.R"
 ## клипах поворот запечён, а в позе кодом стопу ставит на конец голени риг.
 const FOOT_L := "Foot.L"
 const FOOT_R := "Foot.R"
+## Кисть с пистолетом: ствол лежит вдоль пальцев (`build_actors.py`, `_gun`).
+const GUN_HAND := "Wrist.R"
+## Вторая кисть, которой держат рукоять снизу, и насколько она ниже первой, м.
+const SUPPORT_HAND := "Wrist.L"
+const SUPPORT_DROP: float = 0.04
 const BONES: PackedStringArray = [
 	HIPS,
 	ABDOMEN,
@@ -103,6 +108,8 @@ class SkinnedSurface:
 	extends RefCounted
 
 	var mesh_instance: MeshInstance3D
+	## Номер поверхности в меше.
+	var index: int = 0
 	var vertices := PackedVector3Array()
 	var bone_ids := PackedInt32Array()
 	var weights := PackedFloat32Array()
@@ -114,6 +121,7 @@ class SkinnedSurface:
 	static func of(instance: MeshInstance3D, surface: int) -> SkinnedSurface:
 		var made := SkinnedSurface.new()
 		made.mesh_instance = instance
+		made.index = surface
 		var arrays := instance.mesh.surface_get_arrays(surface)
 		made.vertices = arrays[Mesh.ARRAY_VERTEX]
 		# У поверхности без скина костей и весов нет вовсе — там null, не пустой
@@ -222,6 +230,12 @@ static var _carve_materials: Dictionary = {}
 ## Модель актёра. Без неё риг — пустой узел, и это ошибка сцены.
 @export var model: PackedScene
 
+## Куда наводить дуло, пока актёр стреляет: высота над ступнями и вынос
+## вперёд, м, — точка, откуда вылетает пуля по правилам ROM (ADR-0043,
+## решение 16). NAN — не наводить: рука ходит клипом.
+var aim_height: float = NAN
+var aim_reach: float = Proportions.MUZZLE
+
 ## Во сколько раз быстрее мира идут часы рига. Сценка добивания замедляет мир,
 ## а двое в ней двигаются в своём темпе (ADR-0040).
 var speed: float = 1.0
@@ -274,6 +288,8 @@ var _settled: bool = false
 ## Что от тела отрезано под днищем кабины: x от, x до, высота днища. Пусто —
 ## не резано.
 var _carved := Vector4.ZERO
+## Дуло пистолета в системе кисти [constant GUN_HAND]; NAN — пистолета нет.
+var _muzzle := Vector3(NAN, NAN, NAN)
 
 
 func _ready() -> void:
@@ -309,6 +325,7 @@ func _ready() -> void:
 		for surface in mesh_instance.mesh.get_surface_count():
 			_surfaces.append(SkinnedSurface.of(mesh_instance, surface))
 
+	_muzzle = _find_muzzle()
 	_stand = _clip_frame(FigurePoses.CLIP_STAND, 0.0)
 	_stand_globals = _globals(_stand)
 	_current = _wanted()
@@ -432,6 +449,14 @@ func hide_bones(names: PackedStringArray) -> void:
 					else:
 						mask.y |= 1 << (bind - 32)
 		mesh_instance.set_instance_shader_parameter(&"hidden_bones", mask)
+
+
+## Где дуло пистолета сейчас, в мире; NAN, если пистолета нет.
+func muzzle_position() -> Vector3:
+	var hand := _skeleton.find_bone(GUN_HAND) if _skeleton != null else -1
+	if hand < 0 or is_nan(_muzzle.x):
+		return Vector3(NAN, NAN, NAN)
+	return _skeleton.global_transform * _skeleton.get_bone_global_pose(hand) * _muzzle
 
 
 ## Скелет фигуры: на нём собирается рэгдолл.
@@ -772,6 +797,104 @@ func _follow_feet(frame: Frame) -> void:
 		frame.positions[foot] = local.origin
 
 
+## Дуло пистолета в системе кисти: край ствола в сторону пальцев. Ствол
+## собран вдоль −X покоя (T-поза, пальцы к −X), и дуло — середина его торца.
+func _find_muzzle() -> Vector3:
+	var hand := _skeleton.find_bone(GUN_HAND)
+	if hand < 0:
+		return Vector3(NAN, NAN, NAN)
+	for surface in _surfaces:
+		var material := surface.mesh_instance.mesh.surface_get_material(surface.index)
+		if material == null or material.resource_name != "gun":
+			continue
+		var tip := INF
+		for vertex in surface.vertices:
+			tip = minf(tip, vertex.x)
+		var end := Vector3.ZERO
+		var count := 0
+		for vertex in surface.vertices:
+			if vertex.x < tip + 0.01:
+				end += vertex
+				count += 1
+		end /= float(maxi(count, 1))
+		return _skeleton.get_bone_global_rest(hand).affine_inverse() * end
+	return Vector3(NAN, NAN, NAN)
+
+
+## Кадр с рукой, наведённой на точку вылета пули (ADR-0043, решение 16).
+##
+## Плечо и предплечье правой руки поворачиваются так, чтобы дуло встало в
+## точку [member aim_height] над ступнями и [member aim_reach] впереди; левая
+## держит рукоять снизу. Вбок руки остаются, где были: пуля летит в плоскости
+## игры, а вбок кадр её не видит.
+func _aimed(frame: Frame) -> Frame:
+	var hand := _skeleton.find_bone(GUN_HAND)
+	var support := _skeleton.find_bone(SUPPORT_HAND)
+	if not _bones.has(ARM_R) or not _bones.has(ELBOW_R) or hand < 0:
+		return frame
+	var aimed := frame.copy()
+	# Точка вылета в системе скелета — через мир: между ригом и скелетом лежат
+	# модель со своим сдвигом над полом и узел арматуры.
+	var to_skeleton := _skeleton.global_transform.affine_inverse() * global_transform
+	var target := to_skeleton * Vector3(0.0, aim_height, aim_reach)
+	_reach(aimed, _bones[ARM_R], _bones[ELBOW_R], hand, _muzzle, target)
+	# Вторая рука держит рукоять снизу: кисть к кисти с пистолетом.
+	if support >= 0 and _bones.has(ARM_L) and _bones.has(ELBOW_L):
+		var grip := _globals(aimed)[hand].origin + Vector3(0.0, -SUPPORT_DROP, 0.0)
+		_reach(aimed, _bones[ARM_L], _bones[ELBOW_L], support, Vector3.ZERO, grip)
+	return aimed
+
+
+## Сводит конец руки — точку [param tip] в системе кости [param end] — в
+## [param target]: плечо и локоть поворачиваются в плоскости взгляда (Y —
+## вверх, Z — вперёд модели), вбок рука остаётся, где была. Локоть уходит вниз
+## от линии плечо — цель.
+func _reach(
+	frame: Frame, shoulder_bone: int, elbow_bone: int, end: int, tip: Vector3, target: Vector3
+) -> void:
+	var globals := _globals(frame)
+	var shoulder := globals[shoulder_bone].origin
+	var elbow := globals[elbow_bone].origin
+	var point := globals[end] * tip
+	target.x = point.x
+	var upper := _flat(elbow - shoulder)
+	var lower := _flat(point - elbow)
+	var reach := Vector2(target.z - shoulder.z, target.y - shoulder.y)
+	var span := clampf(reach.length(), absf(upper - lower) + 0.001, upper + lower - 0.001)
+	var toward := reach.normalized()
+	var bend := acos(
+		clampf((upper * upper + span * span - lower * lower) / (2.0 * upper * span), -1.0, 1.0)
+	)
+	var elbow_dir := toward.rotated(-bend)
+	var wanted := Vector3(
+		elbow.x, shoulder.y + elbow_dir.y * upper, shoulder.z + elbow_dir.x * upper
+	)
+	_turn_bone(frame, globals, shoulder_bone, elbow - shoulder, wanted - shoulder)
+	globals = _globals(frame)
+	elbow = globals[elbow_bone].origin
+	point = globals[end] * tip
+	_turn_bone(frame, globals, elbow_bone, point - elbow, target - elbow)
+
+
+## Длина отрезка в плоскости взгляда: без бокового сдвига.
+static func _flat(offset: Vector3) -> float:
+	return Vector2(offset.z, offset.y).length()
+
+
+## Поворачивает кость [param bone] кадра так, чтобы её отрезок [param from]
+## смотрел по [param to]; оба — в системе скелета.
+func _turn_bone(
+	frame: Frame, globals: Array[Transform3D], bone: int, from: Vector3, to: Vector3
+) -> void:
+	if from.is_zero_approx() or to.is_zero_approx():
+		return
+	var turn := Quaternion(from.normalized(), to.normalized())
+	var parent := _skeleton.get_bone_parent(bone)
+	var parent_basis := globals[parent].basis if parent >= 0 else Basis()
+	var turned := Basis(turn) * globals[bone].basis
+	frame.rotations[bone] = (parent_basis.inverse() * turned).get_rotation_quaternion()
+
+
 ## Положения костей в системе скелета для кадра — по цепочке родителей.
 func _globals(frame: Frame) -> Array[Transform3D]:
 	var globals: Array[Transform3D] = []
@@ -792,9 +915,7 @@ func _globals(frame: Frame) -> Array[Transform3D]:
 ## кодом, клипы «один раз» и конец клипа ([method _grounded_by_the_clip]) и
 ## переход: смесь двух кадров на полу сама не стоит.
 func _apply(frame: Frame, exact: bool) -> void:
-	for bone in frame.rotations.size():
-		_skeleton.set_bone_pose_rotation(bone, frame.rotations[bone])
-		_skeleton.set_bone_pose_position(bone, frame.positions[bone])
+	_pose_bones(frame)
 
 	# Наклон вперёд вокруг пяток: начало модели — в ногах, и поворот вокруг X
 	# кладёт макушку в +Z, то есть по взгляду. Раздавленный сплющен по высоте
@@ -803,11 +924,20 @@ func _apply(frame: Frame, exact: bool) -> void:
 	_instance.rotation.x = deg_to_rad(frame.tilt)
 	_instance.scale = Vector3(widen, frame.squash, widen)
 	_instance.position.y = 0.0
-	if _settled and not exact and _grounded_by_the_clip():
-		return
-	_skeleton.force_update_all_bone_transforms()
+	if not (_settled and not exact and _grounded_by_the_clip()):
+		_skeleton.force_update_all_bone_transforms()
+		# Заземление: поза встаёт на пол низшей точкой. Лежащий на спине
+		# опирается спиной, залёгший — грудью, присевший — подошвами, и глубина
+		# у всех своя.
+		var low := skinned_aabb(not exact).position.y
+		_instance.position.y = -low + frame.lift * _height
+	# Руку наводят после заземления: точка вылета — над полом, а модель только
+	# что встала на пол. Низшую точку позы рука не меняет.
+	if not is_nan(aim_height) and not is_nan(_muzzle.x):
+		_pose_bones(_aimed(frame))
 
-	# Заземление: поза встаёт на пол низшей точкой. Лежащий на спине опирается
-	# спиной, залёгший — грудью, присевший — подошвами, и глубина у всех своя.
-	var low := skinned_aabb(not exact).position.y
-	_instance.position.y = -low + frame.lift * _height
+
+func _pose_bones(frame: Frame) -> void:
+	for bone in frame.rotations.size():
+		_skeleton.set_bone_pose_rotation(bone, frame.rotations[bone])
+		_skeleton.set_bone_pose_position(bone, frame.positions[bone])

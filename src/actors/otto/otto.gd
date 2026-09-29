@@ -757,6 +757,11 @@ func _update_look(delta: float) -> void:
 
 	if riding and ride_facing != 0.0:
 		_facing = ride_facing
+	# Дуло — там, откуда вылетает пуля (ADR-0043, решение 16).
+	var crouching := _states.state == OttoStateMachine.State.CROUCH
+	var aim := shot_height_crouching if crouching else shot_height_standing
+	_body.aim_height = aim if _shooting > 0.0 else NAN
+	_body.aim_reach = muzzle_offset
 	_body.show_pose(_pose())
 	_body.set_walk_phase(_walk_phase)
 	_body.face(_facing)

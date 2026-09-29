@@ -622,6 +622,11 @@ func _shot_height() -> float:
 			return shot_height
 
 
+## Насколько ствол впереди ног, м: у лежащего — дальше (ADR-0043, решение 16).
+func _muzzle_reach() -> float:
+	return Proportions.MUZZLE_PRONE if _brain.stance == EnemyBrain.Stance.PRONE else muzzle_offset
+
+
 func _apply_gravity(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y = maxf(velocity.y - gravity * delta, -max_fall_speed)
@@ -648,6 +653,11 @@ func _update_look(delta: float) -> void:
 	else:
 		_walk_phase = 0.0
 
+	# Дуло — там, откуда вылетит пуля: и в замахе, и в выстреле (ADR-0043,
+	# решение 16).
+	var aiming := not _brain.is_dead() and (_shooting > 0.0 or _brain.is_winding_up())
+	_body.aim_height = _shot_height() if aiming else NAN
+	_body.aim_reach = _muzzle_reach()
 	_body.show_pose(_pose())
 	_body.set_walk_phase(_walk_phase)
 	_body.face(_brain.facing)
@@ -675,7 +685,7 @@ func _show_the_aim() -> void:
 	if not _brain.is_winding_up():
 		laser.put_out()
 		return
-	laser.position = Vector3(_brain.facing * muzzle_offset, _shot_height(), 0.0)
+	laser.position = Vector3(_brain.facing * _muzzle_reach(), _shot_height(), 0.0)
 	laser.reach = Bullet.RANGE
 	laser.shot_in = _brain.wind_up_left()
 	laser.shot_speed = _shot_speed()
@@ -698,7 +708,7 @@ func _fire() -> void:
 	bullet.hit_target.connect(_on_bullet_hit)
 	get_parent().add_child(bullet)
 	bullet.global_position = (
-		global_position + Vector3(_brain.facing * muzzle_offset, _shot_height(), 0.0)
+		global_position + Vector3(_brain.facing * _muzzle_reach(), _shot_height(), 0.0)
 	)
 	_bullet = bullet
 

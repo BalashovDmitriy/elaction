@@ -99,7 +99,9 @@ static func of_otto(
 ) -> String:
 	if state == OttoStateMachine.State.DEAD:
 		return _death(crushed, falling_over)
-	if shooting:
+	# Из приседа Otto стреляет, не вставая: пуля летит низко, и рука наводится
+	# на неё в самом приседе (ADR-0043, решение 16).
+	if shooting and state != OttoStateMachine.State.CROUCH:
 		return "shoot"
 	if landing and state == OttoStateMachine.State.IDLE:
 		return "land"
