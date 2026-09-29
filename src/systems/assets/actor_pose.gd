@@ -33,6 +33,7 @@ const OTTO_POSES: PackedStringArray = [
 	"dead_0",
 	"dead_1",
 	"crushed",
+	"rope",
 ]
 
 ## Позы агента. Он не прыгает и не бьёт ногой — этого не умеет [EnemyBrain].
@@ -52,6 +53,10 @@ const AGENT_POSES: PackedStringArray = [
 
 ## Поза приседа. Одна на Otto и на агента: у агента это «на колене».
 const CROUCH := "crouch"
+
+## Otto висит на тросе вертолёта: руки вверх, ноги вместе (ADR-0043,
+## решение 1). Выбирает её не состояние, а тот, кто везёт ([member Otto.ride_look]).
+const ROPE := "rope"
 
 ## Поза агента лёжа. Единственная лежащая поза живого: в [FigurePoses] у неё
 ## своя запись — лицом вниз, ствол вперёд, — а не труп, положенный набок.
@@ -94,7 +99,9 @@ static func of_otto(
 ) -> String:
 	if state == OttoStateMachine.State.DEAD:
 		return _death(crushed, falling_over)
-	if shooting:
+	# Из приседа Otto стреляет, не вставая: пуля летит низко, и рука наводится
+	# на неё в самом приседе (ADR-0043, решение 16).
+	if shooting and state != OttoStateMachine.State.CROUCH:
 		return "shoot"
 	if landing and state == OttoStateMachine.State.IDLE:
 		return "land"

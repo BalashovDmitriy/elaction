@@ -41,6 +41,17 @@ const TELEPORT_GAP: float = 0.5
 ## Сколько надо пробыть в воздухе, чтобы касание пола было приземлением, с.
 ## Прыжок длится около секунды, а кадр без опоры на уходящей вниз кабине — один.
 const LANDING_AIR_TIME: float = 0.15
+## Вид Otto в поездке ([member ride_look]): висит на тросе, идёт по ступеням.
+const LOOK_ROPE := "rope"
+const LOOK_WALK := "walk"
+## Входит в красную дверь вглубь и выходит из неё (ADR-0043, решение 4).
+const LOOK_DOOR_IN := "door_in"
+const LOOK_DOOR_OUT := "door_out"
+## Насколько вглубь проёма Otto уходит, м: из плоскости игры за стену.
+const DOOR_WALK_DEPTH: float = 1.2
+## Качание на тросе: размах, радианы, и частота, рад/с.
+const ROPE_SWAY: float = 0.05
+const ROPE_SWAY_RATE: float = 2.2
 
 ## Кнопки, нажатие которых может уйти на пропуск вступления ([method ride]).
 const PRESS_ACTIONS: Array[StringName] = [&"jump", &"shoot"]
@@ -110,6 +121,20 @@ var figure: FigureRig:
 ## длина и миг смерти агента, и несеянный жребий делал бы прогон бота
 ## неповторимым (`docs/testing.md`, правило из M18b).
 var takedown_rng := RandomNumberGenerator.new()
+## Тело на суставах ([Corpse]): собирается с рождения, падает в миг смерти и
+## встаёт при возвращении в игру (ADR-0043, решение 12).
+var corpse: Corpse = null
+## Как Otto выглядит, пока его везут ([method ride]), — ставит тот, кто везёт,
+## до [code]ride(true)[/code]: журнал прогона пишет его в начале поездки
+## (ADR-0043, решения 1 и 2). На тросе висит на руках, на эскалаторе идёт по
+## ступеням. Пусто — стоит.
+var ride_look: String = ""
+## Куда Otto смотрит, пока идёт по эскалатору: −1 влево, +1 вправо, 0 — куда
+## смотрел.
+var ride_facing: float = 0.0
+## Насколько Otto ушёл в проём двери: 0 — у коврика, 1 — внутри. Ставит дверь
+## по ходу створки.
+var ride_progress: float = 0.0
 
 var _states := OttoStateMachine.new()
 ## Один снимок ввода на всё время жизни: перечитывается, а не создаётся заново.
@@ -193,6 +218,7 @@ func _ready() -> void:
 	_rest_here()
 	_camera.follow(self)
 	_repose()
+	corpse = Corpse.new(self, _body)
 
 
 func _physics_process(delta: float) -> void:
@@ -282,7 +308,12 @@ func kill(crushed: bool = false) -> void:
 	if _states.is_dead():
 		return
 	_crushed = crushed
+	if crushed:
+		set_meta(&"death_cause", "crushed")
+	elif not has_meta(&"shooter"):
+		set_meta(&"death_cause", "fall")
 	_states.kill()
+	corpse.fall(velocity)
 	_falling_over = FALLING_TIME
 	Sounds.play(Sounds.OTTO_DEATH)
 	Sounds.play(Sounds.DEATH_JINGLE)
@@ -359,6 +390,10 @@ func _hold_the_feet() -> void:
 ## глубиной падения за спиной и разбивался бы на ровном месте.
 func revive() -> void:
 	_crushed = false
+	for key: StringName in [&"death_cause", &"shooter"]:
+		if has_meta(key):
+			remove_meta(key)
+	corpse.rise()
 	_states.reset()
 	_locks.clear()
 	_jump_waiting = false
@@ -423,10 +458,17 @@ func turn_into_depth(weight: float) -> void:
 ## нажата», а Otto — по [method Input.is_action_just_pressed], и шаг, в котором
 ## нажатие видит каждый, не обязан совпасть.
 func ride(on: bool, presses_spent: bool = false) -> void:
+	RunLog.write("ride", {"on": on, "look": ride_look, "at": RunLog.at(self)})
 	if on:
 		_states.ride()
 	else:
 		_states.stop_riding()
+		# С троса Otto встаёт на крышу клипом приземления (ADR-0043, решение 1).
+		if ride_look == LOOK_ROPE:
+			_landing = FigurePoses.LAND_SHOW
+		ride_look = ""
+		ride_facing = 0.0
+		ride_progress = 0.0
 	if presses_spent:
 		for action: StringName in PRESS_ACTIONS:
 			if Input.is_action_pressed(action) and not _spent_actions.has(action):
@@ -513,7 +555,9 @@ func _fire() -> void:
 	# Счётчик ведёт сам ствол: пуля кончается и попаданием, и на дальности.
 	bullet.tree_exited.connect(_gun.bullet_spent)
 	get_parent().add_child(bullet)
-	bullet.global_position = global_position + Vector3(_facing * muzzle_offset, height, 0.0)
+	var from := global_position + Vector3(0.0, height, 0.0)
+	var muzzle := from + Vector3(_facing * muzzle_offset, 0.0, 0.0)
+	bullet.global_position = Bullet.spawn_point(get_world_3d(), from, muzzle)
 	_gun.fired()
 
 
@@ -527,6 +571,7 @@ func _on_bullet_hit(target: Node3D) -> void:
 	var agent := target as Enemy
 	if agent == null or agent.is_dead():
 		return
+	RunLog.write("hit_agent", {"at": RunLog.at(agent), "otto": RunLog.at(self)})
 	agent.take_bullet()
 	_award_for(agent, GameState.ENEMY_SHOT_SCORE)
 
@@ -689,6 +734,11 @@ func _apply_pose(state: OttoStateMachine.State) -> void:
 ## Выбирает её [ActorPose] — тот же, что выбирал спрайт, — а исполняет [FigureRig]
 ## на скелете: между позами он интерполирует сам (ADR-0022, решение 2).
 func _pose() -> String:
+	if _states.state == OttoStateMachine.State.RIDE:
+		if ride_look == LOOK_ROPE:
+			return ActorPose.ROPE
+		if ride_look in [LOOK_WALK, LOOK_DOOR_IN, LOOK_DOOR_OUT]:
+			return ActorPose.walk_frame(_walk_phase)
 	return ActorPose.of_otto(
 		_states.state, _crushed, _falling_over > 0.0, _shooting > 0.0, _walk_phase, _landing > 0.0
 	)
@@ -707,19 +757,51 @@ func _grace_alpha() -> float:
 func _update_look(delta: float) -> void:
 	_shooting = maxf(_shooting - delta, 0.0)
 	_falling_over = maxf(_falling_over - delta, 0.0)
+	var riding := _states.state == OttoStateMachine.State.RIDE
 	if _states.state == OttoStateMachine.State.WALK:
 		_walk_phase = ActorPose.advance(_walk_phase, delta)
 		_step_sound()
+	elif riding and ride_look in [LOOK_WALK, LOOK_DOOR_IN, LOOK_DOOR_OUT]:
+		_walk_phase = ActorPose.advance(_walk_phase, delta)
 	else:
 		_walk_phase = 0.0
 		_stepped_on = -1
 
+	if riding and ride_facing != 0.0:
+		_facing = ride_facing
+	# Дуло — там, откуда вылетает пуля (ADR-0043, решение 16).
+	var crouching := _states.state == OttoStateMachine.State.CROUCH
+	var aim := shot_height_crouching if crouching else shot_height_standing
+	_body.aim_height = aim if _shooting > 0.0 else NAN
+	_body.aim_reach = muzzle_offset
 	_body.show_pose(_pose())
 	_body.set_walk_phase(_walk_phase)
 	_body.face(_facing)
+	# На тросе Otto чуть качается маятником в плоскости игры.
+	var sway := 0.0
+	if riding and ride_look == LOOK_ROPE:
+		sway = sin(Time.get_ticks_msec() * 0.001 * ROPE_SWAY_RATE) * ROPE_SWAY
+	_body.rotation.z = sway
+	_walk_the_doorway(riding)
 	if _depth_turn > 0.0:
 		_body.rotation.y = lerp_angle(_body.rotation.y, PI, _depth_turn)
 	_body.set_transparency(1.0 - _grace_alpha())
+
+
+## Вход в дверь и выход (ADR-0043, решение 4): Otto поворачивается к двери и
+## уходит вглубь проёма, пока открывается створка; выходит на камеру, пока она
+## закрывается, и под конец поворачивается вдоль этажа. Двигается фигура, а не
+## тело: в плоскости игры Otto стоит на коврике.
+func _walk_the_doorway(riding: bool) -> void:
+	var depth := 0.0
+	if riding and ride_look == LOOK_DOOR_IN:
+		depth = ride_progress
+		_body.rotation.y = lerp_angle(_body.rotation.y, PI, clampf(ride_progress * 2.0, 0.0, 1.0))
+	elif riding and ride_look == LOOK_DOOR_OUT:
+		depth = ride_progress
+		# Лицом к камере, пока в проёме, вдоль этажа — вышедши.
+		_body.rotation.y = lerp_angle(_body.rotation.y, 0.0, clampf(ride_progress * 2.0, 0.0, 1.0))
+	_body.position.z = -DOOR_WALK_DEPTH * depth
 
 
 ## Шаг звучит на крайних кадрах ходьбы — тех, где нога ставится. На каждом

@@ -146,6 +146,13 @@ func unlock() -> void:
 	for hatch in _hatches:
 		hatch.collision_layer = 0
 		hatch.collision_mask = 0
+	# Труп, улёгшийся на створках, спит, и ушедшая опора его не будит: он висел
+	# бы над открытым проёмом (ADR-0043, решение 12).
+	for node: Node in get_tree().get_nodes_in_group(Corpse.GROUP):
+		var corpse := Corpse.of(node)
+		if corpse != null and not corpse.gone:
+			corpse.ragdoll.wake()
+	for hatch in _hatches:
 		for leaf in hatch.get_children():
 			var part := leaf as MeshInstance3D
 			# Огоньки висят на теле рядом со створками и остаются на месте.
@@ -164,8 +171,8 @@ func _build_hatch(rect: Rect2) -> StaticBody3D:
 	var depth := WorldSpace.CORRIDOR_DEPTH + WorldSpace.ROOM_DEPTH
 	var body := StaticBody3D.new()
 	body.name = "Hatch"
-	# Люк уходит, когда собраны документы: лежащий на нём труп не засыпает и
-	# падает вместе с ним, а не висит в воздухе (авторевью M24f).
+	# Люк уходит, когда собраны документы: уснувший на нём труп будит
+	# [method unlock], и он падает вместе с ним, а не висит в воздухе.
 	body.add_to_group(HATCH_GROUP)
 	body.position = WorldSpace.to_scene(rect.get_center())
 	body.position.z = WorldSpace.CORRIDOR_DEPTH * 0.5 - depth * 0.5

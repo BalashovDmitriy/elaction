@@ -12,10 +12,11 @@ extends GutTest
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
 ## Сколько кадров дать зданию собраться и сколько ждать отъезда. Машина с M24b
-## трогается с места и разгоняется, а не уходит сразу на полном ходу: из кадра
-## она уезжает за полторы-две секунды, запас — вдвое.
+## трогается с места и разгоняется, а не уходит сразу на полном ходу; с M24g
+## кадр обгоняет её, чтобы дорога под фарами была видна (ADR-0043, решение 18),
+## и из кадра она уезжает секунд за шесть — запас полуторный.
 const SETTLE_FRAMES: int = 5
-const PATIENCE: int = 480
+const PATIENCE: int = 720
 ## Сколько шагов физики ждать, пока Otto сядет и машина тронется: шаг к двери,
 ## посадка с дверцей ([constant ExitBoarding.GET_IN_TIME], 0.85 с), полсекунды
 ## в машине ([constant ExitBoarding.SEAT_TIME]) и две секунды стартера
@@ -379,5 +380,7 @@ func test_the_car_drives_up_the_ramp_in_the_widened_frame() -> void:
 	assert_true(cleared[0], "машина ушла из кадра")
 	var top := gate - GarageGate.RAMP_APRON - GarageGate.RAMP_RUN
 	assert_lt(last.position.x, top, "кадр доехал за машиной до улицы")
-	assert_lt(last.end.y, bottom - rules.floor_height * 0.9, "и поднялся вместе с ней")
+	# Под машиной кадр держит полосу улицы: поднимается на этаж без неё.
+	var rise := rules.floor_height - ExitBoarding.STREET_VIEW
+	assert_lt(last.end.y, bottom - rise * 0.9, "и поднялся вместе с ней")
 	assert_gt(car.position.y, floor_y + rules.floor_height * 0.99, "уходит по улице")

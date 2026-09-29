@@ -75,17 +75,25 @@ class EscalatorSpot:
 
 	var x: float = 0.0
 	var floor_index: int = 0
-	## Куда спускается полотно: -1 влево, +1 вправо.
+	## Куда спускается полотно: -1 влево, +1 вправо. С M24g — всегда к краю
+	## этажа (ADR-0043, решение 15).
 	var towards: float = -1.0
+	## Край этажа, к которому эскалатор спускается: там кончается проём.
+	var edge: float = 0.0
 
 	## Проём в перекрытии под полотном: пара «левый край, правый край».
 	##
-	## Дыра не под площадкой, а сбоку от неё, по ходу спуска. Считается здесь,
-	## чтобы уровень и [method BuildingPlan.safe_x] видели один и тот же проём.
+	## Дыра не под площадкой, а сбоку от неё, по ходу спуска, и тянется до края
+	## этажа: пролёт под 45° уходит под плиту на два с лишним метра, и остаток
+	## пола за ним был бы островом, куда не дойти. Считается здесь, чтобы
+	## уровень и [method BuildingPlan.safe_x] видели один и тот же проём.
 	func gap(rules: BuildingRules) -> Vector2:
 		var near := x + towards * rules.escalator_gap_offset
-		var far := near + towards * rules.escalator_gap_width
-		return Vector2(minf(near, far), maxf(near, far))
+		return Vector2(minf(near, edge), maxf(near, edge))
+
+	## Нижняя площадка — на этаже ниже, у края.
+	func landing(rules: BuildingRules) -> float:
+		return x + towards * rules.escalator_run
 
 	## Перегиб ломаной в своих координатах: где площадка кончается и начинается
 	## пролёт.
@@ -596,9 +604,10 @@ func _bridges(index: int) -> bool:
 ## [param avoid_towards] — сторона, в которую на этом этаже уже уводит другой
 ## эскалатор; ноль, если он первый.
 ##
-## Эскалатор занимает два места: своё и следующее по ходу спуска. Проём уходит от
-## оси на 2.1 м, площадка — на 2.24, и в один шаг сетки это не укладывается
-## (ADR-0024, решение 1). Занимал он раньше одно, и на площадку могла встать дверь.
+## С M24g эскалатор стоит у края этажа и спускается к нему, под 45° (ADR-0043,
+## решение 15): посередине этажа он выглядел нелепо. Нижняя площадка — у края,
+## верхняя — внутри этажа, и к ней доходят пешком: проём уходит от неё к краю,
+## мимо прохода. Подряд — зигзагом: пришли на этаж слева — уводит вправо.
 func _add_escalator(
 	rules: BuildingRules,
 	rng: RandomNumberGenerator,
@@ -607,70 +616,116 @@ func _add_escalator(
 	avoid_towards: float,
 	must: bool
 ) -> float:
-	var levels: Array[int] = [index, index + 1]
-	# Эскалатор занимает по два места на каждом из двух этажей, и полоса из них
-	# выедает узкий этаж целиком: на семиместном этаже два эскалатора сверху и
-	# два своих не оставляют ни двери, ни лампе. Необязательный уступает.
-	if not must:
-		for level in levels:
-			if not _room_left(rules, taken, level, 2):
-				return 0.0
+	# Жребий — ровно один на поставленный эскалатор, как до M24g: раскладка
+	# после эскалаторов тянет его дальше, и лишний бросок переложил бы двери,
+	# стены и лампы всего здания у каждого сида.
+	var before := rng.state
+	var coin := rng.randi()
+	for side: float in _escalator_sides(coin, index, avoid_towards):
+		var spot := _edge_escalator(rules, taken, index, side)
+		if spot.is_empty():
+			continue
+		# Эскалатор под 45° занимает полосу мест на двух этажах, и на узком
+		# этаже она выедает почти всё: необязательный уступает двери и лампам.
+		if not must:
+			var room := true
+			for level: int in spot:
+				room = room and _room_left(rules, taken, level, (spot[level] as Array).size())
+			if not room:
+				continue
+		var escalator := EscalatorSpot.new()
+		escalator.floor_index = index
+		escalator.towards = side
+		var first: int = (spot[index] as Array)[0]
+		escalator.x = rules.slot_x(first)
+		var span := rules.floor_span(index)
+		escalator.edge = span.x if side < 0.0 else span.y
+		for level: int in spot:
+			for slot: int in spot[level]:
+				occupy(taken, level, slot)
+		escalators.append(escalator)
+		return side
+	rng.state = before
+	return 0.0
 
-	var from_x := _shaft_x_near(rules, index)
-	var free := _free_slots(rules, taken, levels)
-	var slot := _pick_escalator_slot(rules, rng, free, index, from_x, avoid_towards)
-	if slot < 0:
-		return 0.0
 
-	var escalator := EscalatorSpot.new()
-	escalator.floor_index = index
-	escalator.x = rules.slot_x(slot)
-	escalator.towards = _descent_towards(rules, slot, index, from_x)
-	for level in levels:
-		occupy(taken, level, slot)
-		occupy(taken, level, slot + int(escalator.towards))
-	escalators.append(escalator)
-	return escalator.towards
+## В какие стороны пробовать спуск, по порядку. Второй на этаже — только в
+## другую, чем первый. Первый — зигзагом: прочь от края, у которого на этот
+## этаж пришёл эскалатор сверху; не пришёл — жребием [param coin].
+func _escalator_sides(coin: int, index: int, avoid_towards: float) -> Array[float]:
+	if not is_zero_approx(avoid_towards):
+		return [-avoid_towards] as Array[float]
+	var arrived := 0.0
+	for escalator in escalators:
+		if escalator.floor_index == index - 1:
+			arrived = escalator.towards
+	var first := -arrived if not is_zero_approx(arrived) else (1.0 if coin % 2 == 0 else -1.0)
+	return [first, -first] as Array[float]
 
 
-## Место под эскалатор: годится то, где свободно и само место, и следующее за ним
-## по ходу спуска. [code]-1[/code] — годного места нет.
+## Места эскалатора у края [param side] с этажа [param index]: уровень →
+## занятые на нём места, первым — место верхней площадки. Пусто — не
+## помещается: занято, мешает шахта или этаж узок.
 ##
-## Из годных предпочитаются те, где полотно уходит прочь от шахты: у стены
-## уводить некуда, и там проём ложится Otto под ноги на полпути от лифта. Ещё
-## раньше — те, что уводят не в ту сторону, куда уже уводит сосед по этажу.
-func _pick_escalator_slot(
-	rules: BuildingRules,
-	rng: RandomNumberGenerator,
-	free: Array[int],
-	floor_index: int,
-	from_x: float,
-	avoid_towards: float
-) -> int:
-	var roomy: Array[int] = []
-	var fitting: Array[int] = []
-	var opposite: Array[int] = []
-	for slot in free:
-		var towards := _descent_towards(rules, slot, floor_index, from_x)
-		if not free.has(slot + int(towards)):
+## Край — у того из двух этажей, что уже с этой стороны: под башней стилобат
+## шире, и пролёт до его края ушёл бы из-под башни на улицу.
+func _edge_escalator(
+	rules: BuildingRules, taken: Dictionary, index: int, side: float
+) -> Dictionary:
+	var here := rules.floor_span(index)
+	var below := rules.floor_span(index + 1)
+	var edge := maxf(here.x, below.x) if side < 0.0 else minf(here.y, below.y)
+	var lowest := edge - side * rules.escalator_edge_margin
+	var goal := lowest - side * rules.escalator_run
+	var slots := rules.slot_range(index)
+	var top := -1
+	# Ближайшее к краю место, с которого пролёт не заходит за отступ от края.
+	for slot in range(slots.x, slots.y + 1):
+		var x := rules.slot_x(slot)
+		if side < 0.0 and x >= goal - 0.001:
+			top = slot
+			break
+		if side > 0.0 and x <= goal + 0.001:
+			top = slot
+	if top < 0:
+		return {}
+	var top_x := rules.slot_x(top)
+	var bottom_x := top_x + side * rules.escalator_run
+	var used := {}
+	used[index] = _slots_between(rules, index, top_x, edge)
+	used[index + 1] = _slots_between(
+		rules, index + 1, bottom_x - side * rules.escalator_low_span, edge
+	)
+	for level: int in used:
+		for slot: int in used[level]:
+			if is_taken(taken, level, slot):
+				return {}
+	# Шахта в полосе пролёта — кабина прошла бы сквозь полотно.
+	var near := minf(top_x, edge)
+	var far := maxf(top_x, edge)
+	for shaft in shafts:
+		if shaft.bottom < index or shaft.top > index + 1:
 			continue
-		# Проём уходит от площадки почти на весь шаг следующего места, и шахта
-		# сразу за ним оставила бы между дырами 0.6 м пола — уже тела. Агент,
-		# вышедший из кабины, вставал бы полкорпусом в шахте, а Otto шагал
-		# прямо в проём (авторевью M18c).
-		if _shaft_column_at(slot + 2 * int(towards), floor_index):
-			continue
-		roomy.append(slot)
-		if not is_equal_approx(towards, _away_from(rules, slot, from_x)):
-			continue
-		fitting.append(slot)
-		if not is_equal_approx(towards, avoid_towards):
-			opposite.append(slot)
+		var half := rules.shaft_width * 0.5
+		if shaft.x + half > near and shaft.x - half < far:
+			return {}
+	return used
 
-	var pool := roomy if fitting.is_empty() else fitting
-	if not opposite.is_empty():
-		pool = opposite
-	return -1 if pool.is_empty() else pick_any(rng, pool)
+
+## Места уровня [param level] между [param from_x] и [param to_x], первым —
+## ближнее к [param from_x].
+func _slots_between(rules: BuildingRules, level: int, from_x: float, to_x: float) -> Array[int]:
+	var found: Array[int] = []
+	var slots := rules.slot_range(level)
+	var low := minf(from_x, to_x) - 0.001
+	var high := maxf(from_x, to_x) + 0.001
+	for slot in range(slots.x, slots.y + 1):
+		var x := rules.slot_x(slot)
+		if x >= low and x <= high:
+			found.append(slot)
+	if from_x > to_x:
+		found.reverse()
+	return found
 
 
 ## Останется ли на уровне место под обязательное — одну дверь и лампы, — если
@@ -683,47 +738,6 @@ func _pick_escalator_slot(
 func _room_left(rules: BuildingRules, taken: Dictionary, level: int, taking: int) -> bool:
 	var free := _free_slots(rules, taken, [level] as Array[int])
 	return free.size() - taking >= mini(rules.doors_on(level), 1) + rules.lamps_on(level)
-
-
-## Где ближайшая к середине этажа шахта, которая его обслуживает. Ею меряется,
-## куда эскалатору уводить: прочь от лифта, из которого Otto пришёл.
-##
-## Шахт на этаже нет вовсе — берётся середина этажа: уводить всё равно надо,
-## а отсчитывать не от чего.
-func _shaft_x_near(rules: BuildingRules, index: int) -> float:
-	var span := rules.floor_span(index)
-	var centre := (span.x + span.y) * 0.5
-	var nearest := centre
-	var best := INF
-	for shaft in shafts:
-		if shaft.top > index or shaft.bottom < index:
-			continue
-		var distance := absf(shaft.x - centre)
-		if distance < best:
-			best = distance
-			nearest = shaft.x
-	return nearest
-
-
-## Куда проём должен смотреть: прочь от шахты, из которой Otto приходит.
-static func _away_from(rules: BuildingRules, slot: int, comes_from_x: float) -> float:
-	return 1.0 if rules.slot_x(slot) > comes_from_x else -1.0
-
-
-## Куда спускается полотно на самом деле. Это [method _away_from], если только
-## место не у стены: оттуда спуск возможен лишь внутрь здания.
-##
-## Стена берётся по границам самого уровня, а не здания: на узком этаже крайнее
-## место стоит посреди ширины, и по краям здания полотно уводило бы на улицу.
-static func _descent_towards(
-	rules: BuildingRules, slot: int, floor_index: int, comes_from_x: float
-) -> float:
-	var span := rules.slot_range(floor_index)
-	if slot <= span.x:
-		return 1.0
-	if slot >= span.y:
-		return -1.0
-	return _away_from(rules, slot, comes_from_x)
 
 
 ## Выход из здания: своё место на нижнем этаже, чтобы на нём не оказались ни дверь,
@@ -907,8 +921,14 @@ func _wall_blockers(rules: BuildingRules, index: int) -> Array[Vector2]:
 		if escalator.floor_index == index:
 			busy.append(Vector2(escalator.x - clearance, escalator.x + clearance))
 		elif escalator.floor_index == index - 1:
-			var landing := escalator.x + escalator.towards * rules.escalator_run
-			busy.append(Vector2(landing - clearance, landing + clearance))
+			# Пролёт под 45° висит над этим этажом от площадки до верхней
+			# площадки на этаже выше (ADR-0043, решение 15): стена под ним
+			# прошла бы сквозь полотно. Зазор — у площадки; над другим концом
+			# уже целая плита этажа выше.
+			var landing := escalator.landing(rules)
+			var low := minf(landing, escalator.x) - (clearance if escalator.towards < 0.0 else 0.0)
+			var high := maxf(landing, escalator.x) + (clearance if escalator.towards > 0.0 else 0.0)
+			busy.append(Vector2(low, high))
 
 	# Дверь за стеной — дверь, в которую не войти, а выход — непроходимое здание.
 	for door in doors:

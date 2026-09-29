@@ -66,6 +66,11 @@ const TIE_SPREAD: float = 0.45
 const TIE_DEPTH: float = 0.6
 
 ## Ход кабины по ROM: 2 px за тик логики, этаж за 1.6 с (ADR-0027, решение 4).
+## Полоса над полом кабины, в которой части тела лежат на пороге, м: ниже —
+## на плиту, выше — на толщину лежащего тела.
+const TEAR_REACH: float = 0.25
+const TEAR_HEIGHT: float = 0.45
+
 @export var speed: float = Arcade.speed(Arcade.CAR_PX)
 @export var floor_pause: float = 1.5
 ## Встаёт ли кабина между этажами. Сверкой не подтверждено — см. ADR-0004.
@@ -90,6 +95,9 @@ var _indicators: Array[MeshInstance3D] = []
 var _width: float = DEFAULT_WIDTH
 ## Стенки, светильник, пульт, тросы и противовес — только вид (ADR-0031).
 var _detail: CarDetail = null
+## Тела, которые днище начало резать: у срезанного целиком формы нет, и зона
+## давки его уже не видит, а срез идёт до пола.
+var _cutting: Array[Corpse] = []
 @onready var _interior: Area3D = $Interior
 @onready var _crush_zone: Area3D = $CrushZone
 @onready var _up_arrow: MeshInstance3D = $UpArrow
@@ -175,6 +183,11 @@ func width() -> float:
 	return _width
 
 
+## Высота низа днища в сцене, м: по ней кабина режет тех, кто под ней.
+func bottom() -> float:
+	return global_position.y + _under_the_floor()
+
+
 ## Меняет габарит формы по ширине и, если задана, по высоте.
 ##
 ## Форма своя на каждую кабину: подресурс сцены общий на все её копии, и
@@ -213,6 +226,7 @@ func _physics_process(delta: float) -> void:
 
 	_show_arrows()
 	_crush_those_underneath(_motion.velocity)
+	_tear_across_the_walls(_motion.velocity)
 
 
 ## Задаёт шахту: координаты этажей-остановок в правилах и этаж, с которого
@@ -378,6 +392,7 @@ func _ride_along() -> void:
 	position.y = _leader.position.y - _deck_drop
 	_show_arrows()
 	_crush_those_underneath(_leader.speed_now())
+	_tear_across_the_walls(_leader.speed_now())
 
 
 ## Постоять на этаже ещё не меньше [param seconds] — см. [method ElevatorMotion.hold].
@@ -408,11 +423,23 @@ func _place(height_in_plane: float) -> void:
 	position.y = WorldSpace.height_to_scene(height_in_plane)
 
 
-## Давит тех, кто оказался под днищем едущей вниз кабины.
+## Давит тех, кто оказался под днищем едущей вниз кабины, и режет днищем
+## тела под ним (ADR-0043, решения 7–9).
 func _crush_those_underneath(speed: float) -> void:
 	if speed <= 0.0:
 		return
+	for corpse: Corpse in _cutting.duplicate():
+		corpse.cut_under(self)
+		if corpse.cut == null or corpse.cut.done:
+			_cutting.erase(corpse)
 	for body: Node3D in _crush_zone.get_overlapping_bodies():
+		var part := body as PhysicalBone3D
+		if part != null:
+			# Часть упавшего тела под днищем, а не на полу кабины: у лежащей
+			# на полу середина выше днища на плиту и больше.
+			if Ragdoll.center_of(part).y < bottom():
+				_start_cutting(Corpse.of(part))
+			continue
 		var agent := body as Enemy
 		if agent != null:
 			# Кабина давит и агентов — 300 очков, как в ROM (ADR-0027, решение 6).
@@ -431,6 +458,42 @@ func _crush_those_underneath(speed: float) -> void:
 			continue
 		if ShaftHazards.crushes(speed, victim.is_grounded(), victim == _occupant):
 			victim.kill(true)
+
+
+## Начинает резать днищем тело [param corpse]; дальше срез ведёт список:
+## срезанная часть пропадает, и зона давки её уже не видит.
+func _start_cutting(corpse: Corpse) -> void:
+	if corpse == null or corpse.cut != null or corpse.gone:
+		return
+	corpse.cut_under(self)
+	if corpse.cut != null and not corpse.cut.done:
+		_cutting.append(corpse)
+
+
+## Рвёт стенкой тела, лежащие поперёк порога едущей кабины (ADR-0043,
+## решение 11): части внутри уезжают с кабиной, части снаружи остаются. Без
+## крови не рвёт — тело тянут суставы.
+func _tear_across_the_walls(speed: float) -> void:
+	if not Blood.enabled or is_zero_approx(speed):
+		return
+	var floor_top := bottom() + SLAB_THICKNESS
+	var low := floor_top - TEAR_REACH
+	var high := floor_top + TEAR_HEIGHT
+	var x := global_position.x
+	for node: Node in get_tree().get_nodes_in_group(Corpse.GROUP):
+		var corpse := Corpse.of(node)
+		if corpse == null or corpse.gone or corpse.torn or corpse.cut != null:
+			continue
+		# Трупов до конца здания много, а кабин в ходу — каждая: сперва
+		# дешёвая прикидка по одной части, габарит — только у близких.
+		if not corpse.near(x, _width):
+			continue
+		var reach := corpse.span()
+		if reach.y < x - _width or reach.x > x + _width:
+			continue
+		var inside := corpse.across(self, low, high, global_position.y + _roof_top())
+		if not inside.is_empty():
+			corpse.tear(self, inside)
 
 
 ## Сажает Otto, если он в проёме и в кабину можно войти (ADR-0037, решение 1).

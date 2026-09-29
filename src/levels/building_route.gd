@@ -272,7 +272,7 @@ static func _graph(
 	for escalator in plan.escalators:
 		var upper := escalator.floor_index
 		var top_segment := _segment_at(pieces[upper], escalator.x)
-		var landing := escalator.x + escalator.towards * rules.escalator_run
+		var landing := escalator.landing(rules)
 		var bottom_segment := _segment_at(pieces[upper + 1], landing)
 		# -1 — конец эскалатора попал в проём или за стену. Узла с таким номером
 		# на этаже нет, и связывать его нельзя: обход пометил бы его достижимым,

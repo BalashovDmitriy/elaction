@@ -74,8 +74,10 @@ func test_nothing_shares_a_place_on_a_floor() -> void:
 		for index in range(shaft.top, shaft.bottom + 1):
 			_claim(busy, index, shaft.x)
 	for escalator in plan.escalators:
+		# Верхняя площадка — на своём этаже, нижняя — у края этажа ниже: пролёт
+		# под 45° уходит на два места (ADR-0043, решение 15).
 		_claim(busy, escalator.floor_index, escalator.x)
-		_claim(busy, escalator.floor_index + 1, escalator.x)
+		_claim(busy, escalator.floor_index + 1, escalator.landing(rules))
 	_claim(busy, plan.floors - 1, plan.exit_x)
 	for door in plan.doors:
 		_claim(busy, door.floor_index, door.x)

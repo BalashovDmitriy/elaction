@@ -36,6 +36,7 @@ const POSES: PackedStringArray = [
 	"land",
 	"fall",
 	"prone",
+	"rope",
 	"dead_0",
 	"dead_1",
 	"crushed",

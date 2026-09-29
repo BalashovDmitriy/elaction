@@ -114,8 +114,8 @@ static func lay(
 
 ## Места этажа, где предмету стоять можно: там, где встают люди
 ## ([method BuildingPlan.safe_spots] — не шахта, не эскалатор и не выход), и не
-## на месте двери или лампы, не у нижней площадки эскалатора и не вплотную к
-## глухой стене.
+## на месте двери или лампы, не у нижней площадки эскалатора и не под низом его
+## пролёта, не вплотную к глухой стене.
 static func free_spots(
 	rules: BuildingRules, plan: BuildingPlan, floor_index: int
 ) -> PackedFloat64Array:
@@ -128,9 +128,15 @@ static func free_spots(
 	for lamp in plan.lamps:
 		if lamp.floor_index == floor_index:
 			busy.append(lamp.x)
+	# Низ пролёта с этажа выше: полотно под 45° там ниже роста (ADR-0043,
+	# решение 15), и предмет встал бы сквозь него.
+	var low_flights: Array[Vector2] = []
 	for escalator in plan.escalators:
 		if escalator.floor_index + 1 == floor_index:
-			busy.append(escalator.x + escalator.towards * rules.escalator_run)
+			var landing := escalator.landing(rules)
+			busy.append(landing)
+			var start := landing - escalator.towards * rules.escalator_low_span
+			low_flights.append(Vector2(minf(landing, start), maxf(landing, start)))
 
 	var free := PackedFloat64Array()
 	for x: float in plan.safe_spots(rules, floor_index):
@@ -139,6 +145,9 @@ static func free_spots(
 			if absf(other - x) < step * 0.5:
 				taken = true
 				break
+		for flight: Vector2 in low_flights:
+			if x > flight.x and x < flight.y:
+				taken = true
 		for wall in plan.walls:
 			if wall.floor_index == floor_index and absf(wall.x - x) < near_wall:
 				taken = true

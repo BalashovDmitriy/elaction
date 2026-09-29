@@ -26,6 +26,12 @@ extends Node3D
 
 ## Грунт под полом подвала, м, — до низа любого кадра.
 const SOIL_DEPTH: float = 6.0
+## Зазор клина грунта от плиты и стен, м.
+const SOIL_GAP: float = 0.01
+## Насколько клин уходит в пласт грунта под полом, м.
+const SOIL_SINK: float = 0.05
+## На сколько отрезков разбит подъём по кривой: граней на ней не видно.
+const SLOPE_PIECES: int = 24
 ## Тоннель: сколько пандуса от ворот накрыто потолком, м. Дальше потолок
 ## задевал бы крышу машины: пол пандуса поднимается, а потолок — нет.
 const TUNNEL: float = 5.0
@@ -124,10 +130,36 @@ func top_x() -> float:
 
 
 ## Высота проезда над полом подвала в [param x], м: площадка у ворот, подъём,
-## улица.
+## улица. Подъём — плавной кривой (ADR-0043, решение 17): пологий вход, круче к
+## середине, пологий выход на улицу. Прямой пандус ломался на концах углами, и
+## машина на них переламывалась.
 static func climb_at(rules: BuildingRules, x: float) -> float:
+	return rules.floor_height * rise_share(_along(rules, x))
+
+
+## Наклон проезда в [param x], рад: касательная к той же кривой.
+static func slope_at(rules: BuildingRules, x: float) -> float:
+	var t := _along(rules, x)
+	return atan(rules.floor_height / GarageGate.RAMP_RUN * rise_slope(t))
+
+
+## Доля подъёма на доле пути [param t]: сглаженная ступень — касательная на
+## обоих концах горизонтальна.
+static func rise_share(t: float) -> float:
+	var at := clampf(t, 0.0, 1.0)
+	return at * at * (3.0 - 2.0 * at)
+
+
+## Производная [method rise_share] по доле пути.
+static func rise_slope(t: float) -> float:
+	var at := clampf(t, 0.0, 1.0)
+	return 6.0 * at * (1.0 - at)
+
+
+## Доля пути по подъёму в [param x]: 0 — у площадки, 1 — наверху.
+static func _along(rules: BuildingRules, x: float) -> float:
 	var start := rules.floor_span(rules.floors - 1).x - GarageGate.RAMP_APRON
-	return rules.floor_height * clampf((start - x) / GarageGate.RAMP_RUN, 0.0, 1.0)
+	return clampf((start - x) / GarageGate.RAMP_RUN, 0.0, 1.0)
 
 
 ## Где кончается потолок тоннеля, в плоскости правил.
@@ -167,23 +199,35 @@ func _build_slabs() -> void:
 	_slope(Vector3(0.0, BUMPER.x, BUMPER.y), yellow, bumper_z, -BUMPER.x * 0.5)
 
 
-## Наклонная коробка вдоль подъёма: во всю его длину, [param size] — толщина и
-## глубина (x не в счёт), [param z] — середина по глубине, [param lift] —
-## насколько середина ниже (+) или выше (−) поверхности пандуса.
-func _slope(size: Vector3, material: Material, z: float, lift: float) -> MeshInstance3D:
+## Лента вдоль подъёма из коротких коробок по кривой: во всю его длину,
+## [param size] — толщина и глубина (x не в счёт), [param z] — середина по
+## глубине, [param lift] — насколько середина ниже (+) или выше (−) поверхности
+## пандуса. Отрезков столько, что на кривой не видно граней.
+func _slope(size: Vector3, material: Material, z: float, lift: float) -> Node3D:
+	var strip := Node3D.new()
+	add_child(strip)
 	var run := GarageGate.RAMP_RUN
 	var rise := _rules.floor_height
-	var part := _box(
-		Vector3(Vector2(run, rise).length(), size.y, size.z), material, Vector3.ZERO, false
-	)
-	var angle := atan2(rise, run)
-	part.rotation.z = -angle
-	var middle := _left - GarageGate.RAMP_APRON - run * 0.5
-	# Сдвиг от поверхности — по нормали к подъёму, а не по вертикали.
-	var normal := Vector2(sin(angle), cos(angle))
-	var centre := Vector2(middle, _surface - rise * 0.5) + normal * lift * Vector2(-1.0, 1.0)
-	part.position = _at(centre.x, centre.y, z)
-	return part
+	var start := _left - GarageGate.RAMP_APRON
+	for index in SLOPE_PIECES:
+		var t0 := float(index) / float(SLOPE_PIECES)
+		var t1 := float(index + 1) / float(SLOPE_PIECES)
+		var from := Vector2(start - run * t0, _surface - rise * rise_share(t0))
+		var to := Vector2(start - run * t1, _surface - rise * rise_share(t1))
+		var chord := to - from
+		# Внахлёст на толщину: у коротких отрезков под разными углами между
+		# гранями иначе светились бы щели.
+		var part := _box(
+			Vector3(chord.length() + size.y, size.y, size.z), material, Vector3.ZERO, false
+		)
+		var angle := atan2(-chord.y, -chord.x)
+		part.rotation.z = -angle
+		# Сдвиг от поверхности — по нормали к подъёму, а не по вертикали.
+		var normal := Vector2(sin(angle), cos(angle))
+		var centre := (from + to) * 0.5 + normal * lift * Vector2(-1.0, 1.0)
+		part.position = _at(centre.x, centre.y, z)
+		part.reparent(strip)
+	return strip
 
 
 ## Грунт разрезом: клин под подъёмом и пласт под всем выездом. Лицо разреза —
@@ -196,20 +240,28 @@ func _build_soil() -> void:
 	var z := _width * 0.5 - depth * 0.5
 	# Клин: высокая сторона слева, у верха пандуса. Чуть ниже плиты, чтобы грани
 	# не легли в одну плоскость.
-	var prism := PrismMesh.new()
-	prism.size = Vector3(run, rise - _rules.slab_height, depth)
-	prism.left_to_right = 0.0
-	var wedge := MeshInstance3D.new()
-	wedge.name = "Wedge"
-	wedge.mesh = prism
-	wedge.material_override = soil
-	wedge.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	wedge.position = _at(
-		_left - GarageGate.RAMP_APRON - run * 0.5,
-		_surface - (rise - _rules.slab_height) * 0.5 + _rules.slab_height * 0.5,
-		z
-	)
-	add_child(wedge)
+	# Клин под кривой подъёма — столбиками: каждый от пласта грунта до низа
+	# плиты над ним.
+	var start := _left - GarageGate.RAMP_APRON
+	var step := run / float(SLOPE_PIECES)
+	for index in SLOPE_PIECES:
+		var t := (float(index) + 0.5) / float(SLOPE_PIECES)
+		# Чуть ниже плиты и чуть уже разреза: грани клина не ложатся в одну
+		# плоскость ни с плитой, ни со стенами.
+		var top := _surface - rise * rise_share(t) + _rules.slab_height + SOIL_GAP
+		# Низ — в пласт грунта под полом: вровень с его верхом грани совпали бы
+		# с тоннелем.
+		var bottom := _surface + _rules.slab_height + SOIL_SINK
+		if bottom - top <= SOIL_SINK + 0.02:
+			continue
+		var pillar := _box(
+			Vector3(step + 0.01, bottom - top, depth - SOIL_GAP * 2.0),
+			soil,
+			_at(start - run * t, (top + bottom) * 0.5, z),
+			false
+		)
+		pillar.name = "Wedge%d" % index
+		pillar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var span := ExitStreet.FROM
 	_box(
 		Vector3(span, SOIL_DEPTH, depth),
@@ -338,7 +390,7 @@ func _build_tunnel() -> void:
 		var ground := climb_at(_rules, x)
 		pool.position = _at(x, _surface - ground - 0.012, 0.0)
 		if ground > 0.0:
-			pool.rotation.z = -atan2(_rules.floor_height, GarageGate.RAMP_RUN)
+			pool.rotation.z = -slope_at(_rules, x)
 		add_child(pool)
 		x -= TUBE_STEP
 	# Стрелка EXIT краской на стене — по ней выезжают.

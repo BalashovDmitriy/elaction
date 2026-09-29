@@ -164,6 +164,8 @@ var _riding_down: bool = true
 var _ride_shaft_x: float = INF
 ## Что бот решил последним разбором: для трассы прогона.
 var _decision: String = ""
+## Решение, уже записанное в журнал прогона.
+var _logged: String = ""
 ## Сколько ещё держать кабину в сторону, выбранную от пули, с. Решение
 ## держится до пролёта пули: сменивший ход тут же выходит из-под луча, и
 ## пересчёт на каждом шаге качал бы кабину туда-сюда прямо на линии огня.
@@ -182,6 +184,7 @@ func _init(level: GreyboxLevel) -> void:
 
 ## Один шаг решения. Зовётся каждый физический кадр.
 func step() -> void:
+	_log_the_decision()
 	_release_all()
 	if _otto.is_dead():
 		_duel_time = 0.0
@@ -241,6 +244,14 @@ func step() -> void:
 	# Поэтому на ходу бот стреляет только вперёд: разворот спорил бы с шагом.
 	if threat != null and (aiming or is_equal_approx(_otto.facing(), _side_of(threat))):
 		_press(&"shoot")
+
+
+## Пишет в журнал прогона решение бота, когда оно поменялось.
+func _log_the_decision() -> void:
+	if _decision == _logged or not RunLog.is_on():
+		return
+	_logged = _decision
+	RunLog.write("bot", {"decision": _decision, "at": RunLog.at(_otto)})
 
 
 ## Шаг к цели: чем бот воспользуется прямо сейчас.

@@ -348,6 +348,11 @@ func test_bot_survives_the_real_building_with_agents_seed_3() -> void:
 ## всего набора и его пол, ниже которого не опускается никакая раскладка.
 func _play_guarded(building_seed: int) -> void:
 	GameState.instance().start_game()
+	# Журнал прогона — всегда: провал этого теста разбирается по нему, без
+	# перезапусков с отладочной печатью (`tools/run_log.py`).
+	RunLog.open(
+		ProjectSettings.globalize_path("res://logs/playthrough_seed%d.jsonl" % building_seed)
+	)
 	var level := _build(building_seed, BuildingRules.new(), true)
 	var cleared := [false]
 	level.building_cleared.connect(func() -> void: cleared[0] = true)
@@ -380,6 +385,7 @@ func _play_guarded(building_seed: int) -> void:
 		if watchdog.stalled(deepest, game.documents_collected + deaths):
 			break
 	bot.release()
+	RunLog.close()
 
 	assert_false(
 		watchdog.tripped, "сид %d: %s" % [building_seed, watchdog.report(level, bot, deepest)]

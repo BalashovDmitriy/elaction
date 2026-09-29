@@ -94,8 +94,14 @@ const POOL_ENERGY: float = 0.4
 const DROPS: int = 1300
 const RIPPLES: int = 90
 
-const ASPHALT_DRY := Color(0.055, 0.055, 0.062)
-const ASPHALT_WET := Color(0.025, 0.026, 0.032)
+## Асфальт: цвет в sRGB. До M24g он был 0.055 — в линейных единицах 0.004,
+## почти чёрное тело: свет фар на нём не рассеивался вовсе, а мокрый, почти
+## зеркальный, отражал косой луч вперёд, мимо камеры (ADR-0043, решение 5).
+## Настоящий асфальт — около 0.2; мокрый темнее и блестит, но берёт свет.
+const ASPHALT_DRY := Color(0.21, 0.21, 0.22)
+const ASPHALT_WET := Color(0.13, 0.13, 0.145)
+const ASPHALT_DRY_ROUGHNESS: float = 0.78
+const ASPHALT_WET_ROUGHNESS: float = 0.3
 const KERB_TONE := Color(0.42, 0.42, 0.4)
 const PAVEMENT := Color(0.2, 0.2, 0.21)
 const LANE_PAINT := Color(0.55, 0.52, 0.42)
@@ -184,16 +190,15 @@ func build(left: float, street: float, building_seed: int, weather: Weather.Kind
 	apply_graphics()
 
 
-## Асфальт мостовой: в дождь темнее и почти зеркальный — в нём ловятся огни.
+## Асфальт мостовой: в дождь темнее и блестит — в нём ловятся огни.
 static func road_material(weather: Weather.Kind) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	if Weather.is_raining(weather):
 		material.albedo_color = ASPHALT_WET
-		material.roughness = 0.07
-		material.metallic = 0.25
+		material.roughness = ASPHALT_WET_ROUGHNESS
 	else:
 		material.albedo_color = ASPHALT_DRY
-		material.roughness = 0.62
+		material.roughness = ASPHALT_DRY_ROUGHNESS
 	return material
 
 

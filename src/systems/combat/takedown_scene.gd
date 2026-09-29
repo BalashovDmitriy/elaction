@@ -77,6 +77,11 @@ func _ready() -> void:
 	_otto.died.connect(_abort)
 	if _scene.side == Takedown.Side.BACK:
 		_otto.figure.position.z = -BEHIND_DEPTH
+	# Рука, наведённая до сценки — агент замахивался, Otto только что стрелял, —
+	# висела бы вскинутой поверх её клипов: вид в сценке ни тот ни другой не
+	# обновляет (ADR-0043, решение 16).
+	_otto.figure.aim_height = NAN
+	_agent.figure.aim_height = NAN
 	_slow_down()
 	_show(0.0)
 

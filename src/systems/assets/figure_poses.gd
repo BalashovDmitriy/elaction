@@ -41,6 +41,12 @@ class Pose:
 	var lift: float = 0.0
 	## Сжатие по высоте: раздавленный — 0.3.
 	var squash: float = 1.0
+	## Разведение ног вбок от стойки, градусы: меньше нуля — сведены. Стойка
+	## пака стоит врозь, а висящий на тросе держит ноги вместе.
+	var spread: float = 0.0
+	## Сведение рук к середине тела, градусы: висящий держится за трос кистями
+	## над головой, а стойка пака разводит руки.
+	var reach_in: float = 0.0
 
 	static func make(leg_angles: Vector2, arm_angles: Vector2) -> Pose:
 		var pose := Pose.new()
@@ -65,6 +71,16 @@ class Pose:
 		twist = head_twist
 		return self
 
+	## Ноги врозь или вместе.
+	func spread_by(degrees: float) -> Pose:
+		spread = degrees
+		return self
+
+	## Руки к середине тела.
+	func reached_in(degrees: float) -> Pose:
+		reach_in = degrees
+		return self
+
 	## Наклон тела целиком вокруг пяток.
 	func tilted(body_tilt: float) -> Pose:
 		tilt = body_tilt
@@ -83,7 +99,15 @@ class Pose:
 	## Своя копия: таблица поз общая, а актёр работает со своей.
 	func copy() -> Pose:
 		var twin := Pose.make(legs, arms).bent_at(knees, elbows).leaned(lean, head)
-		return twin.twisted(twist).tilted(tilt).lifted(lift).squashed(squash)
+		return (
+			twin
+			. twisted(twist)
+			. tilted(tilt)
+			. lifted(lift)
+			. squashed(squash)
+			. spread_by(spread)
+			. reached_in(reach_in)
+		)
 
 
 ## Клип пака: какой и как его играть.
@@ -364,6 +388,17 @@ static func _build_table() -> Dictionary:
 		. make(Vector2(-30.0, 30.0), Vector2(60.0, -60.0))
 		. bent_at(Vector2(40.0, 40.0))
 		. squashed(0.3)
+	)
+	# Висит на тросе вертолёта (ADR-0043, решение 1): руки прямо вверх — угол
+	# рук, как у залёгшего, только тело стоит, — ноги вместе и чуть вперёд,
+	# колени мягко согнуты, голова задрана к крюку.
+	table["rope"] = (
+		Pose
+		. make(Vector2(8.0, 4.0), Vector2(165.0, 160.0))
+		. bent_at(Vector2(14.0, 10.0), Vector2(6.0, 10.0))
+		. leaned(0.0, -18.0)
+		. spread_by(-18.0)
+		. reached_in(25.0)
 	)
 	# Залёгший под пулю агент (ADR-0016, пункт 2). Лежит лицом вниз, руки со
 	# стволом вытянуты вперёд по полу — от трупа на спине отличается сразу.

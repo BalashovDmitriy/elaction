@@ -331,18 +331,26 @@ func _build_records() -> void:
 ## [Credits] (ADR-0042, решение 6). По разделу — строка имён с лицензиями.
 func _build_credits() -> void:
 	_caption("UI_CREDITS")
+	# Первым — создатель игры, потом — авторы ассетов из `CREDITS.md`.
+	_credit_line(tr("UI_CREDITS_CREATOR"), tr("UI_CREDITS_CREATOR_NAME"))
+	_gap(10.0)
 	_note(tr("UI_CREDITS_ABOUT"))
 	for section: Credits.Section in Credits.load_sections():
-		var heading := NeonStyle.label(20, _neon(), 700)
-		heading.text = tr(section.key).to_upper()
-		_column.add_child(heading)
-		var names := NeonStyle.label(19, NeonStyle.INK, 500)
-		names.text = section.line()
-		names.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		names.custom_minimum_size = Vector2(_column.custom_minimum_size.x, 0.0)
-		_column.add_child(names)
+		_credit_line(tr(section.key), section.line())
 	_gap(10.0)
 	_back()
+
+
+## Заголовок раздела страницы «Авторы» и строка имён под ним.
+func _credit_line(title: String, line: String) -> void:
+	var heading := NeonStyle.label(20, _neon(), 700)
+	heading.text = title.to_upper()
+	_column.add_child(heading)
+	var names := NeonStyle.label(19, NeonStyle.INK, 500)
+	names.text = line
+	names.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	names.custom_minimum_size = Vector2(_column.custom_minimum_size.x, 0.0)
+	_column.add_child(names)
 
 
 func _build_controls() -> void:

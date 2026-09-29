@@ -16,6 +16,19 @@ extends Node3D
 ## ([ADR-0025](../../../docs/adr/0025-shafts-escalators-and-riders.md), решение 4):
 ## ступени рельефом, площадки в концах, балюстрада и обрамление проёма. Рельеф,
 ## а не анимация: свет M17 ложится на геометрию, ради этого пивот и затевался.
+##
+## С M24g конструкция — из деталей модели, собранной своим скриптом в Blender
+## (`tools/build_escalator.py`, ADR-0043, решение 3): рифлёные ступени с жёлтой
+## кромкой, стеклянная балюстрада с поручнем, тумбы, площадки с гребёнкой,
+## ферма. Пролёт в каждом здании свой, поэтому модель — набор деталей, и
+## эскалатор расставляет их по месту: ступени по одной, остальное растягивает
+## по длине.
+
+## Детали эскалатора и их размеры в модели, м: по ним детали растягиваются.
+const KIT := preload("res://assets/models/escalator/escalator.glb")
+const KIT_STEP_RUN: float = 0.24
+const KIT_STEP_HEIGHT: float = 0.45
+const KIT_LANDING_RUN: float = 0.42
 
 ## Докуда слышен стрёкот полотна, м.
 const HUM_REACH: float = 9.0
@@ -79,6 +92,14 @@ const LANDING_THICKNESS: float = 0.12
 const FRAME_WIDTH: float = 0.12
 const FRAME_MARGIN: float = 0.12
 
+## Сетки деталей по имени: одни на все эскалаторы здания.
+static var _meshes: Dictionary = {}
+
+## Скорость поездки, м/с по пути. До M24g поездка по короткому крутому пролёту
+## шла 1.1 с; с пологим пролётом M24g путь длиннее, и время считается по нему
+## ([method setup]), а скорость остаётся прежней.
+@export var ride_speed: float = 4.3
+
 ## Сколько секунд занимает поездка между площадками.
 @export var travel_time: float = 1.1
 
@@ -129,6 +150,7 @@ func setup(descent: Vector2, via: Vector2, gap: Vector2, slab: float) -> void:
 	_via = WorldSpace.direction_to_scene(via)
 	_has_via = true
 	_bottom_pad.position = down
+	travel_time = (_via.length() + (down - _via).length()) / ride_speed
 	_build(down, gap, slab)
 
 
@@ -161,6 +183,9 @@ func _try_board(pad: Area3D, target: Area3D, towards: float) -> bool:
 		_passenger = rider
 		_path = _route_from(rider.global_position, target)
 		_progress = 0.0
+		# По ступеням Otto идёт, лицом по ходу (ADR-0043, решение 2).
+		rider.ride_look = Otto.LOOK_WALK
+		rider.ride_facing = signf(target.global_position.x - rider.global_position.x)
 		rider.ride(true)
 		return true
 	return false
@@ -217,8 +242,9 @@ func _build(down: Vector3, gap: Vector2, slab: float) -> void:
 	var towards := signf(down.x)
 	_lay_landing(Vector3.ZERO, _via)
 	_lay_flight(_via, down)
-	# Нижняя площадка уходит по ходу спуска: с неё сходят, приехав.
-	_lay_landing(down, down + Vector3(towards * LANDING_RUN, 0.0, 0.0))
+	# Нижняя площадка уходит по ходу спуска: с неё сходят, приехав. Гребёнкой
+	# она к ступеням — раскладывается от своего дальнего края к ним.
+	_lay_landing(down + Vector3(towards * LANDING_RUN, 0.0, 0.0), down)
 	_frame_the_gap(gap, slab)
 
 
@@ -234,17 +260,17 @@ func _lay_flight(from: Vector3, to: Vector3) -> void:
 	_light_the_flight(from, to)
 
 
-## Полотно пролёта: ровная лента вдоль ломаной.
+## Ферма пролёта с обшивкой снизу, вдоль ломаной.
 ##
 ## Со стороны её закрывают ступени, но снизу видно именно её: эскалатор проходит
 ## сквозь перекрытие, и с нижнего этажа смотрят ему в брюхо.
 func _lay_belt(from: Vector3, to: Vector3) -> void:
 	var span := to - from
-	_add_part(
-		Vector3(span.length(), BELT_THICKNESS, BELT_DEPTH),
-		(from + to) * 0.5 + Vector3(0.0, 0.0, BELT_Z),
+	_add_kit(
+		"Truss",
+		(from + to) * 0.5 + Vector3(0.0, -BELT_THICKNESS, BELT_Z),
 		atan2(span.y, span.x),
-		GreyboxLook.surface(GreyboxLook.ESCALATOR)
+		Vector3(span.length(), 1.0, 1.0)
 	)
 
 
@@ -258,15 +284,15 @@ func _lay_steps(from: Vector3, span: Vector3) -> void:
 	var tread := span.x / float(count)
 	var riser := span.y / float(count)
 	var height := absf(riser) + BELT_THICKNESS
-	var look := GreyboxLook.metal(GreyboxLook.ESCALATOR)
 
+	# Жёлтая кромка ступени — по ходу спуска: край, с которого шагают вниз.
 	for index in count:
 		var top := from.y + riser * float(index)
-		_add_part(
-			Vector3(absf(tread), height, BELT_DEPTH),
-			Vector3(from.x + tread * (float(index) + 0.5), top - height * 0.5, BELT_Z),
+		_add_kit(
+			"Step",
+			Vector3(from.x + tread * (float(index) + 0.5), top, BELT_Z),
 			0.0,
-			look
+			Vector3(tread / KIT_STEP_RUN, height / KIT_STEP_HEIGHT, 1.0)
 		)
 
 
@@ -282,28 +308,12 @@ func _lay_sides(from: Vector3, to: Vector3) -> void:
 	if up.y < 0.0:
 		up = -up
 
-	var panel := GreyboxLook.surface(GreyboxLook.ESCALATOR)
-	var trim := GreyboxLook.metal(GreyboxLook.TRIM)
 	var over := BELT_THICKNESS * 0.5
-
-	_add_part(
-		Vector3(length, RAIL_HEIGHT, RAIL_THICKNESS),
-		centre + up * (over + RAIL_HEIGHT * 0.5) + Vector3(0.0, 0.0, RAIL_Z),
-		angle,
-		panel
-	)
-	_add_part(
-		Vector3(length, HANDRAIL_SIZE, HANDRAIL_SIZE),
-		centre + up * (over + RAIL_HEIGHT + HANDRAIL_SIZE * 0.5) + Vector3(0.0, 0.0, RAIL_Z),
-		angle,
-		trim
-	)
-	_add_part(
-		Vector3(length, KERB_HEIGHT, KERB_DEPTH),
-		centre + up * (over + KERB_HEIGHT * 0.5) + Vector3(0.0, 0.0, KERB_Z),
-		angle,
-		trim
-	)
+	var stretch := Vector3(length, 1.0, 1.0)
+	_add_kit("Balustrade", centre + up * over + Vector3(0.0, 0.0, RAIL_Z), angle, stretch)
+	_add_kit("Kerb", centre + up * over + Vector3(0.0, 0.0, KERB_Z), angle, stretch)
+	for end: Vector3 in [from, to]:
+		_add_kit("Newel", end + up * over + Vector3(0.0, 0.0, RAIL_Z), 0.0, Vector3.ONE)
 
 	var cap := up * (over + RAIL_HEIGHT + HANDRAIL_SIZE * 0.5) + Vector3(0.0, 0.0, RAIL_Z)
 	_mark_end(from + cap)
@@ -349,15 +359,17 @@ func _mark_end(at: Vector3) -> void:
 ## Иначе встающий на неё Otto оказывался бы по щиколотку в плите — он стоит
 ## на полу этажа, а не на эскалаторе.
 func _lay_landing(from: Vector3, to: Vector3) -> void:
-	var run := absf(to.x - from.x)
+	var run := to.x - from.x
 	if is_zero_approx(run):
 		return
 
-	_add_part(
-		Vector3(run, LANDING_THICKNESS, BELT_DEPTH),
-		Vector3((from.x + to.x) * 0.5, from.y - LANDING_THICKNESS * 0.5, BELT_Z),
+	# Гребёнка площадки — на её конце [param to]; у нижней площадки конец —
+	# там, откуда уходят ступени, и она ляжет, если её раскладывать от ступеней.
+	_add_kit(
+		"Landing",
+		Vector3((from.x + to.x) * 0.5, from.y, BELT_Z),
 		0.0,
-		GreyboxLook.metal(GreyboxLook.ESCALATOR)
+		Vector3(run / KIT_LANDING_RUN, 1.0, 1.0)
 	)
 
 
@@ -378,6 +390,26 @@ func _frame_the_gap(gap: Vector2, slab: float) -> void:
 			0.0,
 			look
 		)
+
+
+## Деталь модели [param part] на своём месте, под своим углом и с растяжкой
+## [param stretch]: пролёт у каждого эскалатора свой.
+func _add_kit(part: String, at: Vector3, angle: float, stretch: Vector3) -> void:
+	var mesh := MeshInstance3D.new()
+	mesh.mesh = Escalator._kit_mesh(part)
+	mesh.position = at
+	mesh.rotation.z = angle
+	mesh.scale = stretch
+	_ramp.add_child(mesh)
+
+
+static func _kit_mesh(part: String) -> Mesh:
+	if _meshes.is_empty():
+		var model := KIT.instantiate()
+		for node: Node in model.find_children("*", "MeshInstance3D", true, false):
+			_meshes[node.name] = (node as MeshInstance3D).mesh
+		model.free()
+	return _meshes.get(part) as Mesh
 
 
 ## Кусок конструкции: коробка без тела на своём месте и под своим углом.

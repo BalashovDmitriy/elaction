@@ -44,3 +44,6 @@ Thumbs.db
 
 # Рабочие копии агентов Claude Code
 /.claude/worktrees/
+
+# Журналы прогонов (RunLog): пишут тесты прохождения и инструменты
+/logs/
