@@ -13,8 +13,9 @@ extends RefCounted
 ## что у каждой записи оно есть.
 
 ## Где предмет: стоит на полу у стены, висит на стене, стоит на крыше, стоит
-## только поверх другого (лампа на комоде — в жребий сама не идёт).
-enum Place { FLOOR, WALL, ROOF, TOP }
+## только поверх другого (лампа на комоде — в жребий сама не идёт), стоит в
+## комнате за дверью ([DoorRoom]) — в коридор не идёт.
+enum Place { FLOOR, WALL, ROOF, TOP, ROOM }
 
 ## Для какого здания: отель, офис, любое.
 enum Fit { HOTEL, OFFICE, ANY }
@@ -99,6 +100,11 @@ static var _entries: Dictionary = _build()
 static var _footprints: Dictionary = {}
 ## Габарит повёрнутой модели до масштаба, по имени.
 static var _boxes: Dictionary = {}
+## Сцены моделей по имени. Кэш загрузчика держит ресурс, только пока на него
+## есть ссылка, а собранный предмет на сцену не ссылается: комната за дверью,
+## собранная на открытии и убранная на закрытии, читала бы .glb с диска заново
+## на каждой створке — посреди шага физики (авторевью M24i).
+static var _scenes: Dictionary = {}
 
 
 ## Все записи каталога.
@@ -127,13 +133,20 @@ static func pick(where: Place, which: Fit) -> Array[Entry]:
 ## Собирает предмет: модель, повёрнутая к камере и приведённая к росту, нуль —
 ## посередине низа по ширине и у задней грани по глубине. Так предмет ставится
 ## к стене одним сдвигом, какой бы глубины ни был. Узел без тел.
-static func make(prop_name: String) -> Node3D:
+##
+## [param full_depth] — не сжимать по глубине: для комнаты за дверью, где
+## коридорная мебель стоит в свою настоящую глубину.
+static func make(prop_name: String, full_depth: bool = false) -> Node3D:
 	var item := entry(prop_name)
-	var path := "%s/%s.glb" % [DIR, prop_name]
-	if not ResourceLoader.exists(path):
-		push_error("нет модели обстановки: %s" % path)
-		return null
-	var model := (load(path) as PackedScene).instantiate() as Node3D
+	var scene := _scenes.get(prop_name) as PackedScene
+	if scene == null:
+		var path := "%s/%s.glb" % [DIR, prop_name]
+		if not ResourceLoader.exists(path):
+			push_error("нет модели обстановки: %s" % path)
+			return null
+		scene = load(path) as PackedScene
+		_scenes[prop_name] = scene
+	var model := scene.instantiate() as Node3D
 	# Поворот — отдельным узлом над моделью: габарит считается уже повёрнутым.
 	var turned := Node3D.new()
 	turned.add_child(model)
@@ -150,7 +163,9 @@ static func make(prop_name: String) -> Node3D:
 		factor = minf(factor, WALL_MAX_WIDTH / maxf(box.size.x, 0.001))
 		height = box.size.y * factor
 	var squeeze := minf(1.0, MAX_DEPTH / maxf(box.size.z * factor, 0.001))
-	if item != null and item.place == Place.ROOF:
+	# Крыше и комнате за дверью глубины хватает: сжимается только то, что
+	# стоит в коридоре между стеной и актёрами.
+	if full_depth or (item != null and (item.place == Place.ROOF or item.place == Place.ROOM)):
 		squeeze = 1.0
 	var sized := Node3D.new()
 	sized.add_child(turned)
@@ -164,7 +179,7 @@ static func make(prop_name: String) -> Node3D:
 	holder.add_child(sized)
 	_mark_as_props(model)
 	if item != null and not item.top.is_empty():
-		var on_top := make(item.top)
+		var on_top := make(item.top, full_depth)
 		if on_top != null:
 			# Сверху, по середине глубины низа: лампа стоит на столешнице, а не
 			# на её заднем крае.
@@ -244,6 +259,8 @@ static func _build() -> Dictionary:
 		Entry.of("trashcan", Place.FLOOR, Fit.ANY, 0.6),
 		Entry.of("vending_machine", Place.FLOOR, Fit.ANY, 1.85),
 		Entry.of("fire_extinguisher", Place.FLOOR, Fit.ANY, 0.6),
+		# Табличка «Мокрый пол» — в любом здании: уборщица прошла (ADR-0048).
+		Entry.of("wet_floor_sign", Place.FLOOR, Fit.ANY, 0.62),
 		# Пол, отель: гостиная у лифтов, а не склад.
 		Entry.of("couch_medium", Place.FLOOR, Fit.HOTEL, 0.8),
 		Entry.of("armchair", Place.FLOOR, Fit.HOTEL, 0.9),
@@ -253,6 +270,7 @@ static func _build() -> Dictionary:
 		Entry.of("end_table", Place.FLOOR, Fit.HOTEL, 0.6).topped("table_lamp"),
 		Entry.of("cabinet", Place.FLOOR, Fit.HOTEL, 0.9),
 		Entry.of("table_lamp", Place.TOP, Fit.HOTEL, 0.5),
+		Entry.of("bench_hotel", Place.FLOOR, Fit.HOTEL, 0.85),
 		# Пол, офис.
 		Entry.of("water_cooler", Place.FLOOR, Fit.OFFICE, 1.2),
 		Entry.of("file_cabinet", Place.FLOOR, Fit.OFFICE, 1.3, -90.0),
@@ -260,6 +278,9 @@ static func _build() -> Dictionary:
 		Entry.of("cardboard_boxes", Place.FLOOR, Fit.OFFICE, 1.0),
 		Entry.of("bins", Place.FLOOR, Fit.OFFICE, 0.9),
 		Entry.of("bookshelf", Place.FLOOR, Fit.OFFICE, 1.6),
+		# Приёмная у кабинетов: кресло для посетителей и торшер (ADR-0048).
+		Entry.of("lounge_chair", Place.FLOOR, Fit.OFFICE, 0.85),
+		Entry.of("light_stand", Place.FLOOR, Fit.OFFICE, 1.6),
 		# Стены: картины — везде, остальное — по зданию. Wall Art пришли
 		# спиной к камере, Painting — плашмя.
 		Entry.of("painting", Place.WALL, Fit.ANY, 0.6).tilted(90.0),
@@ -275,6 +296,18 @@ static func _build() -> Dictionary:
 		Entry.of("vent", Place.WALL, Fit.OFFICE, 0.35),
 		Entry.of("air_vent", Place.WALL, Fit.OFFICE, 0.45, 90.0),
 		Entry.of("fire_exit_sign", Place.WALL, Fit.ANY, 0.3, -90.0).raised(2.35),
+		# Комната за дверью (ADR-0047): в неё видно в открытую створку. Рабочие
+		# места dook пришли боком — столом к +X.
+		Entry.of("bed_hotel", Place.ROOM, Fit.HOTEL, 0.8),
+		Entry.of("bed_double", Place.ROOM, Fit.HOTEL, 1.15),
+		Entry.of("night_stand", Place.ROOM, Fit.HOTEL, 0.58).topped("table_lamp"),
+		Entry.of("night_stand_b", Place.ROOM, Fit.HOTEL, 0.62).topped("table_lamp"),
+		Entry.of("curtains", Place.ROOM, Fit.HOTEL, 2.3),
+		Entry.of("rug", Place.ROOM, Fit.HOTEL, 0.02),
+		Entry.of("desk", Place.ROOM, Fit.OFFICE, 0.78),
+		Entry.of("office_chair", Place.ROOM, Fit.OFFICE, 1.05),
+		Entry.of("workstation_a", Place.ROOM, Fit.OFFICE, 1.45, 90.0),
+		Entry.of("workstation_b", Place.ROOM, Fit.OFFICE, 1.35, 90.0),
 		# Крыша (ADR-0033, решение 8).
 		Entry.of("water_tower", Place.ROOF, Fit.ANY, 4.5),
 		Entry.of("water_tank", Place.ROOF, Fit.ANY, 2.5),

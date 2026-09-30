@@ -141,7 +141,12 @@ func _exit_tree() -> void:
 ## Проигрывает эффект. Голоса разбираются по кругу: самый старый затирается,
 ## и одновременная пальба не съедает звук шагов насовсем. Джингл на время
 ## звучания приглушает трек (ADR-0036, решение 6).
-func play(name: String) -> void:
+##
+## [param pitch] и [param db] — тон и громкость этого раза: удар добивания
+## звучит поверх себя же на тон ниже, гулко (ADR-0050). Голоса общие, и каждый
+## раз тон и громкость ставятся заново — иначе пониженный удар передавал бы
+## свой тон следующему шагу.
+func play(name: String, pitch: float = 1.0, db: float = 0.0) -> void:
 	var stream := Sounds.stream(name)
 	if stream == null:
 		return
@@ -151,6 +156,8 @@ func play(name: String) -> void:
 	# Голоса общие, а шина у звука своя: меню и джинглы мимо глушения коридора.
 	player.bus = Sounds.bus_of(name)
 	player.stream = stream
+	player.pitch_scale = pitch
+	player.volume_db = db
 	player.play()
 	if Sounds.JINGLES.has(name):
 		_duck(stream.get_length())
@@ -426,6 +433,12 @@ func _sweep(bus: String, hz: float) -> void:
 
 func _gain(bus: String, target_db: float, seconds: float) -> void:
 	_restart(bus + "/gain").tween_property(_gain_of(bus), "volume_db", target_db, seconds)
+
+
+## Приглушает трек на [param seconds] секунд снаружи: музыка проваливается на
+## ударе добивания (ADR-0050).
+func duck(seconds: float) -> void:
+	_duck(seconds)
 
 
 ## Приглушает трек на [param seconds] секунд. Джингл поверх джингла продлевает

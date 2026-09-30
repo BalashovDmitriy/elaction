@@ -30,12 +30,15 @@ const STOP_PAST_RAMP: float = LENGTH * 0.5 + 0.4
 ## Съезд в полосу: за сколько метров хода машина переходит с края мостовой на
 ## середину ближней полосы.
 const MERGE_RUN: float = 7.0
-## Сколько машина ждёт просвета, прежде чем поток его устроит, с: выезд не
-## должен тянуться дольше, чем держит интерес.
-const WAIT_LIMIT: float = 2.0
-## Водительская дверь — на столько от середины машины к капоту, м: над передним
-## сиденьем. У неё Otto садится в машину (ADR-0038, решение 4).
-const DOOR_OFFSET: float = LENGTH * 0.08
+## Сколько машина ждёт просвета, прежде чем поток его устроит, решает сам поток
+## по своей ситуации ([method StreetTraffic.wait_limit]): выезд не должен
+## тянуться дольше, чем держит интерес.
+##
+## За сколько метров до края мостовой машина смотрит, свободна ли полоса: если
+## да — не встаёт, а съезжает с ходу (ADR-0046, решение 3). С этого же места
+## мигает поворотник.
+const ROLL_IN: float = 3.0
+const SIGNAL_AHEAD: float = 6.0
 ## Как машина качнулась, приняв водителя: наклон, рад, и сколько длится, с.
 const ROCK_ANGLE: float = 0.025
 const ROCK_TIME: float = 0.5
@@ -64,25 +67,25 @@ const SOUND_REACH: float = 24.0
 ## Машина стоит снаружи здания: за плоскостью игры, но перед стеной, чтобы
 ## Otto проходил перед ней, а не сквозь.
 const Z: float = -0.6
-## Водительская дверца. У моделей пака дверь не отдельной деталью, поэтому на
-## посадку поверх кузова распахивается своя створка — тонкая панель в краске
-## кузова со стеклом, на петлях у передней стойки. Видна, пока открыта: закрытую
-## рисует сама модель. Длина — доля длины машины; низ панели, линия окна и верх
-## стекла — доли высоты кузова.
-const DOOR_LENGTH: float = LENGTH * 0.26
-const DOOR_SILL: float = 0.24
-const DOOR_BELT: float = 0.6
-const DOOR_TOP: float = 0.9
-const DOOR_THICKNESS: float = 0.04
-## Насколько распахнута открытая дверца, градусы.
+## Водительская дверца — деталь модели `DriverDoor`: кузов прорезан по её
+## проёму, в проёме — салон `CarInterior` (ADR-0046, решение 1). Начало детали —
+## на петле у передней стойки; насколько распахнута открытая, градусы.
 const DOOR_SWING: float = 62.0
-const DOOR_GLASS := Color(0.08, 0.1, 0.13)
-## Плафон салона: зажигается с открытой дверцей, как в любой машине, и
-## высвечивает садящегося и дверцу — у ворот темно. Без тени; яркость и
-## дальность, м.
+## Плафон салона — под крышей внутри, в точке `DomeLight` модели: зажигается с
+## открытой дверцей, как в любой машине, и высвечивает салон и садящегося. Без
+## тени; яркость и дальность, м. Слабый и близкий: светит салон, а не костюм.
 const DOME := Color(1.0, 0.82, 0.6)
-const DOME_ENERGY: float = 1.6
-const DOME_RANGE: float = 2.6
+const DOME_ENERGY: float = 0.9
+const DOME_RANGE: float = 1.6
+## Правый поворотник (ADR-0046, решение 2): машина съезжает в ближнюю полосу
+## улицы — от камеры, по ходу это вправо. Мигает, пока ждёт просвета и съезжает,
+## с полупериодом [constant BLINK_HALF], с. Фонари — на дальнем борту, и видно
+## мигание по вспышке у каждого: свет ложится на асфальт и кузов.
+const INDICATOR := Color(1.0, 0.55, 0.08)
+const BLINK_HALF: float = 0.36
+const BLINK_GLOW: float = 6.0
+const BLINK_ENERGY: float = 2.6
+const BLINK_RANGE: float = 2.2
 
 ## Куда машина уезжает: -1 влево, +1 вправо. С M24b всегда влево — в ворота.
 var towards: float = 1.0
@@ -117,10 +120,16 @@ var _ramp_run: float = 0.0
 var _ramp_rise: float = 0.0
 ## Пол, на котором машина стоит, в плоскости правил.
 var _floor_y: float = 0.0
-## Петля водительской дверцы и насколько дверца открыта: 0 — закрыта.
-var _door_hinge: Node3D = null
+## Водительская дверца модели и насколько она открыта: 0 — закрыта.
+var _door: Node3D = null
 var _door_open: float = 0.0
+## Середина дверцы от середины машины к капоту, м: у неё Otto садится.
+var _door_offset: float = LENGTH * 0.08
 var _dome: OmniLight3D = null
+## Правый поворотник: свой материал фонарей, их вспышки и ход мигания, с.
+var _indicator: StandardMaterial3D = null
+var _flashes: Array[OmniLight3D] = []
+var _blink: float = 0.0
 ## Ближний к камере борт кузова, Z в системе машины: к нему Otto шагает на посадке.
 var _near_side: float = 0.0
 
@@ -154,7 +163,7 @@ func park(
 	if towards < 0.0:
 		model.rotation.y = PI
 	add_child(model)
-	_hang_the_door(model, CarModel.PAINTS[choice.paint])
+	_fit_the_cabin(model)
 	_wheels = CarModel.wheels(model)
 	_hubs = CarModel.hubs(_wheels)
 	_wheel_radius = CarModel.wheel_radius(_wheels, _wheel_radius)
@@ -232,21 +241,20 @@ static func spot(exit_x: float, rules: BuildingRules, plan: BuildingPlan) -> flo
 
 ## Где водительская дверь, по горизонтали в плоскости правил: там Otto садится.
 func door_x() -> float:
-	return position.x + towards * DOOR_OFFSET
+	return position.x + towards * _door_offset
 
 
-## Открывает водительскую дверцу: 0 — закрыта (и не видна), 1 — распахнута.
+## Открывает водительскую дверцу: 0 — закрыта, 1 — распахнута.
 func set_door(openness: float) -> void:
 	_door_open = clampf(openness, 0.0, 1.0)
-	if _door_hinge == null:
-		return
-	_door_hinge.visible = _door_open > 0.0
-	# Свободный край дверцы — к багажнику, и распахивается она к камере (+Z):
-	# поворот вокруг +Y уводит +X в -Z, поэтому знак — по [member towards].
 	var eased := ease(_door_open, -2.0)
-	_door_hinge.rotation.y = towards * deg_to_rad(DOOR_SWING) * eased
-	_dome.visible = _door_open > 0.0
-	_dome.light_energy = DOME_ENERGY * eased
+	if _door != null:
+		# Дверца лежит от петли к багажнику (-X модели) у борта -Z модели и
+		# распахивается наружу: поворот вокруг +Y с минусом уводит её край в -Z.
+		_door.rotation.y = -deg_to_rad(DOOR_SWING) * eased
+	if _dome != null:
+		_dome.visible = _door_open > 0.0
+		_dome.light_energy = DOME_ENERGY * eased
 
 
 ## Насколько открыта водительская дверца.
@@ -349,6 +357,11 @@ func is_leaving() -> bool:
 	return _leaving
 
 
+## Скорость машины прямо сейчас, м/с.
+func speed_now() -> float:
+	return _speed
+
+
 ## Качает машину, принявшую водителя: затухающий наклон вдоль кузова.
 func settle(delta: float) -> void:
 	if _rocking <= 0.0:
@@ -366,6 +379,7 @@ func advance(delta: float, view: Rect2) -> bool:
 	if not _leaving:
 		return false
 	_speed = _speed_now(delta)
+	_signal(delta)
 	position.x += towards * _speed * delta
 	_climb()
 	_merge()
@@ -385,16 +399,10 @@ func _speed_now(delta: float) -> float:
 		return minf(_speed + ACCELERATION * delta, SPEED)
 	match stage:
 		Stage.CLIMB:
-			var left := (position.x - stop_x()) * -towards
-			if left <= 0.01:
-				position.x = stop_x()
-				stage = Stage.WAIT
-				return 0.0
-			var braked := sqrt(2.0 * BRAKING * left)
-			return minf(minf(_speed + ACCELERATION * delta, SPEED), braked)
+			return _climb_speed(delta)
 		Stage.WAIT:
 			waited += delta
-			traffic.hold_back(waited >= WAIT_LIMIT)
+			traffic.hold_back(waited >= traffic.wait_limit())
 			if not traffic.is_clear_for(position.x):
 				return 0.0
 			traffic.hold_back(false)
@@ -402,6 +410,28 @@ func _speed_now(delta: float) -> float:
 			stage = Stage.MERGE
 			return minf(START_SPEED, traffic.near_speed())
 	return minf(_speed + ACCELERATION * delta, traffic.near_speed())
+
+
+## Скорость на подъезде к краю мостовой: просвет есть — съезжает с ходу, нет —
+## тормозит и встаёт у края.
+func _climb_speed(delta: float) -> float:
+	var left := _to_the_kerb()
+	if left <= ROLL_IN and traffic.is_clear_for(stop_x()):
+		# Просвет есть: не вставая, съезжает в полосу с ходу.
+		traffic.join(self)
+		stage = Stage.MERGE
+		return minf(_speed + ACCELERATION * delta, traffic.near_speed())
+	if left <= 0.01:
+		position.x = stop_x()
+		stage = Stage.WAIT
+		return 0.0
+	var braked := sqrt(2.0 * BRAKING * left)
+	return minf(minf(_speed + ACCELERATION * delta, SPEED), braked)
+
+
+## Сколько машине осталось до края мостовой, м; за ним — меньше нуля.
+func _to_the_kerb() -> float:
+	return (position.x - stop_x()) * -towards
 
 
 ## Где машина ждёт просвета, по X середины: у края мостовой за верхом пандуса.
@@ -426,9 +456,10 @@ func _merge() -> void:
 		stage = Stage.CRUISE
 
 
-## Вешает водительскую дверцу на петлю у передней стойки: панель в краске
-## [param paint] и стекло над ней. Размеры — по габариту модели [param model].
-func _hang_the_door(model: Node3D, paint: Color) -> void:
+## Находит в модели [param model] дверцу, плафон и поворотник и меряет борт:
+## к ближнему садящийся шагает. Модели без салона — дверцы нет, и Otto садится
+## у середины, как раньше.
+func _fit_the_cabin(model: Node3D) -> void:
 	var box := AABB()
 	var first := true
 	for node in model.find_children("*", "MeshInstance3D", true, false):
@@ -437,36 +468,77 @@ func _hang_the_door(model: Node3D, paint: Color) -> void:
 		box = part if first else box.merge(part)
 		first = false
 	_near_side = box.end.z
-	var height := box.size.y
-	_door_hinge = Node3D.new()
-	_door_hinge.name = "DoorHinge"
-	# Петля — у передней стойки: от середины дверцы к капоту на половину её длины.
-	var front := towards * (DOOR_OFFSET + DOOR_LENGTH * 0.5)
-	_door_hinge.position = Vector3(front, 0.0, _near_side + DOOR_THICKNESS * 0.5 + 0.01)
-	add_child(_door_hinge)
-	var reach := -towards * DOOR_LENGTH * 0.5
-	var panel_h := height * (DOOR_BELT - DOOR_SILL)
-	var panel := GreyboxLook.box(
-		Vector3(DOOR_LENGTH, panel_h, DOOR_THICKNESS), GreyboxLook.polished(paint)
-	)
-	panel.name = "DoorPanel"
-	panel.position = Vector3(reach, height * DOOR_SILL + panel_h * 0.5, 0.0)
-	_door_hinge.add_child(panel)
-	var glass_h := height * (DOOR_TOP - DOOR_BELT)
-	var glass := GreyboxLook.box(
-		Vector3(DOOR_LENGTH * 0.86, glass_h, DOOR_THICKNESS * 0.5), GreyboxLook.polished(DOOR_GLASS)
-	)
-	glass.name = "DoorGlass"
-	glass.position = Vector3(reach * 1.1, height * DOOR_BELT + glass_h * 0.5, 0.0)
-	_door_hinge.add_child(glass)
+	_door = model.find_child("DriverDoor", true, false) as Node3D
+	if _door != null:
+		var door_mesh := _door as MeshInstance3D
+		var span := door_mesh.mesh.get_aabb() if door_mesh != null else AABB()
+		# Середина дверцы в системе модели: петля плюс половина её длины к багажнику.
+		_door_offset = _door.position.x + span.get_center().x
 	_dome = OmniLight3D.new()
 	_dome.name = "Dome"
 	_dome.light_color = DOME
 	_dome.omni_range = DOME_RANGE
 	_dome.shadow_enabled = false
-	_dome.position = Vector3(towards * DOOR_OFFSET, height * 0.8, _near_side + 0.3)
-	add_child(_dome)
+	var anchor := model.find_child("DomeLight", true, false) as Node3D
+	if anchor != null:
+		anchor.add_child(_dome)
+	else:
+		_dome.position = Vector3(towards * _door_offset, box.end.y - 0.1, 0.0)
+		add_child(_dome)
+	_hook_the_indicator(model)
 	set_door(0.0)
+
+
+## Правый поворотник модели: свой материал вместо общего из кэша и по вспышке у
+## каждого фонаря — по краям его сетки вдоль машины.
+func _hook_the_indicator(model: Node3D) -> void:
+	var lamps := model.find_child("IndicatorRight", true, false) as MeshInstance3D
+	if lamps == null:
+		return
+	_indicator = GreyboxLook.light(INDICATOR).duplicate() as StandardMaterial3D
+	_indicator.emission_energy_multiplier = 0.0
+	lamps.material_override = _indicator
+	var span := lamps.mesh.get_aabb()
+	for x: float in [span.position.x, span.end.x]:
+		var flash := OmniLight3D.new()
+		flash.light_color = INDICATOR
+		flash.omni_range = BLINK_RANGE
+		flash.shadow_enabled = false
+		flash.visible = false
+		flash.position = Vector3(x, span.get_center().y, span.get_center().z)
+		lamps.add_child(flash)
+		_flashes.append(flash)
+
+
+## Мигает ли правый поворотник: на подъезде к краю мостовой, пока машина ждёт
+## просвета и пока съезжает в полосу.
+func is_signalling() -> bool:
+	if not _leaving or traffic == null:
+		return false
+	if stage == Stage.CLIMB:
+		return _to_the_kerb() <= SIGNAL_AHEAD
+	return stage == Stage.WAIT or stage == Stage.MERGE
+
+
+## Горит ли фонарь поворотника в этот миг мигания.
+func indicator_lit() -> bool:
+	return not _flashes.is_empty() and _flashes[0].visible
+
+
+## Ход мигания: горит первую половину периода, гаснет вторую.
+func _signal(delta: float) -> void:
+	if _indicator == null:
+		return
+	var on := false
+	if is_signalling():
+		_blink += delta
+		on = fmod(_blink, BLINK_HALF * 2.0) < BLINK_HALF
+	else:
+		_blink = 0.0
+	_indicator.emission_energy_multiplier = BLINK_GLOW if on else 0.0
+	for flash: OmniLight3D in _flashes:
+		flash.visible = on
+		flash.light_energy = BLINK_ENERGY
 
 
 ## Трансформ меша [param mesh] в системе модели [param model].

@@ -361,6 +361,22 @@ static func _add_takedown_poses(table: Dictionary) -> void:
 		. bent_at(Vector2(32.0, 18.0), Vector2(35.0, 5.0))
 		. leaned(20.0, 10.0)
 	)
+	# Агент успевает отыграть (ADR-0050): спереди — тянет ствол, рука с
+	# пистолетом идёт вперёд, свободная прикрывается; корпус откинут...
+	table["reach_gun"] = (
+		Pose
+		. make(Vector2(8.0, -10.0), Vector2(35.0, 62.0))
+		. bent_at(Vector2(12.0, 14.0), Vector2(85.0, 40.0))
+		. leaned(-6.0, -6.0)
+	)
+	# ...сзади — почуял и оборачивается: голова через плечо, плечи следом.
+	table["look_back"] = (
+		Pose
+		. make(Vector2(6.0, -6.0), Vector2(15.0, 25.0))
+		. bent_at(Vector2(12.0, 10.0), Vector2(30.0, 35.0))
+		. leaned(-2.0, -8.0)
+		. twisted(-70.0)
+	)
 	# Напрыгнувший сверху добивает: присел над поверженным, бьёт вниз.
 	table["pounce_strike"] = (
 		Pose

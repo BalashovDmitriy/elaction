@@ -132,6 +132,7 @@ func _hang(prop: BuildingDressing.PropSpot) -> void:
 func _plate_the_doors(plan: BuildingPlan, identity: BuildingIdentity) -> void:
 	var counted := {}
 	var metal := GreyboxLook.metal(PLATE_HOTEL if identity.is_hotel() else PLATE_OFFICE)
+	var style := BuildingStyle.of(identity)
 	var doors := plan.doors.duplicate()
 	doors.sort_custom(
 		func(a: BuildingPlan.DoorSpot, b: BuildingPlan.DoorSpot) -> bool: return a.x < b.x
@@ -141,14 +142,23 @@ func _plate_the_doors(plan: BuildingPlan, identity: BuildingIdentity) -> void:
 		counted[door.floor_index] = int(counted.get(door.floor_index, 0)) + 1
 		var x := door.x + Door.LEAF_SIZE.x * 0.5 + PLATE_GAP
 		var y := _rules.floor_surface(door.floor_index) - PLATE_RISE
-		var plate := GreyboxLook.box(PLATE, metal)
+		var room := "%d%02d" % [number, counted[door.floor_index]]
+		# У офиса табличка шире: отдел над номером кабинета (ADR-0048).
+		var size := PLATE
+		var text := room
+		if style.departments:
+			var names := BuildingStyle.DEPARTMENTS
+			text = "%s\n%s" % [names[hash([number, room]) % names.size()], room]
+			size = Vector3(PLATE.x * 2.2, PLATE.y * 1.6, PLATE.z)
+			x += (size.x - PLATE.x) * 0.5
+		var plate := GreyboxLook.box(size, metal)
 		plate.position = WorldSpace.to_scene(Vector2(x, y))
 		plate.position.z = PLATE_Z + PLATE.z * 0.5
 		add_child(plate)
 		var label := Label3D.new()
-		label.text = "%d%02d" % [number, counted[door.floor_index]]
+		label.text = text
 		label.font = NeonStyle.font(700)
-		label.font_size = 32
+		label.font_size = 24 if style.departments else 32
 		label.pixel_size = 0.0022
 		label.modulate = PLATE_INK
 		label.outline_size = 0

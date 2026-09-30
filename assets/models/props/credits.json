@@ -262,5 +262,89 @@
   "author": "J-Toastie",
   "licence": "CC-BY 3.0",
   "url": "https://poly.pizza/m/GEB4pWBI8l"
+ },
+ "bed_hotel": {
+  "title": "Bed",
+  "author": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/rXo5Rkl5LC"
+ },
+ "bed_double": {
+  "title": "Bed Double",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/BuRay4fVFr"
+ },
+ "night_stand": {
+  "title": "Night Stand",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/A9vPgVUrF9"
+ },
+ "night_stand_b": {
+  "title": "Night Stand",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/9LI73c5uFA"
+ },
+ "curtains": {
+  "title": "Curtains Double",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/kkeII96j9N"
+ },
+ "rug": {
+  "title": "Rug",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/7H5qKjuxVY"
+ },
+ "desk": {
+  "title": "Desk",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/V86Go2rlnq"
+ },
+ "office_chair": {
+  "title": "Office Chair",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/UfKvrZBK6C"
+ },
+ "workstation_a": {
+  "title": "Desk",
+  "author": "dook",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/ISpMh81QGq"
+ },
+ "workstation_b": {
+  "title": "Desk",
+  "author": "dook",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/EtJlOllzbf"
+ },
+ "bench_hotel": {
+  "title": "Bench",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/jLxjFxFRpw"
+ },
+ "wet_floor_sign": {
+  "title": "Sign",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/4MSsNFk5fc"
+ },
+ "lounge_chair": {
+  "title": "Chair",
+  "author": "CMHT Oculus",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/aVo4dG09vfD"
+ },
+ "light_stand": {
+  "title": "Light Stand",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/9L6lLUl9sD"
  }
 }

@@ -8,12 +8,6 @@
      "licences": [
       "CC0 1.0"
      ]
-    },
-    {
-     "name": "kazuma",
-     "licences": [
-      "CC0 1.0"
-     ]
     }
    ]
   },
@@ -64,6 +58,12 @@
     },
     {
      "name": "dook",
+     "licences": [
+      "CC-BY 3.0"
+     ]
+    },
+    {
+     "name": "CMHT Oculus",
      "licences": [
       "CC-BY 3.0"
      ]

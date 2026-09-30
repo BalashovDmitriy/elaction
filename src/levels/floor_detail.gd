@@ -24,9 +24,6 @@ const JOINT_STEP: float = 0.9
 const JOINT_WIDTH: float = 0.02
 const JOINT_FROM: float = BuildingRibs.SKIRTING_HEIGHT + BuildingRibs.RAIL_HEIGHT
 
-## Карниз под потолком: высота и вынос от стены.
-const CROWN := Vector2(0.12, 0.1)
-
 const RUNNER_COLOR := Color(0.26, 0.08, 0.09)
 const RUNNER_EDGE_COLOR := Color(0.62, 0.5, 0.26)
 const SEAM_COLOR := Color(0.09, 0.09, 0.1)
@@ -35,12 +32,17 @@ const JOINT_COLOR := Color(0.07, 0.08, 0.09)
 var _rules: BuildingRules = null
 var _plan: BuildingPlan = null
 var _parts: Dictionary = {}
+## Вид по типу здания (ADR-0048): дорожка у отеля, плитка у офиса, карниз.
+var _style := BuildingStyle.new()
 
 
-## Собирает детали всех этажей, кроме гаража.
-func build(rules: BuildingRules, plan: BuildingPlan) -> void:
+## Собирает детали всех этажей, кроме гаража. [param style] — вид по типу
+## здания; без него — отель, как до M24i.
+func build(rules: BuildingRules, plan: BuildingPlan, style: BuildingStyle = null) -> void:
 	_rules = rules
 	_plan = plan
+	if style != null:
+		_style = style
 	for index in rules.floors - 1:
 		_dress_floor(index)
 	# Дорожка — в тон кладки раунда: ещё одна метка, какой идёт раунд (ADR-0031).
@@ -48,9 +50,11 @@ func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 		"runner", GreyboxLook.surface(RUNNER_COLOR.lerp(rules.palette.masonry.darkened(0.55), 0.6))
 	)
 	_commit("edge", GreyboxLook.surface(RUNNER_EDGE_COLOR))
+	_commit("carpet", GreyboxLook.surface(_style.tile_color))
+	_commit("tile_seam", GreyboxLook.surface(_style.tile_color.darkened(0.35)))
 	_commit("seam", GreyboxLook.surface(SEAM_COLOR))
 	_commit("joint", GreyboxLook.surface(JOINT_COLOR))
-	_commit("crown", GreyboxLook.metal(GreyboxLook.TRIM.darkened(0.4)), true)
+	_commit("crown", GreyboxLook.metal(_style.crown_color), true)
 
 
 func _dress_floor(index: int) -> void:
@@ -66,6 +70,9 @@ func _dress_floor(index: int) -> void:
 			continue
 		var middle := (span.x + span.y) * 0.5
 		var top := surface - RUNNER.y * 0.5
+		if not _style.runner:
+			_carpet_tiles(span, surface)
+			continue
 		_add("runner", Vector3(length, RUNNER.y, RUNNER.x), Vector3(middle, top, RUNNER_Z))
 		for side: float in [-1.0, 1.0]:
 			var edge_z := RUNNER_Z + side * (RUNNER.x * 0.5 - RUNNER_EDGE * 0.5)
@@ -82,7 +89,7 @@ func _dress_floor(index: int) -> void:
 			)
 	var story_top := _rules.story_top(index)
 	var wall_height := surface - story_top
-	var joint_height := wall_height - JOINT_FROM - CROWN.x
+	var joint_height := wall_height - JOINT_FROM - _style.crown.x
 	var wall_z := WorldSpace.BACK_WALL_Z + 0.004
 	var joints := int((inner.y - inner.x) / JOINT_STEP)
 	for joint in joints:
@@ -92,17 +99,37 @@ func _dress_floor(index: int) -> void:
 		_add(
 			"joint",
 			Vector3(JOINT_WIDTH, joint_height, 0.008),
-			Vector3(x, story_top + CROWN.x + joint_height * 0.5, wall_z)
+			Vector3(x, story_top + _style.crown.x + joint_height * 0.5, wall_z)
 		)
+	var crown := _style.crown
 	_add(
 		"crown",
-		Vector3(inner.y - inner.x, CROWN.x, CROWN.y),
+		Vector3(inner.y - inner.x, crown.x, crown.y),
 		Vector3(
 			(inner.x + inner.y) * 0.5,
-			story_top + CROWN.x * 0.5,
-			WorldSpace.BACK_WALL_Z + CROWN.y * 0.5
+			story_top + crown.x * 0.5,
+			WorldSpace.BACK_WALL_Z + crown.y * 0.5
 		)
 	)
+
+
+## Ковровая плитка офиса во весь пол коридора с сеткой швов (ADR-0048).
+func _carpet_tiles(span: Vector2, surface: float) -> void:
+	var length := span.y - span.x
+	var middle := (span.x + span.y) * 0.5
+	var depth := WorldSpace.CORRIDOR_DEPTH
+	_add("carpet", Vector3(length, RUNNER.y, depth), Vector3(middle, surface - RUNNER.y * 0.5, 0.0))
+	var step := _style.tile_step
+	for across in int(length / step):
+		var x := span.x + step * (float(across) + 1.0)
+		_add("tile_seam", Vector3(SEAM, 0.004, depth), Vector3(x, surface - RUNNER.y - 0.001, 0.0))
+	for row in int(depth / step):
+		var z := -depth * 0.5 + step * (float(row) + 1.0)
+		_add(
+			"tile_seam",
+			Vector3(length, 0.004, SEAM),
+			Vector3(middle, surface - RUNNER.y - 0.001, z)
+		)
 
 
 ## Стоит ли точка стены в проёме двери или в портале шахты: стыку там не место.

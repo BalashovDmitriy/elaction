@@ -62,6 +62,11 @@ const CANOPY := Vector2(0.08, 0.05)
 const SHADE_COLOR := Color(0.42, 0.4, 0.36)
 ## Чаша рассеивателя под абажуром: радиус и глубина, м.
 const BOWL := Vector2(0.27, 0.13)
+## Офисный светильник (ADR-0048): короб лампы дневного света и рассеиватель
+## под ним, м. Шире абажура не выходит — в ширину формы лампы: мишень та же.
+const PANEL_BOX := Vector3(0.6, 0.1, 0.34)
+const PANEL_DIFFUSER := Vector3(0.56, 0.05, 0.38)
+const PANEL_COLOR := Color(0.82, 0.84, 0.86)
 
 @export var fall_speed: float = 7.8
 
@@ -73,6 +78,9 @@ const BOWL := Vector2(0.27, 0.13)
 ## этаж, на метрах на другой. Под потолком она ближе к полу этажа выше, чем
 ## к своему, и вывод из координаты ошибался бы уже всегда.
 var floor_index: int = 0
+## Вид светильника по типу здания: плафон отеля или короб офиса. Ставит
+## уровень до добавления в дерево ([BuildingStyle]).
+var fixture: BuildingStyle.Fixture = BuildingStyle.Fixture.PENDANT
 
 var _fall := LampFall.new()
 var _spot: SpotLight3D = null
@@ -234,6 +242,9 @@ func _dress_fixture() -> void:
 	_visual.transparency = 1.0
 	_visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var box := _shape.shape as BoxShape3D
+	if fixture == BuildingStyle.Fixture.PANEL:
+		_dress_panel(box)
+		return
 	var shade := _cylinder(SHADE.x, SHADE.z, GreyboxLook.metal(SHADE_COLOR), SHADE.y)
 	shade.position = Vector3(0.0, box.size.y * 0.5 - SHADE.z * 0.5, 0.0)
 	# Светильник не отбрасывает тени: источник сидит внутри него, и абажур с
@@ -252,6 +263,33 @@ func _dress_fixture() -> void:
 	_diffuser.rotation.x = PI
 	_diffuser.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_diffuser.position = Vector3(0.0, box.size.y * 0.5 - SHADE.z, 0.0)
+	add_child(_diffuser)
+
+
+## Офисный светильник: белый короб под шнуром и светящийся рассеиватель под
+## ним — видно сбоку полосой.
+func _dress_panel(box: BoxShape3D) -> void:
+	# Короб — посередине формы лампы на двух штангах: лампа — цель, и под
+	# потолком плоский короб читался полоской (кадры M24i).
+	var top := PANEL_BOX.y * 0.5
+	# Короб матовый: металл отражал тёмный коридор, и спереди светильник
+	# читался чёрным квадратом.
+	var metal := GreyboxLook.surface(PANEL_COLOR)
+	for side: float in [-1.0, 1.0]:
+		var rod := GreyboxLook.box(Vector3(0.015, box.size.y * 0.5 - top, 0.015), metal)
+		rod.position = Vector3(side * PANEL_BOX.x * 0.38, (box.size.y * 0.5 + top) * 0.5, 0.0)
+		add_child(rod)
+	var housing := GreyboxLook.box(PANEL_BOX, metal)
+	housing.position = Vector3(0.0, 0.0, 0.0)
+	housing.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(housing)
+	var slab := BoxMesh.new()
+	slab.size = PANEL_DIFFUSER
+	_diffuser = MeshInstance3D.new()
+	_diffuser.mesh = slab
+	_diffuser.material_override = GreyboxLook.marker(GreyboxLook.LAMP)
+	_diffuser.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_diffuser.position = Vector3(0.0, top - PANEL_BOX.y - PANEL_DIFFUSER.y * 0.5, 0.0)
 	add_child(_diffuser)
 
 

@@ -11,7 +11,9 @@ extends RefCounted
 ## колёсами на земле, длина — [constant Proportions.CAR_LENGTH], глубина —
 ## сколько влезает между задней стеной и телом Otto. Кузов у каждой — материал
 ## `Paint` (у двухцветной ещё `PaintShade`), его и перекрашивает жребий. Фары и
-## стоп-сигналы светятся эмиссией — источников машина не добавляет.
+## стоп-сигналы светятся эмиссией — источников машина не добавляет. С M24i у
+## каждой — проём водительской двери, дверь `DriverDoor` на петле, салон
+## `CarInterior`, точка плафона `DomeLight` и поворотники (ADR-0046, решение 1).
 
 ## Длина по бамперам, м — та же, по которой [ExitCar] ставит машину у выхода.
 const LENGTH: float = Proportions.CAR_LENGTH
@@ -44,6 +46,7 @@ const SHADE: float = 0.55
 
 const HEADLIGHT := Color(1.0, 0.95, 0.8)
 const TAILLIGHT := Color(1.0, 0.1, 0.08)
+const INDICATOR_GLASS := Color(0.55, 0.3, 0.05)
 
 ## Соль жребия машины: своя, чтобы машина не ходила в ногу с раскладкой.
 const SALT: int = 0x0CA2_5EED
@@ -140,4 +143,8 @@ static func _material_for(name: String, paint: Color) -> StandardMaterial3D:
 			return GreyboxLook.light(HEADLIGHT)
 		"TailLights":
 			return GreyboxLook.light(TAILLIGHT)
+		# Поворотники без огня — янтарный пластик; мигает только правый у машины
+		# Otto, своим материалом ([ExitCar]).
+		"IndicatorLeft", "IndicatorRight":
+			return GreyboxLook.polished(INDICATOR_GLASS)
 	return null

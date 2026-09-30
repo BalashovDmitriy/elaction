@@ -367,6 +367,24 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "landing", "actions": [], "hold": 0.4},
 		{"label": "walking_on", "actions": ["move_right"], "hold": 1.0},
 	],
+	# M24i: вид. Маршрут M24h: вертолёт и трос, крыша, кабина, коридор с
+	# отделкой по типу здания. Машины с салоном — tools/car_shot.tscn, посадка
+	# и выезд на всех моделях — tools/m24b_shot.tscn -- --building=N
+	# --only=exit, комнаты за дверью — tools/room_shot.tscn, добивания —
+	# tools/takedown_shot.tscn, этажи отеля и офиса — tools/layout_shot.tscn --
+	# --floor-only --building=N.
+	"M24I":
+	[
+		{"label": "rope", "actions": [], "hold": 0.4},
+		{"label": "roof", "actions": [], "hold": 1.2},
+		{"label": "roof_walk", "actions": ["move_right"], "hold": 2.5},
+		{"label": "to_the_shaft", "actions": ["move_right"], "hold": 2.9},
+		{"label": "riding_down", "actions": ["move_down"], "hold": 1.4},
+		{"label": "stopped", "actions": [], "hold": 1.6},
+		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
+		{"label": "floor", "actions": [], "hold": 0.6},
+		{"label": "walking_on", "actions": ["move_right"], "hold": 1.6},
+	],
 	"M19":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},

@@ -19,7 +19,6 @@
 | Ultimate Modular Men Pack (Otto, агенты) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/ultimatemodularcharacters.html) |
 | Cars Pack (машины у выхода) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/cars.html) |
 | Universal Animation Library (движение Otto и агентов) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/universalanimationlibrary.html) |
-| Helicopter (вертолёт вступления, `assets/models/aircraft/helicopter.glb`) | kazuma | CC0 1.0 | [poly.pizza](https://poly.pizza/m/EQJ2MECUbx) |
 
 ## Обстановка и крыша
 
@@ -33,6 +32,9 @@
 | `antenna` | Antenna | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/OuHQCigiUR) |
 | `antenna_small` | Antenna | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/l5Oc9swvKk) |
 | `armchair` | Armchair | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/myd1WSucAz) |
+| `bed_double` | Bed Double | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/BuRay4fVFr) |
+| `bed_hotel` | Bed | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/rXo5Rkl5LC) |
+| `bench_hotel` | Bench | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/jLxjFxFRpw) |
 | `bins` | Bins | Dilan Shah | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/75lHRN19gMY) |
 | `bookshelf` | Bookshelf | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/30Iealxb0p) |
 | `cabinet` | Cabinet | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/wOiMrnUuhe) |
@@ -42,6 +44,8 @@
 | `copier` | Office Printer / Copier | Bruno Oliveira | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/bgNnmejxBa-) |
 | `corkboard` | Wall Corkboard | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/U8yQZ9l0HZ) |
 | `couch_medium` | Couch Medium | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/fFfoi1LNKY) |
+| `curtains` | Curtains Double | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/kkeII96j9N) |
+| `desk` | Desk | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/V86Go2rlnq) |
 | `dresser` | Dresser | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/Ud8QR8Ku9e) |
 | `end_table` | End Table | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/8gAkbKs1ii) |
 | `file_cabinet` | File Cabinet | J-Toastie | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/9732ObD3OY) |
@@ -52,11 +56,17 @@
 | `houseplant_a` | Houseplant | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/Kr4kr7OCCQ) |
 | `houseplant_b` | Houseplant | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/bfLOqIV5uP) |
 | `houseplant_c` | Houseplant | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/dveIJ0xNpX) |
+| `light_stand` | Light Stand | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/9L6lLUl9sD) |
+| `lounge_chair` | Chair | CMHT Oculus | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/aVo4dG09vfD) |
 | `message_board` | Message board | Poly by Google | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/fDpegPgEB0j) |
+| `night_stand` | Night Stand | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/A9vPgVUrF9) |
+| `night_stand_b` | Night Stand | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/9LI73c5uFA) |
+| `office_chair` | Office Chair | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/UfKvrZBK6C) |
 | `painting` | Painting | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/Pi6oReAizt) |
 | `potted_plant` | Potted Plant | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/GJ3Bm5FDE4) |
 | `roof_antenna` | Roof Antenna | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/Fbdg52kqJ6) |
 | `roof_exit` | Roof Exit | J-Toastie | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/GEB4pWBI8l) |
+| `rug` | Rug | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/7H5qKjuxVY) |
 | `satellite_dish` | Satellite Dish | Kenney | CC0 1.0 | [poly.pizza](https://poly.pizza/m/IDRrztoAMB) |
 | `solar_panel` | Solar Panel Structure | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/snXloZEimW) |
 | `table_lamp` | Table Lamp | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/9Mo3JruPHY) |
@@ -70,7 +80,10 @@
 | `water_cooler` | Water Cooler | J-Toastie | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/zWi9p5FSxD) |
 | `water_tank` | Water Tank | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/XVB8vUbnZb) |
 | `water_tower` | Water Tower | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/tMK8bhapAK) |
+| `wet_floor_sign` | Sign | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/4MSsNFk5fc) |
 | `whiteboard` | Whiteboard | jeremy | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/cYQOKE7Wd7D) |
+| `workstation_a` | Desk | dook | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/ISpMh81QGq) |
+| `workstation_b` | Desk | dook | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/EtJlOllzbf) |
 
 ## Фактуры
 

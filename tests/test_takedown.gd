@@ -185,8 +185,32 @@ func test_shooting_close_up_takes_the_agent_down_from_the_front() -> void:
 	if director == null:
 		return
 	assert_eq(director.scene().side, Takedown.Side.FRONT, "агент лицом к Otto — спереди")
-	assert_almost_eq(Engine.time_scale, TakedownScene.SLOW, 0.001, "мир замедлен")
+	# Замедление неровное (ADR-0050): заход быстрее, к удару — [constant
+	# TakedownScene.SLOW], на ударе — стоп-кадр.
+	assert_between(
+		Engine.time_scale,
+		TakedownScene.SLOW - 0.001,
+		TakedownScene.APPROACH + 0.001,
+		"мир замедлен"
+	)
 	assert_true(otto.takedown != null, "Otto в сценке")
+	var froze := false
+	for _frame: int in 600:
+		await wait_physics_frames(1)
+		if not is_instance_valid(director):
+			break
+		if director.is_frozen():
+			froze = froze or Engine.time_scale < TakedownScene.SLOW * 0.5
+		if director.killed() and not director.is_frozen():
+			break
+	assert_true(froze, "на ударе — стоп-кадр: мир почти встал")
+	assert_true(agent.is_dead(), "агент погиб на ударе")
+	assert_false(agent.held, "погибший отпущен — падает рэгдоллом, а не позой")
+	var hat := agent.figure.find_child("hat", true, false) as MeshInstance3D
+	assert_not_null(hat, "у агента шляпа — своим мешем")
+	if hat != null:
+		assert_false(hat.visible, "шляпа слетела с головы")
+	assert_not_null(agent.get_parent().find_child("Hat", false, false), "и улетела телом")
 	await _wait_for_the_end(agent)
 	assert_eq(GameState.instance().score - before, 200, "спереди — 200")
 	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "мир снова в своём темпе")
@@ -349,3 +373,28 @@ func test_a_freed_agent_ends_the_scene_quietly() -> void:
 	assert_null(_director(), "сценка снята")
 	assert_null(otto.takedown, "Otto отпущен")
 	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "мир в своём темпе")
+
+
+## Толчок камеры на ударе (ADR-0050): кадр сдвинут и накренён, а за
+## [constant SideCamera.KICK_FADE] настоящего времени встаёт на место.
+func test_the_camera_kicks_on_the_blow_and_settles() -> void:
+	var target := Node3D.new()
+	add_child_autofree(target)
+	var camera := SideCamera.new()
+	add_child_autofree(camera)
+	camera.follow(target)
+	await get_tree().process_frame
+	var calm := camera.global_position
+	camera.kick(1.0)
+	var moved := false
+	var rolled := false
+	for _frame: int in 6:
+		await get_tree().process_frame
+		moved = moved or not camera.global_position.is_equal_approx(calm)
+		rolled = rolled or not is_zero_approx(camera.rotation.z)
+	assert_true(moved and rolled, "кадр толкнуло и накренило")
+	await get_tree().create_timer(SideCamera.KICK_FADE + 0.1, true, false, true).timeout
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert_false(camera.is_kicked(), "толчок погас")
+	assert_almost_eq(camera.rotation.z, 0.0, 0.0001, "крен снят")

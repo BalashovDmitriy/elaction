@@ -44,6 +44,16 @@ const CLOSE_UP_SIZE: float = 0.38
 const ACTOR_FILL_COLOR := Color(0.62, 0.7, 0.95)
 const ACTOR_FILL_ENERGY: float = 0.35
 
+## Толчок камеры на ударе добивания (ADR-0050): сдвиг кадра, м, крен, рад, и
+## добавочный наезд — доля размера кадра — при толчке в полную силу; за сколько
+## секунд настоящего времени он гаснет и как часто дрожит, Гц. Время — не мира:
+## мир на ударе почти стоит, а толчок должен пройти.
+const KICK_SHIFT: float = 0.09
+const KICK_ROLL: float = 0.04
+const KICK_ZOOM: float = 0.12
+const KICK_FADE: float = 0.45
+const KICK_RATE: float = 19.0
+
 ## Скорость сглаживания. Число то же, что стояло у [Camera2D] в 2D-сцене.
 @export var smoothing_speed: float = 8.0
 
@@ -65,6 +75,9 @@ var _listener: AudioListener3D = null
 ## Крупный план: насколько наехали, 0–1, и на что. Ведёт его режиссёр сценки.
 var _close: float = 0.0
 var _close_point := Vector2.ZERO
+## Сила толчка, 0–1, и когда он начался, мс настоящего времени.
+var _kick: float = 0.0
+var _kick_ticks: int = 0
 
 
 func _ready() -> void:
@@ -98,6 +111,38 @@ func _process(delta: float) -> void:
 	else:
 		_centre = CameraBounds.smoothed(_centre, wanted, smoothing_speed, delta)
 	global_position = _perch(_centre)
+	_shake()
+
+
+## Толкает кадр: сдвиг, крен и добавочный наезд, гаснущие за [constant
+## KICK_FADE] с настоящего времени. [param strength] — 0–1.
+func kick(strength: float) -> void:
+	_kick = clampf(strength, 0.0, 1.0)
+	_kick_ticks = Time.get_ticks_msec()
+
+
+## Идёт ли толчок. Тестам.
+func is_kicked() -> bool:
+	return _kick > 0.0
+
+
+func _shake() -> void:
+	if _kick <= 0.0:
+		return
+	var age := (Time.get_ticks_msec() - _kick_ticks) / 1000.0
+	var left := 1.0 - age / KICK_FADE
+	if left <= 0.0:
+		_kick = 0.0
+		rotation = Vector3(-_tilt(), 0.0, 0.0)
+		close_up(_close, _close_point)
+		return
+	var force := _kick * left * left
+	var wave := age * KICK_RATE * TAU
+	global_position += (
+		Vector3(sin(wave) * KICK_SHIFT, cos(wave * 1.3) * KICK_SHIFT * 0.6, 0.0) * force
+	)
+	rotation = Vector3(-_tilt(), 0.0, sin(wave * 0.7) * KICK_ROLL * force)
+	size = DEFAULT_HALF_HEIGHT * 2.0 * lerpf(1.0, CLOSE_UP_SIZE, _close) * (1.0 - KICK_ZOOM * force)
 
 
 ## Свет камеры на фигуры: слабый, по оси взгляда, только на слой фигур

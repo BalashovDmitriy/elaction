@@ -69,7 +69,7 @@ func build(
 	var details := FloorDetail.new()
 	details.name = "FloorDetail"
 	add_child(details)
-	details.build(rules, plan)
+	details.build(rules, plan, BuildingStyle.of(identity))
 
 	dressing = BuildingDressing.lay(rules, plan, building_seed, identity)
 	var props := BuildingProps.new()

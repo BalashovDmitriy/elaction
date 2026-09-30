@@ -8,10 +8,12 @@ extends Node3D
 ## уходит вправо и вверх, а за кадром убирает себя сам. Когда что делать, решает
 ## [RoofArrival]; вертолёт умеет только лететь, висеть и опускать трос.
 ##
-## Модель — Helicopter, kazuma, CC0 (poly.pizza): один меш из четырёх
-## поверхностей, и четвёртая — несущий винт. Он вынимается в свой меш и крутится
-## кодом. Нуль узла — под осью винта на уровне полозьев, в середине корпуса по
-## глубине: так «зависнуть над точкой» — это просто поставить узел в неё.
+## Модель с M24i своя (ADR-0049, `tools/build_helicopter.py`): корпус с
+## остеклением и откаченной дверью, полозья, киль, несущий и хвостовой винты
+## отдельными узлами `MainRotor` и `TailRotor` и пустышки огней, прожектора,
+## света кабины и лебёдки. Нуль узла — под осью винта на уровне полозьев, в
+## середине корпуса по глубине: так «зависнуть над точкой» — это просто
+## поставить узел в неё.
 
 enum Phase { ARRIVING, HOVERING, LEAVING }
 
@@ -21,29 +23,36 @@ const MODEL := preload("res://assets/models/aircraft/helicopter.glb")
 ## небольшим; модель приводится к ней одним масштабом.
 const LENGTH: float = 8.6
 
-## Какая поверхность меша — несущий винт и куда у модели смотрит нос: в сторону
-## +Y меша — 1, в сторону −Y — −1 (модель экспортирована осью Z вверх, и длина
-## идёт по Y меша).
-const ROTOR_SURFACE: int = 3
-const NOSE_MESH_Y: float = -1.0
-
-## Окраска. У модели корпус почти чёрный, и ночью над крышей от вертолёта
-## оставались одни огни: корпус перекрашен в тёмный металлик, который ловит
-## неон и огни города. Остекление светится изнутри приборами — так кабину видно
-## в темноте, и вертолёт читается машиной с людьми, а не силуэтом.
-const HULL_SURFACE: int = 0
-const GLASS_SURFACE: int = 2
+## Окраска. Корпус — тёмный металлик, который ловит неон и огни города;
+## остекление светится изнутри приборами — так кабину видно в темноте, и
+## вертолёт читается машиной с людьми, а не силуэтом; проём двери — тёплым
+## светом кабины.
 const HULL_COLOR := Color(0.34, 0.37, 0.44)
 const GLASS_COLOR := Color(0.05, 0.07, 0.09)
-const GLASS_GLOW := Color(0.45, 0.7, 0.75)
-const GLASS_GLOW_ENERGY: float = 0.3
+const GLASS_GLOW := Color(0.3, 0.46, 0.52)
+const GLASS_GLOW_ENERGY: float = 0.08
+const CABIN_GLOW := Color(1.0, 0.72, 0.42)
 const ROTOR_COLOR := Color(0.5, 0.5, 0.52)
-
-## Насколько винт в кадре шире модели. У модели он короче корпуса вдвое, а у
-## настоящего лёгкого вертолёта диск почти в длину фюзеляжа: так силуэт читается
-## вертолётом, а не игрушкой.
-const ROTOR_SPREAD: float = 1.45
-
+const CABIN_GLOW_ENERGY: float = 0.25
+## Диск размытия под лопастями: винт на оборотах — не четыре палки, а круг, по
+## которому бегут лопасти. Доля непрозрачности у кончиков и у оси.
+const BLUR_ALPHA: float = 0.22
+const BLUR_SHADER := """
+shader_type spatial;
+render_mode unshaded, blend_mix, depth_draw_never, cull_disabled, shadows_disabled;
+uniform vec4 tint : source_color;
+uniform float blades = 4.0;
+void fragment() {
+	vec2 p = (UV - vec2(0.5)) * 2.0;
+	float r = length(p);
+	float streak = 0.55 + 0.45 * cos(atan(p.y, p.x) * blades);
+	float ring = smoothstep(0.12, 0.3, r) * (1.0 - smoothstep(0.92, 1.0, r));
+	ALBEDO = tint.rgb;
+	ALPHA = tint.a * ring * streak * (0.4 + 0.6 * r);
+}
+"""
+## Хвостовой винт крутится быстрее несущего, как у настоящего.
+const TAIL_ROTOR_SPEED: float = 48.0
 ## Обороты винта, рад/с. Не настоящие — на них винт стоял бы строботом на
 ## частоте кадра, — а такие, чтобы лопасти читались движением.
 const ROTOR_SPEED: float = 21.0
@@ -155,6 +164,8 @@ const VOLUME_EASE: float = 4.0
 ## Ободок — один на все вертолёты: шейдер компилируется раз за запуск, а не на
 ## каждое здание, когда вертолёт влетает в кадр.
 static var _rim_material: ShaderMaterial = null
+## Шейдер диска размытия винтов, тоже один за запуск ([method _blur_shader]).
+static var _blur_code: Shader = null
 
 var _phase: Phase = Phase.ARRIVING
 var _time: float = 0.0
@@ -169,7 +180,10 @@ var _leave_in: float = 0.0
 var _leaving_set: bool = false
 
 var _body: Node3D = null
-var _rotor: MeshInstance3D = null
+var _rotor: Node3D = null
+var _tail_rotor: Node3D = null
+## Точки модели: огни, прожектор, свет кабины, лебёдка — в координатах узла.
+var _marks: Dictionary = {}
 var _hook := Vector3.ZERO
 var _rope: MeshInstance3D = null
 var _rope_length: float = 0.0
@@ -334,7 +348,9 @@ func _physics_process(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	if _rotor != null:
-		_rotor.rotate_object_local(Vector3.FORWARD, ROTOR_SPEED * delta)
+		_rotor.rotate_object_local(Vector3.UP, ROTOR_SPEED * delta)
+	if _tail_rotor != null:
+		_tail_rotor.rotate_object_local(Vector3.BACK, TAIL_ROTOR_SPEED * delta)
 
 
 ## Прилёт по кривой [method _arrival_progress]: на входе скорость крейсерская,
@@ -445,76 +461,109 @@ func _mix_engine(delta: float) -> void:
 	_pass.volume_db = maxf(PASS_DB + linear_to_db(maxf(_motion, 0.0001)), SILENT_DB)
 
 
-## Собирает вид: корпус, винт отдельным мешем, лебёдку с тросом, огни и прожектор.
+## Собирает вид: модель с перекрашенным корпусом, винты с дисками размытия,
+## лебёдку с тросом, огни и прожектор по точкам модели.
 func _dress() -> void:
 	var model := MODEL.instantiate() as Node3D
 	_body.add_child(model)
-	var hull := model.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D
-	var source := hull.mesh
-	# Ось винта — середина его вершин, а не габарита: лопастей три, и габарит
-	# у них несимметричный — вокруг его середины винт ходил бы восьмёркой.
-	var rotor_box := _surface_box(source, ROTOR_SURFACE)
-	var middle := _surface_middle(source, ROTOR_SURFACE)
-	var hub := Vector3(middle.x, middle.y, rotor_box.position.z)
+	for node: Node in model.find_children("*", "MeshInstance3D", true, false):
+		_repaint(node as MeshInstance3D)
+	_rotor = model.find_child("MainRotor", true, false) as Node3D
+	_tail_rotor = model.find_child("TailRotor", true, false) as Node3D
+	# Длина — по корпусу: модель собрана в метрах, но переснятая с другой длиной
+	# не разойдётся с игрой.
+	var hull := _parts_box(model, ["Hull", "Skids"])
+	var fit := LENGTH / maxf(hull.size.x, 0.001)
+	model.scale = Vector3.ONE * fit
+	hull = _parts_box(model, ["Hull", "Skids"])
+	for mark: String in [
+		"NavGreen", "BeaconTop", "BeaconBelly", "Strobe", "Searchlight", "CabinLight", "Winch"
+	]:
+		var anchor := model.find_child(mark, true, false) as Node3D
+		_marks[mark] = _chain(_body, anchor).origin if anchor != null else hull.get_center()
+	_blur(_rotor, 4.0, false)
+	_blur(_tail_rotor, 2.0, true)
+	_hang_winch(hull)
+	_hang_lights()
+	_measure(hull, model)
 
-	var body_mesh := ArrayMesh.new()
-	for index: int in source.get_surface_count():
-		if index != ROTOR_SURFACE:
-			_copy_surface(source, index, body_mesh, Vector3.ZERO, _paint(index, source))
-	hull.mesh = body_mesh
 
-	var rotor_mesh := ArrayMesh.new()
-	_copy_surface(source, ROTOR_SURFACE, rotor_mesh, hub, _paint(ROTOR_SURFACE, source))
-	_rotor = MeshInstance3D.new()
-	_rotor.name = "Rotor"
-	_rotor.mesh = rotor_mesh
-	_rotor.position = hub
-	_rotor.scale = Vector3(ROTOR_SPREAD, ROTOR_SPREAD, 1.0)
-	hull.add_child(_rotor)
-
-	# Масштаб и место — по габариту корпуса без винта: нос в +X, ось винта над
-	# нулём, полозья на нуле, середина по глубине на нуле.
-	var to_model := _chain(model, hull)
-	var box := to_model * _surface_box(source, 0)
-	var turn := Basis(Vector3.UP, -PI * 0.5 * NOSE_MESH_Y)
-	var length := maxf(box.size.x, box.size.z)
-	var fit := LENGTH / maxf(length, 0.001)
-	model.basis = turn.scaled(Vector3.ONE * fit)
-	var placed := _chain(_body, hull)
-	var hull_box := placed * _surface_box(source, 0)
-	var hub_at := placed * hub
-	model.position = -Vector3(hub_at.x, hull_box.position.y, hull_box.get_center().z)
-	placed = _chain(_body, hull)
-	hull_box = placed * _surface_box(source, 0)
-	_hang_winch(hull_box)
-	_hang_lights(hull_box)
-	_measure(hull_box, placed, source, hub)
+## Габарит частей [param names] модели в координатах узла.
+func _parts_box(model: Node3D, names: Array[String]) -> AABB:
+	var box := AABB()
+	var first := true
+	for part_name: String in names:
+		var part := model.find_child(part_name, true, false) as MeshInstance3D
+		if part == null:
+			continue
+		var placed := _chain(_body, part) * part.mesh.get_aabb()
+		box = placed if first else box.merge(placed)
+		first = false
+	return box
 
 
 ## Габариты для прохода над крышей: корпус со стрелой лебёдки до плоскости игры
-## и диск винта — круг радиусом самой дальней вершины лопасти.
-func _measure(hull: AABB, placed: Transform3D, source: Mesh, hub: Vector3) -> void:
+## и диск винта — круг радиусом конца лопасти.
+func _measure(hull: AABB, model: Node3D) -> void:
 	var near := maxf(hull.end.z, -DEPTH_Z)
 	_hull_local = AABB(hull.position, Vector3(hull.size.x, hull.size.y, near - hull.position.z))
-	var to_rotor := placed * _rotor.transform
-	var centre := placed * hub
-	var radius := 0.0
-	var low := INF
-	var high := -INF
-	var vertices := (
-		source.surface_get_arrays(ROTOR_SURFACE)[Mesh.ARRAY_VERTEX] as PackedVector3Array
-	)
-	for vertex: Vector3 in vertices:
-		var at := to_rotor * (vertex - hub)
-		radius = maxf(radius, Vector2(at.x - centre.x, at.z - centre.z).length())
-		low = minf(low, at.y)
-		high = maxf(high, at.y)
+	var disc := _parts_box(model, ["MainRotor"])
+	var centre := _chain(_body, _rotor).origin if _rotor != null else disc.get_center()
+	var radius := maxf(disc.size.x, disc.size.z) * 0.5
 	_rotor_local = AABB(
-		Vector3(centre.x - radius, low, centre.z - radius),
-		Vector3(radius * 2.0, high - low, radius * 2.0)
+		Vector3(centre.x - radius, disc.position.y, centre.z - radius),
+		Vector3(radius * 2.0, disc.size.y, radius * 2.0)
 	)
 	_hull_reach = _tilted(_hull_local)
 	_rotor_reach = _tilted(_rotor_local)
+
+
+## Перекрашивает части модели по имени материала: корпус, стекло, проём кабины.
+static func _repaint(mesh: MeshInstance3D) -> void:
+	for index: int in mesh.mesh.get_surface_count():
+		var source := mesh.mesh.surface_get_material(index)
+		var wanted := _paint(source.resource_name if source != null else "")
+		if wanted != null:
+			mesh.set_surface_override_material(index, wanted)
+
+
+## Диск размытия под лопастями винта [param rotor]: круг в плоскости вращения,
+## крутится вместе с винтом. [param upright] — плоскость вертикальна, вдоль
+## корпуса (хвостовой винт), иначе горизонтальна (несущий). Плоскость задана
+## явно, а не угадана по габариту: у двухлопастного хвостового винта самая
+## тонкая ось габарита — хорда лопасти, а не ось вращения, и диск ложился
+## плашмя и кувыркался вокруг оси (авторевью M24i).
+func _blur(rotor: Node3D, blades: float, upright: bool) -> void:
+	var mesh := rotor as MeshInstance3D
+	if mesh == null:
+		return
+	var box := mesh.mesh.get_aabb()
+	var radius := maxf(maxf(box.size.x, box.size.z), box.size.y) * 0.5
+	var quad := PlaneMesh.new()
+	quad.size = Vector2.ONE * radius * 2.0
+	var look := ShaderMaterial.new()
+	look.shader = _blur_shader()
+	look.set_shader_parameter(&"tint", Color(ROTOR_COLOR, BLUR_ALPHA))
+	look.set_shader_parameter(&"blades", blades)
+	quad.material = look
+	var disc := MeshInstance3D.new()
+	disc.name = "Blur"
+	disc.mesh = quad
+	disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Плоскость меша — XZ; хвостовому винту она нужна в XY, лицом по оси +Z.
+	if upright:
+		disc.rotation.x = PI * 0.5
+	rotor.add_child(disc)
+
+
+## Шейдер диска размытия — один на все вертолёты, как ободок ([method _rim]):
+## вертолёт прилетает в каждое здание, и новый шейдер собирался бы на каждом.
+static func _blur_shader() -> Shader:
+	if _blur_code != null:
+		return _blur_code
+	_blur_code = Shader.new()
+	_blur_code.code = BLUR_SHADER
+	return _blur_code
 
 
 ## Габарит [param box] при всех наклонах до [constant TILT_MAX]: при малых углах
@@ -529,16 +578,16 @@ static func _tilted(box: AABB) -> AABB:
 ## Стрела лебёдки над дверью: от ближнего борта в плоскость игры. Трос висит с её
 ## конца, и Otto на нём — в плоскости игры, как везде.
 func _hang_winch(hull: AABB) -> void:
-	var door_top := hull.position.y + hull.size.y * 0.62
-	var near_side := hull.end.z
+	var winch: Vector3 = _marks["Winch"]
+	var near_side := minf(winch.z, hull.end.z)
 	var reach := -DEPTH_Z - near_side
 	var arm := GreyboxLook.box(
 		Vector3(0.08, 0.08, reach + 0.1), GreyboxLook.metal(Color(0.3, 0.31, 0.33))
 	)
 	arm.name = "WinchArm"
-	arm.position = Vector3(0.0, door_top, near_side + reach * 0.5)
+	arm.position = Vector3(winch.x, winch.y, near_side + reach * 0.5)
 	_body.add_child(arm)
-	_hook = Vector3(0.0, door_top - 0.06, -DEPTH_Z)
+	_hook = Vector3(winch.x, winch.y - 0.06, -DEPTH_Z)
 
 	var cylinder := CylinderMesh.new()
 	cylinder.top_radius = ROPE_RADIUS
@@ -555,21 +604,15 @@ func _hang_winch(hull: AABB) -> void:
 	add_child(_rope)
 
 
-func _hang_lights(hull: AABB) -> void:
-	var nose := hull.end.x
-	var tail := hull.position.x
-	var roof := hull.position.y + hull.size.y * 0.66
-	var near_side := hull.end.z
-	var green := _light(
-		NAV_GREEN, Vector3(nose * 0.55, hull.position.y + hull.size.y * 0.45, near_side)
-	)
+func _hang_lights() -> void:
+	var green := _light(NAV_GREEN, _marks["NavGreen"])
 	green.name = "NavGreen"
-	var top := _light(BEACON_RED, Vector3(-1.0, roof, 0.0))
+	var top := _light(BEACON_RED, _marks["BeaconTop"])
 	top.name = "BeaconTop"
-	var belly := _light(BEACON_RED, Vector3(0.3, hull.position.y + hull.size.y * 0.3, 0.0))
+	var belly := _light(BEACON_RED, _marks["BeaconBelly"])
 	belly.name = "BeaconBelly"
 	_beacons = [top, belly]
-	_strobe = _light(STROBE_WHITE, Vector3(tail + 0.15, hull.position.y + hull.size.y * 0.6, 0.0))
+	_strobe = _light(STROBE_WHITE, _marks["Strobe"])
 	_strobe.name = "Strobe"
 
 	_search = SpotLight3D.new()
@@ -581,7 +624,7 @@ func _hang_lights(hull: AABB) -> void:
 	_search.shadow_enabled = false
 	# Конус виден в дымке над крышей ([RoofRain]), где она есть.
 	_search.light_volumetric_fog_energy = Graphics.light_in_fog() * 2.0
-	_search.position = Vector3(nose * 0.6, hull.position.y + hull.size.y * 0.25, -DEPTH_Z * 0.5)
+	_search.position = _marks["Searchlight"]
 	# Смотрит вниз и чуть вперёд: пятно ложится туда, куда спускается Otto.
 	_search.rotation = Vector3(-PI * 0.5, 0.0, 0.0)
 	_search.rotate_z(deg_to_rad(12.0))
@@ -595,7 +638,7 @@ func _hang_lights(hull: AABB) -> void:
 	_cabin.light_energy = CABIN_ENERGY
 	_cabin.omni_range = CABIN_RANGE
 	_cabin.shadow_enabled = false
-	_cabin.position = Vector3(0.0, hull.position.y + hull.size.y * 0.45, near_side + 0.35)
+	_cabin.position = _marks["CabinLight"]
 	_body.add_child(_cabin)
 	_show_hover_lights(false)
 
@@ -637,25 +680,18 @@ static func _chain(root: Node3D, leaf: Node3D) -> Transform3D:
 	return xf
 
 
-static func _surface_box(mesh: Mesh, index: int) -> AABB:
-	var vertices := mesh.surface_get_arrays(index)[Mesh.ARRAY_VERTEX] as PackedVector3Array
-	var box := AABB(vertices[0], Vector3.ZERO)
-	for vertex: Vector3 in vertices:
-		box = box.expand(vertex)
-	return box
-
-
-## Материал поверхности: корпус, остекление и винт — свои, полоса — как у модели.
-static func _paint(index: int, source: Mesh) -> Material:
-	match index:
-		HULL_SURFACE:
+## Материал части по имени материала модели: корпус, остекление, проём
+## кабины и винт — свои, остальное — как у модели.
+static func _paint(material_name: String) -> Material:
+	match material_name:
+		"Hull":
 			var hull := StandardMaterial3D.new()
 			hull.albedo_color = HULL_COLOR
 			hull.metallic = 0.55
 			hull.roughness = 0.32
 			hull.next_pass = _rim()
 			return hull
-		GLASS_SURFACE:
+		"Glass":
 			var glass := StandardMaterial3D.new()
 			glass.albedo_color = GLASS_COLOR
 			glass.metallic = 0.2
@@ -664,9 +700,16 @@ static func _paint(index: int, source: Mesh) -> Material:
 			glass.emission = GLASS_GLOW
 			glass.emission_energy_multiplier = GLASS_GLOW_ENERGY
 			return glass
-		ROTOR_SURFACE:
+		"Cabin":
+			var cabin := StandardMaterial3D.new()
+			cabin.albedo_color = CABIN_GLOW.darkened(0.5)
+			cabin.emission_enabled = true
+			cabin.emission = CABIN_GLOW
+			cabin.emission_energy_multiplier = CABIN_GLOW_ENERGY
+			return cabin
+		"Rotor":
 			return GreyboxLook.metal(ROTOR_COLOR)
-	return source.surface_get_material(index)
+	return null
 
 
 ## Второй проход корпуса — холодный ободок по краям силуэта.
@@ -681,26 +724,3 @@ static func _rim() -> ShaderMaterial:
 	_rim_material.set_shader_parameter(&"rim_power", RIM_POWER)
 	_rim_material.set_shader_parameter(&"rim_strength", RIM_STRENGTH)
 	return _rim_material
-
-
-static func _surface_middle(mesh: Mesh, index: int) -> Vector3:
-	var vertices := mesh.surface_get_arrays(index)[Mesh.ARRAY_VERTEX] as PackedVector3Array
-	var sum := Vector3.ZERO
-	for vertex: Vector3 in vertices:
-		sum += vertex
-	return sum / float(maxi(vertices.size(), 1))
-
-
-## Переносит поверхность [param index] в [param into], сдвинув её на
-## [param offset] к нулю: винт крутится вокруг своей оси, а не нуля модели.
-static func _copy_surface(
-	source: Mesh, index: int, into: ArrayMesh, offset: Vector3, material: Material
-) -> void:
-	var arrays := source.surface_get_arrays(index)
-	if offset != Vector3.ZERO:
-		var vertices := arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array
-		for at: int in vertices.size():
-			vertices[at] -= offset
-		arrays[Mesh.ARRAY_VERTEX] = vertices
-	into.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	into.surface_set_material(into.get_surface_count() - 1, material)

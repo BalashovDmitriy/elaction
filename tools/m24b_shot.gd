@@ -52,6 +52,11 @@ var _hud: Hud = null
 var _curtain: FadeCurtain = null
 var _seed: int = 1
 var _folder: String = DEFAULT_FOLDER
+## Номер здания в партии (`--building=`): от него жребий машины у выхода —
+## первое всегда с красной спортивной ([method CarModel.choose]).
+var _building: int = 1
+## Только выход (`--only=exit`): посадка и выезд без двери и подвала.
+var _only: String = ""
 
 
 func _ready() -> void:
@@ -60,6 +65,10 @@ func _ready() -> void:
 			_seed = argument.trim_prefix("--seed=").to_int()
 		elif argument.begins_with("--folder="):
 			_folder = argument.trim_prefix("--folder=").strip_edges()
+		elif argument.begins_with("--building="):
+			_building = maxi(argument.trim_prefix("--building=").to_int(), 1)
+		elif argument.begins_with("--only="):
+			_only = argument.trim_prefix("--only=").strip_edges()
 		elif argument.begins_with("--quality="):
 			var quality := clampi(
 				argument.trim_prefix("--quality=").to_int(), 0, Graphics.Quality.size() - 1
@@ -76,8 +85,9 @@ func _run() -> void:
 	if not _level.skip_the_intro():
 		await _level.wait_for_the_landing()
 	await _frames(10)
-	await _door()
-	await _basement()
+	if _only != "exit":
+		await _door()
+		await _basement()
 	await _exit()
 	get_tree().quit()
 
@@ -93,6 +103,9 @@ func _start() -> void:
 	_hud = _main.get_node("Hud") as Hud
 	_curtain = _main.get(&"_curtain") as FadeCurtain
 	GameState.instance().start_game()
+	GameState.instance().building = _building
+	var car := CarModel.choose(_building, _seed)
+	print("машина: модель %d, краска %d" % [car.model, car.paint])
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	_level.rules = BuildingRules.new()
 	_level.building_seed = _seed
@@ -188,6 +201,9 @@ func _exit() -> void:
 	var door := _level.exit_position()
 	var bonus := Arcade.building_bonus(GameState.instance().building)
 	var floor_y := rules.floor_surface(rules.floors - 1)
+	var game := GameState.instance()
+	while not game.all_documents_collected():
+		game.collect_document()
 	_place(door.x + CAR_APPROACH, floor_y)
 	await _settle()
 	await _shoot("exit_01_at_the_car")
@@ -217,9 +233,13 @@ func _exit() -> void:
 	await _seconds(0.9)
 	if car.is_leaving():
 		await _shoot("exit_04b_ramp")
-	await _seconds(0.9)
+	# У края мостовой: ждёт просвета с правым поворотником (ADR-0046, решение 2).
+	if await _until(func() -> bool: return car.is_signalling() and car.indicator_lit()):
+		await _shoot("exit_04c_signal")
+	await _until(func() -> bool: return car.stage == ExitCar.Stage.MERGE)
+	await _seconds(0.3)
 	if car.is_leaving():
-		await _shoot("exit_04c_street")
+		await _shoot("exit_04d_merge")
 	# Бонус досчитан: машина к этому времени уже ушла, здание сдано.
 	await _until(func() -> bool: return _hud.bonus_text() == Hud.format_score(bonus))
 	await _shoot("exit_05_bonus")

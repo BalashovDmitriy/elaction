@@ -96,9 +96,12 @@ func line_the_wall(index: int, inner: Vector2, openings: Array[Vector2]) -> void
 		if index >= shaft.top and index <= shaft.bottom:
 			gaps.append(Vector2(shaft.x - half, shaft.x + half))
 
+	# Бра — на пилястрах отеля (ADR-0048); на тёмном этаже свет погашен
+	# по правилам ROM, и светящееся бра спорило бы с темнотой.
+	var sconces := BuildingStyle.of(_identity).sconces and not _rules.is_unlit(index)
 	for span in BuildingPlan.spans_between(gaps, inner):
 		_skirting(span, surface)
-		_pilasters(span, top, surface)
+		_pilasters(span, top, surface, sconces)
 
 
 func _skirting(span: Vector2, surface: float) -> void:
@@ -120,7 +123,9 @@ func _skirting(span: Vector2, surface: float) -> void:
 ## Пилястры простенка: по одной у каждого его края и по одной между соседними
 ## местами этажа, если до краёв далеко. Ритм идёт по местам, а не по метрам:
 ## двери и шахты стоят по местам, и пилястры между ними ложатся ровно.
-func _pilasters(span: Vector2, top: float, surface: float) -> void:
+##
+## [param sconces] — вешать ли на каждую бра ([WallSconce]).
+func _pilasters(span: Vector2, top: float, surface: float, sconces: bool = false) -> void:
 	var width := span.y - span.x
 	if width < PILASTER_WIDTH:
 		return
@@ -145,6 +150,10 @@ func _pilasters(span: Vector2, top: float, surface: float) -> void:
 			WorldSpace.BACK_WALL_Z,
 			PILASTER_DEPTH
 		)
+		if sconces:
+			var at := WorldSpace.to_scene(Vector2(centre, surface - WallSconce.HEIGHT))
+			at.z = WorldSpace.BACK_WALL_Z + PILASTER_DEPTH
+			add_child(WallSconce.hang(at))
 
 
 ## Часть глубиной [param depth], задней гранью на [param face]: рёбра стоят
