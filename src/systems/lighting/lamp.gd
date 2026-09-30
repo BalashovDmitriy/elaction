@@ -44,6 +44,9 @@ const FLOOR_REACH: float = 0.1
 const FILL_RANGE: float = 7.0
 ## Радиус заливки без тени — на низком и среднем качестве: не дальше этажа.
 const FILL_RANGE_UNSHADOWED: float = 3.0
+## Сколько ламп в кадре разом кладут тень заливкой: столько, сколько бывает
+## в кадре наверху здания, где кадр в бюджете.
+const FILL_SHADOW_CAP: int = 4
 const FILL_ENERGY: float = 1.5
 
 ## Тёплый цвет лампы против холодного общего тона палитры (ADR-0023, решение 3).
@@ -76,6 +79,8 @@ var _spot: SpotLight3D = null
 var _fill: OmniLight3D = null
 ## Этаж лампы в кадре: свет с тенью. Иначе — запасной, конус до пола без тени.
 var _shadowed: bool = true
+## Кладёт ли тень заливка ([method set_light_visible]).
+var _fill_shadowed: bool = true
 ## На какой высоте над своим полом висит лампа, м: [method hang].
 var _above_floor: float = SPOT_RANGE
 var _cord: MeshInstance3D = null
@@ -185,15 +190,23 @@ func shoot_down() -> void:
 ## конусом, без тени и не дальше своего пола: его тени никто не видит, а внизу
 ## здания запасные лампы давали треть проходов теней (ADR-0042, решение 2).
 ## Заливка там не горит: без тени она светила бы сквозь потолок на этаж выше.
-func set_light_visible(on: bool, shadowed: bool = true) -> void:
+##
+## [param fill_shadowed] — кладёт ли тень и заливка. Тень заливки кубическая —
+## шесть проходов по сцене, — и внизу здания, где в кадре до восьми ламп, она
+## одна стоила 7.7 мс из 18 (замер M24h, ADR-0044, решение 11). Поэтому тень
+## заливки — только у [constant FILL_SHADOW_CAP] ламп ближе к середине кадра;
+## остальные светят заливкой без тени и не дальше своего этажа.
+func set_light_visible(on: bool, shadowed: bool = true, fill_shadowed: bool = true) -> void:
 	_spot.visible = on
 	_fill.visible = on and shadowed
+	var fill := shadowed and fill_shadowed
 	# Уровень зовёт это всем лампам разом, как только кадр сменил этажи. Запись
 	# дальности или тени, даже прежней, помечает карту теней грязной, и лампы, у
 	# которых ничего не сменилось, перерисовывали бы тени в тот же кадр.
-	if shadowed == _shadowed:
+	if shadowed == _shadowed and fill == _fill_shadowed:
 		return
 	_shadowed = shadowed
+	_fill_shadowed = fill
 	apply_graphics()
 
 
@@ -205,13 +218,14 @@ func apply_graphics() -> void:
 	_spot.shadow_enabled = Graphics.spot_shadows() and _shadowed
 	# Конус без тени не держится полом: до пола и чуть в плиту, но не сквозь неё.
 	_spot.spot_range = SPOT_RANGE if _shadowed else minf(SPOT_RANGE, _above_floor + FLOOR_REACH)
-	_fill.shadow_enabled = Graphics.fill_shadows()
+	var fill := Graphics.fill_shadows() and _fill_shadowed
+	_fill.shadow_enabled = fill
 	_spot.light_volumetric_fog_energy = Graphics.light_in_fog()
 	_fill.light_volumetric_fog_energy = Graphics.light_in_fog() * 0.25
 	# Заливка без тени не держится перекрытием и светила бы сквозь плиты на
 	# соседние, погашенные этажи — темнота переставала бы быть темнотой (как в
 	# M17). Без тени её радиус — в этаж (авторевью M20).
-	_fill.omni_range = FILL_RANGE if Graphics.fill_shadows() else FILL_RANGE_UNSHADOWED
+	_fill.omni_range = FILL_RANGE if fill else FILL_RANGE_UNSHADOWED
 
 
 ## Светильник вместо коробки: абажур конусом и рассеиватель снизу. Коробка

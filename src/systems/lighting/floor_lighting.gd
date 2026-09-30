@@ -109,3 +109,20 @@ func _nearest(floor_index: int, x: float) -> int:
 			best_gap = gap
 			best = index
 	return best
+
+
+## [param count] живых ламп из [param lamps], ближайших к точке кадра
+## [param centre] в плоскости правил: им тень заливки (ADR-0044, решение 11).
+static func nearest(lamps: Array[Lamp], centre: Vector2, count: int) -> Array[Lamp]:
+	var alive: Array[Lamp] = []
+	for lamp: Lamp in lamps:
+		if is_instance_valid(lamp):
+			alive.append(lamp)
+	alive.sort_custom(
+		func(a: Lamp, b: Lamp) -> bool:
+			return (
+				WorldSpace.to_plane(a.global_position).distance_squared_to(centre)
+				< WorldSpace.to_plane(b.global_position).distance_squared_to(centre)
+			)
+	)
+	return alive.slice(0, count)

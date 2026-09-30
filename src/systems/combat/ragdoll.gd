@@ -88,6 +88,19 @@ const ANGULAR_DAMP: float = 2.0
 const MAX_SPEED: float = 8.0
 ## Часть медленнее этого, м/с, считается улёгшейся.
 const RESTING_SPEED: float = 0.15
+## Сколько тело лежит неподвижно, прежде чем застыть, с (ADR-0044, решение 11).
+##
+## Сами части засыпали плохо: в стопке соседи будят друг друга, и двадцать
+## улёгшихся тел стоили физике 11 мс на шаг (замер M24h). Застывшее тело —
+## статичное: из расчёта оно уходит, а столкновения остаются, и на него
+## по-прежнему ложатся другие. Выглядит оно так же и лежит до конца здания.
+const FREEZE_AFTER: float = 1.0
+## Насколько ниже низа здания тело считается выпавшим из мира, м.
+const ABYSS_MARGIN: float = 10.0
+
+## Высота сцены, ниже которой тело выпало из мира и пропадает: падало бы оно
+## вечно и вечно считалось бы физикой. Ставит уровень по своему зданию.
+static var abyss: float = -INF
 
 ## Части по кости, пока они есть: отрезанная кабиной уходит из словаря.
 var parts: Dictionary = {}
@@ -102,6 +115,8 @@ var _joints: Dictionary = {}
 ## части. Прячутся вместе с ней.
 var _owned: Dictionary = {}
 var _hidden := PackedStringArray()
+## Застыло ли тело ([method freeze]).
+var _frozen: bool = false
 
 
 ## Собирает рэгдолл на фигуре [param figure]. [param only] — только эти части
@@ -249,10 +264,39 @@ func bounds() -> AABB:
 
 
 ## Будит части: опора ушла из-под улёгшегося тела — люк подвала открылся, — а
-## спящее тело физика сама не будит, и оно висело бы в воздухе.
+## спящее тело физика сама не будит, и оно висело бы в воздухе. Застывшее —
+## снова живёт физикой.
 func wake() -> void:
+	if _frozen:
+		_frozen = false
+		for part: PhysicalBone3D in parts.values():
+			PhysicsServer3D.body_set_mode(part.get_rid(), PhysicsServer3D.BODY_MODE_RIGID)
+		_set_limiter(true)
 	for part: PhysicalBone3D in parts.values():
 		PhysicsServer3D.body_set_state(part.get_rid(), PhysicsServer3D.BODY_STATE_SLEEPING, false)
+
+
+## Застывает улёгшееся тело: части становятся статичными телами — физика их
+## больше не считает, но сталкиваются они по-прежнему ([constant FREEZE_AFTER]).
+func freeze() -> void:
+	if _frozen:
+		return
+	_frozen = true
+	for part: PhysicalBone3D in parts.values():
+		PhysicsServer3D.body_set_mode(part.get_rid(), PhysicsServer3D.BODY_MODE_STATIC)
+	_set_limiter(false)
+
+
+## Застыло ли тело.
+func is_frozen() -> bool:
+	return _frozen
+
+
+func _set_limiter(on: bool) -> void:
+	for child: Node in _simulator.get_children():
+		if child is SpeedLimit:
+			child.set_physics_process(on)
+			(child as SpeedLimit).still = 0.0
 
 
 ## Спят ли все части: тело улеглось.
@@ -279,10 +323,18 @@ class SpeedLimit:
 	const REACH: float = 0.08
 
 	var ragdoll: Ragdoll = null
+	## Сколько тело уже лежит неподвижно, с.
+	var still: float = 0.0
 
-	func _physics_process(_delta: float) -> void:
+	func _physics_process(delta: float) -> void:
 		var space := get_viewport().world_3d.direct_space_state
+		var resting := true
 		for part: PhysicalBone3D in ragdoll.parts.values():
+			if part.global_position.y < Ragdoll.abyss:
+				ragdoll.corpse.vanish()
+				return
+			if part.linear_velocity.length() > RESTING_SPEED:
+				resting = false
 			# Уснувшая часть лежит на неподвижном: на кабине части не засыпают —
 			# её тело кинематическое и будит всё, что на нём лежит. Трупов до
 			# конца здания много, и луч под каждую часть каждый шаг стоил бы кадру.
@@ -291,6 +343,9 @@ class SpeedLimit:
 			if part.linear_velocity.length_squared() > MAX_SPEED * MAX_SPEED:
 				part.linear_velocity = part.linear_velocity.limit_length(MAX_SPEED)
 			var car := _car_under(space, part)
+			if car != null:
+				# На полу кабины тело не застывает: кабина уехала бы из-под него.
+				resting = false
 			if car == null or is_zero_approx(car.speed_now()):
 				continue
 			if car.speed_now() < 0.0 and _pinned(space, part, car):
@@ -300,6 +355,9 @@ class SpeedLimit:
 			velocity.y = -car.speed_now()
 			velocity.x *= 0.5
 			part.linear_velocity = velocity
+		still = still + delta if resting else 0.0
+		if still >= FREEZE_AFTER:
+			ragdoll.freeze()
 
 	## Кабина, на полу которой лежит часть, или null.
 	func _car_under(space: PhysicsDirectSpaceState3D, part: PhysicalBone3D) -> ElevatorCar:
