@@ -15,6 +15,9 @@ extends RefCounted
 ## миг шага, встречает его ниже. Половина этажа — граница между «на этаж» и
 ## «на два»: ближе к двум, чем к одному, — уже два.
 const FALL_SLACK: float = 0.5
+## Насколько тело может выступать за борт кабины и всё ещё считаться «целиком
+## под ней», м: пара сантиметров на округление положения, не больше.
+const UNDER_SLACK: float = 0.04
 
 
 ## Смертельно ли приземление после падения на [param drop] метров.
@@ -37,5 +40,27 @@ static func is_deadly_fall(drop: float, floor_height: float) -> bool:
 ##
 ## Флагами [code]is_on_ceiling[/code] это не ловится: кабина двигает игрока
 ## физическим сервером, а флаг выставляет только собственный move_and_slide.
-static func crushes(car_speed: float, victim_grounded: bool, victim_is_passenger: bool) -> bool:
-	return car_speed > 0.0 and victim_grounded and not victim_is_passenger
+##
+## Четвёртое условие — с M24h, по ROM (@4A30, @46E9): жертва под днищем
+## [b]целиком[/b]. Задетого краем кабина не давит, а выталкивает к краю шахты
+## ([method push_out]); раньше случайное касание бортом убивало (ADR-0044,
+## решение 6).
+static func crushes(
+	car_speed: float, victim_grounded: bool, victim_is_passenger: bool, fully_under: bool = true
+) -> bool:
+	return car_speed > 0.0 and victim_grounded and not victim_is_passenger and fully_under
+
+
+## Целиком ли тело шириной [param body_width] с серединой в [param body_x]
+## стоит под кабиной шириной [param car_width] с серединой в [param car_x].
+static func is_fully_under(
+	body_x: float, body_width: float, car_x: float, car_width: float
+) -> bool:
+	return absf(body_x - car_x) + body_width * 0.5 <= car_width * 0.5 + UNDER_SLACK
+
+
+## Куда выталкивает кабина задетого краем: середина тела у борта с той
+## стороны, где середина тела (@4713/@4722 ROM, по стороне середины).
+static func push_out(body_x: float, body_width: float, car_x: float, car_width: float) -> float:
+	var side := 1.0 if body_x >= car_x else -1.0
+	return car_x + side * (car_width + body_width) * 0.5

@@ -442,22 +442,47 @@ func _crush_those_underneath(speed: float) -> void:
 			continue
 		var agent := body as Enemy
 		if agent != null:
-			# Кабина давит и агентов — 300 очков, как в ROM (ADR-0027, решение 6).
-			# Зона заходит на полу кабины выше днища, и ноги пассажира в неё
-			# попадают: пассажир — тот, кто стоит на полу кабины, а жертва — тот,
-			# кто под днищем. Разводит их высота ступней.
+			# Кабина давит и агентов, как в ROM (ADR-0027, решение 6). Зона
+			# заходит на полу кабины выше днища, и ноги пассажира в неё попадают:
+			# пассажир — тот, кто стоит на полу кабины, а жертва — тот, кто под
+			# днищем. Разводит их высота ступней.
 			var riding := to_local(agent.global_position).y > _under_the_floor()
-			if not agent.is_dead() and ShaftHazards.crushes(speed, agent.is_on_floor(), riding):
-				agent.kill(true)
-				# Надбавка за темноту — та же, что у пули, ноги и лампы (ADR-0010).
+			if agent.is_dead() or not _pinned(speed, agent, agent.is_on_floor(), riding):
+				continue
+			agent.kill(true)
+			# 300 очков — только если давит кабина, в которой едет Otto (@4A97
+			# ROM, ADR-0044, решение 7). Надбавка за темноту — та же, что у
+			# пули и лампы (ADR-0010).
+			if _carries_otto():
 				var points := GameState.kill_score(GameState.CRUSH_SCORE, agent.is_in_the_dark())
 				GameState.instance().add_score(points)
 			continue
 		var victim := body as Otto
 		if victim == null:
 			continue
-		if ShaftHazards.crushes(speed, victim.is_grounded(), victim == _occupant):
+		if _pinned(speed, victim, victim.is_grounded(), victim == _occupant):
 			victim.kill(true)
+
+
+## Прижало ли днищем [param body]: он под кабиной целиком и деваться ему
+## некуда. Задетого краем выталкивает к краю шахты и отпускает живым
+## (ADR-0044, решение 6).
+func _pinned(speed: float, body: Node3D, grounded: bool, passenger: bool) -> bool:
+	if not ShaftHazards.crushes(speed, grounded, passenger):
+		return false
+	var x := global_position.x
+	var body_x := body.global_position.x
+	if ShaftHazards.is_fully_under(body_x, Proportions.BODY_WIDTH, x, _width):
+		return true
+	body.global_position.x = ShaftHazards.push_out(body_x, Proportions.BODY_WIDTH, x, _width)
+	return false
+
+
+## Едет ли Otto в этой кабине — или в паре, с которой она скреплена.
+func _carries_otto() -> bool:
+	if _leader != null:
+		return _leader._carries_otto()
+	return has_rider() or (_deck != null and _deck.has_rider())
 
 
 ## Начинает резать днищем тело [param corpse]; дальше срез ведёт список:
