@@ -350,6 +350,13 @@ func is_aligned() -> bool:
 	return _leader.is_aligned() if _leader != null else _motion.is_aligned()
 
 
+## Можно ли сойти из кабины на этаж прямо сейчас — [method ElevatorMotion.can_step_out].
+## У яруса пары отвечает ведущий: шаг этажа один по всей высоте, и ярус
+## на столько же выше этажа под ним, на сколько ведущий.
+func can_step_out() -> bool:
+	return _leader.can_step_out() if _leader != null else _motion.can_step_out()
+
+
 ## Берёт нижний ярус под себя и связывает его с собой тягами.
 ##
 ## Зовёт [method serve_as_deck], и только он: пара задаётся с одной стороны,

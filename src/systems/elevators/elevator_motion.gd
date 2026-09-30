@@ -15,6 +15,10 @@ const FLOOR_EPSILON: float = 0.015
 ## Ниже этого порога команда игрока считается отпущенной.
 const COMMAND_THRESHOLD: float = 0.1
 
+## Насколько пол кабины может быть выше пола этажа, чтобы из неё ещё можно было
+## спрыгнуть на ходу, в долях этажа: 18 px из 48 в ROM (@36F2).
+const STEP_OUT_SHARE: float = 18.0 / 48.0
+
 ## Направления те же, что у эскалатора и двери: одно место на проект.
 const UP := Intent.UP
 const DOWN := Intent.DOWN
@@ -121,7 +125,33 @@ func can_go(towards: float) -> bool:
 	return (_shaft_limit(towards) - position) * signf(towards) > FLOOR_EPSILON
 
 
-## Совпал ли пол кабины с полом этажа: только тогда из неё можно выйти.
+## Можно ли сойти из кабины на этаж прямо сейчас — в том числе на ходу.
+##
+## Как в ROM (@36F2–3712): из едущей кабины спрыгивают, пока её пол выше пола
+## этажа под ним не больше чем на [constant STEP_OUT_SHARE] этажа; ниже этажа —
+## только вровень (ADR-0044, решение 5). До M24h выйти можно было только из
+## совпавшей с этажом кабины.
+func can_step_out() -> bool:
+	if floors.is_empty():
+		return false
+	var step := _floor_step()
+	for stop: float in floors:
+		# Ось правил вниз: этаж под полом кабины — с большей координатой.
+		var drop := stop - position
+		if drop >= -FLOOR_EPSILON and drop <= step * STEP_OUT_SHARE:
+			return true
+	return false
+
+
+## Шаг этажа шахты: разница соседних остановок. У шахты в одну остановку
+## шага нет — тогда выйти можно только вровень.
+func _floor_step() -> float:
+	if floors.size() < 2:
+		return 0.0
+	return floors[1] - floors[0]
+
+
+## Совпал ли пол кабины с полом этажа.
 func is_aligned() -> bool:
 	return aligned_floor() >= 0
 
