@@ -60,7 +60,9 @@ func _live_agents(level: GreyboxLevel) -> Array[Enemy]:
 	return live
 
 
-## Одинокая дверь на твёрдом полу: здание для неё поднимать незачем.
+## Одинокая красная дверь на твёрдом полу: здание для неё поднимать незачем.
+## Красная — потому что Otto пускает только такая (ADR-0044, решение 3), и
+## иначе проверки «пустит ли» прошли бы на двери, которая не пускает никого.
 func _bare_door() -> Door:
 	var ground := StaticBody3D.new()
 	var shape := CollisionShape3D.new()
@@ -72,6 +74,7 @@ func _bare_door() -> Door:
 	add_child_autofree(ground)
 
 	var door := DOOR_SCENE.instantiate() as Door
+	door.has_document = true
 	add_child_autofree(door)
 	return door
 

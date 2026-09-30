@@ -261,6 +261,11 @@ func _look_for_visitor() -> void:
 		# dismiss_agent]), а визит гостя идёт по створке — прячется он и выходит
 		# только в открытую, — и пущенный сюда Otto застрял бы в проёме.
 		return
+	if not has_document:
+		# Как в ROM (@3BDA): игрока пускает только красная дверь, пока документ
+		# не забран. Обычная — дверь агентов, и укрытием она не служит
+		# (ADR-0044, решение 3).
+		return
 	for body: Node3D in _mat.get_overlapping_bodies():
 		var visitor := body as Otto
 		if visitor == null:

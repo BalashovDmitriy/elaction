@@ -117,7 +117,7 @@ func _wait_out(otto: Otto) -> void:
 
 
 func test_the_leaf_shuts_behind_otto_and_opens_to_let_him_out() -> void:
-	var door := _bare_door(false)
+	var door := _bare_door(true)
 	var otto := _guest_at(door)
 	assert_true(await _knock(otto), "дверь взяла Otto")
 	assert_false(otto.is_hidden(), "пока створка идёт, он ещё в проёме")
@@ -136,7 +136,7 @@ func test_the_leaf_shuts_behind_otto_and_opens_to_let_him_out() -> void:
 
 
 func test_otto_is_out_exactly_after_seventy_ticks_whatever_he_presses() -> void:
-	var door := _bare_door(false)
+	var door := _bare_door(true)
 	var otto := _guest_at(door)
 	assert_true(await _knock(otto), "дверь взяла Otto")
 	var frames := 0
@@ -155,6 +155,31 @@ func test_otto_is_out_exactly_after_seventy_ticks_whatever_he_presses() -> void:
 	var inside := float(frames) * _step()
 	var rom := Arcade.seconds(Arcade.ROOM_TICKS)
 	assert_almost_eq(inside, rom, _step() * 2.0, "ровно 70 тиков ROM")
+
+
+## Обычная дверь Otto не пускает: как в ROM (@3BDA), внутрь — только в красную
+## (ADR-0044, решение 3). Раньше обычная служила укрытием.
+func test_a_plain_door_does_not_take_otto_in() -> void:
+	var door := _bare_door(false)
+	var otto := _guest_at(door)
+	assert_false(await _knock(otto), "обычная дверь Otto не взяла")
+	_release_all()
+	assert_eq(door.openness(), 0.0, "и не открылась")
+
+
+## Сданная красная становится обычной — и тоже больше не пускает.
+func test_an_emptied_red_door_does_not_take_otto_in_again() -> void:
+	var door := _bare_door(true)
+	var otto := _guest_at(door)
+	assert_true(await _knock(otto), "красная дверь взяла Otto")
+	_release_all()
+	assert_true(await _wait_hidden(otto), "зашёл")
+	await _wait_out(otto)
+	await _wait_game(1.0)
+	assert_false(door.has_document, "документ забран")
+	assert_true(otto.is_on_foot(), "вышел, управление у игрока")
+	assert_false(await _knock(otto), "сданная дверь второй раз не пускает")
+	_release_all()
 
 
 func test_the_document_is_counted_on_the_way_out() -> void:
@@ -202,7 +227,7 @@ func test_the_corridor_is_muffled_while_otto_is_inside() -> void:
 		pass_test("звука нет — глушить нечего")
 		return
 	director.reset()
-	var door := _bare_door(false)
+	var door := _bare_door(true)
 	var otto := _guest_at(door)
 	assert_true(await _knock(otto), "дверь взяла Otto")
 	assert_true(await _wait_hidden(otto))
@@ -320,6 +345,9 @@ func test_agents_wait_at_otto_s_door_one_at_most_and_let_go_when_he_is_out() -> 
 		var door: Door = null
 		var spots: Array[float] = []
 		for candidate in level.doors():
+			# Otto пускает только красная (ADR-0044, решение 3).
+			if not candidate.has_document:
+				continue
 			spots = _agent_spots(level, candidate)
 			if spots.size() >= 2:
 				door = candidate
