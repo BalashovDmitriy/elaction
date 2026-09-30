@@ -57,7 +57,10 @@ func _dress_floor(index: int) -> void:
 	var surface := _rules.floor_surface(index)
 	var bounds := _rules.floor_span(index)
 	var inner := Vector2(bounds.x + BuildingShell.WALL_WIDTH, bounds.y - BuildingShell.WALL_WIDTH)
-	for span in BuildingPlan.spans_between(_plan.gaps_on(_rules, index), inner):
+	# Над проёмом эскалатора дорожки и швов нет: они легли бы поперёк дыры в
+	# задней полосе коридора (ADR-0044, решение 10).
+	var cuts := _plan.gaps_on(_rules, index) + _plan.escalator_holes_on(_rules, index)
+	for span in BuildingPlan.spans_between(cuts, inner):
 		var length := span.y - span.x
 		if length <= 0.2:
 			continue

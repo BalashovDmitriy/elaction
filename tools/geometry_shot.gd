@@ -177,11 +177,11 @@ func _settle_after_the_fall(index: int) -> void:
 ## Кадр о конструкции: ступени, балюстрада и поручень видны только под светом.
 ## Эскалаторов на здание пяток, и половина из них стоит в неосвещённой части
 ## этажа — снятый там, кадр показывал бы зоны ламп M17, а не геометрию M18b.
-func _escalator_under_a_lamp() -> BuildingPlan.EscalatorSpot:
+func _escalator_under_a_lamp() -> EscalatorSpot:
 	var plan := _level.plan()
 	if plan.escalators.is_empty():
 		return null
-	var best: BuildingPlan.EscalatorSpot = plan.escalators[0]
+	var best: EscalatorSpot = plan.escalators[0]
 	var best_gap := INF
 	for spot in plan.escalators:
 		for lamp in plan.lamps:
@@ -196,7 +196,7 @@ func _escalator_under_a_lamp() -> BuildingPlan.EscalatorSpot:
 
 ## Ставит Otto на верхнюю площадку: кадр должен показывать и то, что борт со
 ## стороны камеры его не закрывает (ADR-0025, решение 5).
-func _stand_otto_on_the_top_pad(spot: BuildingPlan.EscalatorSpot) -> void:
+func _stand_otto_on_the_top_pad(spot: EscalatorSpot) -> void:
 	var rules := _level.rules
 	_level.otto.global_position = WorldSpace.to_scene(
 		Vector2(spot.x, rules.floor_surface(spot.floor_index))

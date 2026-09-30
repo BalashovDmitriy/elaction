@@ -64,7 +64,7 @@ func test_the_gap_runs_from_the_pad_to_the_edge() -> void:
 ## почти не встают — пара с этажа выше занимает края этажа ниже.
 func test_the_next_escalator_tries_the_other_edge_first() -> void:
 	var plan := BuildingPlan.new()
-	var arrived := BuildingPlan.EscalatorSpot.new()
+	var arrived := EscalatorSpot.new()
 	arrived.floor_index = 4
 	arrived.towards = -1.0
 	plan.escalators.append(arrived)

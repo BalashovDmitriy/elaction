@@ -183,7 +183,7 @@ func test_every_shaft_stands_on_a_slot_its_whole_band_offers() -> void:
 ##
 ## С M18b ломаная поездки — площадка по этажу до проёма и один прямой пролёт
 ## вниз ([ADR-0025](../docs/adr/0025-shafts-escalators-and-riders.md), решение 4).
-## Перегиб отодвинут внутрь дыры на [constant BuildingPlan.EscalatorSpot.BEND_CLEARANCE],
+## Перегиб отодвинут внутрь дыры на [constant EscalatorSpot.BEND_CLEARANCE],
 ## и весь запас там — 15 см: сквозь проём идёт не линия, а тело шириной
 ## в полкорпуса. Правится это одним числом в правилах — шириной проёма или
 ## его отступом, — и тогда плечо съедается молча.

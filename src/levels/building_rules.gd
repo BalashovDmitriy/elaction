@@ -161,7 +161,7 @@ const MIN_SHAFT_FLOORS: int = 4
 ## иначе геометрия проёма была бы записана дважды и разъехалась бы.
 ##
 ## С M24g проём тянется от площадки до края этажа
-## ([method BuildingPlan.EscalatorSpot.gap]): ширины у него нет, есть отступ от
+## ([method EscalatorSpot.gap]): ширины у него нет, есть отступ от
 ## площадки.
 @export var escalator_gap_offset: float = 0.12
 

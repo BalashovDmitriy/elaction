@@ -447,7 +447,7 @@ func _spawn_escalators() -> void:
 		var descent := Vector2(spot.towards * rules.escalator_run, rules.floor_height)
 		# Перегиб — в самом проёме: через него идут и полотно, и поездка, поэтому
 		# пассажир проходит сквозь дыру, а не сквозь плиту.
-		var gap := spot.gap(rules)
+		var gap := spot.hole(rules)
 		# Проём — в координатах эскалатора: обрамление ставит он сам, а правила
 		# о том, где стоит его узел, знать не обязаны.
 		var edges := Vector2(gap.x - spot.x, gap.y - spot.x)
