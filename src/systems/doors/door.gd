@@ -147,7 +147,9 @@ var _panels: Array[MeshInstance3D] = []
 var _room: DoorRoom = null
 var _room_identity: BuildingIdentity = null
 var _room_seed: int = 0
+var _room_span := Vector2(-INF, INF)
 var _furnished: bool = false
+var _room_unlit: bool = false
 ## Вид двери по типу здания (ADR-0048): филёнки и дерево у отеля, стекло и
 ## алюминий у офиса. Без здания — отель, как до M24i.
 var _style := BuildingStyle.new()
@@ -404,24 +406,30 @@ func _refresh_look() -> void:
 	_leaf.rotation.y = angle
 	_leaf.position.x = -half + cos(angle) * half
 	_leaf.position.z = WorldSpace.BACK_WALL_Z + LEAF_STANDOFF - sin(angle) * half
-	var plain := GreyboxLook.DOOR if _style.panels else _style.leaf_tone
-	var tone := GreyboxLook.DOOR_RED if has_document else plain
+	var tone := GreyboxLook.DOOR_RED if has_document else _style.leaf_tone
 	# Занятая створка светится сама, неярко: маркер, а не краска.
 	_leaf.material_override = _paint(tone, occupied)
 	var relief := _paint(tone.darkened(0.14), occupied)
 	for panel in _panels:
 		panel.material_override = relief
-	var glow := GreyboxLook.SIGN_RED if has_document else _sign_tone()
+	var glow := GreyboxLook.SIGN_RED if has_document else _style.sign_tone
 	_sign.material_override = GreyboxLook.light(glow)
 	_red_light.visible = has_document and _in_view
 	_pulse_clock = 0.0
 
 
 ## Какая комната за дверью: здание [param identity] и жребий двери
-## [param seed].
-func furnish(identity: BuildingIdentity, seed: int) -> void:
+## [param seed]. [param span] — этаж от наружной стены до наружной по X от
+## середины двери: комната не выходит за него ([method DoorRoom.build]).
+##
+## [param unlit] — этаж двери тёмный: комната за ней без своего света.
+func furnish(
+	identity: BuildingIdentity, seed: int, span: Vector2 = Vector2(-INF, INF), unlit: bool = false
+) -> void:
+	_room_unlit = unlit
 	_room_identity = identity
 	_room_seed = seed
+	_room_span = span
 	_furnished = true
 
 
@@ -436,7 +444,7 @@ func _open_the_room(along: float) -> void:
 		return
 	if along > 0.0 and _room == null:
 		var hotel := _room_identity == null or _room_identity.is_hotel()
-		_room = DoorRoom.build(hotel, _room_seed, _room_identity)
+		_room = DoorRoom.build(hotel, _room_seed, _room_identity, _room_span, _room_unlit)
 		add_child(_room)
 	elif along <= 0.0 and _room != null:
 		_room.queue_free()
@@ -505,11 +513,6 @@ func _breathe(delta: float) -> void:
 	_sign.material_override = _pulse
 
 
-## Табло над обычной дверью: тёплое у отеля, холодное у офиса.
-func _sign_tone() -> Color:
-	return GreyboxLook.SIGN_WARM if _style.panels else _style.sign_tone
-
-
 ## Детали створки: у отеля — две филёнки, у офиса — матовое стекло в верхней
 ## трети; ручка с розеткой у свободного края и отбойная пластина внизу. Дети
 ## створки — поворачиваются вместе с ней. У части номеров отеля — табличка «Не
@@ -528,9 +531,7 @@ func _dress_leaf() -> void:
 			_panels.append(panel)
 	if _style.vision_glass:
 		_leaf.add_child(_vision_glass(front, bottom))
-	var chrome := GreyboxLook.metal(GreyboxLook.TRIM if _style.panels else _style.handle_tone)
-	if _style.panels:
-		chrome = GreyboxLook.metal(_style.handle_tone)
+	var chrome := GreyboxLook.metal(_style.handle_tone)
 	var handle_x := LEAF_SIZE.x * 0.5 - 0.14
 	var rosette := GreyboxLook.box(ROSETTE, chrome)
 	rosette.position = Vector3(handle_x, bottom + HANDLE_RISE, front + ROSETTE.z * 0.5)

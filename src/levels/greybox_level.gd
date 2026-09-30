@@ -479,7 +479,9 @@ func _spawn_doors() -> void:
 		var door := DOOR_SCENE.instantiate() as Door
 		door.position = WorldSpace.to_scene(Vector2(spot.x, rules.floor_surface(spot.floor_index)))
 		door.has_document = spot.has_document
-		door.furnish(identity, hash([building_seed, spot.floor_index, roundi(spot.x * 10.0)]))
+		var room_seed := hash([building_seed, spot.floor_index, roundi(spot.x * 10.0)])
+		var span := rules.floor_span(spot.floor_index) - Vector2(spot.x, spot.x)
+		door.furnish(identity, room_seed, span, rules.is_unlit(spot.floor_index))
 		add_child(door)
 		_doors.append(door)
 		door.otto_hid.connect(_on_otto_hid.bind(door))
@@ -503,6 +505,7 @@ static func lamp_height(of_rules: BuildingRules) -> float:
 
 
 func _spawn_lamps() -> void:
+	var fixture := BuildingStyle.of(identity).fixture
 	for spot in _plan.lamps:
 		var lamp := LAMP_SCENE.instantiate() as Lamp
 		var hang := rules.floor_surface(spot.floor_index) - lamp_height(rules)
@@ -510,7 +513,7 @@ func _spawn_lamps() -> void:
 		# Этаж лампы известен здесь, и обратно из координаты его не выводят: под
 		# потолком она ближе к полу этажа выше, чем к своему.
 		lamp.floor_index = spot.floor_index
-		lamp.fixture = BuildingStyle.of(identity).fixture
+		lamp.fixture = fixture
 		# Зона лампы считается от того, что висит: правило темноты узнаёт о
 		# лампе здесь же, где она вешается.
 		_lighting.hang(spot.floor_index, spot.x)

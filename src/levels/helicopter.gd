@@ -164,6 +164,8 @@ const VOLUME_EASE: float = 4.0
 ## Ободок — один на все вертолёты: шейдер компилируется раз за запуск, а не на
 ## каждое здание, когда вертолёт влетает в кадр.
 static var _rim_material: ShaderMaterial = null
+## Шейдер диска размытия винтов, тоже один за запуск ([method _blur_shader]).
+static var _blur_code: Shader = null
 
 var _phase: Phase = Phase.ARRIVING
 var _time: float = 0.0
@@ -479,10 +481,10 @@ func _dress() -> void:
 	]:
 		var anchor := model.find_child(mark, true, false) as Node3D
 		_marks[mark] = _chain(_body, anchor).origin if anchor != null else hull.get_center()
-	_blur(_rotor, 4.0)
-	_blur(_tail_rotor, 2.0)
+	_blur(_rotor, 4.0, false)
+	_blur(_tail_rotor, 2.0, true)
 	_hang_winch(hull)
-	_hang_lights(hull)
+	_hang_lights()
 	_measure(hull, model)
 
 
@@ -526,20 +528,21 @@ static func _repaint(mesh: MeshInstance3D) -> void:
 
 
 ## Диск размытия под лопастями винта [param rotor]: круг в плоскости вращения,
-## крутится вместе с винтом.
-func _blur(rotor: Node3D, blades: float) -> void:
+## крутится вместе с винтом. [param upright] — плоскость вертикальна, вдоль
+## корпуса (хвостовой винт), иначе горизонтальна (несущий). Плоскость задана
+## явно, а не угадана по габариту: у двухлопастного хвостового винта самая
+## тонкая ось габарита — хорда лопасти, а не ось вращения, и диск ложился
+## плашмя и кувыркался вокруг оси (авторевью M24i).
+func _blur(rotor: Node3D, blades: float, upright: bool) -> void:
 	var mesh := rotor as MeshInstance3D
 	if mesh == null:
 		return
 	var box := mesh.mesh.get_aabb()
-	var along_y := box.size.y < minf(box.size.x, box.size.z)
 	var radius := maxf(maxf(box.size.x, box.size.z), box.size.y) * 0.5
 	var quad := PlaneMesh.new()
 	quad.size = Vector2.ONE * radius * 2.0
 	var look := ShaderMaterial.new()
-	var shader := Shader.new()
-	shader.code = BLUR_SHADER
-	look.shader = shader
+	look.shader = _blur_shader()
 	look.set_shader_parameter(&"tint", Color(ROTOR_COLOR, BLUR_ALPHA))
 	look.set_shader_parameter(&"blades", blades)
 	quad.material = look
@@ -547,11 +550,20 @@ func _blur(rotor: Node3D, blades: float) -> void:
 	disc.name = "Blur"
 	disc.mesh = quad
 	disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	# Плоскость диска — плоскость вращения: у несущего — горизонталь, у
-	# хвостового — вертикаль вдоль корпуса.
-	if not along_y:
+	# Плоскость меша — XZ; хвостовому винту она нужна в XY, лицом по оси +Z.
+	if upright:
 		disc.rotation.x = PI * 0.5
 	rotor.add_child(disc)
+
+
+## Шейдер диска размытия — один на все вертолёты, как ободок ([method _rim]):
+## вертолёт прилетает в каждое здание, и новый шейдер собирался бы на каждом.
+static func _blur_shader() -> Shader:
+	if _blur_code != null:
+		return _blur_code
+	_blur_code = Shader.new()
+	_blur_code.code = BLUR_SHADER
+	return _blur_code
 
 
 ## Габарит [param box] при всех наклонах до [constant TILT_MAX]: при малых углах
@@ -592,7 +604,7 @@ func _hang_winch(hull: AABB) -> void:
 	add_child(_rope)
 
 
-func _hang_lights(_hull: AABB) -> void:
+func _hang_lights() -> void:
 	var green := _light(NAV_GREEN, _marks["NavGreen"])
 	green.name = "NavGreen"
 	var top := _light(BEACON_RED, _marks["BeaconTop"])

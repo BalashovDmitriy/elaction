@@ -98,6 +98,9 @@ static func _cone(tool: SurfaceTool, centre: Vector3) -> void:
 			tool.add_vertex(vertex - Vector3(0.0, SHADE_HEIGHT * 0.5, 0.0))
 
 
+## Квадрат лицом к +Z, к камере. Лицевая грань у Godot — обход по часовой, если
+## смотреть на неё: против часовой шейдер с `cull_back` пятно не рисовал вовсе
+## (авторевью M24i, как у разряда молнии в M22).
 static func _quad(tool: SurfaceTool, size: Vector2, centre: Vector3) -> void:
 	var half := size * 0.5
 	var corners := [
@@ -107,6 +110,6 @@ static func _quad(tool: SurfaceTool, size: Vector2, centre: Vector3) -> void:
 		Vector3(-half.x, half.y, 0.0)
 	]
 	var uvs := [Vector2(0, 1), Vector2(1, 1), Vector2(1, 0), Vector2(0, 0)]
-	for at: int in [0, 1, 2, 0, 2, 3]:
+	for at: int in [0, 2, 1, 0, 3, 2]:
 		tool.set_uv(uvs[at])
 		tool.add_vertex((corners[at] as Vector3) + centre)

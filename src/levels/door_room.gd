@@ -59,24 +59,41 @@ const OFFICE_ART: PackedStringArray = ["whiteboard", "calendar", "corkboard", "a
 ## стены комнаты к коридору, м) и поворот, градусы. Тестам и кадрам.
 var placed: Array[Dictionary] = []
 var hotel: bool = true
+## Этаж тёмный по правилам ROM: своего света у комнаты нет, светится только
+## окно с городом — темнота этажа не нарушается (решение пользователя, M24i).
+var dark: bool = false
 
 
 ## Собирает комнату: [param is_hotel] — номер отеля или кабинет, [param seed] —
-## жребий двери, [param identity] — здание, его отделка.
-static func build(is_hotel: bool, seed: int, identity: BuildingIdentity = null) -> DoorRoom:
+## жребий двери, [param identity] — здание, его отделка. [param span] — этаж
+## от стены до стены по X двери: за его наружные стены комната не выходит.
+## [param unlit] — этаж тёмный: комната без своего света ([member dark]).
+static func build(
+	is_hotel: bool,
+	seed: int,
+	identity: BuildingIdentity = null,
+	span: Vector2 = Vector2(-INF, INF),
+	unlit: bool = false
+) -> DoorRoom:
 	var room := DoorRoom.new()
 	room.name = "Room"
 	room.hotel = is_hotel
+	room.dark = unlit
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
-	var shift := rng.randf_range(-SHIFT, SHIFT)
+	# У крайнего места этажа до наружной стены 2.4 м, а комната со сдвигом
+	# уходит от проёма на 2.7: без упора она торчала бы из силуэта здания полосой
+	# стены, пола и потолка (авторевью M24i). Жребий тот же, сдвиг — в упор.
+	var half := (WIDTH + WALL) * 0.5
+	var shift := clampf(rng.randf_range(-SHIFT, SHIFT), span.x + half, span.y - half)
 	room._shell(shift, identity)
 	room._window(shift + rng.randf_range(-0.3, 0.3), rng)
 	if is_hotel:
 		room._furnish_hotel(rng)
 	else:
 		room._furnish_office(rng)
-	room._light(shift, is_hotel)
+	if not unlit:
+		room._light(shift, is_hotel)
 	return room
 
 
@@ -157,7 +174,8 @@ func _furnish_hotel(rng: RandomNumberGenerator) -> void:
 	var bed_size := _put(bed, bed_x, 0.02, 0.0)
 	var stand_x := bed_x - side * (bed_size.x * 0.5 + 0.35)
 	_put("night_stand" if rng.randf() < 0.5 else "night_stand_b", stand_x, 0.05, 0.0)
-	_lamp_glow(stand_x)
+	if not dark:
+		_lamp_glow(stand_x)
 	_put("rug", bed_x * 0.5, bed_size.z * 0.55, 0.0, 1.8)
 	_hang(HOTEL_ART[rng.randi_range(0, HOTEL_ART.size() - 1)], bed_x, 1.75)
 

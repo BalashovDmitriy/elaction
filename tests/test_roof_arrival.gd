@@ -380,3 +380,28 @@ func test_pause_in_the_intro_skips_it_instead_of_pausing() -> void:
 	assert_true(get_tree().paused, "после вступления пауза снова пауза")
 	main._unpause()
 	Sounds.stop_music()
+
+
+## Диск размытия лежит в плоскости вращения своего винта (ADR-0049): у
+## несущего — плашмя, у хвостового — стоймя, поперёк его оси. Плоскость
+## угадывалась по габариту, и у двухлопастного хвостового винта диск ложился
+## плашмя и кувыркался вокруг оси (авторевью M24i).
+func test_each_rotor_blur_lies_in_its_plane_of_spin() -> void:
+	var helicopter := Helicopter.new()
+	autofree(helicopter)
+	# Ось вращения — та, вокруг которой винт крутит сам вертолёт ([Helicopter]).
+	for pair: Array in [["MainRotor", Vector3.UP], ["TailRotor", Vector3.BACK]]:
+		var rotor := helicopter.find_child(String(pair[0]), true, false) as Node3D
+		assert_not_null(rotor, "%s есть в модели" % pair[0])
+		if rotor == null:
+			continue
+		var disc := rotor.get_node_or_null(^"Blur") as MeshInstance3D
+		assert_not_null(disc, "%s: диск размытия" % pair[0])
+		if disc == null:
+			continue
+		# Нормаль плоского меша — его +Y: она и должна смотреть по оси винта.
+		var normal := disc.transform.basis.y.normalized()
+		var axis: Vector3 = pair[1]
+		assert_almost_eq(
+			absf(normal.dot(axis)), 1.0, 0.001, "%s: диск в плоскости вращения" % pair[0]
+		)

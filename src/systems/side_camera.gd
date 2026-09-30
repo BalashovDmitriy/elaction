@@ -75,9 +75,8 @@ var _listener: AudioListener3D = null
 ## Крупный план: насколько наехали, 0–1, и на что. Ведёт его режиссёр сценки.
 var _close: float = 0.0
 var _close_point := Vector2.ZERO
-## Сила толчка, 0–1, и сколько он уже идёт, с настоящего времени.
+## Сила толчка, 0–1, и когда он начался, мс настоящего времени.
 var _kick: float = 0.0
-var _kick_age: float = 0.0
 var _kick_ticks: int = 0
 
 
@@ -119,7 +118,6 @@ func _process(delta: float) -> void:
 ## KICK_FADE] с настоящего времени. [param strength] — 0–1.
 func kick(strength: float) -> void:
 	_kick = clampf(strength, 0.0, 1.0)
-	_kick_age = 0.0
 	_kick_ticks = Time.get_ticks_msec()
 
 
@@ -131,15 +129,15 @@ func is_kicked() -> bool:
 func _shake() -> void:
 	if _kick <= 0.0:
 		return
-	_kick_age = (Time.get_ticks_msec() - _kick_ticks) / 1000.0
-	var left := 1.0 - _kick_age / KICK_FADE
+	var age := (Time.get_ticks_msec() - _kick_ticks) / 1000.0
+	var left := 1.0 - age / KICK_FADE
 	if left <= 0.0:
 		_kick = 0.0
 		rotation = Vector3(-_tilt(), 0.0, 0.0)
 		close_up(_close, _close_point)
 		return
 	var force := _kick * left * left
-	var wave := _kick_age * KICK_RATE * TAU
+	var wave := age * KICK_RATE * TAU
 	global_position += (
 		Vector3(sin(wave) * KICK_SHIFT, cos(wave * 1.3) * KICK_SHIFT * 0.6, 0.0) * force
 	)

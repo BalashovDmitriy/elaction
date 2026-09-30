@@ -24,9 +24,6 @@ const JOINT_STEP: float = 0.9
 const JOINT_WIDTH: float = 0.02
 const JOINT_FROM: float = BuildingRibs.SKIRTING_HEIGHT + BuildingRibs.RAIL_HEIGHT
 
-## Карниз под потолком: высота и вынос от стены.
-const CROWN := Vector2(0.12, 0.1)
-
 const RUNNER_COLOR := Color(0.26, 0.08, 0.09)
 const RUNNER_EDGE_COLOR := Color(0.62, 0.5, 0.26)
 const SEAM_COLOR := Color(0.09, 0.09, 0.1)

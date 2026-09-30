@@ -31,13 +31,13 @@ var crown := Vector2(0.12, 0.1)
 var crown_color := Color(0.3, 0.3, 0.32)
 ## Створка: тон, филёнки (отель) или стекло в створке (офис), тон коробки и
 ## ручки.
-var leaf_tone := Color(0.72, 0.6, 0.34)
+var leaf_tone := GreyboxLook.DOOR
 var panels: bool = true
 var vision_glass: bool = false
 var frame_tone := Color(0.26, 0.2, 0.14)
 var handle_tone := Color(0.78, 0.64, 0.32)
 ## Табло над дверью: тёплое у отеля, холодное белое у офиса.
-var sign_tone := Color(1.0, 0.86, 0.6)
+var sign_tone := GreyboxLook.SIGN_WARM
 ## Светильник этажа.
 var fixture: Fixture = Fixture.PENDANT
 ## Бра на пилястрах — только в отеле.

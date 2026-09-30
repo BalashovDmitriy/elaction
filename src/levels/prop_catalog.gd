@@ -100,6 +100,11 @@ static var _entries: Dictionary = _build()
 static var _footprints: Dictionary = {}
 ## Габарит повёрнутой модели до масштаба, по имени.
 static var _boxes: Dictionary = {}
+## Сцены моделей по имени. Кэш загрузчика держит ресурс, только пока на него
+## есть ссылка, а собранный предмет на сцену не ссылается: комната за дверью,
+## собранная на открытии и убранная на закрытии, читала бы .glb с диска заново
+## на каждой створке — посреди шага физики (авторевью M24i).
+static var _scenes: Dictionary = {}
 
 
 ## Все записи каталога.
@@ -133,11 +138,15 @@ static func pick(where: Place, which: Fit) -> Array[Entry]:
 ## коридорная мебель стоит в свою настоящую глубину.
 static func make(prop_name: String, full_depth: bool = false) -> Node3D:
 	var item := entry(prop_name)
-	var path := "%s/%s.glb" % [DIR, prop_name]
-	if not ResourceLoader.exists(path):
-		push_error("нет модели обстановки: %s" % path)
-		return null
-	var model := (load(path) as PackedScene).instantiate() as Node3D
+	var scene := _scenes.get(prop_name) as PackedScene
+	if scene == null:
+		var path := "%s/%s.glb" % [DIR, prop_name]
+		if not ResourceLoader.exists(path):
+			push_error("нет модели обстановки: %s" % path)
+			return null
+		scene = load(path) as PackedScene
+		_scenes[prop_name] = scene
+	var model := scene.instantiate() as Node3D
 	# Поворот — отдельным узлом над моделью: габарит считается уже повёрнутым.
 	var turned := Node3D.new()
 	turned.add_child(model)

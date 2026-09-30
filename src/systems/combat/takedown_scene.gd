@@ -50,7 +50,8 @@ const FLASH_RANGE: float = 2.4
 const FLASH_OUT: float = 0.45
 const FLASH_TIME: float = 0.32
 ## Фон на время сценки: насыщенность и яркость кадра, и за сколько он к ним
-## приходит и уходит, с настоящего времени.
+## приходит, с настоящего времени. Уходит сразу, на любом выходе из сценки
+## ([method _restore_grade]).
 const GRADE_SATURATION: float = 0.35
 const GRADE_BRIGHTNESS: float = 0.8
 const GRADE_TIME: float = 0.2
@@ -81,6 +82,13 @@ var _time_scale_before: float = 1.0
 var _slowed: bool = false
 ## Во сколько раз замедлен мир прямо сейчас: по кривой сценки.
 var _world: float = APPROACH
+## Во сколько раз был замедлен мир в начале этого кадра, и какого. Масштаб
+## времени движок читает раз на кадр: шаг физики, идущий в кадре после того,
+## как сценка сменила замедление, приходит ещё со старым. Поделённый на новое,
+## второй шаг кадра удара шёл бы вдесятеро длиннее и проскакивал стоп-кадр
+## целиком, а исход сценки зависел бы от числа шагов в кадре (авторевью M24i).
+var _frame_world: float = 1.0
+var _frame_number: int = -1
 ## Сколько ещё идёт стоп-кадр, с настоящего времени.
 var _freeze_left: float = 0.0
 var _from_x: float = 0.0
@@ -92,7 +100,6 @@ var _environment: Environment = null
 var _saturation_before: float = 1.0
 var _brightness_before: float = 1.0
 var _grade_ticks: int = 0
-var _grading_out: bool = false
 
 
 ## Начинает сценку [param scene] над агентом [param agent]. Узел встаёт в дерево
@@ -140,6 +147,10 @@ func _ready() -> void:
 	_agent.figure.aim_height = NAN
 	_grade_in()
 	Sounds.muffle_music(MUFFLE, true)
+	# Сценка начинается посреди шага физики Otto: до конца кадра мир идёт ещё
+	# без замедления.
+	_frame_number = Engine.get_process_frames()
+	_frame_world = 1.0
 	_slow_down()
 	_show(0.0)
 
@@ -153,7 +164,11 @@ func advance(delta: float) -> void:
 	if not is_instance_valid(_agent) or not is_instance_valid(_otto):
 		_abort()
 		return
-	var real := delta / _world if _slowed else delta
+	var frame := Engine.get_process_frames()
+	if frame != _frame_number:
+		_frame_number = frame
+		_frame_world = _world if _slowed else 1.0
+	var real := delta / _frame_world
 	_fade_effects()
 	if _freeze_left > 0.0:
 		_freeze_left -= real
@@ -253,7 +268,10 @@ func _kill() -> void:
 	_flash_at_the_faces()
 	Sounds.duck_music(DUCK_TIME)
 	# Агента уже убило посреди сценки — лампой, кабиной: очки за него взяты там.
+	# Тело и его падает на ударе: поз ему сценка больше не ставит, а держать —
+	# значит оставить его стоять замершим до конца сценки.
 	if _agent.is_dead():
+		_agent.held = false
 		return
 	var score := Takedown.score(_scene.side, _agent.is_in_the_dark())
 	_knock_the_hat()
@@ -359,7 +377,6 @@ func _grade_in() -> void:
 	_saturation_before = _environment.adjustment_saturation
 	_brightness_before = _environment.adjustment_brightness
 	_grade_ticks = Time.get_ticks_msec()
-	_grading_out = false
 	_grade_step()
 
 
@@ -367,8 +384,6 @@ func _grade_step() -> void:
 	if _environment == null:
 		return
 	var share := clampf((Time.get_ticks_msec() - _grade_ticks) / 1000.0 / GRADE_TIME, 0.0, 1.0)
-	if _grading_out:
-		share = 1.0 - share
 	_environment.adjustment_enabled = true
 	_environment.adjustment_saturation = lerpf(_saturation_before, GRADE_SATURATION, share)
 	_environment.adjustment_brightness = lerpf(_brightness_before, GRADE_BRIGHTNESS, share)

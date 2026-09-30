@@ -79,6 +79,31 @@ func test_the_room_holds_its_furniture_inside() -> void:
 			)
 
 
+## У крайнего места этажа до наружной стены меньше, чем комната со сдвигом
+## уходит от проёма: комната упирается в стену и из силуэта здания не торчит
+## (авторевью M24i). Мебель стоит от проёма, а не от стен, — меряется сама
+## комната, её оболочка.
+func test_a_room_at_the_end_of_the_floor_stays_inside_the_building() -> void:
+	var margin := BuildingRules.new().margin
+	for is_hotel: bool in [true, false]:
+		for seed: int in DRAWS / 4:
+			for side: float in [-1.0, 1.0]:
+				var span := Vector2(-margin, 20.0) if side < 0.0 else Vector2(-20.0, margin)
+				var room := DoorRoom.build(is_hotel, seed, null, span)
+				autofree(room)
+				var shell := AABB()
+				var first := true
+				for child: Node in room.get_children():
+					var box := child as MeshInstance3D
+					if box == null or not (box.mesh is BoxMesh):
+						continue
+					var part := box.transform * box.mesh.get_aabb()
+					shell = part if first else shell.merge(part)
+					first = false
+				assert_gte(shell.position.x, span.x - 0.001, "жребий %d: за левую стену нет" % seed)
+				assert_lte(shell.end.x, span.y + 0.001, "жребий %d: за правую стену нет" % seed)
+
+
 func test_every_room_has_its_light_and_window() -> void:
 	for is_hotel: bool in [true, false]:
 		var room := _room(is_hotel, 7)
@@ -125,3 +150,13 @@ func test_a_bare_door_stays_dark() -> void:
 		await wait_physics_frames(1)
 	assert_gt(door.openness(), 0.0)
 	assert_null(door.room(), "без здания комнаты нет")
+
+
+## На тёмном этаже комната без своего света: светится только окно с городом
+## (решение пользователя, M24i).
+func test_a_room_on_a_dark_floor_keeps_the_dark() -> void:
+	for is_hotel: bool in [true, false]:
+		var room := DoorRoom.build(is_hotel, 5, null, Vector2(-INF, INF), true)
+		add_child_autofree(room)
+		assert_eq(room.find_children("*", "Light3D", true, false).size(), 0, "своего света нет")
+		assert_not_null(room.find_child("Window", true, false), "окно на город есть")
