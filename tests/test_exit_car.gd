@@ -15,7 +15,7 @@ const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 ## трогается с места и разгоняется, а не уходит сразу на полном ходу; с M24g
 ## кадр обгоняет её, чтобы дорога под фарами была видна (ADR-0043, решение 18),
 ## и из кадра она уезжает секунд за шесть. С M24h она ещё встаёт у края
-## мостовой и ждёт просвета в потоке — до [constant ExitCar.WAIT_LIMIT] и
+## мостовой и ждёт просвета в потоке — до [method StreetTraffic.wait_limit] и
 ## сколько-то сверх, пока просвет доедет (ADR-0044, решение 2): запас на
 ## пятнадцать секунд.
 const SETTLE_FRAMES: int = 5
@@ -121,27 +121,83 @@ func test_the_building_is_cleared_only_after_the_car_leaves() -> void:
 	assert_true(cleared[0], "здание сдано, когда машина уехала")
 
 
-## На улице машина встаёт у края мостовой, ждёт просвета и вливается в
-## ближнюю полосу потока (ADR-0044, решения 1–2).
-func test_the_car_waits_for_a_gap_and_joins_the_near_lane() -> void:
+## Полоса занята — машина встаёт у края мостовой, ждёт просвета с правым
+## поворотником и вливается в ближнюю полосу (ADR-0044, решения 1–2; ADR-0046,
+## решения 2–3). Занята она тестом: ближняя машина потока держится вплотную за
+## местом въезда, пока машина Otto не встала.
+func test_a_busy_lane_makes_the_car_wait_with_the_indicator_on() -> void:
 	var level := await _building()
 	var car := _car_of(level) as ExitCar
-	assert_not_null(car)
 	if car == null or car.traffic == null:
 		fail_test("у выезда нет потока")
 		return
 	_stand_at_the_door(level)
+	var lane := car.traffic.cars(true)
+	var blocker: StreetTraffic.Car = lane[lane.size() - 1]
 	var stages: Dictionary = {}
 	var waited := 0
+	var lit := false
+	var dark_while_signalling := false
 	while car.stage != ExitCar.Stage.CRUISE and waited < PATIENCE:
+		if car.stage == ExitCar.Stage.CLIMB and car.is_leaving():
+			_hold_behind(blocker, car.stop_x())
 		await get_tree().physics_frame
 		stages[car.stage] = true
+		if car.is_signalling():
+			lit = lit or car.indicator_lit()
+			dark_while_signalling = dark_while_signalling or not car.indicator_lit()
 		if car.stage == ExitCar.Stage.WAIT:
 			assert_almost_eq(car.position.x, car.stop_x(), 0.05, "ждёт у края мостовой")
 		waited += 1
-	assert_true(stages.has(ExitCar.Stage.WAIT), "машина вставала у края мостовой")
+	assert_true(stages.has(ExitCar.Stage.WAIT), "полоса занята — машина вставала у края мостовой")
 	assert_eq(car.stage, ExitCar.Stage.CRUISE, "влилась в поток")
 	assert_almost_eq(car.position.z, car.traffic.near_lane_z(), 0.01, "в ближней полосе")
+	assert_true(lit and dark_while_signalling, "поворотник мигал, пока машина ждала")
+	await get_tree().physics_frame
+	assert_false(car.is_signalling(), "в полосе поворотник выключен")
+	assert_false(car.indicator_lit())
+
+
+## Полоса свободна — машина не встаёт у края мостовой, а съезжает с ходу, с
+## поворотником (ADR-0046, решение 3). Свободна она тестом: ближняя полоса
+## пуста, и въезд на неё придержан.
+func test_a_clear_lane_lets_the_car_merge_without_stopping() -> void:
+	var level := await _building()
+	var car := _car_of(level) as ExitCar
+	if car == null or car.traffic == null:
+		fail_test("у выезда нет потока")
+		return
+	car.traffic.hold_back(true)
+	for other: StreetTraffic.Car in car.traffic.cars(true):
+		other.x = -1000.0
+		other.node.position.x = other.x
+	_stand_at_the_door(level)
+	var stages: Dictionary = {}
+	var slowest := INF
+	var signalled := false
+	var waited := 0
+	while car.stage != ExitCar.Stage.CRUISE and waited < PATIENCE:
+		car.traffic.hold_back(true)
+		await get_tree().physics_frame
+		stages[car.stage] = true
+		signalled = signalled or car.is_signalling()
+		if car.is_leaving() and absf(car.position.x - car.stop_x()) < 0.5:
+			slowest = minf(slowest, car.speed_now())
+		waited += 1
+	assert_false(stages.has(ExitCar.Stage.WAIT), "не вставала у края мостовой")
+	assert_gt(slowest, 1.0, "у края мостовой не останавливалась, м/с")
+	assert_eq(car.stage, ExitCar.Stage.CRUISE, "влилась в поток")
+	assert_true(signalled, "поворотник мигал на съезде")
+
+
+## Держит машину потока [param blocker] вплотную за местом въезда [param x]:
+## сзади, в пяти метрах по бамперам, стоя.
+func _hold_behind(blocker: StreetTraffic.Car, x: float) -> void:
+	if not is_instance_valid(blocker.node):
+		return
+	blocker.x = x + CarModel.LENGTH + 5.0
+	blocker.speed = 0.0
+	blocker.node.position.x = blocker.x
 
 
 ## Ставит Otto на пол подвала у водительской двери.
@@ -346,6 +402,38 @@ func test_the_body_takes_the_drawn_paint() -> void:
 	assert_true(painted, "кузов в краске жребия")
 
 
+## У каждой машины жребия — проём водительской двери с дверью на петле, салон,
+## плафон под крышей и поворотники (ADR-0046, решение 1): посадка толковая в
+## любую, не только в красную первого здания. Дверь у борта к камере, в
+## пределах машины по длине, и салон внутри кузова, а не под ним или над ним.
+func test_every_car_has_a_door_a_cabin_and_indicators() -> void:
+	for index: int in CarModel.MODELS.size():
+		var choice := CarModel.Choice.new()
+		choice.model = index
+		var car: Node3D = CarModel.build(choice)
+		add_child_autofree(car)
+		var door := car.find_child("DriverDoor", true, false) as MeshInstance3D
+		var cabin := car.find_child("CarInterior", true, false) as MeshInstance3D
+		assert_not_null(door, "модель %d: дверь" % index)
+		assert_not_null(cabin, "модель %d: салон" % index)
+		assert_not_null(car.find_child("DomeLight", true, false), "модель %d: плафон" % index)
+		assert_not_null(
+			car.find_child("IndicatorRight", true, false), "модель %d: поворотник" % index
+		)
+		if door == null or cabin == null:
+			continue
+		var span := door.mesh.get_aabb()
+		var front := door.position.x
+		assert_lt(door.position.z, 0.0, "модель %d: дверь у борта -Z — к камере у ворот" % index)
+		assert_between(span.size.x, 0.6, 1.4, "модель %d: длина двери, м" % index)
+		assert_between(
+			front, 0.0, CarModel.LENGTH * 0.5, "модель %d: петля перед серединой" % index
+		)
+		var inside := cabin.mesh.get_aabb()
+		assert_gt(inside.position.y, 0.1, "модель %d: салон не под днищем" % index)
+		assert_lt(inside.end.y, 1.4, "модель %d: салон не над крышей" % index)
+
+
 ## Посадку видно (ADR-0038, решение 4): Otto поворачивается к машине, дверца
 ## распахивается, он шагает в глубину к борту и скрывается, дверца захлопывается.
 ## Раньше он пропадал перед кузовом, шагнув к двери.
@@ -354,8 +442,9 @@ func test_otto_gets_in_through_the_open_driver_door() -> void:
 	var car := _car_of(level) as ExitCar
 	var boarding := level.get(&"_boarding") as ExitBoarding
 	assert_eq(car.door_openness(), 0.0, "у стоящей машины дверца закрыта")
-	var hinge := car.get_node("DoorHinge") as Node3D
-	assert_false(hinge.visible, "закрытую дверцу рисует сама модель")
+	var door := car.find_child("DriverDoor", true, false) as Node3D
+	assert_not_null(door, "дверца — деталь модели, кузов под ней прорезан")
+	assert_almost_eq(door.rotation.y, 0.0, 0.001, "закрытая дверца — вровень с кузовом")
 	_stand_at_the_door(level)
 	var widest := 0.0
 	var deepest := WorldSpace.PLAY_Z
@@ -375,7 +464,7 @@ func test_otto_gets_in_through_the_open_driver_door() -> void:
 	assert_true(hidden_behind_door, "скрылся, пока дверца ещё открыта")
 	assert_true(car.is_leaving(), "машина тронулась")
 	assert_eq(car.door_openness(), 0.0, "дверца захлопнулась")
-	assert_false(hinge.visible)
+	assert_almost_eq(door.rotation.y, 0.0, 0.001)
 
 
 ## С посадки кадр раздвигается влево за торец: ворота, площадка и тоннель в

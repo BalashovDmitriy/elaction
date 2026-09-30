@@ -907,6 +907,383 @@ def _car(name: str) -> None:
     for obj in list(bpy.context.scene.objects):
         if obj.type not in ("MESH", "EMPTY"):
             bpy.data.objects.remove(obj, do_unlink=True)
+    body = max(
+        (obj for obj in objects if "Wheel" not in obj.name), key=lambda obj: len(obj.data.polygons)
+    )
+    # Проём и салон считаются в мировых координатах: начало кузова — в нуль.
+    for other in bpy.context.scene.objects:
+        other.select_set(other is body)
+    bpy.context.view_layer.objects.active = body
+    bpy.ops.object.transform_apply(location=True, rotation=False, scale=False)
+    kind = CABIN_KINDS[CABINS[name]]
+    cabin = _cabin_box(body)
+    _cut_the_door(body, cabin, kind)
+    _furnish_the_cabin(cabin, _roof_over(body, cabin), kind)
+    _indicators(body)
+
+
+# Салон и водительская дверь (ADR-0046, решение 1). Дверь — у борта +Y
+# Blender: у стоящей у ворот машины он к камере. Дверь — доля длины машины,
+# передний край — у основания лобового стекла; порог — над днищем кузова.
+DOOR_SILL_LIFT = 0.1
+# Салон по типу машины: у купе дверь длиннее, сиденья низкие ковшом и сзади
+# только полка; у седана и универсала — диван, у универсала и внедорожника —
+# багажник за ним; внедорожник сидит выше и прямее. Числа: доля длины машины
+# под дверь, подъём подушки в долях высоты салона, наклон спинки и руля, рад.
+CABINS: dict[str, str] = {
+    "sports_car_2": "coupe",
+    "sports_car_1": "coupe",
+    "car_1": "sedan",
+    "car_2": "wagon",
+    "suv": "suv",
+}
+CABIN_KINDS: dict[str, dict] = {
+    "coupe": {"door": 0.31, "seat": 0.1, "recline": 0.4, "wheel": 0.62, "rear": False, "cargo": False, "buckets": True},
+    "sedan": {"door": 0.27, "seat": 0.2, "recline": 0.24, "wheel": 0.45, "rear": True, "cargo": False, "buckets": False},
+    "wagon": {"door": 0.27, "seat": 0.2, "recline": 0.22, "wheel": 0.45, "rear": True, "cargo": True, "buckets": False},
+    "suv": {"door": 0.27, "seat": 0.3, "recline": 0.14, "wheel": 0.3, "rear": True, "cargo": True, "buckets": False},
+}
+# Толщина дверцы с обшивкой и глубина проёма в кузове, м.
+DOOR_SKIN = 0.03
+JAMB_DEPTH = 0.05
+# Салон: обшивка, сиденья, торпедо, потолок, плафон — цвета sRGB.
+LINING: Rgb = (132, 100, 76)
+SEAT: Rgb = (58, 40, 34)
+DASH: Rgb = (30, 30, 34)
+HEADLINER: Rgb = (168, 156, 136)
+DOME_LAMP: Rgb = (255, 236, 200)
+CARPET: Rgb = (44, 40, 38)
+GAUGE: Rgb = (200, 230, 255)
+INDICATOR: Rgb = (255, 140, 20)
+
+
+def _cabin_box(body):
+    """Салон по стёклам модели: (низ, верх) углов, Blender-координаты.
+
+    По длине — от заднего стекла до лобового, по высоте — от порога до крыши,
+    по глубине — внутри бортов.
+    """
+    from mathutils import Vector
+
+    low = Vector((float("inf"),) * 3)
+    high = Vector((float("-inf"),) * 3)
+    body_low = float("inf")
+    for polygon in body.data.polygons:
+        centre = body.matrix_world @ polygon.center
+        body_low = min(body_low, centre.z)
+        slot = body.material_slots[polygon.material_index] if body.material_slots else None
+        if slot is None or slot.material is None or slot.material.name != "Windows":
+            continue
+        low = Vector(map(min, low, centre))
+        high = Vector(map(max, high, centre))
+    if low.x == float("inf"):
+        raise RuntimeError(body.name + ": нет стёкол — не понять, где салон")
+    sill = body_low + DOOR_SILL_LIFT
+    return Vector((low.x, -0.27, sill)), Vector((high.x, 0.27, high.z + 0.02))
+
+
+def _cut_the_door(body, cabin, kind: dict) -> None:
+    """Водительская дверь — отдельной деталью `DriverDoor`, проём — в кузове.
+
+    Кузов режется плоскостями по краям двери и порогу; грани борта +Y между
+    ними уходят в дверь. Край проёма в кузове вытягивается внутрь — у проёма
+    видна толщина, а не бумажный срез. Дверь толщиной [constant DOOR_SKIN],
+    изнутри — обшивка `Lining`. Начало двери — на петле у передней стойки: игра
+    поворачивает её вокруг вертикали через начало.
+    """
+    import bmesh
+    from mathutils import Vector
+
+    low, high = cabin
+    front = high.x - 0.02
+    rear = front - proportion("CAR_LENGTH") * kind["door"]
+    sill = low.z
+
+    bm = bmesh.new()
+    bm.from_mesh(body.data)
+    for co, no in (((front, 0, 0), (1, 0, 0)), ((rear, 0, 0), (1, 0, 0)), ((0, 0, sill), (0, 0, 1))):
+        geom = bm.verts[:] + bm.edges[:] + bm.faces[:]
+        bmesh.ops.bisect_plane(bm, geom=geom, plane_co=co, plane_no=no)
+    bm.normal_update()
+    door_faces = [
+        face
+        for face in bm.faces
+        if rear < face.calc_center_median().x < front
+        and face.calc_center_median().z > sill
+        and face.calc_center_median().y > 0.05
+        and face.normal.y > 0.45
+    ]
+    if not door_faces:
+        raise RuntimeError(body.name + ": у борта нет граней под дверь")
+    chosen = set(door_faces)
+    rim = [edge for edge in {e for f in door_faces for e in f.edges} if any(f not in chosen for f in edge.link_faces)]
+
+    door_bm = bmesh.new()
+    mapped: dict = {}
+    for face in door_faces:
+        verts = []
+        for vert in face.verts:
+            if vert not in mapped:
+                mapped[vert] = door_bm.verts.new(vert.co)
+            verts.append(mapped[vert])
+        made = door_bm.faces.new(verts)
+        made.material_index = face.material_index
+        # Кузов пака гранёный: сглаженная дверь шла бы бликами пятнами.
+        made.smooth = False
+    lining = len(body.material_slots)
+    # Обшивка — копия граней двери, сдвинутая внутрь и развёрнутая лицом в
+    # салон; по краю — торец двери той же обшивкой.
+    outer = list(door_bm.faces)
+    edge_loop = [edge for edge in door_bm.edges if edge.is_boundary]
+    copied = bmesh.ops.duplicate(door_bm, geom=outer)
+    inner = [elem for elem in copied["geom"] if isinstance(elem, bmesh.types.BMFace)]
+    inner_verts = [elem for elem in copied["geom"] if isinstance(elem, bmesh.types.BMVert)]
+    bmesh.ops.translate(door_bm, vec=(0.0, -DOOR_SKIN, 0.0), verts=inner_verts)
+    bmesh.ops.reverse_faces(door_bm, faces=inner)
+    for face in inner:
+        face.material_index = lining
+    edge_map = copied["edge_map"]
+    for edge in edge_loop:
+        twin = edge_map.get(edge)
+        if twin is None:
+            continue
+        a, b = edge.verts
+        c, d = twin.verts
+        if (c.co - a.co).length > (d.co - a.co).length:
+            c, d = d, c
+        for order in ((a, b, d, c), (c, d, b, a)):
+            try:
+                side = door_bm.faces.new(order)
+            except ValueError:
+                continue
+            side.material_index = lining
+            side.smooth = False
+    bmesh.ops.delete(bm, geom=door_faces, context="FACES_ONLY")
+    rim = [edge for edge in rim if edge.is_valid]
+    extruded = bmesh.ops.extrude_edge_only(bm, edges=rim)
+    new_verts = [elem for elem in extruded["geom"] if isinstance(elem, bmesh.types.BMVert)]
+    bmesh.ops.translate(bm, vec=(0.0, -JAMB_DEPTH, 0.0), verts=new_verts)
+    jamb = [elem for elem in extruded["geom"] if isinstance(elem, bmesh.types.BMFace)]
+    # Грани проёма смотрят кто куда — лицом к камере должна быть каждая: копия
+    # с обратной стороной.
+    twins = bmesh.ops.duplicate(bm, geom=jamb)["geom"]
+    bmesh.ops.reverse_faces(bm, faces=[elem for elem in twins if isinstance(elem, bmesh.types.BMFace)])
+    bm.to_mesh(body.data)
+    bm.free()
+
+    mesh = bpy.data.meshes.new("DriverDoor")
+    door_bm.to_mesh(mesh)
+    door_bm.free()
+    for slot in body.material_slots:
+        mesh.materials.append(slot.material)
+    mesh.materials.append(_material("Lining", LINING, 0.7))
+    door = bpy.data.objects.new("DriverDoor", mesh)
+    bpy.context.scene.collection.objects.link(door)
+    for polygon in mesh.polygons:
+        polygon.use_smooth = False
+    hinge_y = max(vert.co.y for vert in mesh.vertices)
+    hinge = Vector((front, hinge_y, (sill + high.z) * 0.5))
+    for vert in mesh.vertices:
+        vert.co -= hinge
+    door.location = hinge
+
+
+def _roof_over(body, cabin) -> float:
+    """Низ крыши над серединой салона, м: самое низкое из попаданий луча вниз
+    по длине потолка на полуширине [constant HEADLINER_HALF]. Крыша к верху
+    сужается, и потолок по высоте стёкол торчал бы из неё углами."""
+    from mathutils import Vector
+    from mathutils.bvhtree import BVHTree
+
+    low, high = cabin
+    tree = BVHTree.FromObject(body, bpy.context.evaluated_depsgraph_get())
+    lowest = high.z
+    length = high.x - low.x
+    for step in range(9):
+        x = low.x + length * (0.27 + 0.5 * step / 8.0)
+        for y in (-HEADLINER_HALF, HEADLINER_HALF):
+            hit, _normal, _index, _distance = tree.ray_cast(Vector((x, y, high.z + 1.0)), Vector((0, 0, -1)))
+            # Луч, прошедший мимо крыши, упрётся в днище: такие не в счёт.
+            if hit is not None and hit.z > (low.z + high.z) * 0.5:
+                lowest = min(lowest, hit.z)
+    return lowest
+
+
+HEADLINER_HALF = 0.13
+
+
+def _furnish_the_cabin(cabin, roof: float, kind: dict) -> None:
+    """Салон одним мешем `CarInterior` по типу машины [param kind]: пол с
+    ковриком, обшивка дальнего борта с подлокотником, потолок, передние
+    сиденья (у купе — ковшом, с боковой поддержкой), тоннель с рычагом, задний
+    диван или полка, багажник, торпедо со щитком приборов, руль и плафон.
+
+    Место плафона — пустышка `DomeLight`: игра ставит туда источник.
+    """
+    import math
+
+    import bmesh
+    from mathutils import Vector
+
+    low, high = cabin
+    length = high.x - low.x
+    height = roof - low.z
+    front_door = high.x - 0.02
+    door = proportion("CAR_LENGTH") * kind["door"]
+    driver_x = front_door - door * 0.6
+    seat_z = low.z + height * kind["seat"] + 0.05
+    belt = low.z + (high.z - low.z) * 0.5
+    lean = kind["recline"]
+    back_h = max(min(height * 0.5, roof - seat_z - 0.08), 0.18)
+
+    materials = [
+        _material("Lining", LINING, 0.7),
+        _material("Seat", SEAT, 0.55),
+        _material("Dash", DASH, 0.5),
+        _material("Headliner", HEADLINER, 0.95),
+        _material("DomeLamp", DOME_LAMP, 0.3),
+        _material("Carpet", CARPET, 1.0),
+        _material("Gauge", GAUGE, 0.2),
+    ]
+    bm = bmesh.new()
+
+    def part(material: int, build) -> None:
+        before = len(bm.faces)
+        build()
+        bm.faces.ensure_lookup_table()
+        for index in range(before, len(bm.faces)):
+            bm.faces[index].material_index = material
+
+    def seat(x: float, side: float, width: float) -> None:
+        """Подушка, спинка с наклоном назад и подголовник; ковш — с валиками."""
+        part(1, lambda: _box_into(bm, (0.34, width, 0.08), (x, side, seat_z)))
+        back_x = x - 0.17 - math.sin(lean) * back_h * 0.5
+        back_z = seat_z + math.cos(lean) * back_h * 0.5
+        part(1, lambda: _box_into(bm, (0.07, width, back_h), (back_x, side, back_z), (-lean, 3, "Y")))
+        top_x = x - 0.17 - math.sin(lean) * back_h
+        top_z = seat_z + math.cos(lean) * back_h
+        if top_z + 0.06 < roof - 0.03:
+            part(1, lambda: _box_into(bm, (0.06, width * 0.6, 0.07), (top_x - 0.01, side, top_z + 0.03), (-lean, 3, "Y")))
+        if not kind["buckets"]:
+            return
+        for edge in (-1.0, 1.0):
+            bolster = side + edge * (width * 0.5 - 0.015)
+            part(1, lambda b=bolster: _box_into(bm, (0.3, 0.03, 0.12), (x, b, seat_z + 0.03)))
+            part(
+                1,
+                lambda b=bolster: _box_into(
+                    bm, (0.09, 0.03, back_h * 0.8), (back_x + 0.01, b, back_z - back_h * 0.05), (-lean, 3, "Y")
+                ),
+            )
+
+    # Пол с ковриком и обшивка дальнего борта до линии окон с подлокотником.
+    part(0, lambda: _box_into(bm, (length, 0.54, 0.02), (low.x + length * 0.5, 0.0, low.z)))
+    part(5, lambda: _box_into(bm, (length * 0.8, 0.5, 0.012), (low.x + length * 0.55, 0.0, low.z + 0.016)))
+    part(0, lambda: _box_into(bm, (length, 0.02, belt - low.z), (low.x + length * 0.5, -0.26, (low.z + belt) * 0.5)))
+    part(0, lambda: _box_into(bm, (door * 0.6, 0.04, 0.03), (driver_x, -0.24, seat_z + 0.1)))
+    # Потолок под крышей, середина салона. Уже салона: крыша к верху сужается,
+    # и потолок во всю ширину торчал бы углами из неё.
+    part(3, lambda: _box_into(bm, (length * 0.5, HEADLINER_HALF * 2.0, 0.02), (low.x + length * 0.52, 0.0, roof - 0.03)))
+    # Передние сиденья и тоннель между ними с рычагом.
+    for side in (0.13, -0.13):
+        seat(driver_x, side, 0.2)
+    part(2, lambda: _box_into(bm, (door * 0.8, 0.06, seat_z - low.z + 0.02), (driver_x + 0.12, 0.0, (low.z + seat_z) * 0.5 + 0.01)))
+    part(2, lambda: _box_into(bm, (0.02, 0.02, 0.1), (driver_x + 0.22, 0.0, seat_z + 0.05), (-0.3, 3, "Y")))
+    rear_x = driver_x - 0.62
+    if kind["rear"] and rear_x - 0.2 > low.x:
+        # Задний диван во всю ширину.
+        part(1, lambda: _box_into(bm, (0.34, 0.5, 0.09), (rear_x, 0.0, seat_z)))
+        part(1, lambda: _box_into(bm, (0.07, 0.5, back_h * 0.9), (rear_x - 0.2, 0.0, seat_z + back_h * 0.45), (-0.2, 3, "Y")))
+        if kind["cargo"] and rear_x - 0.3 > low.x:
+            # Багажник за диваном: пол ковром и шторка.
+            cargo = rear_x - 0.26 - low.x
+            part(5, lambda: _box_into(bm, (cargo, 0.5, 0.02), (low.x + cargo * 0.5, 0.0, seat_z - 0.02)))
+            part(2, lambda: _box_into(bm, (cargo, 0.48, 0.012), (low.x + cargo * 0.5, 0.0, seat_z + back_h * 0.8)))
+    else:
+        # У купе сзади — полка за спинками.
+        shelf = max(driver_x - 0.3 - low.x, 0.1)
+        part(2, lambda: _box_into(bm, (shelf, 0.5, 0.02), (low.x + shelf * 0.5 + 0.05, 0.0, belt)))
+    # Торпедо у лобового стекла, щиток приборов с двумя циферблатами и руль.
+    dash_x = high.x - 0.12
+    part(2, lambda: _box_into(bm, (0.22, 0.52, 0.12), (dash_x, 0.0, belt - 0.02)))
+    part(2, lambda: _box_into(bm, (0.08, 0.2, 0.05), (dash_x - 0.08, 0.13, belt + 0.06)))
+    for offset in (-0.04, 0.04):
+        part(6, lambda o=offset: _box_into(bm, (0.005, 0.06, 0.04), (dash_x - 0.121, 0.13 + o, belt + 0.035)))
+    wheel_at = Vector((dash_x - 0.16, 0.13, belt + 0.02))
+    part(2, lambda: _torus_into(bm, wheel_at, 0.1, 0.012, -kind["wheel"]))
+    part(2, lambda: _box_into(bm, (0.14, 0.02, 0.02), (dash_x - 0.09, 0.13, belt), (kind["wheel"], 3, "Y")))
+    # Плафон под крышей над передними сиденьями.
+    dome = Vector((driver_x + 0.12, 0.0, roof - 0.045))
+    part(4, lambda: _box_into(bm, (0.1, 0.06, 0.012), tuple(dome)))
+
+    mesh = bpy.data.meshes.new("CarInterior")
+    bm.to_mesh(mesh)
+    bm.free()
+    for material in materials:
+        mesh.materials.append(material)
+    interior = bpy.data.objects.new("CarInterior", mesh)
+    bpy.context.scene.collection.objects.link(interior)
+    anchor = bpy.data.objects.new("DomeLight", None)
+    anchor.location = dome - Vector((0.0, 0.0, 0.03))
+    bpy.context.scene.collection.objects.link(anchor)
+
+
+def _torus_into(bm, centre, radius: float, tube: float, tilt: float, segments: int = 16, sides: int = 6) -> None:
+    """Баранка: тор радиуса [param radius] с трубкой [param tube], плоскостью
+    вдоль Y и наклоном [param tilt] рад от вертикали к водителю."""
+    import math
+
+    from mathutils import Matrix, Vector
+
+    turn = Matrix.Rotation(tilt, 3, "Y")
+    rings = []
+    for step in range(segments):
+        around = math.tau * step / segments
+        ring = []
+        for side in range(sides):
+            across = math.tau * side / sides
+            reach = radius + tube * math.cos(across)
+            local = Vector((tube * math.sin(across), reach * math.cos(around), reach * math.sin(around)))
+            ring.append(bm.verts.new(centre + turn @ local))
+        rings.append(ring)
+    for step in range(segments):
+        ring, following = rings[step], rings[(step + 1) % segments]
+        for side in range(sides):
+            nxt = (side + 1) % sides
+            bm.faces.new((ring[side], following[side], following[nxt], ring[nxt]))
+
+
+def _indicators(body) -> None:
+    """Поворотники по четырём углам кузова, материалы `IndicatorLeft` у борта +Y
+    и `IndicatorRight` у борта -Y: капот в +X, и правый борт — -Y. Стекло
+    ставится лучом на кузов — у каждой модели свой изгиб угла."""
+    import bmesh
+    from mathutils import Vector
+    from mathutils.bvhtree import BVHTree
+
+    tree = BVHTree.FromObject(body, bpy.context.evaluated_depsgraph_get())
+    heights: dict[str, float] = {}
+    for polygon in body.data.polygons:
+        slot = body.material_slots[polygon.material_index] if body.material_slots else None
+        if slot is not None and slot.material is not None and slot.material.name in ("Headlights", "TailLights"):
+            heights.setdefault(slot.material.name, (body.matrix_world @ polygon.center).z)
+    half = proportion("CAR_LENGTH") * 0.5
+    for name, side in (("IndicatorLeft", 1.0), ("IndicatorRight", -1.0)):
+        bm = bmesh.new()
+        for end, lights in ((1.0, "Headlights"), (-1.0, "TailLights")):
+            z = heights.get(lights, 0.45)
+            origin = Vector((end * (half + 0.3), side * 0.5, z))
+            aim = Vector((end * (half - 0.14), side * 0.26, z)) - origin
+            hit, normal, _index, _distance = tree.ray_cast(origin, aim.normalized())
+            if hit is None:
+                continue
+            _box_into(bm, (0.07, 0.07, 0.035), tuple(hit + normal * 0.012))
+        mesh = bpy.data.meshes.new(name)
+        bm.to_mesh(mesh)
+        bm.free()
+        mesh.materials.append(_material(name, INDICATOR, 0.3))
+        lamp = bpy.data.objects.new(name, mesh)
+        bpy.context.scene.collection.objects.link(lamp)
 
 
 def _export(path: Path) -> None:

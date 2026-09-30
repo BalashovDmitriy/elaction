@@ -21,8 +21,15 @@ extends Node3D
 ## когда та влилась: подъехавшая сзади притормаживает, а не проходит насквозь.
 ## Дальней держать некого: скорость полосы одна на всех.
 ##
-## Жребий потока — от сида здания: каждый прогон одного здания одинаков.
+## Жребий потока — от сида здания: каждый прогон одного здания одинаков, а
+## сид здания солью партии свой в каждой партии. Первым жребием — дорожная
+## ситуация ([enum Density], ADR-0046, решение 3): свободная улица, где просвет
+## чаще есть сразу, обычная и плотная, где ждать дольше. Машины — жребием
+## модели и краски, каждая своя.
 ## Двигается поток, только пока выезд в кадре ([method set_active]).
+
+## Дорожная ситуация у выезда: насколько плотно идут машины.
+enum Density { LIGHT, NORMAL, HEAVY }
 
 ## Середины полос по Z, м: ближняя — между тротуаром у выезда и осевой, дальняя
 ## — между осевой и машиной, припаркованной у дальнего бордюра.
@@ -30,8 +37,14 @@ const NEAR_LANE_Z: float = -3.2
 const FAR_LANE_Z: float = -5.2
 ## Скорость полос, м/с: жребий по зданию в этих пределах.
 const SPEEDS := Vector2(8.0, 11.0)
-## Просвет между машинами при въезде, м по бамперам: жребий на каждую.
-const GAPS := Vector2(7.0, 24.0)
+## Просвет между машинами при въезде, м по бамперам: жребий на каждую, в
+## пределах ситуации [enum Density].
+const GAPS: Array[Vector2] = [Vector2(20.0, 48.0), Vector2(7.0, 24.0), Vector2(3.5, 11.0)]
+## Доли ситуаций в жребии: свободная, обычная, плотная.
+const DENSITY_ODDS: Array[float] = [0.35, 0.4, 0.25]
+## Сколько машина Otto ждёт просвета, прежде чем поток его устроит, с, по
+## ситуации: в плотном потоке ждать приходится дольше.
+const WAIT_LIMITS: Array[float] = [1.5, 2.2, 4.0]
 ## Ближе этого машина к передней не подъедет, м по бамперам; с [constant
 ## SAFE_GAP] и дальше — едет полным ходом.
 const MIN_GAP: float = 2.5
@@ -85,6 +98,9 @@ class Lane:
 	var held: bool = false
 
 
+## Ситуация этого выезда.
+var density: Density = Density.NORMAL
+
 var _rng := RandomNumberGenerator.new()
 var _street: float = 0.0
 var _near := Lane.new()
@@ -104,6 +120,7 @@ func build(left: float, street: float, building_seed: int) -> void:
 	name = "Traffic"
 	_street = street
 	_rng.seed = hash([building_seed, SALT])
+	density = _draw_density(_rng.randf())
 	var far_end := left - ExitStreet.FROM - BEHIND_CORNER
 	var corner := left + BEHIND_CORNER
 	_near.z = NEAR_LANE_Z
@@ -118,6 +135,29 @@ func build(left: float, street: float, building_seed: int) -> void:
 		lane.speed = _rng.randf_range(SPEEDS.x, SPEEDS.y)
 		_fill(lane)
 	set_active(false)
+
+
+## Ситуация по доле [param roll] из [0, 1): по долям [constant DENSITY_ODDS].
+static func _draw_density(roll: float) -> Density:
+	var upto := 0.0
+	for index: int in DENSITY_ODDS.size():
+		upto += DENSITY_ODDS[index]
+		if roll < upto:
+			return index as Density
+	return Density.HEAVY
+
+
+## Какая ситуация выпадет у здания с сидом [param building_seed]: тот же первый
+## жребий, что у [method build]. Тестам — найти здание с нужной.
+static func density_for(building_seed: int) -> Density:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash([building_seed, SALT])
+	return _draw_density(rng.randf())
+
+
+## Сколько машина Otto ждёт просвета, прежде чем поток его устроит, с.
+func wait_limit() -> float:
+	return WAIT_LIMITS[density]
 
 
 ## Двигается ли поток: только пока выезд в кадре — или пока его ждёт машина
@@ -228,7 +268,7 @@ func _let_in(lane: Lane) -> void:
 		if (last.x - lane.entry) * lane.towards < lane.next_gap + CarModel.LENGTH:
 			return
 	lane.cars.append(_add_car(lane, lane.entry))
-	lane.next_gap = _rng.randf_range(GAPS.x, GAPS.y)
+	lane.next_gap = _next_gap()
 
 
 ## Убирает уехавших за конец улицы.
@@ -243,11 +283,17 @@ func _let_go(lane: Lane) -> void:
 
 ## Заполняет полосу машинами от конца к въезду с жребием просветов.
 func _fill(lane: Lane) -> void:
-	var x := lane.exit - lane.towards * _rng.randf_range(0.0, GAPS.y)
+	var x := lane.exit - lane.towards * _rng.randf_range(0.0, GAPS[density].y)
 	while (lane.entry - x) * -lane.towards > 0.0:
 		lane.cars.append(_add_car(lane, x))
-		x -= lane.towards * (CarModel.LENGTH + _rng.randf_range(GAPS.x, GAPS.y))
-	lane.next_gap = _rng.randf_range(GAPS.x, GAPS.y)
+		x -= lane.towards * (CarModel.LENGTH + _next_gap())
+	lane.next_gap = _next_gap()
+
+
+## Просвет до следующей машины, м: жребий в пределах ситуации.
+func _next_gap() -> float:
+	var span := GAPS[density]
+	return _rng.randf_range(span.x, span.y)
 
 
 func _add_car(lane: Lane, x: float) -> Car:
