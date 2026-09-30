@@ -224,3 +224,34 @@ Timings: the roof intro runs at 5 frames per tick (@4EA3), the car exit at 3 (@0
   Bonus line drawn over the scene from counter 7 (@0DAD-0E65); no tally screen.
 - missing documents (@09B5-0A69): highest floor with a red door is the target; sound $38 at counter 4; at counter 30
   Otto is hidden and the playfield scrolls up 2 px/frame; 20 ticks after, sound $39, Otto placed at the door x (@2FAA).
+
+## Part 5 (M24h: walking in the cab, crush, empty shaft)
+
+Elevator record at $837D, 8 bytes: +00 cab floor height above the floor of storey +01 (0..47), +01 cab storey,
++02 top storey, +03 bottom storey, +04/+05 left/right x, +07 player command. Character +09: 5 death, 6 crushed,
+7 jumping. Character +06 situation: 0 ground, 1 in cab, 2 on cab roof, 3 falling.
+
+### Walking in the cab
+- in-cab hook @45B4 -> @4674/@45C5 masks only up/down (`and $F3`, "no crouch in elevator") and sets iy+07 = +02/$FE;
+  left/right and jump go through the normal ground code (@438C/@442A, dx +-2). No check that the cab is moving:
+  Otto walks in a moving cab exactly as in a stopped one.
+- cab width: @2AFA `add a,$15` => iy+05 = iy+04 + 21 px; Otto 8 px => 13 px of travel. Walls @375A/@3765.
+- stepping out of a moving cab is allowed (@36F2-3712): if the cab floor is 0..18 px above the storey floor he
+  exits onto that storey with a forced hop (@379D, table @44ED); if 46-47 px up (level with the storey above) onto
+  that one; otherwise the slab crosses his body and he is held at the wall. Boarding a moving cab is symmetric
+  (@47FD-482D): cab roof above his head and cab floor below feet+4.
+
+### Crush
+- side contact never kills: partly over the shaft with the cab edge between feet+4 and head, @47C8/@47F6 ->
+  @4713/@4722 put his x back at the shaft edge.
+- kill (@4A30 -> @4A78): Otto entirely inside the shaft span (@46E9), on the cab's storey, top >= iy+00, i.e. the
+  cab floor came down to his head (29 px standing, 20 crouched). Standing entirely inside a shaft is possible only
+  on its bottom storey (@48A6), i.e. the pit under a raised cab. On the cab roof (@37E9): crushed when his head
+  reaches the top of the shaft.
+- @39B4-3AB4 and @3948/@397F are for bodies: a body in the shaft blocks and reverses the cab; a body over the edge
+  is moved to the side of the cab its centre is on, or falls.
+- agents: same code; 300 points (@56E7 -> @578A) only if Otto rides that same cab ($8520 == 1, @4A97-4AA9, @381E).
+
+### Empty shaft
+- walking into an opening without a cab: held at the edge; after 8 ticks of pushing (@301C, ~0.54 s) he drops
+  (CS_FALLING, $C3) at 6 px/tick (@3BBB); landing on the bottom or on a cab roof kills ($C4) at any height.
