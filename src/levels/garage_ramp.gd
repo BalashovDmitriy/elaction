@@ -114,6 +114,11 @@ func show_light(on: bool) -> void:
 		_street_node.show_light(on)
 
 
+## Поток машин улицы у выезда.
+func traffic() -> StreetTraffic:
+	return _street_node.traffic() if _street_node != null else null
+
+
 ## Настоящие источники выезда — для тестов бюджета.
 func lights() -> Array[Light3D]:
 	var found: Array[Light3D] = []

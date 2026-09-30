@@ -14,9 +14,12 @@ const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 ## Сколько кадров дать зданию собраться и сколько ждать отъезда. Машина с M24b
 ## трогается с места и разгоняется, а не уходит сразу на полном ходу; с M24g
 ## кадр обгоняет её, чтобы дорога под фарами была видна (ADR-0043, решение 18),
-## и из кадра она уезжает секунд за шесть — запас полуторный.
+## и из кадра она уезжает секунд за шесть. С M24h она ещё встаёт у края
+## мостовой и ждёт просвета в потоке — до [constant ExitCar.WAIT_LIMIT] и
+## сколько-то сверх, пока просвет доедет (ADR-0044, решение 2): запас на
+## пятнадцать секунд.
 const SETTLE_FRAMES: int = 5
-const PATIENCE: int = 720
+const PATIENCE: int = 1800
 ## Сколько шагов физики ждать, пока Otto сядет и машина тронется: шаг к двери,
 ## посадка с дверцей ([constant ExitBoarding.GET_IN_TIME], 0.85 с), полсекунды
 ## в машине ([constant ExitBoarding.SEAT_TIME]) и две секунды стартера
@@ -116,6 +119,29 @@ func test_the_building_is_cleared_only_after_the_car_leaves() -> void:
 		await get_tree().process_frame
 		waited += 1
 	assert_true(cleared[0], "здание сдано, когда машина уехала")
+
+
+## На улице машина встаёт у края мостовой, ждёт просвета и вливается в
+## ближнюю полосу потока (ADR-0044, решения 1–2).
+func test_the_car_waits_for_a_gap_and_joins_the_near_lane() -> void:
+	var level := await _building()
+	var car := _car_of(level) as ExitCar
+	assert_not_null(car)
+	if car == null or car.traffic == null:
+		fail_test("у выезда нет потока")
+		return
+	_stand_at_the_door(level)
+	var stages: Dictionary = {}
+	var waited := 0
+	while car.stage != ExitCar.Stage.CRUISE and waited < PATIENCE:
+		await get_tree().physics_frame
+		stages[car.stage] = true
+		if car.stage == ExitCar.Stage.WAIT:
+			assert_almost_eq(car.position.x, car.stop_x(), 0.05, "ждёт у края мостовой")
+		waited += 1
+	assert_true(stages.has(ExitCar.Stage.WAIT), "машина вставала у края мостовой")
+	assert_eq(car.stage, ExitCar.Stage.CRUISE, "влилась в поток")
+	assert_almost_eq(car.position.z, car.traffic.near_lane_z(), 0.01, "в ближней полосе")
 
 
 ## Ставит Otto на пол подвала у водительской двери.

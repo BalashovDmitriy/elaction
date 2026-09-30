@@ -233,15 +233,16 @@ func _exit() -> void:
 ## на дорогу.
 func _drive_sequence(car: ExitCar) -> void:
 	var index := 0
-	while car.is_leaving() and _curtain.opacity() < 0.95 and index < 40:
+	while car.is_leaving() and _curtain.opacity() < 0.95 and index < 90:
 		await _shoot("drive_%02d" % index)
 		var camera := get_viewport().get_camera_3d()
 		print(
 			(
-				"  drive_%02d машина %s наклон %.1f° фары %s камера %s затемнение %.2f"
+				"  drive_%02d машина %s стадия %d наклон %.1f° фары %s камера %s затемнение %.2f"
 				% [
 					index,
 					WorldSpace.to_plane(car.global_position),
+					car.stage,
 					rad_to_deg(car.rotation.z),
 					car.lights_on(),
 					camera.global_position if camera != null else Vector3.ZERO,
