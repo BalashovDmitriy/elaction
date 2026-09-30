@@ -280,6 +280,20 @@ static func play(name: String) -> void:
 		director.play(name)
 
 
+## Эффект с тоном [param pitch] и громкостью [param db] этого раза.
+static func play_tuned(name: String, pitch: float, db: float = 0.0) -> void:
+	var director := AudioDirector.instance()
+	if director != null:
+		director.play(name, pitch, db)
+
+
+## Приглушает музыку на [param seconds] секунд.
+static func duck_music(seconds: float) -> void:
+	var director := AudioDirector.instance()
+	if director != null:
+		director.duck(seconds)
+
+
 ## Включает музыку, если она ещё не та же самая. [param pick] — какой из
 ## вариантов трека: здание берёт его по своему сиду.
 static func play_music(name: String, pick: int = 0) -> void:

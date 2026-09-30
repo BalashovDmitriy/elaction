@@ -134,7 +134,7 @@ static func all_scenes() -> Array[Scene]:
 static func _combo() -> Scene:
 	var scene := _scene("combo", Side.FRONT, 1.15, 0.72, 0.72, true)
 	scene.otto = [[0.0, "punch_jab"], [0.34, "punch_cross"], [0.95, "idle"]]
-	scene.agent = [[0.0, "idle"], [0.12, "hit_head"], [0.46, "hit_chest"], [0.66, "knockback"]]
+	scene.agent = [[0.0, "reach_gun"], [0.12, "hit_head"], [0.46, "hit_chest"], [0.66, "knockback"]]
 	scene.corpse = "knocked"
 	return scene
 
@@ -144,7 +144,7 @@ static func _combo() -> Scene:
 static func _pistol_whip() -> Scene:
 	var scene := _scene("pistol_whip", Side.FRONT, 1.0, 0.42, 0.62, true)
 	scene.otto = [[0.0, "whip_raise"], [0.3, "whip_strike"], [0.8, "idle"]]
-	scene.agent = [[0.0, "idle"], [0.3, "hit_head"], [0.42, "dead_0"]]
+	scene.agent = [[0.0, "reach_gun"], [0.3, "hit_head"], [0.42, "dead_0"]]
 	return scene
 
 
@@ -153,7 +153,8 @@ static func _choke() -> Scene:
 	var scene := _scene("choke", Side.BACK, 1.35, 1.02, 0.4, false)
 	scene.otto = [[0.0, "choke_hold"], [1.12, "idle"]]
 	scene.agent = [
-		[0.0, "choked"],
+		[0.0, "look_back"],
+		[0.12, "choked"],
 		[0.22, "choked_kick"],
 		[0.42, "choked"],
 		[0.6, "choked_kick"],
@@ -167,7 +168,7 @@ static func _choke() -> Scene:
 static func _neck_snap() -> Scene:
 	var scene := _scene("neck_snap", Side.BACK, 0.95, 0.46, 0.32, false)
 	scene.otto = [[0.0, "snap_grab"], [0.38, "snap_twist"], [0.78, "idle"]]
-	scene.agent = [[0.0, "snap_held"], [0.4, "snap_broken"], [0.52, "dead_0"]]
+	scene.agent = [[0.0, "look_back"], [0.14, "snap_held"], [0.4, "snap_broken"], [0.52, "dead_0"]]
 	return scene
 
 

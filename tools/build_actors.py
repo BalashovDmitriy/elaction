@@ -805,8 +805,15 @@ def _dress(armature, meshes, actor: dict) -> None:
     parts = [_gun(armature)]
     if actor["glasses"]:
         parts.append(_glasses(meshes))
-    if actor["hat"]:
-        parts.append(_hat(meshes, armature, actor["colours"]["Hair"]))
+    # Шляпа — своим мешем `hat` на кости головы, а не в общем теле: на ударе
+    # добивания она слетает (ADR-0050), и игра прячет её, не трогая тело.
+    hat = _hat(meshes, armature, actor["colours"]["Hair"]) if actor["hat"] else None
+    if hat is not None:
+        hat.name = "hat"
+        hat.data.name = "hat"
+        modifier = hat.modifiers.new("Armature", "ARMATURE")
+        modifier.object = armature
+        hat.parent = armature
 
     for obj in bpy.context.scene.objects:
         obj.select_set(obj in meshes or obj in parts)
