@@ -42,3 +42,25 @@ func test_fill_shadows_go_to_the_lamps_nearest_the_middle() -> void:
 	for lamp: Lamp in picked:
 		var x := WorldSpace.to_plane(lamp.global_position).x
 		assert_between(x, 19.0, 25.0, "ближние к середине: %.1f" % x)
+
+
+## Тень заливки достаётся только лампам, которые тень кладут: запасной этаж и
+## лампа из-за края полосы теней места не занимают (авторевью M24h).
+func test_fill_shadows_skip_lamps_that_cast_no_shadow() -> void:
+	var lamps: Array[Lamp] = []
+	# x, этаж: у середины — лампа запасного этажа; за полосой — ещё одна.
+	for spot: Vector2 in [
+		Vector2(21.0, 6.0), Vector2(18.0, 5.0), Vector2(25.0, 5.0), Vector2(40.0, 5.0)
+	]:
+		var lamp := LAMP_SCENE.instantiate() as Lamp
+		lamp.position = WorldSpace.to_scene(Vector2(spot.x, 3.0))
+		lamp.floor_index = int(spot.y)
+		add_child_autofree(lamp)
+		lamps.append(lamp)
+	var picked := FloorLighting.nearest(
+		lamps, Vector2(21.0, 3.0), 3, Vector2(10.0, 30.0), Vector2i(5, 5)
+	)
+	assert_eq(picked.size(), 2, "из четырёх тень кладут две")
+	for lamp: Lamp in picked:
+		assert_eq(lamp.floor_index, 5, "с этажа в кадре")
+		assert_lt(WorldSpace.to_plane(lamp.global_position).x, 30.0, "из полосы теней")

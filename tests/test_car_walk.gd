@@ -27,6 +27,7 @@ func after_all() -> void:
 	GameState.instance().reset()
 	Input.action_release(&"move_down")
 	Input.action_release(&"move_right")
+	Input.action_release(&"jump")
 
 
 ## Пол нижнего этажа справа от шахты: верх — на высоте −1 этаж.
@@ -85,6 +86,33 @@ func test_otto_walks_in_a_moving_car_and_stops_at_its_wall() -> void:
 	Input.action_release(&"move_right")
 	Input.action_release(&"move_down")
 	assert_true(walked, "в едущей кабине Otto идёт")
+
+
+## Борт держит и в прыжке: скорость полёта берётся с земли, и прыжок с разбега
+## выносил бы Otto из едущей кабины в шахту (авторевью M24h).
+func test_a_jump_in_a_moving_car_stops_at_its_wall_too() -> void:
+	var pair := await _riding_down()
+	var car := pair[0] as ElevatorCar
+	var otto := pair[1] as Otto
+	var room := (car.width() - Proportions.BODY_WIDTH) * 0.5
+	Input.action_press(&"move_right")
+	Input.action_press(&"jump")
+	var flew := false
+	for _frame: int in RIDE_FRAMES:
+		await wait_physics_frames(1)
+		if car.can_step_out():
+			break
+		flew = flew or not otto.is_grounded()
+		assert_lte(
+			otto.global_position.x - car.global_position.x,
+			room + 0.02,
+			"в прыжке борт — тоже стена"
+		)
+	Input.action_release(&"jump")
+	Input.action_release(&"move_right")
+	Input.action_release(&"move_down")
+	assert_true(flew, "Otto прыгнул в едущей кабине")
+	assert_true(otto.is_riding(), "и прыжок не вынес его из кабины")
 
 
 func test_otto_steps_out_of_a_moving_car_near_a_floor() -> void:

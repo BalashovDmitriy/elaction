@@ -246,7 +246,9 @@ func _process(_delta: float) -> void:
 	_lit_band = strip
 	# Свет лампы кладёт тени, то есть стоит дорого, и горит только в кадре; на
 	# запасных этажах — без тени (ADR-0042, решение 2).
-	var filled := FloorLighting.nearest(_lamps, seen.get_center(), Lamp.FILL_SHADOW_CAP)
+	var filled := FloorLighting.nearest(
+		_lamps, seen.get_center(), Lamp.FILL_SHADOW_CAP, shade, in_frame
+	)
 	for lamp: Lamp in _lamps:
 		if not is_instance_valid(lamp):
 			continue

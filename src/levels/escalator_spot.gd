@@ -42,9 +42,14 @@ func gap(rules: BuildingRules) -> Vector2:
 ## эскалатором, от площадки до края этажа, и по нему по-прежнему стоят
 ## двери, лампы и мебель. Пол с M24h цельный, и дыра нужна лишь там, где
 ## пролёт проходит сквозь плиту: пока голова едущего не ушла под неё.
+##
+## Голове надо уйти вниз на рост, плиту и запас; по горизонтали — это, делённое
+## на уклон правил ([member BuildingRules.escalator_angle]), а не 45° молча
+## (авторевью M24h). Пролёт от перегиба круче уклона правил — запас выходит сам.
 func hole(rules: BuildingRules) -> Vector2:
 	var near := x + towards * rules.escalator_gap_offset
-	var reach := BEND_CLEARANCE + Proportions.BODY + rules.slab_height + HEAD_CLEARANCE
+	var drop := Proportions.BODY + rules.slab_height + HEAD_CLEARANCE
+	var reach := BEND_CLEARANCE + drop * rules.escalator_run / rules.floor_height
 	var far := near + towards * minf(reach, absf(edge - near))
 	return Vector2(minf(near, far), maxf(near, far))
 

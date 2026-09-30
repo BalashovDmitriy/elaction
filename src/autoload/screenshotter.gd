@@ -348,6 +348,25 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "turning", "actions": ["move_right"], "hold": 0.05},
 		{"label": "walking_on", "actions": ["move_right"], "hold": 1.0},
 	],
+	# M24h: улица и кабина. Маршрут M24g плюс шаг в едущей кабине; эскалатор в
+	# глубине — tools/m24g_shot.tscn, поток и выезд — tools/m24b_shot.tscn --
+	# --sequence, кадр по этажам — tools/light_bench.tscn -- --floors.
+	"M24H":
+	[
+		{"label": "rope", "actions": [], "hold": 0.4},
+		{"label": "roof", "actions": [], "hold": 1.2},
+		{"label": "roof_walk", "actions": ["move_right"], "hold": 2.5},
+		{"label": "to_the_shaft", "actions": ["move_right"], "hold": 2.9},
+		{"label": "riding_down", "actions": ["move_down"], "hold": 1.4},
+		{"label": "walking_in_the_car", "actions": ["move_down", "move_left"], "hold": 0.8},
+		{"label": "stopped", "actions": [], "hold": 1.6},
+		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
+		{"label": "floor", "actions": [], "hold": 0.6},
+		{"label": "takeoff", "actions": ["jump"], "hold": 0.2},
+		{"label": "falling", "actions": [], "hold": 0.45},
+		{"label": "landing", "actions": [], "hold": 0.4},
+		{"label": "walking_on", "actions": ["move_right"], "hold": 1.0},
+	],
 	"M19":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},

@@ -156,13 +156,8 @@ func park(
 	add_child(model)
 	_hang_the_door(model, CarModel.PAINTS[choice.paint])
 	_wheels = CarModel.wheels(model)
-	_hubs = PackedVector3Array()
-	for wheel in _wheels:
-		var mesh := wheel as MeshInstance3D
-		var box := mesh.mesh.get_aabb() if mesh != null else AABB()
-		_hubs.append(box.get_center())
-		if mesh != null:
-			_wheel_radius = maxf(box.size.y * 0.5, 0.05)
+	_hubs = CarModel.hubs(_wheels)
+	_wheel_radius = CarModel.wheel_radius(_wheels, _wheel_radius)
 
 
 ## Где машина стоит у ворот: пара «левый край, правый край» по бамперам.
@@ -374,14 +369,8 @@ func advance(delta: float, view: Rect2) -> bool:
 	position.x += towards * _speed * delta
 	_climb()
 	_merge()
-	# Колёса катятся вокруг своих осей: угол — путь, делённый на радиус. Капот
-	# в +X, и колесо, катящееся вперёд, идёт по часовой, если смотреть с +Z, —
-	# это минус вокруг +Z. Модель, развёрнутая назад, катит их в своей системе
-	# вперёд, поэтому знак один.
-	var spin := Basis(Vector3.BACK, -_speed * delta / _wheel_radius)
-	for index in _wheels.size():
-		var hub := _hubs[index]
-		_wheels[index].transform *= Transform3D(spin, hub - spin * hub)
+	# Колёса катятся вокруг своих осей ([method CarModel.roll]).
+	CarModel.roll(_wheels, _hubs, _speed * delta, _wheel_radius)
 	var left := position.x - LENGTH * 0.5
 	if left + LENGTH < view.position.x or left > view.end.x:
 		_leaving = false

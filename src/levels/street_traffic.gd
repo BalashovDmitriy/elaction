@@ -164,13 +164,13 @@ func cars(near: bool) -> Array[Car]:
 ## никто не подъезжает ближе [constant CLEAR_BEHIND], впереди никого ближе
 ## [constant CLEAR_AHEAD].
 func is_clear_for(x: float) -> bool:
-	var half := CarModel.LENGTH * 0.5
 	for car: Car in _near.cars:
-		# Ближняя идёт влево: сзади — правее, впереди — левее.
+		# Ближняя идёт влево: сзади — правее, впереди — левее. Просвет — по
+		# бамперам: от середины до середины минус длина машины.
 		var gap := car.x - x
 		if gap >= 0.0 and gap - CarModel.LENGTH < CLEAR_BEHIND:
 			return false
-		if gap < 0.0 and -gap - half * 2.0 < CLEAR_AHEAD:
+		if gap < 0.0 and -gap - CarModel.LENGTH < CLEAR_AHEAD:
 			return false
 	return true
 
@@ -200,7 +200,8 @@ func _drive(lane: Lane, delta: float) -> void:
 		car.speed = move_toward(car.speed, wanted, change * delta)
 		car.x += lane.towards * car.speed * delta
 		car.node.position.x = car.x
-		_spin(car, delta)
+		# Колёса катятся, как у машины Otto ([method CarModel.roll]).
+		CarModel.roll(car.wheels, car.hubs, car.speed * delta, car.radius)
 
 
 ## Где передняя по ходу у машины [param index], по X; NAN — впереди никого.
@@ -260,6 +261,9 @@ func _add_car(lane: Lane, x: float) -> Car:
 	model.scale = Vector3(1.0, 1.0, Garage.CAR_WIDTH / _depth_of(choice.model, model))
 	root.add_child(model)
 	var halo := ExitCar.halo()
+	# Своим именем: «Halo» — ореол дождя ([RainLook]), и в сухую погоду его в
+	# здании быть не должно; фары потока светят и в сухую.
+	halo.name = "HeadlightGlow"
 	halo.position = Vector3(CarModel.LENGTH * HALO_REACH, HALO_HEIGHT, 0.0)
 	root.add_child(halo)
 	# Капот модели в +X; полосе влево машина развёрнута целиком.
@@ -273,12 +277,8 @@ func _add_car(lane: Lane, x: float) -> Car:
 	car.x = x
 	car.speed = lane.speed
 	car.wheels = CarModel.wheels(model)
-	for wheel: Node3D in car.wheels:
-		var mesh := wheel as MeshInstance3D
-		var box := mesh.mesh.get_aabb() if mesh != null else AABB()
-		car.hubs.append(box.get_center())
-		if mesh != null:
-			car.radius = maxf(box.size.y * 0.5, 0.05)
+	car.hubs = CarModel.hubs(car.wheels)
+	car.radius = CarModel.wheel_radius(car.wheels, car.radius)
 	return car
 
 
@@ -288,12 +288,3 @@ func _depth_of(index: int, model: Node3D) -> float:
 	if not _depths.has(index):
 		_depths[index] = maxf(Garage.depth_of(model), 0.1)
 	return float(_depths[index])
-
-
-## Колёса катятся: угол — путь, делённый на радиус, как у машины Otto
-## ([method ExitCar.advance]).
-func _spin(car: Car, delta: float) -> void:
-	var spin := Basis(Vector3.BACK, -car.speed * delta / car.radius)
-	for index: int in car.wheels.size():
-		var hub := car.hubs[index]
-		car.wheels[index].transform *= Transform3D(spin, hub - spin * hub)
