@@ -62,54 +62,6 @@ class ShaftSpot:
 		)
 
 
-## Эскалатор ведёт с [member floor_index] на следующий этаж вниз.
-class EscalatorSpot:
-	extends RefCounted
-
-	## Насколько перегиб ломаной отступает внутрь проёма от его ближнего края, м.
-	##
-	## Сквозь дыру проходит не линия пути, а пассажир: он шире её на полкорпуса,
-	## и отступ обязан быть больше. Запас — 0.15 м, и его стережёт
-	## [code]test_escalator_carries_its_rider_through_the_gap[/code].
-	const BEND_CLEARANCE: float = Proportions.BODY_WIDTH * 0.5 + 0.15
-
-	var x: float = 0.0
-	var floor_index: int = 0
-	## Куда спускается полотно: -1 влево, +1 вправо. С M24g — всегда к краю
-	## этажа (ADR-0043, решение 15).
-	var towards: float = -1.0
-	## Край этажа, к которому эскалатор спускается: там кончается проём.
-	var edge: float = 0.0
-
-	## Проём в перекрытии под полотном: пара «левый край, правый край».
-	##
-	## Дыра не под площадкой, а сбоку от неё, по ходу спуска, и тянется до края
-	## этажа: пролёт под 45° уходит под плиту на два с лишним метра, и остаток
-	## пола за ним был бы островом, куда не дойти. Считается здесь, чтобы
-	## уровень и [method BuildingPlan.safe_x] видели один и тот же проём.
-	func gap(rules: BuildingRules) -> Vector2:
-		var near := x + towards * rules.escalator_gap_offset
-		return Vector2(minf(near, edge), maxf(near, edge))
-
-	## Нижняя площадка — на этаже ниже, у края.
-	func landing(rules: BuildingRules) -> float:
-		return x + towards * rules.escalator_run
-
-	## Перегиб ломаной в своих координатах: где площадка кончается и начинается
-	## пролёт.
-	##
-	## До M18b перегиб стоял посреди проёма и ниже перекрытия, и ломаная шла
-	## двумя пролётами разной крутизны — в кадре это читалось жёлобом, а не
-	## эскалатором (ADR-0025, решение 4). Теперь до проёма идёт площадка по
-	## этажу, а от его ближнего края — один прямой пролёт вниз.
-	##
-	## Считается здесь, рядом с проёмом, через который проходит: уровень ставит
-	## по этому числу конструкцию, тест по нему же проверяет, что пассажир идёт
-	## сквозь дыру, а не сквозь плиту.
-	func bend(rules: BuildingRules) -> Vector2:
-		return Vector2(towards * (rules.escalator_gap_offset + BEND_CLEARANCE), 0.0)
-
-
 class DoorSpot:
 	extends RefCounted
 	var x: float = 0.0
@@ -262,7 +214,9 @@ func roof_shaft() -> ShaftSpot:
 	return highest
 
 
-## Проёмы в перекрытии этажа: пары «левый край, правый край», в любом порядке.
+## Сквозные проёмы в перекрытии этажа — шахты: пары «левый край, правый край»,
+## в любом порядке. Проёмы эскалаторов сквозными с M24h не бывают —
+## [method escalator_holes_on].
 ##
 ## Считается здесь, а не в уровне: по этим же дырам строится граф достижимости,
 ## и разъехаться они не должны. Порядок не обещается намеренно: единственный
@@ -277,11 +231,22 @@ func gaps_on(rules: BuildingRules, floor_index: int) -> Array[Vector2]:
 			var half := rules.shaft_width * 0.5
 			gaps.append(Vector2(shaft.x - half, shaft.x + half))
 
+	return gaps
+
+
+## Проёмы эскалаторов в перекрытии этажа: пара «левый край, правый край».
+##
+## С M24h эскалатор стоит в глубине, у задней стены (ADR-0044, решение 10):
+## плиту он режет только в задней полосе коридора, за плоскостью игры, а
+## перед ней пол цельный, и мимо эскалатора проходят. Поэтому проёмы
+## эскалаторов — не в [method gaps_on]: те режут плиту во всю глубину и
+## ходьбу вместе с ней.
+func escalator_holes_on(rules: BuildingRules, floor_index: int) -> Array[Vector2]:
+	var holes: Array[Vector2] = []
 	for escalator in escalators:
 		if floor_index == escalator.floor_index:
-			gaps.append(escalator.gap(rules))
-
-	return gaps
+			holes.append(escalator.hole(rules))
+	return holes
 
 
 ## Что режет этаж для ходьбы: проёмы плюс внутренние стены.
@@ -901,7 +866,12 @@ static func _wall_x_at(rules: BuildingRules, slot: int) -> float:
 func _wall_blockers(rules: BuildingRules, index: int) -> Array[Vector2]:
 	var clearance := (rules.slot_x(1) - rules.slot_x(0)) * 0.5
 	var busy: Array[Vector2] = []
-	for gap: Vector2 in gaps_on(rules, index):
+	# Место эскалатора — тоже: стена во всю глубину встала бы поперёк пролёта.
+	var openings := gaps_on(rules, index)
+	for escalator in escalators:
+		if escalator.floor_index == index:
+			openings.append(escalator.gap(rules))
+	for gap: Vector2 in openings:
 		busy.append(Vector2(gap.x - clearance, gap.y + clearance))
 
 	# Столбец шахты считается целиком, а не по дырам из [method gaps_on]: на дне

@@ -277,7 +277,7 @@ func _physics_process(delta: float) -> void:
 
 	if is_on_floor() or state == OttoStateMachine.State.DEAD:
 		_air_speed = _horizontal_speed(_snapshot, state)
-	velocity.x = _air_speed
+	velocity.x = _within_the_car(_air_speed)
 	if not is_on_floor():
 		velocity.y = maxf(velocity.y - gravity * delta, -max_fall_speed)
 
@@ -692,15 +692,35 @@ func _rest_here() -> void:
 func _horizontal_speed(input: OttoInput, state: OttoStateMachine.State) -> float:
 	if state == OttoStateMachine.State.DEAD:
 		return 0.0
-	# Пол кабины не совпал с полом этажа — выходить некуда (ADR-0004, пункт 6).
-	if _car != null and not _car.is_aligned():
-		return 0.0
 	if state == OttoStateMachine.State.CROUCH and not can_move_while_crouching:
 		return 0.0
 	if absf(input.move) <= OttoStateMachine.MOVE_THRESHOLD:
 		return 0.0
 	# Движение аркадное, дискретное: наклон стика не меняет скорость.
 	return signf(input.move) * walk_speed
+
+
+## Скорость [param speed] в кабине: ходят в ней и на ходу, как в ROM (ADR-0044,
+## решение 4), но выйти можно, только пока этаж рядом — иначе борт — стена.
+##
+## И на земле, и в воздухе: скорость полёта берётся с земли, и прыжок с разбега
+## в едущей кабине иначе выносил бы Otto сквозь борт в шахту (авторевью M24h).
+func _within_the_car(speed: float) -> float:
+	if _car == null or is_zero_approx(speed) or _car.can_step_out():
+		return speed
+	return _up_to_the_car_wall(speed)
+
+
+## Скорость [param speed], урезанная так, чтобы шаг этого кадра кончился у
+## борта кабины, а не за ним.
+func _up_to_the_car_wall(speed: float) -> float:
+	var towards := signf(speed)
+	var room := (_car.width() - Proportions.BODY_WIDTH) * 0.5
+	var left := room - (global_position.x - _car.global_position.x) * towards
+	var step := get_physics_process_delta_time()
+	if left <= 0.0 or step <= 0.0:
+		return 0.0
+	return towards * minf(absf(speed), left / step)
 
 
 ## Пересобирает позу прямо сейчас, не дожидаясь следующего [method _physics_process].

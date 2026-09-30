@@ -24,30 +24,43 @@ extends Node3D
 ## эскалатор расставляет их по месту: ступени по одной, остальное растягивает
 ## по длине.
 
+## С M24h эскалатор стоит в глубине, у задней стены (ADR-0044, решение 10):
+## пролёт за плоскостью игры, плита перед ним цельная, и мимо эскалатора
+## проходят по полу. На площадку встают шагом вглубь, как в красную дверь, и
+## сходят шагом обратно к камере.
+
 ## Детали эскалатора и их размеры в модели, м: по ним детали растягиваются.
 const KIT := preload("res://assets/models/escalator/escalator.glb")
-const KIT_STEP_RUN: float = 0.24
+const KIT_STEP_RUN: float = 0.2
 const KIT_STEP_HEIGHT: float = 0.45
 const KIT_LANDING_RUN: float = 0.42
 
 ## Докуда слышен стрёкот полотна, м.
 const HUM_REACH: float = 9.0
 
+## Докуда от камеры плита под эскалатором цельная, м по Z: проём — только за
+## этим краем, в задней полосе коридора. Тело идущего мимо Otto — перед ним.
+const HOLE_FRONT_Z: float = -WorldSpace.BODY_DEPTH * 0.5 - 0.04
+
 ## Толщина и глубина полотна, м. Тела у полотна нет: везёт эскалатор, а не пол.
 const BELT_THICKNESS: float = 0.15
-const BELT_DEPTH: float = 0.8
+const BELT_DEPTH: float = 0.72
 
-## На сколько полотно утоплено за плоскость игры: пассажир едет перед ним.
-const BELT_Z: float = -0.5
+## Середина полотна по Z: за краем цельной плиты, у задней стены. По ней же
+## едет пассажир.
+const BELT_Z: float = HOLE_FRONT_Z - BELT_DEPTH * 0.5 - 0.01
 
 ## Сколько полотно проходит по горизонтали за одну ступень, м.
 ##
 ## Ступень и есть то, чем эскалатор отличается от пандуса: на пролёте в 1.6 м
 ## их выходит полдюжины, и зубчатый край читается с любого этажа.
-const STEP_RUN: float = 0.24
+const STEP_RUN: float = 0.2
 
-## Балюстрада у задней стены: где стоит, какой толщины и высоты, м.
-const RAIL_Z: float = -1.02
+## Балюстрады по краям полотна — у задней стены и со стороны камеры, м по Z.
+## Спереди с M24h тоже стекло с поручнем, а не низкий борт: перила
+## должны читаться, а едущего Otto за стеклом видно (ADR-0044, решение 10).
+const RAIL_Z: float = BELT_Z - BELT_DEPTH * 0.5 + 0.03
+const FRONT_RAIL_Z: float = BELT_Z + BELT_DEPTH * 0.5 - 0.03
 const RAIL_THICKNESS: float = 0.1
 const RAIL_HEIGHT: float = 0.96
 
@@ -68,18 +81,9 @@ const END_LIGHT_SIZE: float = 0.16
 ## Тени не отбрасывает: пролёт стоит в проёме, ронять их ему не на что, а стоят
 ## они дороже всего остального в кадре.
 const GLOW_RANGE: float = 3.6
-const GLOW_ENERGY: float = 2.4
+const GLOW_ENERGY: float = 1.2
 const GLOW_COLOR := Color(1.0, 0.88, 0.68)
-const GLOW_Z: float = -0.3
-
-## Борт со стороны камеры: где стоит, какой глубины и высоты, м.
-##
-## Низкий нарочно (ADR-0025, решение 5). Полноценная балюстрада с этой стороны
-## закрыла бы едущего Otto по грудь, а на эскалаторе он беззащитен: ввод не
-## действует, уклониться нечем, и поездка длится больше секунды.
-const KERB_Z: float = -0.08
-const KERB_DEPTH: float = 0.08
-const KERB_HEIGHT: float = 0.16
+const GLOW_Z: float = -0.1
 
 ## Площадка в конце полотна: длина по ходу и толщина, м.
 ##
@@ -88,9 +92,8 @@ const KERB_HEIGHT: float = 0.16
 const LANDING_RUN: float = 0.42
 const LANDING_THICKNESS: float = 0.12
 
-## Обрамление проёма: ширина стойки по краю дыры и насколько она шире полотна, м.
+## Обрамление проёма: ширина стойки по краю дыры, м.
 const FRAME_WIDTH: float = 0.12
-const FRAME_MARGIN: float = 0.12
 
 ## Сетки деталей по имени: одни на все эскалаторы здания.
 static var _meshes: Dictionary = {}
@@ -150,7 +153,9 @@ func setup(descent: Vector2, via: Vector2, gap: Vector2, slab: float) -> void:
 	_via = WorldSpace.direction_to_scene(via)
 	_has_via = true
 	_bottom_pad.position = down
-	travel_time = (_via.length() + (down - _via).length()) / ride_speed
+	# Шаг вглубь на площадку и обратно к камере — тоже путь.
+	var depth := absf(BELT_Z) * 2.0
+	travel_time = (_via.length() + (down - _via).length() + depth) / ride_speed
 	_build(down, gap, slab)
 
 
@@ -191,14 +196,21 @@ func _try_board(pad: Area3D, target: Area3D, towards: float) -> bool:
 	return false
 
 
-## Путь поездки: от места, где пассажир стоял, через перегиб к дальней площадке.
+## Путь поездки: от места, где пассажир стоял, шаг вглубь на полотно, через
+## перегиб к дальней площадке и шаг обратно в плоскость игры.
 ##
 ## Перегиб берётся из полотна, поэтому едут ровно там, где выложено. Без
 ## [method setup] полотна нет — тогда путь прямой, лишь бы не падать по индексу.
 func _route_from(start: Vector3, target: Area3D) -> PackedVector3Array:
+	var finish := target.global_position
 	if not _has_via:
-		return PackedVector3Array([start, target.global_position])
-	return PackedVector3Array([start, to_global(_via), target.global_position])
+		return PackedVector3Array([start, finish])
+	var belt := Vector3(0.0, 0.0, BELT_Z - start.z)
+	var bend := to_global(_via)
+	bend.z = start.z + belt.z
+	return PackedVector3Array(
+		[start, start + belt, bend, Vector3(finish.x, finish.y, bend.z), finish]
+	)
 
 
 func _carry(delta: float) -> void:
@@ -296,7 +308,7 @@ func _lay_steps(from: Vector3, span: Vector3) -> void:
 		)
 
 
-## Бока пролёта: балюстрада с поручнем у задней стены и низкий борт у камеры.
+## Бока пролёта: стеклянные балюстрады с поручнем у задней стены и у камеры.
 func _lay_sides(from: Vector3, to: Vector3) -> void:
 	var span := to - from
 	var angle := atan2(span.y, span.x)
@@ -310,12 +322,12 @@ func _lay_sides(from: Vector3, to: Vector3) -> void:
 
 	var over := BELT_THICKNESS * 0.5
 	var stretch := Vector3(length, 1.0, 1.0)
-	_add_kit("Balustrade", centre + up * over + Vector3(0.0, 0.0, RAIL_Z), angle, stretch)
-	_add_kit("Kerb", centre + up * over + Vector3(0.0, 0.0, KERB_Z), angle, stretch)
-	for end: Vector3 in [from, to]:
-		_add_kit("Newel", end + up * over + Vector3(0.0, 0.0, RAIL_Z), 0.0, Vector3.ONE)
+	for z: float in [RAIL_Z, FRONT_RAIL_Z]:
+		_add_kit("Balustrade", centre + up * over + Vector3(0.0, 0.0, z), angle, stretch)
+		for end: Vector3 in [from, to]:
+			_add_kit("Newel", end + up * over + Vector3(0.0, 0.0, z), 0.0, Vector3.ONE)
 
-	var cap := up * (over + RAIL_HEIGHT + HANDRAIL_SIZE * 0.5) + Vector3(0.0, 0.0, RAIL_Z)
+	var cap := up * (over + RAIL_HEIGHT + HANDRAIL_SIZE * 0.5) + Vector3(0.0, 0.0, FRONT_RAIL_Z)
 	_mark_end(from + cap)
 	_mark_end(to + cap)
 
@@ -384,12 +396,21 @@ func _frame_the_gap(gap: Vector2, slab: float) -> void:
 
 	var look := GreyboxLook.metal(GreyboxLook.TRIM)
 	for edge: float in [gap.x, gap.y]:
+		# Проём — только в задней полосе, от стены до края цельной плиты.
+		var depth := HOLE_FRONT_Z - WorldSpace.BACK_WALL_Z
 		_add_part(
-			Vector3(FRAME_WIDTH, slab, BELT_DEPTH + FRAME_MARGIN * 2.0),
-			Vector3(edge, -slab * 0.5, BELT_Z),
+			Vector3(FRAME_WIDTH, slab, depth),
+			Vector3(edge, -slab * 0.5, WorldSpace.BACK_WALL_Z + depth * 0.5),
 			0.0,
 			look
 		)
+	# И кромка вдоль цельной плиты: край, за которым пол кончается.
+	_add_part(
+		Vector3(absf(gap.y - gap.x), slab, FRAME_WIDTH * 0.5),
+		Vector3((gap.x + gap.y) * 0.5, -slab * 0.5, HOLE_FRONT_Z - FRAME_WIDTH * 0.25),
+		0.0,
+		look
+	)
 
 
 ## Деталь модели [param part] на своём месте, под своим углом и с растяжкой

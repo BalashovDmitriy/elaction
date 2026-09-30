@@ -135,6 +135,11 @@ func _parts(root: Node) -> Array[Array]:
 			continue
 		if part.get_parent() is MultiMeshInstance3D:
 			continue
+		# Поток машин (M24h) — не геометрия выезда: он едет по той же полосе,
+		# что и машина Otto, и въезжает из-за угла здания нарочно. Его правила —
+		# в test_street_traffic.
+		if _in_traffic(part):
+			continue
 		var basis := part.global_basis.orthonormalized()
 		var straight := basis.is_equal_approx(Basis.IDENTITY)
 		var box := part.global_transform * part.mesh.get_aabb()
@@ -143,6 +148,16 @@ func _parts(root: Node) -> Array[Array]:
 		var tilted := not straight and part.mesh is BoxMesh
 		found.append([box, part.material_override, tilted, plain_box])
 	return found
+
+
+## Часть ли это машины потока ([StreetTraffic]).
+func _in_traffic(node: Node) -> bool:
+	var up := node.get_parent()
+	while up != null:
+		if up is StreetTraffic:
+			return true
+		up = up.get_parent()
+	return false
 
 
 ## Пары коробок разных материалов с гранью в одной плоскости и одной нормалью,

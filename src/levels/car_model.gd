@@ -95,6 +95,40 @@ static func wheels(car: Node3D) -> Array[Node3D]:
 	return found
 
 
+## Середина каждого колеса [param wheels] в его собственных координатах: вокруг
+## неё оно и крутится. Начало узла колеса у пака не на оси, а в нуле машины, и
+## поворот вокруг начала носил бы колёса кругом по кузову (авторевью M21).
+static func hubs(wheels: Array[Node3D]) -> PackedVector3Array:
+	var found := PackedVector3Array()
+	for wheel: Node3D in wheels:
+		var mesh := wheel as MeshInstance3D
+		found.append(mesh.mesh.get_aabb().get_center() if mesh != null else Vector3.ZERO)
+	return found
+
+
+## Радиус колеса по габариту его сетки, м; [param fallback] — если сеток нет.
+static func wheel_radius(wheels: Array[Node3D], fallback: float) -> float:
+	var radius := fallback
+	for wheel: Node3D in wheels:
+		var mesh := wheel as MeshInstance3D
+		if mesh != null:
+			radius = maxf(mesh.mesh.get_aabb().size.y * 0.5, 0.05)
+	return radius
+
+
+## Катит колёса [param wheels] вокруг осей [param hubs] на путь [param travel], м:
+## угол — путь, делённый на радиус [param radius]. Капот в +X, и колесо,
+## катящееся вперёд, идёт по часовой, если смотреть с +Z, — это минус вокруг +Z.
+## Модель, развёрнутая назад, катит их в своей системе вперёд, поэтому знак один.
+static func roll(
+	wheels: Array[Node3D], hubs_of: PackedVector3Array, travel: float, radius: float
+) -> void:
+	var spin := Basis(Vector3.BACK, -travel / radius)
+	for index: int in wheels.size():
+		var hub := hubs_of[index]
+		wheels[index].transform *= Transform3D(spin, hub - spin * hub)
+
+
 ## Замена материала пака на игровой: краска, свет. Остальное — как у пака.
 static func _material_for(name: String, paint: Color) -> StandardMaterial3D:
 	match name:

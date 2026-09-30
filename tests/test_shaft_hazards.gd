@@ -57,3 +57,22 @@ func test_passenger_rides_and_is_not_crushed() -> void:
 
 func test_airborne_victim_is_pushed_not_crushed() -> void:
 	assert_false(ShaftHazards.crushes(60.0, false, false), "в воздухе его просто толкает")
+
+
+func test_touching_the_car_edge_crushes_nobody() -> void:
+	assert_false(ShaftHazards.crushes(60.0, true, false, false), "задет краем — не прижат")
+
+
+func test_a_body_inside_the_car_span_is_under_it() -> void:
+	assert_true(ShaftHazards.is_fully_under(0.0, 0.72, 0.0, 1.8))
+	assert_true(ShaftHazards.is_fully_under(0.54, 0.72, 0.0, 1.8), "вплотную к борту — ещё под ней")
+
+
+func test_a_body_across_the_car_edge_is_not_under_it() -> void:
+	assert_false(ShaftHazards.is_fully_under(0.7, 0.72, 0.0, 1.8))
+	assert_false(ShaftHazards.is_fully_under(-0.7, 0.72, 0.0, 1.8))
+
+
+func test_the_push_goes_to_the_side_of_the_body() -> void:
+	assert_almost_eq(ShaftHazards.push_out(0.7, 0.72, 0.0, 1.8), 1.26, 0.001)
+	assert_almost_eq(ShaftHazards.push_out(-0.7, 0.72, 0.0, 1.8), -1.26, 0.001)

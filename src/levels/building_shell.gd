@@ -96,9 +96,23 @@ func _build_floors() -> void:
 		var gaps := _plan.gaps_on(_rules, index)
 		# Перекрытие шире собственных стен там, где силуэт делает ступень: оно же
 		# потолок нижнего этажа, а тот шире своего верхнего соседа.
-		for rect in slab_segments(surface, gaps, _rules.slab_span(index), _rules.slab_height):
+		var holes := _plan.escalator_holes_on(_rules, index)
+		for rect in slab_segments(
+			surface, gaps + holes, _rules.slab_span(index), _rules.slab_height
+		):
 			_build_solid(rect, slab)
 			_ribs.edge_of(rect)
+		# Под эскалатором плита вырезана только в задней полосе коридора: перед
+		# ней пол цельный, за задней стеной — пол комнаты (ADR-0044, решение 10).
+		for hole: Vector2 in holes:
+			var rect := Rect2(hole.x, surface, hole.y - hole.x, _rules.slab_height)
+			_build_solid_between(
+				rect, slab, WorldSpace.CORRIDOR_DEPTH * 0.5, Escalator.HOLE_FRONT_Z
+			)
+			_ribs.edge_of(rect)
+			_build_solid_between(
+				rect, slab, WorldSpace.BACK_WALL_Z, WorldSpace.BACK_WALL_Z - WorldSpace.ROOM_DEPTH
+			)
 		_build_side_walls(index, surface, bounds, wall)
 		_build_inner_walls(index, surface, wall)
 
@@ -248,6 +262,24 @@ func _build_solid(rect: Rect2, material: StandardMaterial3D, shown: bool = true)
 	if shown:
 		body.add_child(GreyboxLook.box(size, material))
 
+	add_child(body)
+
+
+## Тело с видом на месте прямоугольника, но не во всю глубину, а от [param front]
+## до [param back] по Z сцены: кусок плиты вокруг проёма эскалатора.
+func _build_solid_between(
+	rect: Rect2, material: StandardMaterial3D, front: float, back: float
+) -> void:
+	var size := Vector3(rect.size.x, rect.size.y, front - back)
+	var body := StaticBody3D.new()
+	body.position = WorldSpace.to_scene(rect.get_center())
+	body.position.z = (front + back) * 0.5
+	var shape := BoxShape3D.new()
+	shape.size = size
+	var collision := CollisionShape3D.new()
+	collision.shape = shape
+	body.add_child(collision)
+	body.add_child(GreyboxLook.box(size, material))
 	add_child(body)
 
 

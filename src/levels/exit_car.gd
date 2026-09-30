@@ -10,6 +10,10 @@ extends Node3D
 ## Своим узлом с M18d: уровень перерос предел строк, а у машины своё состояние —
 ## куда стоит и едет ли, — которое уровню знать незачем.
 
+## Выезд на улицу с потоком (ADR-0044, решения 1–2): поднялась по пандусу,
+## встала у края мостовой, дождалась просвета, влилась и едет с потоком.
+enum Stage { CLIMB, WAIT, MERGE, CRUISE }
+
 ## Длина машины, м: по ней она ставится в зазор от проёма и считается уехавшей
 ## из кадра. [CarModel] приводит к ней любую машину жребия (ADR-0032, решение 7).
 const LENGTH: float = CarModel.LENGTH
@@ -19,6 +23,16 @@ const GAP: float = 0.36
 const SPEED: float = 9.6
 const START_SPEED: float = 1.2
 const ACCELERATION: float = 7.2
+## У края мостовой машина тормозит, м/с², и встаёт серединой на столько
+## левее верха пандуса, м: целиком на улице, носом к полосе.
+const BRAKING: float = 8.0
+const STOP_PAST_RAMP: float = LENGTH * 0.5 + 0.4
+## Съезд в полосу: за сколько метров хода машина переходит с края мостовой на
+## середину ближней полосы.
+const MERGE_RUN: float = 7.0
+## Сколько машина ждёт просвета, прежде чем поток его устроит, с: выезд не
+## должен тянуться дольше, чем держит интерес.
+const WAIT_LIMIT: float = 2.0
 ## Водительская дверь — на столько от середины машины к капоту, м: над передним
 ## сиденьем. У неё Otto садится в машину (ADR-0038, решение 4).
 const DOOR_OFFSET: float = LENGTH * 0.08
@@ -72,6 +86,12 @@ const DOME_RANGE: float = 2.6
 
 ## Куда машина уезжает: -1 влево, +1 вправо. С M24b всегда влево — в ворота.
 var towards: float = 1.0
+## Поток улицы, в который машина вливается. Нет его — уезжает, как до M24h,
+## по пустой улице не останавливаясь.
+var traffic: StreetTraffic = null
+var stage: Stage = Stage.CLIMB
+## Сколько машина уже ждёт просвета, с.
+var waited: float = 0.0
 
 var _leaving: bool = false
 ## Скорость отъезда прямо сейчас, м/с.
@@ -136,13 +156,8 @@ func park(
 	add_child(model)
 	_hang_the_door(model, CarModel.PAINTS[choice.paint])
 	_wheels = CarModel.wheels(model)
-	_hubs = PackedVector3Array()
-	for wheel in _wheels:
-		var mesh := wheel as MeshInstance3D
-		var box := mesh.mesh.get_aabb() if mesh != null else AABB()
-		_hubs.append(box.get_center())
-		if mesh != null:
-			_wheel_radius = maxf(box.size.y * 0.5, 0.05)
+	_hubs = CarModel.hubs(_wheels)
+	_wheel_radius = CarModel.wheel_radius(_wheels, _wheel_radius)
 
 
 ## Где машина стоит у ворот: пара «левый край, правый край» по бамперам.
@@ -294,13 +309,13 @@ func _headlight(side: float) -> Node3D:
 	spot.shadow_enabled = false
 	spot.light_volumetric_fog_energy = HAZE_FOG
 	lamp.add_child(spot)
-	lamp.add_child(_halo())
+	lamp.add_child(halo())
 	return lamp
 
 
 ## Ореол у стекла фары: плоское пятно, всегда повёрнутое к камере, ярче к
 ## середине и мягко сходящее на нет к краю.
-static func _halo() -> MeshInstance3D:
+static func halo() -> MeshInstance3D:
 	var quad := QuadMesh.new()
 	quad.size = Vector2(HALO_SIZE, HALO_SIZE)
 	var look := ShaderMaterial.new()
@@ -322,6 +337,8 @@ func lights_on() -> bool:
 ## Машина тронулась, увозя Otto: мотор, фары и разгон с места.
 func drive_away() -> void:
 	_leaving = true
+	if traffic != null:
+		traffic.keep_running()
 	_speed = START_SPEED
 	set_lights(true)
 	_say(Sounds.CAR_AWAY)
@@ -348,22 +365,65 @@ func settle(delta: float) -> void:
 func advance(delta: float, view: Rect2) -> bool:
 	if not _leaving:
 		return false
-	_speed = minf(_speed + ACCELERATION * delta, SPEED)
+	_speed = _speed_now(delta)
 	position.x += towards * _speed * delta
 	_climb()
-	# Колёса катятся вокруг своих осей: угол — путь, делённый на радиус. Капот
-	# в +X, и колесо, катящееся вперёд, идёт по часовой, если смотреть с +Z, —
-	# это минус вокруг +Z. Модель, развёрнутая назад, катит их в своей системе
-	# вперёд, поэтому знак один.
-	var spin := Basis(Vector3.BACK, -_speed * delta / _wheel_radius)
-	for index in _wheels.size():
-		var hub := _hubs[index]
-		_wheels[index].transform *= Transform3D(spin, hub - spin * hub)
+	_merge()
+	# Колёса катятся вокруг своих осей ([method CarModel.roll]).
+	CarModel.roll(_wheels, _hubs, _speed * delta, _wheel_radius)
 	var left := position.x - LENGTH * 0.5
 	if left + LENGTH < view.position.x or left > view.end.x:
 		_leaving = false
 		return true
 	return false
+
+
+## Скорость на этот шаг: разгон по пандусу, торможение к краю мостовой,
+## стоянка до просвета и ход полосы после.
+func _speed_now(delta: float) -> float:
+	if traffic == null:
+		return minf(_speed + ACCELERATION * delta, SPEED)
+	match stage:
+		Stage.CLIMB:
+			var left := (position.x - stop_x()) * -towards
+			if left <= 0.01:
+				position.x = stop_x()
+				stage = Stage.WAIT
+				return 0.0
+			var braked := sqrt(2.0 * BRAKING * left)
+			return minf(minf(_speed + ACCELERATION * delta, SPEED), braked)
+		Stage.WAIT:
+			waited += delta
+			traffic.hold_back(waited >= WAIT_LIMIT)
+			if not traffic.is_clear_for(position.x):
+				return 0.0
+			traffic.hold_back(false)
+			traffic.join(self)
+			stage = Stage.MERGE
+			return minf(START_SPEED, traffic.near_speed())
+	return minf(_speed + ACCELERATION * delta, traffic.near_speed())
+
+
+## Где машина ждёт просвета, по X середины: у края мостовой за верхом пандуса.
+## Уезжает она с M24b всегда влево, и верх пандуса левее его начала.
+func stop_x() -> float:
+	return _ramp_start - _ramp_run - STOP_PAST_RAMP
+
+
+## Съезд с края мостовой на середину ближней полосы плавной кривой: капот
+## поворачивается по ходу, в полосе выпрямляется.
+func _merge() -> void:
+	if traffic == null or (stage != Stage.MERGE and stage != Stage.CRUISE):
+		return
+	var run := (stop_x() - position.x) * -towards
+	var share := clampf(run / MERGE_RUN, 0.0, 1.0)
+	var lane := traffic.near_lane_z()
+	position.z = lerpf(Z, lane, smoothstep(0.0, 1.0, share))
+	# Наклон кривой — производная smoothstep: 6u(1 - u) на длину съезда.
+	var slope := (lane - Z) * 6.0 * share * (1.0 - share) / MERGE_RUN
+	rotation.y = atan(slope)
+	if share >= 1.0:
+		stage = Stage.CRUISE
 
 
 ## Вешает водительскую дверцу на петлю у передней стойки: панель в краске

@@ -9,11 +9,15 @@
   верх в начале координат, по X — длина проступи, по Y вниз — высота;
 - `Balustrade` — стеклянная балюстрада метр длиной: нержавеющий цоколь,
   стекло, чёрный резиновый поручень на направляющей; низ в начале координат;
-- `Kerb` — низкий нержавеющий борт со стороны камеры, метр длиной;
 - `Newel` — тумба на конце балюстрады, вокруг которой разворачивается поручень;
 - `Landing` — входная площадка: рифлёная плита и гребёнка у края, где уходят
   ступени; верх в начале координат;
-- `Truss` — ферма под пролётом метр длиной: пояса и раскосы.
+- `Truss` — ферма под пролётом метр длиной: пояса, раскосы и нержавеющая
+  обшивка по бокам — с M24h пролёт читается массой, а не парой реек
+  (ADR-0044, решение 10).
+
+С M24h балюстрада стоит с обеих сторон полотна, а низкого борта у камеры
+больше нет: эскалатор ушёл в глубину, и перила должны читаться.
 
 Длина вдоль X, глубина коридора — Z, как в игре. Детали в метр длиной игра
 растягивает по X — рисунок у них вдоль длины ровный, и растяжка его не портит.
@@ -46,14 +50,13 @@ TARGET = ROOT / "assets" / "models" / "escalator" / "escalator.glb"
 
 # Размеры — те же, что у `Escalator`: проступь, глубина полотна, высота
 # балюстрады, площадка, м.
-STEP_RUN = 0.24
+STEP_RUN = 0.2
 STEP_HEIGHT = 0.45
-BELT_DEPTH = 0.8
+BELT_DEPTH = 0.72
 RAIL_HEIGHT = 0.96
-KERB_HEIGHT = 0.16
 LANDING_RUN = 0.42
 LANDING_THICKNESS = 0.12
-TRUSS_HEIGHT = 0.42
+TRUSS_HEIGHT = 0.62
 
 # Материалы: цвет линейный RGB, металличность, шероховатость, прозрачность.
 # Металл без отражений в сцене темнеет почти до чёрного: отражать ему нечего,
@@ -172,15 +175,8 @@ def build_balustrade() -> None:
     rail.box(_size(1.0, RAIL_HEIGHT - 0.2, 0.02), _game(0.0, 0.12 + (RAIL_HEIGHT - 0.2) * 0.5, 0.0), "Glass")
     # Направляющая и поручень.
     rail.box(_size(1.0, 0.03, 0.05), _game(0.0, RAIL_HEIGHT - 0.07, 0.0), "Stainless")
-    rail.rod(0.04, 1.0, _game(0.0, RAIL_HEIGHT - 0.03, 0.0), "X", "Rubber")
+    rail.rod(0.05, 1.0, _game(0.0, RAIL_HEIGHT - 0.03, 0.0), "X", "Rubber")
     rail.publish()
-
-
-def build_kerb() -> None:
-    kerb = Part("Kerb")
-    kerb.box(_size(1.0, KERB_HEIGHT, 0.06), _game(0.0, KERB_HEIGHT * 0.5, 0.0), "Stainless")
-    kerb.box(_size(1.0, 0.02, 0.07), _game(0.0, KERB_HEIGHT, 0.0), "Aluminium")
-    kerb.publish()
 
 
 def build_newel() -> None:
@@ -226,6 +222,12 @@ def build_truss() -> None:
             bmesh.ops.translate(truss.mesh, vec=_game(x, -TRUSS_HEIGHT * 0.5, z), verts=verts)
     # Обшивка снизу: её видно с этажа под эскалатором.
     truss.box(_size(1.0, 0.02, BELT_DEPTH), _game(0.0, -TRUSS_HEIGHT - 0.01, 0.0), "Stainless")
+    # Обшивка по бокам с полосой-молдингом: со стороны камеры пролёт —
+    # нержавеющий короб, как у настоящего эскалатора.
+    for side in (-1.0, 1.0):
+        z = side * (BELT_DEPTH * 0.5 + 0.012)
+        truss.box(_size(1.0, TRUSS_HEIGHT, 0.02), _game(0.0, -TRUSS_HEIGHT * 0.5, z), "Stainless")
+        truss.box(_size(1.0, 0.05, 0.03), _game(0.0, -TRUSS_HEIGHT * 0.45, z), "Steel")
     truss.publish()
 
 
@@ -233,7 +235,6 @@ def inside_blender() -> int:
     bpy.ops.wm.read_factory_settings(use_empty=True)
     build_step()
     build_balustrade()
-    build_kerb()
     build_newel()
     build_landing()
     build_truss()

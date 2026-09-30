@@ -136,6 +136,13 @@ var _watched: Dictionary = {}
 ## Что табло уже показывают: кабина → [этаж, направление]. Надписи меняются
 ## только при смене, а не каждый кадр.
 var _shown: Dictionary = {}
+## Этажи в кадре: табло перерисовываются только на них (M24h, ADR-0044,
+## решение 11). Кабины здания ходят в ногу, и на каждом пройденном этаже все
+## табло всех шахт перестраивали надписи разом — полторы сотни в один кадр,
+## до 10 мс шага физики. Невидимые табло дописываются, когда этаж входит в
+## кадр ([method light_span]) или когда их спрашивают ([method board_text]).
+## До первого [method light_span] видно всё.
+var _span := Vector2i(-1_000_000, 1_000_000)
 ## Табло и кнопки — своим узлом: по прямым детям шахт тесты ищут их части
 ## (направляющие, упоры, трос спуска), и панель кнопок в 12 см шириной
 ## сходила бы за трос.
@@ -182,11 +189,16 @@ func apply_graphics() -> void:
 ## по источнику на каждый их этаж, а в кадр влезает два с половиной этажа.
 ## Гаснет источник, но не сам столб: погашенный этаж от невидимого отличается
 ## тем, что его видно.
-func light_span(span: Vector2i) -> void:
+func light_span(span: Vector2i, strip: Vector2 = Vector2(-INF, INF)) -> void:
+	if span != _span:
+		_span = span
+		for car: ElevatorCar in _watched:
+			if is_instance_valid(car) and _shown.has(car):
+				_paint(car, _span)
 	for index: int in _glow:
 		var lit := VisibleFloors.covers(span, index)
 		for light: OmniLight3D in _glow[index]:
-			light.visible = lit
+			light.visible = lit and VisibleFloors.in_band(strip, light.global_position.x)
 
 
 ## Верх шахты: докуда идут её стойки и упор.
@@ -415,11 +427,21 @@ func refresh(car: ElevatorCar) -> void:
 	if not last.is_empty() and last[0] == index and last[1] == heading:
 		return
 	_shown[car] = [index, heading]
+	_paint(car, _span)
+
+
+## Пишет на табло шахты кабины [param car] то, что она показывает сейчас, —
+## на этажах полосы [param span].
+func _paint(car: ElevatorCar, span: Vector2i) -> void:
+	var shaft := _watched[car] as BuildingPlan.ShaftSpot
+	var shown: Array = _shown[car]
+	var index := int(shown[0])
+	var heading := float(shown[1])
 	var label := floor_label(_rules, index)
 	# Только этажи своей шахты: в том же столбце бывает другая, со своей кабиной,
 	# и табло столбца целиком показывали бы то одну кабину, то другую.
 	var column := _boards.get(shaft.x, {}) as Dictionary
-	for floor_index in range(shaft.top, shaft.bottom + 1):
+	for floor_index in range(maxi(shaft.top, span.x), mini(shaft.bottom, span.y) + 1):
 		var board := column.get(floor_index) as ShaftBoard
 		if board != null:
 			_show(board, label, heading, coming(heading, index, floor_index))
@@ -477,13 +499,24 @@ func watches(car: ElevatorCar) -> bool:
 
 ## Что показывает табло портала шахты [param x] на этаже [param index].
 func board_text(x: float, index: int) -> String:
+	_catch_up(x, index)
 	var board := (_boards.get(x, {}) as Dictionary).get(index) as ShaftBoard
 	return board.digits.text if board != null else ""
+
+
+## Дописывает табло портала вне кадра, которое спросили: оно отстало.
+func _catch_up(x: float, index: int) -> void:
+	for car: ElevatorCar in _watched:
+		var shaft := _watched[car] as BuildingPlan.ShaftSpot
+		if is_instance_valid(car) and _shown.has(car) and is_equal_approx(shaft.x, x):
+			if index >= shaft.top and index <= shaft.bottom:
+				_paint(car, Vector2i(index, index))
 
 
 ## Какая кнопка горит на этом портале: [constant Intent.UP], [constant
 ## Intent.DOWN] или 0 — ни одна (или панели нет).
 func lit_button(x: float, index: int) -> float:
+	_catch_up(x, index)
 	var board := (_boards.get(x, {}) as Dictionary).get(index) as ShaftBoard
 	return board.lit if board != null else 0.0
 

@@ -159,6 +159,7 @@ var _facades: Array[Transform3D] = []
 var _facade_tones: Array[Color] = []
 var _facade_kinds: Array[Color] = []
 var _windows: Array[Array] = [[], []]
+var _traffic: StreetTraffic = null
 ## Колода вывесок: лавки на одной улице не повторяются.
 var _names: Array[String] = []
 
@@ -183,6 +184,9 @@ func build(left: float, street: float, building_seed: int, weather: Weather.Kind
 	_build_row()
 	_build_lamp(_left - FROM * 0.55)
 	_park_a_car(_left - _rng.randf_range(12.0, 17.0))
+	_traffic = StreetTraffic.new()
+	add_child(_traffic)
+	_traffic.build(_left, _street, building_seed)
 	_flush_multimeshes()
 	if Weather.is_raining(weather):
 		_build_rain()
@@ -207,10 +211,17 @@ func road() -> StandardMaterial3D:
 	return _road
 
 
-## Настоящий свет улицы: горит, пока выезд в кадре.
+## Настоящий свет улицы: горит, пока выезд в кадре. Поток тоже едет только тогда.
 func show_light(on: bool) -> void:
 	if _glow != null:
 		_glow.visible = on
+	if _traffic != null:
+		_traffic.set_active(on)
+
+
+## Поток машин улицы (ADR-0044, решение 1).
+func traffic() -> StreetTraffic:
+	return _traffic
 
 
 ## Настоящие источники улицы — для тестов бюджета.
@@ -240,9 +251,11 @@ func _build_road() -> void:
 		_road,
 		_at(middle, _street + ASPHALT * 0.5, (NEAR_Z + FAR_KERB_Z) * 0.5)
 	)
-	# Прерывистая осевая: по штриху на шаг, чуть над асфальтом.
+	# Прерывистая осевая: по штриху на шаг, чуть над асфальтом. С M24h — между
+	# полосами потока, а не посередине мостовой: у дальнего бордюра стоит
+	# машина, и дальней полосе нужно место перед ней.
 	var paint := GreyboxLook.surface(LANE_PAINT)
-	var lane_z := (NEAR_Z + FAR_KERB_Z) * 0.5
+	var lane_z := (StreetTraffic.NEAR_LANE_Z + StreetTraffic.FAR_LANE_Z) * 0.5
 	var x := _left - 1.5
 	while x > from + 1.5:
 		_box(Vector3(2.4, 0.01, 0.2), paint, _at(x, _street - 0.005, lane_z), false)

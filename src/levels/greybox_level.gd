@@ -128,6 +128,8 @@ var _lighting := FloorLighting.new()
 var _lit_span := Vector2i(0, -1)
 ## Этажи в кадре без запаса: их лампы кладут тени (ADR-0042, решение 2).
 var _shadowed_span := Vector2i(0, -1)
+## Полоса кадра по X, в которой горит свет ([method VisibleFloors.band]).
+var _lit_band := Vector2.ZERO
 ## Лампы здания: их свет гасится за пределами кадра. Упавшие лампы убирают себя
 ## сами, поэтому перед обращением проверяется живость.
 var _lamps: Array[Lamp] = []
@@ -159,6 +161,7 @@ func _ready() -> void:
 	if rules == null:
 		rules = BuildingRules.new()
 	_plan = BuildingPlan.generate(rules, building_seed)
+	Ragdoll.abyss = WorldSpace.height_to_scene(rules.total_height() + Ragdoll.ABYSS_MARGIN)
 	RunLog.write("building", {"seed": building_seed, "floors": rules.floors})
 	_spawn.rng.seed = building_seed
 	# Свой генератор, не выпуска: иначе вход в дверь менял бы и выпуск агентов.
@@ -233,28 +236,38 @@ func _process(_delta: float) -> void:
 			)
 		)
 	var in_frame := VisibleFloors.seen(rules, seen)
-	if span == _lit_span and in_frame == _shadowed_span:
+	var strip := VisibleFloors.band(seen)
+	var shade := VisibleFloors.band(seen, VisibleFloors.SHADOW_REACH)
+	if span == _lit_span and in_frame == _shadowed_span and strip == _lit_band:
 		return
 
 	_lit_span = span
 	_shadowed_span = in_frame
+	_lit_band = strip
 	# Свет лампы кладёт тени, то есть стоит дорого, и горит только в кадре; на
 	# запасных этажах — без тени (ADR-0042, решение 2).
+	var filled := FloorLighting.nearest(
+		_lamps, seen.get_center(), Lamp.FILL_SHADOW_CAP, shade, in_frame
+	)
 	for lamp: Lamp in _lamps:
 		if not is_instance_valid(lamp):
 			continue
+		var x := lamp.global_position.x
 		lamp.set_light_visible(
-			VisibleFloors.covers(span, lamp.floor_index),
-			VisibleFloors.covers(in_frame, lamp.floor_index)
+			VisibleFloors.in_band(strip, x) and VisibleFloors.covers(span, lamp.floor_index),
+			VisibleFloors.in_band(shade, x) and VisibleFloors.covers(in_frame, lamp.floor_index),
+			filled.has(lamp)
 		)
 	# Бра красных дверей — тем же правилом (ADR-0042, решение 8).
 	for door: Door in _doors:
 		if is_instance_valid(door):
 			var index := rules.floor_index_near(WorldSpace.to_plane(door.position).y)
-			door.set_light_in_view(VisibleFloors.covers(span, index))
+			door.set_light_in_view(
+				VisibleFloors.covers(span, index) and VisibleFloors.in_band(strip, door.position.x)
+			)
 	# Столбы шахт — тем же правилом: их в здании втрое больше, чем ламп.
 	if _shafts != null:
-		_shafts.light_span(span)
+		_shafts.light_span(span, strip)
 	# Свет трубок паркинга — тоже.
 	if _garage != null:
 		_garage.show_lights(VisibleFloors.covers(span, rules.floors - 1))
@@ -263,8 +276,11 @@ func _process(_delta: float) -> void:
 	for escalator: Escalator in _escalators:
 		escalator.set_light_visible(
 			(
-				VisibleFloors.covers(span, escalator.floor_index)
-				or VisibleFloors.covers(span, escalator.floor_index + 1)
+				VisibleFloors.in_band(strip, escalator.global_position.x)
+				and (
+					VisibleFloors.covers(span, escalator.floor_index)
+					or VisibleFloors.covers(span, escalator.floor_index + 1)
+				)
 			)
 		)
 
@@ -447,7 +463,7 @@ func _spawn_escalators() -> void:
 		var descent := Vector2(spot.towards * rules.escalator_run, rules.floor_height)
 		# Перегиб — в самом проёме: через него идут и полотно, и поездка, поэтому
 		# пассажир проходит сквозь дыру, а не сквозь плиту.
-		var gap := spot.gap(rules)
+		var gap := spot.hole(rules)
 		# Проём — в координатах эскалатора: обрамление ставит он сам, а правила
 		# о том, где стоит его узел, знать не обязаны.
 		var edges := Vector2(gap.x - spot.x, gap.y - spot.x)
@@ -538,6 +554,8 @@ func _spawn_car(exit_x: float, surface: float) -> void:
 	add_child(_car)
 	# Заглушённая машина стоит с тёмными фарами: зажигаются они на отъезде.
 	_car.set_lights(false)
+	if _garage != null and _garage.gate != null and _garage.gate.ramp() != null:
+		_car.traffic = _garage.gate.ramp().traffic()
 	_boarding = ExitBoarding.new(_car, surface, _garage, ExitBoarding.exit_frame(rules))
 	_exit_position = _boarding.door_point()
 
