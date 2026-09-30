@@ -85,6 +85,15 @@ const RED_LIGHT_ANGLE: float = 42.0
 const RED_LIGHT_OUT: float = 0.7
 const RED_LIGHT_TILT: float = 0.35
 
+## Стекло офисной створки: размер, м, и тон — светлое матовое.
+const VISION := Vector2(0.62, 0.5)
+const FROSTED := Color(0.78, 0.84, 0.88)
+## Табличка «Не беспокоить» на ручке: размер, м, и цвет.
+const HANGER := Vector3(0.09, 0.22, 0.008)
+const HANGER_COLOR := Color(0.72, 0.1, 0.12)
+## Соль жребия мелочей у двери: свой, чтобы не ходить в ногу с комнатой.
+const LITTLE_SALT: int = 0x7A_B1E5
+
 ## Краски занятой створки по тону: их две на все двери (створка и филёнки).
 static var _occupied_paints: Dictionary = {}
 
@@ -139,6 +148,9 @@ var _room: DoorRoom = null
 var _room_identity: BuildingIdentity = null
 var _room_seed: int = 0
 var _furnished: bool = false
+## Вид двери по типу здания (ADR-0048): филёнки и дерево у отеля, стекло и
+## алюминий у офиса. Без здания — отель, как до M24i.
+var _style := BuildingStyle.new()
 
 @onready var _mat: Area3D = $Mat
 @onready var _leaf: MeshInstance3D = $Leaf
@@ -155,6 +167,8 @@ func _notification(what: int) -> void:
 
 
 func _ready() -> void:
+	if _furnished:
+		_style = BuildingStyle.of(_room_identity)
 	_visit.hide_time = hide_time
 	_visit.leaf_time = open_time
 	_mat_visual.material_override = GreyboxLook.surface(GreyboxLook.SLAB)
@@ -390,13 +404,14 @@ func _refresh_look() -> void:
 	_leaf.rotation.y = angle
 	_leaf.position.x = -half + cos(angle) * half
 	_leaf.position.z = WorldSpace.BACK_WALL_Z + LEAF_STANDOFF - sin(angle) * half
-	var tone := GreyboxLook.DOOR_RED if has_document else GreyboxLook.DOOR
+	var plain := GreyboxLook.DOOR if _style.panels else _style.leaf_tone
+	var tone := GreyboxLook.DOOR_RED if has_document else plain
 	# Занятая створка светится сама, неярко: маркер, а не краска.
 	_leaf.material_override = _paint(tone, occupied)
 	var relief := _paint(tone.darkened(0.14), occupied)
 	for panel in _panels:
 		panel.material_override = relief
-	var glow := GreyboxLook.SIGN_RED if has_document else GreyboxLook.SIGN_WARM
+	var glow := GreyboxLook.SIGN_RED if has_document else _sign_tone()
 	_sign.material_override = GreyboxLook.light(glow)
 	_red_light.visible = has_document and _in_view
 	_pulse_clock = 0.0
@@ -490,24 +505,38 @@ func _breathe(delta: float) -> void:
 	_sign.material_override = _pulse
 
 
-## Детали створки: две филёнки, ручка с розеткой у свободного края и отбойная
-## пластина внизу. Дети створки — поворачиваются вместе с ней.
+## Табло над обычной дверью: тёплое у отеля, холодное у офиса.
+func _sign_tone() -> Color:
+	return GreyboxLook.SIGN_WARM if _style.panels else _style.sign_tone
+
+
+## Детали створки: у отеля — две филёнки, у офиса — матовое стекло в верхней
+## трети; ручка с розеткой у свободного края и отбойная пластина внизу. Дети
+## створки — поворачиваются вместе с ней. У части номеров отеля — табличка «Не
+## беспокоить» на ручке и газета или поднос у порога (ADR-0048).
 func _dress_leaf() -> void:
 	var front := LEAF_THICKNESS * 0.5
 	var bottom := -LEAF_SIZE.y * 0.5
-	for rise: float in [0.35, 0.78]:
-		var panel := GreyboxLook.box(
-			Vector3(PANEL_SIZE.x, PANEL_SIZE.y, PANEL_RELIEF), GreyboxLook.surface(GreyboxLook.DOOR)
-		)
-		panel.position = Vector3(0.0, bottom + LEAF_SIZE.y * rise, front + PANEL_RELIEF * 0.5)
-		_leaf.add_child(panel)
-		_panels.append(panel)
-	var chrome := GreyboxLook.metal(GreyboxLook.TRIM)
+	if _style.panels:
+		for rise: float in [0.35, 0.78]:
+			var panel := GreyboxLook.box(
+				Vector3(PANEL_SIZE.x, PANEL_SIZE.y, PANEL_RELIEF),
+				GreyboxLook.surface(GreyboxLook.DOOR)
+			)
+			panel.position = Vector3(0.0, bottom + LEAF_SIZE.y * rise, front + PANEL_RELIEF * 0.5)
+			_leaf.add_child(panel)
+			_panels.append(panel)
+	if _style.vision_glass:
+		_leaf.add_child(_vision_glass(front, bottom))
+	var chrome := GreyboxLook.metal(GreyboxLook.TRIM if _style.panels else _style.handle_tone)
+	if _style.panels:
+		chrome = GreyboxLook.metal(_style.handle_tone)
 	var handle_x := LEAF_SIZE.x * 0.5 - 0.14
 	var rosette := GreyboxLook.box(ROSETTE, chrome)
 	rosette.position = Vector3(handle_x, bottom + HANDLE_RISE, front + ROSETTE.z * 0.5)
 	_leaf.add_child(rosette)
 	var lever := GreyboxLook.box(HANDLE, chrome)
+	lever.name = "Lever"
 	lever.position = Vector3(
 		handle_x - HANDLE.x * 0.4, bottom + HANDLE_RISE, front + ROSETTE.z + HANDLE.z * 0.5
 	)
@@ -515,11 +544,84 @@ func _dress_leaf() -> void:
 	var kick := GreyboxLook.box(Vector3(KICK_PLATE.x, KICK_PLATE.y, 0.01), chrome)
 	kick.position = Vector3(0.0, bottom + KICK_PLATE.y * 0.5 + 0.02, front + 0.005)
 	_leaf.add_child(kick)
+	_little_things(lever)
+
+
+## Матовое стекло в створке офиса: светлая полоса в верхней трети, чуть
+## светится — за ней кабинет.
+func _vision_glass(front: float, bottom: float) -> MeshInstance3D:
+	var frosted := StandardMaterial3D.new()
+	frosted.albedo_color = FROSTED
+	frosted.roughness = 0.2
+	frosted.emission_enabled = true
+	frosted.emission = FROSTED
+	frosted.emission_energy_multiplier = 0.25
+	var glass := GreyboxLook.box(Vector3(VISION.x, VISION.y, 0.012), frosted)
+	glass.name = "VisionGlass"
+	glass.position = Vector3(0.0, bottom + LEAF_SIZE.y * 0.72, front + 0.006)
+	return glass
+
+
+## Мелочи номера отеля жребием двери: табличка на ручке и газета или поднос у
+## порога. У красной двери и в офисе их нет.
+func _little_things(lever: MeshInstance3D) -> void:
+	if not _furnished or has_document:
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash([_room_seed, LITTLE_SALT])
+	if rng.randf() < _style.door_hanger_share:
+		var card := GreyboxLook.box(HANGER, GreyboxLook.surface(HANGER_COLOR))
+		card.name = "DoorHanger"
+		card.position = Vector3(-HANGER.x * 0.3, -HANGER.y * 0.55, HANGER.z)
+		lever.add_child(card)
+	if rng.randf() < _style.door_tray_share:
+		var tray := _tray() if rng.randf() < 0.5 else _newspaper()
+		tray.position = Vector3(LEAF_SIZE.x * 0.5 + 0.28, 0.0, WorldSpace.BACK_WALL_Z + 0.3)
+		add_child(tray)
+
+
+## Поднос с посудой после ужина в номере.
+func _tray() -> Node3D:
+	var tray := Node3D.new()
+	tray.name = "Tray"
+	var board := GreyboxLook.box(
+		Vector3(0.42, 0.02, 0.3), GreyboxLook.metal(Color(0.72, 0.7, 0.66))
+	)
+	board.position.y = 0.01
+	tray.add_child(board)
+	var dish := GreyboxLook.box(Vector3(0.2, 0.03, 0.2), GreyboxLook.surface(Color(0.9, 0.9, 0.88)))
+	dish.position = Vector3(-0.07, 0.035, 0.0)
+	tray.add_child(dish)
+	var cloche := GreyboxLook.box(
+		Vector3(0.14, 0.09, 0.14), GreyboxLook.metal(Color(0.8, 0.8, 0.82))
+	)
+	cloche.position = Vector3(0.11, 0.065, 0.02)
+	tray.add_child(cloche)
+	return tray
+
+
+## Газета у порога.
+func _newspaper() -> Node3D:
+	var paper := GreyboxLook.box(
+		Vector3(0.36, 0.025, 0.26), GreyboxLook.surface(Color(0.82, 0.8, 0.74))
+	)
+	paper.name = "Newspaper"
+	paper.position.y = 0.0125
+	paper.rotation.y = 0.25
+	var holder := Node3D.new()
+	holder.add_child(paper)
+	return holder
 
 
 ## Наличник вокруг проёма на задней стене: стойки и перемычка.
 func _frame_the_opening() -> void:
 	var trim := GreyboxLook.metal(GreyboxLook.TRIM.darkened(0.35))
+	if _furnished:
+		trim = (
+			GreyboxLook.surface(_style.frame_tone)
+			if _style.panels
+			else GreyboxLook.metal(_style.frame_tone)
+		)
 	var half := LEAF_SIZE.x * 0.5
 	var z := WorldSpace.BACK_WALL_Z + FRAME_DEPTH * 0.5
 	for side: float in [-1.0, 1.0]:

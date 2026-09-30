@@ -35,6 +35,7 @@
 | `armchair` | Armchair | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/myd1WSucAz) |
 | `bed_double` | Bed Double | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/BuRay4fVFr) |
 | `bed_hotel` | Bed | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/rXo5Rkl5LC) |
+| `bench_hotel` | Bench | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/jLxjFxFRpw) |
 | `bins` | Bins | Dilan Shah | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/75lHRN19gMY) |
 | `bookshelf` | Bookshelf | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/30Iealxb0p) |
 | `cabinet` | Cabinet | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/wOiMrnUuhe) |
@@ -56,6 +57,8 @@
 | `houseplant_a` | Houseplant | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/Kr4kr7OCCQ) |
 | `houseplant_b` | Houseplant | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/bfLOqIV5uP) |
 | `houseplant_c` | Houseplant | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/dveIJ0xNpX) |
+| `light_stand` | Light Stand | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/9L6lLUl9sD) |
+| `lounge_chair` | Chair | CMHT Oculus | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/aVo4dG09vfD) |
 | `message_board` | Message board | Poly by Google | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/fDpegPgEB0j) |
 | `night_stand` | Night Stand | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/A9vPgVUrF9) |
 | `night_stand_b` | Night Stand | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/9LI73c5uFA) |
@@ -78,6 +81,7 @@
 | `water_cooler` | Water Cooler | J-Toastie | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/zWi9p5FSxD) |
 | `water_tank` | Water Tank | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/XVB8vUbnZb) |
 | `water_tower` | Water Tower | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/tMK8bhapAK) |
+| `wet_floor_sign` | Sign | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/4MSsNFk5fc) |
 | `whiteboard` | Whiteboard | jeremy | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/cYQOKE7Wd7D) |
 | `workstation_a` | Desk | dook | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/ISpMh81QGq) |
 | `workstation_b` | Desk | dook | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/EtJlOllzbf) |

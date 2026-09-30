@@ -250,6 +250,8 @@ static func _build() -> Dictionary:
 		Entry.of("trashcan", Place.FLOOR, Fit.ANY, 0.6),
 		Entry.of("vending_machine", Place.FLOOR, Fit.ANY, 1.85),
 		Entry.of("fire_extinguisher", Place.FLOOR, Fit.ANY, 0.6),
+		# Табличка «Мокрый пол» — в любом здании: уборщица прошла (ADR-0048).
+		Entry.of("wet_floor_sign", Place.FLOOR, Fit.ANY, 0.62),
 		# Пол, отель: гостиная у лифтов, а не склад.
 		Entry.of("couch_medium", Place.FLOOR, Fit.HOTEL, 0.8),
 		Entry.of("armchair", Place.FLOOR, Fit.HOTEL, 0.9),
@@ -259,6 +261,7 @@ static func _build() -> Dictionary:
 		Entry.of("end_table", Place.FLOOR, Fit.HOTEL, 0.6).topped("table_lamp"),
 		Entry.of("cabinet", Place.FLOOR, Fit.HOTEL, 0.9),
 		Entry.of("table_lamp", Place.TOP, Fit.HOTEL, 0.5),
+		Entry.of("bench_hotel", Place.FLOOR, Fit.HOTEL, 0.85),
 		# Пол, офис.
 		Entry.of("water_cooler", Place.FLOOR, Fit.OFFICE, 1.2),
 		Entry.of("file_cabinet", Place.FLOOR, Fit.OFFICE, 1.3, -90.0),
@@ -266,6 +269,9 @@ static func _build() -> Dictionary:
 		Entry.of("cardboard_boxes", Place.FLOOR, Fit.OFFICE, 1.0),
 		Entry.of("bins", Place.FLOOR, Fit.OFFICE, 0.9),
 		Entry.of("bookshelf", Place.FLOOR, Fit.OFFICE, 1.6),
+		# Приёмная у кабинетов: кресло для посетителей и торшер (ADR-0048).
+		Entry.of("lounge_chair", Place.FLOOR, Fit.OFFICE, 0.85),
+		Entry.of("light_stand", Place.FLOOR, Fit.OFFICE, 1.6),
 		# Стены: картины — везде, остальное — по зданию. Wall Art пришли
 		# спиной к камере, Painting — плашмя.
 		Entry.of("painting", Place.WALL, Fit.ANY, 0.6).tilted(90.0),

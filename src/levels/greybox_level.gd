@@ -510,6 +510,7 @@ func _spawn_lamps() -> void:
 		# Этаж лампы известен здесь, и обратно из координаты его не выводят: под
 		# потолком она ближе к полу этажа выше, чем к своему.
 		lamp.floor_index = spot.floor_index
+		lamp.fixture = BuildingStyle.of(identity).fixture
 		# Зона лампы считается от того, что висит: правило темноты узнаёт о
 		# лампе здесь же, где она вешается.
 		_lighting.hang(spot.floor_index, spot.x)
