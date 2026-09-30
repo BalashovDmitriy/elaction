@@ -13,8 +13,9 @@ extends RefCounted
 ## что у каждой записи оно есть.
 
 ## Где предмет: стоит на полу у стены, висит на стене, стоит на крыше, стоит
-## только поверх другого (лампа на комоде — в жребий сама не идёт).
-enum Place { FLOOR, WALL, ROOF, TOP }
+## только поверх другого (лампа на комоде — в жребий сама не идёт), стоит в
+## комнате за дверью ([DoorRoom]) — в коридор не идёт.
+enum Place { FLOOR, WALL, ROOF, TOP, ROOM }
 
 ## Для какого здания: отель, офис, любое.
 enum Fit { HOTEL, OFFICE, ANY }
@@ -127,7 +128,10 @@ static func pick(where: Place, which: Fit) -> Array[Entry]:
 ## Собирает предмет: модель, повёрнутая к камере и приведённая к росту, нуль —
 ## посередине низа по ширине и у задней грани по глубине. Так предмет ставится
 ## к стене одним сдвигом, какой бы глубины ни был. Узел без тел.
-static func make(prop_name: String) -> Node3D:
+##
+## [param full_depth] — не сжимать по глубине: для комнаты за дверью, где
+## коридорная мебель стоит в свою настоящую глубину.
+static func make(prop_name: String, full_depth: bool = false) -> Node3D:
 	var item := entry(prop_name)
 	var path := "%s/%s.glb" % [DIR, prop_name]
 	if not ResourceLoader.exists(path):
@@ -150,7 +154,9 @@ static func make(prop_name: String) -> Node3D:
 		factor = minf(factor, WALL_MAX_WIDTH / maxf(box.size.x, 0.001))
 		height = box.size.y * factor
 	var squeeze := minf(1.0, MAX_DEPTH / maxf(box.size.z * factor, 0.001))
-	if item != null and item.place == Place.ROOF:
+	# Крыше и комнате за дверью глубины хватает: сжимается только то, что
+	# стоит в коридоре между стеной и актёрами.
+	if full_depth or (item != null and (item.place == Place.ROOF or item.place == Place.ROOM)):
 		squeeze = 1.0
 	var sized := Node3D.new()
 	sized.add_child(turned)
@@ -164,7 +170,7 @@ static func make(prop_name: String) -> Node3D:
 	holder.add_child(sized)
 	_mark_as_props(model)
 	if item != null and not item.top.is_empty():
-		var on_top := make(item.top)
+		var on_top := make(item.top, full_depth)
 		if on_top != null:
 			# Сверху, по середине глубины низа: лампа стоит на столешнице, а не
 			# на её заднем крае.
@@ -275,6 +281,18 @@ static func _build() -> Dictionary:
 		Entry.of("vent", Place.WALL, Fit.OFFICE, 0.35),
 		Entry.of("air_vent", Place.WALL, Fit.OFFICE, 0.45, 90.0),
 		Entry.of("fire_exit_sign", Place.WALL, Fit.ANY, 0.3, -90.0).raised(2.35),
+		# Комната за дверью (ADR-0047): в неё видно в открытую створку. Рабочие
+		# места dook пришли боком — столом к +X.
+		Entry.of("bed_hotel", Place.ROOM, Fit.HOTEL, 0.8),
+		Entry.of("bed_double", Place.ROOM, Fit.HOTEL, 1.15),
+		Entry.of("night_stand", Place.ROOM, Fit.HOTEL, 0.58).topped("table_lamp"),
+		Entry.of("night_stand_b", Place.ROOM, Fit.HOTEL, 0.62).topped("table_lamp"),
+		Entry.of("curtains", Place.ROOM, Fit.HOTEL, 2.3),
+		Entry.of("rug", Place.ROOM, Fit.HOTEL, 0.02),
+		Entry.of("desk", Place.ROOM, Fit.OFFICE, 0.78),
+		Entry.of("office_chair", Place.ROOM, Fit.OFFICE, 1.05),
+		Entry.of("workstation_a", Place.ROOM, Fit.OFFICE, 1.45, 90.0),
+		Entry.of("workstation_b", Place.ROOM, Fit.OFFICE, 1.35, 90.0),
 		# Крыша (ADR-0033, решение 8).
 		Entry.of("water_tower", Place.ROOF, Fit.ANY, 4.5),
 		Entry.of("water_tank", Place.ROOF, Fit.ANY, 2.5),

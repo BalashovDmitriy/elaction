@@ -65,6 +65,10 @@ func test_props_take_their_size_from_the_catalog() -> void:
 					size.x, PropCatalog.WALL_MAX_WIDTH + 0.001, "%s шире простенка" % entry.name
 				)
 				assert_lte(size.y, entry.height + 0.01, "%s: не выше каталога" % entry.name)
+			PropCatalog.Place.ROOM:
+				# Комнате за дверью глубины хватает: по глубине не сжимается.
+				if entry.top.is_empty():
+					assert_almost_eq(size.y, entry.height, 0.01, "%s: рост" % entry.name)
 			_:
 				assert_almost_eq(size.y, entry.height, 0.01, "%s: рост" % entry.name)
 

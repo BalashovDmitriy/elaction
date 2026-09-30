@@ -132,6 +132,13 @@ var _pulse: StandardMaterial3D = null
 var _pulse_clock: float = 0.0
 ## Филёнки створки: их тон идёт за створкой — красной или обычной.
 var _panels: Array[MeshInstance3D] = []
+## Комната за дверью ([DoorRoom], ADR-0047): собирается, когда створка
+## трогается, и убирается, когда закрылась. Здание и жребий двери даёт уровень
+## ([method furnish]); без них — в тестах — за дверью по-прежнему темно.
+var _room: DoorRoom = null
+var _room_identity: BuildingIdentity = null
+var _room_seed: int = 0
+var _furnished: bool = false
 
 @onready var _mat: Area3D = $Mat
 @onready var _leaf: MeshInstance3D = $Leaf
@@ -375,6 +382,7 @@ func _refresh_look() -> void:
 	_shown = along
 	_shown_red = has_document
 	_shown_occupied = occupied
+	_open_the_room(along)
 	var angle := along * PI * 0.5
 	var half := LEAF_SIZE.x * 0.5
 	# Поворот вокруг Y на +угол уводит правый край створки в −Z, то есть
@@ -392,6 +400,32 @@ func _refresh_look() -> void:
 	_sign.material_override = GreyboxLook.light(glow)
 	_red_light.visible = has_document and _in_view
 	_pulse_clock = 0.0
+
+
+## Какая комната за дверью: здание [param identity] и жребий двери
+## [param seed].
+func furnish(identity: BuildingIdentity, seed: int) -> void:
+	_room_identity = identity
+	_room_seed = seed
+	_furnished = true
+
+
+## Комната за дверью, пока створка открыта; иначе null.
+func room() -> DoorRoom:
+	return _room
+
+
+## Собирает комнату, когда створка тронулась, и убирает, когда закрылась.
+func _open_the_room(along: float) -> void:
+	if not _furnished:
+		return
+	if along > 0.0 and _room == null:
+		var hotel := _room_identity == null or _room_identity.is_hotel()
+		_room = DoorRoom.build(hotel, _room_seed, _room_identity)
+		add_child(_room)
+	elif along <= 0.0 and _room != null:
+		_room.queue_free()
+		_room = null
 
 
 ## Этаж двери попал в полосу горящих или ушёл из неё. Зовёт уровень, отбирая

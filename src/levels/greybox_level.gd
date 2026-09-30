@@ -479,6 +479,7 @@ func _spawn_doors() -> void:
 		var door := DOOR_SCENE.instantiate() as Door
 		door.position = WorldSpace.to_scene(Vector2(spot.x, rules.floor_surface(spot.floor_index)))
 		door.has_document = spot.has_document
+		door.furnish(identity, hash([building_seed, spot.floor_index, roundi(spot.x * 10.0)]))
 		add_child(door)
 		_doors.append(door)
 		door.otto_hid.connect(_on_otto_hid.bind(door))
