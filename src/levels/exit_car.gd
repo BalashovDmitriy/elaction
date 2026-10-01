@@ -246,7 +246,11 @@ func door_x() -> float:
 
 ## Открывает водительскую дверцу: 0 — закрыта, 1 — распахнута.
 func set_door(openness: float) -> void:
+	var was := _door_open
 	_door_open = clampf(openness, 0.0, 1.0)
+	# Дверцу открывают — щелчок ручки и замка (ADR-0052, решение 7).
+	if was <= 0.0 and _door_open > 0.0 and is_inside_tree():
+		_say(Sounds.CAR_DOOR_OPEN)
 	var eased := ease(_door_open, -2.0)
 	if _door != null:
 		# Дверца лежит от петли к багажнику (-X модели) у борта -Z модели и
@@ -533,6 +537,9 @@ func _signal(delta: float) -> void:
 	if is_signalling():
 		_blink += delta
 		on = fmod(_blink, BLINK_HALF * 2.0) < BLINK_HALF
+		# Реле поворотника щёлкает на каждой вспышке.
+		if on and not indicator_lit() and is_inside_tree():
+			_say(Sounds.TURN_SIGNAL)
 	else:
 		_blink = 0.0
 	_indicator.emission_energy_multiplier = BLINK_GLOW if on else 0.0

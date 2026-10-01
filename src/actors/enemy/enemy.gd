@@ -17,6 +17,12 @@ signal died(agent: Enemy)
 ## Агент дошёл до двери и ушёл в неё (ADR-0027, решение 3а). Убирает его уровень.
 signal left_building(agent: Enemy)
 
+## Звук агента на его месте (ADR-0052, решение 7): докуда слышно шаг и
+## выстрел, м, и насколько шаг тише шага Otto, дБ.
+const STEP_REACH: float = 14.0
+const SHOT_REACH: float = 40.0
+const STEP_DB: float = -5.0
+
 const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
 ## Слой врагов в `project.godot`. Агент сходит с него, пока стоит в проёме.
 const ENEMY_LAYER: int = 3
@@ -105,6 +111,9 @@ var figure: FigureRig:
 	get:
 		return _body
 
+## Чем звучит шаг агента — ставит уровень по полу здания.
+var step_sound: String = Sounds.STEP_CONCRETE
+
 ## Правила здания, из которого вышел агент. Пустых не бывает: без них он
 ## достаёт значения по умолчанию — те же, что у здания по умолчанию.
 var _rules: BuildingRules = null
@@ -122,6 +131,10 @@ var _lift_x: float = NAN
 var _exit_x: float = NAN
 ## Фаза ходьбы, поза выстрела и падения, признак раздавленного — всё как у Otto.
 var _walk_phase: float = 0.0
+## Кадр ходьбы, на котором шаг уже прозвучал; стойка, о которой уже
+## прозвучало (ADR-0052, решение 7).
+var _stepped_on: int = -1
+var _heard_stance: EnemyBrain.Stance = EnemyBrain.Stance.STAND
 var _walking: bool = false
 ## Пауза разворота, как у Otto (ADR-0039, решение 6), и сторона, в которую агент
 ## смотрел прошлый кадр: смена стороны на полу и есть разворот.
@@ -646,8 +659,11 @@ func _update_look(delta: float) -> void:
 	_shooting = maxf(_shooting - delta, 0.0)
 	if _walking:
 		_walk_phase = ActorPose.advance(_walk_phase, delta)
+		_step_sound()
 	else:
 		_walk_phase = 0.0
+		_stepped_on = -1
+	_stance_sound()
 
 	# Дуло — там, откуда вылетит пуля: и в замахе, и в выстреле (ADR-0043,
 	# решение 16).
@@ -657,6 +673,25 @@ func _update_look(delta: float) -> void:
 	_body.show_pose(_pose())
 	_body.set_walk_phase(_walk_phase)
 	_body.face(_brain.facing)
+
+
+## Шаг агента — на его месте и тише шага Otto: слышно, кто идёт рядом.
+func _step_sound() -> void:
+	var frame := int(_walk_phase)
+	if frame == _stepped_on or frame == 1 or not is_on_floor():
+		return
+	_stepped_on = frame
+	Sounds.play_at(get_parent(), step_sound, global_position, STEP_REACH, STEP_DB)
+
+
+## Агент приседает или ложится от пули — шорох одежды.
+func _stance_sound() -> void:
+	var now := _brain.stance
+	if now == _heard_stance:
+		return
+	_heard_stance = now
+	if now != EnemyBrain.Stance.STAND and not _brain.is_dead():
+		Sounds.play_at(get_parent(), Sounds.CROUCH, global_position, STEP_REACH)
 
 
 func _pose() -> String:
@@ -697,7 +732,8 @@ func _shot_speed() -> float:
 
 func _fire() -> void:
 	_shooting = SHOOT_POSE_TIME
-	Sounds.play(Sounds.SHOT)
+	# Свой выстрел, на месте агента: на слух ясно, кто стрелял (ADR-0052).
+	Sounds.play_at(get_parent(), Sounds.ENEMY_SHOT, global_position, SHOT_REACH)
 	var bullet := BULLET_SCENE.instantiate() as Bullet
 	bullet.direction = _brain.facing
 	bullet.speed = _shot_speed()

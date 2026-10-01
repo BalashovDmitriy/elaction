@@ -12,6 +12,9 @@ extends Node3D
 ## убирает себя сам. След — не узел эффекта: он остаётся на стене до конца
 ## здания, но их число ограничено ([constant HOLES_KEPT]).
 
+## Докуда слышно удар пули, м.
+const IMPACT_REACH: float = 22.0
+
 ## Вспышка у ствола: свет, сила, радиус и сколько она живёт, с. Короткий
 ## импульс — на три-четыре кадра, а не весь полёт пули: свет стоит у ствола.
 const FLASH_COLOR := Color(1.0, 0.84, 0.52)
@@ -92,14 +95,23 @@ static func muzzle(host: Node, at: Vector3, towards: float) -> ShotFx:
 
 ## Удар пули в стену, дверь или кабину в точке [param at]: искры, пыль и след.
 ## [param towards] — ход пули; [param surface] — во что она попала: след
-## вешается на него, чтобы ехать с кабиной.
-static func impact(host: Node, at: Vector3, towards: float, surface: Node3D) -> ShotFx:
+## вешается на него, чтобы ехать с кабиной. [param audible] — false у прогрева
+## шейдеров ([ShaderWarmup]): там удар только рисуется.
+static func impact(
+	host: Node, at: Vector3, towards: float, surface: Node3D, audible: bool = true
+) -> ShotFx:
 	var fx := ShotFx.new()
 	fx.name = "Impact"
 	fx._lifetime = DUST_LIFETIME
 	host.add_child(fx)
 	fx.global_position = at
 	Sparks.ricochet(host, at, towards)
+	# Удар пули слышно там, куда она попала: о металл кабины — звонко, о
+	# стену и пол — глухо (ADR-0052, решение 7).
+	if audible:
+		var metal := surface is AnimatableBody3D
+		var sound := Sounds.BULLET_METAL if metal else Sounds.BULLET_WALL
+		Sounds.play_at(host, sound, at, IMPACT_REACH)
 	fx.add_child(
 		_puff(
 			DUST_COUNT,

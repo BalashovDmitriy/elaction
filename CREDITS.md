@@ -17,7 +17,7 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 
 | Что | Автор | Лицензия | Источник |
 |---|---|---|---|
-| Ultimate Modular Men Pack (Otto, агенты) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/ultimatemodularcharacters.html) |
+| Ultimate Modular Men Pack (Otto, агенты, пилот вертолёта) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/ultimatemodularcharacters.html) |
 | Cars Pack (машины у выхода) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/cars.html) |
 | Universal Animation Library (движение Otto и агентов) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/universalanimationlibrary.html) |
 
@@ -133,6 +133,12 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `theme.2` | Hard Boiled | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
 | `theme.3` | Covert Affair | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
 | `theme.4` | Dances and Dames | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
+| `theme_morning` | Shades of Spring | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
+| `theme_morning.2` | Walking Along | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
+| `theme_day` | George Street Shuffle | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
+| `theme_day.2` | Opportunity Walks | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
+| `theme_evening` | Apero Hour | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
+| `theme_evening.2` | Backbay Lounge | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
 | `alarm_theme` | Fast Talkin | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
 | `alarm_theme.2` | Private Eye | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
 | `alarm_theme.3` | On the Cool Side | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
@@ -167,10 +173,37 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `car_start` | Car Start | snakebarney | CC0 1.0 | [freesound.org](https://freesound.org/people/snakebarney/sounds/138099/) |
 | `garage_gate` | Automatic Garage Roller Door Opening | freesoundjon01 | CC0 1.0 | [freesound.org](https://freesound.org/people/freesoundjon01/sounds/202666/) |
 | `basement_open` | Door buzz alarm elevator HALIFAX 93 | TRP | CC0 1.0 | [freesound.org](https://freesound.org/people/TRP/sounds/567317/) |
+| `heli_door` | Van sliding door open | MrAuralization | CC-BY 4.0 | [freesound.org](https://freesound.org/people/MrAuralization/sounds/269520/) |
+| `winch` | SFX Electric Actuator Jack 1 | mpuffenbarger | CC0 1.0 | [freesound.org](https://freesound.org/people/mpuffenbarger/sounds/683808/) |
+| `rope_drop` | rbhRopeRMX1 | nicStage | CC-BY 4.0 | [freesound.org](https://freesound.org/people/nicStage/sounds/1949/) |
+| `bullet_wall` | Ricochet 3_2 | Benboncan | CC-BY 4.0 | [freesound.org](https://freesound.org/people/Benboncan/sounds/78092/) |
+| `bullet_metal` | Guns & Explosions Album - Bullet Impact 14 | OGsoundFX | CC-BY 4.0 | [freesound.org](https://freesound.org/people/OGsoundFX/sounds/423107/) |
+| `enemy_shot` | Pistol Shot | LeMudCrab | CC0 1.0 | [freesound.org](https://freesound.org/people/LeMudCrab/sounds/163456/) |
+| `body_fall` | Thud | Breviceps | CC0 1.0 | [freesound.org](https://freesound.org/people/Breviceps/sounds/447922/) |
+| `crush` | Hard Candy / Bone Crunch | clif_creates | CC0 1.0 | [freesound.org](https://freesound.org/people/clif_creates/sounds/392883/) |
+| `slowmo` | long wispy woosh2 | newagesoup | CC-BY 4.0 | [freesound.org](https://freesound.org/people/newagesoup/sounds/377829/) |
+| `jump` | Jacket/Cloth Rustle 9 | brandondelehoy | CC0 1.0 | [freesound.org](https://freesound.org/people/brandondelehoy/sounds/494797/) |
+| `land` | Jump_End_Gravel | D001447733 | CC-BY 3.0 | [freesound.org](https://freesound.org/people/D001447733/sounds/464607/) |
+| `crouch` | Jacket/Cloth Rustle 9 | brandondelehoy | CC0 1.0 | [freesound.org](https://freesound.org/people/brandondelehoy/sounds/494797/) |
+| `step_metal` | metal footstep | atleastrelatively | CC0 1.0 | [freesound.org](https://freesound.org/people/atleastrelatively/sounds/816413/) |
+| `respawn` | Interface Sounds: bong_001 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/interface-sounds) |
+| `elevator_start` | Elevator Stalling 2 | maxmaxmaxmaxmaxmaxmax | CC0 1.0 | [freesound.org](https://freesound.org/people/maxmaxmaxmaxmaxmaxmax/sounds/439435/) |
+| `elevator_stop` | elevator_stop | simpsi | CC-BY 3.0 | [freesound.org](https://freesound.org/people/simpsi/sounds/175668/) |
+| `car_door_open` | Car Door Open 2 | Geoff-Bremner-Audio | CC-BY 4.0 | [freesound.org](https://freesound.org/people/Geoff-Bremner-Audio/sounds/844708/) |
+| `turn_signal` | turnsignal | morgantj | CC-BY 4.0 | [freesound.org](https://freesound.org/people/morgantj/sounds/61053/) |
+| `car_pass` | car_4 | koirankarva84581682 | CC0 1.0 | [freesound.org](https://freesound.org/people/koirankarva84581682/sounds/664770/) |
+| `horn` | Double car horn | mudflea2 | CC0 1.0 | [freesound.org](https://freesound.org/people/mudflea2/sounds/705723/) |
+| `alarm` | fire alarm bell | msx2plus | CC0 1.0 | [freesound.org](https://freesound.org/people/msx2plus/sounds/678345/) |
+| `neon_flicker` | Interface Sounds: glitch_004 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/interface-sounds) |
+| `bonus_tick` | SCORE COUNT | xtrgamr | CC-BY 4.0 | [freesound.org](https://freesound.org/people/xtrgamr/sounds/253546/) |
+| `record` | Jingle_Win_00 | LittleRobotSoundFactory | CC-BY 4.0 | [freesound.org](https://freesound.org/people/LittleRobotSoundFactory/sounds/270333/) |
 | `ui_move` | UI Audio: click1 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/ui-audio) |
 | `ui_select` | Interface Sounds: confirmation_001 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/interface-sounds) |
 | `ui_back` | UI Audio: mouserelease1 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/ui-audio) |
 | `city` | city night hum | klankbeeld | CC-BY 4.0 | [freesound.org](https://freesound.org/people/klankbeeld/sounds/361088/) |
+| `city_morning` | Morning on my street | VlatkoBlazek | CC-BY 4.0 | [freesound.org](https://freesound.org/people/VlatkoBlazek/sounds/261307/) |
+| `city_day` | city from pasture 03 | klankbeeld | CC-BY 4.0 | [freesound.org](https://freesound.org/people/klankbeeld/sounds/169080/) |
+| `city_evening` | Baltimore City Ambience at Dusk | flood-mix | CC0 1.0 | [freesound.org](https://freesound.org/people/flood-mix/sounds/413335/) |
 | `rain` | steady rain in the city | roofusj | CC0 1.0 | [freesound.org](https://freesound.org/people/roofusj/sounds/217236/) |
 | `rain_window` | Rain on Windows, Interior | InspectorJ | CC-BY 4.0 | [freesound.org](https://freesound.org/people/InspectorJ/sounds/346642/) |
 | `wind` | rushing air, distant skyline | kyles | CC0 1.0 | [freesound.org](https://freesound.org/people/kyles/sounds/454072/) |

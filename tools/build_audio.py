@@ -92,6 +92,9 @@ class Source:
     # Срезать тишину в начале: у записей freesound до звука бывает полсекунды.
     trim: bool = True
     excerpt: bool = False
+    # Сколько оставить после срезки тишины, с; 0 — всё. Так из записи с серией
+    # щелчков берётся один щелчок.
+    length: float = 0.0
 
 
 def freesound(sound: int, user: int, author: str, title: str, licence: str, **kw) -> Source:
@@ -122,6 +125,10 @@ SOUNDS: dict[str, list[Source]] = {
     # --- Музыка: свой трек на экран, трек здания и тревоги — жребием по зданию.
     "theme": [_track("Spy Glass"), _track("Hard Boiled"), _track("Covert Affair"),
               _track("Dances and Dames")],
+    # Утро, день и вечер — свои треки; ночь — "theme" (ADR-0052, решение 1).
+    "theme_morning": [_track("Shades of Spring"), _track("Walking Along")],
+    "theme_day": [_track("George Street Shuffle"), _track("Opportunity Walks")],
+    "theme_evening": [_track("Apero Hour"), _track("Backbay Lounge")],
     "alarm_theme": [_track("Fast Talkin"), _track("Private Eye"), _track("On the Cool Side")],
     "menu_theme": [_track("Cool Vibes")],
     "game_over_theme": [_track("Just As Soon")],
@@ -180,6 +187,56 @@ SOUNDS: dict[str, list[Source]] = {
                               end=11.8, fade_out=0.5)],
     "basement_open": [freesound(567317, 97550, "TRP", "Door buzz alarm elevator HALIFAX 93",
                                 CC0, mono=True, end=1.5)],
+    # --- M24k: пробелы, найденные аудитом звука (ADR-0052, решение 7).
+    "heli_door": [freesound(269520, 2843367, "MrAuralization", "Van sliding door open", BY4,
+                            mono=True, fade_out=0.3, gain=-2.0)],
+    "winch": [freesound(683808, 4257513, "mpuffenbarger", "SFX Electric Actuator Jack 1", CC0,
+                        mono=True, start=0.5, end=5.0, loop=0.5, level="loop", gain=-2.0,
+                        trim=False)],
+    "rope_drop": [freesound(1949, 1198, "nicStage", "rbhRopeRMX1", BY4, mono=True, gain=-2.0)],
+    "bullet_wall": [freesound(78092, 634166, "Benboncan", "Ricochet 3_2", BY4, mono=True,
+                              fade_out=0.2, gain=-4.0)],
+    "bullet_metal": [freesound(423107, 3325582, "OGsoundFX",
+                               "Guns & Explosions Album - Bullet Impact 14", BY4, mono=True,
+                               fade_out=0.15, gain=-4.0)],
+    "enemy_shot": [freesound(163456, 2263027, "LeMudCrab", "Pistol Shot", CC0, mono=True,
+                             fade_out=0.15, gain=-3.0)],
+    "body_fall": [freesound(447922, 9159316, "Breviceps", "Thud", CC0, mono=True, gain=-4.0)],
+    "crush": [freesound(392883, 3530854, "clif_creates", "Hard Candy / Bone Crunch", CC0,
+                        mono=True, fade_out=0.2, gain=-2.0)],
+    "slowmo": [freesound(377829, 4067257, "newagesoup", "long wispy woosh2", BY4,
+                         fade_out=0.6, gain=-6.0)],
+    "jump": [freesound(494797, 4682121, "brandondelehoy", "Jacket/Cloth Rustle 9", CC0,
+                       mono=True, gain=-10.0)],
+    "land": [freesound(464607, 7787874, "D001447733", "Jump_End_Gravel", BY3, mono=True,
+                       gain=-8.0)],
+    "crouch": [freesound(494797, 4682121, "brandondelehoy", "Jacket/Cloth Rustle 9", CC0,
+                         mono=True, gain=-12.0)],
+    "step_metal": [freesound(816413, 17614127, "atleastrelatively", "metal footstep", CC0,
+                             mono=True, gain=-9.0)],
+    "respawn": [kenney("interface", "Audio/bong_001.ogg", "Interface Sounds: bong_001",
+                       mono=True, gain=-6.0)],
+    "elevator_start": [freesound(439435, 8080193, "maxmaxmaxmaxmaxmaxmax",
+                                 "Elevator Stalling 2", CC0, mono=True, fade_out=0.3,
+                                 gain=-6.0)],
+    "elevator_stop": [freesound(175668, 2762119, "simpsi", "elevator_stop", BY3, mono=True,
+                                end=2.6, fade_out=0.6, gain=-6.0)],
+    "car_door_open": [freesound(844708, 10643461, "Geoff-Bremner-Audio", "Car Door Open 2",
+                                BY4, mono=True, gain=-4.0)],
+    "turn_signal": [freesound(61053, 27178, "morgantj", "turnsignal", BY4, mono=True,
+                              length=0.22, fade_out=0.05, gain=-8.0)],
+    "car_pass": [freesound(664770, 14565628, "koirankarva84581682", "car_4", CC0, mono=True,
+                           fade_in=0.3, fade_out=0.8, gain=-2.0)],
+    "horn": [freesound(705723, 15236906, "mudflea2", "Double car horn", CC0, mono=True,
+                       fade_out=0.15, gain=-3.0)],
+    "alarm": [freesound(678345, 14784311, "msx2plus", "fire alarm bell", CC0, end=3.2,
+                        fade_out=0.8, gain=-4.0)],
+    "neon_flicker": [kenney("interface", "Audio/glitch_004.ogg", "Interface Sounds: glitch_004",
+                            mono=True, gain=-10.0)],
+    "bonus_tick": [freesound(253546, 4157918, "xtrgamr", "SCORE COUNT", BY4, mono=True,
+                             end=1.25, fade_out=0.15, gain=-8.0)],
+    "record": [freesound(270333, 5123851, "LittleRobotSoundFactory", "Jingle_Win_00", BY4,
+                         level="jingle")],
     "ui_move": [kenney("ui", "Audio/click1.ogg", "UI Audio: click1", mono=True, gain=-10.0)],
     "ui_select": [kenney("interface", "Audio/confirmation_001.ogg",
                          "Interface Sounds: confirmation_001", mono=True, gain=-8.0)],
@@ -188,6 +245,13 @@ SOUNDS: dict[str, list[Source]] = {
     # --- Фон. Петли снаружи — по минуте: дольше в игре не стоят на месте.
     "city": [freesound(361088, 1648170, "klankbeeld", "city night hum", BY4, start=10.0,
                        end=72.0, loop=2.0, level="ambience", trim=False)],
+    "city_morning": [freesound(261307, 3452716, "VlatkoBlazek", "Morning on my street", BY4,
+                               start=10.0, end=72.0, loop=2.0, level="ambience", trim=False)],
+    "city_day": [freesound(169080, 1648170, "klankbeeld", "city from pasture 03", BY4,
+                           start=10.0, end=72.0, loop=2.0, level="ambience", trim=False)],
+    "city_evening": [freesound(413335, 7723777, "flood-mix", "Baltimore City Ambience at Dusk",
+                               CC0, start=10.0, end=72.0, loop=2.0, level="ambience",
+                               trim=False)],
     "rain": [freesound(217236, 4054839, "roofusj", "steady rain in the city", CC0, start=5.0,
                        end=67.0, loop=2.0, level="ambience", trim=False)],
     "rain_window": [freesound(346642, 5121236, "InspectorJ", "Rain on Windows, Interior", BY4,
@@ -207,7 +271,7 @@ SOUNDS: dict[str, list[Source]] = {
 }
 
 # Что звучит петлёй: сшивка нужна им, а форматом — OGG.
-LONG = {"theme", "alarm_theme", "menu_theme", "game_over_theme", "city", "rain",
+LONG = {"winch", "car_pass", "alarm", "city_morning", "city_day", "city_evening", "theme", "theme_morning", "theme_day", "theme_evening", "alarm_theme", "menu_theme", "game_over_theme", "city", "rain",
         "rain_window", "wind", "room_tone", "shaft_hum", "elevator_hum", "escalator_hum",
         "car_away", "helicopter", "helicopter_pass", "garage_gate", "thunder_near", "thunder_far", "neon_buzz", "building_bonus", "game_over"}
 
@@ -261,6 +325,8 @@ def _shape(source: Source, signal: np.ndarray, rate: int) -> np.ndarray:
         above = np.nonzero(envelope > envelope.max() * 0.02)[0]
         if len(above):
             signal = signal[max(0, above[0] - int(0.004 * rate)) :]
+    if source.length > 0:
+        signal = signal[: int(source.length * rate)]
 
     if tail > 0:
         body = len(signal) - tail

@@ -47,6 +47,7 @@ func _ready() -> void:
 	_time_scale_before = Engine.time_scale
 	Engine.time_scale = _time_scale_before * SLOW
 	_slowed = true
+	Sounds.play(Sounds.SLOWMO)
 
 
 ## Ведёт сцену на [param real_delta] секунд настоящего времени. Отдан тестам.

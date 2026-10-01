@@ -36,12 +36,13 @@ func after_each() -> void:
 		Input.action_release(action)
 
 
-func _build(building_seed: int) -> GreyboxLevel:
+func _build(building_seed: int, full: bool = false) -> GreyboxLevel:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
 	level.rules = BuildingRules.new()
 	level.building_seed = building_seed
 	level.spawn_agents = false
+	level.full_intro = full
 	add_child_autofree(level)
 	return level
 
@@ -157,9 +158,11 @@ func test_the_rope_reaches_the_deck_and_the_frame_holds_both() -> void:
 ## Весь путь — прилёт, висение, уход — вертолёт идёт над техникой крыши, а не
 ## сквозь неё: ни корпус, ни диск винта не задевают габарита ни одного предмета.
 ## Сиды выбраны с водонапорной башней у места посадки (нечётные) и с баком.
+## Вступление полное: прилёт есть только у него, а висение и уход — те же, что
+## у короткого (ADR-0052, решение 6).
 func test_the_flight_clears_everything_on_the_roof() -> void:
 	for building_seed: int in [1, 2, 3, 5, 7]:
-		var level := _build(building_seed)
+		var level := _build(building_seed, true)
 		var deck := WorldSpace.to_scene(_landing(level)).y
 		var roof := RoofArrival.roof_obstacles(level, deck, [level.otto] as Array[Node])
 		# Сначала — что техника вообще нашлась: пустой список прошёл бы всегда.
@@ -199,7 +202,8 @@ func test_the_flight_clears_everything_on_the_roof() -> void:
 ## Звук вертолёта: петля висения и слой пролёта звучат с прилёта; на подлёте
 ## громче пролёт, в висении — петля висения; трос звучит, пока Otto едет.
 func test_the_helicopter_sounds_its_flight() -> void:
-	var level := _build(1)
+	# Подлёт есть только у полного вступления: в коротком вертолёт уже висит.
+	var level := _build(1, true)
 	await wait_physics_frames(SETTLE_FRAMES)
 	var voices := _voices(level.helicopter())
 	assert_true(voices.has(Sounds.HELICOPTER), "петля висения есть")
@@ -214,9 +218,11 @@ func test_the_helicopter_sounds_its_flight() -> void:
 	assert_gt(flyby.volume_db, hover.volume_db, "на подлёте громче пролёт")
 
 	var heard_rope := false
-	while level.is_in_the_intro():
+	var waits := 0
+	while level.is_in_the_intro() and waits < GreyboxLevel.LANDING_PATIENCE:
 		heard_rope = heard_rope or rope.playing
 		await wait_physics_frames(1)
+		waits += 1
 	assert_true(heard_rope, "трос звучал, пока Otto ехал")
 	assert_gt(hover.volume_db, flyby.volume_db, "в висении громче петля висения")
 	_drop(level)
@@ -405,3 +411,108 @@ func test_each_rotor_blur_lies_in_its_plane_of_spin() -> void:
 		assert_almost_eq(
 			absf(normal.dot(axis)), 1.0, 0.001, "%s: диск в плоскости вращения" % pair[0]
 		)
+
+
+## Полное вступление первого здания (ADR-0052, решение 6) — на любом здании:
+## шаги идут по порядку, дверь открыта, пока Otto в проёме, трос качается после
+## сброса, Otto встаёт ровно на место, а вертолёт уходит с закрытой дверью.
+func test_the_full_intro_plays_every_step_in_order() -> void:
+	for building_seed: int in [1, 3, 5]:
+		var level := _build(building_seed, true)
+		var arrival := level.arrival()
+		assert_true(arrival.is_full(), "сид %d: вступление полное" % building_seed)
+		var seen: Array[int] = []
+		var swung := false
+		var door_shut_in_flight := true
+		# С пределом: вставшее вступление — провал теста, а не вечный прогон.
+		var waits := 0
+		while level.is_in_the_intro() and waits < GreyboxLevel.LANDING_PATIENCE:
+			waits += 1
+			var step := arrival.step()
+			if seen.is_empty() or seen[seen.size() - 1] != step:
+				seen.append(step)
+			var helicopter := level.helicopter()
+			if step == RoofArrival.Step.FLY_IN and helicopter.door_share() > 0.0:
+				door_shut_in_flight = false
+			if step in [RoofArrival.Step.PEEK, RoofArrival.Step.SIT, RoofArrival.Step.GRAB]:
+				assert_true(helicopter.door_share() >= 1.0, "сид %d: дверь открыта" % building_seed)
+			if step == RoofArrival.Step.DROP and helicopter.rope_length() > 1.0:
+				var bottom := helicopter.rope_point(helicopter.rope_length())
+				swung = swung or absf(bottom.x - helicopter.hook().x) > 0.02
+			await wait_physics_frames(1)
+		assert_false(level.is_in_the_intro(), "сид %d: вступление кончилось" % building_seed)
+		var order: Array[int] = []
+		for step: int in RoofArrival.Step.values():
+			if step != RoofArrival.Step.DONE:
+				order.append(step)
+		assert_eq(seen, order, "сид %d: шаги по порядку" % building_seed)
+		assert_true(door_shut_in_flight, "сид %d: подлетает с закрытой дверью" % building_seed)
+		assert_true(swung, "сид %d: сброшенный трос качается" % building_seed)
+		await level.wait_for_the_landing()
+		var landing := _landing(level)
+		assert_almost_eq(
+			_otto_at(level).x, landing.x, TOLERANCE, "сид %d: на месте" % building_seed
+		)
+		assert_almost_eq(
+			_otto_at(level).y, landing.y, TOLERANCE, "сид %d: на крыше" % building_seed
+		)
+		var helicopter := level.helicopter()
+		var frames := 0
+		while (
+			helicopter != null
+			and not helicopter.position.x > _otto_at(level).x + 2.0
+			and frames < GONE_FRAMES
+		):
+			await wait_physics_frames(1)
+			frames += 1
+			helicopter = level.helicopter()
+		if helicopter != null:
+			assert_eq(
+				helicopter.door_share(), 0.0, "сид %d: уходит с закрытой дверью" % building_seed
+			)
+			assert_eq(helicopter.rope_length(), 0.0, "сид %d: и с выбранным тросом" % building_seed)
+		_drop(level)
+
+
+## Полное вступление — сценка в 10–12 секунд до управления (ADR-0052).
+func test_the_full_intro_takes_ten_to_twelve_seconds() -> void:
+	var level := _build(1, true)
+	var start := Engine.get_physics_frames()
+	var waits := 0
+	while level.is_in_the_intro() and waits < GreyboxLevel.LANDING_PATIENCE:
+		await wait_physics_frames(1)
+		waits += 1
+	var frames := Engine.get_physics_frames() - start
+	var seconds := frames * Engine.time_scale / float(Engine.physics_ticks_per_second)
+	assert_between(seconds, 9.5, 12.5, "полное вступление идёт %.2f с" % seconds)
+	_drop(level)
+
+
+## Короткое вступление: вертолёт с первого кадра висит с открытой дверью.
+func test_the_short_intro_starts_hovering_with_the_door_open() -> void:
+	var level := _build(2)
+	await wait_physics_frames(2)
+	var helicopter := level.helicopter()
+	assert_false(level.arrival().is_full(), "вступление короткое")
+	assert_true(helicopter.is_hovering(), "вертолёт уже висит")
+	assert_true(helicopter.door_share() >= 1.0, "и дверь открыта")
+	assert_true(level.otto.visible, "Otto виден в проёме")
+	_drop(level)
+
+
+## Пилот сидит за остеклением: в кабине, выше пола и ниже потолка, у носа.
+func test_the_pilot_sits_in_the_cockpit() -> void:
+	var helicopter := Helicopter.new()
+	add_child_autofree(helicopter)
+	await wait_physics_frames(3)
+	var pilot := helicopter.find_child("Pilot", true, false) as FigureRig
+	assert_not_null(pilot, "пилот есть")
+	if pilot == null:
+		return
+	pilot.snap()
+	var box := pilot.skinned_aabb()
+	var at := pilot.global_transform * box
+	var hull := helicopter.hull_box()
+	assert_gt(at.position.y, hull.position.y, "ступни пилота выше днища")
+	assert_lt(at.end.y, hull.end.y, "голова пилота ниже крыши")
+	assert_gt(at.get_center().x, helicopter.doorway().x, "пилот впереди двери")

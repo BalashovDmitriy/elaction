@@ -24,7 +24,9 @@ var _level: GreyboxLevel = null
 var _folder: String = FOLDER
 var _times: Array[int] = [0, 1, 2, 3]
 var _weathers: Array[int] = [0, 1, 2]
-## Какие кадры снимать: roof, floor, garage; пусто — все.
+## Какие кадры снимать: roof, floor, garage, street, room; пусто — все. Улица у
+## выезда (M24k, ADR-0052, решение 3) снимается камерой без Otto: он на неё не
+## выходит.
 var _only: String = ""
 var _seed: int = BUILDING_SEED
 
@@ -72,6 +74,10 @@ func _combo(time: int, weather: int) -> void:
 		var bottom := _level.rules.floors - 1
 		_place(_level.plan().exit_x + 2.5, bottom)
 		await _shoot("%s_garage" % tag)
+	if _only == "" or _only == "street":
+		await _shoot_street("%s_street" % tag)
+	if _only == "" or _only == "room":
+		await _shoot_room("%s_room" % tag)
 	remove_child(_level)
 	_level.queue_free()
 	_level = null
@@ -100,3 +106,59 @@ func _shoot(label: String) -> void:
 func _place(x: float, index: int) -> void:
 	_level.otto.global_position = WorldSpace.to_scene(Vector2(x, _level.rules.floor_surface(index)))
 	_level.otto.velocity = Vector3.ZERO
+
+
+## Улица у выезда: камера отпускает Otto и встаёт над мостовой левее торца.
+func _shoot_street(label: String) -> void:
+	var camera := get_viewport().get_camera_3d() as SideCamera
+	if camera == null:
+		return
+	var bottom := _level.rules.floors - 1
+	var street := _level.rules.floor_surface(bottom) - _level.rules.floor_height
+	var left := _level.rules.floor_span(bottom).x
+	for node: Node in _level.find_children("*", "GarageRamp", true, false):
+		(node as GarageRamp).show_light(true)
+	camera.follow(null)
+	camera.apply_bounds(Rect2(-1000.0, -1000.0, 4000.0, 4000.0), false)
+	var point := WorldSpace.to_scene(Vector2(left - 9.0, street - 4.5))
+	camera.snap_to(Vector2(point.x, point.y))
+	await _shoot(label)
+	camera.follow(_level.otto)
+
+
+## Комната за дверью с городом в окне (ADR-0052, решение 5): дверь на этаже
+## Otto открывается, как для агента, и кадр — когда створка распахнута.
+func _shoot_room(label: String) -> void:
+	var index := 4
+	var surface := _level.rules.floor_surface(index)
+	var door: Door = null
+	for node: Node in _level.find_children("*", "Door", true, false):
+		var candidate := node as Door
+		if candidate != null and is_equal_approx(candidate.mat_position().y, surface):
+			door = candidate
+			break
+	if door == null:
+		push_error("на этаже %d нет двери" % index)
+		return
+	_place(door.mat_position().x + 2.5, index)
+	await _settle_frames(20)
+	door.summon_agent()
+	for _frame: int in 240:
+		if door.openness() >= 0.98:
+			break
+		await get_tree().physics_frame
+	await _shoot(label)
+	# И крупно: проём с окном и городом за ним.
+	var camera := get_viewport().get_camera_3d() as SideCamera
+	if camera != null:
+		var at := WorldSpace.to_scene(door.mat_position())
+		var otto := _level.otto.global_position
+		var centre := Vector2(at.x, at.y + 1.4)
+		camera.close_up(0.75, Vector2(otto.x, otto.y) + (centre - Vector2(otto.x, otto.y)) / 0.75)
+		await _shoot(label + "_close")
+		camera.close_up(0.0, Vector2.ZERO)
+
+
+func _settle_frames(count: int) -> void:
+	for _frame: int in count:
+		await get_tree().physics_frame

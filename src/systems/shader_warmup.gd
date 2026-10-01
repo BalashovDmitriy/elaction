@@ -48,7 +48,8 @@ static func spawn(host: Node3D, at: Vector3) -> Array[Node]:
 	# Новые дети встают в конец: всё поставленное — хвост списка после этой отметки.
 	var before := host.get_child_count()
 	ShotFx.muzzle(host, at, 1.0)
-	ShotFx.impact(host, at, -1.0, null)
+	# Без звука: прогрев идёт под чёрным кадром, рикошет там слышался бы из ниоткуда.
+	ShotFx.impact(host, at, -1.0, null, false)
 	Sparks.burst(host, at)
 	# Кровь прогревается и выключенная: включат её посреди партии — кадр не
 	# должен дёрнуться и тогда.

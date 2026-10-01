@@ -99,9 +99,22 @@ func _lit(level: GreyboxLevel) -> int:
 		# (ADR-0042, решение 7).
 		if light == null or light.light_cull_mask == FigureRig.RENDER_LAYER:
 			continue
+		# Свет вертолёта вступления гаснет и загорается сам — с дверью и уходом
+		# (ADR-0052): к лампам этажа он отношения не имеет.
+		if _in_helicopter(light, level):
+			continue
 		if light.is_visible_in_tree():
 			count += 1
 	return count
+
+
+func _in_helicopter(node: Node, level: GreyboxLevel) -> bool:
+	var up := node.get_parent()
+	while up != null and up != level:
+		if up is Helicopter:
+			return true
+		up = up.get_parent()
+	return false
 
 
 ## Здание в полный рост: правила по умолчанию, тридцать этажей.
@@ -157,6 +170,9 @@ func test_a_tall_building_lights_only_what_is_in_frame() -> void:
 ## Проверяется не флаг, а погасший источник: флаг без света ничего не значит.
 func test_a_fallen_lamp_puts_its_floor_out() -> void:
 	var level := _tall(1)
+	# Вступление наезжает камерой и меняет, какие этажи в кадре, а с ними и
+	# горящие лампы (ADR-0052): тест — про лампу, и вступление пропускается.
+	level.skip_the_intro()
 	await wait_physics_frames(SETTLE_FRAMES)
 
 	var lamp := _nearest_lamp_below(level)

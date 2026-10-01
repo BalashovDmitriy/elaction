@@ -34,6 +34,9 @@ const OTTO_POSES: PackedStringArray = [
 	"dead_1",
 	"crushed",
 	"rope",
+	"peek",
+	"sit_edge",
+	"sit_grab",
 ]
 
 ## Позы агента. Он не прыгает и не бьёт ногой — этого не умеет [EnemyBrain].
@@ -57,6 +60,14 @@ const CROUCH := "crouch"
 ## Otto висит на тросе вертолёта: руки вверх, ноги вместе (ADR-0043,
 ## решение 1). Выбирает её не состояние, а тот, кто везёт ([member Otto.ride_look]).
 const ROPE := "rope"
+
+## Вступление здания (ADR-0052, решение 6): Otto выглядывает из проёма
+## вертолёта, садится на порог и берётся за трос. Как и трос, их выбирает не
+## состояние, а вступление ([member Otto.ride_pose]).
+const PEEK := "peek"
+const SIT_EDGE := "sit_edge"
+const SIT_GRAB := "sit_grab"
+const ARRIVAL_POSES: PackedStringArray = [PEEK, SIT_EDGE, SIT_GRAB]
 
 ## Поза агента лёжа. Единственная лежащая поза живого: в [FigurePoses] у неё
 ## своя запись — лицом вниз, ствол вперёд, — а не труп, положенный набок.

@@ -4,20 +4,23 @@ extends Node3D
 ## Вертолёт вступления: привозит Otto на крышу (ADR-0038, решение 1).
 ##
 ## Вид, а не тело: коллизий у него нет, в бою он не участвует. Прилетает слева,
-## зависает, спускает трос с лебёдки над дверью, по команде выбирает трос и
-## уходит вправо и вверх, а за кадром убирает себя сам. Когда что делать, решает
-## [RoofArrival]; вертолёт умеет только лететь, висеть и опускать трос.
+## зависает, откатывает сдвижную дверь, сбрасывает бухту троса, по команде
+## выбирает трос, задвигает дверь и уходит — нос вниз, с креном, вверх и вбок
+## (ADR-0052, решение 6), — а за кадром убирает себя сам. Когда что делать,
+## решает [RoofArrival]; вертолёт умеет только лететь, висеть, открывать дверь и
+## опускать трос. За остеклением — пилот, на уходе кивает.
 ##
 ## Модель с M24i своя (ADR-0049, `tools/build_helicopter.py`): корпус с
-## остеклением и откаченной дверью, полозья, киль, несущий и хвостовой винты
-## отдельными узлами `MainRotor` и `TailRotor` и пустышки огней, прожектора,
-## света кабины и лебёдки. Нуль узла — под осью винта на уровне полозьев, в
-## середине корпуса по глубине: так «зависнуть над точкой» — это просто
-## поставить узел в неё.
+## остеклением, полозья, киль, несущий и хвостовой винты отдельными узлами
+## `MainRotor` и `TailRotor`, с M24k — дверь узлом `Door`, и пустышки
+## огней, прожектора, света кабины, лебёдки и кресла пилота. Нуль узла — под
+## осью винта на уровне полозьев, в середине корпуса по глубине: так
+## «зависнуть над точкой» — это просто поставить узел в неё.
 
 enum Phase { ARRIVING, HOVERING, LEAVING }
 
 const MODEL := preload("res://assets/models/aircraft/helicopter.glb")
+const PILOT_MODEL := preload("res://assets/models/pilot.glb")
 
 ## Длина по корпусу от носа до хвоста, м. Лёгкий вертолёт — девять метров с
 ## небольшим; модель приводится к ней одним масштабом.
@@ -31,6 +34,8 @@ const HULL_COLOR := Color(0.34, 0.37, 0.44)
 const GLASS_COLOR := Color(0.05, 0.07, 0.09)
 const GLASS_GLOW := Color(0.3, 0.46, 0.52)
 const GLASS_GLOW_ENERGY: float = 0.08
+## Остекление прозрачно: за ним видно пилота (ADR-0052, решение 6).
+const GLASS_ALPHA: float = 0.42
 const CABIN_GLOW := Color(1.0, 0.72, 0.42)
 const ROTOR_COLOR := Color(0.5, 0.5, 0.52)
 const CABIN_GLOW_ENERGY: float = 0.25
@@ -116,10 +121,39 @@ void fragment() {
 const BOB_HEIGHT: float = 0.06
 const BOB_RATE: float = 1.7
 
-## Трос: толщина, цвет и с какой скоростью лебёдка его отдаёт и выбирает, м/с.
+## Трос: толщина, цвет и с какой скоростью лебёдка его выбирает, м/с. Отдаёт
+## его не лебёдка: бухту сбрасывают, и трос разматывается падением.
 const ROPE_RADIUS: float = 0.022
 const ROPE_COLOR := Color(0.36, 0.34, 0.3)
-const ROPE_SPEED: float = 11.0
+const ROPE_SPEED: float = 3.2
+## Сброшенная бухта падает с ускорением чуть меньше свободного — трос тянет
+## её назад, — и не быстрее предела, м/с², м/с.
+const ROPE_DROP_PULL: float = 7.5
+const ROPE_DROP_TOP: float = 9.0
+## Качание троса маятником в плоскости игры: толчок на сбросе, рад, и как
+## быстро гаснет, 1/с; поток от винта качает его и дальше — на столько, рад.
+const ROPE_KICK: float = 0.16
+const ROPE_DAMPING: float = 1.1
+const ROPE_DRAFT: float = 0.018
+const ROPE_DRAFT_RATE: float = 1.3
+
+## Сдвижная дверь: за сколько секунд откатывается и насколько отходит от
+## борта, прежде чем поехать назад, м.
+const DOOR_TIME: float = 0.85
+const DOOR_POP: float = 0.05
+## Насколько короче своей длины дверь откатывается: край остаётся у проёма.
+const DOOR_KEEP: float = 0.12
+
+## Уход (ADR-0052, решение 6): крен в повороте, рад, и насколько вертолёт
+## уходит вбок, в глубину кадра, на метр пути вправо; рысканье носом туда же.
+const BANK_MAX: float = 0.3
+const LEAVE_AWAY: float = 0.28
+const LEAVE_YAW: float = 0.32
+## Сколько висит с закрытой дверью перед уходом, с: пилот кивает.
+const NOD_TIME: float = 0.55
+
+## Пилот сидит в кресле: насколько ступни ниже подушки и впереди неё, м.
+const PILOT_FEET := Vector3(0.36, -0.36, 0.0)
 
 ## Огни: зелёный бортовой — на ближнем борту (нос смотрит вправо, к камере —
 ## правый борт), красный маячок сверху и снизу, белая вспышка на хвосте.
@@ -167,6 +201,9 @@ static var _rim_material: ShaderMaterial = null
 ## Шейдер диска размытия винтов, тоже один за запуск ([method _blur_shader]).
 static var _blur_code: Shader = null
 
+## Утром и днём прожектор не горит (ADR-0052): ставится до [method fly_in].
+var daytime: bool = false
+
 var _phase: Phase = Phase.ARRIVING
 var _time: float = 0.0
 var _hover := Vector3.ZERO
@@ -188,6 +225,27 @@ var _hook := Vector3.ZERO
 var _rope: MeshInstance3D = null
 var _rope_length: float = 0.0
 var _rope_wanted: float = 0.0
+## Бухта летит вниз: трос отдаётся падением, а не лебёдкой.
+var _dropping: bool = false
+var _drop_speed: float = 0.0
+## Угол троса от отвеса в плоскости игры, рад, и его скорость.
+var _swing: float = 0.0
+var _swing_speed: float = 0.0
+var _door: Node3D = null
+var _door_closed := Vector3.ZERO
+var _door_slide: float = 0.0
+## Доля открытия двери, 0–1, и куда она идёт.
+var _door_share: float = 0.0
+var _door_wanted: float = 0.0
+var _door_voice: AudioStreamPlayer3D = null
+var _winch_voice: AudioStreamPlayer3D = null
+var _pilot: FigureRig = null
+## Пыль под винтом ([Downwash]).
+var _dust: Downwash = null
+## Сколько ещё кивает пилот, с.
+var _nod: float = 0.0
+## Шаги ухода: выбрать трос, задвинуть дверь, кивнуть — и только потом лететь.
+var _nodded: bool = false
 var _beacons: Array[Node3D] = []
 var _strobe: Node3D = null
 var _search: SpotLight3D = null
@@ -203,6 +261,9 @@ var _hull_local := AABB()
 var _rotor_local := AABB()
 var _hull_reach := AABB()
 var _rotor_reach := AABB()
+## Они же на уходе — с креном и рысканьем поворота (авторевью M24k).
+var _hull_leave := AABB()
+var _rotor_leave := AABB()
 ## Техника крыши, над которой надо пройти: габариты в координатах сцены.
 var _obstacles: Array[AABB] = []
 
@@ -219,7 +280,10 @@ func _init() -> void:
 ## точке под осью винта на уровне полозьев, в координатах сцены.
 ##
 ## Точка поднимается над техникой крыши, если та выше ([method safe_hover]).
-func fly_in(hover: Vector3) -> void:
+##
+## [param already_there] — короткое вступление (ADR-0052, решение 6): вертолёт
+## с первого кадра висит над точкой с открытой дверью.
+func fly_in(hover: Vector3, already_there: bool = false) -> void:
 	_hover = safe_hover(hover)
 	_from = _hover + Vector3(-ARRIVAL_DISTANCE, ARRIVAL_RISE, 0.0)
 	_phase = Phase.ARRIVING
@@ -227,12 +291,64 @@ func fly_in(hover: Vector3) -> void:
 	position = _from
 	_velocity = Vector3.ZERO
 	_start_engine()
+	if already_there:
+		position = _hover
+		_from = _hover
+		_time = ARRIVAL_TIME
+		_door_share = 1.0
+		_door_wanted = 1.0
+		_place_door()
+		_motion = 0.0
+
+
+## Откатывает сдвижную дверь назад — в проёме загорается салон — или задвигает
+## её, [param open] = false.
+func set_door_open(open: bool) -> void:
+	var wanted := 1.0 if open else 0.0
+	if not is_equal_approx(_door_wanted, wanted):
+		_door_wanted = wanted
+		_door_sound()
+
+
+## Насколько открыта дверь, 0–1: 1 — открыта настежь.
+func door_share() -> float:
+	return _door_share
+
+
+## Порог проёма двери в координатах сцены: середина по длине проёма, на полу
+## салона, у ближнего борта.
+func doorway() -> Vector3:
+	return _body.to_global(_marks["Doorway"])
+
+
+## Сбрасывает бухту троса: трос разматывается падением на [param length]
+## метров и качается маятником, пока поток от винта его не успокоит.
+func drop_rope(length: float) -> void:
+	_rope_wanted = maxf(length, 0.0)
+	_dropping = true
+	_drop_speed = 0.0
+	_swing_speed = ROPE_KICK * 3.0
+	# Сброс бухты звучит на крюке, откуда она летит.
+	Sounds.play_at(self, Sounds.ROPE_DROP, hook(), ENGINE_REACH)
+
+
+## Точка на тросе в [param along] метрах от крюка — с качанием троса.
+func rope_point(along: float) -> Vector3:
+	var reach := clampf(along, 0.0, _rope_length)
+	return hook() + Vector3(sin(_swing) * reach, -cos(_swing) * reach, 0.0)
 
 
 ## Что на крыше мешает полёту: габариты в координатах сцены. Путь прилёта,
-## висение и уход идут над ними с запасом [constant CLEARANCE].
-func avoid(obstacles: Array[AABB]) -> void:
+## висение и уход идут над ними с запасом [constant CLEARANCE]. [param deck] —
+## высота самой крыши, сцена: на неё поток от винта гонит пыль ([Downwash]).
+func avoid(obstacles: Array[AABB], deck: float = NAN) -> void:
 	_obstacles = obstacles
+	if is_nan(deck):
+		return
+	if _dust == null:
+		_dust = Downwash.new()
+		add_child(_dust)
+	_dust.deck = deck
 
 
 ## Точка висения над [param hover], поднятая над техникой крыши, если нужно.
@@ -244,12 +360,18 @@ func safe_hover(hover: Vector3) -> Vector3:
 ## [param x], — по всей технике крыши, при любом наклоне корпуса и с запасом.
 ## Над соседями высота спадает склоном [constant CLEAR_SLOPE]: путь набирает
 ## её заранее. Мешать нечему — минус бесконечность.
-func clear_height(x: float) -> float:
+##
+## [param leaving] — на уходе: корпус в крене и рысканье, и узел ушёл в
+## глубину на [param depth] (по Z сцены).
+func clear_height(x: float, leaving: bool = false, depth: float = DEPTH_Z) -> float:
 	var lowest := -INF
+	var reaches: Array[AABB] = [_hull_reach, _rotor_reach]
+	if leaving:
+		reaches = [_hull_leave, _rotor_leave]
 	for obstacle: AABB in _obstacles:
-		for reach: AABB in [_hull_reach, _rotor_reach]:
-			var near := DEPTH_Z + reach.position.z - CLEARANCE
-			var far := DEPTH_Z + reach.end.z + CLEARANCE
+		for reach: AABB in reaches:
+			var near := depth + reach.position.z - CLEARANCE
+			var far := depth + reach.end.z + CLEARANCE
 			if obstacle.end.z < near or obstacle.position.z > far:
 				continue
 			var left := x + reach.position.x - CLEARANCE
@@ -298,11 +420,6 @@ func hook_at_hover(hover: Vector3) -> Vector3:
 	return Vector3(hover.x, hover.y, DEPTH_Z) + _hook
 
 
-## Отдаёт трос на [param length] метров. Лебёдка идёт с [constant ROPE_SPEED].
-func lower_rope(length: float) -> void:
-	_rope_wanted = maxf(length, 0.0)
-
-
 ## Сколько троса отдано сейчас, м.
 func rope_length() -> float:
 	return _rope_length
@@ -313,14 +430,19 @@ func rope_is_down() -> bool:
 	return _rope_wanted > 0.0 and is_equal_approx(_rope_length, _rope_wanted)
 
 
-## Выбирает трос и уходит вправо и вверх — через [param delay] секунд висения.
-## Зовётся и посреди прилёта: пропущенное вступление вертолёт не доигрывает,
-## а уходит с того места и той скоростью, какие у него были.
+## Выбирает трос, задвигает дверь, пилот кивает — и вертолёт уходит вправо,
+## вверх и вбок, через [param delay] секунд висения. Зовётся и посреди
+## прилёта: пропущенное вступление вертолёт не доигрывает, а уходит с того
+## места и той скоростью, какие у него были.
 func leave(delay: float = 0.0) -> void:
 	_rope_wanted = 0.0
+	_dropping = false
 	_leave_in = delay
 	_leaving_set = true
-	_show_hover_lights(false)
+	if _rope_length > 0.01:
+		_winch(true)
+	if _search != null:
+		_search.visible = false
 
 
 func _physics_process(delta: float) -> void:
@@ -342,6 +464,9 @@ func _physics_process(delta: float) -> void:
 	_velocity = seen
 	_lean(acceleration, delta)
 	_wind_rope(delta)
+	_slide_door(delta)
+	_pose_pilot(delta)
+	_raise_dust()
 	_blink()
 	_mix_engine(delta)
 
@@ -379,9 +504,19 @@ func _hang() -> void:
 	if not _leaving_set:
 		return
 	_leave_in -= get_physics_process_delta_time()
-	# Уходит с выбранным тросом: болтающийся конец на уходе смотрится обрывом.
-	if _leave_in <= 0.0 and _rope_length <= 0.0:
-		_start_leaving()
+	# Уходит с выбранным тросом и закрытой дверью: болтающийся конец на уходе
+	# смотрится обрывом, а открытая дверь — забытой.
+	if _leave_in > 0.0 or _rope_length > 0.0:
+		return
+	if _door_share > 0.0:
+		set_door_open(false)
+		return
+	if not _nodded:
+		_nodded = true
+		_nod = NOD_TIME
+		_leave_in = NOD_TIME
+		return
+	_start_leaving()
 
 
 func _start_leaving() -> void:
@@ -392,8 +527,12 @@ func _start_leaving() -> void:
 
 func _fly_off(delta: float) -> void:
 	var speed := minf(maxf(_velocity.x, 0.0) + LEAVE_ACCELERATION * delta, LEAVE_SPEED)
-	position += Vector3(speed, speed * LEAVE_CLIMB, 0.0) * delta
-	position.y = maxf(position.y, clear_height(position.x))
+	position += Vector3(speed, speed * LEAVE_CLIMB, -speed * LEAVE_AWAY) * delta
+	position.y = maxf(position.y, clear_height(position.x, true, position.z))
+	# Крен и рысканье в повороте вбок — по набранной скорости.
+	var turn := clampf(speed / LEAVE_SPEED, 0.0, 1.0)
+	_body.rotation.x = -BANK_MAX * turn
+	_body.rotation.y = LEAVE_YAW * turn
 
 
 ## Клонит корпус по ускорению и сопротивлению — носом вниз на разгоне и полном
@@ -407,12 +546,69 @@ func _lean(acceleration: Vector3, delta: float) -> void:
 
 
 func _wind_rope(delta: float) -> void:
-	_rope_length = move_toward(_rope_length, _rope_wanted, ROPE_SPEED * delta)
+	if _dropping and _rope_length < _rope_wanted:
+		_drop_speed = minf(_drop_speed + ROPE_DROP_PULL * delta, ROPE_DROP_TOP)
+		_rope_length = minf(_rope_length + _drop_speed * delta, _rope_wanted)
+	else:
+		var was := _rope_length
+		_rope_length = move_toward(_rope_length, _rope_wanted, ROPE_SPEED * delta)
+		if was > 0.0 and _rope_length <= 0.0:
+			_winch(false)
+	_swing_rope(delta)
 	_rope.visible = _rope_length > 0.01
-	# Трос висит отвесно, как бы ни клонился корпус: он на крюке, а не на палке.
+	# Трос висит с крюка, как бы ни клонился корпус: он на крюке, а не на палке,
+	# и качается маятником в плоскости игры.
 	var top := hook()
-	_rope.global_basis = Basis.from_scale(Vector3(1.0, maxf(_rope_length, 0.01), 1.0))
-	_rope.global_position = top - Vector3(0.0, _rope_length * 0.5, 0.0)
+	var tilt := Basis(Vector3.BACK, _swing)
+	_rope.global_basis = tilt * Basis.from_scale(Vector3(1.0, maxf(_rope_length, 0.01), 1.0))
+	_rope.global_position = top + tilt * Vector3(0.0, -_rope_length * 0.5, 0.0)
+
+
+## Маятник троса: частота — от длины, затухание — своё, и поток от винта
+## толкает его медленной волной.
+func _swing_rope(delta: float) -> void:
+	if _rope_length <= 0.05:
+		_swing = 0.0
+		_swing_speed = 0.0
+		return
+	var rate := 9.8 / maxf(_rope_length, 0.5)
+	var draft := sin(_time * ROPE_DRAFT_RATE * TAU) * ROPE_DRAFT
+	_swing_speed += (-rate * (_swing - draft) - ROPE_DAMPING * _swing_speed) * delta
+	_swing += _swing_speed * delta
+
+
+## Дверь едет к открытой или закрытой: сначала отходит от борта, потом
+## катится назад по направляющим.
+func _slide_door(delta: float) -> void:
+	if is_equal_approx(_door_share, _door_wanted):
+		return
+	_door_share = move_toward(_door_share, _door_wanted, delta / DOOR_TIME)
+	_place_door()
+
+
+func _place_door() -> void:
+	if _door != null:
+		var pop := clampf(_door_share * 5.0, 0.0, 1.0)
+		var slide := smoothstep(0.15, 1.0, _door_share)
+		_door.position = _door_closed + Vector3(-_door_slide * slide, 0.0, DOOR_POP * pop)
+	# Салон горит, пока дверь открыта.
+	if _cabin != null:
+		_cabin.visible = _door_share > 0.05
+
+
+## Пыль встаёт под винтом, пока вертолёт висит низко над крышей, и оседает,
+## когда он уходит.
+func _raise_dust() -> void:
+	if _dust != null:
+		_dust.follow(position.x, position.y, _phase != Phase.LEAVING)
+
+
+## Пилот сидит, на уходе кивает.
+func _pose_pilot(delta: float) -> void:
+	if _pilot == null:
+		return
+	_nod = maxf(_nod - delta, 0.0)
+	_pilot.show_pose("pilot_nod" if _nod > NOD_TIME * 0.45 else "pilot_sit")
 
 
 func _blink() -> void:
@@ -421,6 +617,24 @@ func _blink() -> void:
 		light.visible = beacon
 	var strobe := fmod(_time + 0.4, STROBE_PERIOD)
 	_strobe.visible = strobe < FLASH or (strobe > FLASH * 2.5 and strobe < FLASH * 3.5)
+
+
+## Лязг двери на её месте.
+func _door_sound() -> void:
+	if _door_voice != null:
+		_door_voice.global_position = doorway()
+		_door_voice.play()
+
+
+## Лебёдка выбирает трос — гудит, пока он идёт.
+func _winch(on: bool) -> void:
+	if _winch_voice == null:
+		return
+	if on:
+		_winch_voice.global_position = hook()
+		_winch_voice.play()
+	else:
+		_winch_voice.stop()
 
 
 ## Звук скольжения Otto по тросу — на крюке, откуда трос идёт. [param on] —
@@ -448,6 +662,10 @@ func _start_engine() -> void:
 	_pass.play()
 	_rope_voice = Sounds.source(self, Sounds.ROPE_SLIDE, ENGINE_REACH)
 	_rope_voice.top_level = true
+	_door_voice = Sounds.source(self, Sounds.HELI_DOOR, ENGINE_REACH)
+	_door_voice.top_level = true
+	_winch_voice = Sounds.source(self, Sounds.WINCH, ENGINE_REACH)
+	_winch_voice.top_level = true
 
 
 ## Громкость по ходу: чем быстрее летит, тем тише висение и громче пролёт.
@@ -477,15 +695,50 @@ func _dress() -> void:
 	model.scale = Vector3.ONE * fit
 	hull = _parts_box(model, ["Hull", "Skids"])
 	for mark: String in [
-		"NavGreen", "BeaconTop", "BeaconBelly", "Strobe", "Searchlight", "CabinLight", "Winch"
+		"NavGreen",
+		"BeaconTop",
+		"BeaconBelly",
+		"Strobe",
+		"Searchlight",
+		"CabinLight",
+		"Winch",
+		"PilotSeat",
 	]:
 		var anchor := model.find_child(mark, true, false) as Node3D
 		_marks[mark] = _chain(_body, anchor).origin if anchor != null else hull.get_center()
+	_fit_door(model)
+	_seat_pilot()
 	_blur(_rotor, 4.0, false)
 	_blur(_tail_rotor, 2.0, true)
 	_hang_winch(hull)
 	_hang_lights()
 	_measure(hull, model)
+
+
+## Дверь модели: закрытая, в своём начале; откатывается на свою длину без
+## края у проёма. Порог проёма — низ двери у ближнего борта.
+func _fit_door(model: Node3D) -> void:
+	_door = model.find_child("Door", true, false) as Node3D
+	var door_mesh := _door as MeshInstance3D
+	if door_mesh == null:
+		_marks["Doorway"] = _marks["CabinLight"]
+		return
+	_door_closed = _door.position
+	var box := door_mesh.mesh.get_aabb()
+	_door_slide = maxf(box.size.x - DOOR_KEEP, 0.0)
+	var placed := _chain(_body, door_mesh) * box
+	_marks["Doorway"] = Vector3(placed.get_center().x, placed.position.y, placed.position.z)
+
+
+## Пилот в кресле лицом к носу. Риг ставит позу на пол ступнями — его начало
+## под ступнями, впереди и ниже подушки кресла.
+func _seat_pilot() -> void:
+	_pilot = FigureRig.new()
+	_pilot.name = "Pilot"
+	_pilot.model = PILOT_MODEL
+	_pilot.position = _marks["PilotSeat"] + PILOT_FEET
+	_body.add_child(_pilot)
+	_pilot.face(1.0, true)
 
 
 ## Габарит частей [param names] модели в координатах узла.
@@ -516,6 +769,8 @@ func _measure(hull: AABB, model: Node3D) -> void:
 	)
 	_hull_reach = _tilted(_hull_local)
 	_rotor_reach = _tilted(_rotor_local)
+	_hull_leave = _banked(_hull_local)
+	_rotor_leave = _banked(_rotor_local)
 
 
 ## Перекрашивает части модели по имени материала: корпус, стекло, проём кабины.
@@ -572,6 +827,18 @@ static func _tilted(box: AABB) -> AABB:
 	var reach := box
 	for angle: float in [-TILT_MAX, TILT_MAX]:
 		reach = reach.merge(Transform3D(Basis(Vector3.BACK, angle), Vector3.ZERO) * box)
+	return reach
+
+
+## Габарит [param box] на уходе: наклоны носом, крен до [constant BANK_MAX] и
+## рысканье до [constant LEAVE_YAW] — в том порядке, в каком их ставит уход.
+static func _banked(box: AABB) -> AABB:
+	var reach := box
+	for pitch: float in [-TILT_MAX, 0.0, TILT_MAX]:
+		for bank: float in [-BANK_MAX, 0.0]:
+			for yaw: float in [0.0, LEAVE_YAW]:
+				var turn := Basis.from_euler(Vector3(bank, yaw, -pitch))
+				reach = reach.merge(Transform3D(turn, Vector3.ZERO) * box)
 	return reach
 
 
@@ -647,9 +914,9 @@ func _hang_lights() -> void:
 ## лишний источник в кадре на пару секунд, а не на весь полёт.
 func _show_hover_lights(on: bool) -> void:
 	if _search != null:
-		_search.visible = on
+		_search.visible = on and not daytime
 	if _cabin != null:
-		_cabin.visible = on
+		_cabin.visible = on and _door_share > 0.05
 
 
 func _light(color: Color, at: Vector3) -> MeshInstance3D:
@@ -693,7 +960,8 @@ static func _paint(material_name: String) -> Material:
 			return hull
 		"Glass":
 			var glass := StandardMaterial3D.new()
-			glass.albedo_color = GLASS_COLOR
+			glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			glass.albedo_color = Color(GLASS_COLOR, GLASS_ALPHA)
 			glass.metallic = 0.2
 			glass.roughness = 0.08
 			glass.emission_enabled = true

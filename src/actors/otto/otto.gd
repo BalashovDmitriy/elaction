@@ -47,6 +47,9 @@ const LOOK_WALK := "walk"
 ## Входит в красную дверь вглубь и выходит из неё (ADR-0043, решение 4).
 const LOOK_DOOR_IN := "door_in"
 const LOOK_DOOR_OUT := "door_out"
+## В проёме вертолёта и на его пороге: позу, глубину и разворот ставит
+## вступление ([member ride_pose]).
+const LOOK_HELI := "heli"
 ## Насколько вглубь проёма Otto уходит, м: из плоскости игры за стену.
 const DOOR_WALK_DEPTH: float = 1.2
 ## Качание на тросе: размах, радианы, и частота, рад/с.
@@ -135,6 +138,12 @@ var ride_facing: float = 0.0
 ## Насколько Otto ушёл в проём двери: 0 — у коврика, 1 — внутри. Ставит дверь
 ## по ходу створки.
 var ride_progress: float = 0.0
+## Вступление здания (ADR-0052, решение 6), [constant LOOK_HELI]: какую позу
+## показать, насколько фигура в глубине от плоскости игры, м (минус — дальше от
+## камеры), и насколько она развёрнута к камере, 0–1.
+var ride_pose: String = ""
+var ride_depth: float = 0.0
+var ride_turn: float = 0.0
 
 var _states := OttoStateMachine.new()
 ## Один снимок ввода на всё время жизни: перечитывается, а не создаётся заново.
@@ -309,6 +318,9 @@ func kill(crushed: bool = false) -> void:
 		return
 	_crushed = crushed
 	if crushed:
+		# Только настоящая смерть: в передышке кабина зовёт это каждый шаг
+		# физики, пока Otto под ней, и давка звучала бы очередью.
+		Sounds.play(Sounds.CRUSH)
 		set_meta(&"death_cause", "crushed")
 	elif not has_meta(&"shooter"):
 		set_meta(&"death_cause", "fall")
@@ -466,9 +478,13 @@ func ride(on: bool, presses_spent: bool = false) -> void:
 		# С троса Otto встаёт на крышу клипом приземления (ADR-0043, решение 1).
 		if ride_look == LOOK_ROPE:
 			_landing = FigurePoses.LAND_SHOW
+			Sounds.play(Sounds.LAND)
 		ride_look = ""
 		ride_facing = 0.0
 		ride_progress = 0.0
+		ride_pose = ""
+		ride_depth = 0.0
+		ride_turn = 0.0
 	if presses_spent:
 		for action: StringName in PRESS_ACTIONS:
 			if Input.is_action_pressed(action) and not _spent_actions.has(action):
@@ -673,6 +689,7 @@ func _track_fall() -> void:
 		elif _air_time >= LANDING_AIR_TIME:
 			_locks.land()
 			_landing = FigurePoses.LAND_SHOW
+			Sounds.play(Sounds.LAND)
 	_air_time = 0.0 if grounded else _air_time + get_physics_process_delta_time()
 	_was_grounded = grounded
 	if grounded or _car != null:
@@ -737,7 +754,9 @@ func _apply_pose(state: OttoStateMachine.State) -> void:
 	# каждый физический кадр сыпал бы по два отложенных вызова в очередь.
 	if state == _posed_state:
 		return
+	var was := _posed_state
 	_posed_state = state
+	_state_sound(was, state)
 
 	var crouching := state == OttoStateMachine.State.CROUCH
 	# За дверью Otto нет вовсе, на эскалаторе он на виду — но достать нельзя
@@ -757,6 +776,8 @@ func _pose() -> String:
 	if _states.state == OttoStateMachine.State.RIDE:
 		if ride_look == LOOK_ROPE:
 			return ActorPose.ROPE
+		if ride_look == LOOK_HELI:
+			return ride_pose if not ride_pose.is_empty() else "idle"
 		if ride_look in [LOOK_WALK, LOOK_DOOR_IN, LOOK_DOOR_OUT]:
 			return ActorPose.walk_frame(_walk_phase)
 	return ActorPose.of_otto(
@@ -803,6 +824,9 @@ func _update_look(delta: float) -> void:
 		sway = sin(Time.get_ticks_msec() * 0.001 * ROPE_SWAY_RATE) * ROPE_SWAY
 	_body.rotation.z = sway
 	_walk_the_doorway(riding)
+	if riding and ride_look == LOOK_HELI:
+		_body.position.z = ride_depth
+		_body.rotation.y = lerp_angle(_body.rotation.y, 0.0, clampf(ride_turn, 0.0, 1.0))
 	if _depth_turn > 0.0:
 		_body.rotation.y = lerp_angle(_body.rotation.y, PI, _depth_turn)
 	_body.set_transparency(1.0 - _grace_alpha())
@@ -833,7 +857,27 @@ func _step_sound() -> void:
 	if frame == _stepped_on or frame == 1 or not is_on_floor():
 		return
 	_stepped_on = frame
-	Sounds.play(step_sound)
+	Sounds.play(Sounds.STEP_METAL if _on_metal() else step_sound)
+
+
+## Стоит ли Otto на металле — в кабине или на её крыше: шаг там звонкий
+## (ADR-0052, решение 7).
+func _on_metal() -> bool:
+	if _car != null:
+		return true
+	for index: int in get_slide_collision_count():
+		if get_slide_collision(index).get_collider() is ElevatorCar:
+			return true
+	return false
+
+
+## Звук перехода между состояниями: прыжок и присед (ADR-0052, решение 7).
+## Приземление звучит не здесь, а там, где его решает падение ([method _track_fall]).
+func _state_sound(was: OttoStateMachine.State, now: OttoStateMachine.State) -> void:
+	if now == OttoStateMachine.State.JUMP:
+		Sounds.play(Sounds.JUMP)
+	elif now == OttoStateMachine.State.CROUCH and was != OttoStateMachine.State.CROUCH:
+		Sounds.play(Sounds.CROUCH)
 
 
 static func _shape_size(shape: CollisionShape3D) -> Vector3:

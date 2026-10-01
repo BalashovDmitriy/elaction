@@ -91,7 +91,7 @@ func build(
 	_rules = rules
 	_ground = WorldSpace.height_to_scene(rules.floor_surface(rules.floors - 1))
 	# Город звучит тем же, что показывает: улица, дождь или ветер (ADR-0036).
-	Sounds.set_weather(weather)
+	Sounds.set_weather(weather, time)
 	_view = SubViewport.new()
 	_view.name = "CityView"
 	_view.own_world_3d = true
@@ -194,7 +194,8 @@ func _process(delta: float) -> void:
 	# Здание закрыло кадр целиком — город не виден, и второй кадр не рисуется
 	# (ADR-0030, решение 7).
 	var side := main as SideCamera
-	var visible := side == null or is_visible_around(_rules, side.view())
+	# Открытая комната показывает город в окне (ADR-0052, решение 5).
+	var visible := side == null or is_visible_around(_rules, side.view()) or DoorRoom.open_count > 0
 	_view.render_target_update_mode = (
 		SubViewport.UPDATE_ALWAYS if visible else SubViewport.UPDATE_DISABLED
 	)

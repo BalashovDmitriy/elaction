@@ -47,6 +47,11 @@ const HALO_MARGIN := Vector2(2.4, 2.0)
 const HALO_STRENGTH: float = 0.25
 const HALO_BEHIND: float = 1.6
 
+## Погашенный неон днём (ADR-0052, решение 4): стеклянные трубки цвета
+## неона, но тёмные и в свету солнца, — вывеску видно, а не горит она.
+const UNLIT_DARKEN: float = 0.55
+const UNLIT_GREY: float = 0.35
+
 ## Мигание: раз в сколько секунд буква гаснет и на сколько.
 const FLICKER_EVERY: float = 3.7
 const FLICKER_FOR: float = 0.18
@@ -58,6 +63,7 @@ var _halo: MeshInstance3D = null
 var _height: float = 0.0
 var _flicker: Label3D = null
 var _clock: float = 0.0
+var _lit: bool = true
 
 
 ## Вешает вывеску здания [param identity] у правой стены верхнего этажа.
@@ -65,6 +71,7 @@ func hang(rules: BuildingRules, identity: BuildingIdentity) -> void:
 	name = "VerticalSign"
 	var lines := identity.sign_lines()
 	var neon := NEON_HOTEL if identity.is_hotel() else NEON_OFFICE
+	_lit = TimeOfDay.sign_lit(rules.time_of_day)
 	var count := 0
 	for line in lines:
 		count += line.length()
@@ -80,7 +87,9 @@ func hang(rules: BuildingRules, identity: BuildingIdentity) -> void:
 	panel.position.z = Z
 	add_child(panel)
 	# Неон гудит там, где висит (ADR-0036): слышно на крыше и верхних этажах.
-	Sounds.source(panel, Sounds.NEON_BUZZ, BUZZ_REACH, true)
+	# Погашенный молчит.
+	if _lit:
+		Sounds.source(panel, Sounds.NEON_BUZZ, BUZZ_REACH, true)
 	# Кронштейны к стене: сверху и снизу.
 	for share: float in [0.12, 0.88]:
 		var arm := GreyboxLook.box(
@@ -98,16 +107,26 @@ func hang(rules: BuildingRules, identity: BuildingIdentity) -> void:
 			label.font = NeonStyle.font(700)
 			label.font_size = 96
 			label.pixel_size = LETTER_SIZE / 96.0
-			label.modulate = neon
-			label.outline_modulate = neon.darkened(0.4)
+			if _lit:
+				label.modulate = neon
+				label.outline_modulate = neon.darkened(0.4)
+			else:
+				var tube := unlit_tube(neon)
+				label.modulate = tube
+				label.outline_modulate = tube.darkened(0.3)
 			label.outline_size = 8
-			label.shaded = false
+			# Горящий неон светит сам; погашенный — в свету дня, как стекло.
+			label.shaded = not _lit
 			label.position = WorldSpace.to_scene(Vector2(x, y))
 			label.position.z = Z + PANEL_DEPTH * 0.5 + 0.01
 			add_child(label)
 			_letters.append(label)
 			y += LETTER_STEP
 		y += LETTER_STEP * LINE_GAP
+	add_to_group(Graphics.GROUP)
+	if not _lit:
+		# Погашенной вывеске нечем мигать и нечем светить.
+		return
 	# Мигает одна буква, по имени здания — всегда та же у этого здания.
 	_flicker = (
 		_letters[posmod(hash(identity.name), _letters.size())] if not _letters.is_empty() else null
@@ -123,7 +142,6 @@ func hang(rules: BuildingRules, identity: BuildingIdentity) -> void:
 	glow.position = WorldSpace.to_scene(Vector2(x, top + height * 0.5))
 	glow.position.z = Z + 1.2
 	add_child(glow)
-	add_to_group(Graphics.GROUP)
 	apply_graphics()
 
 
@@ -158,7 +176,22 @@ func _process(delta: float) -> void:
 	if _flicker == null:
 		return
 	_clock = fmod(_clock + delta, FLICKER_EVERY)
-	_flicker.visible = _clock > FLICKER_FOR
+	var shown := _clock > FLICKER_FOR
+	# Гаснущая трубка трещит там, где висит (ADR-0052, решение 7).
+	if _flicker.visible and not shown:
+		Sounds.play_at(self, Sounds.NEON_FLICKER, _flicker.global_position, BUZZ_REACH)
+	_flicker.visible = shown
+
+
+## Горит ли неон: вечером и ночью — да, утром и днём — нет.
+func is_lit() -> bool:
+	return _lit
+
+
+## Погашенная неоновая трубка днём: цвет неона, но тёмный и в свету. Одна на
+## вывеску здания и вывески лавок у выезда ([ExitStreet]).
+static func unlit_tube(neon: Color) -> Color:
+	return neon.lerp(Color(0.5, 0.5, 0.5), UNLIT_GREY).darkened(UNLIT_DARKEN)
 
 
 ## Текст вывески сверху вниз, буквами без пробелов: для тестов.

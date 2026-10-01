@@ -149,6 +149,17 @@ static func street_lights(kind: Kind, weather: Weather.Kind = Weather.Kind.CLEAR
 	return lights
 
 
+## Светло ли снаружи: утро и день. Тогда неон вывески погашен, в комнатах за
+## дверью не горит свет — светит солнце из окна (ADR-0052, решения 4 и 5).
+static func is_daytime(kind: Kind) -> bool:
+	return kind == Kind.MORNING or kind == Kind.DAY
+
+
+## Горит ли неон вывески здания: вечером и ночью (ADR-0052, решение 4).
+static func sign_lit(kind: Kind) -> bool:
+	return not is_daytime(kind)
+
+
 ## Окружающий свет здания от ночного [param night]: цвет и множитель силы.
 static func ambient(kind: Kind, night: Color) -> Color:
 	return night.lerp(AMBIENT_TINT[kind], AMBIENT_TINT_SHARE[kind])
