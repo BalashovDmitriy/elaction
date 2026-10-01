@@ -86,6 +86,11 @@ static func fill_shadows() -> bool:
 	return quality >= Quality.HIGH
 
 
+## Тень солнца на крыше и улице (ADR-0051).
+static func sun_shadows() -> bool:
+	return quality >= Quality.MEDIUM
+
+
 ## Сколько света источника уходит в объёмный туман.
 static func light_in_fog() -> float:
 	return LIGHT_IN_FOG[quality]

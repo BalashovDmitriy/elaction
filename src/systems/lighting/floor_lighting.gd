@@ -26,6 +26,9 @@ var _dark: Dictionary = {}
 ## Тёмные этажи карты: ламп на них нет, и темны они с начала здания
 ## (ADR-0028, решение 4). Этаж → true.
 var _unlit: Dictionary = {}
+## Ночь ли: не ночью сбитая лампа зону не гасит — её освещает день
+## (ADR-0051, решение 5).
+var _night: bool = true
 
 
 ## Вешает лампу на этаж. Зовёт уровень, раскладывая здание: зона считается
@@ -46,12 +49,20 @@ func mark_unlit(floor_index: int) -> void:
 	_unlit[floor_index] = true
 
 
+## Берёт у правил здания время суток и тёмные этажи карты.
+func follow(rules: BuildingRules) -> void:
+	_night = rules.is_night()
+	for index in rules.floors:
+		if rules.is_unlit(index):
+			mark_unlit(index)
+
+
 ## Гасит зону лампы, ближайшей к [param x]. Лампа падает там же, где висела,
 ## поэтому её место и есть её зона. Возвращает false, если зона уже была погашена
-## или ламп на этаже нет вовсе.
+## или ламп на этаже нет вовсе, а не ночью — всегда: зону освещает день.
 func darken(floor_index: int, x: float) -> bool:
 	var index := _nearest(floor_index, x)
-	if index < 0:
+	if index < 0 or not _night:
 		return false
 	if not _dark.has(floor_index):
 		_dark[floor_index] = {}

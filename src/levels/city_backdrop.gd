@@ -60,6 +60,22 @@ const WINDOW_DARK := Color(0.05, 0.06, 0.09)
 const FLASH_SKY: float = 4.0
 const FLASH_GLASS := Color(0.55, 0.6, 0.75)
 
+const SKY_SHADER := preload("res://src/levels/city_sky.gdshader")
+
+## День (ADR-0051): свет неба на фасадах — доля цвета неба, — свет солнца на
+## гранях к нему и тон верхов домов. Город неосвещаемый, и эти числа — весь
+## его дневной свет.
+const DAY_SKY_LIGHT: float = 0.5
+const DAY_SUN_LIGHT: float = 0.4
+const DAY_CROWN := Color(0.4, 0.4, 0.42)
+## Дымка днём: доля ночной плотности и насколько она темнее горизонта.
+const DAY_HAZE: float = 0.35
+const DAY_HAZE_DARKEN: float = 0.2
+const DAY_GLOW_THRESHOLD: float = 1.6
+## Экспозиция города днём: кадр города ложится фоном под тон основного
+## воздуха, и тот его ещё высветляет.
+const DAY_EXPOSURE: float = 0.55
+
 var _view: SubViewport = null
 var _camera: Camera3D = null
 var _ground: float = 0.0
@@ -72,11 +88,19 @@ var _fog_banks: Node3D = null
 var _lightning: Lightning = null
 ## Вспышка, которая сейчас стоит на небе и в стёклах.
 var _flash_shown: float = 0.0
+var _time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT
 
 
-## Строит город вдоль здания по правилам и сиду, с погодой [param weather].
-func build(rules: BuildingRules, building_seed: int, weather: Weather.Kind) -> void:
+## Строит город вдоль здания по правилам и сиду, с погодой [param weather] во
+## время суток [param time] (ADR-0051).
+func build(
+	rules: BuildingRules,
+	building_seed: int,
+	weather: Weather.Kind,
+	time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT
+) -> void:
 	_rules = rules
+	_time = time
 	_ground = WorldSpace.height_to_scene(rules.floor_surface(rules.floors - 1))
 	# Город звучит тем же, что показывает: улица, дождь или ветер (ADR-0036).
 	Sounds.set_weather(weather)
@@ -105,19 +129,29 @@ func build(rules: BuildingRules, building_seed: int, weather: Weather.Kind) -> v
 	_view.add_child(_camera)
 
 	var blocks := CityPlan.generate(building_seed, 0.0, rules.width)
-	_view.add_child(_facades(blocks))
-	_view.add_child(_windows(blocks))
+	var facades := _facades(blocks)
+	_view.add_child(facades)
+	var lit := _windows(blocks)
+	_view.add_child(lit)
 	var dark := _dark_windows(blocks)
 	_dark_glass = (dark.multimesh.mesh as QuadMesh).material as ShaderMaterial
 	_view.add_child(dark)
 	# Детали города (M22): верхи, огни, неон, зарево улиц.
-	_view.add_child(CityDetails.crowns(blocks, _ground, _unshaded(FACADE)))
-	_view.add_child(CityDetails.beacons(blocks, _ground))
-	_view.add_child(CityDetails.signs(blocks, _ground))
-	_view.add_child(CityDetails.street_glow(_ground, 0.0, rules.width))
+	var crown_look := _unshaded(FACADE)
+	_view.add_child(CityDetails.crowns(blocks, _ground, crown_look))
+	var beacons := CityDetails.beacons(blocks, _ground)
+	_view.add_child(beacons)
+	var signs := CityDetails.signs(blocks, _ground)
+	_view.add_child(signs)
+	var glow := CityDetails.street_glow(_ground, 0.0, rules.width)
+	_view.add_child(glow)
+	if not TimeOfDay.is_night(time):
+		_daylight(weather, facades, [lit, dark], crown_look, beacons, signs, glow)
 	match weather:
 		Weather.Kind.CLEAR:
-			_view.add_child(CityDetails.night_sky(building_seed, 0.0, rules.width, _ground))
+			# Звёзды и луна — только ночью.
+			if TimeOfDay.is_night(time):
+				_view.add_child(CityDetails.night_sky(building_seed, 0.0, rules.width, _ground))
 		Weather.Kind.FOG:
 			_fog_banks = CityDetails.fog_banks(building_seed, 0.0, rules.width, _ground)
 			_view.add_child(_fog_banks)
@@ -125,9 +159,11 @@ func build(rules: BuildingRules, building_seed: int, weather: Weather.Kind) -> v
 			# Слои струй у камеры и завесы между рядами (ADR-0037, решение 3).
 			_view.add_child(RainLook.city(_camera, _ground, 0.0, rules.width))
 			_rain_layers = RainLook.city_layers(_camera)
-			_lightning = Lightning.new()
-			_lightning.setup(building_seed, Vector2(0.0, rules.width), _ground)
-			_view.add_child(_lightning)
+			# Гроза — только вечером и ночью (ADR-0051, решение 7).
+			if TimeOfDay.has_thunder(time):
+				_lightning = Lightning.new()
+				_lightning.setup(building_seed, Vector2(0.0, rules.width), _ground)
+				_view.add_child(_lightning)
 
 	var layer := CanvasLayer.new()
 	layer.name = "CityLayer"
@@ -145,6 +181,75 @@ func build(rules: BuildingRules, building_seed: int, weather: Weather.Kind) -> v
 	get_viewport().size_changed.connect(_fit_view)
 	add_to_group(Graphics.GROUP)
 	apply_graphics()
+
+
+## Город утром, днём и вечером (ADR-0051): небо шейдером, фасады под солнцем,
+## окна — стекло с небом, огни по времени. Ночь не трогается вовсе.
+func _daylight(
+	weather: Weather.Kind,
+	facades: MultiMeshInstance3D,
+	windows: Array[MultiMeshInstance3D],
+	crown_look: StandardMaterial3D,
+	beacons: MultiMeshInstance3D,
+	signs: MultiMeshInstance3D,
+	glow: MeshInstance3D
+) -> void:
+	var day := TimeOfDay.daylight(_time)
+	var zenith := TimeOfDay.zenith(_time, weather)
+	var horizon := TimeOfDay.horizon(_time, weather)
+	var sun := TimeOfDay.sun_colour(_time) * TimeOfDay.sun_energy(_time, weather)
+	# Тени освещает небо над головой, а не горизонт: вечером они лиловые, а не
+	# оранжевые, как всё остальное.
+	var sky_light := zenith.lerp(horizon, 0.25) * DAY_SKY_LIGHT
+	var lights := TimeOfDay.street_lights(_time, weather)
+
+	var sky := ShaderMaterial.new()
+	sky.shader = SKY_SHADER
+	sky.set_shader_parameter("zenith", zenith)
+	sky.set_shader_parameter("horizon", horizon)
+	sky.set_shader_parameter("glow", TimeOfDay.sun_glow(_time, weather))
+	sky.set_shader_parameter("glow_side", TimeOfDay.SUN_SIDE[_time])
+	sky.set_shader_parameter("cloud_cover", TimeOfDay.clouds(_time, weather))
+	sky.set_shader_parameter("cloud_light", horizon.lerp(Color.WHITE, 0.55))
+	sky.set_shader_parameter("cloud_shade", zenith.lerp(horizon, 0.6).darkened(0.25))
+	_city_air.background_mode = Environment.BG_SKY
+	_city_air.sky = Sky.new()
+	_city_air.sky.sky_material = sky
+	# Дымка — цвета горизонта и не на небе: на бесконечности она закрасила бы
+	# его целиком, а ночью небо и было цветом дымки.
+	_city_air.fog_light_color = horizon.darkened(DAY_HAZE_DARKEN)
+	_city_air.fog_sky_affect = 0.0
+	# Днём дымка реже ночной: светлая, она съедала бы дома уже со второго ряда.
+	_city_air.fog_density = Weather.city_fog(weather) * DAY_HAZE
+	# И свечение только с ярчайшего: дневной фасад и так светлее порога ночи.
+	_city_air.glow_hdr_threshold = DAY_GLOW_THRESHOLD
+	_city_air.tonemap_exposure = DAY_EXPOSURE
+
+	var facade := (facades.multimesh.mesh as BoxMesh).material as ShaderMaterial
+	var tones := PackedVector3Array()
+	for tone: Color in CityLook.DAY_TONES:
+		tones.append(Vector3(tone.r, tone.g, tone.b))
+	facade.set_shader_parameter("daylight", day)
+	facade.set_shader_parameter("day_tones", tones)
+	facade.set_shader_parameter("sun_direction", TimeOfDay.sun_direction(_time))
+	facade.set_shader_parameter("sun_light", Vector3(sun.r, sun.g, sun.b) * DAY_SUN_LIGHT)
+	facade.set_shader_parameter("sky_light", sky_light)
+	facade.set_shader_parameter("street_lights", lights)
+	for node in windows:
+		var glass := (node.multimesh.mesh as QuadMesh).material as ShaderMaterial
+		glass.set_shader_parameter("daylight", day)
+		glass.set_shader_parameter("lit_share", TimeOfDay.lit_windows(_time))
+		glass.set_shader_parameter("sky_top", zenith)
+		glass.set_shader_parameter("sky_low", horizon)
+		glass.set_shader_parameter("day_frame", DAY_CROWN * (sky_light + sun * 0.3))
+	crown_look.albedo_color = FACADE.lerp(DAY_CROWN * (sky_light + sun * 0.4), day)
+	var neon := (signs.multimesh.mesh as QuadMesh).material as ShaderMaterial
+	neon.set_shader_parameter("power", lights)
+	neon.set_shader_parameter("daylight", day)
+	beacons.visible = lights > 0.0
+	glow.visible = lights > 0.0
+	var warm := (glow.mesh as QuadMesh).material as StandardMaterial3D
+	warm.albedo_color = Color(1.0, 1.0, 1.0, lights)
 
 
 ## Настраивает основной воздух так, чтобы он рисовал город фоном.
@@ -220,6 +325,11 @@ static func is_visible_around(rules: BuildingRules, view: Rect2) -> bool:
 		if view.position.x < bounds.x or view.end.x > bounds.y:
 			return true
 	return false
+
+
+## Бьют ли над городом молнии: в дождь вечером и ночью.
+func has_lightning() -> bool:
+	return _lightning != null
 
 
 ## Яркость вспышки молнии прямо сейчас, 0–1: воздух здания светлеет с ней.

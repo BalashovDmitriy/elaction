@@ -30,9 +30,15 @@ const SKY: Array[Color] = [
 ## раскладки того же сида.
 const SALT: int = 0x5EA7_4E12
 
+## Погода, поставленная руками, или -1 — жребий по сиду. Ставят инструменты
+## кадров: сочетание времени суток и погоды снимается без подбора сида (M24j).
+static var forced: int = -1
+
 
 ## Погода здания по его сиду.
 static func of_seed(building_seed: int) -> Kind:
+	if forced >= 0:
+		return forced as Kind
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([building_seed, SALT])
 	return rng.randi_range(0, Kind.size() - 1) as Kind
