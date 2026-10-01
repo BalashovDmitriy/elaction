@@ -73,7 +73,7 @@ const DEPTH: float = 12.0
 const WINDOW_STEP := Vector2(2.4, Proportions.FLOOR)
 
 ## Сколько окон горит ночью.
-const LIT_SHARE: float = 0.35
+const LIT_SHARE: float = 0.26
 
 ## С каким шансом у дома горит целый этаж.
 const LIT_FLOOR_CHANCE: float = 0.35

@@ -297,6 +297,8 @@ func _enter_building(demo: bool = false) -> void:
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	_level.rules = BuildingRules.for_building(game.building, _settings.difficulty)
 	_level.building_seed = game.building_seed()
+	# Время суток — жребием по сиду, на всё здание (ADR-0051, решения 3 и 4).
+	_level.rules.time_of_day = TimeOfDay.of_seed(_level.building_seed)
 	# Режим наследуется от родителя, а он тут ALWAYS: без этой строки пауза
 	# не останавливала бы ничего — игра шла бы дальше с надписью «пауза».
 	_level.process_mode = Node.PROCESS_MODE_PAUSABLE

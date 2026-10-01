@@ -43,6 +43,10 @@ const MIN_SHAFT_FLOORS: int = 4
 ## первая палитра набора — та самая, что на кадре порта.
 @export var palette: BuildingPalette = BuildingPalette.of_round(1)
 
+## Время суток здания (ADR-0051): жребием по сиду в [method Main._enter_building].
+## По умолчанию ночь — здание, собранное тестом без жребия, темнеет, как и до M24j.
+@export var time_of_day: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT
+
 ## Этажей в здании, не считая крыши. Нулевой — верхний, последний — с выходом.
 @export var floors: int = 30
 
@@ -410,8 +414,17 @@ func slab_span(index: int) -> Vector2:
 
 ## Тёмный ли этаж по карте оригинала: ламп на нём нет, и темен он с начала
 ## здания (ADR-0028, решение 4). Крыша не темна никогда — ей светит город.
+## Тёмные этажи бывают только ночью (ADR-0051, решение 5).
 func is_unlit(index: int) -> bool:
+	if not is_night():
+		return false
 	return index > ROOF and index < floors and Arcade.is_dark_floor(Arcade.rom_floor(index, floors))
+
+
+## Ночь ли в здании: только ночью сбитая лампа гасит зону, а этажи карты темны
+## (ADR-0051, решение 5).
+func is_night() -> bool:
+	return TimeOfDay.is_night(time_of_day)
 
 
 ## Во сколько экранов оригинала ширина уровня, не меньше одного. Башня — в

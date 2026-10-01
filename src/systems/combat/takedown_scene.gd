@@ -94,12 +94,12 @@ var _freeze_left: float = 0.0
 var _from_x: float = 0.0
 var _to_x: float = 0.0
 var _flash: OmniLight3D = null
-var _flash_ticks: int = 0
+var _flash_age: float = 0.0
 ## Кадр сцены и его прежние насыщенность и яркость: сценка их возвращает.
 var _environment: Environment = null
 var _saturation_before: float = 1.0
 var _brightness_before: float = 1.0
-var _grade_ticks: int = 0
+var _grade_age: float = 0.0
 
 
 ## Начинает сценку [param scene] над агентом [param agent]. Узел встаёт в дерево
@@ -169,6 +169,8 @@ func advance(delta: float) -> void:
 		_frame_number = frame
 		_frame_world = _world if _slowed else 1.0
 	var real := delta / _frame_world
+	_flash_age += real
+	_grade_age += real
 	_fade_effects()
 	if _freeze_left > 0.0:
 		_freeze_left -= real
@@ -311,7 +313,7 @@ func _flash_at_the_faces() -> void:
 	var middle := (_head_of(_otto) + _head_of(_agent)) * 0.5
 	_flash.global_position = middle + Vector3(0.0, 0.0, FLASH_OUT)
 	_flash.light_energy = FLASH_ENERGY
-	_flash_ticks = Time.get_ticks_msec()
+	_flash_age = 0.0
 
 
 ## Шляпа слетает с агента: прячется на нём, а её копия улетает телом — от Otto,
@@ -360,10 +362,11 @@ func _knock_the_hat() -> void:
 
 
 ## Вспышка и цвет кадра гаснут по настоящему времени: мир на ударе почти стоит.
+## Настоящее — шагами сценки без замедления мира, а не по часам: под прогоном
+## тестов с `--fixed-fps` часы и кадры расходятся (run_tests.py).
 func _fade_effects() -> void:
 	if _flash != null:
-		var age := (Time.get_ticks_msec() - _flash_ticks) / 1000.0
-		_flash.light_energy = FLASH_ENERGY * maxf(1.0 - age / FLASH_TIME, 0.0)
+		_flash.light_energy = FLASH_ENERGY * maxf(1.0 - _flash_age / FLASH_TIME, 0.0)
 	_grade_step()
 
 
@@ -376,14 +379,14 @@ func _grade_in() -> void:
 		return
 	_saturation_before = _environment.adjustment_saturation
 	_brightness_before = _environment.adjustment_brightness
-	_grade_ticks = Time.get_ticks_msec()
+	_grade_age = 0.0
 	_grade_step()
 
 
 func _grade_step() -> void:
 	if _environment == null:
 		return
-	var share := clampf((Time.get_ticks_msec() - _grade_ticks) / 1000.0 / GRADE_TIME, 0.0, 1.0)
+	var share := clampf(_grade_age / GRADE_TIME, 0.0, 1.0)
 	_environment.adjustment_enabled = true
 	_environment.adjustment_saturation = lerpf(_saturation_before, GRADE_SATURATION, share)
 	_environment.adjustment_brightness = lerpf(_brightness_before, GRADE_BRIGHTNESS, share)

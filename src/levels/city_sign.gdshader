@@ -11,6 +11,11 @@ render_mode unshaded, fog_disabled, cull_back;
 //
 // INSTANCE_CUSTOM.x — жребий вывески 0–1.
 
+// Сколько неона горит, 0–1, и сколько дня (ADR-0051): днём вывеска — доска
+// с буквами, трубки бледные.
+uniform float power = 1.0;
+uniform float daylight = 0.0;
+
 varying vec3 tone;
 varying float seed;
 varying vec2 size;
@@ -64,6 +69,7 @@ void fragment() {
 	if (seed > 0.875) {
 		flicker = mix(0.15, 1.0, step(0.12, hash(vec2(floor(TIME * 7.0), seed))));
 	}
-	vec3 plate = tone * 0.06;
-	ALBEDO = mix(plate, tone * 2.2, neon * flicker);
+	vec3 plate = mix(tone * 0.06, vec3(0.16) + tone * 0.1, daylight);
+	vec3 lit_tube = mix(tone * 0.5 + 0.2, tone * 2.2, power);
+	ALBEDO = mix(plate, lit_tube, neon * mix(1.0, flicker, power));
 }

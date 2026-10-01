@@ -1,17 +1,27 @@
 #!/usr/bin/env python3
 """Прогон тестов GUT в headless-режиме, несколькими процессами сразу.
 
-Настройки берутся из `.gutconfig.json` в корне проекта; файлы тестов
-раскидываются по шардам, и каждый шард — свой процесс Godot.
+Набор режется на задания — файл тестов, отдельный тест разрезанного файла или
+пачку мелких файлов, — и задания идут очередью: процессов Godot столько, сколько
+потоков у процессора, и освободившийся берёт следующее, самое тяжёлое из
+оставшихся. Так прогон не ждёт хвоста одной перегруженной кучки, как ждал при
+раскладке заранее.
+
+Движок идёт с `--fixed-fps`: кадр — ровно 1/60 с игрового времени, а настоящие
+часы кадры не держат. Тесты со сценой ждут кадров физики, и без флага процесс
+спал между кадрами — шесть процессов грузили процессор на 5–30 %, а набор шёл
+шесть минут. С флагом тот же набор идёт около минуты. Код игры поэтому меряет
+время кадрами (`delta / Engine.time_scale`), а не `Time.get_ticks_msec()`: под
+этим флагом часы и кадры расходятся (docs/testing.md).
 
 Запуск:
-    python tools/run_tests.py                # шардов по числу ядер, но не больше SHARDS_MAX
-    python tools/run_tests.py --shards 1     # один процесс, как было до шардинга
+    python tools/run_tests.py                # процессов по числу потоков
+    python tools/run_tests.py --jobs 1       # один процесс за раз
     python tools/run_tests.py --part 2/3     # вторая треть набора — одна машина матрицы CI
+    python tools/run_tests.py --real-time    # без --fixed-fps: кадры по настоящим часам
 
-Части делятся тем же жадным способом, что и шарды, по весам `KNOWN_SLOW`: CI
-гоняет набор матрицей на нескольких машинах, и на каждой её часть снова
-раскладывается по ядрам.
+Части делятся жадно по весам `KNOWN_SLOW`: CI гоняет набор матрицей на
+нескольких машинах, и на каждой её часть снова идёт очередью.
 """
 
 from __future__ import annotations
@@ -21,7 +31,7 @@ import os
 import sys
 import tempfile
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from godot_bin import PROJECT_ROOT, require_godot, run, use_utf8_output
@@ -29,19 +39,25 @@ from godot_bin import PROJECT_ROOT, require_godot, run, use_utf8_output
 GUT_CMDLN = "addons/gut/gut_cmdln.gd"
 SUCCESS_MARKER = "All tests passed"
 
-# Сколько ждём один шард, с. Свой лимит, а не общий из godot_bin: там он на один
-# запуск движка — импорт ресурсов, съёмка кадра, — а здесь идут сотни тестов,
-# часть из них со сценами и ботом.
-TEST_TIMEOUT = 1200
+# Сколько ждём одно задание, с. Свой лимит, а не общий из godot_bin: там он на
+# один запуск движка — импорт ресурсов, съёмка кадра.
+TEST_TIMEOUT = 600
 
-# С какой доли лимита пора беспокоиться. Запас съедается по вехе за раз, и
-# заметить это надо на прогоне, а не когда прогон уже снимается.
-CROWDED_RATIO = 0.75
+# С какой доли лимита пора беспокоиться о задании. Запас съедается по вехе за
+# раз, и заметить это надо на прогоне, а не когда задание уже снимается.
+CROWDED_RATIO = 0.5
 
-# Больше шардов не заводим. Упирается прогон не в ядра, а в самую долгую единицу:
-# один сид бота на настоящем здании идёт полторы-две минуты, и седьмой шард
-# стоял бы и ждал его так же, как шестой.
-SHARDS_MAX = 6
+# Кадров в секунду игрового времени под `--fixed-fps`: как у физики игры.
+FIXED_FPS = 60
+
+# Больше процессов разом не заводим: под `--fixed-fps` каждый грузит свой поток,
+# и сверх числа потоков они только толкаются.
+JOBS_MAX = 16
+
+# Пачка мелких файлов — одно задание, пока её вес не дорос до этого, с. Старт
+# движка стоит секунды две, и процесс на файл в полсекунды съел бы больше, чем
+# сами тесты; а пачка крупнее держала бы хвост прогона.
+BATCH_COST = 8.0
 
 # Строки, после которых ждать нечего. Бот печатает это, упершись в тупик, и
 # дальше только добирает бюджет шагов — на настоящем здании это минуты.
@@ -55,13 +71,9 @@ BROKEN_SCRIPT_MARKERS = (
     "SCRIPT ERROR",
 )
 
-# Файлы, которые режутся по отдельным тестам. Шард не умеет делить файл, а
-# `test_building_playthrough.gd` весил треть набора: пока он ходил целиком,
-# шесть шардов давали 574 с против 755 — весь прогон стоял и ждал его.
-# Разрезанный по сидам, он дал 139 с (docs/testing.md).
-#
-# Режется он без единой правки в самом тесте: GUT принимает `-gunit_test_name`,
-# и каждый такой кусок идёт своим процессом.
+# Файлы, которые режутся по отдельным тестам: задание не умеет делить файл, а
+# `test_building_playthrough.gd` весил треть набора (docs/testing.md). Режется он
+# без единой правки в самом тесте: GUT принимает `-gunit_test_name`.
 SPLIT_BY_TEST: dict[str, list[str]] = {
     "test_building_playthrough.gd": [
         "test_bot_survives_the_real_building_with_agents_seed_1",
@@ -74,39 +86,84 @@ SPLIT_BY_TEST: dict[str, list[str]] = {
     ],
 }
 
-# Кто сколько идёт, с. Замер — `python tools/test_times.py --by-test`, шесть
-# процессов разом, то есть в тех же условиях, в каких потом идёт прогон.
-#
-# Раскладка жадная, и класть надо сперва тяжёлое: иначе самый долгий кусок
-# ляжет последним и растянет прогон на свою длину плюс всё, что легло до него.
-# Разъехались числа — прогон это переживёт, просто раскладка станет хуже.
+# Кто сколько идёт под `--fixed-fps`, с, двенадцатью процессами разом — замер
+# `python tools/run_tests.py --batch-cost 0 --slowest 120` (M24j). Файлы короче
+# трёх секунд не записаны — они идут по [UNKNOWN_COST]. Очередь берёт тяжёлое первым; разъехались числа — прогон это
+# переживёт, только хвост выйдет длиннее.
 KNOWN_SLOW: dict[str, float] = {
-    "test_bot_survives_the_real_building_with_agents_seed_1": 120.0,
-    "test_bot_survives_the_real_building_with_agents_seed_2": 120.0,
-    "test_bot_survives_the_real_building_with_agents_seed_3": 90.0,
-    "test_bot_finishes_the_real_building_seed_1": 95.0,
-    "test_bot_finishes_the_real_building_seed_2": 95.0,
-    "test_bot_finishes_every_building": 60.0,
-    "test_building_architecture.gd": 54.0,
-    "test_agent_doors.gd": 36.0,
-    "test_agent_lifts.gd": 30.0,
-    "test_darkness.gd": 26.0,
-    "test_car_boarding.gd": 80.0,
-    "test_elevator_control.gd": 26.0,
-    "test_building_assembly.gd": 5.0,
-    "test_building_shafts.gd": 5.0,
+    "test_bot_survives_the_real_building_with_agents_seed_1": 53.0,
+    "test_bot_survives_the_real_building_with_agents_seed_3": 51.0,
+    "test_car_corpses.gd": 44.0,
+    "test_bot_survives_the_real_building_with_agents_seed_2": 35.0,
+    "test_building_architecture.gd": 29.0,
+    "test_building_basement.gd": 23.0,
+    "test_bot_finishes_the_real_building_seed_1": 16.0,
+    "test_bot_finishes_the_real_building_seed_2": 16.0,
+    "test_car_boarding.gd": 14.0,
+    "test_roof_arrival.gd": 14.0,
+    "test_building_map.gd": 14.0,
+    "test_agent_doors.gd": 13.0,
+    "test_building_dressing.gd": 11.0,
+    "test_time_of_day.gd": 10.0,
+    "test_building_shafts.gd": 10.0,
+    "test_darkness.gd": 10.0,
+    "test_elevator_control.gd": 10.0,
+    "test_building_plan.gd": 9.0,
+    "test_rain.gd": 9.0,
+    "test_basement_lock.gd": 9.0,
+    "test_building_walls.gd": 9.0,
+    "test_red_door.gd": 8.0,
+    "test_garage.gd": 8.0,
+    "test_building_scenery.gd": 8.0,
+    "test_agent_lifts.gd": 8.0,
+    "test_demo.gd": 8.0,
+    "test_readability.gd": 7.0,
+    "test_exit_street.gd": 7.0,
+    "test_building_dress.gd": 7.0,
+    "test_bot_finishes_every_building": 7.0,
+    "test_figure_rig.gd": 7.0,
+    "test_exit_car.gd": 6.0,
+    "test_building_assembly.gd": 6.0,
+    "test_building_route.gd": 6.0,
+    "test_shaft_boards.gd": 6.0,
+    "test_shaft_faces.gd": 6.0,
+    "test_escalator_edges.gd": 5.0,
+    "test_escalator_depth.gd": 5.0,
+    "test_bot_fights.gd": 5.0,
+    "test_car_cut.gd": 5.0,
+    "test_building_transition.gd": 4.0,
+    "test_takedown.gd": 4.0,
+    "test_corpse_freeze.gd": 4.0,
+    "test_otto_fall.gd": 4.0,
+    "test_graphics.gd": 3.0,
+    "test_menu.gd": 3.0,
+    "test_door_room.gd": 3.0,
+    "test_building_style.gd": 3.0,
+    "test_street_traffic.gd": 3.0,
+    "test_otto_pauses.gd": 3.0,
+    "test_sounds.gd": 3.0,
+    "test_muzzle.gd": 3.0,
+    "test_enemy_corpse.gd": 3.0,
+    "test_enemy_dodge.gd": 3.0,
+    "test_car_crush.gd": 3.0,
+    "test_car_walk.gd": 3.0,
+    "test_alarm.gd": 3.0,
+    "test_actor_pose.gd": 3.0,
+    "test_agent_spawn.gd": 3.0,
 }
 
-# Во сколько считать файл, о котором ничего не известно. Тесты правил без сцены
-# идут доли секунды, и переоценивать их незачем.
-UNKNOWN_COST = 2.0
+# Во сколько считать файл, о котором ничего не известно.
+UNKNOWN_COST = 1.5
 
-# Подробность вывода GUT. Своё число, а не из конфига: конфиг шард не читает.
+# Подробность вывода GUT. Своё число, а не из конфига: конфиг задание не читает.
 LOG_LEVEL = 1
+
+# Сколько самых долгих заданий печатать в конце: по ним правится `KNOWN_SLOW`.
+SLOWEST_SHOWN = 8
 
 
 class Unit:
-    """Что гоняет один процесс Godot: файл целиком или один тест из него."""
+    """Файл целиком или один тест из разрезанного файла."""
 
     def __init__(self, script: Path, only: str = "") -> None:
         self.script = script
@@ -117,6 +174,30 @@ class Unit:
 
     def label(self) -> str:
         return self.only or self.script.name
+
+
+class Job:
+    """Что гоняет один процесс Godot: один разрезанный тест или пачка файлов."""
+
+    def __init__(self, units: list[Unit]) -> None:
+        self.units = units
+
+    def cost(self) -> float:
+        return sum(unit.cost() for unit in self.units)
+
+    def label(self) -> str:
+        if len(self.units) == 1:
+            return self.units[0].label()
+        return f"{self.units[0].label()} и ещё {len(self.units) - 1}"
+
+    def arguments(self) -> list[str]:
+        def path(unit: Unit) -> str:
+            return f"res://{unit.script.relative_to(PROJECT_ROOT).as_posix()}"
+
+        if self.units[0].only:
+            only = self.units[0]
+            return [f"-gtest={path(only)}", f"-gunit_test_name={only.only}"]
+        return ["-gtest=" + ",".join(path(unit) for unit in self.units)]
 
 
 def units_of(scripts: list[Path]) -> list[Unit]:
@@ -132,16 +213,34 @@ def units_of(scripts: list[Path]) -> list[Unit]:
     return found
 
 
-def shard_units(units: list[Unit], shards: int) -> list[list[Unit]]:
-    """Раскидывает единицы по шардам: самая долгая — в самый свободный."""
+def jobs_of(units: list[Unit], batch_cost: float = BATCH_COST) -> list[Job]:
+    """Задания очереди, тяжёлые первыми: разрезанный тест и известный тяжёлый
+    файл — по одному, мелкие файлы — пачками до [BATCH_COST] с."""
+    jobs: list[Job] = []
+    batch: list[Unit] = []
+    for unit in sorted(units, key=lambda unit: -unit.cost()):
+        if unit.only or unit.cost() >= batch_cost:
+            jobs.append(Job([unit]))
+            continue
+        batch.append(unit)
+        if sum(item.cost() for item in batch) >= batch_cost:
+            jobs.append(Job(batch))
+            batch = []
+    if batch:
+        jobs.append(Job(batch))
+    return sorted(jobs, key=lambda job: -job.cost())
+
+
+def split_units(units: list[Unit], piles: int) -> list[list[Unit]]:
+    """Раскидывает единицы по кучкам: самая долгая — в самую лёгкую."""
     ordered = sorted(units, key=lambda unit: -unit.cost())
-    piles: list[list[Unit]] = [[] for _ in range(shards)]
-    weights = [0.0] * shards
+    found: list[list[Unit]] = [[] for _ in range(piles)]
+    weights = [0.0] * piles
     for unit in ordered:
         lightest = weights.index(min(weights))
-        piles[lightest].append(unit)
+        found[lightest].append(unit)
         weights[lightest] += unit.cost()
-    return [pile for pile in piles if pile]
+    return [pile for pile in found if pile]
 
 
 def part_of(units: list[Unit], part: str) -> list[Unit]:
@@ -153,66 +252,52 @@ def part_of(units: list[Unit], part: str) -> list[Unit]:
     k, n = int(number), int(total)
     if not 1 <= k <= n:
         raise ValueError(wrong)
-    piles = shard_units(units, n)
+    piles = split_units(units, n)
     # Кучек бывает меньше N, если единиц меньше машин: лишней машине нечего делать.
     return piles[k - 1] if k <= len(piles) else []
 
 
-def run_shard(godot: str, units: list[Unit], home: Path) -> tuple[int, str, float]:
-    """Гоняет шард: единицы идут подряд, каждая своим процессом Godot.
+def run_job(godot: str, job: Job, home: Path, real_time: bool) -> tuple[int, str, float]:
+    """Гоняет задание своим процессом Godot.
 
     Своя папка `user://` нужна потому, что `test_records` и `test_interface`
     пишут в неё, а флага для неё у Godot нет — он выводит её из `APPDATA` или
-    `HOME`. Без этого шарды затирают друг другу файл рекордов, и падает то один,
-    то другой, без всякой связи с тем, что менялось в коде.
-
-    Процесс на единицу, а не один на шард: разрезанный файл иначе не разложить —
-    `-gunit_test_name` у GUT один на запуск. Старт движка стоит пару секунд,
-    и на фоне самого дешёвого теста это заметно, а на фоне прогона бота — нет.
+    `HOME`. Без этого процессы затирают друг другу файл рекордов.
     """
     home.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)
     env["APPDATA"] = str(home)
     env["HOME"] = str(home)
     env["XDG_DATA_HOME"] = str(home)
-
+    pace = [] if real_time else ["--fixed-fps", str(FIXED_FPS)]
     started = time.monotonic()
-    whole = [unit for unit in units if not unit.only]
-    pieces = [unit for unit in units if unit.only]
-
-    calls: list[list[str]] = []
-    if whole:
-        paths = ",".join(
-            f"res://{unit.script.relative_to(PROJECT_ROOT).as_posix()}" for unit in whole
-        )
-        calls.append([f"-gtest={paths}"])
-    for unit in pieces:
-        path = f"res://{unit.script.relative_to(PROJECT_ROOT).as_posix()}"
-        calls.append([f"-gtest={path}", f"-gunit_test_name={unit.only}"])
-
-    collected: list[str] = []
-    for extra in calls:
-        # `-gconfig=` пустым — это отказ от `.gutconfig.json`, и он обязателен.
-        # Иначе `-gdir` берётся оттуда, к списку шарда добавляется весь
-        # `res://tests`, и каждый процесс гоняет набор целиком: шесть шардов
-        # шли те же одиннадцать минут, что и один, только вшестером.
-        code, output = run(
-            godot,
-            ["--headless", "-s", GUT_CMDLN, "-gconfig=", *extra, f"-glog={LOG_LEVEL}", "-gexit"],
-            timeout=TEST_TIMEOUT,
-            echo=False,
-            stop_on=STALLED_MARKERS,
-            env=env,
-        )
-        collected.append(output)
-        if code != 0 or SUCCESS_MARKER not in output:
-            return code or 1, "\n".join(collected), time.monotonic() - started
-    return 0, "\n".join(collected), time.monotonic() - started
+    # `-gconfig=` пустым — это отказ от `.gutconfig.json`, и он обязателен.
+    # Иначе `-gdir` берётся оттуда, и каждый процесс гоняет набор целиком.
+    code, output = run(
+        godot,
+        [
+            "--headless",
+            *pace,
+            "-s",
+            GUT_CMDLN,
+            "-gconfig=",
+            *job.arguments(),
+            f"-glog={LOG_LEVEL}",
+            "-gexit",
+        ],
+        timeout=TEST_TIMEOUT,
+        echo=False,
+        stop_on=STALLED_MARKERS,
+        env=env,
+    )
+    if code == 0 and SUCCESS_MARKER not in output:
+        code = 1
+    return code, output, time.monotonic() - started
 
 
 def verdict(code: int, output: str, where: str) -> str:
-    """Что не так с шардом, или пустая строка, если всё в порядке."""
-    if code != 0:
+    """Что не так с заданием, или пустая строка, если всё в порядке."""
+    if code != 0 and SUCCESS_MARKER in output:
         return f"{where}: провал, код возврата {code}."
     broken = [marker for marker in BROKEN_SCRIPT_MARKERS if marker in output]
     if broken:
@@ -223,23 +308,40 @@ def verdict(code: int, output: str, where: str) -> str:
     # GUT возвращает 0 и когда тесты не нашлись, поэтому сверяемся с итогом.
     if SUCCESS_MARKER not in output:
         return f'{where}: в выводе GUT нет строки "{SUCCESS_MARKER}" — тесты не прошли.'
+    if code != 0:
+        return f"{where}: провал, код возврата {code}."
     return ""
+
+
+def passing(output: str) -> int:
+    """Сколько тестов прошло по итогу GUT."""
+    total = 0
+    for line in output.splitlines():
+        if "Passing Tests" in line:
+            total += int(line.split()[-1])
+    return total
 
 
 def main() -> int:
     use_utf8_output()
     parser = argparse.ArgumentParser(description="Прогон тестов GUT")
     parser.add_argument(
-        "--shards",
+        "--jobs",
         type=int,
-        default=min(os.cpu_count() or 1, SHARDS_MAX),
+        default=min(os.cpu_count() or 1, JOBS_MAX),
         help="сколько процессов Godot запускать разом",
     )
+    parser.add_argument("--part", default="", help="какую часть набора гнать, K/N — для CI")
     parser.add_argument(
-        "--part",
-        default="",
-        help="какую часть набора гнать, K/N — для матрицы CI",
+        "--real-time", action="store_true", help="без --fixed-fps: кадры по настоящим часам"
     )
+    parser.add_argument(
+        "--batch-cost",
+        type=float,
+        default=BATCH_COST,
+        help="вес пачки мелких файлов, с; 0 — каждый файл своим процессом (замер весов)",
+    )
+    parser.add_argument("--slowest", type=int, default=SLOWEST_SHOWN, help="сколько долгих печатать")
     args = parser.parse_args()
 
     godot = require_godot()
@@ -260,42 +362,43 @@ def main() -> int:
         if not units:
             print(f"Тестовых файлов {len(scripts)}.{scope} Этой машине гнать нечего.")
             return 0
-    piles = shard_units(units, max(args.shards, 1))
+    jobs = jobs_of(units, args.batch_cost)
+    workers = max(1, min(args.jobs, len(jobs)))
+    pace = "по настоящим часам" if args.real_time else f"--fixed-fps {FIXED_FPS}"
     print(
-        f"Тестовых файлов {len(scripts)}, единиц {len(units)}, шардов {len(piles)}.{scope}",
+        f"Тестовых файлов {len(scripts)}, единиц {len(units)}, заданий {len(jobs)}, "
+        f"процессов {workers}, {pace}.{scope}",
         flush=True,
     )
 
     started = time.monotonic()
     failures: list[str] = []
-    with tempfile.TemporaryDirectory(prefix="elaction-shards-") as shared:
-        with ThreadPoolExecutor(max_workers=len(piles)) as pool:
-            jobs = [
-                pool.submit(run_shard, godot, pile, Path(shared) / f"shard{number}")
-                for number, pile in enumerate(piles)
-            ]
-            for number, job in enumerate(jobs):
-                code, output, took = job.result()
-                where = f"шард {number + 1}"
-                trouble = verdict(code, output, where)
-                totals = [line.strip() for line in output.splitlines() if "Passing Tests" in line]
-                # Время каждого шарда печатается всегда: по нему видно, какой
-                # файл держит прогон, а без этого раскладку не поправить.
-                print(
-                    "  %s: %3.0f с, единиц %d, %s"
-                    % (where, took, len(piles[number]), "; ".join(totals) or "итога нет"),
-                    flush=True,
-                )
+    timings: list[tuple[float, str]] = []
+    tests = 0
+    with tempfile.TemporaryDirectory(prefix="elaction-tests-") as shared:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            running = {
+                pool.submit(run_job, godot, job, Path(shared) / f"job{number}", args.real_time): job
+                for number, job in enumerate(jobs)
+            }
+            for done in as_completed(running):
+                job = running[done]
+                code, output, took = done.result()
+                timings.append((took, job.label()))
+                tests += passing(output)
+                trouble = verdict(code, output, job.label())
                 if trouble:
                     failures.append(trouble)
                     # Вывод целиком нужен только у упавшего: у зелёного это
                     # сотни строк, в которых нечего искать.
-                    print(output.strip())
+                    print(output.strip(), flush=True)
+                if took > TEST_TIMEOUT * CROWDED_RATIO:
+                    print(f"  {job.label()}: {took:.0f} с — запас до лимита меньше половины")
 
     spent = time.monotonic() - started
-    print(f"\nНабор шёл {spent:.0f} с при лимите {TEST_TIMEOUT} на шард.")
-    if spent > TEST_TIMEOUT * CROWDED_RATIO:
-        print("Запас до лимита меньше четверти — пора разрезать самый дорогой тест.")
+    print(f"\nНабор шёл {spent:.0f} с, тестов прошло {tests}. Самые долгие задания:")
+    for took, label in sorted(timings, reverse=True)[: args.slowest]:
+        print(f"  {took:5.1f} с  {label}")
 
     if failures:
         print()

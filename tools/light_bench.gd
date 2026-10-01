@@ -19,6 +19,7 @@ extends Node3D
 ##     godot --path . res://tools/light_bench.tscn -- --whole --seed=2
 ##     godot --path . res://tools/light_bench.tscn -- --garage --x=16
 ##     godot --path . res://tools/light_bench.tscn -- --floors --quality=3 --native
+##     godot --path . res://tools/light_bench.tscn -- --floors --quality=3 --time=1
 ##     godot --path . res://tools/light_bench.tscn -- --shot=screens/bench.png --index=15
 ##     godot --path . res://tools/light_bench.tscn -- --probe --floor=6 --native
 ##     godot --path . res://tools/light_bench.tscn -- --probe --floor=6 --corpses=40
@@ -73,6 +74,9 @@ func _ready() -> void:
 	for argument: String in OS.get_cmdline_user_args():
 		if argument.begins_with("--seed="):
 			level.building_seed = argument.trim_prefix("--seed=").to_int()
+		elif argument.begins_with("--time="):
+			# Время суток (M24j): днём город другой — солнце и стекло с небом.
+			level.rules.time_of_day = argument.trim_prefix("--time=").to_int() as TimeOfDay.Kind
 	add_child(level)
 
 	# Не крыша, а широкий этаж: три лампы, двери с табло и агенты у них —

@@ -48,14 +48,16 @@ const CONTRAST: float = 1.12
 const SATURATION: float = 0.9
 
 
-## Воздух здания с общим тоном [param ambient] — цветом палитры раунда.
-static func environment(ambient: Color) -> Environment:
+## Воздух здания с общим тоном [param ambient] — цветом палитры раунда — во
+## время суток [param time] (ADR-0051): днём здание светлее и без ламп, тон
+## кадра — свой на каждое время. Ночь — как до M24j.
+static func environment(ambient: Color, time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT) -> Environment:
 	var air := Environment.new()
 	air.background_mode = Environment.BG_COLOR
 	air.background_color = SKY
 	air.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	air.ambient_light_color = ambient
-	air.ambient_light_energy = AMBIENT_ENERGY
+	air.ambient_light_color = TimeOfDay.ambient(time, ambient)
+	air.ambient_light_energy = AMBIENT_ENERGY * TimeOfDay.ambient_gain(time)
 
 	air.ssr_enabled = true
 	air.ssr_max_steps = SSR_STEPS
@@ -66,7 +68,9 @@ static func environment(ambient: Color) -> Environment:
 
 	air.volumetric_fog_enabled = true
 	air.volumetric_fog_density = FOG_DENSITY
-	air.volumetric_fog_emission = FOG_EMISSION
+	air.volumetric_fog_emission = FOG_EMISSION.lerp(
+		TimeOfDay.HORIZON[time] * 0.08, TimeOfDay.daylight(time)
+	)
 
 	air.glow_enabled = true
 	air.glow_intensity = GLOW_INTENSITY
@@ -77,18 +81,22 @@ static func environment(ambient: Color) -> Environment:
 
 	air.adjustment_enabled = true
 	air.adjustment_contrast = CONTRAST
-	air.adjustment_saturation = SATURATION
-	air.adjustment_color_correction = noir_curve()
+	air.adjustment_saturation = TimeOfDay.SATURATION[time]
+	air.adjustment_color_correction = grade_curve(time)
 	Graphics.apply_to(air)
 	return air
 
 
 ## Кривые тона: градиент, по которому каждый канал переводится из своего
-## значения в своё. Чёрный уходит в холодный синий, белый — в тёплый.
-static func noir_curve() -> GradientTexture1D:
+## значения в своё. Ночью — нуар: чёрный уходит в холодный синий, белый — в
+## тёплый; в другое время — свой тон ([constant TimeOfDay.GRADE_SHADOW] и
+## соседи).
+static func grade_curve(time: TimeOfDay.Kind) -> GradientTexture1D:
 	var gradient := Gradient.new()
 	gradient.offsets = PackedFloat32Array([0.0, NOIR_MIDDLE_AT, 1.0])
-	gradient.colors = PackedColorArray([NOIR_SHADOW, NOIR_MIDDLE, NOIR_LIGHT])
+	gradient.colors = PackedColorArray(
+		[TimeOfDay.GRADE_SHADOW[time], TimeOfDay.GRADE_MIDDLE[time], TimeOfDay.GRADE_LIGHT[time]]
+	)
 	var curve := GradientTexture1D.new()
 	curve.gradient = gradient
 	return curve

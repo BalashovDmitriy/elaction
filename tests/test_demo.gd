@@ -209,11 +209,14 @@ func test_game_over_waits_for_the_last_death() -> void:
 	assert_false(menu.visible, "в кадр смерти меню нет")
 	assert_false(get_tree().paused, "мир ещё идёт — медленно")
 	assert_lt(Engine.time_scale, 1.0, "замедлен")
-	# Кадрами дерева по настоящим часам: они идут и на паузе, а ожидание GUT
-	# под паузой встаёт вместе со зданием.
-	var until := Time.get_ticks_msec() + int((LastDeath.DURATION + 0.5) * 1000.0)
-	while Time.get_ticks_msec() < until:
+	# Кадрами дерева: они идут и на паузе, а ожидание GUT под паузой встаёт
+	# вместе со зданием. Время — шагами кадров без замедления, как его считает
+	# [LastDeath], а не по часам: под `--fixed-fps` кадры бегут быстрее часов,
+	# и за две секунды часов пункты успевали разблокироваться (run_tests.py).
+	var waited := 0.0
+	while waited < LastDeath.DURATION + 0.1:
 		await get_tree().process_frame
+		waited += get_process_delta_time() / maxf(Engine.time_scale, 0.001)
 	assert_true(menu.visible, "потом — конец партии")
 	assert_eq(menu.current_page(), Menu.Page.GAME_OVER)
 	assert_true(get_tree().paused, "здание замерло")
@@ -243,9 +246,10 @@ func test_escape_during_the_last_death_does_not_resume() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	Input.action_release(&"pause")
-	var until := Time.get_ticks_msec() + int((LastDeath.DURATION + 0.5) * 1000.0)
-	while Time.get_ticks_msec() < until:
+	var waited := 0.0
+	while waited < LastDeath.DURATION + 0.5:
 		await get_tree().process_frame
+		waited += get_process_delta_time() / maxf(Engine.time_scale, 0.001)
 	var menu := main.get_node("Menu") as Menu
 	assert_true(menu.visible, "конец партии показан")
 	assert_eq(menu.current_page(), Menu.Page.GAME_OVER)

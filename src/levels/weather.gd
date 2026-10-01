@@ -16,23 +16,19 @@ enum Kind { CLEAR, FOG, RAIN }
 ## тумане тают уже со второго ряда.
 const CITY_FOG: Array[float] = [0.006, 0.02, 0.012]
 
-## Цвет неба и дымки города по погоде. Небо светлее домов — городская ночь
-## подсвечена снизу, — иначе силуэты кварталов на нём не читаются: на первых
-## кадрах M19 тёмные фасады сливались с тёмным небом. В тумане небо светлее
-## всего, ясная ночь темнее.
-const SKY: Array[Color] = [
-	Color(0.07, 0.08, 0.15),
-	Color(0.13, 0.14, 0.18),
-	Color(0.09, 0.10, 0.14),
-]
-
 ## Смешивается с сидом, чтобы жребий погоды не совпадал с первым жребием
 ## раскладки того же сида.
 const SALT: int = 0x5EA7_4E12
 
+## Погода, поставленная руками, или -1 — жребий по сиду. Ставят инструменты
+## кадров: сочетание времени суток и погоды снимается без подбора сида (M24j).
+static var forced: int = -1
+
 
 ## Погода здания по его сиду.
 static func of_seed(building_seed: int) -> Kind:
+	if forced >= 0:
+		return forced as Kind
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([building_seed, SALT])
 	return rng.randi_range(0, Kind.size() - 1) as Kind
@@ -41,11 +37,6 @@ static func of_seed(building_seed: int) -> Kind:
 ## Плотность дымки города при этой погоде.
 static func city_fog(kind: Kind) -> float:
 	return CITY_FOG[kind]
-
-
-## Цвет неба при этой погоде.
-static func sky(kind: Kind) -> Color:
-	return SKY[kind]
 
 
 ## Идёт ли дождь.

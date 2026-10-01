@@ -199,6 +199,7 @@ func _ready() -> void:
 	add_child(scenery)
 	scenery.build(rules, _plan, building_seed, identity)
 	scenery.catch_rain([_shell, _shafts, _ribs] as Array[Node])
+	scenery.light_outdoors([_shell, _shafts, _ribs] as Array[Node], rules)
 
 	# Otto начинает с крыши, как в оригинале, и там, где нет проёмов. Крыша —
 	# свой уровень над зданием, а не нулевой этаж: ADR-0014, пункт 1.
@@ -524,9 +525,7 @@ func _spawn_lamps() -> void:
 		_lamps.append(lamp)
 	# Тёмные этажи карты ламп не получают, и темнота им объявляется здесь же,
 	# где вешаются лампы: иначе этаж без ламп для правила темноты светел (ADR-0028).
-	for index in rules.floors:
-		if rules.is_unlit(index):
-			_lighting.mark_unlit(index)
+	_lighting.follow(rules)
 
 
 ## Выход из здания. Без всех документов в подвал не попасть — его запирает
@@ -579,8 +578,7 @@ func _on_lamp_crushed(agent: Enemy) -> void:
 ## Гасить нечего: свет лампы ушёл вместе с ней. Здесь остаётся правило —
 ## запомнить темноту; кто в ней стоит, пересчитает [method _shroud_agents].
 func _on_lamp_fell(index: int, x: float) -> void:
-	_lighting.darken(index, x)
-	if index == rules.floors - 1 and _garage != null:
+	if _lighting.darken(index, x) and index == rules.floors - 1 and _garage != null:
 		# Светильники паркинга в зоне лампы гаснут вместе с ней.
 		_garage.darken(x)
 	_shroud_agents()

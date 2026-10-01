@@ -29,6 +29,7 @@ SECTIONS = {
     "Люди и машины": "UI_CREDITS_ACTORS",
     "Обстановка и крыша": "UI_CREDITS_PROPS",
     "Фактуры": "UI_CREDITS_TEXTURES",
+    "Город и небо": "UI_CREDITS_CITY",
     "Звук": "UI_CREDITS_SOUND",
     "Шрифты": "UI_CREDITS_FONTS",
 }

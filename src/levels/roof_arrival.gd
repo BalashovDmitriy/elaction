@@ -88,6 +88,8 @@ func begin(host: Node3D, otto: Otto, landing: Vector2, bounds: Rect2) -> void:
 	var obstacles := roof_obstacles(host, deck, [otto] as Array[Node])
 	_helicopter = Helicopter.new()
 	host.add_child(_helicopter)
+	# Вертолёт снаружи: днём на нём солнце (ADR-0051).
+	Outdoors.mark(_helicopter)
 	_helicopter.avoid(obstacles)
 	# Над высокой техникой — башней, антенной — вертолёт висит выше обычного.
 	var hover := _helicopter.safe_hover(WorldSpace.to_scene(landing - Vector2(0.0, HOVER_HEIGHT)))
