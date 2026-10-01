@@ -322,8 +322,7 @@ def _compose() -> None:
         "density": DENSITY,
         "rows": [{"name": name, "height": h} for name, h in ROWS],
     }
-    (TARGET / "facade_layout.json").write_text(json.dumps(layout, indent=2) + "
-", encoding="utf-8")
+    (TARGET / "facade_layout.json").write_text(json.dumps(layout, indent=2) + chr(10), encoding="utf-8")
     print(f"записан атлас {width * len(names)}×{height} в {TARGET}")
 
 
