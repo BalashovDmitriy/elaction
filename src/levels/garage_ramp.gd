@@ -97,7 +97,9 @@ func build(rules: BuildingRules, building_seed: int = 1) -> void:
 	_weather = Weather.of_seed(building_seed)
 	_street_node = ExitStreet.new()
 	add_child(_street_node)
-	_street_node.build(_left, _street, building_seed, _weather)
+	_street_node.build(_left, _street, building_seed, _weather, rules.time_of_day)
+	# Улица — снаружи: днём на ней солнце здания (ADR-0052, решение 3).
+	Outdoors.mark(_street_node)
 	_build_slabs()
 	_build_soil()
 	_build_street_edge()

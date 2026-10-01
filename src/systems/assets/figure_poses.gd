@@ -386,6 +386,50 @@ static func _add_takedown_poses(table: Dictionary) -> void:
 	)
 
 
+## Позы вступления (ADR-0052, решение 6) и пилота вертолёта.
+##
+## Проём вертолёта ниже роста Otto: выглядывая, он пригибается — колени
+## согнуты, корпус вперёд, голова к крыше внизу, руки на раме. Сидит на пороге
+## лицом к камере: бёдра вперёд, голени свисают, руки упёрты в порог; берясь
+## за трос, тянет обе руки вверх и вперёд, к стреле лебёдки.
+static func _add_arrival_poses(table: Dictionary) -> void:
+	table["peek"] = (
+		Pose
+		. make(Vector2(38.0, 30.0), Vector2(70.0, 25.0))
+		. bent_at(Vector2(55.0, 48.0), Vector2(55.0, 20.0))
+		. leaned(34.0, 18.0)
+	)
+	table["sit_edge"] = (
+		Pose
+		. make(Vector2(88.0, 82.0), Vector2(-12.0, -12.0))
+		. bent_at(Vector2(84.0, 92.0), Vector2(18.0, 18.0))
+		. leaned(4.0, 12.0)
+		. spread_by(-6.0)
+	)
+	table["sit_grab"] = (
+		Pose
+		. make(Vector2(84.0, 80.0), Vector2(150.0, 142.0))
+		. bent_at(Vector2(80.0, 88.0), Vector2(14.0, 20.0))
+		. leaned(-6.0, -20.0)
+		. spread_by(-6.0)
+		. reached_in(22.0)
+	)
+	# Пилот в кресле: руки на ручке и рычаге, взгляд вперёд; кивок — голова
+	# вниз. Заземляет риг по ступням — пилота сажает вертолёт по месту кресла.
+	table["pilot_sit"] = (
+		Pose
+		. make(Vector2(85.0, 85.0), Vector2(38.0, 30.0))
+		. bent_at(Vector2(80.0, 80.0), Vector2(60.0, 70.0))
+		. leaned(-4.0, 0.0)
+	)
+	table["pilot_nod"] = (
+		Pose
+		. make(Vector2(85.0, 85.0), Vector2(38.0, 30.0))
+		. bent_at(Vector2(80.0, 80.0), Vector2(60.0, 70.0))
+		. leaned(2.0, 28.0)
+	)
+
+
 static func _build_table() -> Dictionary:
 	var table := {}
 	# Первый кадр стойки как есть: основа всех поз кодом и запасная поза.
@@ -416,6 +460,7 @@ static func _build_table() -> Dictionary:
 		. spread_by(-18.0)
 		. reached_in(25.0)
 	)
+	_add_arrival_poses(table)
 	# Залёгший под пулю агент (ADR-0016, пункт 2). Лежит лицом вниз, руки со
 	# стволом вытянуты вперёд по полу — от трупа на спине отличается сразу.
 	# Угол рук — наклон тела плюс 90: так рука ложится вдоль пола. Голова

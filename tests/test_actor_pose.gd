@@ -41,6 +41,8 @@ func test_every_pose_of_otto_is_reachable() -> void:
 
 	# Трос выбирает не состояние, а тот, кто везёт ([member Otto.ride_look]).
 	shown.append(ActorPose.ROPE)
+	# И позы вступления — их ставит вертолёт ([member Otto.ride_pose]).
+	shown.append_array(ActorPose.ARRIVAL_POSES)
 	for pose: String in ActorPose.OTTO_POSES:
 		assert_true(shown.has(pose), "поза %s кому-то нужна" % pose)
 	# И наоборот — как у агента: показать можно только нарисованное. Без этого

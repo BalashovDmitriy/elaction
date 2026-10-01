@@ -150,6 +150,8 @@ var _room_seed: int = 0
 var _room_span := Vector2(-INF, INF)
 var _furnished: bool = false
 var _room_unlit: bool = false
+var _room_time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT
+var _room_weather: Weather.Kind = Weather.Kind.CLEAR
 ## Вид двери по типу здания (ADR-0048): филёнки и дерево у отеля, стекло и
 ## алюминий у офиса. Без здания — отель, как до M24i.
 var _style := BuildingStyle.new()
@@ -423,10 +425,18 @@ func _refresh_look() -> void:
 ## середины двери: комната не выходит за него ([method DoorRoom.build]).
 ##
 ## [param unlit] — этаж двери тёмный: комната за ней без своего света.
+## [param time] и [param weather] — что за окном комнаты (ADR-0052, решение 5).
 func furnish(
-	identity: BuildingIdentity, seed: int, span: Vector2 = Vector2(-INF, INF), unlit: bool = false
+	identity: BuildingIdentity,
+	seed: int,
+	span: Vector2 = Vector2(-INF, INF),
+	unlit: bool = false,
+	time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT,
+	weather: Weather.Kind = Weather.Kind.CLEAR
 ) -> void:
 	_room_unlit = unlit
+	_room_time = time
+	_room_weather = weather
 	_room_identity = identity
 	_room_seed = seed
 	_room_span = span
@@ -444,7 +454,9 @@ func _open_the_room(along: float) -> void:
 		return
 	if along > 0.0 and _room == null:
 		var hotel := _room_identity == null or _room_identity.is_hotel()
-		_room = DoorRoom.build(hotel, _room_seed, _room_identity, _room_span, _room_unlit)
+		_room = DoorRoom.build(
+			hotel, _room_seed, _room_identity, _room_span, _room_unlit, _room_time, _room_weather
+		)
 		add_child(_room)
 	elif along <= 0.0 and _room != null:
 		_room.queue_free()

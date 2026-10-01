@@ -19,15 +19,12 @@ signal car_started
 signal building_cleared
 
 ## Сколько кадров физики [method wait_for_the_landing] ждёт по умолчанию:
-## вступление с вертолётом идёт около 4.5 с — 270 шагов без ускорения времени,
-## остальное — запас (ADR-0038, решение 1).
-const LANDING_PATIENCE: int = 480
+## полное вступление с вертолётом идёт до 12 с — 720 шагов без ускорения
+## времени, остальное — запас (ADR-0038, решение 1; ADR-0052, решение 6).
+const LANDING_PATIENCE: int = 900
 
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 const ESCALATOR_SCENE := preload("res://src/systems/escalators/escalator.tscn")
-## Кусок этажа уже этого, м, — тупик, а не своя сторона: возвращение в игру
-## ищет место на всём этаже.
-const RESPAWN_POCKET: float = 3.0
 const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 const LAMP_SCENE := preload("res://src/systems/lighting/lamp.tscn")
@@ -109,6 +106,9 @@ class AgentPost:
 ## Что за здание: отель или офис и его имя (ADR-0033, решение 1).
 var identity: BuildingIdentity = null
 
+## Полное вступление — в первом здании партии, 10–12 с; в остальных и в тестах
+## — короткое (ADR-0052, решение 6). Ставит [Main] до входа в дерево.
+var full_intro: bool = false
 var _plan: BuildingPlan
 var _doors: Array[Door] = []
 var _cars: Array[ElevatorCar] = []
@@ -214,7 +214,9 @@ func _ready() -> void:
 	if GameState.instance().alarm.raised:
 		# Здание заведено уже при включённой сирене — редкость, но бывает.
 		_on_alarm_raised()
-	_arrival.begin(self, otto, landing, Rect2(0.0, 0.0, rules.width, rules.total_height()))
+	var bounds := Rect2(0.0, 0.0, rules.width, rules.total_height())
+	var daytime := TimeOfDay.is_daytime(rules.time_of_day)
+	_arrival.begin(self, otto, landing, bounds, full_intro, daytime)
 
 
 ## Гасит всё, что уехало из кадра. Ламп в здании тридцать, а в кадр влезает
@@ -342,6 +344,11 @@ func wait_for_the_landing(patience: int = LANDING_PATIENCE) -> bool:
 	return otto.is_grounded()
 
 
+## Вступление здания — для тестов и кадров: какой шаг идёт, полное ли.
+func arrival() -> RoofArrival:
+	return _arrival
+
+
 ## Пропускает вступление: Otto сразу на крыше, вертолёт уходит. Возвращает,
 ## шло ли вступление, — по этому [Main] решает, пауза это или пропуск.
 func skip_the_intro() -> bool:
@@ -412,7 +419,7 @@ func _physics_process(delta: float) -> void:
 	if _arrival.is_playing():
 		_arrival.advance(delta)
 		return
-	_arrival.linger()
+	_arrival.linger(delta)
 
 	# Кадр правил, а не сглаженный кадр игрока: тот едет в _process по настенным
 	# часам, и полоса выпуска агентов после скачка Otto зависела от скорости
@@ -476,13 +483,15 @@ func _spawn_doors() -> void:
 	# кто начинает партию. Здесь объявляется только, сколько здесь документов.
 	var game := GameState.instance()
 	var documents := 0
+	var sky := Weather.of_seed(building_seed)
 	for spot in _plan.doors:
 		var door := DOOR_SCENE.instantiate() as Door
 		door.position = WorldSpace.to_scene(Vector2(spot.x, rules.floor_surface(spot.floor_index)))
 		door.has_document = spot.has_document
 		var room_seed := hash([building_seed, spot.floor_index, roundi(spot.x * 10.0)])
 		var span := rules.floor_span(spot.floor_index) - Vector2(spot.x, spot.x)
-		door.furnish(identity, room_seed, span, rules.is_unlit(spot.floor_index))
+		var unlit := rules.is_unlit(spot.floor_index)
+		door.furnish(identity, room_seed, span, unlit, rules.time_of_day, sky)
 		add_child(door)
 		_doors.append(door)
 		door.otto_hid.connect(_on_otto_hid.bind(door))
@@ -886,6 +895,8 @@ func _release_agent(post: AgentPost) -> Enemy:
 	)
 	agent.set_threat(_difficulty(), rules.skill, GameState.instance().alarm.raised)
 	agent.set_late(post.slot >= 2)
+	# Шаг агента — по полу здания, как у Otto на этажах.
+	agent.step_sound = PlaceSound.step_at(false, identity)
 	if _alert_left > 0.0:
 		agent.alert_for(_alert_left)
 	agent.died.connect(_on_agent_died.bind(post))
@@ -899,6 +910,8 @@ func _on_alarm_raised() -> void:
 	# Сирена работает с M5b, а звучать ей было нечем: теперь вместо темы здания
 	# идёт мотив тревоги, и снять его можно только новым зданием.
 	Sounds.play_music(Sounds.ALARM_THEME, building_seed)
+	# Сама сирена — в миг тревоги, поверх смены трека (ADR-0052, решение 7).
+	Sounds.play(Sounds.ALARM)
 	for car in _cars:
 		car.set_response_delay(ALARM_CAR_DELAY)
 	for agent in agents():
@@ -963,34 +976,10 @@ func _respawn_otto() -> void:
 	var surface := rules.floor_surface(index)
 	otto.global_position = WorldSpace.to_scene(Vector2(_safest_x(index), surface))
 	otto.revive()
+	Sounds.play(Sounds.RESPAWN)
 	RunLog.write("respawn", {"at": RunLog.at(otto), "floor": index})
 
 
 func _safest_x(index: int) -> float:
-	var spots := _plan.safe_spots(rules, index)
-	if spots.is_empty():
-		return _plan.safe_x(rules, index)
-	# Своя сторона этажа, а не та, что за стеной или проёмом. Но не карман:
-	# между стеной и шахтой бывает тупик в полтора метра, и вернувшийся туда Otto
-	# уходил бы из него только кабиной, под огнём из-за шахты, — и погибал там
-	# раз за разом (M24g, сид 3). Тогда — весь этаж.
 	var from_x := WorldSpace.to_plane(otto.global_position).x
-	var own := _plan.spots_on_the_same_piece(rules, index, from_x, spots)
-	var sorted := own.duplicate()
-	sorted.sort()
-	if not own.is_empty() and sorted[sorted.size() - 1] - sorted[0] >= RESPAWN_POCKET:
-		spots = own
-
-	var agents := _agents_on(index)
-	var best := spots[0]
-	var best_gap := -1.0
-	for x: float in spots:
-		var gap := INF
-		for agent in agents:
-			if agent.is_dead():
-				continue
-			gap = minf(gap, absf(agent.global_position.x - x))
-		if gap > best_gap:
-			best_gap = gap
-			best = x
-	return best
+	return RespawnSpot.choose(_plan, rules, index, from_x, _agents_on(index))

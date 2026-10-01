@@ -10,6 +10,10 @@ extends Node3D
 ## Запуск:
 ##     godot --path . res://tools/room_shot.tscn
 ##     godot --path . res://tools/room_shot.tscn -- --folder=M24i
+##     godot --path . res://tools/room_shot.tscn -- --folder=M24k --time=1 --weather=2
+##
+## `--time` — время суток ([enum TimeOfDay.Kind]) и `--weather` — погода за окном
+## (ADR-0052, решение 5): днём в комнате солнце из окна.
 
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 
@@ -21,12 +25,18 @@ const SETTLE_FRAMES: int = 20
 
 var _folder: String = "M24i"
 var _walls: Array[Node3D] = []
+var _time: int = TimeOfDay.Kind.NIGHT
+var _weather: int = Weather.Kind.CLEAR
 
 
 func _ready() -> void:
 	for argument: String in OS.get_cmdline_user_args():
 		if argument.begins_with("--folder="):
 			_folder = argument.trim_prefix("--folder=")
+		elif argument.begins_with("--time="):
+			_time = clampi(argument.trim_prefix("--time=").to_int(), 0, 3)
+		elif argument.begins_with("--weather="):
+			_weather = clampi(argument.trim_prefix("--weather=").to_int(), 0, 2)
 	DirAccess.make_dir_recursive_absolute("res://screens/%s" % _folder)
 	SCREENSHOTTER.mark_ignored_by_engine(ProjectSettings.globalize_path("res://screens"))
 	get_window().size = Vector2i(1920, 1080)
@@ -50,7 +60,15 @@ func _stage() -> void:
 	for index: int in PER_ROW * 2:
 		var is_hotel := index < PER_ROW
 		var spot := Vector3((index % PER_ROW) * STEP, -(index / PER_ROW) * ROW_STEP, 0.0)
-		var room := DoorRoom.build(is_hotel, index * 7919 + 13, hotel if is_hotel else office)
+		var room := DoorRoom.build(
+			is_hotel,
+			index * 7919 + 13,
+			hotel if is_hotel else office,
+			Vector2(-INF, INF),
+			false,
+			_time as TimeOfDay.Kind,
+			_weather as Weather.Kind
+		)
 		room.position = spot
 		add_child(room)
 		var wall := _corridor_wall()
@@ -115,6 +133,6 @@ func _run() -> void:
 
 func _save(shot: String) -> void:
 	var image := get_viewport().get_texture().get_image()
-	var path := "res://screens/%s/%s.png" % [_folder, shot]
+	var path := "res://screens/%s/%s_t%d_w%d.png" % [_folder, shot, _time, _weather]
 	image.save_png(path)
 	print(ProjectSettings.globalize_path(path))

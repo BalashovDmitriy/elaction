@@ -18,6 +18,11 @@ extends RefCounted
 ## кабины рвётся, и части внутри уезжают отдельным [CorpsePiece]. Без крови
 ## тело не рвётся: под днищем оно исчезает целиком.
 
+## Через сколько после начала падения тело бьётся о пол, с, и докуда это
+## слышно, м.
+const THUD_AFTER: float = 0.4
+const THUD_REACH: float = 16.0
+
 ## Группа упавших тел: по ней кабина ищет, кого рвать стенкой.
 const GROUP := &"corpses"
 ## Слой трупов в `project.godot`.
@@ -90,6 +95,17 @@ func fall(velocity: Vector3) -> void:
 	var at: Variant = _holder.get_meta(HIT_POINT) if _holder.has_meta(HIT_POINT) else null
 	ragdoll.start(velocity, impulse, at)
 	_holder.add_to_group(GROUP)
+	# Тело оземь — чуть позже начала падения, когда оно долетело до пола.
+	if _holder.is_inside_tree():
+		var timer := _holder.get_tree().create_timer(THUD_AFTER, false)
+		timer.timeout.connect(_thud)
+
+
+## Удар тела о пол на месте тела (ADR-0052, решение 7).
+func _thud() -> void:
+	if is_instance_valid(_holder) and _holder.is_inside_tree():
+		var parent := _holder.get_parent()
+		Sounds.play_at(parent, Sounds.BODY_FALL, _holder.global_position, THUD_REACH)
 
 
 ## Тело встаёт: Otto воскрес. Скелет собирается заново — отрезанное кабиной

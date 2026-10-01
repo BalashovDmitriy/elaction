@@ -51,6 +51,35 @@ const OFFICE_FLOOR := Color(0.26, 0.28, 0.31)
 const CEILING := Color(0.85, 0.83, 0.8)
 const WINDOW_FRAME := Color(0.9, 0.88, 0.84)
 const WINDOW_SHADER := preload("res://src/levels/room_window.gdshader")
+## Вид за окном по времени суток (ADR-0052, решение 5): верх неба, низ неба у
+## домов и сами дома, по [enum TimeOfDay.Kind]. Ночь — прежняя, M24i.
+const WINDOW_SKY_TOP: Array[Color] = [
+	Color(0.42, 0.58, 0.84),
+	Color(0.36, 0.6, 0.92),
+	Color(0.16, 0.12, 0.32),
+	Color(0.02, 0.03, 0.08)
+]
+const WINDOW_SKY_LOW: Array[Color] = [
+	Color(0.98, 0.78, 0.64), Color(0.72, 0.84, 0.96), Color(0.98, 0.52, 0.3), Color(0.1, 0.09, 0.2)
+]
+const WINDOW_BLOCK: Array[Color] = [
+	Color(0.36, 0.36, 0.42),
+	Color(0.44, 0.47, 0.52),
+	Color(0.08, 0.07, 0.11),
+	Color(0.015, 0.018, 0.03)
+]
+const WINDOW_GLOW: Array[float] = [1.0, 1.0, 1.25, 1.4]
+## Облачность за окном: в туман и дождь небо и дома уходят к серому.
+const WINDOW_OVERCAST := Color(0.5, 0.52, 0.56)
+const WINDOW_OVERCAST_SHARE: float = 0.6
+## Солнце из окна днём (ADR-0052, решение 5): пятно на полу и мебели. Свой
+## источник вместо света под потолком — комнат открыто одна-две, бюджет тот
+## же. Без тени: тень от рамы дороже, чем видна.
+const SUN_ENERGY: float = 4.0
+const SUN_RANGE: float = 5.5
+const SUN_ANGLE: float = 21.0
+## Насколько солнце падает вниз из окна, градусы.
+const SUN_PITCH: float = 44.0
 ## Картины и доски на стене комнаты — те же, что в коридоре.
 const HOTEL_ART: PackedStringArray = ["painting", "wall_art_02", "wall_art_03", "wall_art_05"]
 const OFFICE_ART: PackedStringArray = ["whiteboard", "calendar", "corkboard", "analog_clock"]
@@ -62,23 +91,31 @@ var hotel: bool = true
 ## Этаж тёмный по правилам ROM: своего света у комнаты нет, светится только
 ## окно с городом — темнота этажа не нарушается (решение пользователя, M24i).
 var dark: bool = false
+## Время суток за окном: днём свет в комнате не горит, светит солнце.
+var time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT
+var weather: Weather.Kind = Weather.Kind.CLEAR
 
 
 ## Собирает комнату: [param is_hotel] — номер отеля или кабинет, [param seed] —
 ## жребий двери, [param identity] — здание, его отделка. [param span] — этаж
 ## от стены до стены по X двери: за его наружные стены комната не выходит.
 ## [param unlit] — этаж тёмный: комната без своего света ([member dark]).
+## [param when] и [param sky] — время суток и погода за окном.
 static func build(
 	is_hotel: bool,
 	seed: int,
 	identity: BuildingIdentity = null,
 	span: Vector2 = Vector2(-INF, INF),
-	unlit: bool = false
+	unlit: bool = false,
+	when: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT,
+	sky: Weather.Kind = Weather.Kind.CLEAR
 ) -> DoorRoom:
 	var room := DoorRoom.new()
 	room.name = "Room"
 	room.hotel = is_hotel
 	room.dark = unlit
+	room.time = when
+	room.weather = sky
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
 	# У крайнего места этажа до наружной стены 2.4 м, а комната со сдвигом
@@ -87,14 +124,23 @@ static func build(
 	var half := (WIDTH + WALL) * 0.5
 	var shift := clampf(rng.randf_range(-SHIFT, SHIFT), span.x + half, span.y - half)
 	room._shell(shift, identity)
-	room._window(shift + rng.randf_range(-0.3, 0.3), rng)
+	var window_x := shift + rng.randf_range(-0.3, 0.3)
+	room._window(window_x, rng)
 	if is_hotel:
 		room._furnish_hotel(rng)
 	else:
 		room._furnish_office(rng)
-	if not unlit:
+	if room.is_sunlit():
+		room._sun_in(window_x)
+	elif not unlit:
 		room._light(shift, is_hotel)
 	return room
+
+
+## Светло ли за окном: утро и день. Тогда свет в комнате не горит, а из окна
+## падает солнце — или, в непогоду, просто дневной свет.
+func is_sunlit() -> bool:
+	return TimeOfDay.is_daytime(time)
 
 
 ## Где задняя стена комнаты, Z сцены.
@@ -134,6 +180,7 @@ func _window(x: float, rng: RandomNumberGenerator) -> void:
 	var look := ShaderMaterial.new()
 	look.shader = WINDOW_SHADER
 	look.set_shader_parameter(&"seed", rng.randf() * 100.0)
+	_dress_window(look)
 	look.set_shader_parameter(&"blinds", 0.0 if hotel else 1.0)
 	glass.material = look
 	var pane := MeshInstance3D.new()
@@ -163,6 +210,23 @@ func _window(x: float, rng: RandomNumberGenerator) -> void:
 		_put("curtains", x, 0.12, 0.0, WINDOW.x + 0.9)
 
 
+## Цвета вида за окном по времени суток и погоде.
+func _dress_window(look: ShaderMaterial) -> void:
+	var overcast := WINDOW_OVERCAST_SHARE if weather != Weather.Kind.CLEAR else 0.0
+	var top := WINDOW_SKY_TOP[time]
+	var low := WINDOW_SKY_LOW[time]
+	var block := WINDOW_BLOCK[time]
+	if is_sunlit():
+		top = top.lerp(WINDOW_OVERCAST, overcast)
+		low = low.lerp(WINDOW_OVERCAST, overcast)
+		block = block.lerp(WINDOW_OVERCAST.darkened(0.3), overcast * 0.5)
+	look.set_shader_parameter(&"sky_top", top)
+	look.set_shader_parameter(&"sky_low", low)
+	look.set_shader_parameter(&"block", block)
+	look.set_shader_parameter(&"glow", WINDOW_GLOW[time])
+	look.set_shader_parameter(&"lit_share", 0.38 * TimeOfDay.lit_windows(time))
+
+
 ## Номер отеля: кровать изголовьем к стене, тумба с лампой, ковёр, картина над
 ## кроватью; кровать слева или справа от окна — жребий.
 func _furnish_hotel(rng: RandomNumberGenerator) -> void:
@@ -174,7 +238,8 @@ func _furnish_hotel(rng: RandomNumberGenerator) -> void:
 	var bed_size := _put(bed, bed_x, 0.02, 0.0)
 	var stand_x := bed_x - side * (bed_size.x * 0.5 + 0.35)
 	_put("night_stand" if rng.randf() < 0.5 else "night_stand_b", stand_x, 0.05, 0.0)
-	if not dark:
+	# Днём лампа на тумбе погашена, как и свет под потолком.
+	if not dark and not is_sunlit():
 		_lamp_glow(stand_x)
 	_put("rug", bed_x * 0.5, bed_size.z * 0.55, 0.0, 1.8)
 	_hang(HOTEL_ART[rng.randi_range(0, HOTEL_ART.size() - 1)], bed_x, 1.75)
@@ -250,6 +315,27 @@ func _light(shift: float, is_hotel: bool) -> void:
 	light.shadow_enabled = false
 	light.position = Vector3(shift, HEIGHT - 0.35, WorldSpace.BACK_WALL_Z - DEPTH * 0.55)
 	add_child(light)
+
+
+## Солнце из окна: прожектор за стеклом светит в комнату вниз, к коридору.
+## В непогоду — тот же свет, но рассеянный и холодный.
+func _sun_in(x: float) -> void:
+	var sun := SpotLight3D.new()
+	sun.name = "WindowSun"
+	var colour := TimeOfDay.sun_colour(time)
+	var energy := SUN_ENERGY
+	if weather != Weather.Kind.CLEAR:
+		colour = colour.lerp(WINDOW_OVERCAST.lightened(0.4), 0.7)
+		energy *= 0.55
+	sun.light_color = colour
+	sun.light_energy = energy
+	sun.spot_range = SUN_RANGE
+	sun.spot_angle = SUN_ANGLE
+	sun.shadow_enabled = false
+	sun.position = Vector3(x, WINDOW_SILL + WINDOW.y * 0.7, back_z() + 0.05)
+	# Прожектор светит по −Z; разворот на 180° — в комнату, наклон — вниз.
+	sun.rotation = Vector3(-deg_to_rad(SUN_PITCH), PI, 0.0)
+	add_child(sun)
 
 
 ## Тёплый огонёк лампы на тумбе.

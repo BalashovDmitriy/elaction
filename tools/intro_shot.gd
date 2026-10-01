@@ -1,6 +1,7 @@
 extends Node3D
 
-## Снимки вступления M24b: вертолёт привозит Otto на крышу (ADR-0038, решение 1).
+## Снимки вступления: вертолёт привозит Otto на крышу (ADR-0038, решение 1;
+## режиссура M24k — ADR-0052, решение 6).
 ##
 ## Сценарий съёмки начинает с приземления — ждёт, пока Otto встанет, — и сама
 ## сценка в него не попадает. Инструмент собирает здание и снимает вступление по
@@ -8,9 +9,15 @@ extends Node3D
 ## на тросе, приземлился, вертолёт уходит. `--model` — модель крупно, на сером
 ## фоне с ровным светом: проверить, куда смотрит нос и где винт.
 ##
+## С M24k снимок — на каждый шаг вступления ([enum RoofArrival.Step]) и на
+## уход: дверь задвигается, пилот кивает, вертолёт кренится. `--full` — полное
+## вступление первого здания, иначе короткое; `--time=0..3` — время суток
+## ([enum TimeOfDay.Kind]); `--series=N` — ещё и кадр каждые N шагов физики,
+## покадровой серией.
+##
 ## Запуск:
 ##     godot --path . res://tools/intro_shot.tscn
-##     godot --path . res://tools/intro_shot.tscn -- --folder=M24b --seed=3 --building=2
+##     godot --path . res://tools/intro_shot.tscn -- --folder=M24k --seed=3 --full --time=1
 ##     godot --path . res://tools/intro_shot.tscn -- --model
 ##
 ## Кадры ложатся в screens/<папка>/ — папка локальная, в репозиторий не идёт.
@@ -28,6 +35,11 @@ var _seed: int = 1
 var _building: int = 1
 var _folder: String = DEFAULT_FOLDER
 var _model: bool = false
+var _full: bool = false
+var _time: int = TimeOfDay.Kind.NIGHT
+var _series: int = 0
+var _shot_steps: Dictionary = {}
+var _tick: int = 0
 
 
 func _ready() -> void:
@@ -40,6 +52,12 @@ func _ready() -> void:
 			_folder = argument.trim_prefix("--folder=").strip_edges()
 		elif argument == "--model":
 			_model = true
+		elif argument == "--full":
+			_full = true
+		elif argument.begins_with("--time="):
+			_time = clampi(argument.trim_prefix("--time=").to_int(), 0, 3)
+		elif argument.begins_with("--series="):
+			_series = maxi(argument.trim_prefix("--series=").to_int(), 0)
 	DirAccess.make_dir_recursive_absolute("res://screens/%s" % _folder)
 	SCREENSHOTTER.mark_ignored_by_engine(ProjectSettings.globalize_path("res://screens"))
 	get_window().size = Vector2i(1920, 1080)
@@ -54,24 +72,32 @@ func _run() -> void:
 	GameState.instance().building = _building
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	_level.rules = BuildingRules.new()
+	_level.rules.time_of_day = _time as TimeOfDay.Kind
 	_level.building_seed = _seed
 	_level.spawn_agents = false
+	_level.full_intro = _full
 	add_child(_level)
 
-	await _frames(40)
-	await _shoot("01_flying_in")
-	if await _until(func() -> bool: return _heli() != null and _heli().is_hovering()):
-		await _frames(2)
-		await _shoot("02_hovering")
-	if await _until(func() -> bool: return _heli() != null and _heli().rope_is_down()):
-		await _shoot("03_rope_down")
-	if await _until(func() -> bool: return _falling_through()):
-		await _shoot("04_on_the_rope")
-	if await _until(func() -> bool: return not _level.is_in_the_intro()):
-		await _frames(1)
-		await _shoot("05_landed")
-	if await _until(func() -> bool: return _heli() == null or _heli().position.x > _otto_x() + 5.0):
-		await _shoot("06_leaving")
+	# Шаг за шагом: снимок — в середине каждого шага, когда поза уже встала.
+	var names := RoofArrival.Step.keys()
+	while _level.is_in_the_intro():
+		var step := _level.arrival().step()
+		_tick += 1
+		if not _shot_steps.has(step):
+			_shot_steps[step] = _tick
+		elif _tick - int(_shot_steps[step]) == 24:
+			await _shoot("%02d_%s" % [step + 1, String(names[step]).to_lower()])
+		if _series > 0 and _tick % _series == 0:
+			await _shoot("s%04d" % _tick)
+		await get_tree().physics_frame
+	await _frames(2)
+	await _shoot("10_landed")
+	if await _until(func() -> bool: return _heli() == null or _heli().door_share() < 0.5):
+		await _shoot("11_door_closing")
+	if await _until(func() -> bool: return _heli() == null or _heli().position.x > _otto_x() + 2.0):
+		await _shoot("12_leaving")
+	if await _until(func() -> bool: return _heli() == null or _heli().position.x > _otto_x() + 7.0):
+		await _shoot("13_banking")
 	get_tree().quit()
 
 
@@ -92,7 +118,6 @@ func _run_model() -> void:
 	helicopter.fly_in(Vector3.ZERO)
 	helicopter.set_physics_process(false)
 	helicopter.position = Vector3(0.0, 0.0, -1.15)
-	helicopter.lower_rope(0.0)
 	var camera := Camera3D.new()
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 	camera.size = 7.0
@@ -141,6 +166,7 @@ func _until(done: Callable) -> bool:
 func _shoot(label: String) -> void:
 	await RenderingServer.frame_post_draw
 	var image := get_viewport().get_texture().get_image()
-	var path := "res://screens/%s/intro_%s_seed%d.png" % [_folder, label, _seed]
+	var kind := "full" if _full else "short"
+	var path := "res://screens/%s/intro_%s_%s_t%d_seed%d.png" % [_folder, kind, label, _time, _seed]
 	image.save_png(path)
 	print("  %s" % ProjectSettings.globalize_path(path))

@@ -56,6 +56,14 @@ const THUNDER_NEAR: float = 1200.0
 ## Эффекты фильтров в [code]buses.tres[/code]: срез первым, громкость вторым.
 const MUFFLE_EFFECT: int = 0
 const DUCK_EFFECT: int = 1
+## Третий эффект шины SFX — сдвиг тона: в замедлении мира (добивание, последняя
+## смерть) звуки мира звучат ниже (ADR-0052, решение 7). Включён только на
+## время замедления — сдвиг тона дорог.
+const SLOW_EFFECT: int = 2
+## Тон звуков мира в самом глубоком замедлении и с какого темпа мира он
+## начинает опускаться.
+const SLOWEST_PITCH: float = 0.62
+const SLOW_FROM: float = 0.98
 
 static var _instance: AudioDirector = null
 
@@ -86,6 +94,7 @@ var _muffled_by: Dictionary = {}
 var _world_muffled: bool = false
 var _outdoors: bool = true
 var _weather: Weather.Kind = Weather.Kind.CLEAR
+var _time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT
 ## Какой по счёту город звучит. Гром назначается городу, и к следующему — в
 ## меню, в другое здание — он уже не приходит (авторевью M23).
 var _city: int = 0
@@ -129,6 +138,22 @@ func _enter_tree() -> void:
 	# первый.
 	_ambience_shot.max_polyphony = 2
 	add_child(_ambience_shot)
+
+
+## Тон звуков мира идёт за темпом мира: замедление — ниже. Темп ставят сценки
+## добивания и последней смерти ([member Engine.time_scale]); ускорение тестов
+## тон не трогает.
+func _process(_delta: float) -> void:
+	var index := AudioServer.get_bus_index(Sounds.SFX_BUS)
+	if index < 0 or AudioServer.get_bus_effect_count(index) <= SLOW_EFFECT:
+		return
+	var tempo := Engine.time_scale
+	var slow := tempo < SLOW_FROM
+	if AudioServer.is_bus_effect_enabled(index, SLOW_EFFECT) != slow:
+		AudioServer.set_bus_effect_enabled(index, SLOW_EFFECT, slow)
+	if slow:
+		var shift := AudioServer.get_bus_effect(index, SLOW_EFFECT) as AudioEffectPitchShift
+		shift.pitch_scale = lerpf(SLOWEST_PITCH, 1.0, clampf(tempo, 0.0, 1.0))
 
 
 ## Как у [GameState]: без этого статическая ссылка переживала бы сам узел, и
@@ -261,10 +286,11 @@ func set_ambience(names: PackedStringArray) -> void:
 
 ## Погода вокруг: снаружи и внутри звучат свои петли. Зовёт её город, когда
 ## строится, — и гром прежнего города с этим отменяется.
-func set_weather(weather: Weather.Kind) -> void:
+func set_weather(weather: Weather.Kind, time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT) -> void:
 	_weather = weather
+	_time = time
 	_city += 1
-	set_ambience(Sounds.weather_loops(_weather, _outdoors))
+	set_ambience(Sounds.weather_loops(_weather, _outdoors, _time))
 
 
 ## Какие петли фона звучат. Нужно тестам.
@@ -278,7 +304,7 @@ func set_outdoors(on: bool) -> void:
 	if _outdoors == on:
 		return
 	_outdoors = on
-	set_ambience(Sounds.weather_loops(_weather, _outdoors))
+	set_ambience(Sounds.weather_loops(_weather, _outdoors, _time))
 	# Гром на этажах глухой: петли внутри и так записаны из-за стекла, а
 	# фильтр шины приглушает то, что приходит снаружи.
 	_sweep(Sounds.AMBIENCE_BUS, OPEN_HZ if on else AMBIENCE_MUFFLED_HZ)

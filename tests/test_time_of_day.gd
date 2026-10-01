@@ -203,7 +203,10 @@ func _a_lamp(level: GreyboxLevel) -> Lamp:
 func _outdoor_root(node: Node, level: GreyboxLevel) -> bool:
 	var up := node.get_parent()
 	while up != null and up != level:
+		# Улица у выезда — тоже снаружи: с M24k на ней солнце (ADR-0052, решение 3).
 		if up is Helicopter or up is VerticalSign or up is RoofKit or up is BuildingRoof:
+			return true
+		if up is ExitStreet:
 			return true
 		up = up.get_parent()
 	return false

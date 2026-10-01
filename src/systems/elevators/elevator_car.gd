@@ -17,6 +17,10 @@ extends AnimatableBody3D
 ## Кабина совпала с этажом и из неё можно выйти.
 signal floor_reached(index: int)
 
+## Трогание и остановка кабины: докуда слышно, м, и насколько тише гула, дБ.
+const CLUNK_REACH: float = 12.0
+const CLUNK_DB: float = -4.0
+
 ## Докуда слышно гул кабины, м. Дальше по этажу он уже не мешает.
 const HUM_REACH: float = 10.8
 
@@ -89,6 +93,8 @@ var _deck: ElevatorCar = null
 var _deck_drop: float = 0.0
 
 var _hum: AudioStreamPlayer3D = null
+## Ехала ли кабина в прошлый шаг: по смене — звук трогания и остановки.
+var _was_moving: bool = false
 ## Огоньки на крыше: их двигает [method fit_to_story], когда меняется высота.
 var _indicators: Array[MeshInstance3D] = []
 ## Ширина кабины, м. Задаёт её [method fit_to_story] из правил здания.
@@ -222,7 +228,13 @@ func _physics_process(delta: float) -> void:
 
 	# Гул идёт, пока кабина едет. Источник позиционный: шахт в здании пять,
 	# и слышно должно быть только ту, рядом с которой стоишь.
-	Sounds.keep_playing(_hum, not is_zero_approx(_motion.velocity))
+	var moving := not is_zero_approx(_motion.velocity)
+	Sounds.keep_playing(_hum, moving)
+	if moving != _was_moving:
+		_was_moving = moving
+		# Трогается и встаёт — лязгом на своём месте (ADR-0052, решение 7).
+		var clunk := Sounds.ELEVATOR_START if moving else Sounds.ELEVATOR_STOP
+		Sounds.play_at(self, clunk, global_position, CLUNK_REACH, CLUNK_DB)
 
 	_show_arrows()
 	_crush_those_underneath(_motion.velocity)
@@ -457,6 +469,7 @@ func _crush_those_underneath(speed: float) -> void:
 			if agent.is_dead() or not _pinned(speed, agent, agent.is_on_floor(), riding):
 				continue
 			agent.kill(true)
+			Sounds.play_at(get_parent(), Sounds.CRUSH, agent.global_position, CLUNK_REACH)
 			# 300 очков — только если давит кабина, в которой едет Otto (@4A97
 			# ROM, ADR-0044, решение 7). Надбавка за темноту — та же, что у
 			# пули и лампы (ADR-0010).

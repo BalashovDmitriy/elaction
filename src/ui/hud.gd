@@ -146,6 +146,10 @@ func count_bonus(amount: int) -> void:
 		_bonus_count.kill()
 	_bonus_plate.visible = true
 	_show_bonus_value(0.0)
+	# Счётчик стрекочет, пока число набегает: запись — длиной в счёт
+	# (ADR-0052, решение 7).
+	if amount > 0:
+		Sounds.play(Sounds.BONUS_TICK)
 	_bonus_count = create_tween()
 	_bonus_count.set_pause_mode(Tween.TWEEN_PAUSE_STOP)
 	_bonus_count.tween_method(_show_bonus_value, 0.0, float(amount), BONUS_COUNT_TIME)

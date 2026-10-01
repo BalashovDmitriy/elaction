@@ -91,7 +91,7 @@ func build(
 	_rules = rules
 	_ground = WorldSpace.height_to_scene(rules.floor_surface(rules.floors - 1))
 	# Город звучит тем же, что показывает: улица, дождь или ветер (ADR-0036).
-	Sounds.set_weather(weather)
+	Sounds.set_weather(weather, time)
 	_view = SubViewport.new()
 	_view.name = "CityView"
 	_view.own_world_3d = true

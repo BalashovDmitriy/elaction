@@ -51,6 +51,12 @@ AGENT_SUIT: Rgb = (0x2F, 0x35, 0x47)
 AGENT_SUIT_SHADE: Rgb = (0x23, 0x28, 0x3A)
 AGENT_HAT: Rgb = (0x26, 0x2B, 0x3B)
 AGENT_SKIN: Rgb = (0xC0, 0x8F, 0x68)
+# Пилот вертолёта вступления (ADR-0052, решение 6): оливковый лётный
+# комбинезон, светлый шлем с тёмным визором.
+PILOT_SUIT: Rgb = (0x4E, 0x55, 0x3C)
+PILOT_SUIT_SHADE: Rgb = (0x3E, 0x44, 0x30)
+PILOT_HELMET: Rgb = (0xC9, 0xCB, 0xC4)
+PILOT_SKIN: Rgb = (0xC8, 0x98, 0x70)
 
 try:
     import bpy
@@ -272,6 +278,21 @@ def _actors() -> dict[str, dict]:
             },
             "hat": True,
             "glasses": True,
+        },
+        # Пилот сидит за остеклением вертолёта и кивает на уходе: оружия нет,
+        # голову закрывает шлем с визором.
+        "pilot": {
+            "colours": {
+                "Suit": PILOT_SUIT_SHADE,
+                "Suit.001": PILOT_SUIT,
+                "Tie": PILOT_SUIT_SHADE,
+                "Skin": PILOT_SKIN,
+                "Hair": PILOT_HELMET,
+            },
+            "hat": False,
+            "glasses": False,
+            "helmet": True,
+            "gun": False,
         },
     }
 
@@ -721,6 +742,44 @@ def _hat(meshes, armature, colour: Rgb):
     return hat
 
 
+def _helmet(meshes, colour: Rgb):
+    """Лётный шлем: купол над головой ниже ушей и тёмный визор спереди."""
+    low, high = _head_box(meshes)
+    centre_x = (low.x + high.x) * 0.5
+    centre_y = (low.y + high.y) * 0.5
+    half_x = (high.x - low.x) * 0.5
+    half_y = (high.y - low.y) * 0.5
+    head_height = high.z - low.z
+    rim_z = high.z - head_height * 0.62
+
+    def build(bm) -> None:
+        # Купол ступенями: снизу шире головы, к макушке сужается.
+        _cylinder_into(bm, half_x * 1.16, half_y * 1.14, 0.97, head_height * 0.4, (centre_x, centre_y, rim_z))
+        _cylinder_into(
+            bm, half_x * 1.12, half_y * 1.1, 0.78, head_height * 0.18, (centre_x, centre_y, rim_z + head_height * 0.4)
+        )
+        _cylinder_into(
+            bm, half_x * 0.88, half_y * 0.86, 0.5, head_height * 0.1, (centre_x, centre_y, rim_z + head_height * 0.58)
+        )
+
+    helmet = _part("helmet", build, _material("helmet", colour, roughness=0.35), HEAD_BONE)
+    _trim_hair(meshes, rim_z)
+    return helmet
+
+
+def _visor(meshes):
+    """Тёмный визор шлема перед глазами — шире очков и выше."""
+    eye_low, eye_high = _material_box(meshes, "Eye")
+    front_y = eye_low.y - 0.018
+    centre_z = (eye_low.z + eye_high.z) * 0.5 + 0.012
+    span = eye_high.x - eye_low.x
+
+    def build(bm) -> None:
+        _box_into(bm, (span * 1.25, 0.012, span * 0.55), (0.0, front_y, centre_z))
+
+    return _part("visor", build, _material("visor", (0x10, 0x14, 0x1C), roughness=0.08), HEAD_BONE)
+
+
 def _trim_hair(meshes, above_z: float) -> None:
     """Удаляет грани причёски выше [param above_z]: их закрывает шляпа."""
     import bmesh
@@ -802,9 +861,12 @@ def _gun(armature):
 
 def _dress(armature, meshes, actor: dict) -> None:
     """Надевает вещи и сливает всё в один меш под скелетом."""
-    parts = [_gun(armature)]
+    parts = [_gun(armature)] if actor.get("gun", True) else []
     if actor["glasses"]:
         parts.append(_glasses(meshes))
+    if actor.get("helmet", False):
+        parts.append(_helmet(meshes, actor["colours"]["Hair"]))
+        parts.append(_visor(meshes))
     # Шляпа — своим мешем `hat` на кости головы, а не в общем теле: на ударе
     # добивания она слетает (ADR-0050), и игра прячет её, не трогая тело.
     hat = _hat(meshes, armature, actor["colours"]["Hair"]) if actor["hat"] else None

@@ -467,6 +467,7 @@ func _slow_down() -> void:
 		return
 	_time_scale_before = Engine.time_scale
 	_slowed = true
+	Sounds.play(Sounds.SLOWMO)
 	_apply_world()
 
 

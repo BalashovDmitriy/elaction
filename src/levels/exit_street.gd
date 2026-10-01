@@ -20,6 +20,12 @@ extends Node3D
 ## круги.
 ##
 ## Вид, без тел: Otto сюда не выходит, машина — вид без тела — проезжает.
+##
+## С M24k (ADR-0052, решение 3) дома через дорогу — запечённый фасад пака, как
+## у города на заднике ([method CityLook.building]), в любое время суток: днём
+## их освещает солнце здания ([Outdoors]), ночью — фонарь, неон и горящие окна.
+## Огни улицы — фонарь, неон, пятна света — горят долей
+## [method TimeOfDay.street_lights], а днём в ясную погоду погашены.
 
 ## Насколько ряд домов тянется левее торца здания, м: до края самого широкого
 ## кадра выезда, когда кадр доехал за машиной до улицы.
@@ -44,14 +50,6 @@ const HEIGHTS := Vector2(16.0, 21.0)
 const SHOP_STOREY: float = 4.2
 const CORNICE: float = 0.22
 const FACADE_DEPTH: float = 1.2
-## Тон фасада относительно дальнего города. Фасад — без освещения, как у
-## города, а в воздухе здания без освещения он выходил светлее всего кадра:
-## темнее города вдвое, и зарево улиц слабее ([constant FACADE_GLOW]).
-const FACADE_BOOST: float = 0.38
-const FACADE_GLOW: float = 0.012
-## Доля горящих окон и их яркость: ближе города, но тусклее витрин.
-const LIT_SHARE: float = 0.4
-const WINDOW_GLOW: float = 0.42
 ## Яркость витрин: стекло без освещения, и в полную силу оно выгорало в белое.
 const SHOP_GLOW: float = 0.17
 ## Витрина: цоколь под ней, высота стекла, ширина двери, м.
@@ -87,6 +85,12 @@ const ESCAPE_RAIL: float = 0.9
 ## светильник и пятно на тротуаре.
 const LAMP_HEIGHT: float = 4.6
 const LAMP_ARM: float = 1.2
+## Свет фонаря: сила, дальность, м, раствор конуса и наклон к домам, градусы
+## и радианы — светит на тротуар и витрины через дорогу.
+const LAMP_ENERGY: float = 5.0
+const LAMP_RANGE: float = 9.0
+const LAMP_ANGLE: float = 55.0
+const LAMP_LEAN: float = -0.35
 ## Пятна света на тротуаре: перед витриной и под фонарём.
 const SPILL_ENERGY: float = 0.32
 const POOL_ENERGY: float = 0.4
@@ -144,20 +148,33 @@ const COLD := Color(0.62, 0.78, 1.0)
 
 const SALT: int = 0x57_4EE7
 
+## С какой силы огней улицы горят неон и фонарь: утром — да (0.35), днём в
+## ясную — нет (ADR-0052, решение 3).
+const LIGHTS_ON: float = 0.3
+## Витрина днём: стекло в свету дня, свет комнаты за ним тусклее.
+const SHOP_GLOW_BY_DAY: float = 0.55
+## Фасад пака ставится за линию витрин на столько, м: цоколь с витринами —
+## перед ним, и грани не ложатся в одну плоскость.
+const PACK_BEHIND: float = 0.05
+
 var _left: float = 0.0
 ## Улица и верх тротуара через дорогу в плоскости правил: дома стоят на
 ## тротуаре, а не в нём.
 var _street: float = 0.0
 var _floor: float = 0.0
 var _weather: Weather.Kind = Weather.Kind.CLEAR
+var _time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT
+## Сила огней улицы, 0–1: ночью 1, днём в ясную — 0.
+var _lights: float = 1.0
+## Дома под солнцем — фасадом пака; ночью — фасадом без освещения.
+var _sunlit: bool = false
+var _blocks: Array[CityPlan.Block] = []
 var _rng := RandomNumberGenerator.new()
 var _road: StandardMaterial3D = null
 var _glow: OmniLight3D = null
+var _lamp: SpotLight3D = null
 var _rain: Array[GPUParticles3D] = []
 ## Коробки фасадов и окна — мультимешами, как у города на заднике.
-var _facades: Array[Transform3D] = []
-var _facade_tones: Array[Color] = []
-var _facade_kinds: Array[Color] = []
 var _windows: Array[Array] = [[], []]
 var _traffic: StreetTraffic = null
 ## Колода вывесок: лавки на одной улице не повторяются.
@@ -165,13 +182,22 @@ var _names: Array[String] = []
 
 
 ## Собирает улицу у левого торца здания: [param left] — торец, [param street]
-## — уровень улицы в плоскости правил.
-func build(left: float, street: float, building_seed: int, weather: Weather.Kind) -> void:
+## — уровень улицы в плоскости правил, [param time] — время суток.
+func build(
+	left: float,
+	street: float,
+	building_seed: int,
+	weather: Weather.Kind,
+	time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT
+) -> void:
 	name = "Street"
 	_left = left
 	_street = street
 	_floor = street - (KERB.y - 0.01)
 	_weather = weather
+	_time = time
+	_lights = TimeOfDay.street_lights(time, weather)
+	_sunlit = not TimeOfDay.is_night(time)
 	_rng.seed = hash([building_seed, SALT])
 	_names.assign(SHOPS)
 	for index in range(_names.size() - 1, 0, -1):
@@ -186,7 +212,7 @@ func build(left: float, street: float, building_seed: int, weather: Weather.Kind
 	_park_a_car(_left - _rng.randf_range(12.0, 17.0))
 	_traffic = StreetTraffic.new()
 	add_child(_traffic)
-	_traffic.build(_left, _street, building_seed)
+	_traffic.build(_left, _street, building_seed, time, _lights > 0.0)
 	_flush_multimeshes()
 	if Weather.is_raining(weather):
 		_build_rain()
@@ -214,7 +240,9 @@ func road() -> StandardMaterial3D:
 ## Настоящий свет улицы: горит, пока выезд в кадре. Поток тоже едет только тогда.
 func show_light(on: bool) -> void:
 	if _glow != null:
-		_glow.visible = on
+		_glow.visible = on and is_lit()
+	if _lamp != null:
+		_lamp.visible = on and is_lit()
 	if _traffic != null:
 		_traffic.set_active(on)
 
@@ -224,11 +252,23 @@ func traffic() -> StreetTraffic:
 	return _traffic
 
 
+## Горят ли огни улицы: неон, фонарь, отсвет вывески. Днём в ясную — нет.
+func is_lit() -> bool:
+	return _lights > LIGHTS_ON
+
+
+## Дома через дорогу — под солнцем, фасадом пака (не ночью).
+func is_sunlit() -> bool:
+	return _sunlit
+
+
 ## Настоящие источники улицы — для тестов бюджета.
 func lights() -> Array[Light3D]:
 	var found: Array[Light3D] = []
 	if _glow != null:
 		found.append(_glow)
+	if _lamp != null:
+		found.append(_lamp)
 	return found
 
 
@@ -238,6 +278,8 @@ func apply_graphics() -> void:
 		RainLook.scale_amount(layer, Graphics.rain_share())
 	if _glow != null:
 		_glow.light_volumetric_fog_energy = Graphics.light_in_fog()
+	if _lamp != null:
+		_lamp.light_volumetric_fog_energy = Graphics.light_in_fog()
 
 
 ## Мостовая с разметкой, бордюр и тротуар через дорогу.
@@ -318,13 +360,10 @@ func _build_house(block: CityPlan.Block, span: Vector2, face: float) -> void:
 		_at(middle, _street - SHOP_STOREY + CORNICE * 0.5, face - 0.25 + 0.08),
 		false
 	)
-	var upper := block.height - SHOP_STOREY
-	var centre := _at(middle, _street - SHOP_STOREY - upper * 0.5, face - FACADE_DEPTH * 0.5)
-	_facades.append(Transform3D(Basis.from_scale(Vector3(width, upper, FACADE_DEPTH)), centre))
-	var tone := CityLook.facade_tone(block) * FACADE_BOOST
-	_facade_tones.append(Color(tone.r, tone.g, tone.b))
-	_facade_kinds.append(CityLook.facade_custom(block))
-	_place_windows(block, span, face, upper)
+	# Фасад пака во всю высоту дома, за цоколем с витринами.
+	block.depth = FACADE_DEPTH
+	block.z = face - PACK_BEHIND - FACADE_DEPTH * 0.5
+	_blocks.append(block)
 	var shops := 2 if width >= 8.5 else 1
 	var share := width / float(shops)
 	for shop in shops:
@@ -334,39 +373,6 @@ func _build_house(block: CityPlan.Block, span: Vector2, face: float) -> void:
 			_build_open_shop(shop_middle, shop_width, face)
 		else:
 			_build_closed_shop(shop_middle, shop_width, face)
-
-
-## Окна верхних этажей — по той же сетке, что пояса и простенки шейдера
-## фасада ([code]city_facade.gdshader[/code]): окно на высоте шага над низом
-## коробки, колонки — по середине фасада.
-func _place_windows(block: CityPlan.Block, span: Vector2, face: float, upper: float) -> void:
-	var step := CityPlan.WINDOW_STEP
-	var width := span.y - span.x
-	var columns := maxi(floori(width / step.x) - 1, 1)
-	var first := width * 0.5 - float(columns - 1) * step.x * 0.5
-	var window_size := CityLook.WINDOW_SIZES[block.kind]
-	var bottom := _street - SHOP_STOREY
-	var level := 0
-	while step.y * float(level + 1) + window_size.y * 0.5 < upper - 1.4:
-		for column in columns:
-			var cell := Vector2i(column, level)
-			var lit := _rng.randf() < LIT_SHARE
-			var x := span.x + first + float(column) * step.x
-			var y := bottom - step.y * float(level + 1)
-			var place := Transform3D(
-				Basis.from_scale(CityLook.window_scale(block)), _at(x, y, face + 0.02)
-			)
-			var tone := WARM if _rng.randf() > 0.3 else COLD
-			var glow := WINDOW_GLOW if lit else 1.0
-			var colour := (
-				Color(tone.r * glow, tone.g * glow, tone.b * glow)
-				if lit
-				else CityBackdrop.WINDOW_DARK
-			)
-			(_windows[1 if lit else 0] as Array).append(
-				[place, colour, CityLook.window_custom(block, cell, lit)]
-			)
-		level += 1
 
 
 ## Лавка открыта: горящая витрина в раме, дверь со стеклом, неон над ней,
@@ -380,6 +386,8 @@ func _build_open_shop(middle: float, width: float, face: float) -> void:
 	]
 	var inside := insides[_rng.randi_range(0, insides.size() - 1)]
 	var tone := (WARM if _rng.randf() < 0.75 else COLD) * SHOP_GLOW
+	if not is_lit():
+		tone *= SHOP_GLOW_BY_DAY
 	_add_glass(Vector2(glass_x, glass_y), Vector2(glass_width, GLASS_HEIGHT), face, tone, inside)
 	var frame := GreyboxLook.metal(FRAME_TONE)
 	var front := face + 0.04
@@ -410,7 +418,7 @@ func _build_open_shop(middle: float, width: float, face: float) -> void:
 		CityLook.Inside.PLAIN
 	)
 	var neon := NEON[_rng.randi_range(0, NEON.size() - 1)]
-	_hang_sign(middle, width, face, neon, true)
+	_hang_sign(middle, width, face, neon, is_lit())
 	if _rng.randf() < 0.6:
 		_build_awning(middle, width, face)
 	_spill(Vector2(middle, width), face, tone)
@@ -465,6 +473,11 @@ func _hang_sign(middle: float, width: float, face: float, neon: Color, lit: bool
 		words.modulate = neon
 		words.outline_modulate = neon.darkened(0.45)
 		words.outline_size = 10
+	elif _sunlit:
+		# Погашенный неон днём — трубки в свету, как у вывески здания.
+		words.modulate = unlit_tube(neon)
+		words.outline_size = 0
+		words.shaded = true
 	else:
 		words.modulate = neon.darkened(0.82)
 		words.outline_size = 0
@@ -532,10 +545,14 @@ func _hang_blade(x: float, face: float) -> void:
 		label.font = NeonStyle.font(700)
 		label.font_size = 96
 		label.pixel_size = BLADE_LETTER / 96.0
-		label.modulate = neon
-		label.outline_modulate = neon.darkened(0.4)
+		if is_lit():
+			label.modulate = neon
+			label.outline_modulate = neon.darkened(0.4)
+		else:
+			label.modulate = unlit_tube(neon)
+			label.outline_modulate = label.modulate.darkened(0.3)
 		label.outline_size = 8
-		label.shaded = false
+		label.shaded = not is_lit()
 		label.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		label.position = _at(x, y, z + 0.09)
 		add_child(label)
@@ -551,6 +568,10 @@ func _hang_blade(x: float, face: float) -> void:
 	# тротуар — фасад выше без освещения и отсвета не взял бы.
 	_glow.position = _at(x, bottom + 0.6, z + 1.4)
 	_glow.visible = false
+	if not is_lit():
+		# Днём отсвет погашен: источника нет вовсе.
+		_glow = null
+		return
 	add_child(_glow)
 	if Weather.is_raining(_weather):
 		add_child(
@@ -628,8 +649,25 @@ func _build_lamp(x: float) -> void:
 	)
 	var head := _at(x, base - LAMP_HEIGHT + 0.08, z + LAMP_ARM)
 	_box(Vector3(0.34, 0.1, 0.5), metal, head + Vector3(0.0, 0.08, 0.0), false)
+	if not is_lit():
+		# Днём фонарь не горит: стекло светильника тёмное, пятна нет.
+		_box(Vector3(0.28, 0.04, 0.42), GreyboxLook.surface(SODIUM.darkened(0.6)), head, false)
+		return
 	_box(Vector3(0.28, 0.04, 0.42), GreyboxLook.light(SODIUM), head, false)
-	var pool := _pool(Vector2(4.2, 4.2), SODIUM, POOL_ENERGY)
+	# Фонарь светит по-настоящему: фасад пака без света — тёмная стена, и
+	# витрины, маркизы и тротуар под ним берут натриевый свет (ADR-0052).
+	_lamp = SpotLight3D.new()
+	_lamp.name = "StreetLamp"
+	_lamp.light_color = SODIUM
+	_lamp.light_energy = LAMP_ENERGY * _lights
+	_lamp.spot_range = LAMP_RANGE
+	_lamp.spot_angle = LAMP_ANGLE
+	_lamp.shadow_enabled = false
+	_lamp.position = head + Vector3(0.0, -0.1, 0.0)
+	_lamp.rotation = Vector3(-PI * 0.5 + LAMP_LEAN, 0.0, 0.0)
+	_lamp.visible = false
+	add_child(_lamp)
+	var pool := _pool(Vector2(4.2, 4.2), SODIUM, POOL_ENERGY * _lights)
 	pool.position = _at(x, _street - 0.012, z + LAMP_ARM - 0.4)
 	add_child(pool)
 	if Weather.is_raining(_weather):
@@ -655,7 +693,10 @@ func _park_a_car(x: float) -> void:
 ## Свет витрины на тротуаре: тёплое пятно перед стеклом.
 func _spill(shop: Vector2, face: float, tone: Color) -> void:
 	var depth := FAR_KERB_Z - KERB.x - face
-	var pool := _pool(Vector2(shop.y * 1.3, absf(depth) * 1.6), tone, SPILL_ENERGY)
+	if not is_lit():
+		# Днём свет витрины на тротуаре не виден.
+		return
+	var pool := _pool(Vector2(shop.y * 1.3, absf(depth) * 1.6), tone, SPILL_ENERGY * _lights)
 	pool.position = _at(shop.x, _street - KERB.y - 0.004, face)
 	add_child(pool)
 
@@ -674,25 +715,11 @@ func _add_glass(centre: Vector2, size: Vector2, face: float, tone: Color, inside
 
 ## Фасады и окна одним махом: мультимешем, как у города на заднике.
 func _flush_multimeshes() -> void:
-	var box := BoxMesh.new()
-	var look := CityLook.facade()
-	look.set_shader_parameter("glow_strength", FACADE_GLOW)
-	box.material = look
-	var many := MultiMesh.new()
-	many.transform_format = MultiMesh.TRANSFORM_3D
-	many.use_colors = true
-	many.use_custom_data = true
-	many.mesh = box
-	many.instance_count = _facades.size()
-	for index in _facades.size():
-		many.set_instance_transform(index, _facades[index])
-		many.set_instance_color(index, _facade_tones[index])
-		many.set_instance_custom_data(index, _facade_kinds[index])
-	var facades := MultiMeshInstance3D.new()
-	facades.name = "Facades"
-	facades.multimesh = many
-	facades.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(facades)
+	_flush_pack_facades()
+
+
+## Окна и витрины одним мультимешем на горящие и погасшие.
+func _flush_windows() -> void:
 	for lit in 2:
 		var places: Array[Transform3D] = []
 		var colours: Array[Color] = []
@@ -706,6 +733,40 @@ func _flush_multimeshes() -> void:
 		)
 		quads.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(quads)
+
+
+## Дома: фасад пака на коробке во всю высоту, как у города на заднике, и его
+## же окна — горящие долей времени суток.
+func _flush_pack_facades() -> void:
+	var box := BoxMesh.new()
+	var look := CityLook.building()
+	look.set_shader_parameter("lit_share", CityPlan.LIT_SHARE * TimeOfDay.lit_windows(_time))
+	look.set_shader_parameter("window_glow", CityBackdrop.WINDOW_GLOW[_time])
+	box.material = look
+	var many := MultiMesh.new()
+	many.transform_format = MultiMesh.TRANSFORM_3D
+	many.use_colors = true
+	many.use_custom_data = true
+	many.mesh = box
+	many.instance_count = _blocks.size()
+	for index in _blocks.size():
+		var block := _blocks[index]
+		var centre := _at(block.x + block.width * 0.5, _street - block.height * 0.5, block.z)
+		var basis := Basis.from_scale(Vector3(block.width, block.height, block.depth))
+		many.set_instance_transform(index, Transform3D(basis, centre))
+		many.set_instance_color(index, CityLook.wall_tint(block))
+		many.set_instance_custom_data(index, CityLook.building_custom(block))
+	var houses := MultiMeshInstance3D.new()
+	houses.name = "PackFacades"
+	houses.multimesh = many
+	add_child(houses)
+	# Витрины лавок — те же стёкла с жизнью за ними, что и ночью.
+	_flush_windows()
+
+
+## Погашенная неоновая трубка днём: цвет неона, но тёмный и в свету.
+static func unlit_tube(neon: Color) -> Color:
+	return neon.lerp(Color(0.5, 0.5, 0.5), 0.35).darkened(0.5)
 
 
 ## Дождь над улицей: струи перед домами и круги на мостовой.

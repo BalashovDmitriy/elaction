@@ -9,10 +9,12 @@ poly.pizza не нашлось, и вертолёт собирается зде�
 Лёгкий вертолёт с закрытым винтом, лофтом по сечениям: округлый нос с
 остеклением, кабина, сужение в хвостовую балку, киль со стабилизатором, капот
 двигателя с выхлопом и заборником, полозья на поперечинах со ступеньками,
-сдвижная дверь откачена назад — в проёме свет кабины и кресла. Несущий и
-хвостовой винты — отдельные узлы `MainRotor` и `TailRotor`, начало — на оси,
-их крутит игра. Точки огней, прожектора и лебёдки — пустышками: игра ставит
-туда своё, а не угадывает по габариту.
+сдвижная дверь — в проёме свет кабины и кресла. Несущий и хвостовой винты —
+отдельные узлы `MainRotor` и `TailRotor`, начало — на оси, их крутит игра.
+С M24k (ADR-0052, решение 6) и дверь — свой узел `Door`, закрытый: игра
+откатывает её назад по направляющим. В кабине — кресло пилота, его место —
+пустышка `PilotSeat`: пилота сажает игра. Точки огней, прожектора и лебёдки —
+пустышками: игра ставит туда своё, а не угадывает по габариту.
 
 Метры, нос в +X, ближний к камере борт — −Y Blender (+Z Godot после экспорта),
 нуль — под осью несущего винта на уровне низа полозьев, середина по глубине.
@@ -85,6 +87,9 @@ BLADES = 4
 TAIL_ROTOR = (-5.42, -0.2, 2.02)
 TAIL_RADIUS = 0.72
 TAIL_BLADES = 2
+# Сиденье пилота: x, y, высота подушки над низом полозьев. Правое кресло — к
+# ближнему борту: пилота видно в боковое окно.
+PILOT_SEAT = (1.05, -0.32, 0.98)
 
 
 class Part:
@@ -224,11 +229,15 @@ def build_hull() -> None:
         hull.box((0.1, 0.5, 0.6), Vector((x - 0.2, -0.25, 1.28)), "Seat")
     for x in DOOR[:2]:
         hull.box((0.05, 0.06, DOOR[3] - DOOR[2]), Vector((x, -0.9, (DOOR[2] + DOOR[3]) * 0.5)), "Metal")
-    # Сдвижная дверь откачена назад, на направляющих.
+    # Направляющие сдвижной двери: сверху и снизу проёма, назад на её длину.
     door_len = DOOR[1] - DOOR[0]
-    hull.box((door_len, 0.05, DOOR[3] - DOOR[2]), Vector((DOOR[0] - door_len * 0.5 + 0.1, -0.93, 1.3)), "Hull")
-    hull.box((door_len * 0.6, 0.06, 0.36), Vector((DOOR[0] - door_len * 0.5 + 0.1, -0.96, 1.65)), "Glass")
     hull.box((door_len * 2.0, 0.04, 0.04), Vector((DOOR[0], -0.95, DOOR[3] + 0.02)), "Metal")
+    hull.box((door_len * 2.0, 0.03, 0.03), Vector((DOOR[0], -0.94, DOOR[2] - 0.03)), "Metal")
+    # Кресло пилота в кабине: спинкой к салону, лицом к носу.
+    hull.box((0.5, 0.5, 0.12), Vector((PILOT_SEAT[0], PILOT_SEAT[1], PILOT_SEAT[2] - 0.06)), "Seat")
+    hull.box((0.12, 0.5, 0.7), Vector((PILOT_SEAT[0] - 0.28, PILOT_SEAT[1], PILOT_SEAT[2] + 0.3)), "Seat")
+    # Приборная доска под лобовым стеклом.
+    hull.box((0.3, 1.3, 0.3), Vector((2.15, 0.0, 1.3)), "Metal")
     # Киль, стабилизатор и полозок хвоста.
     fin = hull.box((0.7, 0.06, 1.0), Vector((-5.35, 0.0, 2.35)), "Hull")
     bmesh.ops.rotate(
@@ -244,6 +253,18 @@ def build_hull() -> None:
     # Лебёдка над дверью.
     hull.box((0.18, 0.28, 0.14), Vector((0.0, -0.95, 2.05)), "Metal")
     hull.publish(smooth=True)
+
+
+def build_door() -> None:
+    """Сдвижная дверь закрытой: полотно с окном и ручкой. Начало — середина
+    проёма на ближнем борту; игра откатывает её назад по направляющим."""
+    door = Part("Door")
+    door_len = DOOR[1] - DOOR[0]
+    middle = Vector(((DOOR[0] + DOOR[1]) * 0.5, -0.95, (DOOR[2] + DOOR[3]) * 0.5))
+    door.box((door_len + 0.06, 0.05, DOOR[3] - DOOR[2] + 0.04), middle, "Hull")
+    door.box((door_len * 0.6, 0.02, 0.36), middle + Vector((0.0, -0.03, 0.35)), "Glass")
+    door.box((0.14, 0.04, 0.04), middle + Vector((door_len * 0.35, -0.04, -0.05)), "Metal")
+    door.publish(origin=middle)
 
 
 def build_skids() -> None:
@@ -298,6 +319,7 @@ def mark(name: str, at: Vector) -> None:
 def inside_blender() -> int:
     bpy.ops.wm.read_factory_settings(use_empty=True)
     build_hull()
+    build_door()
     build_skids()
     build_main_rotor()
     build_tail_rotor()
@@ -310,6 +332,7 @@ def inside_blender() -> int:
     mark("Searchlight", Vector((2.37, -0.2, 0.47)))
     mark("CabinLight", Vector((-0.4, -0.55, 1.5)))
     mark("Winch", Vector((0.0, -1.02, 2.0)))
+    mark("PilotSeat", Vector(PILOT_SEAT))
     TARGET.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.export_scene.gltf(filepath=str(TARGET), export_format="GLB", export_yup=True)
     print(f"записан {TARGET}")

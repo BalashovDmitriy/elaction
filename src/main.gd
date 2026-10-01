@@ -264,6 +264,7 @@ func _new_salt() -> int:
 func _pause() -> void:
 	_playing = false
 	get_tree().paused = true
+	Sounds.play(Sounds.UI_SELECT)
 	_menu.show_page(Menu.Page.PAUSE)
 	Sounds.muffle_music(Sounds.MUFFLE_PAUSE, true)
 
@@ -299,6 +300,8 @@ func _enter_building(demo: bool = false) -> void:
 	_level.building_seed = game.building_seed()
 	# Время суток — жребием по сиду, на всё здание (ADR-0051, решения 3 и 4).
 	_level.rules.time_of_day = TimeOfDay.of_seed(_level.building_seed)
+	# Полное вступление — в первом здании партии, дальше короткое (ADR-0052).
+	_level.full_intro = game.building == 1 and not demo
 	# Режим наследуется от родителя, а он тут ALWAYS: без этой строки пауза
 	# не останавливала бы ничего — игра шла бы дальше с надписью «пауза».
 	_level.process_mode = Node.PROCESS_MODE_PAUSABLE
@@ -318,10 +321,10 @@ func _enter_building(demo: bool = false) -> void:
 		probe.start(_settings)
 	# Тема заводится на здание, а не на партию: после тревоги её надо вернуть,
 	# а сирена снимается только сменой здания (ADR-0009).
-	# Трек здания и тревоги — жребием по сиду здания (ADR-0036, решение 3).
-	Sounds.play_music(
-		Sounds.ALARM_THEME if game.alarm.raised else Sounds.THEME, game.building_seed()
-	)
+	# Трек здания и тревоги — жребием по сиду здания (ADR-0036, решение 3), тема
+	# здания — по времени суток (ADR-0052, решение 1).
+	var theme := Sounds.theme_for(_level.rules.time_of_day)
+	Sounds.play_music(Sounds.ALARM_THEME if game.alarm.raised else theme, game.building_seed())
 
 
 ## Город за меню. Погода — жребием на каждый выход в меню: ясная ночь, туман
@@ -414,6 +417,8 @@ func _on_game_over() -> void:
 	var place := _records.submit(score)
 	if place >= 0:
 		_records.save_to()
+		# Новый рекорд — свой джингл поверх конца партии (ADR-0052, решение 7).
+		Sounds.play(Sounds.RECORD)
 	_menu.remember(score, place)
 	# Сперва последняя смерть — замедление и наезд (ADR-0042, решение 5). Не в
 	# этом кадре: погибший посреди сценки добивания Otto её обрывает, и сценка,

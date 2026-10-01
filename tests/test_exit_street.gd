@@ -62,7 +62,8 @@ func test_the_exit_lights_are_few_unshadowed_and_off_in_play() -> void:
 	var level := _build(2)
 	var ramp := level.garage().gate.ramp()
 	var lights := ramp.lights()
-	assert_between(lights.size(), 1, 2, "свет выезда — один-два источника")
+	# С M24k фонарь у бордюра светит по-настоящему (ADR-0052, решение 3).
+	assert_between(lights.size(), 1, 3, "свет выезда — от одного до трёх источников")
 	for light in lights:
 		assert_false(light.shadow_enabled, "%s кладёт тень" % light.name)
 	await wait_process_frames(3)

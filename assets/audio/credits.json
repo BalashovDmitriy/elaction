@@ -5,6 +5,12 @@
   "licence": "CC0 1.0",
   "url": "https://freesound.org/people/Breviceps/sounds/447922/"
  },
+ "alarm": {
+  "title": "fire alarm bell",
+  "author": "msx2plus",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/msx2plus/sounds/678345/"
+ },
  "alarm_theme": {
   "title": "Fast Talkin",
   "author": "Kevin MacLeod (incompetech.com)",
@@ -29,11 +35,35 @@
   "licence": "CC0 1.0",
   "url": "https://freesound.org/people/TRP/sounds/567317/"
  },
+ "body_fall": {
+  "title": "Thud",
+  "author": "Breviceps",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/Breviceps/sounds/447922/"
+ },
+ "bonus_tick": {
+  "title": "SCORE COUNT",
+  "author": "xtrgamr",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/xtrgamr/sounds/253546/"
+ },
  "building_bonus": {
   "title": "Rollin at 5 (фрагмент)",
   "author": "Kevin MacLeod (incompetech.com)",
   "licence": "CC-BY 4.0",
   "url": "https://incompetech.com/music/royalty-free/licenses/"
+ },
+ "bullet_metal": {
+  "title": "Guns & Explosions Album - Bullet Impact 14",
+  "author": "OGsoundFX",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/OGsoundFX/sounds/423107/"
+ },
+ "bullet_wall": {
+  "title": "Ricochet 3_2",
+  "author": "Benboncan",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/Benboncan/sounds/78092/"
  },
  "car_away": {
   "title": "car drive away",
@@ -47,6 +77,18 @@
   "licence": "CC0 1.0",
   "url": "https://freesound.org/people/monotraum/sounds/208695/"
  },
+ "car_door_open": {
+  "title": "Car Door Open 2",
+  "author": "Geoff-Bremner-Audio",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/Geoff-Bremner-Audio/sounds/844708/"
+ },
+ "car_pass": {
+  "title": "car_4",
+  "author": "koirankarva84581682",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/koirankarva84581682/sounds/664770/"
+ },
  "car_start": {
   "title": "Car Start",
   "author": "snakebarney",
@@ -58,6 +100,36 @@
   "author": "klankbeeld",
   "licence": "CC-BY 4.0",
   "url": "https://freesound.org/people/klankbeeld/sounds/361088/"
+ },
+ "city_day": {
+  "title": "city from pasture 03",
+  "author": "klankbeeld",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/klankbeeld/sounds/169080/"
+ },
+ "city_evening": {
+  "title": "Baltimore City Ambience at Dusk",
+  "author": "flood-mix",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/flood-mix/sounds/413335/"
+ },
+ "city_morning": {
+  "title": "Morning on my street",
+  "author": "VlatkoBlazek",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/VlatkoBlazek/sounds/261307/"
+ },
+ "crouch": {
+  "title": "Jacket/Cloth Rustle 9",
+  "author": "brandondelehoy",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/brandondelehoy/sounds/494797/"
+ },
+ "crush": {
+  "title": "Hard Candy / Bone Crunch",
+  "author": "clif_creates",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/clif_creates/sounds/392883/"
  },
  "death_jingle": {
   "title": "horn_fail_wahwah_3",
@@ -89,6 +161,24 @@
   "licence": "CC0 1.0",
   "url": "https://freesound.org/people/Filmscore/sounds/825478/"
  },
+ "elevator_start": {
+  "title": "Elevator Stalling 2",
+  "author": "maxmaxmaxmaxmaxmaxmax",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/maxmaxmaxmaxmaxmaxmax/sounds/439435/"
+ },
+ "elevator_stop": {
+  "title": "elevator_stop",
+  "author": "simpsi",
+  "licence": "CC-BY 3.0",
+  "url": "https://freesound.org/people/simpsi/sounds/175668/"
+ },
+ "enemy_shot": {
+  "title": "Pistol Shot",
+  "author": "LeMudCrab",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/LeMudCrab/sounds/163456/"
+ },
  "escalator_hum": {
   "title": "escalator",
   "author": "roachpowder",
@@ -119,6 +209,12 @@
   "licence": "CC0 1.0",
   "url": "https://freesound.org/people/freesoundjon01/sounds/202666/"
  },
+ "heli_door": {
+  "title": "Van sliding door open",
+  "author": "MrAuralization",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/MrAuralization/sounds/269520/"
+ },
  "helicopter": {
   "title": "Helicopter_Hover",
   "author": "Lydmakeren",
@@ -130,6 +226,18 @@
   "author": "InspectorJ",
   "licence": "CC-BY 4.0",
   "url": "https://freesound.org/people/InspectorJ/sounds/405234/"
+ },
+ "horn": {
+  "title": "Double car horn",
+  "author": "mudflea2",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/mudflea2/sounds/705723/"
+ },
+ "jump": {
+  "title": "Jacket/Cloth Rustle 9",
+  "author": "brandondelehoy",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/brandondelehoy/sounds/494797/"
  },
  "kick": {
   "title": "punch",
@@ -149,6 +257,12 @@
   "licence": "CC-BY 3.0",
   "url": "https://freesound.org/people/youandbiscuitme/sounds/258242/"
  },
+ "land": {
+  "title": "Jump_End_Gravel",
+  "author": "D001447733",
+  "licence": "CC-BY 3.0",
+  "url": "https://freesound.org/people/D001447733/sounds/464607/"
+ },
  "menu_theme": {
   "title": "Cool Vibes",
   "author": "Kevin MacLeod (incompetech.com)",
@@ -160,6 +274,12 @@
   "author": "Nox_Sound",
   "licence": "CC0 1.0",
   "url": "https://freesound.org/people/Nox_Sound/sounds/553075/"
+ },
+ "neon_flicker": {
+  "title": "Interface Sounds: glitch_004",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/interface-sounds"
  },
  "otto_death": {
   "title": "male death",
@@ -179,11 +299,29 @@
   "licence": "CC-BY 4.0",
   "url": "https://freesound.org/people/InspectorJ/sounds/346642/"
  },
+ "record": {
+  "title": "Jingle_Win_00",
+  "author": "LittleRobotSoundFactory",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/LittleRobotSoundFactory/sounds/270333/"
+ },
+ "respawn": {
+  "title": "Interface Sounds: bong_001",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/interface-sounds"
+ },
  "room_tone": {
   "title": "hotel corridor",
   "author": "addiofbaddi",
   "licence": "CC0 1.0",
   "url": "https://freesound.org/people/addiofbaddi/sounds/241659/"
+ },
+ "rope_drop": {
+  "title": "rbhRopeRMX1",
+  "author": "nicStage",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/nicStage/sounds/1949/"
  },
  "rope_slide": {
   "title": "abseil2",
@@ -202,6 +340,12 @@
   "author": "michorvath",
   "licence": "CC0 1.0",
   "url": "https://freesound.org/people/michorvath/sounds/427592/"
+ },
+ "slowmo": {
+  "title": "long wispy woosh2",
+  "author": "newagesoup",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/newagesoup/sounds/377829/"
  },
  "step_carpet": {
   "title": "footstep-carpet.wav",
@@ -239,6 +383,12 @@
   "licence": "CC0 1.0",
   "url": "https://kenney.nl/assets/impact-sounds"
  },
+ "step_metal": {
+  "title": "metal footstep",
+  "author": "atleastrelatively",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/atleastrelatively/sounds/816413/"
+ },
  "theme": {
   "title": "Spy Glass",
   "author": "Kevin MacLeod (incompetech.com)",
@@ -263,6 +413,42 @@
   "licence": "CC-BY 4.0",
   "url": "https://incompetech.com/music/royalty-free/licenses/"
  },
+ "theme_day": {
+  "title": "George Street Shuffle",
+  "author": "Kevin MacLeod (incompetech.com)",
+  "licence": "CC-BY 4.0",
+  "url": "https://incompetech.com/music/royalty-free/licenses/"
+ },
+ "theme_day.2": {
+  "title": "Opportunity Walks",
+  "author": "Kevin MacLeod (incompetech.com)",
+  "licence": "CC-BY 4.0",
+  "url": "https://incompetech.com/music/royalty-free/licenses/"
+ },
+ "theme_evening": {
+  "title": "Apero Hour",
+  "author": "Kevin MacLeod (incompetech.com)",
+  "licence": "CC-BY 4.0",
+  "url": "https://incompetech.com/music/royalty-free/licenses/"
+ },
+ "theme_evening.2": {
+  "title": "Backbay Lounge",
+  "author": "Kevin MacLeod (incompetech.com)",
+  "licence": "CC-BY 4.0",
+  "url": "https://incompetech.com/music/royalty-free/licenses/"
+ },
+ "theme_morning": {
+  "title": "Shades of Spring",
+  "author": "Kevin MacLeod (incompetech.com)",
+  "licence": "CC-BY 4.0",
+  "url": "https://incompetech.com/music/royalty-free/licenses/"
+ },
+ "theme_morning.2": {
+  "title": "Walking Along",
+  "author": "Kevin MacLeod (incompetech.com)",
+  "licence": "CC-BY 4.0",
+  "url": "https://incompetech.com/music/royalty-free/licenses/"
+ },
  "thunder_far": {
   "title": "distant dry thunderclap",
   "author": "Shuhmi",
@@ -274,6 +460,12 @@
   "author": "loganzsound",
   "licence": "CC0 1.0",
   "url": "https://freesound.org/people/loganzsound/sounds/840628/"
+ },
+ "turn_signal": {
+  "title": "turnsignal",
+  "author": "morgantj",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/morgantj/sounds/61053/"
  },
  "ui_back": {
   "title": "UI Audio: mouserelease1",
@@ -292,6 +484,12 @@
   "author": "Kenney",
   "licence": "CC0 1.0",
   "url": "https://kenney.nl/assets/interface-sounds"
+ },
+ "winch": {
+  "title": "SFX Electric Actuator Jack 1",
+  "author": "mpuffenbarger",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/mpuffenbarger/sounds/683808/"
  },
  "wind": {
   "title": "rushing air, distant skyline",
