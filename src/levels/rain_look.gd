@@ -128,12 +128,19 @@ static func scale_amount(particles: GPUParticles3D, share: float) -> void:
 
 ## Дождь города: слои струй у камеры и завесы между рядами домов. Слои —
 ## детьми [param camera]: едут с ней, а капли падают в мире.
-static func city(camera: Camera3D, ground: float, from_x: float, to_x: float) -> Node3D:
+##
+## [param share] — доля ночной силы (ADR-0051): капли и завесы несут свет того,
+## что за ними, и днём на светлом небе горели бы белым.
+static func city(
+	camera: Camera3D, ground: float, from_x: float, to_x: float, share: float = 1.0
+) -> Node3D:
 	var host := Node3D.new()
 	host.name = "Rain"
 	for index in CITY_LAYERS.size():
 		var layer := CITY_LAYERS[index]
 		var reach := float(layer["depth"])
+		var look := drop_look(CITY_DROP)
+		look.set_shader_parameter("back_gain", float(CITY_DROP["back_gain"]) * share)
 		var drops := streaks(
 			int(layer["drops"]),
 			2.2,
@@ -141,7 +148,7 @@ static func city(camera: Camera3D, ground: float, from_x: float, to_x: float) ->
 			CITY_SPEED,
 			CITY_SLANT,
 			layer["size"] as Vector2,
-			drop_look(CITY_DROP)
+			look
 		)
 		drops.name = "Layer%d" % index
 		drops.position = Vector3(0.0, 26.0, -reach)
@@ -151,23 +158,8 @@ static func city(camera: Camera3D, ground: float, from_x: float, to_x: float) ->
 		)
 		camera.add_child(drops)
 	for curtain in CURTAINS:
-		host.add_child(_curtain(curtain, ground, from_x, to_x))
+		host.add_child(_curtain(curtain, ground, from_x, to_x, share))
 	return host
-
-
-## Приглушает дождь города днём (ADR-0051): капли и завесы несут свет того,
-## что за ними, и на светлом небе горели бы белым. [param share] — доля
-## ночной силы.
-static func dim_city(host: Node, camera: Camera3D, share: float) -> void:
-	for layer in city_layers(camera):
-		var look := (layer.draw_pass_1 as QuadMesh).material as ShaderMaterial
-		look.set_shader_parameter("back_gain", float(CITY_DROP["back_gain"]) * share)
-	for child in host.get_children():
-		var curtain := child as MeshInstance3D
-		if curtain == null:
-			continue
-		var look := (curtain.mesh as QuadMesh).material as ShaderMaterial
-		look.set_shader_parameter("gain", float(look.get_shader_parameter("gain")) * share)
 
 
 ## Струи дождя города, чтобы пересчитать их долю по уровню качества.
@@ -199,13 +191,15 @@ static func halo(
 	return glow
 
 
-static func _curtain(spec: Vector3, ground: float, from_x: float, to_x: float) -> MeshInstance3D:
+static func _curtain(
+	spec: Vector3, ground: float, from_x: float, to_x: float, share: float
+) -> MeshInstance3D:
 	var quad := QuadMesh.new()
 	quad.size = Vector2(to_x - from_x + spec.x * 4.0 + 400.0, CURTAIN_HEIGHT)
 	var look := ShaderMaterial.new()
 	look.shader = CURTAIN_SHADER
 	look.set_shader_parameter("tint", TINT)
-	look.set_shader_parameter("gain", spec.y)
+	look.set_shader_parameter("gain", spec.y * share)
 	look.set_shader_parameter("density", spec.z)
 	look.set_shader_parameter("slant", CITY_SLANT)
 	quad.material = look

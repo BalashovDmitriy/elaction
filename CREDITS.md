@@ -1,8 +1,9 @@
 # Авторы ассетов
 
-Идея и разработка — **Дмитрий Балашов** (Dmitriy Balashov). Оригинальная игра —
+Idea & Development — **Dmitry Balashov**. Оригинальная игра —
 **Elevator Action**, Taito, 1983. В игре — первыми двумя строками страницы «Авторы»,
-ключи `UI_CREDITS_CREATOR` и `UI_CREDITS_ORIGINAL` в `assets/i18n/ui.csv`.
+ключи `UI_CREDITS_CREATOR` и `UI_CREDITS_ORIGINAL` в `assets/i18n/ui.csv`. Страница
+авторов — только по-английски на любом языке игры, имя — всегда Dmitry Balashov.
 
 Код проекта — MIT (см. README). Здесь — чужие модели, фактуры, звуки и шрифты, которые
 лежат в репозитории, и их лицензии. CC0 авторства не требует, но мы указываем всех: так

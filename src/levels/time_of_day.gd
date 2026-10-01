@@ -51,27 +51,27 @@ const LIT_WINDOWS: Array[float] = [0.3, 0.06, 0.75, 1.0]
 const STREET_LIGHTS: Array[float] = [0.35, 0.0, 0.85, 1.0]
 
 ## Тон кадра — кривые по каналам от теней к свету ([Atmosphere]). Ночной —
-## нуар M22; утро прохладное с розовым светом, день почти нейтральный, вечер
-## — фиолетовые тени и оранжевый свет.
+## нуар M22, его числа держит [Atmosphere]; утро прохладное с розовым светом,
+## день почти нейтральный, вечер — фиолетовые тени и оранжевый свет.
 const GRADE_SHADOW: Array[Color] = [
 	Color(0.02, 0.03, 0.07),
 	Color(0.02, 0.025, 0.04),
 	Color(0.05, 0.02, 0.08),
-	Color(0.0, 0.03, 0.08),
+	Atmosphere.NOIR_SHADOW,
 ]
 const GRADE_MIDDLE: Array[Color] = [
 	Color(0.33, 0.35, 0.39),
 	Color(0.36, 0.36, 0.36),
 	Color(0.38, 0.31, 0.33),
-	Color(0.27, 0.33, 0.4),
+	Atmosphere.NOIR_MIDDLE,
 ]
 const GRADE_LIGHT: Array[Color] = [
 	Color(1.0, 0.94, 0.9),
 	Color(1.0, 0.98, 0.94),
 	Color(1.0, 0.86, 0.68),
-	Color(1.0, 0.93, 0.8),
+	Atmosphere.NOIR_LIGHT,
 ]
-const SATURATION: Array[float] = [0.95, 1.0, 1.05, 0.9]
+const SATURATION: Array[float] = [0.95, 1.0, 1.05, Atmosphere.SATURATION]
 
 ## Окружающий свет здания: множитель к ночному и куда тянется его цвет. Днём
 ## здание светло и без ламп — сбитая лампа зону не гасит и на вид.

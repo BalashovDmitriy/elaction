@@ -9,6 +9,7 @@ const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
 const FALL_FRAMES: int = 240
 const SKILLS: Array[int] = [0, 3, 7]
+const SEEDS: Array[int] = [1, 2, 3, 5, 8, 13, 21, 34]
 
 
 func before_all() -> void:
@@ -70,6 +71,32 @@ func test_dark_floors_only_at_night() -> void:
 				assert_eq(unlit, 0, "навык %d, время %d: тёмный этаж не ночью" % [skill, kind])
 
 
+## Не ночью у здания своя раскладка: на этажах ROM 11–15 висят лампы и отнимают
+## места у дверей. Такое здание обязано быть тем же зданием — лампа на каждом
+## этаже, все документы достижимы — на любом сиде и навыке, а не только ночное,
+## которое проверяют тесты карты.
+func test_a_day_building_lays_out_and_can_be_finished() -> void:
+	for skill: int in SKILLS:
+		for kind: int in [TimeOfDay.Kind.MORNING, TimeOfDay.Kind.DAY, TimeOfDay.Kind.EVENING]:
+			var rules := BuildingRules.new()
+			rules.skill = skill
+			rules.time_of_day = kind as TimeOfDay.Kind
+			for building_seed: int in SEEDS:
+				var plan := BuildingPlan.generate(rules, building_seed)
+				var where := "навык %d, время %d, сид %d" % [skill, kind, building_seed]
+				var lamps: Dictionary = {}
+				for lamp in plan.lamps:
+					lamps[lamp.floor_index] = true
+				for index: int in rules.floors:
+					assert_true(lamps.has(index), where + ": этаж %d без лампы" % index)
+				assert_eq(
+					plan.document_floors().size(),
+					BuildingDocuments.count(rules, building_seed),
+					where + ": документов"
+				)
+				assert_true(BuildingRoute.is_winnable(plan, rules), where + ": здание не пройти")
+
+
 ## Гроза — вечером и ночью, утром и днём дождь без молний.
 func test_thunder_only_in_the_evening_and_at_night() -> void:
 	assert_false(TimeOfDay.has_thunder(TimeOfDay.Kind.MORNING))
@@ -85,6 +112,7 @@ func test_a_lamp_puts_out_its_zone_only_at_night() -> void:
 		var lamp := _a_lamp(level)
 		assert_not_null(lamp, "на этаже 2 нет лампы")
 		if lamp == null:
+			level.queue_free()
 			return
 		var x := WorldSpace.to_plane(lamp.global_position).x
 		var index := lamp.floor_index

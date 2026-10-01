@@ -122,15 +122,16 @@ void fragment() {
 		// Окно — пол-плитки: у модулей пака по два окна на четыре метра.
 		float slot = floor(s / (tile_width * 0.5));
 		float seed = custom.y * 977.0 + slot * 13.17 + storey * 71.3 + face.x * 5.1 + face.z * 3.7;
-		float lit = step(hash1(seed), lit_share);
-		if (storey < 0.0) {
-			// Первый этаж — витрины и холлы: горят чаще.
-			lit = step(hash1(seed + 0.5), lit_share * 1.6);
-		}
+		// Первый этаж — витрины и холлы: горят чаще.
+		float share = storey < 0.0 ? lit_share * 1.6 : lit_share;
+		float lit = step(hash1(storey < 0.0 ? seed + 0.5 : seed), share);
 		if (hash1(seed * 91.7) < switch_share) {
+			// Окно, которое включают и выключают, в каждом цикле горит с той же
+			// долей, что и прочие. Переворот через раз зажигал половину таких
+			// окон при любой доле — днём горело впятеро больше «единиц».
 			float period = switch_period * mix(0.5, 1.5, hash1(seed * 17.3));
 			float cycle = floor(TIME / period + hash1(seed * 5.9));
-			lit = abs(lit - step(0.5, hash1(cycle * 13.1 + seed * 71.0)));
+			lit = step(hash1(cycle * 13.1 + seed * 71.0), share);
 		}
 		vec3 warm = vec3(1.0, 0.72, 0.4);
 		vec3 cold = vec3(0.6, 0.76, 1.0);

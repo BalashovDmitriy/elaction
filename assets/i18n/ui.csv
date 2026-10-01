@@ -6,17 +6,18 @@ UI_SETTINGS,Settings,Настройки
 UI_CONTROLS,Controls,Управление
 UI_QUIT,Quit,Выход
 UI_CREDITS,Credits,Авторы
-UI_CREDITS_CREATOR,Idea & Development,Идея & разработка
-UI_CREDITS_CREATOR_NAME,Dmitriy Balashov,Дмитрий Балашов
-UI_CREDITS_ORIGINAL,Original game,Оригинальная игра
+UI_CREDITS_TITLE,Credits,Credits
+UI_CREDITS_CREATOR,Idea & Development,Idea & Development
+UI_CREDITS_CREATOR_NAME,Dmitry Balashov,Dmitry Balashov
+UI_CREDITS_ORIGINAL,Original game,Original game
 UI_CREDITS_ORIGINAL_NAME,"Elevator Action — Taito, 1983","Elevator Action — Taito, 1983"
-UI_CREDITS_ABOUT,"elaction — a fan remake of Elevator Action (Taito, 1983). Models, textures, sounds and fonts by:","elaction — любительский ремейк Elevator Action (Taito, 1983). Модели, фактуры, звуки и шрифты:"
-UI_CREDITS_ACTORS,People and cars,Люди и машины
-UI_CREDITS_PROPS,Furniture and roof,Обстановка и крыша
-UI_CREDITS_TEXTURES,Textures,Фактуры
-UI_CREDITS_CITY,City and sky,Город и небо
-UI_CREDITS_SOUND,Music and sound,Музыка и звук
-UI_CREDITS_FONTS,Fonts,Шрифты
+UI_CREDITS_ABOUT,"elaction — a fan remake of Elevator Action (Taito, 1983). Models, textures, sounds and fonts by:","elaction — a fan remake of Elevator Action (Taito, 1983). Models, textures, sounds and fonts by:"
+UI_CREDITS_ACTORS,People and cars,People and cars
+UI_CREDITS_PROPS,Furniture and roof,Furniture and roof
+UI_CREDITS_TEXTURES,Textures,Textures
+UI_CREDITS_CITY,City and sky,City and sky
+UI_CREDITS_SOUND,Music and sound,Music and sound
+UI_CREDITS_FONTS,Fonts,Fonts
 UI_BACK,Back,Назад
 UI_RESUME,Resume,Продолжить
 UI_RESTART,Start over,Начать заново

@@ -38,6 +38,8 @@ var _roof_light: OmniLight3D = null
 var _sun: DirectionalLight3D = null
 ## Крыша и её техника: с них снимается карта высот дождя.
 var _roof_parts: Array[Node] = []
+## Вывеска на углу: висит снаружи, вдоль верхних этажей, и ловит солнце.
+var _sign: VerticalSign = null
 var _city: CityBackdrop = null
 ## Окружающий свет воздуха без вспышки: от него считается вспышка молнии.
 var _ambient: float = 0.0
@@ -73,6 +75,7 @@ func build(
 	kit.build(rules, plan, building_seed)
 	_roof_parts = [roof, kit] as Array[Node]
 	var sign_board := VerticalSign.new()
+	_sign = sign_board
 	add_child(sign_board)
 	sign_board.hang(rules, identity)
 
@@ -115,12 +118,14 @@ func _process(_delta: float) -> void:
 	_air.environment.ambient_light_energy = _ambient * (1.0 + _city.flash_level() * FLASH_AMBIENT)
 
 
-## Отдаёт солнцу то, что снаружи: всё, что окружение построило на крыше, и
-## то, что над перекрытием крыши построили другие строители уровня
-## ([Outdoors]). Ночью солнца нет, и слой ставится всё равно — здание одно.
+## Отдаёт солнцу то, что снаружи: всё, что окружение построило на крыше,
+## вывеску на углу и то, что над перекрытием крыши построили другие строители
+## уровня ([Outdoors]). Ночью солнца нет, и слой ставится всё равно — здание одно.
 func light_outdoors(roots: Array[Node], rules: BuildingRules) -> void:
 	for part in _roof_parts:
 		Outdoors.mark(part)
+	if _sign != null:
+		Outdoors.mark(_sign)
 	var under_roof := WorldSpace.height_to_scene(
 		rules.floor_surface(BuildingRules.ROOF) + rules.slab_height
 	)
@@ -136,6 +141,9 @@ func _raise_sun(rules: BuildingRules) -> void:
 	_sun.light_color = TimeOfDay.sun_colour(time)
 	_sun.light_energy = TimeOfDay.sun_energy(time, weather) * SUN_GAIN
 	_sun.light_cull_mask = Outdoors.LAYER
+	# Объёмный туман слоя не знает: со своей долей солнце светило бы в дымке
+	# перед коридорами, внутри разреза здания.
+	_sun.light_volumetric_fog_energy = 0.0
 	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	_sun.directional_shadow_max_distance = SUN_SHADOW_DISTANCE
 	var toward := TimeOfDay.sun_direction(time)

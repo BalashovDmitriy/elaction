@@ -72,14 +72,12 @@ var _rules: BuildingRules = null
 ## Струи дождя у камеры города: их долю пересчитывает уровень качества.
 var _rain_layers: Array[GPUParticles3D] = []
 var _city_air: Environment = null
-## Дома и их материал: в него — доля горящих окон и вспышка молнии.
-var _houses: MultiMeshInstance3D = null
+## Материал домов: в него — доля горящих окон и вспышка молнии.
 var _house_look: ShaderMaterial = null
 var _fog_banks: Node3D = null
 var _lightning: Lightning = null
 ## Вспышка, которая сейчас стоит на небе и в стёклах.
 var _flash_shown: float = 0.0
-var _time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT
 
 
 ## Строит город вдоль здания по правилам и сиду, с погодой [param weather] во
@@ -91,7 +89,6 @@ func build(
 	time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT
 ) -> void:
 	_rules = rules
-	_time = time
 	_ground = WorldSpace.height_to_scene(rules.floor_surface(rules.floors - 1))
 	# Город звучит тем же, что показывает: улица, дождь или ветер (ADR-0036).
 	Sounds.set_weather(weather)
@@ -102,7 +99,7 @@ func build(
 	add_child(_view)
 
 	var air := WorldEnvironment.new()
-	_city_air = _air(weather)
+	_city_air = _air(weather, time)
 	air.environment = _city_air
 	_view.add_child(air)
 
@@ -120,24 +117,22 @@ func build(
 	_view.add_child(_camera)
 
 	var blocks := CityPlan.generate(building_seed, 0.0, rules.width)
-	_houses = _buildings(blocks)
-	_view.add_child(_houses)
-	_house_look = (_houses.multimesh.mesh as BoxMesh).material as ShaderMaterial
+	var houses := _buildings(blocks)
+	_view.add_child(houses)
+	_house_look = (houses.multimesh.mesh as BoxMesh).material as ShaderMaterial
 	_house_look.set_shader_parameter("lit_share", CityPlan.LIT_SHARE * TimeOfDay.lit_windows(time))
 	_house_look.set_shader_parameter("window_glow", WINDOW_GLOW[time])
 	_view.add_child(CitySky.light(time, weather))
 	# Детали города (M22): верхи, огни, неон, зарево улиц.
 	_view.add_child(CityDetails.crowns(blocks, _ground, _crown_look()))
 	var lights := TimeOfDay.street_lights(time, weather)
-	var beacons := CityDetails.beacons(blocks, _ground)
-	beacons.visible = lights > 0.0
-	_view.add_child(beacons)
 	var signs := CityDetails.signs(blocks, _ground)
 	var neon := (signs.multimesh.mesh as QuadMesh).material as ShaderMaterial
 	neon.set_shader_parameter("power", lights)
 	neon.set_shader_parameter("daylight", TimeOfDay.daylight(time))
 	_view.add_child(signs)
 	if lights > 0.0:
+		_view.add_child(CityDetails.beacons(blocks, _ground))
 		var glow := CityDetails.street_glow(_ground, 0.0, rules.width)
 		((glow.mesh as QuadMesh).material as StandardMaterial3D).albedo_color.a = lights
 		_view.add_child(glow)
@@ -147,10 +142,9 @@ func build(
 			_view.add_child(_fog_banks)
 		Weather.Kind.RAIN:
 			# Слои струй у камеры и завесы между рядами (ADR-0037, решение 3).
-			var rain := RainLook.city(_camera, _ground, 0.0, rules.width)
-			_view.add_child(rain)
+			var share := lerpf(1.0, DAY_RAIN, TimeOfDay.daylight(time))
+			_view.add_child(RainLook.city(_camera, _ground, 0.0, rules.width, share))
 			_rain_layers = RainLook.city_layers(_camera)
-			RainLook.dim_city(rain, _camera, lerpf(1.0, DAY_RAIN, TimeOfDay.daylight(time)))
 			# Гроза — только вечером и ночью (ADR-0051, решение 7).
 			if TimeOfDay.has_thunder(time):
 				_lightning = Lightning.new()
@@ -280,11 +274,11 @@ func _fit_view() -> void:
 	)
 
 
-func _air(weather: Weather.Kind) -> Environment:
+func _air(weather: Weather.Kind, time: TimeOfDay.Kind) -> Environment:
 	var air := Environment.new()
 	air.background_mode = Environment.BG_SKY
 	air.sky = Sky.new()
-	air.sky.sky_material = CitySky.material(_time, weather)
+	air.sky.sky_material = CitySky.material(time, weather)
 	air.sky.radiance_size = Sky.RADIANCE_SIZE_128
 	# Свет и отражения — от неба: тени лиловые на закате и серые в дождь сами.
 	air.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
