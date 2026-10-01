@@ -137,3 +137,34 @@ func test_the_day_street_is_busier_than_the_night_one() -> void:
 		for share: float in odds:
 			total += share
 		assert_almost_eq(total, 1.0, 0.001, "доли плотности складываются в единицу")
+
+
+## Окно комнаты — проём в задней стене (ADR-0052, решение 5): стена его не
+## закрывает, стекло прозрачное, и пока комната открыта, город за зданием
+## рисуется — он и виден в окне.
+func test_the_room_window_opens_onto_the_city() -> void:
+	for is_hotel: bool in [true, false]:
+		var room := DoorRoom.build(is_hotel, 23)
+		var before := DoorRoom.open_count
+		add_child_autofree(room)
+		assert_eq(DoorRoom.open_count, before + 1, "открытая комната на счету")
+		var pane := room.find_child("Window", true, false) as MeshInstance3D
+		assert_not_null(pane, "окно есть")
+		if pane == null:
+			continue
+		var glass := pane.mesh.surface_get_material(0) as ShaderMaterial
+		assert_eq(glass.shader.get_mode(), Shader.MODE_SPATIAL, "стекло — свой шейдер")
+		assert_string_contains(glass.shader.code, "ALPHA", "стекло прозрачное")
+		var opening := pane.global_transform * pane.mesh.get_aabb()
+		var middle := opening.get_center()
+		for node: Node in room.find_children("*", "MeshInstance3D", true, false):
+			var part := node as MeshInstance3D
+			if part == pane or part.mesh == null:
+				continue
+			var box := part.global_transform * part.mesh.get_aabb()
+			var behind := box.end.z <= opening.position.z + 0.001
+			var covers := box.has_point(Vector3(middle.x, middle.y, box.get_center().z))
+			assert_false(behind and covers, "%s закрывает окно" % part.name)
+		remove_child(room)
+		assert_eq(DoorRoom.open_count, before, "закрытая — снята со счёта")
+		room.queue_free()

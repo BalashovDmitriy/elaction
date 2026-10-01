@@ -95,8 +95,11 @@ static func muzzle(host: Node, at: Vector3, towards: float) -> ShotFx:
 
 ## Удар пули в стену, дверь или кабину в точке [param at]: искры, пыль и след.
 ## [param towards] — ход пули; [param surface] — во что она попала: след
-## вешается на него, чтобы ехать с кабиной.
-static func impact(host: Node, at: Vector3, towards: float, surface: Node3D) -> ShotFx:
+## вешается на него, чтобы ехать с кабиной. [param audible] — false у прогрева
+## шейдеров ([ShaderWarmup]): там удар только рисуется.
+static func impact(
+	host: Node, at: Vector3, towards: float, surface: Node3D, audible: bool = true
+) -> ShotFx:
 	var fx := ShotFx.new()
 	fx.name = "Impact"
 	fx._lifetime = DUST_LIFETIME
@@ -105,8 +108,10 @@ static func impact(host: Node, at: Vector3, towards: float, surface: Node3D) -> 
 	Sparks.ricochet(host, at, towards)
 	# Удар пули слышно там, куда она попала: о металл кабины — звонко, о
 	# стену и пол — глухо (ADR-0052, решение 7).
-	var metal := surface is AnimatableBody3D
-	Sounds.play_at(host, Sounds.BULLET_METAL if metal else Sounds.BULLET_WALL, at, IMPACT_REACH)
+	if audible:
+		var metal := surface is AnimatableBody3D
+		var sound := Sounds.BULLET_METAL if metal else Sounds.BULLET_WALL
+		Sounds.play_at(host, sound, at, IMPACT_REACH)
 	fx.add_child(
 		_puff(
 			DUST_COUNT,

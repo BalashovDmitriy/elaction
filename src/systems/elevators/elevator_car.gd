@@ -232,9 +232,11 @@ func _physics_process(delta: float) -> void:
 	Sounds.keep_playing(_hum, moving)
 	if moving != _was_moving:
 		_was_moving = moving
-		# Трогается и встаёт — лязгом на своём месте (ADR-0052, решение 7).
-		var clunk := Sounds.ELEVATOR_START if moving else Sounds.ELEVATOR_STOP
-		Sounds.play_at(self, clunk, global_position, CLUNK_REACH, CLUNK_DB)
+		# Трогается и встаёт — лязгом, только кабина с Otto: звенящие на каждом
+		# этаже пустые кабины пользователь уже отверг в M21 (ADR-0052, решение 7).
+		if _carries_otto():
+			var clunk := Sounds.ELEVATOR_START if moving else Sounds.ELEVATOR_STOP
+			Sounds.play_at(self, clunk, global_position, CLUNK_REACH, CLUNK_DB)
 
 	_show_arrows()
 	_crush_those_underneath(_motion.velocity)

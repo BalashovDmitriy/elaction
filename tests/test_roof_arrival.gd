@@ -158,9 +158,11 @@ func test_the_rope_reaches_the_deck_and_the_frame_holds_both() -> void:
 ## Весь путь — прилёт, висение, уход — вертолёт идёт над техникой крыши, а не
 ## сквозь неё: ни корпус, ни диск винта не задевают габарита ни одного предмета.
 ## Сиды выбраны с водонапорной башней у места посадки (нечётные) и с баком.
+## Вступление полное: прилёт есть только у него, а висение и уход — те же, что
+## у короткого (ADR-0052, решение 6).
 func test_the_flight_clears_everything_on_the_roof() -> void:
 	for building_seed: int in [1, 2, 3, 5, 7]:
-		var level := _build(building_seed)
+		var level := _build(building_seed, true)
 		var deck := WorldSpace.to_scene(_landing(level)).y
 		var roof := RoofArrival.roof_obstacles(level, deck, [level.otto] as Array[Node])
 		# Сначала — что техника вообще нашлась: пустой список прошёл бы всегда.
@@ -216,9 +218,11 @@ func test_the_helicopter_sounds_its_flight() -> void:
 	assert_gt(flyby.volume_db, hover.volume_db, "на подлёте громче пролёт")
 
 	var heard_rope := false
-	while level.is_in_the_intro():
+	var waits := 0
+	while level.is_in_the_intro() and waits < GreyboxLevel.LANDING_PATIENCE:
 		heard_rope = heard_rope or rope.playing
 		await wait_physics_frames(1)
+		waits += 1
 	assert_true(heard_rope, "трос звучал, пока Otto ехал")
 	assert_gt(hover.volume_db, flyby.volume_db, "в висении громче петля висения")
 	_drop(level)
@@ -420,7 +424,10 @@ func test_the_full_intro_plays_every_step_in_order() -> void:
 		var seen: Array[int] = []
 		var swung := false
 		var door_shut_in_flight := true
-		while level.is_in_the_intro():
+		# С пределом: вставшее вступление — провал теста, а не вечный прогон.
+		var waits := 0
+		while level.is_in_the_intro() and waits < GreyboxLevel.LANDING_PATIENCE:
+			waits += 1
 			var step := arrival.step()
 			if seen.is_empty() or seen[seen.size() - 1] != step:
 				seen.append(step)
@@ -433,6 +440,7 @@ func test_the_full_intro_plays_every_step_in_order() -> void:
 				var bottom := helicopter.rope_point(helicopter.rope_length())
 				swung = swung or absf(bottom.x - helicopter.hook().x) > 0.02
 			await wait_physics_frames(1)
+		assert_false(level.is_in_the_intro(), "сид %d: вступление кончилось" % building_seed)
 		var order: Array[int] = []
 		for step: int in RoofArrival.Step.values():
 			if step != RoofArrival.Step.DONE:
@@ -449,8 +457,14 @@ func test_the_full_intro_plays_every_step_in_order() -> void:
 			_otto_at(level).y, landing.y, TOLERANCE, "сид %d: на крыше" % building_seed
 		)
 		var helicopter := level.helicopter()
-		while helicopter != null and not helicopter.position.x > _otto_at(level).x + 2.0:
+		var frames := 0
+		while (
+			helicopter != null
+			and not helicopter.position.x > _otto_at(level).x + 2.0
+			and frames < GONE_FRAMES
+		):
 			await wait_physics_frames(1)
+			frames += 1
 			helicopter = level.helicopter()
 		if helicopter != null:
 			assert_eq(

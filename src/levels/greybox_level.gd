@@ -212,8 +212,9 @@ func _ready() -> void:
 	otto.died.connect(_on_otto_died)
 	GameState.instance().alarm_raised.connect(_on_alarm_raised)
 	if GameState.instance().alarm.raised:
-		# Здание заведено уже при включённой сирене — редкость, но бывает.
-		_on_alarm_raised()
+		# Здание заведено уже при включённой сирене — редкость, но бывает. Мига
+		# тревоги тут нет — и звонка тоже.
+		_on_alarm_raised(false)
 	var bounds := Rect2(0.0, 0.0, rules.width, rules.total_height())
 	var daytime := TimeOfDay.is_daytime(rules.time_of_day)
 	_arrival.begin(self, otto, landing, bounds, full_intro, daytime)
@@ -905,13 +906,15 @@ func _release_agent(post: AgentPost) -> Enemy:
 	return agent
 
 
-## Сирена: агенты злеют, кабины начинают отвечать с задержкой.
-func _on_alarm_raised() -> void:
+## Сирена: агенты злеют, кабины начинают отвечать с задержкой. [param ring] —
+## тревога поднялась сейчас, и звенит звонок; false — здание завелось при ней.
+func _on_alarm_raised(ring: bool = true) -> void:
 	# Сирена работает с M5b, а звучать ей было нечем: теперь вместо темы здания
 	# идёт мотив тревоги, и снять его можно только новым зданием.
 	Sounds.play_music(Sounds.ALARM_THEME, building_seed)
 	# Сама сирена — в миг тревоги, поверх смены трека (ADR-0052, решение 7).
-	Sounds.play(Sounds.ALARM)
+	if ring:
+		Sounds.play(Sounds.ALARM)
 	for car in _cars:
 		car.set_response_delay(ALARM_CAR_DELAY)
 	for agent in agents():

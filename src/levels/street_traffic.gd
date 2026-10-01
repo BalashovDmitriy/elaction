@@ -209,8 +209,10 @@ func _physics_process(delta: float) -> void:
 
 ## Шаг потока. Отдельно от [method _physics_process]: тесты гоняют его сами.
 func step(delta: float) -> void:
+	# Камера — одна на шаг: по ней машины решают, когда звучать проездом.
+	var camera := get_viewport().get_camera_3d() if is_inside_tree() else null
 	for lane: Lane in [_near, _far]:
-		_drive(lane, delta)
+		_drive(lane, delta, camera)
 		_let_in(lane)
 		_let_go(lane)
 
@@ -261,7 +263,8 @@ func join(car: Node3D) -> void:
 
 
 ## Ведёт машины полосы на шаг: полный ход, но не ближе дистанции до передней.
-func _drive(lane: Lane, delta: float) -> void:
+## [param camera] — кадр, по нему звучит проезд ([method _pass_by]).
+func _drive(lane: Lane, delta: float, camera: Camera3D) -> void:
 	for index: int in lane.cars.size():
 		var car := lane.cars[index]
 		var wanted := lane.speed
@@ -270,11 +273,12 @@ func _drive(lane: Lane, delta: float) -> void:
 			var gap := (ahead - car.x) * lane.towards - CarModel.LENGTH
 			wanted *= clampf((gap - MIN_GAP) / (SAFE_GAP - MIN_GAP), 0.0, 1.0)
 		var change := ACCELERATION if wanted > car.speed else BRAKING
-		# Резко тормозит за машиной Otto — гудит.
-		if lane == _near and wanted < car.speed * 0.4 and _guest != null and not car.honked:
+		# Резко тормозит за машиной Otto — гудит. Именно за ней: за машиной
+		# потока тормозят молча.
+		if wanted < car.speed * 0.4 and not car.honked and _behind_the_guest(lane, ahead):
 			_honk(car)
 		car.speed = move_toward(car.speed, wanted, change * delta)
-		_pass_by(car)
+		_pass_by(car, camera)
 		car.x += lane.towards * car.speed * delta
 		car.node.position.x = car.x
 		# Колёса катятся, как у машины Otto ([method CarModel.roll]).
@@ -283,11 +287,8 @@ func _drive(lane: Lane, delta: float) -> void:
 
 ## Машина подъезжает к кадру — звучит проездом на себе: запись проезда
 ## достигает пика к середине, и пускается она заранее, по скорости машины.
-func _pass_by(car: Car) -> void:
-	if car.heard or not is_inside_tree():
-		return
-	var camera := get_viewport().get_camera_3d()
-	if camera == null:
+func _pass_by(car: Car, camera: Camera3D) -> void:
+	if car.heard or camera == null:
 		return
 	if absf(car.x - camera.global_position.x) > maxf(car.speed, 1.0) * PASS_LEAD:
 		return
@@ -296,6 +297,14 @@ func _pass_by(car: Car) -> void:
 	voice.volume_db = PASS_DB
 	voice.finished.connect(voice.queue_free)
 	voice.play()
+
+
+## Передняя у машины ближней полосы — машина Otto: [param ahead] из
+## [method _ahead_of] совпал с ней.
+func _behind_the_guest(lane: Lane, ahead: float) -> bool:
+	if lane != _near or is_nan(ahead) or _guest == null or not is_instance_valid(_guest):
+		return false
+	return is_equal_approx(ahead, _guest.position.x)
 
 
 ## Гудок машины [param car] — один раз на машину.

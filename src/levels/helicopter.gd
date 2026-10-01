@@ -240,6 +240,8 @@ var _door_wanted: float = 0.0
 var _door_voice: AudioStreamPlayer3D = null
 var _winch_voice: AudioStreamPlayer3D = null
 var _pilot: FigureRig = null
+## Пыль под винтом ([Downwash]).
+var _dust: Downwash = null
 ## Сколько ещё кивает пилот, с.
 var _nod: float = 0.0
 ## Шаги ухода: выбрать трос, задвинуть дверь, кивнуть — и только потом лететь.
@@ -259,6 +261,9 @@ var _hull_local := AABB()
 var _rotor_local := AABB()
 var _hull_reach := AABB()
 var _rotor_reach := AABB()
+## Они же на уходе — с креном и рысканьем поворота (авторевью M24k).
+var _hull_leave := AABB()
+var _rotor_leave := AABB()
 ## Техника крыши, над которой надо пройти: габариты в координатах сцены.
 var _obstacles: Array[AABB] = []
 
@@ -323,7 +328,8 @@ func drop_rope(length: float) -> void:
 	_dropping = true
 	_drop_speed = 0.0
 	_swing_speed = ROPE_KICK * 3.0
-	_rope_sound(Sounds.ROPE_DROP)
+	# Сброс бухты звучит на крюке, откуда она летит.
+	Sounds.play_at(self, Sounds.ROPE_DROP, hook(), ENGINE_REACH)
 
 
 ## Точка на тросе в [param along] метрах от крюка — с качанием троса.
@@ -333,9 +339,16 @@ func rope_point(along: float) -> Vector3:
 
 
 ## Что на крыше мешает полёту: габариты в координатах сцены. Путь прилёта,
-## висение и уход идут над ними с запасом [constant CLEARANCE].
-func avoid(obstacles: Array[AABB]) -> void:
+## висение и уход идут над ними с запасом [constant CLEARANCE]. [param deck] —
+## высота самой крыши, сцена: на неё поток от винта гонит пыль ([Downwash]).
+func avoid(obstacles: Array[AABB], deck: float = NAN) -> void:
 	_obstacles = obstacles
+	if is_nan(deck):
+		return
+	if _dust == null:
+		_dust = Downwash.new()
+		add_child(_dust)
+	_dust.deck = deck
 
 
 ## Точка висения над [param hover], поднятая над техникой крыши, если нужно.
@@ -347,12 +360,18 @@ func safe_hover(hover: Vector3) -> Vector3:
 ## [param x], — по всей технике крыши, при любом наклоне корпуса и с запасом.
 ## Над соседями высота спадает склоном [constant CLEAR_SLOPE]: путь набирает
 ## её заранее. Мешать нечему — минус бесконечность.
-func clear_height(x: float) -> float:
+##
+## [param leaving] — на уходе: корпус в крене и рысканье, и узел ушёл в
+## глубину на [param depth] (по Z сцены).
+func clear_height(x: float, leaving: bool = false, depth: float = DEPTH_Z) -> float:
 	var lowest := -INF
+	var reaches: Array[AABB] = [_hull_reach, _rotor_reach]
+	if leaving:
+		reaches = [_hull_leave, _rotor_leave]
 	for obstacle: AABB in _obstacles:
-		for reach: AABB in [_hull_reach, _rotor_reach]:
-			var near := DEPTH_Z + reach.position.z - CLEARANCE
-			var far := DEPTH_Z + reach.end.z + CLEARANCE
+		for reach: AABB in reaches:
+			var near := depth + reach.position.z - CLEARANCE
+			var far := depth + reach.end.z + CLEARANCE
 			if obstacle.end.z < near or obstacle.position.z > far:
 				continue
 			var left := x + reach.position.x - CLEARANCE
@@ -447,6 +466,7 @@ func _physics_process(delta: float) -> void:
 	_wind_rope(delta)
 	_slide_door(delta)
 	_pose_pilot(delta)
+	_raise_dust()
 	_blink()
 	_mix_engine(delta)
 
@@ -508,7 +528,7 @@ func _start_leaving() -> void:
 func _fly_off(delta: float) -> void:
 	var speed := minf(maxf(_velocity.x, 0.0) + LEAVE_ACCELERATION * delta, LEAVE_SPEED)
 	position += Vector3(speed, speed * LEAVE_CLIMB, -speed * LEAVE_AWAY) * delta
-	position.y = maxf(position.y, clear_height(position.x))
+	position.y = maxf(position.y, clear_height(position.x, true, position.z))
 	# Крен и рысканье в повороте вбок — по набранной скорости.
 	var turn := clampf(speed / LEAVE_SPEED, 0.0, 1.0)
 	_body.rotation.x = -BANK_MAX * turn
@@ -576,6 +596,13 @@ func _place_door() -> void:
 		_cabin.visible = _door_share > 0.05
 
 
+## Пыль встаёт под винтом, пока вертолёт висит низко над крышей, и оседает,
+## когда он уходит.
+func _raise_dust() -> void:
+	if _dust != null:
+		_dust.follow(position.x, position.y, _phase != Phase.LEAVING)
+
+
 ## Пилот сидит, на уходе кивает.
 func _pose_pilot(delta: float) -> void:
 	if _pilot == null:
@@ -597,17 +624,6 @@ func _door_sound() -> void:
 	if _door_voice != null:
 		_door_voice.global_position = doorway()
 		_door_voice.play()
-
-
-## Звук троса на крюке: сброс бухты.
-func _rope_sound(name: String) -> void:
-	if _rope_voice == null:
-		return
-	var voice := Sounds.source(self, name, ENGINE_REACH)
-	voice.top_level = true
-	voice.global_position = hook()
-	voice.finished.connect(voice.queue_free)
-	voice.play()
 
 
 ## Лебёдка выбирает трос — гудит, пока он идёт.
@@ -753,6 +769,8 @@ func _measure(hull: AABB, model: Node3D) -> void:
 	)
 	_hull_reach = _tilted(_hull_local)
 	_rotor_reach = _tilted(_rotor_local)
+	_hull_leave = _banked(_hull_local)
+	_rotor_leave = _banked(_rotor_local)
 
 
 ## Перекрашивает части модели по имени материала: корпус, стекло, проём кабины.
@@ -809,6 +827,18 @@ static func _tilted(box: AABB) -> AABB:
 	var reach := box
 	for angle: float in [-TILT_MAX, TILT_MAX]:
 		reach = reach.merge(Transform3D(Basis(Vector3.BACK, angle), Vector3.ZERO) * box)
+	return reach
+
+
+## Габарит [param box] на уходе: наклоны носом, крен до [constant BANK_MAX] и
+## рысканье до [constant LEAVE_YAW] — в том порядке, в каком их ставит уход.
+static func _banked(box: AABB) -> AABB:
+	var reach := box
+	for pitch: float in [-TILT_MAX, 0.0, TILT_MAX]:
+		for bank: float in [-BANK_MAX, 0.0]:
+			for yaw: float in [0.0, LEAVE_YAW]:
+				var turn := Basis.from_euler(Vector3(bank, yaw, -pitch))
+				reach = reach.merge(Transform3D(turn, Vector3.ZERO) * box)
 	return reach
 
 

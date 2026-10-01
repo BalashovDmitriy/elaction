@@ -111,7 +111,7 @@ func hang(rules: BuildingRules, identity: BuildingIdentity) -> void:
 				label.modulate = neon
 				label.outline_modulate = neon.darkened(0.4)
 			else:
-				var tube := neon.lerp(Color(0.5, 0.5, 0.5), UNLIT_GREY).darkened(UNLIT_DARKEN)
+				var tube := unlit_tube(neon)
 				label.modulate = tube
 				label.outline_modulate = tube.darkened(0.3)
 			label.outline_size = 8
@@ -186,6 +186,12 @@ func _process(delta: float) -> void:
 ## Горит ли неон: вечером и ночью — да, утром и днём — нет.
 func is_lit() -> bool:
 	return _lit
+
+
+## Погашенная неоновая трубка днём: цвет неона, но тёмный и в свету. Одна на
+## вывеску здания и вывески лавок у выезда ([ExitStreet]).
+static func unlit_tube(neon: Color) -> Color:
+	return neon.lerp(Color(0.5, 0.5, 0.5), UNLIT_GREY).darkened(UNLIT_DARKEN)
 
 
 ## Текст вывески сверху вниз, буквами без пробелов: для тестов.

@@ -153,7 +153,8 @@ func _process(_delta: float) -> void:
 		AudioServer.set_bus_effect_enabled(index, SLOW_EFFECT, slow)
 	if slow:
 		var shift := AudioServer.get_bus_effect(index, SLOW_EFFECT) as AudioEffectPitchShift
-		shift.pitch_scale = lerpf(SLOWEST_PITCH, 1.0, clampf(tempo, 0.0, 1.0))
+		if shift != null:
+			shift.pitch_scale = lerpf(SLOWEST_PITCH, 1.0, clampf(tempo, 0.0, 1.0))
 
 
 ## Как у [GameState]: без этого статическая ссылка переживала бы сам узел, и
@@ -186,6 +187,16 @@ func play(name: String, pitch: float = 1.0, db: float = 0.0) -> void:
 	player.play()
 	if Sounds.JINGLES.has(name):
 		_duck(stream.get_length())
+
+
+## Сколько общих голосов звучит эффектом [param name] прямо сейчас. Нужно тестам.
+func voices_playing(name: String) -> int:
+	var stream := Sounds.stream(name)
+	var count := 0
+	for player: AudioStreamPlayer in _sfx:
+		if player.playing and player.stream == stream:
+			count += 1
+	return count
 
 
 ## Включает музыку наплывом. Тот же трек не перезапускается: иначе тема

@@ -157,7 +157,8 @@ func begin(
 	# Вертолёт снаружи: днём на нём солнце (ADR-0051).
 	Outdoors.mark(_helicopter)
 	_helicopter.daytime = daytime
-	_helicopter.avoid(obstacles)
+	# Над техникой крыши — с запасом; на саму крышу поток от винта гонит пыль.
+	_helicopter.avoid(obstacles, deck)
 	# Над высокой техникой — башней, антенной — вертолёт висит выше обычного.
 	var hover := _helicopter.safe_hover(WorldSpace.to_scene(landing - Vector2(0.0, HOVER_HEIGHT)))
 	_helicopter.fly_in(hover, not full)
@@ -331,6 +332,9 @@ func _enter(next: Step) -> void:
 			_otto.visible = true
 			_otto.ride_pose = ActorPose.PEEK
 			_otto.ride_turn = 1.0
+			# В проём сразу: показанный под крюком, он на кадр висел бы в воздухе
+			# снаружи вертолёта.
+			_peek()
 		Step.SIT:
 			_wait = SIT_TIME if _full else SIT_TIME_SHORT
 			_otto.ride_pose = ActorPose.SIT_EDGE
@@ -394,14 +398,19 @@ func _swing_out() -> void:
 func _slide(delta: float) -> void:
 	var feet := _on_rope().y
 	var left := feet - _deck_height()
+	# Предел скорости: полный ход, а у крыши — тот, с которого успеть затормозить.
+	# Разгон — и в зоне торможения: начатый у самой крыши спуск с нуля иначе
+	# так и стоял бы на месте.
+	var top := SLIDE_SPEED
 	if left < BRAKE_FROM:
-		var allowed := maxf(sqrt(2.0 * BRAKING * maxf(left, 0.0)), TOUCH_SPEED)
-		_speed = minf(_speed, allowed)
-	else:
-		_speed = minf(_speed + SLIDE_ACCELERATION * delta, SLIDE_SPEED)
+		top = minf(top, maxf(sqrt(2.0 * BRAKING * maxf(left, 0.0)), TOUCH_SPEED))
+	_speed = minf(_speed + SLIDE_ACCELERATION * delta, top)
 	_along += _speed * delta
 	var at := _on_rope()
 	if at.y <= _deck_height() + 0.001:
+		# Сам встал на место: вступление его и поставило, — иначе отпуск принял
+		# бы приезд за перестановку и оборвал звук троса.
+		_place(WorldSpace.to_scene(_landing))
 		_land()
 		_release_camera(false)
 		return

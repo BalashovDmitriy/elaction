@@ -4,14 +4,18 @@ extends Node3D
 ## Комната за дверью (ADR-0047): номер отеля или кабинет офиса.
 ##
 ## Видна, пока створка открыта: ортокамера смотрит в проём почти в лоб, и в
-## нём — задняя стена комнаты с окном на ночной город и тем, что стоит перед
-## ней, и полоса пола (камера наклонена на [constant SideCamera.TILT_DEGREES]).
+## нём — задняя стена комнаты с окном и тем, что стоит перед ней, и полоса пола
+## (камера наклонена на [constant SideCamera.TILT_DEGREES]).
 ## Потолка не видно, боковые стены — на случай света: он не уходит в пустоту
 ## за коридором.
 ##
 ## Собирает её дверь, когда створка трогается, и убирает, когда закрылась:
 ## дверей в здании полсотни, и держать полсотни комнат со своим светом — лишнее.
 ## Жребий — по двери: одна и та же дверь открывается в ту же комнату.
+##
+## Окно — проём в задней стене со стеклом (ADR-0052, решение 5): за ним тот же
+## город, что за зданием ([CityBackdrop]), — он рисуется позади всей сцены, и в
+## проёме виден он сам, с фасадами пака, небом, погодой и временем суток.
 ##
 ## Координаты — двери: X вдоль стены от середины проёма, Y — от пола, Z —
 ## сцены, комната за задней стеной коридора.
@@ -51,27 +55,8 @@ const OFFICE_FLOOR := Color(0.26, 0.28, 0.31)
 const CEILING := Color(0.85, 0.83, 0.8)
 const WINDOW_FRAME := Color(0.9, 0.88, 0.84)
 const WINDOW_SHADER := preload("res://src/levels/room_window.gdshader")
-## Вид за окном по времени суток (ADR-0052, решение 5): верх неба, низ неба у
-## домов и сами дома, по [enum TimeOfDay.Kind]. Ночь — прежняя, M24i.
-const WINDOW_SKY_TOP: Array[Color] = [
-	Color(0.42, 0.58, 0.84),
-	Color(0.36, 0.6, 0.92),
-	Color(0.16, 0.12, 0.32),
-	Color(0.02, 0.03, 0.08)
-]
-const WINDOW_SKY_LOW: Array[Color] = [
-	Color(0.98, 0.78, 0.64), Color(0.72, 0.84, 0.96), Color(0.98, 0.52, 0.3), Color(0.1, 0.09, 0.2)
-]
-const WINDOW_BLOCK: Array[Color] = [
-	Color(0.36, 0.36, 0.42),
-	Color(0.44, 0.47, 0.52),
-	Color(0.08, 0.07, 0.11),
-	Color(0.015, 0.018, 0.03)
-]
-const WINDOW_GLOW: Array[float] = [1.0, 1.0, 1.25, 1.4]
-## Облачность за окном: в туман и дождь небо и дома уходят к серому.
+## Облачный свет из окна: в туман и дождь солнце уходит к серому.
 const WINDOW_OVERCAST := Color(0.5, 0.52, 0.56)
-const WINDOW_OVERCAST_SHARE: float = 0.6
 ## Солнце из окна днём (ADR-0052, решение 5): пятно на полу и мебели. Свой
 ## источник вместо света под потолком — комнат открыто одна-две, бюджет тот
 ## же. Без тени: тень от рамы дороже, чем видна.
@@ -84,6 +69,10 @@ const SUN_PITCH: float = 44.0
 const HOTEL_ART: PackedStringArray = ["painting", "wall_art_02", "wall_art_03", "wall_art_05"]
 const OFFICE_ART: PackedStringArray = ["whiteboard", "calendar", "corkboard", "analog_clock"]
 
+## Сколько комнат сейчас открыто: пока хоть одна, город за зданием рисуется,
+## даже когда здание закрыло весь кадр, — его видно в окне.
+static var open_count: int = 0
+
 ## Что стоит в комнате: имя предмета каталога, где (X вдоль стены, Z от задней
 ## стены комнаты к коридору, м) и поворот, градусы. Тестам и кадрам.
 var placed: Array[Dictionary] = []
@@ -94,6 +83,9 @@ var dark: bool = false
 ## Время суток за окном: днём свет в комнате не горит, светит солнце.
 var time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT
 var weather: Weather.Kind = Weather.Kind.CLEAR
+
+var _wall_look: StandardMaterial3D = null
+var _shift: float = 0.0
 
 
 ## Собирает комнату: [param is_hotel] — номер отеля или кабинет, [param seed] —
@@ -137,6 +129,14 @@ static func build(
 	return room
 
 
+func _enter_tree() -> void:
+	open_count += 1
+
+
+func _exit_tree() -> void:
+	open_count = maxi(open_count - 1, 0)
+
+
 ## Светло ли за окном: утро и день. Тогда свет в комнате не горит, а из окна
 ## падает солнце — или, в непогоду, просто дневной свет.
 func is_sunlit() -> bool:
@@ -164,7 +164,8 @@ func _shell(shift: float, identity: BuildingIdentity) -> void:
 		Vector3(shift, HEIGHT - 0.01, middle),
 		GreyboxLook.surface(CEILING)
 	)
-	_box(Vector3(WIDTH, HEIGHT, WALL), Vector3(shift, HEIGHT * 0.5, back_z() - WALL * 0.5), wall)
+	_wall_look = wall
+	_shift = shift
 	for side: float in [-1.0, 1.0]:
 		_box(
 			Vector3(WALL, HEIGHT, DEPTH),
@@ -175,12 +176,12 @@ func _shell(shift: float, identity: BuildingIdentity) -> void:
 
 ## Окно на город в задней стене с рамой и подоконником; у отеля — шторы.
 func _window(x: float, rng: RandomNumberGenerator) -> void:
+	_wall_around(x)
 	var glass := QuadMesh.new()
 	glass.size = WINDOW
 	var look := ShaderMaterial.new()
 	look.shader = WINDOW_SHADER
 	look.set_shader_parameter(&"seed", rng.randf() * 100.0)
-	_dress_window(look)
 	look.set_shader_parameter(&"blinds", 0.0 if hotel else 1.0)
 	glass.material = look
 	var pane := MeshInstance3D.new()
@@ -210,21 +211,24 @@ func _window(x: float, rng: RandomNumberGenerator) -> void:
 		_put("curtains", x, 0.12, 0.0, WINDOW.x + 0.9)
 
 
-## Цвета вида за окном по времени суток и погоде.
-func _dress_window(look: ShaderMaterial) -> void:
-	var overcast := WINDOW_OVERCAST_SHARE if weather != Weather.Kind.CLEAR else 0.0
-	var top := WINDOW_SKY_TOP[time]
-	var low := WINDOW_SKY_LOW[time]
-	var block := WINDOW_BLOCK[time]
-	if is_sunlit():
-		top = top.lerp(WINDOW_OVERCAST, overcast)
-		low = low.lerp(WINDOW_OVERCAST, overcast)
-		block = block.lerp(WINDOW_OVERCAST.darkened(0.3), overcast * 0.5)
-	look.set_shader_parameter(&"sky_top", top)
-	look.set_shader_parameter(&"sky_low", low)
-	look.set_shader_parameter(&"block", block)
-	look.set_shader_parameter(&"glow", WINDOW_GLOW[time])
-	look.set_shader_parameter(&"lit_share", 0.38 * TimeOfDay.lit_windows(time))
+## Задняя стена с проёмом под окно: слева, справа, над окном и под ним.
+func _wall_around(x: float) -> void:
+	var z := back_z() - WALL * 0.5
+	var left := _shift - WIDTH * 0.5
+	var right := _shift + WIDTH * 0.5
+	var low := x - WINDOW.x * 0.5
+	var high := x + WINDOW.x * 0.5
+	var top := WINDOW_SILL + WINDOW.y
+	_box(
+		Vector3(low - left, HEIGHT, WALL), Vector3((left + low) * 0.5, HEIGHT * 0.5, z), _wall_look
+	)
+	_box(
+		Vector3(right - high, HEIGHT, WALL),
+		Vector3((high + right) * 0.5, HEIGHT * 0.5, z),
+		_wall_look
+	)
+	_box(Vector3(WINDOW.x, HEIGHT - top, WALL), Vector3(x, (top + HEIGHT) * 0.5, z), _wall_look)
+	_box(Vector3(WINDOW.x, WINDOW_SILL, WALL), Vector3(x, WINDOW_SILL * 0.5, z), _wall_look)
 
 
 ## Номер отеля: кровать изголовьем к стене, тумба с лампой, ковёр, картина над

@@ -166,16 +166,18 @@ var _weather: Weather.Kind = Weather.Kind.CLEAR
 var _time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT
 ## Сила огней улицы, 0–1: ночью 1, днём в ясную — 0.
 var _lights: float = 1.0
-## Дома под солнцем — фасадом пака; ночью — фасадом без освещения.
+## Светло ли снаружи — не ночь: погашенный неон тогда в свету дня, а не в темноте.
 var _sunlit: bool = false
+## Дома и стёкла витрин — мультимешами, как у города на заднике.
 var _blocks: Array[CityPlan.Block] = []
+var _glass_places: Array[Transform3D] = []
+var _glass_tones: Array[Color] = []
+var _glass_customs: Array[Color] = []
 var _rng := RandomNumberGenerator.new()
 var _road: StandardMaterial3D = null
 var _glow: OmniLight3D = null
 var _lamp: SpotLight3D = null
 var _rain: Array[GPUParticles3D] = []
-## Коробки фасадов и окна — мультимешами, как у города на заднике.
-var _windows: Array[Array] = [[], []]
 var _traffic: StreetTraffic = null
 ## Колода вывесок: лавки на одной улице не повторяются.
 var _names: Array[String] = []
@@ -238,11 +240,12 @@ func road() -> StandardMaterial3D:
 
 
 ## Настоящий свет улицы: горит, пока выезд в кадре. Поток тоже едет только тогда.
+## Днём в ясную источников нет вовсе ([method is_lit]).
 func show_light(on: bool) -> void:
 	if _glow != null:
-		_glow.visible = on and is_lit()
+		_glow.visible = on
 	if _lamp != null:
-		_lamp.visible = on and is_lit()
+		_lamp.visible = on
 	if _traffic != null:
 		_traffic.set_active(on)
 
@@ -255,11 +258,6 @@ func traffic() -> StreetTraffic:
 ## Горят ли огни улицы: неон, фонарь, отсвет вывески. Днём в ясную — нет.
 func is_lit() -> bool:
 	return _lights > LIGHTS_ON
-
-
-## Дома через дорогу — под солнцем, фасадом пака (не ночью).
-func is_sunlit() -> bool:
-	return _sunlit
 
 
 ## Настоящие источники улицы — для тестов бюджета.
@@ -475,7 +473,7 @@ func _hang_sign(middle: float, width: float, face: float, neon: Color, lit: bool
 		words.outline_size = 10
 	elif _sunlit:
 		# Погашенный неон днём — трубки в свету, как у вывески здания.
-		words.modulate = unlit_tube(neon)
+		words.modulate = VerticalSign.unlit_tube(neon)
 		words.outline_size = 0
 		words.shaded = true
 	else:
@@ -549,7 +547,7 @@ func _hang_blade(x: float, face: float) -> void:
 			label.modulate = neon
 			label.outline_modulate = neon.darkened(0.4)
 		else:
-			label.modulate = unlit_tube(neon)
+			label.modulate = VerticalSign.unlit_tube(neon)
 			label.outline_modulate = label.modulate.darkened(0.3)
 		label.outline_size = 8
 		label.shaded = not is_lit()
@@ -557,6 +555,9 @@ func _hang_blade(x: float, face: float) -> void:
 		label.position = _at(x, y, z + 0.09)
 		add_child(label)
 		y += BLADE_STEP
+	if not is_lit():
+		# Днём отсвет погашен: источника нет вовсе.
+		return
 	_glow = OmniLight3D.new()
 	_glow.name = "BladeGlow"
 	_glow.light_color = neon
@@ -568,10 +569,6 @@ func _hang_blade(x: float, face: float) -> void:
 	# тротуар — фасад выше без освещения и отсвета не взял бы.
 	_glow.position = _at(x, bottom + 0.6, z + 1.4)
 	_glow.visible = false
-	if not is_lit():
-		# Днём отсвет погашен: источника нет вовсе.
-		_glow = null
-		return
 	add_child(_glow)
 	if Weather.is_raining(_weather):
 		add_child(
@@ -709,35 +706,15 @@ func _add_glass(centre: Vector2, size: Vector2, face: float, tone: Color, inside
 		),
 		_at(centre.x, centre.y, face + 0.02)
 	)
-	var custom := Color(_rng.randf(), float(inside), 1.0, 1.0)
-	(_windows[1] as Array).append([place, Color(tone.r, tone.g, tone.b), custom])
+	_glass_places.append(place)
+	_glass_tones.append(Color(tone.r, tone.g, tone.b))
+	_glass_customs.append(Color(_rng.randf(), float(inside), 1.0, 1.0))
 
 
-## Фасады и окна одним махом: мультимешем, как у города на заднике.
+## Дома и витрины одним махом, мультимешами, как у города на заднике: фасад
+## пака на коробке во всю высоту, его же окна — горящие долей времени суток, —
+## и стёкла лавок с жизнью за ними.
 func _flush_multimeshes() -> void:
-	_flush_pack_facades()
-
-
-## Окна и витрины одним мультимешем на горящие и погасшие.
-func _flush_windows() -> void:
-	for lit in 2:
-		var places: Array[Transform3D] = []
-		var colours: Array[Color] = []
-		var customs: Array[Color] = []
-		for window: Array in _windows[lit]:
-			places.append(window[0] as Transform3D)
-			colours.append(window[1] as Color)
-			customs.append(window[2] as Color)
-		var quads := CityBackdrop.window_quads(
-			"LitWindows" if lit == 1 else "DarkWindows", places, colours, customs, lit == 1
-		)
-		quads.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		add_child(quads)
-
-
-## Дома: фасад пака на коробке во всю высоту, как у города на заднике, и его
-## же окна — горящие долей времени суток.
-func _flush_pack_facades() -> void:
 	var box := BoxMesh.new()
 	var look := CityLook.building()
 	look.set_shader_parameter("lit_share", CityPlan.LIT_SHARE * TimeOfDay.lit_windows(_time))
@@ -759,14 +736,15 @@ func _flush_pack_facades() -> void:
 	var houses := MultiMeshInstance3D.new()
 	houses.name = "PackFacades"
 	houses.multimesh = many
+	# Солнце за спиной камеры: тень домов легла бы за них, где её не видно, а
+	# карту теней грузила бы двадцатиметровыми коробками.
+	houses.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(houses)
-	# Витрины лавок — те же стёкла с жизнью за ними, что и ночью.
-	_flush_windows()
-
-
-## Погашенная неоновая трубка днём: цвет неона, но тёмный и в свету.
-static func unlit_tube(neon: Color) -> Color:
-	return neon.lerp(Color(0.5, 0.5, 0.5), 0.35).darkened(0.5)
+	var glass := CityBackdrop.window_quads(
+		"LitWindows", _glass_places, _glass_tones, _glass_customs, true
+	)
+	glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(glass)
 
 
 ## Дождь над улицей: струи перед домами и круги на мостовой.

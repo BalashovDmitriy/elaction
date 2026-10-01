@@ -311,8 +311,6 @@ func _physics_process(delta: float) -> void:
 ## [param crushed] — придавило кабиной: у такой смерти своя поза, в оригинале
 ## раздавленный показан отдельной картинкой (ADR-0011, пункт 12).
 func kill(crushed: bool = false) -> void:
-	if crushed and not is_dead():
-		Sounds.play(Sounds.CRUSH)
 	if _grace > 0.0:
 		return
 
@@ -320,6 +318,9 @@ func kill(crushed: bool = false) -> void:
 		return
 	_crushed = crushed
 	if crushed:
+		# Только настоящая смерть: в передышке кабина зовёт это каждый шаг
+		# физики, пока Otto под ней, и давка звучала бы очередью.
+		Sounds.play(Sounds.CRUSH)
 		set_meta(&"death_cause", "crushed")
 	elif not has_meta(&"shooter"):
 		set_meta(&"death_cause", "fall")

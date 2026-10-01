@@ -5,6 +5,8 @@ extends GutTest
 ## Как и поездка на эскалаторе, это состояние снимается только снаружи: дверь
 ## выпускает Otto сама через 70 тиков ROM, раньше не выйти (ADR-0038, решение 2).
 
+const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
+
 
 func _snapshot(move: float = 0.0, crouch: bool = false, jump: bool = false) -> OttoInput:
 	var input := OttoInput.new()
@@ -59,7 +61,7 @@ func test_world_driven_covers_door_and_escalator() -> void:
 ## Уязвим Otto только на своих ногах и без передышки: по этому агенты
 ## придерживают выстрел, а не пускают пулю сквозь него.
 func test_otto_can_be_hit_only_on_foot_and_out_of_grace() -> void:
-	var otto := preload("res://src/actors/otto/otto.tscn").instantiate() as Otto
+	var otto := OTTO_SCENE.instantiate() as Otto
 	add_child_autofree(otto)
 	assert_true(otto.hittable, "на своих ногах уязвим")
 	otto.ride(true)
@@ -75,3 +77,25 @@ func test_otto_can_be_hit_only_on_foot_and_out_of_grace() -> void:
 	assert_false(otto.hittable, "в передышку после возвращения — нет")
 	await wait_seconds(Otto.RESPAWN_GRACE + 0.2)
 	assert_true(otto.hittable, "передышка кончилась — снова уязвим")
+
+
+## Кабина зовёт [method Otto.kill] каждый шаг физики, пока Otto под ней, и в
+## передышке тоже: давка звучит только настоящей смертью, а не очередью на все
+## голоса (авторевью M24k).
+func test_a_crush_in_grace_makes_no_sound() -> void:
+	var director := AudioDirector.instance()
+	assert_not_null(director, "автолоад звука поднят")
+	if director == null:
+		return
+	var otto := OTTO_SCENE.instantiate() as Otto
+	add_child_autofree(otto)
+	otto.kill()
+	otto.revive()
+	for _step: int in 3:
+		otto.kill(true)
+	assert_false(otto.is_dead(), "в передышку кабина не убивает")
+	assert_eq(director.voices_playing(Sounds.CRUSH), 0, "и давка не звучит")
+	await wait_seconds(Otto.RESPAWN_GRACE + 0.2)
+	otto.kill(true)
+	assert_true(otto.is_dead(), "без передышки — давит")
+	assert_eq(director.voices_playing(Sounds.CRUSH), 1, "и давка звучит один раз")
