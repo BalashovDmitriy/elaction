@@ -75,9 +75,9 @@ var _listener: AudioListener3D = null
 ## Крупный план: насколько наехали, 0–1, и на что. Ведёт его режиссёр сценки.
 var _close: float = 0.0
 var _close_point := Vector2.ZERO
-## Сила толчка, 0–1, и когда он начался, мс настоящего времени.
+## Сила толчка, 0–1, и сколько он уже идёт, с настоящего времени.
 var _kick: float = 0.0
-var _kick_ticks: int = 0
+var _kick_age: float = 0.0
 
 
 func _ready() -> void:
@@ -111,14 +111,14 @@ func _process(delta: float) -> void:
 	else:
 		_centre = CameraBounds.smoothed(_centre, wanted, smoothing_speed, delta)
 	global_position = _perch(_centre)
-	_shake()
+	_shake(delta)
 
 
 ## Толкает кадр: сдвиг, крен и добавочный наезд, гаснущие за [constant
 ## KICK_FADE] с настоящего времени. [param strength] — 0–1.
 func kick(strength: float) -> void:
 	_kick = clampf(strength, 0.0, 1.0)
-	_kick_ticks = Time.get_ticks_msec()
+	_kick_age = 0.0
 
 
 ## Идёт ли толчок. Тестам.
@@ -126,10 +126,13 @@ func is_kicked() -> bool:
 	return _kick > 0.0
 
 
-func _shake() -> void:
+## Настоящее время толчка — шаг кадра без замедления мира, а не часы: под
+## прогоном тестов с `--fixed-fps` часы и кадры расходятся (run_tests.py).
+func _shake(delta: float) -> void:
 	if _kick <= 0.0:
 		return
-	var age := (Time.get_ticks_msec() - _kick_ticks) / 1000.0
+	_kick_age += delta / maxf(Engine.time_scale, 0.001)
+	var age := _kick_age
 	var left := 1.0 - age / KICK_FADE
 	if left <= 0.0:
 		_kick = 0.0

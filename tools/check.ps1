@@ -15,18 +15,15 @@ try {
         throw 'Нет .venv. Создайте: python -m venv .venv; .venv\Scripts\pip install -r requirements-dev.txt'
     }
 
-    Write-Host '== gdformat --check ==' -ForegroundColor Cyan
-    # Модулем, а не gdformat.exe и gdlint.exe: неподписанные обёртки pip
+    Write-Host '== gdformat --check и gdlint ==' -ForegroundColor Cyan
+    # Модулями, а не gdformat.exe и gdlint.exe: неподписанные обёртки pip
     # блокирует управление приложениями Windows (WinError 4551), см.
-    # .pre-commit-config.yaml. python.exe из того же окружения не блокируется.
-    & (Join-Path $bin 'python.exe') -m gdtoolkit.formatter --check src tests tools
+    # .pre-commit-config.yaml. Оба разом и кусками по потокам процессора:
+    # подряд они шли одиннадцать секунд на одном потоке (tools/gd_tools.py).
+    & (Join-Path $bin 'python.exe') (Join-Path $root 'tools\gd_tools.py')
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    Write-Host '== gdlint ==' -ForegroundColor Cyan
-    & (Join-Path $bin 'python.exe') -m gdtoolkit.linter src tests tools
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-    Write-Host '== godot --headless --import ==' -ForegroundColor Cyan
+    Write-Host '== движок: импорт и разбор скриптов ==' -ForegroundColor Cyan
     & python (Join-Path $root 'tools\godot_check.py')
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
