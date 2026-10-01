@@ -3,7 +3,7 @@ extends RefCounted
 
 ## Детали ночного города за зданием (M22, замечание пользователя — «больше
 ## детализации заднему фону»): верхи домов, мигающие огни, неон, зарево улиц,
-## звёзды и луна, полосы тумана.
+## полосы тумана; звёзды и луна с M24j — на панораме неба.
 ##
 ## Город размыт глубиной резкости своей камеры, поэтому детали такие, что
 ## читаются и в размытии: силуэт, огонёк, пятно цвета. Всё мультимешами и без
@@ -26,11 +26,6 @@ const BEACON_PERIOD: float = 1.8
 ## Зарево улиц: высота полосы над землёй и её цвет у земли.
 const GLOW_HEIGHT: float = 26.0
 const GLOW_COLOUR := Color(1.0, 0.55, 0.25, 0.55)
-
-## Звёзды и луна ясной ночи.
-const STARS: int = 260
-const MOON: float = 16.0
-const MOON_COLOUR := Color(0.9, 0.92, 1.0)
 
 ## Полосы тумана: сколько, какой высоты и насколько плотные.
 const FOG_BANKS: int = 7
@@ -215,60 +210,6 @@ static func street_glow(ground: float, from_x: float, to_x: float) -> MeshInstan
 	glow.mesh = quad
 	glow.position = Vector3((from_x + to_x) * 0.5, ground + GLOW_HEIGHT * 0.5, -58.0)
 	return glow
-
-
-## Звёзды и луна над городом ясной ночи.
-static func night_sky(building_seed: int, from_x: float, to_x: float, ground: float) -> Node3D:
-	var host := Node3D.new()
-	host.name = "NightSky"
-	var rng := RandomNumberGenerator.new()
-	rng.seed = hash([building_seed, "stars"])
-	var places: Array[Transform3D] = []
-	var colours: Array[Color] = []
-	for _i in STARS:
-		var size := rng.randf_range(0.5, 1.4)
-		var at := Vector3(
-			rng.randf_range(from_x - 500.0, to_x + 500.0),
-			ground + rng.randf_range(60.0, 300.0),
-			-600.0
-		)
-		places.append(Transform3D(Basis.from_scale(Vector3.ONE * size), at))
-		var warm := rng.randf() < 0.2
-		var shine := rng.randf_range(0.35, 0.9)
-		colours.append(Color(1.0, 0.9, 0.75) * shine if warm else Color(0.8, 0.86, 1.0) * shine)
-	var quad := QuadMesh.new()
-	var look := StandardMaterial3D.new()
-	look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	look.vertex_color_use_as_albedo = true
-	look.disable_fog = true
-	quad.material = look
-	var many := MultiMesh.new()
-	many.transform_format = MultiMesh.TRANSFORM_3D
-	many.use_colors = true
-	many.mesh = quad
-	many.instance_count = places.size()
-	for index in places.size():
-		many.set_instance_transform(index, places[index])
-		many.set_instance_color(index, colours[index])
-	var stars := MultiMeshInstance3D.new()
-	stars.name = "Stars"
-	stars.multimesh = many
-	host.add_child(stars)
-
-	var moon := MeshInstance3D.new()
-	moon.name = "Moon"
-	var disc := SphereMesh.new()
-	disc.radius = MOON * 0.5
-	disc.height = MOON
-	var pale := StandardMaterial3D.new()
-	pale.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	pale.albedo_color = MOON_COLOUR
-	pale.disable_fog = true
-	disc.material = pale
-	moon.mesh = disc
-	moon.position = Vector3(to_x * 0.8, ground + 150.0, -590.0)
-	host.add_child(moon)
-	return host
 
 
 ## Полосы тумана между рядами домов; плывут вбок в [method drift].

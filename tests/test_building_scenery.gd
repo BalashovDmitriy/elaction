@@ -201,6 +201,8 @@ func test_roof_steps_frame_the_machine_room() -> void:
 ## У декора нет тел, а источников в окружении два — лампа над крышей и отсвет
 ## неоновой вывески на углу (ADR-0033, решение 2): окна города, табло, буквы
 ## вывески и огонь антенны светятся эмиссией и бюджет ламп кадра не трогают.
+## Солнце или луна города (ADR-0051) — в своём мире города, за [SubViewport], и
+## тоже не в счёт.
 func test_scenery_adds_no_bodies_and_no_lights() -> void:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
@@ -214,7 +216,10 @@ func test_scenery_adds_no_bodies_and_no_lights() -> void:
 		return
 	var bodies := scenery.find_children("*", "CollisionObject3D", true, false)
 	assert_eq(bodies.size(), 0, "у декора есть тела")
-	var lights := scenery.find_children("*", "Light3D", true, false)
+	var lights: Array[Node] = []
+	for light in scenery.find_children("*", "Light3D", true, false):
+		if light.get_viewport() == level.get_viewport():
+			lights.append(light)
 	assert_eq(lights.size(), 2, "в окружении не два источника света")
 	assert_not_null(scenery.get_node_or_null("City"), "города нет")
 	remove_child(level)

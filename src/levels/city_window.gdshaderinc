@@ -23,14 +23,6 @@ uniform vec3 switch_tone : source_color = vec3(0.95, 0.72, 0.42);
 // Во сколько темнее своего света стекло погасшего окна.
 const float SWITCHED_OFF = 0.06;
 
-// День (ADR-0051): горит только доля окон, остальные — стекло, в котором
-// небо. 0 — ночь как была.
-uniform float daylight = 0.0;
-uniform float lit_share = 1.0;
-uniform vec3 sky_top : source_color = vec3(0.3, 0.5, 0.85);
-uniform vec3 sky_low : source_color = vec3(0.75, 0.85, 0.95);
-uniform vec3 day_frame : source_color = vec3(0.32, 0.32, 0.34);
-
 varying vec4 custom;
 varying vec3 tone;
 
@@ -52,7 +44,7 @@ float bar(float distance, float width) {
 // Переключено ли окно сейчас: 1 — наоборот своему состоянию. Жребий окна —
 // его, а не кадра: город по сиду повторяется и в том, кто когда гасит свет.
 float switched(float seed) {
-	if (hash1(seed * 91.7) > switch_share * (1.0 - daylight)) {
+	if (hash1(seed * 91.7) > switch_share) {
 		return 0.0;
 	}
 	float period = switch_period * mix(0.5, 1.5, hash1(seed * 17.3));
@@ -111,12 +103,7 @@ vec3 dark_glass(vec2 uv, float seed, vec3 base) {
 	c += vec3(0.018, 0.022, 0.034) * (1.0 - uv.y);
 	float sheen = 1.0 - smoothstep(0.0, 0.08, abs(uv.x + uv.y * 0.6 - fract(seed * 3.7) * 1.6));
 	c += vec3(0.02, 0.024, 0.036) * sheen;
-	c += flash_colour * flash * 4.0 * (0.4 + 0.6 * (1.0 - uv.y));
-	// Днём в стекле — небо: светлее у верха, где оно над домами напротив, и
-	// косой блик ярче.
-	vec3 sky = mix(sky_low, sky_top, uv.y) * mix(0.32, 0.5, fract(seed * 7.7));
-	sky += sky_low * sheen * 0.35;
-	return mix(c, sky, daylight);
+	return c + flash_colour * flash * 4.0 * (0.4 + 0.6 * (1.0 - uv.y));
 }
 
 void fragment() {
@@ -136,10 +123,6 @@ void fragment() {
 		bars = max(bars, bar(uv.y - 0.34, 0.02));
 	}
 	float was_lit = lit;
-	// Днём горит только доля окон: остальные — своё стекло, в котором небо.
-	if (lit > 0.5 && hash1(seed * 23.9) > lit_share) {
-		lit = 0.0;
-	}
 	if (switched(seed) > 0.5) {
 		lit = 1.0 - lit;
 	}
@@ -149,5 +132,5 @@ void fragment() {
 	vec3 base = was_lit > 0.5 ? tone * SWITCHED_OFF : tone;
 	vec3 glass = lit > 0.5 ? lit_room(uv, seed, custom.y, light) : dark_glass(uv, seed, base);
 	float cover = max(frame, bars) * detail;
-	ALBEDO = mix(glass, mix(frame_colour, day_frame, daylight), cover);
+	ALBEDO = mix(glass, frame_colour, cover);
 }

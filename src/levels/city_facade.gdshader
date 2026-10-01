@@ -16,19 +16,6 @@ uniform vec4 window_heights = vec4(1.5);
 uniform vec3 street_glow : source_color = vec3(1.0, 0.55, 0.25);
 uniform float glow_height = 34.0;
 uniform float glow_strength = 0.05;
-// Сколько уличных огней горит, 0–1 (ADR-0051): днём зарева нет.
-uniform float street_lights = 1.0;
-
-// День (ADR-0051): фасад — краска при солнце и небе, а не тёмная коробка.
-// Материал неосвещаемый, как ночью, — свет считается здесь по грани дома: у
-// коробки их всего три в кадре, лицо, бок и крыша. 0 — ночь как была.
-uniform float daylight = 0.0;
-uniform vec3 day_tones[4];
-// Направление к солнцу в мире города и его свет, уже со силой.
-uniform vec3 sun_direction = vec3(0.0, 1.0, 0.0);
-uniform vec3 sun_light : source_color = vec3(0.0);
-// Свет неба: тени и грани, куда солнце не достаёт.
-uniform vec3 sky_light : source_color = vec3(0.0);
 
 varying vec3 local;
 varying vec3 size;
@@ -93,28 +80,10 @@ void fragment() {
 	colour *= 1.0 - under * 0.5 * detail;
 	colour += base * (cornice * 1.6 + corner * 0.9);
 	// Зарево улиц снизу.
-	colour += street_glow * glow_strength * street_lights * exp(-at.y / glow_height);
+	colour += street_glow * glow_strength * exp(-at.y / glow_height);
 
 	// Бок дома темнее лица, крыша — ещё темнее.
 	colour = mix(colour, base * 0.7, side * (1.0 - front));
 	colour = mix(colour, base * 0.6, roof);
-
-	if (daylight > 0.0) {
-		vec3 paint = day_tones[int(clamp(kind, 0.0, 3.0))];
-		// Пояса и подоконники выступают и ловят свет, простенки чуть в тени.
-		paint *= 1.0 + detail * (band * 0.12 + sill * 0.25 - pier * inside * 0.06 + mullion * 0.2);
-		paint *= 1.0 - under * 0.35 * detail;
-		vec3 normal = vec3(0.0, 0.0, 1.0);
-		if (roof > 0.5) {
-			normal = vec3(0.0, 1.0, 0.0);
-		} else if (side * (1.0 - front) > 0.5) {
-			normal = vec3(sign(local.x), 0.0, 0.0);
-		}
-		float sun = max(dot(normal, sun_direction), 0.0);
-		vec3 day = paint * (sky_light + sun_light * sun);
-		// Угол и карниз — светлее, чтобы силуэт отделялся от дома позади.
-		day += paint * sky_light * (cornice * 0.5 + corner * 0.25);
-		colour = mix(colour, day, daylight);
-	}
 	ALBEDO = colour;
 }

@@ -20,14 +20,7 @@ const WEIGHTS: Array[float] = [0.2, 0.2, 0.2, 0.4]
 ## ([constant Weather.SALT]), ни с раскладкой того же сида.
 const SALT: int = 0x71_3E0D
 
-## Небо у зенита и у горизонта в ясную погоду. Ночное — то же, что было
-## одним цветом до M24j ([constant Weather.SKY]): ночь не меняется.
-const ZENITH: Array[Color] = [
-	Color(0.3, 0.42, 0.68),
-	Color(0.2, 0.42, 0.85),
-	Color(0.24, 0.24, 0.46),
-	Color(0.07, 0.08, 0.15),
-]
+## Горизонт в ясную погоду: его долей светится воздух здания днём.
 const HORIZON: Array[Color] = [
 	Color(0.98, 0.76, 0.6),
 	Color(0.6, 0.75, 0.92),
@@ -35,30 +28,10 @@ const HORIZON: Array[Color] = [
 	Color(0.07, 0.08, 0.15),
 ]
 
-## Небо в непогоду — сплошная облачность: утро и вечер теплее дня. Туман
-## светлее дождя. Ночью — цвет погоды, как было.
-const OVERCAST: Array[Color] = [
-	Color(0.55, 0.55, 0.6),
-	Color(0.6, 0.63, 0.67),
-	Color(0.42, 0.36, 0.38),
-	Color(0.0, 0.0, 0.0),
-]
-
-## Зарево у горизонта на стороне солнца: утром и вечером.
-const SUN_GLOW: Array[Color] = [
-	Color(0.45, 0.25, 0.18),
-	Color(0.08, 0.07, 0.04),
-	Color(0.85, 0.32, 0.1),
-	Color(0.0, 0.0, 0.0),
-]
-
-## Сколько неба под облаками в ясную погоду; в непогоду — сплошь.
-const CLOUDS: Array[float] = [0.35, 0.3, 0.42, 0.0]
-
 ## Откуда светит солнце: высота над горизонтом, градусы, и сторона — минус
 ## слева от камеры. Утром низкое справа, днём высокое, вечером низкое слева.
-const SUN_ELEVATION: Array[float] = [14.0, 58.0, 9.0, -30.0]
-const SUN_SIDE: Array[float] = [1.0, 0.35, -1.0, 0.0]
+const SUN_ELEVATION: Array[float] = [6.0, 40.0, 5.0, 14.0]
+const SUN_SIDE: Array[float] = [1.0, 0.5, -1.0, 0.6]
 const SUN_COLOUR: Array[Color] = [
 	Color(1.0, 0.86, 0.72),
 	Color(1.0, 0.97, 0.9),
@@ -76,9 +49,6 @@ const LIT_WINDOWS: Array[float] = [0.3, 0.06, 0.75, 1.0]
 ## Сила уличных огней — фонарей, неона, зарева, маяков: утром и вечером
 ## частично, днём выключены (решение 6).
 const STREET_LIGHTS: Array[float] = [0.35, 0.0, 0.85, 1.0]
-
-## Сила неоновой вывески здания: днём горит бледно.
-const SIGN_GLOW: Array[float] = [0.55, 0.3, 0.9, 1.0]
 
 ## Тон кадра — кривые по каналам от теней к свету ([Atmosphere]). Ночной —
 ## нуар M22; утро прохладное с розовым светом, день почти нейтральный, вечер
@@ -139,24 +109,6 @@ static func has_thunder(kind: Kind) -> bool:
 	return kind == Kind.EVENING or kind == Kind.NIGHT
 
 
-## Небо у зенита при погоде [param weather].
-static func zenith(kind: Kind, weather: Weather.Kind) -> Color:
-	if kind == Kind.NIGHT:
-		return Weather.sky(weather)
-	if weather != Weather.Kind.CLEAR:
-		return _overcast(kind, weather).darkened(0.1)
-	return ZENITH[kind]
-
-
-## Небо у горизонта при погоде [param weather]: им же — дымка города.
-static func horizon(kind: Kind, weather: Weather.Kind) -> Color:
-	if kind == Kind.NIGHT:
-		return Weather.sky(weather)
-	if weather != Weather.Kind.CLEAR:
-		return _overcast(kind, weather)
-	return HORIZON[kind]
-
-
 ## Откуда идёт свет солнца — направление от сцены к солнцу, мир сцены.
 ## Солнце за спиной камеры и сбоку: лицом к игроку стоит то, что им освещено.
 ## Со спины солнца лица фасадов и крыши были бы против света — силуэтом.
@@ -175,19 +127,6 @@ static func sun_energy(kind: Kind, weather: Weather.Kind) -> float:
 	if weather == Weather.Kind.RAIN:
 		return energy * 0.2
 	return energy
-
-
-## Зарево у горизонта: в облачность оно глохнет.
-static func sun_glow(kind: Kind, weather: Weather.Kind) -> Color:
-	var glow := SUN_GLOW[kind]
-	return glow if weather == Weather.Kind.CLEAR else glow * 0.25
-
-
-## Сколько неба закрыто облаками.
-static func clouds(kind: Kind, weather: Weather.Kind) -> float:
-	if weather == Weather.Kind.CLEAR:
-		return CLOUDS[kind]
-	return 0.95
 
 
 static func sun_colour(kind: Kind) -> Color:
@@ -210,15 +149,6 @@ static func street_lights(kind: Kind, weather: Weather.Kind = Weather.Kind.CLEAR
 	return lights
 
 
-static func sign_glow(kind: Kind) -> float:
-	return SIGN_GLOW[kind]
-
-
-## Горят ли фары у машин: в темноте и в непогоду (решение 6).
-static func headlights(kind: Kind, weather: Weather.Kind) -> bool:
-	return kind == Kind.EVENING or kind == Kind.NIGHT or weather != Weather.Kind.CLEAR
-
-
 ## Окружающий свет здания от ночного [param night]: цвет и множитель силы.
 static func ambient(kind: Kind, night: Color) -> Color:
 	return night.lerp(AMBIENT_TINT[kind], AMBIENT_TINT_SHARE[kind])
@@ -226,8 +156,3 @@ static func ambient(kind: Kind, night: Color) -> Color:
 
 static func ambient_gain(kind: Kind) -> float:
 	return AMBIENT_GAIN[kind]
-
-
-static func _overcast(kind: Kind, weather: Weather.Kind) -> Color:
-	var grey := OVERCAST[kind]
-	return grey.lightened(0.12) if weather == Weather.Kind.FOG else grey.darkened(0.12)

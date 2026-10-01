@@ -40,12 +40,7 @@ const BLUR_FROM: float = 106.0
 const BLUR_OVER: float = 120.0
 const BLUR_AMOUNT: float = 0.035
 
-## Дом — тёмная коробка: его видно дымкой и окнами, а не гранями.
-const FACADE := Color(0.012, 0.014, 0.022)
-
-## Окна: тёплые и холодные вперемешку, как в ночном городе.
-const WINDOW_WARM := Color(1.0, 0.78, 0.45)
-const WINDOW_COLD := Color(0.62, 0.78, 1.0)
+## Окна улицы выезда (`ExitStreet`) — квадами, как было у города до M24j.
 const WINDOW_SIZE := Vector2(1.2, 1.5)
 
 ## Яркость окон по ряду глубины. Окна не берут дымку — в ней они гасли вместе с
@@ -56,25 +51,19 @@ const WINDOW_FADE: Array[float] = [1.0, 0.75, 0.55, 0.4]
 ## сеткой окон, а не россыпью огней (ADR-0031, решение 6).
 const WINDOW_DARK := Color(0.05, 0.06, 0.09)
 
-## Во сколько раз небо ярче во вспышке молнии, и как сильно загораются стёкла.
-const FLASH_SKY: float = 4.0
+## Как сильно стёкла загораются во вспышке молнии.
 const FLASH_GLASS := Color(0.55, 0.6, 0.75)
 
-const SKY_SHADER := preload("res://src/levels/city_sky.gdshader")
-
-## День (ADR-0051): свет неба на фасадах — доля цвета неба, — свет солнца на
-## гранях к нему и тон верхов домов. Город неосвещаемый, и эти числа — весь
-## его дневной свет.
-const DAY_SKY_LIGHT: float = 0.5
-const DAY_SUN_LIGHT: float = 0.4
-const DAY_CROWN := Color(0.4, 0.4, 0.42)
-## Дымка днём: доля ночной плотности и насколько она темнее горизонта.
-const DAY_HAZE: float = 0.35
-const DAY_HAZE_DARKEN: float = 0.2
-const DAY_GLOW_THRESHOLD: float = 1.6
-## Экспозиция города днём: кадр города ложится фоном под тон основного
-## воздуха, и тот его ещё высветляет.
-const DAY_EXPOSURE: float = 0.55
+## Дымка города — доля плотности погоды: дальние ряды уходят в цвет неба.
+const HAZE: float = 0.25
+## Экспозиция города: панорамы Poly Haven ярче нашего кадра.
+const EXPOSURE: float = 0.8
+## Сила света окон по времени суток: днём комната за стеклом темнее неба.
+const WINDOW_GLOW: Array[float] = [0.45, 0.2, 0.6, 0.65]
+## Сила дождя города днём — доля ночной: на светлом небе капли видны и так.
+const DAY_RAIN: float = 0.25
+## Тон верхов домов.
+const CROWN := Color(0.32, 0.31, 0.3)
 
 var _view: SubViewport = null
 var _camera: Camera3D = null
@@ -83,7 +72,9 @@ var _rules: BuildingRules = null
 ## Струи дождя у камеры города: их долю пересчитывает уровень качества.
 var _rain_layers: Array[GPUParticles3D] = []
 var _city_air: Environment = null
-var _dark_glass: ShaderMaterial = null
+## Дома и их материал: в него — доля горящих окон и вспышка молнии.
+var _houses: MultiMeshInstance3D = null
+var _house_look: ShaderMaterial = null
 var _fog_banks: Node3D = null
 var _lightning: Lightning = null
 ## Вспышка, которая сейчас стоит на небе и в стёклах.
@@ -129,36 +120,37 @@ func build(
 	_view.add_child(_camera)
 
 	var blocks := CityPlan.generate(building_seed, 0.0, rules.width)
-	var facades := _facades(blocks)
-	_view.add_child(facades)
-	var lit := _windows(blocks)
-	_view.add_child(lit)
-	var dark := _dark_windows(blocks)
-	_dark_glass = (dark.multimesh.mesh as QuadMesh).material as ShaderMaterial
-	_view.add_child(dark)
+	_houses = _buildings(blocks)
+	_view.add_child(_houses)
+	_house_look = (_houses.multimesh.mesh as BoxMesh).material as ShaderMaterial
+	_house_look.set_shader_parameter("lit_share", CityPlan.LIT_SHARE * TimeOfDay.lit_windows(time))
+	_house_look.set_shader_parameter("window_glow", WINDOW_GLOW[time])
+	_view.add_child(CitySky.light(time, weather))
 	# Детали города (M22): верхи, огни, неон, зарево улиц.
-	var crown_look := _unshaded(FACADE)
-	_view.add_child(CityDetails.crowns(blocks, _ground, crown_look))
+	_view.add_child(CityDetails.crowns(blocks, _ground, _crown_look()))
+	var lights := TimeOfDay.street_lights(time, weather)
 	var beacons := CityDetails.beacons(blocks, _ground)
+	beacons.visible = lights > 0.0
 	_view.add_child(beacons)
 	var signs := CityDetails.signs(blocks, _ground)
+	var neon := (signs.multimesh.mesh as QuadMesh).material as ShaderMaterial
+	neon.set_shader_parameter("power", lights)
+	neon.set_shader_parameter("daylight", TimeOfDay.daylight(time))
 	_view.add_child(signs)
-	var glow := CityDetails.street_glow(_ground, 0.0, rules.width)
-	_view.add_child(glow)
-	if not TimeOfDay.is_night(time):
-		_daylight(weather, facades, [lit, dark], crown_look, beacons, signs, glow)
+	if lights > 0.0:
+		var glow := CityDetails.street_glow(_ground, 0.0, rules.width)
+		((glow.mesh as QuadMesh).material as StandardMaterial3D).albedo_color.a = lights
+		_view.add_child(glow)
 	match weather:
-		Weather.Kind.CLEAR:
-			# Звёзды и луна — только ночью.
-			if TimeOfDay.is_night(time):
-				_view.add_child(CityDetails.night_sky(building_seed, 0.0, rules.width, _ground))
 		Weather.Kind.FOG:
 			_fog_banks = CityDetails.fog_banks(building_seed, 0.0, rules.width, _ground)
 			_view.add_child(_fog_banks)
 		Weather.Kind.RAIN:
 			# Слои струй у камеры и завесы между рядами (ADR-0037, решение 3).
-			_view.add_child(RainLook.city(_camera, _ground, 0.0, rules.width))
+			var rain := RainLook.city(_camera, _ground, 0.0, rules.width)
+			_view.add_child(rain)
 			_rain_layers = RainLook.city_layers(_camera)
+			RainLook.dim_city(rain, _camera, lerpf(1.0, DAY_RAIN, TimeOfDay.daylight(time)))
 			# Гроза — только вечером и ночью (ADR-0051, решение 7).
 			if TimeOfDay.has_thunder(time):
 				_lightning = Lightning.new()
@@ -183,75 +175,6 @@ func build(
 	apply_graphics()
 
 
-## Город утром, днём и вечером (ADR-0051): небо шейдером, фасады под солнцем,
-## окна — стекло с небом, огни по времени. Ночь не трогается вовсе.
-func _daylight(
-	weather: Weather.Kind,
-	facades: MultiMeshInstance3D,
-	windows: Array[MultiMeshInstance3D],
-	crown_look: StandardMaterial3D,
-	beacons: MultiMeshInstance3D,
-	signs: MultiMeshInstance3D,
-	glow: MeshInstance3D
-) -> void:
-	var day := TimeOfDay.daylight(_time)
-	var zenith := TimeOfDay.zenith(_time, weather)
-	var horizon := TimeOfDay.horizon(_time, weather)
-	var sun := TimeOfDay.sun_colour(_time) * TimeOfDay.sun_energy(_time, weather)
-	# Тени освещает небо над головой, а не горизонт: вечером они лиловые, а не
-	# оранжевые, как всё остальное.
-	var sky_light := zenith.lerp(horizon, 0.25) * DAY_SKY_LIGHT
-	var lights := TimeOfDay.street_lights(_time, weather)
-
-	var sky := ShaderMaterial.new()
-	sky.shader = SKY_SHADER
-	sky.set_shader_parameter("zenith", zenith)
-	sky.set_shader_parameter("horizon", horizon)
-	sky.set_shader_parameter("glow", TimeOfDay.sun_glow(_time, weather))
-	sky.set_shader_parameter("glow_side", TimeOfDay.SUN_SIDE[_time])
-	sky.set_shader_parameter("cloud_cover", TimeOfDay.clouds(_time, weather))
-	sky.set_shader_parameter("cloud_light", horizon.lerp(Color.WHITE, 0.55))
-	sky.set_shader_parameter("cloud_shade", zenith.lerp(horizon, 0.6).darkened(0.25))
-	_city_air.background_mode = Environment.BG_SKY
-	_city_air.sky = Sky.new()
-	_city_air.sky.sky_material = sky
-	# Дымка — цвета горизонта и не на небе: на бесконечности она закрасила бы
-	# его целиком, а ночью небо и было цветом дымки.
-	_city_air.fog_light_color = horizon.darkened(DAY_HAZE_DARKEN)
-	_city_air.fog_sky_affect = 0.0
-	# Днём дымка реже ночной: светлая, она съедала бы дома уже со второго ряда.
-	_city_air.fog_density = Weather.city_fog(weather) * DAY_HAZE
-	# И свечение только с ярчайшего: дневной фасад и так светлее порога ночи.
-	_city_air.glow_hdr_threshold = DAY_GLOW_THRESHOLD
-	_city_air.tonemap_exposure = DAY_EXPOSURE
-
-	var facade := (facades.multimesh.mesh as BoxMesh).material as ShaderMaterial
-	var tones := PackedVector3Array()
-	for tone: Color in CityLook.DAY_TONES:
-		tones.append(Vector3(tone.r, tone.g, tone.b))
-	facade.set_shader_parameter("daylight", day)
-	facade.set_shader_parameter("day_tones", tones)
-	facade.set_shader_parameter("sun_direction", TimeOfDay.sun_direction(_time))
-	facade.set_shader_parameter("sun_light", Vector3(sun.r, sun.g, sun.b) * DAY_SUN_LIGHT)
-	facade.set_shader_parameter("sky_light", sky_light)
-	facade.set_shader_parameter("street_lights", lights)
-	for node in windows:
-		var glass := (node.multimesh.mesh as QuadMesh).material as ShaderMaterial
-		glass.set_shader_parameter("daylight", day)
-		glass.set_shader_parameter("lit_share", TimeOfDay.lit_windows(_time))
-		glass.set_shader_parameter("sky_top", zenith)
-		glass.set_shader_parameter("sky_low", horizon)
-		glass.set_shader_parameter("day_frame", DAY_CROWN * (sky_light + sun * 0.3))
-	crown_look.albedo_color = FACADE.lerp(DAY_CROWN * (sky_light + sun * 0.4), day)
-	var neon := (signs.multimesh.mesh as QuadMesh).material as ShaderMaterial
-	neon.set_shader_parameter("power", lights)
-	neon.set_shader_parameter("daylight", day)
-	beacons.visible = lights > 0.0
-	glow.visible = lights > 0.0
-	var warm := (glow.mesh as QuadMesh).material as StandardMaterial3D
-	warm.albedo_color = Color(1.0, 1.0, 1.0, lights)
-
-
 ## Настраивает основной воздух так, чтобы он рисовал город фоном.
 static func show_behind(environment: Environment) -> void:
 	environment.background_mode = Environment.BG_CANVAS
@@ -268,9 +191,9 @@ func _process(delta: float) -> void:
 		# Между вспышками небо и стёкла покадрово не переписываются.
 		if flash != _flash_shown:
 			_flash_shown = flash
-			_city_air.background_energy_multiplier = 1.0 + flash * (FLASH_SKY - 1.0)
-			# Отсвет молнии в стёклах: погасшие окна загораются отражённым небом.
-			_dark_glass.set_shader_parameter("flash", flash)
+			(_city_air.sky.sky_material as ShaderMaterial).set_shader_parameter("flash", flash)
+			# Отсвет молнии в стёклах: окна загораются отражённым небом.
+			_house_look.set_shader_parameter("flash", flash)
 	var main := get_viewport().get_camera_3d()
 	if main == null or _camera == null:
 		return
@@ -359,33 +282,40 @@ func _fit_view() -> void:
 
 func _air(weather: Weather.Kind) -> Environment:
 	var air := Environment.new()
-	air.background_mode = Environment.BG_COLOR
-	air.background_color = Weather.sky(weather)
-	air.ambient_light_source = Environment.AMBIENT_SOURCE_DISABLED
+	air.background_mode = Environment.BG_SKY
+	air.sky = Sky.new()
+	air.sky.sky_material = CitySky.material(_time, weather)
+	air.sky.radiance_size = Sky.RADIANCE_SIZE_128
+	# Свет и отражения — от неба: тени лиловые на закате и серые в дождь сами.
+	air.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	air.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	air.fog_enabled = true
-	air.fog_light_color = Weather.sky(weather)
-	air.fog_density = Weather.city_fog(weather)
+	# Дымка берёт цвет неба по направлению: даль уходит в небо, а не в серое.
+	air.fog_aerial_perspective = 1.0
+	air.fog_sky_affect = 0.0
+	air.fog_density = Weather.city_fog(weather) * HAZE
 	air.tonemap_mode = Environment.TONE_MAPPER_ACES
+	air.tonemap_exposure = EXPOSURE
 	# Свечение — чтобы огни антенн и неон на дальних домах цвели в размытии.
 	air.glow_enabled = true
-	air.glow_intensity = 0.7
-	air.glow_hdr_threshold = 0.9
+	air.glow_intensity = 0.45
+	air.glow_hdr_threshold = 1.5
 	return air
 
 
-static func _unshaded(color: Color, vertex_colors: bool = false) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.albedo_color = color
-	material.vertex_color_use_as_albedo = vertex_colors
-	return material
+## Материал верхов: уступов, шпилей, баков — бетон под тем же светом.
+static func _crown_look() -> StandardMaterial3D:
+	var look := StandardMaterial3D.new()
+	look.albedo_color = CROWN
+	look.roughness = 0.85
+	return look
 
 
-## Коробки домов одним мультимешем: их сотни, и по узлу на дом не нужно.
-## Пояса, простенки и карниз рисует шейдер ([CityLook]), тон — тип дома.
-func _facades(blocks: Array[CityPlan.Block]) -> MultiMeshInstance3D:
+## Дома одним мультимешем: их сотни, и по узлу на дом не нужно. Фасад —
+## запечённый фасад пака по стилю дома, окна — в нём же ([CityLook]).
+func _buildings(blocks: Array[CityPlan.Block]) -> MultiMeshInstance3D:
 	var box := BoxMesh.new()
-	box.material = CityLook.facade()
+	box.material = CityLook.building()
 	var many := MultiMesh.new()
 	many.transform_format = MultiMesh.TRANSFORM_3D
 	many.use_colors = true
@@ -397,65 +327,12 @@ func _facades(blocks: Array[CityPlan.Block]) -> MultiMeshInstance3D:
 		var basis := Basis.from_scale(Vector3(block.width, block.height, block.depth))
 		var centre := Vector3(block.x, _ground + block.height * 0.5, block.z)
 		many.set_instance_transform(index, Transform3D(basis, centre))
-		many.set_instance_color(index, CityLook.facade_tone(block))
-		many.set_instance_custom_data(index, CityLook.facade_custom(block))
+		many.set_instance_color(index, CityLook.wall_tint(block))
+		many.set_instance_custom_data(index, CityLook.building_custom(block))
 	var node := MultiMeshInstance3D.new()
-	node.name = "Facades"
+	node.name = "Buildings"
 	node.multimesh = many
 	return node
-
-
-## Горящие окна на фасадах, обращённых к камере, одним мультимешем.
-func _windows(blocks: Array[CityPlan.Block]) -> MultiMeshInstance3D:
-	var places: Array[Transform3D] = []
-	var colors: Array[Color] = []
-	var customs: Array[Color] = []
-	for block in blocks:
-		for window: Vector2i in block.lit:
-			places.append(_window_place(block, window))
-			customs.append(CityLook.window_custom(block, window, true))
-			# Холодное окно — по хешу окна и дома, а не по диагонали сетки: иначе
-			# по всему городу шёл один и тот же узор (авторевью M19).
-			var cold := hash([block.x, window]) % 3 == 0
-			var tone := WINDOW_COLD if cold else WINDOW_WARM
-			var fade := WINDOW_FADE[mini(block.row, WINDOW_FADE.size() - 1)]
-			colors.append(Color(tone.r * fade, tone.g * fade, tone.b * fade))
-	return window_quads("Windows", places, colors, customs, true)
-
-
-## Погасшие окна — вся остальная сетка фасада — своим мультимешем.
-##
-## В дымке, в отличие от горящих: тёмное стекло обязано быть чуть светлее своего
-## фасада, а фасад дымка высветляет. Без неё в тумане и под дождём погасшее окно
-## выходило темнее фасада дальнего ряда, и сетка читалась дырами (авторевью M20).
-func _dark_windows(blocks: Array[CityPlan.Block]) -> MultiMeshInstance3D:
-	var places: Array[Transform3D] = []
-	var colors: Array[Color] = []
-	var customs: Array[Color] = []
-	for block in blocks:
-		var grid := CityPlan.window_grid(block)
-		var burning: Dictionary = {}
-		for window: Vector2i in block.lit:
-			burning[window] = true
-		for column in grid.x:
-			for level in grid.y:
-				var cell := Vector2i(column, level)
-				if burning.has(cell):
-					continue
-				places.append(_window_place(block, cell))
-				colors.append(WINDOW_DARK)
-				customs.append(CityLook.window_custom(block, cell, false))
-	return window_quads("DarkWindows", places, colors, customs, false)
-
-
-## Где на фасаде дома [param block] окно [param cell] сетки: колонка и этаж.
-func _window_place(block: CityPlan.Block, cell: Vector2i) -> Transform3D:
-	var grid := CityPlan.window_grid(block)
-	var left := block.x - float(grid.x - 1) * CityPlan.WINDOW_STEP.x * 0.5
-	var x := left + float(cell.x) * CityPlan.WINDOW_STEP.x
-	var y := _ground + CityPlan.WINDOW_STEP.y * (float(cell.y) + 1.0)
-	var front := block.z + block.depth * 0.5 + 0.05
-	return Transform3D(Basis.from_scale(CityLook.window_scale(block)), Vector3(x, y, front))
 
 
 ## Окна одним мультимешем: квад на окно, цвет — вершинный, что за стеклом —

@@ -89,7 +89,6 @@ func test_the_city_details_add_no_lights() -> void:
 		CityDetails.beacons(blocks, 0.0),
 		CityDetails.signs(blocks, 0.0),
 		CityDetails.street_glow(0.0, 0.0, 40.0),
-		CityDetails.night_sky(2, 0.0, 40.0, 0.0),
 		CityDetails.fog_banks(2, 0.0, 40.0, 0.0),
 	]
 	for node in nodes:

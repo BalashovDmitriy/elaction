@@ -1,0 +1,26 @@
+{
+  "styles": [
+    "brick",
+    "double",
+    "inset",
+    "glass",
+    "office",
+    "stone"
+  ],
+  "tile_width": 4.0,
+  "density": 64,
+  "rows": [
+    {
+      "name": "top",
+      "height": 1.0
+    },
+    {
+      "name": "floor",
+      "height": 3.0
+    },
+    {
+      "name": "ground",
+      "height": 3.0
+    }
+  ]
+}

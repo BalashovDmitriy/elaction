@@ -22,7 +22,7 @@ const FLASH_AMBIENT: float = 2.5
 ## Солнце утром, днём и вечером (ADR-0051): во сколько раз его сила из
 ## [TimeOfDay] и докуда кладёт тень, м. Лампа над крышей днём — отсвет неба:
 ## своя доля силы и цвет солнца.
-const SUN_GAIN: float = 1.0
+const SUN_GAIN: float = 1.5
 const SUN_SHADOW_DISTANCE: float = 70.0
 const ROOF_LIGHT_BY_DAY: float = 0.45
 

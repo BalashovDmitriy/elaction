@@ -102,6 +102,23 @@
 | `roof_gravel` | [Gravel043](https://ambientcg.com/view?id=Gravel043) | ambientCG | CC0 1.0 |
 | `hotel_wall` | своя, рисуется кодом | elaction | MIT |
 
+## Город и небо
+
+Фасады города запекает `tools/build_city.py` из модулей пака в
+`assets/textures/city/`; панорамы неба качает `tools/build_sky.py` в `assets/sky/`
+([ADR-0051](docs/adr/0051-time-of-day.md), решения 10 и 11).
+
+| Имя | Набор | Автор | Лицензия |
+|---|---|---|---|
+| `city/facade_*` | [Downtown City MegaKit, Standard](https://quaternius.com/packs/downtowncitymegakit.html) | Quaternius | CC0 1.0 |
+| `sky/morning_clear` | [Syferfontein 0d Clear (Pure Sky)](https://polyhaven.com/a/syferfontein_0d_clear_puresky) | Greg Zaal, Jarod Guest | CC0 1.0 |
+| `sky/day_clear` | [Qwantani Mid Morning (Pure Sky)](https://polyhaven.com/a/qwantani_mid_morning_puresky) | Greg Zaal, Jarod Guest | CC0 1.0 |
+| `sky/evening_clear` | [Belfast Sunset (Pure Sky)](https://polyhaven.com/a/belfast_sunset_puresky) | Greg Zaal, Dimitrios Savva, Jarod Guest | CC0 1.0 |
+| `sky/night_clear` | [Qwantani Moonrise (Pure Sky)](https://polyhaven.com/a/qwantani_moonrise_puresky) | Greg Zaal, Jarod Guest | CC0 1.0 |
+| `sky/fog` | [Kloofendal 28d Misty (Pure Sky)](https://polyhaven.com/a/kloofendal_28d_misty_puresky) | Greg Zaal, Jenelle van Heerden | CC0 1.0 |
+| `sky/rain` | [Mud Road (Pure Sky)](https://polyhaven.com/a/mud_road_puresky) | Sergey Rudavin, Jarod Guest | CC0 1.0 |
+| `sky/dusk_overcast` | [Kloppenheim 01 (Pure Sky)](https://polyhaven.com/a/kloppenheim_01_puresky) | Greg Zaal, Jarod Guest | CC0 1.0 |
+
 ## Звук
 
 Собирает `tools/build_audio.py` в `assets/audio/` — обрезка, петля, громкость

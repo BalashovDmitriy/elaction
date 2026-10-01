@@ -100,6 +100,41 @@
    ]
   },
   {
+   "key": "UI_CREDITS_CITY",
+   "authors": [
+    {
+     "name": "Quaternius",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "Greg Zaal, Jarod Guest",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "Greg Zaal, Dimitrios Savva, Jarod Guest",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "Greg Zaal, Jenelle van Heerden",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "Sergey Rudavin, Jarod Guest",
+     "licences": [
+      "CC0 1.0"
+     ]
+    }
+   ]
+  },
+  {
    "key": "UI_CREDITS_SOUND",
    "authors": [
     {

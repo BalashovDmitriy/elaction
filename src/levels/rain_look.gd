@@ -155,6 +155,21 @@ static func city(camera: Camera3D, ground: float, from_x: float, to_x: float) ->
 	return host
 
 
+## Приглушает дождь города днём (ADR-0051): капли и завесы несут свет того,
+## что за ними, и на светлом небе горели бы белым. [param share] — доля
+## ночной силы.
+static func dim_city(host: Node, camera: Camera3D, share: float) -> void:
+	for layer in city_layers(camera):
+		var look := (layer.draw_pass_1 as QuadMesh).material as ShaderMaterial
+		look.set_shader_parameter("back_gain", float(CITY_DROP["back_gain"]) * share)
+	for child in host.get_children():
+		var curtain := child as MeshInstance3D
+		if curtain == null:
+			continue
+		var look := (curtain.mesh as QuadMesh).material as ShaderMaterial
+		look.set_shader_parameter("gain", float(look.get_shader_parameter("gain")) * share)
+
+
 ## Струи дождя города, чтобы пересчитать их долю по уровню качества.
 static func city_layers(camera: Camera3D) -> Array[GPUParticles3D]:
 	var found: Array[GPUParticles3D] = []
