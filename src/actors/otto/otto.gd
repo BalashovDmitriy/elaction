@@ -616,7 +616,8 @@ func _on_bullet_hit(target: Node3D) -> void:
 
 ## Начисляет очки за убитого агента: в темноте они дороже.
 func _award_for(agent: Enemy, base: int) -> void:
-	GameState.instance().add_score(GameState.kill_score(base, agent.is_in_the_dark()))
+	var points := GameState.kill_score(base, agent.is_in_the_dark())
+	GameState.instance().add_score(points, agent.global_position + GameState.OVER_HEAD)
 
 
 ## Агент, которого Otto достаёт вплотную (ADR-0040), или null. Добивают стоя

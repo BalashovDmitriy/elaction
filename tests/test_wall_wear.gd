@@ -47,8 +47,18 @@ func test_marks_keep_off_doors_shafts_and_walls() -> void:
 				assert_lte(mark.x + mark.width * 0.5, span.y, where + ": за правой стеной")
 				assert_lt(mark.floor_index, rules.floors - 1, where + ": гараж без следов")
 				assert_lt(
-					mark.rise + mark.width * 0.5, rules.floor_height, where + ": под потолком"
+					mark.rise + mark.width * 0.5,
+					rules.floor_height - rules.slab_height,
+					where + ": под потолком"
 				)
+				# Картинка лежит на штукатурке, за панелью стены: тэг ниже её
+				# верха панель срезала бы (авторевью M24m).
+				if WallWear.TAGS.has(mark.image):
+					assert_gte(
+						mark.rise - mark.width * WallWear.TAG_INK,
+						BuildingRibs.SKIRTING_HEIGHT + BuildingRibs.RAIL_HEIGHT,
+						where + ": тэг над панелью"
+					)
 
 
 ## Мигает доля ламп жилого дома, у отеля и офиса — ни одна; жребий по месту

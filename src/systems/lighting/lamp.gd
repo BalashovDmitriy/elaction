@@ -163,7 +163,9 @@ func dress_as(style: BuildingStyle) -> void:
 ## Мигание: долгая пауза, затем серия коротких провалов. Сбитая не мигает.
 func _process(delta: float) -> void:
 	if not is_hanging():
-		_show_lit(true)
+		# Свет — во всю силу до конца падения, а рассеиватель уже погасила
+		# [method shoot_down]: зажжённый заново, он светился бы на лету.
+		_glow(true)
 		set_process(false)
 		return
 	_flicker_wait -= delta
@@ -180,10 +182,15 @@ func _process(delta: float) -> void:
 
 
 func _show_lit(lit: bool) -> void:
-	_spot.light_energy = SPOT_ENERGY if lit else SPOT_ENERGY * FLICKER_LOW
-	_fill.light_energy = FILL_ENERGY if lit else FILL_ENERGY * FLICKER_LOW
+	_glow(lit)
 	if _diffuser != null:
 		_diffuser.material_override = GreyboxLook.marker(GreyboxLook.LAMP) if lit else _dim
+
+
+## Сила света лампы: полная или провал мигания.
+func _glow(lit: bool) -> void:
+	_spot.light_energy = SPOT_ENERGY if lit else SPOT_ENERGY * FLICKER_LOW
+	_fill.light_energy = FILL_ENERGY if lit else FILL_ENERGY * FLICKER_LOW
 
 
 func _physics_process(delta: float) -> void:

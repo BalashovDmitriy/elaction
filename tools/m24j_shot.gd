@@ -68,7 +68,9 @@ func _run() -> void:
 func _combo(time: int, weather: int) -> void:
 	GameState.instance().start_game()
 	if _kind >= 0:
-		GameState.instance().building = _building_of(_kind as BuildingIdentity.Kind)
+		GameState.instance().building = BuildingIdentity.first_of(
+			_kind as BuildingIdentity.Kind, _seed
+		)
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	_level.rules = BuildingRules.new()
 	_level.rules.time_of_day = time as TimeOfDay.Kind
@@ -97,15 +99,6 @@ func _combo(time: int, weather: int) -> void:
 	_level.queue_free()
 	_level = null
 	await get_tree().process_frame
-
-
-## Первое здание партии типа [param kind] на сиде кадров: тип — жребий номера
-## здания ([method BuildingIdentity.of]).
-func _building_of(kind: BuildingIdentity.Kind) -> int:
-	for building: int in range(1, 60):
-		if BuildingIdentity.of(building, _seed).kind == kind:
-			return building
-	return 1
 
 
 func _shoot_floor(label: String, index: int) -> void:

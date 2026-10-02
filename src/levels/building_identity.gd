@@ -54,6 +54,17 @@ static func of(building: int, building_seed: int) -> BuildingIdentity:
 	return identity
 
 
+## Номер первого здания партии типа [param which]: съёмке вехи, кадрам и тестам.
+## [param building_seed] — сид зданий; −1 — партия без соли, где сид здания —
+## его номер ([method GameState.building_seed]). Не нашлось — первое здание.
+static func first_of(which: Kind, building_seed: int = -1) -> int:
+	for building: int in range(1, 60):
+		var draw_seed := building if building_seed < 0 else building_seed
+		if BuildingIdentity.of(building, draw_seed).kind == which:
+			return building
+	return 1
+
+
 ## Здание типа [param which] с первым именем своего списка: тестам и кадрам.
 static func typed(which: Kind) -> BuildingIdentity:
 	var identity := BuildingIdentity.new()

@@ -22,6 +22,14 @@ func _rig(model: PackedScene) -> FigureRig:
 	return rig
 
 
+## Otto и агенты всех типов зданий: модели агента собраны одной сборкой
+## (ADR-0055, решение 7), и каждую риг обязан поднять так же, как прежнюю.
+func _models() -> Array[PackedScene]:
+	var all: Array[PackedScene] = [OTTO_MODEL]
+	all.append_array(AgentWardrobe.MODELS)
+	return all
+
+
 ## Otto из сцены: высоты его выстрелов и коллизий берутся у него, а не
 ## переписываются в тест числами.
 func _otto() -> Otto:
@@ -39,7 +47,7 @@ func _bullet_half_height() -> float:
 
 
 func test_both_models_carry_every_bone() -> void:
-	for model: PackedScene in [OTTO_MODEL, AGENT_MODEL]:
+	for model: PackedScene in _models():
 		var scene := model.instantiate()
 		add_child_autofree(scene)
 		var found := scene.find_children("*", "Skeleton3D", true, false)
@@ -274,7 +282,7 @@ func test_a_settled_corpse_lies_on_the_floor() -> void:
 ## пол `build_actors.py` (ADR-0039). Мерка — после шагов `advance`, как в игре, а
 ## не после `snap`: снимок заземляет по всем вершинам и промаха сборки не видит.
 func test_every_clip_stands_on_the_floor_by_itself() -> void:
-	for model: PackedScene in [OTTO_MODEL, AGENT_MODEL]:
+	for model: PackedScene in _models():
 		var rig := _rig(model)
 		var who := model.resource_path.get_file()
 		for pose_name: String in ["idle", "shoot", "jump", "land", "dead_0", "dead_1"]:
@@ -292,7 +300,7 @@ func test_every_clip_stands_on_the_floor_by_itself() -> void:
 ## низа с полным габаритом обязано быть в миллиметрах, иначе актёр висит или
 ## тонет. Верх по крайним не сверяется: риг берёт у них только низ.
 func test_the_hull_grounds_like_the_whole_mesh() -> void:
-	for model: PackedScene in [OTTO_MODEL, AGENT_MODEL]:
+	for model: PackedScene in _models():
 		var rig := _rig(model)
 		for pose_name: String in ActorPose.AGENT_POSES + PackedStringArray(["jump", "fall"]):
 			rig.show_pose(pose_name)
@@ -300,12 +308,15 @@ func test_the_hull_grounds_like_the_whole_mesh() -> void:
 			var whole := rig.skinned_aabb()
 			var hull := rig.skinned_aabb(true)
 			assert_almost_eq(
-				hull.position.y, whole.position.y, 0.01, "%s: низ по крайним" % pose_name
+				hull.position.y,
+				whole.position.y,
+				0.01,
+				"%s %s: низ по крайним" % [model.resource_path.get_file(), pose_name]
 			)
 
 
 func test_every_clip_is_in_both_models() -> void:
-	for model: PackedScene in [OTTO_MODEL, AGENT_MODEL]:
+	for model: PackedScene in _models():
 		var scene := model.instantiate()
 		add_child_autofree(scene)
 		var players := scene.find_children("*", "AnimationPlayer", true, false)

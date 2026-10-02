@@ -29,10 +29,18 @@ const CRACKS: PackedStringArray = ["crack_0", "crack_1"]
 
 ## Сколько следов на этаже: с каким шансом свободное место его получает.
 const CHANCE: float = 0.45
-## Тэг — понизу, на уровне руки, пятно — под потолком, где течёт сверху,
-## трещина — где придётся. Середина над полом, м, и ширина, м.
-const TAG_RISE := Vector2(0.95, 1.3)
+## Тэг — на уровне руки, пятно — под потолком, где течёт сверху, трещина — где
+## придётся. Ширина, м, и середина над полом, м.
 const TAG_WIDTH: float = 1.05
+## Низ рисунка тэга — росчерк под строкой — на такую долю ширины ниже середины
+## картинки (`tools/build_wear.py`).
+const TAG_INK: float = 0.3
+## Тэг — над панелью стены с поручнем: картинка лежит на штукатурке, а панель
+## ([constant BuildingRibs.SKIRTING_HEIGHT]) выступает перед ней и срезала
+## низ букв (кадры авторевью M24m).
+const TAG_RISE := Vector2(
+	BuildingRibs.SKIRTING_HEIGHT + BuildingRibs.RAIL_HEIGHT + TAG_WIDTH * TAG_INK + 0.04, 1.55
+)
 const STAIN_RISE := Vector2(1.9, 2.25)
 const STAIN_WIDTH: float = 0.7
 const CRACK_RISE := Vector2(1.2, 2.0)
@@ -62,11 +70,19 @@ static func lay(
 		return found
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([building_seed, SALT])
+	# Что висит на стене, по этажам: иначе каждое место обходило бы всё здание.
+	var hung := {}
+	if dressing != null:
+		for spot: BuildingDressing.PropSpot in dressing.decor:
+			if not hung.has(spot.floor_index):
+				hung[spot.floor_index] = PackedFloat64Array()
+			(hung[spot.floor_index] as PackedFloat64Array).append(spot.x)
 	# Этаж выхода — гараж: там своя отделка (ADR-0038).
-	for index in rules.floors - 1:
+	for index: int in rules.floors - 1:
 		var zones := BuildingDressing.blocked_zones(rules, plan, index)
+		var decor: PackedFloat64Array = hung.get(index, PackedFloat64Array())
 		for x: float in BuildingDressing.wall_spots(rules, plan, index):
-			if rng.randf() >= CHANCE or _near_decor(dressing, index, x):
+			if rng.randf() >= CHANCE or _near_decor(decor, x):
 				continue
 			var mark := _draw(rng, index, x)
 			if not clashes(zones, mark):
@@ -123,11 +139,11 @@ static func _draw(rng: RandomNumberGenerator, index: int, x: float) -> Mark:
 	return mark
 
 
-static func _near_decor(dressing: BuildingDressing, index: int, x: float) -> bool:
-	if dressing == null:
-		return false
-	for hung: BuildingDressing.PropSpot in dressing.decor:
-		if hung.floor_index == index and absf(hung.x - x) < DECOR_CLEAR:
+## Висит ли что-то из [param decor] этажа (середины по x) ближе
+## [constant DECOR_CLEAR] к месту [param x].
+static func _near_decor(decor: PackedFloat64Array, x: float) -> bool:
+	for hung_x: float in decor:
+		if absf(hung_x - x) < DECOR_CLEAR:
 			return true
 	return false
 
@@ -144,7 +160,7 @@ func _commit(image: String, places: Array[Transform3D]) -> void:
 	many.transform_format = MultiMesh.TRANSFORM_3D
 	many.mesh = quad
 	many.instance_count = places.size()
-	for index in places.size():
+	for index: int in places.size():
 		many.set_instance_transform(index, places[index])
 	var node := MultiMeshInstance3D.new()
 	node.name = image.capitalize()

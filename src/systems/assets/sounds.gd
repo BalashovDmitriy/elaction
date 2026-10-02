@@ -144,6 +144,7 @@ const NEON_BUZZ := "neon_buzz"
 const EFFECTS: PackedStringArray = [
 	STEP_CARPET,
 	STEP_CONCRETE,
+	STEP_LINO,
 	SHOT,
 	BLOW,
 	LAMP_BREAK,
@@ -215,7 +216,6 @@ const AMBIENCE: PackedStringArray = [
 	DOOR_TV,
 	DOOR_DOG,
 	DOOR_ARGUE,
-	STEP_LINO,
 	THUNDER_NEAR,
 	THUNDER_FAR,
 	SHAFT_HUM,

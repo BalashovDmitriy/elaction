@@ -3,7 +3,6 @@ extends GutTest
 ## Дуло пистолета — там, откуда вылетает пуля (ADR-0043, решение 16).
 
 const OTTO_MODEL := preload("res://assets/models/otto.glb")
-const AGENT_MODEL := preload("res://assets/models/agent.glb")
 
 
 func _rig(model: PackedScene) -> FigureRig:
@@ -20,10 +19,12 @@ func test_the_muzzle_meets_the_bullet_line() -> void:
 	var cases := [
 		[OTTO_MODEL, "shoot", Proportions.SHOT_HIGH],
 		[OTTO_MODEL, ActorPose.CROUCH, Proportions.SHOT_LOW],
-		[AGENT_MODEL, "shoot", Proportions.AGENT_SHOT],
-		[AGENT_MODEL, ActorPose.CROUCH, Proportions.SHOT_LOW],
-		[AGENT_MODEL, ActorPose.PRONE, Proportions.SHOT_PRONE, Proportions.MUZZLE_PRONE],
 	]
+	# Агент каждого типа здания (ADR-0055, решение 7): модель своя, пуля та же.
+	for agent: PackedScene in AgentWardrobe.MODELS:
+		cases.append([agent, "shoot", Proportions.AGENT_SHOT])
+		cases.append([agent, ActorPose.CROUCH, Proportions.SHOT_LOW])
+		cases.append([agent, ActorPose.PRONE, Proportions.SHOT_PRONE, Proportions.MUZZLE_PRONE])
 	for case: Array in cases:
 		var rig := _rig(case[0] as PackedScene)
 		rig.face(1.0, true)

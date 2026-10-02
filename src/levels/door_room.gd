@@ -66,6 +66,12 @@ const TV_RANGE: float = 2.6
 const TV_FLICKER: float = 7.0
 ## Телевизор повёрнут к дивану на столько градусов: экран видно и в проём.
 const TV_TURN: float = 25.0
+## Зазор ряда гостиной, м: повёрнутый телевизор выходит передним углом за свой
+## габарит на 0.27 м к дивану, и при узком зазоре угол входил в подлокотник.
+const LIVING_GAP: float = 0.3
+## Отступ ряда мебели от задней стены, м: по нему ряд считает, насколько
+## [method _put] ужмёт глубокий предмет.
+const ROW_FROM_WALL: float = 0.02
 ## Верх столешницы кухни в долях роста мойки: кран выше столешницы.
 const COUNTER_TOP: float = 0.85
 ## Мебель не ближе этого к боковым стенам комнаты, м.
@@ -154,6 +160,8 @@ static func build(
 		room._sun_in(window_x)
 	elif not unlit:
 		room._light(shift)
+	# Кадр нужен только мерцанию телевизора.
+	room.set_process(room._tv_glow != null)
 	return room
 
 
@@ -371,10 +379,12 @@ func _furnish_living(rng: RandomNumberGenerator) -> void:
 	if side > 0.0:
 		names.reverse()
 	var sofa_index := names.find("sofa")
-	var at := _row(names, sofa_index, side * rng.randf_range(0.0, 0.15), 0.1)
+	var at := _row(names, sofa_index, side * rng.randf_range(0.0, 0.15), LIVING_GAP)
 	var sofa := _put("sofa", at[sofa_index], 0.02, 0.0)
 	var tv_x := at[names.find("tv_old")]
-	var tv := _put("tv_old", tv_x, 0.3, side * TV_TURN)
+	# Поворот на +угол уводит лицо предмета к +X: телевизор с краю `side`
+	# смотрит обратно, к дивану, — а не в боковую стену.
+	var tv := _put("tv_old", tv_x, 0.3, -side * TV_TURN)
 	_put("floor_lamp", at[names.find("floor_lamp")], 0.08, 0.0)
 	_put("rug", at[sofa_index], sofa.z * 0.6, 0.0, 1.9)
 	_hang(HOME_ART[rng.randi_range(0, HOME_ART.size() - 1)], at[sofa_index], 1.6)
@@ -404,11 +414,16 @@ func _furnish_bedroom(rng: RandomNumberGenerator) -> void:
 ## Ряд предметов вдоль задней стены вплотную, через [param gap] м: середина
 ## [param hero]-го встаёт в [param hero_x], ряд целиком сдвигается внутрь
 ## комнаты, если упёрся в стену. Возвращает середины по порядку.
+##
+## Ширина — та, с которой предмет встанет: [method _put] ужимает глубокое
+## (двуспальная кровать — до трёх четвертей), и по габариту каталога тумбы
+## отходили от кровати на сорок сантиметров.
 func _row(names: Array[String], hero: int, hero_x: float, gap: float = 0.03) -> PackedFloat64Array:
 	var centres := PackedFloat64Array()
 	var cursor := 0.0
 	for name: String in names:
-		var width := PropCatalog.footprint(name).x
+		var size := PropCatalog.footprint(name)
+		var width := size.x * _depth_fit(size, ROW_FROM_WALL)
 		centres.append(cursor + width * 0.5)
 		cursor += width + gap
 	var span := cursor - gap
@@ -434,11 +449,9 @@ func _put(prop: String, x: float, from_wall: float, yaw: float, width: float = 0
 	if width > 0.0 and size.x > 0.001:
 		node.scale = Vector3.ONE * (width / size.x)
 		size *= width / size.x
-	var room_for := DEPTH - LEAF_CLEAR - from_wall
-	if size.z > room_for and size.z > 0.001:
-		var fit := room_for / size.z
-		node.scale *= fit
-		size *= fit
+	var fit := _depth_fit(size, from_wall)
+	node.scale *= fit
+	size *= fit
 	node.rotation.y = deg_to_rad(yaw)
 	x = _between_walls(x, size.x)
 	# У предмета каталога нуль — у задней грани: к стене он ставится одним
@@ -449,6 +462,15 @@ func _put(prop: String, x: float, from_wall: float, yaw: float, width: float = 0
 	add_child(node)
 	placed.append({"prop": prop, "x": x, "size": size, "from_wall": from_wall, "yaw": yaw})
 	return size
+
+
+## Во сколько раз [method _put] ужмёт предмет габаритом [param size] у отступа
+## [param from_wall]: глубже, чем места до створки, — сжимается целиком.
+static func _depth_fit(size: Vector3, from_wall: float) -> float:
+	var room_for := DEPTH - LEAF_CLEAR - from_wall
+	if size.z > room_for and size.z > 0.001:
+		return room_for / size.z
+	return 1.0
 
 
 ## Середина предмета шириной [param width], сдвинутая от боковых стен внутрь

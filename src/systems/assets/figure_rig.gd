@@ -90,6 +90,22 @@ const HULL_DIRECTIONS: Array[Vector3] = [
 	Vector3(-1, -1, 1),
 	Vector3(-1, -1, -1),
 ]
+## Ещё двенадцать — середины рёбер куба: для жёстких частей на одной кости
+## ([method SkinnedSurface._pick_hull]).
+const HULL_EDGES: Array[Vector3] = [
+	Vector3(1, 1, 0),
+	Vector3(1, -1, 0),
+	Vector3(-1, 1, 0),
+	Vector3(-1, -1, 0),
+	Vector3(1, 0, 1),
+	Vector3(1, 0, -1),
+	Vector3(-1, 0, 1),
+	Vector3(-1, 0, -1),
+	Vector3(0, 1, 1),
+	Vector3(0, 1, -1),
+	Vector3(0, -1, 1),
+	Vector3(0, -1, -1),
+]
 
 ## Шейдер порванной фигуры (ADR-0043, решения 8 и 11).
 const CARVE_SHADER := preload("res://src/systems/combat/carve.gdshader")
@@ -171,6 +187,17 @@ class SkinnedSurface:
 		for picks: Array[int] in best.values():
 			for index in picks:
 				chosen[index] = true
+		# Жёсткая часть на одной кости — шляпа, кепка — лёжа касается пола точкой
+		# между осями и углами куба: по ним одним кепка жилого дома уходила в пол
+		# на полтора сантиметра (авторевью M24m). Ей — и рёбра куба: вершин на ней
+		# сотни, а не тысячи, и лишних в крайних — дюжина.
+		if best.size() == 1:
+			for direction: Vector3 in HULL_EDGES:
+				var pick := 0
+				for index: int in vertices.size():
+					if vertices[index].dot(direction) > vertices[pick].dot(direction):
+						pick = index
+				chosen[pick] = true
 		return PackedInt32Array(chosen.keys())
 
 

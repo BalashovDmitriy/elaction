@@ -576,10 +576,7 @@ static func start_building() -> int:
 	var key := _milestone_from_cmdline().to_upper()
 	if not CAPTURE_KINDS.has(key):
 		return 1
-	for building: int in range(1, 60):
-		if BuildingIdentity.of(building, building).kind == CAPTURE_KINDS[key]:
-			return building
-	return 1
+	return BuildingIdentity.first_of(CAPTURE_KINDS[key])
 
 
 static func _milestone_from_cmdline() -> String:

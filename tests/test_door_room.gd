@@ -97,6 +97,65 @@ func test_furniture_stays_between_the_side_walls() -> void:
 				assert_lte(x + half, shell.end.x + 0.12, where + " за правой стеной")
 
 
+## Телевизор гостиной повёрнут к дивану, а не в боковую стену, и повёрнутый не
+## входит в диван передним углом. У предмета каталога лицо — к камере, и
+## поворот на +угол уводит его к +X (авторевью M24m: экран смотрел в стену).
+func test_the_tv_faces_the_sofa() -> void:
+	var seen := 0
+	for seed: int in DRAWS:
+		var room := _room(BuildingIdentity.Kind.RESIDENTIAL, seed)
+		if room.home != DoorRoom.Home.LIVING:
+			continue
+		var tv := _placed(room, "tv_old")
+		var sofa := _placed(room, "sofa")
+		assert_false(tv.is_empty() or sofa.is_empty(), "жребий %d: телевизор и диван" % seed)
+		if tv.is_empty() or sofa.is_empty():
+			continue
+		seen += 1
+		var apart := float(sofa["x"]) - float(tv["x"])
+		var yaw := float(tv["yaw"])
+		assert_eq(signf(yaw), signf(apart), "жребий %d: экран к дивану" % seed)
+		var size: Vector3 = tv["size"]
+		var turn := deg_to_rad(absf(yaw))
+		var corner := size.x * 0.5 * cos(turn) + size.z * sin(turn)
+		var sofa_edge := absf(apart) - (sofa["size"] as Vector3).x * 0.5
+		assert_gte(sofa_edge, corner, "жребий %d: угол телевизора не в диване" % seed)
+	assert_gt(seen, 0, "гостиные выпадали")
+
+
+## Тумбы спальни — вплотную к кровати. Ряд меряет кровать такой, какой она
+## встаёт: двуспальная ужимается по глубине на четверть, и по габариту каталога
+## тумбы отходили от неё на сорок сантиметров (авторевью M24m).
+func test_the_night_stands_flank_the_bed() -> void:
+	var seen := 0
+	for seed: int in DRAWS:
+		var room := _room(BuildingIdentity.Kind.RESIDENTIAL, seed)
+		if room.home != DoorRoom.Home.BEDROOM:
+			continue
+		var bed := _placed(room, "bed_double")
+		assert_false(bed.is_empty(), "жребий %d: кровать" % seed)
+		if bed.is_empty():
+			continue
+		seen += 1
+		var bed_half := (bed["size"] as Vector3).x * 0.5
+		for stand_name: String in ["night_stand", "night_stand_b"]:
+			var stand := _placed(room, stand_name)
+			if stand.is_empty():
+				continue
+			var stand_half := (stand["size"] as Vector3).x * 0.5
+			var gap := absf(float(stand["x"]) - float(bed["x"])) - bed_half - stand_half
+			assert_between(gap, -0.01, 0.2, "жребий %d: %s у кровати" % [seed, stand_name])
+	assert_gt(seen, 0, "спальни выпадали")
+
+
+## Что поставлено в комнату под именем [param prop]; пусто — если нет.
+func _placed(room: DoorRoom, prop: String) -> Dictionary:
+	for item: Dictionary in room.placed:
+		if item["prop"] == prop:
+			return item
+	return {}
+
+
 ## Оболочка комнаты — её коробки: пол, потолок и стены.
 func _shell_of(room: DoorRoom) -> AABB:
 	var shell := AABB()

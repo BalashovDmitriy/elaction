@@ -587,7 +587,7 @@ func _on_lamp_crushed(agent: Enemy) -> void:
 		return
 	agent.kill(true)
 	var points := GameState.kill_score(GameState.LAMP_SCORE, agent.is_in_the_dark())
-	GameState.instance().add_score(points)
+	GameState.instance().add_score(points, agent.global_position + GameState.OVER_HEAD)
 
 
 ## Лампа долетела до пола: её зона гаснет и обратно уже не загорается.

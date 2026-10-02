@@ -146,16 +146,19 @@ func _checker() -> StandardMaterial3D:
 	var cells := CHECKER_PIXELS * 2
 	var image := Image.create(cells, cells, false, Image.FORMAT_RGB8)
 	var grout := _style.tile_color.lerp(_style.tile_alt, 0.5).darkened(0.4)
-	for y in cells:
-		for x in cells:
+	for y: int in cells:
+		for x: int in cells:
 			var dark := (x / CHECKER_PIXELS + y / CHECKER_PIXELS) % 2 == 1
 			var colour := _style.tile_alt if dark else _style.tile_color
 			if x % CHECKER_PIXELS == 0 or y % CHECKER_PIXELS == 0:
 				colour = grout
 			image.set_pixel(x, y, colour)
+	# Пол виден почти вскользь: два метра коридора — полтора десятка строк кадра,
+	# и без мипов плитка рябит, когда кадр едет за лифтом (авторевью M24m).
+	image.generate_mipmaps()
 	var material := StandardMaterial3D.new()
 	material.albedo_texture = ImageTexture.create_from_image(image)
-	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	material.roughness = CHECKER_ROUGHNESS
 	material.uv1_triplanar = true
 	material.uv1_world_triplanar = true

@@ -15,17 +15,9 @@ func after_each() -> void:
 	GameState.instance().start_game()
 
 
-## Номер здания нужного типа на сиде [param building_seed].
-func _building_of(kind: BuildingIdentity.Kind, building_seed: int) -> int:
-	for building: int in range(1, 60):
-		if BuildingIdentity.of(building, building_seed).kind == kind:
-			return building
-	return -1
-
-
 func _level(kind: BuildingIdentity.Kind, building_seed: int = 1) -> GreyboxLevel:
 	GameState.instance().start_game()
-	GameState.instance().building = _building_of(kind, building_seed)
+	GameState.instance().building = BuildingIdentity.first_of(kind, building_seed)
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
 	var rules := BuildingRules.new()
 	rules.floors = 8
