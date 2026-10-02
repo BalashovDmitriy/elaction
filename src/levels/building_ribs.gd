@@ -110,15 +110,17 @@ func line_the_wall(index: int, inner: Vector2, openings: Array[Vector2]) -> void
 
 func _skirting(span: Vector2, surface: float) -> void:
 	var width := span.y - span.x
+	var style := BuildingStyle.of(_identity)
+	var height := style.wainscot_height
 	_add_part(
-		Rect2(span.x, surface - SKIRTING_HEIGHT, width, SKIRTING_HEIGHT),
+		Rect2(span.x, surface - height, width, height),
 		BuildingFinish.wainscot(_identity, _rules.palette.story),
 		WorldSpace.BACK_WALL_Z,
 		SKIRTING_DEPTH
 	)
 	_add_part(
-		Rect2(span.x, surface - SKIRTING_HEIGHT - RAIL_HEIGHT, width, RAIL_HEIGHT),
-		GreyboxLook.metal(GreyboxLook.TRIM),
+		Rect2(span.x, surface - height - RAIL_HEIGHT, width, RAIL_HEIGHT),
+		GreyboxLook.metal(style.rail_tone),
 		WorldSpace.BACK_WALL_Z,
 		RAIL_DEPTH
 	)

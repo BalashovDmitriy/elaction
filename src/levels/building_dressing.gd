@@ -30,10 +30,6 @@ class PropSpot:
 ## кадрам этаж оставался пустым, ADR-0048).
 const FLOOR_CHANCE: float = 0.7
 
-## С каким шансом место получает предмет на стене: почти всегда — пустая стена
-## между дверями и читалась «квадратом».
-const WALL_CHANCE: float = 0.9
-
 ## Доли шага мест, в которые влезает предмет: узкий — в своё место, широкий —
 ## в три места, если соседние свободны. Шире своего места предмет задевал бы
 ## дверь или табличку соседнего.
@@ -74,6 +70,7 @@ static func lay(
 	var step := rules.slot_x(1) - rules.slot_x(0)
 	var floor_items := PropCatalog.pick(PropCatalog.Place.FLOOR, identity.fit())
 	var wall_items := PropCatalog.pick(PropCatalog.Place.WALL, identity.fit())
+	var decor_share := BuildingStyle.of(identity).decor_share
 	# У офиса задняя стена — стекло (ADR-0056, решение 4): на нём не висит ничего.
 	if identity.kind == BuildingIdentity.Kind.OFFICE:
 		wall_items.clear()
@@ -104,7 +101,7 @@ static func lay(
 		for x: float in wall_spots(rules, plan, index):
 			if _under_tall(on_floor, x) or _beside_shaft(rules, plan, index, x):
 				continue
-			if rng.randf() >= WALL_CHANCE:
+			if rng.randf() >= decor_share:
 				continue
 			var hung := _draw(rng, wall_items, WALL_WIDTH, last)
 			if hung == null:

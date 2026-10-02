@@ -61,6 +61,13 @@ var door_mat_share: float = 0.0
 var door_bag_share: float = 0.0
 ## Доля ламп, что мигают: у жилого дома трубки старые (ADR-0055, решение 4).
 var flicker_share: float = 0.0
+## С каким шансом место на стене получает картину: у отеля и жилого дома
+## реже — место нужно нишам, зеркалам, окнам и щиткам ([WallFeatures]).
+var decor_share: float = 0.9  # почти всегда: пустая стена читалась «квадратом»
+## Панель низа стены: высота и тон рейки над ней. У отеля — высокие
+## деревянные панели с золочёной рейкой (ADR-0056, решение 4).
+var wainscot_height: float = BuildingRibs.SKIRTING_HEIGHT
+var rail_tone := GreyboxLook.TRIM
 ## Свет ламп и его сила по типу ([BuildingAir], ADR-0056, решение 1).
 var lamp_light := BuildingAir.LAMP_LIGHT[BuildingIdentity.Kind.HOTEL]
 var lamp_gain: float = 1.0
@@ -73,6 +80,9 @@ static func of(identity: BuildingIdentity) -> BuildingStyle:
 		style.lamp_light = BuildingAir.LAMP_LIGHT[identity.kind]
 		style.lamp_gain = BuildingAir.LAMP_GAIN[identity.kind]
 	if identity == null or identity.is_hotel():
+		style.decor_share = 0.5
+		style.wainscot_height = 1.25
+		style.rail_tone = WallFeatures.GILT
 		style.door_hanger_share = 0.22
 		style.door_tray_share = 0.12
 		style.crown = Vector2(0.2, 0.14)
@@ -115,4 +125,5 @@ static func _residential(style: BuildingStyle) -> BuildingStyle:
 	style.door_mat_share = 0.55
 	style.door_bag_share = 0.1
 	style.flicker_share = 0.12
+	style.decor_share = 0.45
 	return style

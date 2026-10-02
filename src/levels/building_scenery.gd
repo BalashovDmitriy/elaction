@@ -94,6 +94,9 @@ func build(
 	var wear := WallWear.new()
 	add_child(wear)
 	wear.build(rules, WallWear.lay(rules, plan, building_seed, identity, dressing))
+	var features := WallFeatures.new()
+	add_child(features)
+	features.build(rules, WallFeatures.lay(rules, plan, building_seed, identity, dressing))
 	Sounds.set_building(identity.kind)
 
 	var city := CityBackdrop.new()
