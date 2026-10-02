@@ -429,6 +429,21 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "walking_on", "actions": ["move_right"], "hold": 1.6},
 		{"label": "walking_back", "actions": ["move_left"], "hold": 2.4},
 	],
+	# Характер типа (ADR-0056): тот же маршрут в первом офисе партии — у него
+	# стена изменилась сильнее всех, стекло и зал за ним. Отель и жилой дом
+	# рядом снимает `tools/kinds_sheet.py`.
+	"M24N":
+	[
+		{"label": "roof", "actions": [], "hold": 1.2},
+		{"label": "roof_walk", "actions": ["move_right"], "hold": 2.5},
+		{"label": "to_the_shaft", "actions": ["move_right"], "hold": 2.9},
+		{"label": "riding_down", "actions": ["move_down"], "hold": 1.4},
+		{"label": "stopped", "actions": [], "hold": 1.6},
+		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
+		{"label": "floor", "actions": [], "hold": 0.6},
+		{"label": "walking_on", "actions": ["move_right"], "hold": 1.6},
+		{"label": "walking_back", "actions": ["move_left"], "hold": 2.4},
+	],
 	"M19":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},
@@ -443,7 +458,9 @@ const AUTO_PLANS: Dictionary = {
 const DEFAULT_PLAN := "M1"
 ## В каком типе здания идёт съёмка вехи: партия начинается с первого здания
 ## этого типа. Остальные вехи — с первого здания, отеля.
-const CAPTURE_KINDS: Dictionary = {"M24M": BuildingIdentity.Kind.RESIDENTIAL}
+const CAPTURE_KINDS: Dictionary = {
+	"M24M": BuildingIdentity.Kind.RESIDENTIAL, "M24N": BuildingIdentity.Kind.OFFICE
+}
 
 var _milestone: String = MANUAL_FOLDER
 

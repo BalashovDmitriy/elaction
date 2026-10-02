@@ -10,7 +10,9 @@
 - `tag_*` — тэг: росчерк из нескольких букв-петель одним цветом с обводкой,
   край — брызгами, как у баллончика;
 - `stain_*` — пятно: бурая клякса с неровным краем и потёком вниз;
-- `crack_*` — трещина: ветвистая тёмная линия.
+- `crack_*` — трещина: ветвистая тёмная линия;
+- `brick_*` — голый кирпич там, где осыпалась штукатурка (ADR-0056, решение
+  4): кладка с затиркой, край штукатурки рваный, со светлым сколом.
 
 Жребий посеян: пересборка даёт те же картинки, и в истории не шумит.
 
@@ -38,6 +40,7 @@ TAG_COLOURS = [(170, 30, 36), (36, 60, 150), (20, 20, 22), (170, 172, 176), (40,
 TAGS = 4
 STAINS = 2
 CRACKS = 2
+BRICKS = 2
 
 
 def _stroke(draw: ImageDraw.ImageDraw, points: list[tuple[float, float]], width: int, colour) -> None:
@@ -141,6 +144,40 @@ def crack(index: int) -> Image.Image:
     return image.filter(ImageFilter.GaussianBlur(0.4))
 
 
+def brick(index: int) -> Image.Image:
+    rng = random.Random(4000 + index)
+    image = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    course = 18
+    length = 44
+    mortar = (128, 116, 102, 255)
+    for row in range(SIZE // course + 1):
+        y = row * course
+        draw.rectangle((0, y, SIZE, y + course), fill=mortar)
+        shift = (length // 2) * (row % 2)
+        for column in range(-1, SIZE // length + 2):
+            x = column * length - shift
+            tone = rng.randint(-14, 14)
+            base = (126 + tone, 62 + tone // 2, 46 + tone // 3, 255)
+            draw.rectangle((x + 2, y + 2, x + length - 2, y + course - 2), fill=base)
+    # Рваный край: клякса-маска, за её краем — светлый скол штукатурки.
+    mask = Image.new("L", (SIZE, SIZE), 0)
+    shape = ImageDraw.Draw(mask)
+    centre = SIZE * 0.5
+    points = []
+    for step in range(28):
+        angle = math.tau * step / 28
+        radius = SIZE * rng.uniform(0.3, 0.46)
+        points.append((centre + math.cos(angle) * radius, centre + math.sin(angle) * radius * 0.8))
+    shape.polygon(points, fill=255)
+    mask = mask.filter(ImageFilter.GaussianBlur(2))
+    rim = mask.filter(ImageFilter.MaxFilter(9))
+    chip = Image.new("RGBA", (SIZE, SIZE), (196, 188, 172, 255))
+    chip.putalpha(rim.point(lambda v: 255 if v > 40 else 0))
+    image.putalpha(mask.point(lambda v: 255 if v > 128 else 0))
+    return Image.alpha_composite(chip, image)
+
+
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     made = []
@@ -150,6 +187,8 @@ def main() -> int:
         made.append((f"stain_{index}", stain(index)))
     for index in range(CRACKS):
         made.append((f"crack_{index}", crack(index)))
+    for index in range(BRICKS):
+        made.append((f"brick_{index}", brick(index)))
     for name, image in made:
         image.save(OUT / f"{name}.png", optimize=True)
         print(f"  {name}.png")

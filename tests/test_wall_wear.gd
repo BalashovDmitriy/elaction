@@ -61,6 +61,36 @@ func test_marks_keep_off_doors_shafts_and_walls() -> void:
 					)
 
 
+## След не ложится под устройство стены ([WallFeatures]): места у них одни, и
+## тэг торчал бы из-под окна на пожарную лестницу, кирпич — из-под двери.
+func test_marks_keep_off_wall_features() -> void:
+	var identity := BuildingIdentity.typed(BuildingIdentity.Kind.RESIDENTIAL)
+	var marks := 0
+	for skill: int in SKILLS:
+		var rules := _rules(skill)
+		for building_seed: int in SEEDS:
+			var plan := BuildingPlan.generate(rules, building_seed)
+			var dressing := BuildingDressing.lay(rules, plan, building_seed, identity)
+			var features := WallFeatures.lay(rules, plan, building_seed, identity, dressing)
+			for mark: WallWear.Mark in WallWear.lay(
+				rules, plan, building_seed, identity, dressing, features
+			):
+				marks += 1
+				for feature: WallFeatures.Feature in features:
+					if feature.floor_index != mark.floor_index:
+						continue
+					var half: float = WallFeatures.HALF[feature.kind]
+					assert_gte(
+						absf(feature.x - mark.x),
+						half + mark.width * 0.5,
+						(
+							"навык %d, сид %d, этаж %d: след на %s"
+							% [skill, building_seed, mark.floor_index, feature.kind]
+						)
+					)
+	assert_gt(marks, SEEDS.size() * SKILLS.size() * 5, "следов почти не осталось")
+
+
 ## Мигает доля ламп жилого дома, у отеля и офиса — ни одна; жребий по месту
 ## повторяется.
 func test_a_share_of_residential_lamps_flicker() -> void:

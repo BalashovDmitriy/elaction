@@ -143,6 +143,15 @@ static func lit_windows(kind: Kind) -> float:
 	return LIT_WINDOWS[kind]
 
 
+## Окно на улицу изнутри здания — в зале офиса, на пожарную лестницу: ночью
+## тёмное стекло [param night], в другое время оно светится небом горизонта на
+## долю дня. Ночное стекло днём читалось дырой в темноту (авторевью M24n).
+static func window_look(kind: Kind, night: Color) -> StandardMaterial3D:
+	if is_night(kind):
+		return GreyboxLook.polished(night)
+	return GreyboxLook.marker(night.lerp(HORIZON[kind], daylight(kind)))
+
+
 ## Сила уличных огней. В непогоду днём их зажигают — темно.
 static func street_lights(kind: Kind, weather: Weather.Kind = Weather.Kind.CLEAR) -> float:
 	var lights := STREET_LIGHTS[kind]

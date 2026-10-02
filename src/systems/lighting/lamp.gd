@@ -55,7 +55,8 @@ const FLICKER_BLINK := Vector2(0.04, 0.12)
 const FLICKER_LOW: float = 0.15
 const FLICKER_SALT: int = 0xF11C
 
-## Тёплый цвет лампы против холодного общего тона палитры (ADR-0023, решение 3).
+## Тёплый цвет лампы против холодного общего тона палитры (ADR-0023, решение 3) —
+## у лампы без стиля здания. Свет по типу — [constant BuildingAir.LAMP_LIGHT].
 const LIGHT_COLOR := Color(1.0, 0.9, 0.7)
 
 ## Шнур подвеса, м: толщина. Длина — от патрона до потолка, и её знает уровень.
@@ -78,6 +79,25 @@ const PANEL_COLOR := Color(0.82, 0.84, 0.86)
 const DOME := Vector2(0.24, 0.1)
 const DOME_CAP := Vector2(0.07, 0.04)
 const DOME_CAP_COLOR := Color(0.55, 0.46, 0.28)
+## Голая лампочка: радиус и высота колбы, патрон, м; соль жребия, у какой
+## лампы плафон побит.
+const BULB := Vector2(0.075, 0.17)
+const BULB_SOCKET := Vector2(0.03, 0.07)
+const BULB_SALT: int = 0xB01B
+## Люстра: радиус кольца, м; свечи — сколько и какие (радиус и высота колбы).
+## Шире абажура не выходит — в ширину формы лампы: мишень та же. Штанга — от
+## кольца до шнура, как трубка тарелки.
+const CHANDELIER: float = 0.24
+const CHANDELIER_BRASS := Color(0.72, 0.56, 0.26)
+const CANDLES: int = 6
+const CANDLE := Vector2(0.05, 0.13)
+## Чаша с хрусталём под кольцом — светится вместе со свечами: сбоку люстра
+## тонка, и мишень без неё читалась чертой под потолком (кадры M24n).
+const CHANDELIER_BOWL := Vector2(0.17, 0.11)
+
+## Свечи и чаша люстры одним мешем — один на все люстры: собирать его заново
+## на каждую лампу отеля значило бы полсотни сборок на загрузке здания.
+static var _chandelier_glow: ArrayMesh = null
 
 @export var fall_speed: float = 7.8
 
@@ -95,6 +115,10 @@ var fixture: BuildingStyle.Fixture = BuildingStyle.Fixture.PENDANT
 ## Лампа мигает (ADR-0055, решение 4): трубка вот-вот сдохнет. Только вид —
 ## зона светла, пока лампа цела, как в ROM; темноты мигание не делает.
 var flicker: bool = false
+## Цвет и сила света по типу здания ([BuildingAir], ADR-0056): ставит
+## [method dress_as] до входа в дерево.
+var light_colour := LIGHT_COLOR
+var light_gain: float = 1.0
 
 var _fall := LampFall.new()
 var _spot: SpotLight3D = null
@@ -156,6 +180,13 @@ func _ready() -> void:
 ## до [method Node.add_child], когда [member floor_index] и место уже стоят.
 func dress_as(style: BuildingStyle) -> void:
 	fixture = style.fixture
+	if (
+		hash([floor_index, roundi(position.x * 10.0), BULB_SALT]) % 1000
+		< int(style.bulb_share * 1000.0)
+	):
+		fixture = BuildingStyle.Fixture.BULB
+	light_colour = style.lamp_light
+	light_gain = style.lamp_gain
 	var roll := hash([floor_index, roundi(position.x * 10.0), FLICKER_SALT]) % 1000
 	flicker = roll < int(style.flicker_share * 1000.0)
 
@@ -189,8 +220,9 @@ func _show_lit(lit: bool) -> void:
 
 ## Сила света лампы: полная или провал мигания.
 func _glow(lit: bool) -> void:
-	_spot.light_energy = SPOT_ENERGY if lit else SPOT_ENERGY * FLICKER_LOW
-	_fill.light_energy = FILL_ENERGY if lit else FILL_ENERGY * FLICKER_LOW
+	var gain := light_gain if lit else light_gain * FLICKER_LOW
+	_spot.light_energy = SPOT_ENERGY * gain
+	_fill.light_energy = FILL_ENERGY * gain
 
 
 func _physics_process(delta: float) -> void:
@@ -320,6 +352,12 @@ func _dress_fixture() -> void:
 	if fixture == BuildingStyle.Fixture.DOME:
 		_dress_dome(box)
 		return
+	if fixture == BuildingStyle.Fixture.BULB:
+		_dress_bulb(box)
+		return
+	if fixture == BuildingStyle.Fixture.CHANDELIER:
+		_dress_chandelier(box)
+		return
 	var shade := _cylinder(SHADE.x, SHADE.z, GreyboxLook.metal(SHADE_COLOR), SHADE.y)
 	shade.position = Vector3(0.0, box.size.y * 0.5 - SHADE.z * 0.5, 0.0)
 	# Светильник не отбрасывает тени: источник сидит внутри него, и абажур с
@@ -394,6 +432,93 @@ func _dress_dome(box: BoxShape3D) -> void:
 	add_child(_diffuser)
 
 
+## Голая лампочка жилого дома (ADR-0056, решение 5): патрон на проводе и
+## колба — светится она одна, как рассеиватель у прочих.
+func _dress_bulb(box: BoxShape3D) -> void:
+	var socket := _cylinder(BULB_SOCKET.x, BULB_SOCKET.y, GreyboxLook.surface(Color(0.1, 0.1, 0.1)))
+	socket.position = Vector3(0.0, BULB.x + BULB_SOCKET.y * 0.5, 0.0)
+	_unshadowed(socket)
+	var wire := _cylinder(
+		0.006, box.size.y * 0.5 - BULB.x, GreyboxLook.surface(Color(0.05, 0.05, 0.05))
+	)
+	wire.position = Vector3(0.0, (box.size.y * 0.5 + BULB.x) * 0.5, 0.0)
+	_unshadowed(wire)
+	var glass := SphereMesh.new()
+	glass.radius = BULB.x
+	glass.height = BULB.y
+	_diffuser = MeshInstance3D.new()
+	_diffuser.mesh = glass
+	_diffuser.material_override = GreyboxLook.marker(GreyboxLook.LAMP)
+	_diffuser.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_diffuser)
+
+
+## Люстра отеля (ADR-0056, решение 5): латунное кольцо на штанге, рожки и
+## свечи-лампочки по кругу. Свечи — один меш рассеивателя: сбитая люстра
+## гаснет вся разом, как абажур.
+func _dress_chandelier(box: BoxShape3D) -> void:
+	var brass := GreyboxLook.metal(CHANDELIER_BRASS)
+	# Штанга — до верха формы, где начинается шнур ([method hang]): короче — и
+	# люстра висела бы в воздухе под обрывком.
+	var stem := _cylinder(0.015, box.size.y * 0.5, brass)
+	stem.position = Vector3(0.0, box.size.y * 0.25, 0.0)
+	_unshadowed(stem)
+	var ring := TorusMesh.new()
+	ring.inner_radius = CHANDELIER - 0.02
+	ring.outer_radius = CHANDELIER
+	var hoop := MeshInstance3D.new()
+	hoop.mesh = ring
+	hoop.material_override = brass
+	_unshadowed(hoop)
+	var cup := _cylinder(0.05, 0.08, brass, 0.02)
+	cup.position = Vector3(0.0, -0.06, 0.0)
+	_unshadowed(cup)
+	for arm: int in CANDLES:
+		var holder := _cylinder(0.018, 0.05, brass)
+		holder.position = _candle_at(arm) - Vector3(0.0, 0.045, 0.0)
+		_unshadowed(holder)
+	_diffuser = MeshInstance3D.new()
+	_diffuser.mesh = _chandelier_mesh()
+	_diffuser.material_override = GreyboxLook.marker(GreyboxLook.LAMP)
+	_unshadowed(_diffuser)
+
+
+## Где свеча люстры номер [param arm]: по кругу кольца, чуть над ним.
+static func _candle_at(arm: int) -> Vector3:
+	var angle := TAU * arm / CANDLES
+	return Vector3(cos(angle) * CHANDELIER, 0.06, sin(angle) * CHANDELIER)
+
+
+## Свечи и чаша с хрусталём под кольцом одним мешем ([member _chandelier_glow]).
+static func _chandelier_mesh() -> ArrayMesh:
+	if _chandelier_glow != null:
+		return _chandelier_glow
+	var tool := SurfaceTool.new()
+	var flame := SphereMesh.new()
+	flame.radius = CANDLE.x
+	flame.height = CANDLE.y
+	# Колба в пять сантиметров: шестьдесят четыре грани по умолчанию — лишние.
+	flame.radial_segments = 16
+	flame.rings = 8
+	for arm: int in CANDLES:
+		tool.append_from(flame, 0, Transform3D(Basis.IDENTITY, _candle_at(arm)))
+	var bowl := SphereMesh.new()
+	bowl.radius = CHANDELIER_BOWL.x
+	bowl.height = CHANDELIER_BOWL.y * 2.0
+	bowl.is_hemisphere = true
+	var under := Basis.from_euler(Vector3(PI, 0.0, 0.0))
+	tool.append_from(bowl, 0, Transform3D(under, Vector3(0.0, -0.04, 0.0)))
+	_chandelier_glow = tool.commit()
+	return _chandelier_glow
+
+
+## Деталь светильника без тени: источник сидит внутри светильника, и штанга
+## с рожками клали бы на стену тёмные дуги (кадры M24n).
+func _unshadowed(part: MeshInstance3D) -> void:
+	part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(part)
+
+
 ## Цилиндр или усечённый конус: верх [param top], низ [param bottom] (по
 ## умолчанию как верх), высота [param height].
 func _cylinder(
@@ -411,8 +536,8 @@ func _cylinder(
 
 func _make_spot() -> SpotLight3D:
 	var light := SpotLight3D.new()
-	light.light_color = LIGHT_COLOR
-	light.light_energy = SPOT_ENERGY
+	light.light_color = light_colour
+	light.light_energy = SPOT_ENERGY * light_gain
 	light.spot_range = SPOT_RANGE
 	light.spot_angle = SPOT_ANGLE
 	light.shadow_enabled = true
@@ -424,8 +549,8 @@ func _make_spot() -> SpotLight3D:
 
 func _make_fill() -> OmniLight3D:
 	var light := OmniLight3D.new()
-	light.light_color = LIGHT_COLOR
-	light.light_energy = FILL_ENERGY
+	light.light_color = light_colour
+	light.light_energy = FILL_ENERGY * light_gain
 	light.omni_range = FILL_RANGE
 	light.shadow_enabled = true
 	# Две полусферы, а не куб: вдвое-втрое меньше проходов тени. Заливка слабая

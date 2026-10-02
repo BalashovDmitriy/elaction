@@ -163,9 +163,9 @@ func _ready() -> void:
 	_watch.rng.seed = building_seed * 31 + 7
 	# И свой у сценок добивания — по той же причине (ADR-0040).
 	otto.takedown_rng.seed = building_seed * 17 + 3
-	# Отель или офис: от этого отделка стен, обстановка и вывеска (ADR-0033).
+	# Тип здания: отделка, обстановка, вывеска (ADR-0033) и палитра его семейства (ADR-0056).
 	identity = BuildingIdentity.of(GameState.instance().building, building_seed)
-
+	rules.palette = BuildingPalette.of_kind(rules.palette, identity.kind)
 	_ribs = BuildingRibs.new()
 	_ribs.name = "Ribs"
 	_ribs.setup(rules, _plan, identity)

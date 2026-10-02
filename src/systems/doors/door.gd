@@ -488,7 +488,9 @@ func room() -> DoorRoom:
 func _open_the_room(along: float) -> void:
 	if not _furnished:
 		return
-	if along > 0.0 and _room == null:
+	# Дверь офиса открывается в зал за стеклом ([OpenSpace], ADR-0056):
+	# отдельной комнаты у неё нет.
+	if along > 0.0 and _room == null and not _style.glass_wall:
 		var kind := BuildingIdentity.Kind.HOTEL if _room_identity == null else _room_identity.kind
 		_room = DoorRoom.build(
 			kind, _room_seed, _room_identity, _room_span, _room_unlit, _room_time, _room_weather

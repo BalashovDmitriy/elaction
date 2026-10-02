@@ -59,7 +59,7 @@ func build(
 
 	_air = WorldEnvironment.new()
 	_air.name = "Air"
-	_air.environment = Atmosphere.environment(rules.palette.dark, rules.time_of_day)
+	_air.environment = Atmosphere.environment(rules.palette.dark, rules.time_of_day, identity.kind)
 	_ambient = _air.environment.ambient_light_energy
 	CityBackdrop.show_behind(_air.environment)
 	add_child(_air)
@@ -91,9 +91,15 @@ func build(
 	props.name = "Props"
 	add_child(props)
 	props.build(rules, plan, dressing, identity)
+	# Устройство стены раньше следов: след обходит окна и двери, а не ложится
+	# под них.
+	var laid := WallFeatures.lay(rules, plan, building_seed, identity, dressing)
 	var wear := WallWear.new()
 	add_child(wear)
-	wear.build(rules, WallWear.lay(rules, plan, building_seed, identity, dressing))
+	wear.build(rules, WallWear.lay(rules, plan, building_seed, identity, dressing, laid))
+	var features := WallFeatures.new()
+	add_child(features)
+	features.build(rules, laid)
 	Sounds.set_building(identity.kind)
 
 	var city := CityBackdrop.new()

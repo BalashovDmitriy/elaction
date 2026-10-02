@@ -22,9 +22,9 @@ const SSR_FADE_IN: float = 0.2
 const SSAO_INTENSITY: float = 2.0
 const SSAO_RADIUS: float = 0.6
 
-## Туман — намёк, а не молоко: на 0.015 конусы ламп съедали весь кадр.
+## Туман — намёк, а не молоко: на 0.015 конусы ламп съедали весь кадр. Множитель
+## плотности и свечение воздуха — по типу здания ([constant BuildingAir.FOG_GAIN]).
 const FOG_DENSITY: float = 0.0035
-const FOG_EMISSION := Color(0.03, 0.04, 0.06)
 
 ## Свечение только с того, что ярче кадра: иначе блум растит каждую лампу в
 ## белый столб и съедает деталь, ради которой всё и затевалось.
@@ -40,18 +40,25 @@ const EXPOSURE: float = 1.15
 ## Подобран в M22 по кадрам из трёх наборов (`layout_shot --tone=N`): холод в
 ## тенях и тепло в свете разведены сильнее, чем в M20, — мрамор и обои больше
 ## не выбеливались лампой, а двери и лампы стали теплее на синей стене.
+##
+## С M24n контраст и ночной тон кадра задаёт тип здания ([BuildingAir]): нуар
+## здесь — ночной тон суток в [TimeOfDay], и ночью тип перекрывает его целиком.
 const NOIR_SHADOW := Color(0.0, 0.03, 0.08)
 const NOIR_MIDDLE := Color(0.27, 0.33, 0.4)
 const NOIR_LIGHT := Color(1.0, 0.93, 0.8)
 const NOIR_MIDDLE_AT: float = 0.35
-const CONTRAST: float = 1.12
 const SATURATION: float = 0.9
 
 
 ## Воздух здания с общим тоном [param ambient] — цветом палитры раунда — во
 ## время суток [param time] (ADR-0051): днём здание светлее и без ламп, тон
-## кадра — свой на каждое время. Ночь — как до M24j.
-static func environment(ambient: Color, time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT) -> Environment:
+## кадра — свой на каждое время. С M24n тон, насыщенность и туман — ещё и по
+## типу здания [param kind] ([BuildingAir], ADR-0056).
+static func environment(
+	ambient: Color,
+	time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT,
+	kind: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL
+) -> Environment:
 	var air := Environment.new()
 	air.background_mode = Environment.BG_COLOR
 	air.background_color = SKY
@@ -67,8 +74,8 @@ static func environment(ambient: Color, time: TimeOfDay.Kind = TimeOfDay.Kind.NI
 	air.ssao_radius = SSAO_RADIUS
 
 	air.volumetric_fog_enabled = true
-	air.volumetric_fog_density = FOG_DENSITY
-	air.volumetric_fog_emission = FOG_EMISSION.lerp(
+	air.volumetric_fog_density = FOG_DENSITY * BuildingAir.FOG_GAIN[kind]
+	air.volumetric_fog_emission = BuildingAir.FOG_GLOW[kind].lerp(
 		TimeOfDay.HORIZON[time] * 0.08, TimeOfDay.daylight(time)
 	)
 
@@ -80,9 +87,9 @@ static func environment(ambient: Color, time: TimeOfDay.Kind = TimeOfDay.Kind.NI
 	air.tonemap_exposure = EXPOSURE
 
 	air.adjustment_enabled = true
-	air.adjustment_contrast = CONTRAST
-	air.adjustment_saturation = TimeOfDay.SATURATION[time]
-	air.adjustment_color_correction = grade_curve(time)
+	air.adjustment_contrast = BuildingAir.CONTRAST[kind]
+	air.adjustment_saturation = BuildingAir.saturation(kind, time)
+	air.adjustment_color_correction = grade_curve(time, kind)
 	Graphics.apply_to(air)
 	return air
 
@@ -90,13 +97,13 @@ static func environment(ambient: Color, time: TimeOfDay.Kind = TimeOfDay.Kind.NI
 ## Кривые тона: градиент, по которому каждый канал переводится из своего
 ## значения в своё. Ночью — нуар: чёрный уходит в холодный синий, белый — в
 ## тёплый; в другое время — свой тон ([constant TimeOfDay.GRADE_SHADOW] и
-## соседи).
-static func grade_curve(time: TimeOfDay.Kind) -> GradientTexture1D:
+## соседи), подкрашенный тоном типа здания [param kind] ([BuildingAir]).
+static func grade_curve(
+	time: TimeOfDay.Kind, kind: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL
+) -> GradientTexture1D:
 	var gradient := Gradient.new()
 	gradient.offsets = PackedFloat32Array([0.0, NOIR_MIDDLE_AT, 1.0])
-	gradient.colors = PackedColorArray(
-		[TimeOfDay.GRADE_SHADOW[time], TimeOfDay.GRADE_MIDDLE[time], TimeOfDay.GRADE_LIGHT[time]]
-	)
+	gradient.colors = BuildingAir.grade(kind, time)
 	var curve := GradientTexture1D.new()
 	curve.gradient = gradient
 	return curve

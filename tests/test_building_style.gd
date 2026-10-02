@@ -67,7 +67,11 @@ func test_a_residential_building_hangs_domes_and_peepholes() -> void:
 	var level := await _level(BuildingIdentity.Kind.RESIDENTIAL)
 	assert_eq(level.identity.kind, BuildingIdentity.Kind.RESIDENTIAL, "здание — жилой дом")
 	for lamp: Lamp in level.find_children("*", "Lamp", true, false):
-		assert_eq(lamp.fixture, BuildingStyle.Fixture.DOME, "в жилом доме — тарелка")
+		assert_has(
+			[BuildingStyle.Fixture.DOME, BuildingStyle.Fixture.BULB],
+			lamp.fixture,
+			"в жилом доме — тарелка или голая лампочка"
+		)
 	var peepholes := 0
 	var mats := 0
 	for door: Door in level.doors():
@@ -105,3 +109,72 @@ func test_a_hotel_lights_its_pilasters_but_not_on_dark_floors() -> void:
 		assert_false(level.rules.is_unlit(index), "на тёмном этаже бра не горит")
 	for door: Door in level.doors():
 		assert_null(door.find_child("VisionGlass", true, false), "у отеля двери без стекла")
+
+
+## Стена офиса — стекло с залом за ним (ADR-0056, решение 4); у отеля и жилого
+## дома зала нет. Зал без тел и без теней, на тёмном этаже экраны не светятся.
+## Стыков панелей стены перед стеклом нет: тёмные полосы висели бы на нём.
+func test_only_an_office_opens_its_hall_behind_glass() -> void:
+	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
+		var level := await _level(kind)
+		var halls := level.find_children("OpenSpace", "OpenSpace", true, false)
+		var joints := level.get_node_or_null("Scenery/FloorDetail/Joint")
+		if kind != BuildingIdentity.Kind.OFFICE:
+			assert_eq(halls.size(), 0, "тип %d: зала нет" % kind)
+			assert_not_null(joints, "тип %d: стыки панелей на стене" % kind)
+			continue
+		assert_null(joints, "у стекла офиса стыков панелей нет")
+		assert_eq(halls.size(), 1, "у офиса зал за стеклом")
+		var hall := halls[0] as OpenSpace
+		assert_eq(hall.find_children("*", "PhysicsBody3D", true, false).size(), 0, "зал без тел")
+		for part: Node in hall.get_children():
+			var many := part as MultiMeshInstance3D
+			assert_not_null(many, "зал — мультимешами")
+			if many != null:
+				assert_eq(
+					many.cast_shadow, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, "без теней"
+				)
+
+
+## Картина висит над поручнем панели низа стены: у отеля панель высокая
+## (ADR-0056, решение 4), и низ картины в 0.9 м уходил за поручень.
+## Повторные предметы движок переименовывает, и по каталогу узнаётся первый
+## каждого вида — этого хватает: высота у вида одна.
+func test_wall_decor_hangs_above_the_wainscot() -> void:
+	for kind: BuildingIdentity.Kind in [
+		BuildingIdentity.Kind.HOTEL, BuildingIdentity.Kind.RESIDENTIAL
+	]:
+		var level := await _level(kind)
+		var rules := level.rules
+		var style := BuildingStyle.of(level.identity)
+		var rail_top := style.wainscot_height + BuildingRibs.RAIL_HEIGHT
+		var hung := 0
+		for item: Node in level.get_node("Scenery/Props").get_children():
+			var entry := PropCatalog.entry(String(item.name))
+			if entry == null or entry.place != PropCatalog.Place.WALL:
+				continue
+			var bottom := WorldSpace.to_plane((item as Node3D).position).y
+			# Этаж, над полом которого висит предмет: ближайший пол снизу.
+			var index := int(ceilf((bottom - rules.sky_height) / rules.floor_height)) - 1
+			assert_gte(
+				rules.floor_surface(index) - bottom,
+				rail_top - 0.001,
+				"тип %d: %s за поручнем" % [kind, item.name]
+			)
+			hung += 1
+		assert_gt(hung, 0, "тип %d: на стенах ничего" % kind)
+
+
+## Дверь офиса открывается в зал: своей комнаты за ней нет.
+func test_an_office_door_opens_into_the_hall() -> void:
+	var door := (preload("res://src/systems/doors/door.tscn")).instantiate() as Door
+	door.furnish(BuildingIdentity.typed(BuildingIdentity.Kind.OFFICE), 11)
+	add_child_autofree(door)
+	await wait_physics_frames(2)
+	assert_true(door.summon_agent(), "дверь открывается под агента")
+	for _frame: int in 120:
+		await wait_physics_frames(1)
+		if door.openness() > 0.5:
+			break
+	assert_gt(door.openness(), 0.0, "открылась")
+	assert_null(door.room(), "комнаты за дверью офиса нет")

@@ -94,7 +94,9 @@ func _dress_floor(index: int) -> void:
 	var wall_height := surface - story_top
 	var joint_height := wall_height - JOINT_FROM - _style.crown.x
 	var wall_z := WorldSpace.BACK_WALL_Z + 0.004
-	var joints := int((inner.y - inner.x) / JOINT_STEP)
+	# Стыков панелей у стекла офиса нет (ADR-0056, решение 4): они висели бы
+	# тёмными полосами перед перегородкой, у неё свои стойки ([BuildingShell]).
+	var joints := 0 if _style.glass_wall else int((inner.y - inner.x) / JOINT_STEP)
 	for joint in joints:
 		var x := inner.x + JOINT_STEP * (float(joint) + 0.5)
 		if _near_opening(index, x):
