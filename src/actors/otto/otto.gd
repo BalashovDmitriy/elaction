@@ -864,7 +864,9 @@ func _step_sound() -> void:
 	if frame == _stepped_on or frame == 1 or not is_on_floor():
 		return
 	_stepped_on = frame
-	Sounds.play(Sounds.STEP_METAL if _on_metal() else step_sound)
+	# На заснеженном настиле — хруст снега (ADR-0054).
+	var sound := Sounds.STEP_SNOW if icy else step_sound
+	Sounds.play(Sounds.STEP_METAL if _on_metal() else sound)
 
 
 ## Стоит ли Otto на металле — в кабине или на её крыше: шаг там звонкий

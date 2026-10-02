@@ -687,7 +687,8 @@ func _step_sound() -> void:
 	if frame == _stepped_on or frame == 1 or not is_on_floor():
 		return
 	_stepped_on = frame
-	Sounds.play_at(get_parent(), step_sound, global_position, STEP_REACH, STEP_DB)
+	var sound := Sounds.STEP_SNOW if icy else step_sound
+	Sounds.play_at(get_parent(), sound, global_position, STEP_REACH, STEP_DB)
 
 
 ## Агент приседает или ложится от пули — шорох одежды.

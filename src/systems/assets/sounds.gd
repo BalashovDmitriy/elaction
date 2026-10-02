@@ -121,6 +121,10 @@ const CITY_DAY := "city_day"
 const CITY_EVENING := "city_evening"
 const RAIN := "rain"
 const WIND := "wind"
+## Снег (ADR-0054): ветер снаружи, шаг по снегу, шины по каше.
+const WIND_SNOW := "wind_snow"
+const STEP_SNOW := "step_snow"
+const CAR_PASS_SLUSH := "car_pass_slush"
 const RAIN_WINDOW := "rain_window"
 const ROOM_TONE := "room_tone"
 const THUNDER_NEAR := "thunder_near"
@@ -170,12 +174,14 @@ const EFFECTS: PackedStringArray = [
 	LAND,
 	CROUCH,
 	STEP_METAL,
+	STEP_SNOW,
 	RESPAWN,
 	ELEVATOR_START,
 	ELEVATOR_STOP,
 	CAR_DOOR_OPEN,
 	TURN_SIGNAL,
 	CAR_PASS,
+	CAR_PASS_SLUSH,
 	HORN,
 	ALARM,
 	NEON_FLICKER,
@@ -192,6 +198,7 @@ const AMBIENCE: PackedStringArray = [
 	CITY_EVENING,
 	RAIN,
 	WIND,
+	WIND_SNOW,
 	RAIN_WINDOW,
 	ROOM_TONE,
 	THUNDER_NEAR,
@@ -224,6 +231,7 @@ const LOOPED: PackedStringArray = [
 	CITY,
 	RAIN,
 	WIND,
+	WIND_SNOW,
 	RAIN_WINDOW,
 	ROOM_TONE,
 	SHAFT_HUM,
@@ -436,7 +444,8 @@ static func weather_loops(
 ) -> PackedStringArray:
 	var raining := Weather.is_raining(weather)
 	if outdoors:
-		return PackedStringArray([city_for(time), RAIN if raining else WIND])
+		var outside := WIND_SNOW if Weather.is_snowing(weather) else WIND
+		return PackedStringArray([city_for(time), RAIN if raining else outside])
 	if raining:
 		return PackedStringArray([ROOM_TONE, RAIN_WINDOW])
 	return PackedStringArray([ROOM_TONE])

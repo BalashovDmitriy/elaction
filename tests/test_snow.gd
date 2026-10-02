@@ -183,3 +183,21 @@ func test_otto_leaves_prints_and_slides_on_the_snowy_roof() -> void:
 			assert_almost_eq(after, 0.0, 0.01, "на сухой крыше Otto проскальзывает")
 		level.queue_free()
 		await wait_physics_frames(1)
+
+
+## Снаружи в снег — свой зимний ветер, на этажах — тишина коридора; шаг по
+## снегу и шины по каше — в наборе звуков (решение 5).
+func test_snow_has_its_own_sound() -> void:
+	var outside := Sounds.weather_loops(Weather.Kind.SNOW, true)
+	assert_has(outside, Sounds.WIND_SNOW, "в снег снаружи не метель")
+	assert_does_not_have(outside, Sounds.WIND, "в снег дует обычный ветер")
+	var inside := Sounds.weather_loops(Weather.Kind.SNOW, false)
+	assert_does_not_have(inside, Sounds.WIND_SNOW, "метель слышна в коридоре")
+	for name: String in [Sounds.STEP_SNOW, Sounds.CAR_PASS_SLUSH, Sounds.WIND_SNOW]:
+		assert_true(
+			(
+				ResourceLoader.exists("res://assets/audio/%s.wav" % name)
+				or ResourceLoader.exists("res://assets/audio/%s.ogg" % name)
+			),
+			"нет файла звука %s" % name
+		)

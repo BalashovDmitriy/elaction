@@ -297,7 +297,9 @@ func _pass_by(car: Car, camera: Camera3D) -> void:
 	if absf(car.x - camera.global_position.x) > maxf(car.speed, 1.0) * PASS_LEAD:
 		return
 	car.heard = true
-	var voice := Sounds.source(car.node, Sounds.CAR_PASS, PASS_REACH)
+	# В снег шины шуршат по каше (ADR-0054).
+	var tyres := Sounds.CAR_PASS_SLUSH if _snowy else Sounds.CAR_PASS
+	var voice := Sounds.source(car.node, tyres, PASS_REACH)
 	voice.volume_db = PASS_DB
 	voice.finished.connect(voice.queue_free)
 	voice.play()
