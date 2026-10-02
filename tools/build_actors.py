@@ -57,6 +57,17 @@ PILOT_SUIT: Rgb = (0x4E, 0x55, 0x3C)
 PILOT_SUIT_SHADE: Rgb = (0x3E, 0x44, 0x30)
 PILOT_HELMET: Rgb = (0xC9, 0xCB, 0xC4)
 PILOT_SKIN: Rgb = (0xC8, 0x98, 0x70)
+# Агенты по типу здания (ADR-0055, решение 7). Офис — деловой угольный
+# костюм, бордовый галстук, без шляпы, причёска видна. Жилой дом — уличные:
+# тёмная кожаная куртка поверх тёмной водолазки, твидовая кепка, без очков.
+OFFICE_SUIT: Rgb = (0x45, 0x48, 0x50)
+OFFICE_SUIT_SHADE: Rgb = (0x33, 0x36, 0x3D)
+OFFICE_TIE: Rgb = (0x5E, 0x1C, 0x22)
+OFFICE_HAIR: Rgb = (0x2A, 0x22, 0x1C)
+STREET_JACKET: Rgb = (0x2E, 0x25, 0x20)
+STREET_TROUSERS: Rgb = (0x24, 0x26, 0x2C)
+STREET_SWEATER: Rgb = (0x1B, 0x1B, 0x1E)
+STREET_CAP: Rgb = (0x4A, 0x40, 0x34)
 
 try:
     import bpy
@@ -249,8 +260,11 @@ def _proportions() -> dict[str, float]:
 def _actors() -> dict[str, dict]:
     """Кто строится и чем отличается.
 
-    Модель у обоих одна, поэтому своего от чужого отличают цвет и голова:
-    у агента федора и очки (ADR-0032, решения 2–4). На погашенном этаже цвета
+    Модель у всех одна, поэтому своего от чужого отличают цвет и голова:
+    у агента федора и очки (ADR-0032, решения 2–4). С M24m агентов трое, по
+    типу здания (ADR-0055, решение 7): в отеле — федора, в офисе — без шляпы с
+    галстуком, в жилом доме — кожанка и кепка. `hat` — `True` (федора),
+    `"cap"` (кепка) или `False`. На погашенном этаже цвета
     почти нет, и силуэт со шляпой — то, по чему игрок узнаёт агента.
 
     Ключи `colours` — материалы пака: `Suit` — брюки, `Suit.001` — пиджак.
@@ -278,6 +292,28 @@ def _actors() -> dict[str, dict]:
             },
             "hat": True,
             "glasses": True,
+        },
+        "agent_office": {
+            "colours": {
+                "Suit": OFFICE_SUIT_SHADE,
+                "Suit.001": OFFICE_SUIT,
+                "Tie": OFFICE_TIE,
+                "Skin": AGENT_SKIN,
+                "Hair": OFFICE_HAIR,
+            },
+            "hat": False,
+            "glasses": True,
+        },
+        "agent_residential": {
+            "colours": {
+                "Suit": STREET_TROUSERS,
+                "Suit.001": STREET_JACKET,
+                "Tie": STREET_SWEATER,
+                "Skin": AGENT_SKIN,
+                "Hair": STREET_CAP,
+            },
+            "hat": "cap",
+            "glasses": False,
         },
         # Пилот сидит за остеклением вертолёта и кивает на уходе: оружия нет,
         # голову закрывает шлем с визором.
@@ -742,6 +778,34 @@ def _hat(meshes, armature, colour: Rgb):
     return hat
 
 
+def _cap(meshes, colour: Rgb):
+    """Твидовая кепка: плоская тулья чуть шире головы, козырёк вперёд.
+
+    Сидит ниже федоры и тоже прячет причёску, а на ударе добивания слетает
+    так же — меш зовётся `hat`.
+    """
+    low, high = _head_box(meshes)
+    centre_x = (low.x + high.x) * 0.5
+    centre_y = (low.y + high.y) * 0.5
+    half_x = (high.x - low.x) * 0.5
+    half_y = (high.y - low.y) * 0.5
+    head_height = high.z - low.z
+    band_z = high.z - head_height * 0.24
+
+    def build(bm) -> None:
+        # Тулья: невысокая, сверху почти плоская и сдвинута к козырьку.
+        _cylinder_into(bm, half_x * 1.1, half_y * 1.12, 0.92, head_height * 0.2, (centre_x, centre_y - half_y * 0.06, band_z))
+        _cylinder_into(
+            bm, half_x * 1.0, half_y * 1.1, 0.8, head_height * 0.05, (centre_x, centre_y - half_y * 0.12, band_z + head_height * 0.2)
+        )
+        # Козырёк — вперёд, к лицу (лицо — в −Y Blender), чуть книзу.
+        _box_into(bm, (half_x * 1.5, half_y * 0.7, head_height * 0.03), (centre_x, low.y - half_y * 0.2, band_z + head_height * 0.02))
+
+    cap = _part("hat", build, _material("hat", colour, roughness=0.9), HEAD_BONE)
+    _trim_hair(meshes, band_z + head_height * 0.02)
+    return cap
+
+
 def _helmet(meshes, colour: Rgb):
     """Лётный шлем: купол над головой ниже ушей и тёмный визор спереди."""
     low, high = _head_box(meshes)
@@ -869,7 +933,11 @@ def _dress(armature, meshes, actor: dict) -> None:
         parts.append(_visor(meshes))
     # Шляпа — своим мешем `hat` на кости головы, а не в общем теле: на ударе
     # добивания она слетает (ADR-0050), и игра прячет её, не трогая тело.
-    hat = _hat(meshes, armature, actor["colours"]["Hair"]) if actor["hat"] else None
+    hat = None
+    if actor["hat"] == "cap":
+        hat = _cap(meshes, actor["colours"]["Hair"])
+    elif actor["hat"]:
+        hat = _hat(meshes, armature, actor["colours"]["Hair"])
     if hat is not None:
         hat.name = "hat"
         hat.data.name = "hat"

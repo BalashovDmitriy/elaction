@@ -15,7 +15,6 @@ extends Node3D
 
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 const OTTO_MODEL := preload("res://assets/models/otto.glb")
-const AGENT_MODEL := preload("res://assets/models/agent.glb")
 
 const DEFAULT_FOLDER := "M21"
 
@@ -87,11 +86,14 @@ func _stage() -> void:
 	sun.light_energy = 1.3
 	add_child(sun)
 
-	for row in 2:
+	# Ряды снизу вверх: Otto, затем агенты по типу здания (ADR-0055, решение 7).
+	var models: Array[PackedScene] = [OTTO_MODEL]
+	models.append_array(AgentWardrobe.MODELS)
+	for row in models.size():
 		_row_marks(row * ROW_RISE)
 
-	for row in 2:
-		var model := OTTO_MODEL if row == 0 else AGENT_MODEL
+	for row in models.size():
+		var model := models[row]
 		for column in POSES.size():
 			var rig := FigureRig.new()
 			rig.model = model
@@ -146,12 +148,14 @@ func _run() -> void:
 		rig.set_process(false)
 
 	var middle := STEP * (POSES.size() - 1) * 0.5
-	# Сбоку, как в игре: фигуры смотрят вправо, ряд агентов над рядом Otto.
-	_camera.position = Vector3(middle, 2.2, 12.0)
+	# Сбоку, как в игре: фигуры смотрят вправо, ряды агентов над рядом Otto.
+	var rows := _rigs.size() / POSES.size()
+	var centre_y := ROW_RISE * (rows - 1) * 0.5 + 0.9
+	_camera.position = Vector3(middle, centre_y, 12.0)
 	# Ширина кадра — все позы ряда с полем: ортокамера держит высоту, а окно
 	# 1920×1000 шире её в 1.92 раза.
-	_camera.size = maxf(9.4, (STEP * POSES.size() + 1.0) / 1.92)
-	_camera.look_at(Vector3(middle, 2.2, 0.0))
+	_camera.size = maxf(ROW_RISE * rows + 0.6, (STEP * POSES.size() + 1.0) / 1.92)
+	_camera.look_at(Vector3(middle, centre_y, 0.0))
 	await _shoot("actors_side")
 
 	# Спереди на три четверти: видно лицо, шляпу, очки и пистолет.

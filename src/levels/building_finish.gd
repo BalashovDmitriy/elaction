@@ -46,7 +46,10 @@ static func wainscot(identity: BuildingIdentity, tone: Color) -> StandardMateria
 		BuildingIdentity.Kind.RESIDENTIAL:
 			# Стены в два тона (ADR-0055, решение 4): низ — крашеный глазурованный
 			# кирпич, темнее верха, как в подъездах Нью-Йорка.
-			return _textured("residential_wainscot", tone.darkened(0.35), WOOD_REPEAT, 0.0)
+			# Тон раунда — наполовину к серому: чистый тон кирпича на полстены
+			# забивал кадр (кадры M24m).
+			var paint := tone.lerp(Color(0.42, 0.42, 0.42), 0.55).darkened(0.25)
+			return _textured("residential_wainscot", paint, WOOD_REPEAT, 0.0)
 	return _textured(
 		"office_wainscot", GreyboxLook.SKIRTING.lerp(tone, 0.25).lightened(0.2), WOOD_REPEAT, 0.0
 	)
