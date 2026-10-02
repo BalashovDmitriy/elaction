@@ -105,3 +105,39 @@ func test_a_hotel_lights_its_pilasters_but_not_on_dark_floors() -> void:
 		assert_false(level.rules.is_unlit(index), "на тёмном этаже бра не горит")
 	for door: Door in level.doors():
 		assert_null(door.find_child("VisionGlass", true, false), "у отеля двери без стекла")
+
+
+## Стена офиса — стекло с залом за ним (ADR-0056, решение 4); у отеля и жилого
+## дома зала нет. Зал без тел и без теней, на тёмном этаже экраны не светятся.
+func test_only_an_office_opens_its_hall_behind_glass() -> void:
+	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
+		var level := await _level(kind)
+		var halls := level.find_children("OpenSpace", "OpenSpace", true, false)
+		if kind != BuildingIdentity.Kind.OFFICE:
+			assert_eq(halls.size(), 0, "тип %d: зала нет" % kind)
+			continue
+		assert_eq(halls.size(), 1, "у офиса зал за стеклом")
+		var hall := halls[0] as OpenSpace
+		assert_eq(hall.find_children("*", "PhysicsBody3D", true, false).size(), 0, "зал без тел")
+		for part: Node in hall.get_children():
+			var many := part as MultiMeshInstance3D
+			assert_not_null(many, "зал — мультимешами")
+			if many != null:
+				assert_eq(
+					many.cast_shadow, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, "без теней"
+				)
+
+
+## Дверь офиса открывается в зал: своей комнаты за ней нет.
+func test_an_office_door_opens_into_the_hall() -> void:
+	var door := (preload("res://src/systems/doors/door.tscn")).instantiate() as Door
+	door.furnish(BuildingIdentity.typed(BuildingIdentity.Kind.OFFICE), 11)
+	add_child_autofree(door)
+	await wait_physics_frames(2)
+	assert_true(door.summon_agent(), "дверь открывается под агента")
+	for _frame: int in 120:
+		await wait_physics_frames(1)
+		if door.openness() > 0.5:
+			break
+	assert_gt(door.openness(), 0.0, "открылась")
+	assert_null(door.room(), "комнаты за дверью офиса нет")

@@ -45,6 +45,12 @@ const STORY_SHARE: float = 0.45
 ## слабо — стена отражала общий тон так же, как на светлом.
 const UNLIT_SHADE: float = 0.45
 
+## Стеклянная стена офиса (ADR-0056, решение 4): цвет и прозрачность стекла,
+## шаг стоек и их тон.
+const GLASS := Color(0.55, 0.7, 0.78, 0.07)
+const GLASS_MULLION: float = 1.8
+const GLASS_FRAME := Color(0.62, 0.65, 0.7)
+
 ## Парапет крыши: видимая высота, отлив сверху и его свес, м (ADR-0031, решение 2).
 const PARAPET_HEIGHT: float = 1.05
 const COPING_HEIGHT: float = 0.08
@@ -56,6 +62,8 @@ var _ribs: BuildingRibs = null
 ## Стены без тел отдельным узлом: их много, и в дереве они не должны мешаться
 ## среди тел, по которым ходят.
 var _panels: Node3D = null
+## Стекло офиса — один материал на здание.
+var _glass: StandardMaterial3D = null
 
 
 ## Куски перекрытия уровня прямоугольниками правил.
@@ -202,6 +210,11 @@ func _build_room() -> void:
 	var far := GreyboxLook.surface(GreyboxLook.SKY_WALL)
 	var back_z := WorldSpace.BACK_WALL_Z - PANEL_THICKNESS * 0.5
 	var far_z := WorldSpace.BACK_WALL_Z - WorldSpace.ROOM_DEPTH
+	var glazed := _ribs.identity().kind == BuildingIdentity.Kind.OFFICE
+	if glazed:
+		var hall := OpenSpace.new()
+		add_child(hall)
+		hall.build(_rules, _plan)
 
 	for index: int in _rules.levels():
 		if index == BuildingRules.ROOF or index == _rules.floors - 1:
@@ -215,6 +228,12 @@ func _build_room() -> void:
 		var openings := _openings_on(index)
 		var lintel_top := surface - Door.LEAF_SIZE.y
 		for span in BuildingPlan.spans_between(openings, inner):
+			if glazed:
+				# Офис (ADR-0056, решение 4): стекло в рост двери, над ним —
+				# сплошная полоса до потолка, за стеклом — зал [OpenSpace].
+				_build_panel(Rect2(span.x, top, span.y - span.x, lintel_top - top), back, back_z)
+				_build_glass(Rect2(span.x, lintel_top, span.y - span.x, surface - lintel_top))
+				continue
 			_build_panel(Rect2(span.x, top, span.y - span.x, surface - top), back, back_z)
 		for opening in openings:
 			_build_panel(
@@ -294,6 +313,32 @@ func _build_block(rect: Rect2, material: StandardMaterial3D, depth: float) -> vo
 
 ## Стена, которая только видна: без тела, толщиной [constant PANEL_THICKNESS],
 ## серединой на [param z].
+## Стеклянная перегородка офиса в задней стене: стекло и алюминиевые стойки
+## с шагом [constant GLASS_MULLION], без тел — как и сама стена.
+func _build_glass(rect: Rect2) -> void:
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return
+	if _glass == null:
+		_glass = StandardMaterial3D.new()
+		_glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_glass.albedo_color = GLASS
+		_glass.roughness = 0.04
+		_glass.metallic = 0.1
+		_glass.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var z := WorldSpace.BACK_WALL_Z - PANEL_THICKNESS * 0.5
+	var pane := GreyboxLook.box(Vector3(rect.size.x, rect.size.y, 0.02), _glass)
+	pane.position = WorldSpace.to_scene(rect.get_center())
+	pane.position.z = z
+	pane.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_panels.add_child(pane)
+	var frame := GreyboxLook.metal(GLASS_FRAME)
+	var count := maxi(1, roundi(rect.size.x / GLASS_MULLION))
+	for step: int in count + 1:
+		var x := rect.position.x + rect.size.x * step / count
+		_build_panel(Rect2(x - 0.03, rect.position.y, 0.06, rect.size.y), frame, z + 0.03)
+	_build_panel(Rect2(rect.position.x, rect.end.y - 0.08, rect.size.x, 0.08), frame, z + 0.03)
+
+
 func _build_panel(rect: Rect2, material: StandardMaterial3D, z: float) -> void:
 	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
 		return

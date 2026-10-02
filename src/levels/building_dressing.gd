@@ -74,6 +74,9 @@ static func lay(
 	var step := rules.slot_x(1) - rules.slot_x(0)
 	var floor_items := PropCatalog.pick(PropCatalog.Place.FLOOR, identity.fit())
 	var wall_items := PropCatalog.pick(PropCatalog.Place.WALL, identity.fit())
+	# У офиса задняя стена — стекло (ADR-0056, решение 4): на нём не висит ничего.
+	if identity.kind == BuildingIdentity.Kind.OFFICE:
+		wall_items.clear()
 	# Этаж выхода — гараж: пустой, с одной машиной (ADR-0031, решение 4).
 	for index in rules.floors - 1:
 		var spots := free_spots(rules, plan, index)

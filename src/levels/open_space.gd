@@ -1,0 +1,153 @@
+class_name OpenSpace
+extends Node3D
+
+## Open space офиса за стеклянной стеной коридора (ADR-0056, решение 4).
+##
+## У офиса вместо задней стены — стеклянные перегородки, и за ними виден зал на
+## всю глубину плиты: ряды кубиклов с перегородками в рост сидящего, столы,
+## мониторы со светящимися экранами, кресла, шкафы-картотеки, а у дальней стены
+## — ленточные окна на ночной город. Отдельной комнаты за дверью у офиса нет:
+## дверь открывается в этот зал.
+##
+## Только вид: тел нет, теней нет — набор на всё здание мультимешами по одному
+## на деталь, и в проходе теней ламп он не участвует (бюджет кадра внизу
+## здания, ADR-0042, решение 2). Экраны светятся эмиссией только на светлых
+## этажах: на тёмном по ROM офис погашен целиком.
+##
+## Зал не заходит туда, где плиты нет — в шахты, — и за глухие внутренние
+## стены; столы стоят дальше, чем ходит створка двери.
+
+## Ряды кубиклов: глубина середины ряда от задней стены коридора, м. Первый —
+## за створкой двери ([constant Door.LEAF_SIZE] в глубину), второй — у окон.
+const ROWS: Array[float] = [2.3, 4.7]
+## Шаг кубиклов вдоль ряда и их габарит, м.
+const CUBICLE_STEP: float = 2.0
+const DESK := Vector3(1.5, 0.05, 0.75)
+const DESK_HEIGHT: float = 0.74
+const PARTITION := Vector3(1.9, 1.2, 0.05)
+const MONITOR := Vector3(0.5, 0.36, 0.06)
+const CHAIR := Vector3(0.5, 0.9, 0.5)
+const CABINET := Vector3(0.5, 1.3, 0.6)
+## Окна у дальней стены: высота ленты, её низ над полом, шаг переплёта, м.
+const WINDOW_BAND := Vector2(1.5, 0.9)
+const MULLION_STEP: float = 1.2
+## Ближе этого к краю пролёта кубикл не ставится, м.
+const EDGE: float = 0.6
+
+## Цвета: стол, перегородки кубиклов (ткань), корпус монитора, экран, кресло,
+## шкаф, окна и переплёт.
+const DESK_COLOUR := Color(0.52, 0.47, 0.4)
+const FABRIC := Color(0.36, 0.4, 0.46)
+const CASE := Color(0.12, 0.12, 0.13)
+const SCREEN := Color(0.45, 0.75, 0.95)
+const CHAIR_COLOUR := Color(0.1, 0.11, 0.13)
+const CABINET_COLOUR := Color(0.55, 0.57, 0.6)
+const NIGHT_GLASS := Color(0.06, 0.09, 0.15)
+const FRAME := Color(0.3, 0.32, 0.36)
+
+var _parts: Dictionary = {}
+
+
+## Собирает зал на всех этажах офиса, кроме крыши и паркинга.
+func build(rules: BuildingRules, plan: BuildingPlan) -> void:
+	name = "OpenSpace"
+	var back := WorldSpace.BACK_WALL_Z
+	var far := back - WorldSpace.ROOM_DEPTH
+	for index: int in range(0, rules.floors - 1):
+		var surface := rules.floor_surface(index)
+		var bounds := rules.floor_span(index)
+		var inner := Vector2(
+			bounds.x + BuildingShell.WALL_WIDTH, bounds.y - BuildingShell.WALL_WIDTH
+		)
+		var cuts := plan.gaps_on(rules, index)
+		for wall in plan.walls:
+			if wall.floor_index == index:
+				cuts.append(wall.band(rules))
+		var lit := not rules.is_unlit(index)
+		for span: Vector2 in BuildingPlan.spans_between(cuts, inner):
+			_windows(span, surface, far)
+			for row: float in ROWS:
+				_row(span, surface, back - row, lit)
+	_commit("desk", GreyboxLook.surface(DESK_COLOUR))
+	_commit("fabric", GreyboxLook.surface(FABRIC))
+	_commit("case", GreyboxLook.surface(CASE))
+	_commit("screen", GreyboxLook.light(SCREEN))
+	_commit("screen_off", GreyboxLook.surface(CASE.lightened(0.1)))
+	_commit("chair", GreyboxLook.surface(CHAIR_COLOUR))
+	_commit("cabinet", GreyboxLook.metal(CABINET_COLOUR))
+	_commit("night", GreyboxLook.polished(NIGHT_GLASS))
+	_commit("frame", GreyboxLook.metal(FRAME))
+
+
+## Ряд кубиклов на глубине [param z]: перегородка сзади, стол, монитор лицом к
+## коридору, кресло за столом; через один — шкаф-картотека в торце.
+func _row(span: Vector2, surface: float, z: float, lit: bool) -> void:
+	var length := span.y - span.x - EDGE * 2.0
+	var count := int(length / CUBICLE_STEP)
+	if count <= 0:
+		return
+	var start := (span.x + span.y) * 0.5 - (count - 1) * CUBICLE_STEP * 0.5
+	for cubicle: int in count:
+		var x := start + cubicle * CUBICLE_STEP
+		_add("fabric", PARTITION, Vector3(x, surface - PARTITION.y * 0.5, z - DESK.z * 0.5 - 0.75))
+		_add("desk", DESK, Vector3(x, surface - DESK_HEIGHT, z))
+		var screen_y := surface - DESK_HEIGHT - MONITOR.y * 0.5 - 0.08
+		var screen_z := z - DESK.z * 0.25
+		_add("case", MONITOR, Vector3(x - 0.2, screen_y, screen_z))
+		var face := Vector3(MONITOR.x * 0.86, MONITOR.y * 0.8, 0.01)
+		var lit_face := "screen" if lit and (cubicle + int(z)) % 3 != 0 else "screen_off"
+		_add(lit_face, face, Vector3(x - 0.2, screen_y, screen_z + MONITOR.z * 0.5 + 0.005))
+		_add("chair", CHAIR, Vector3(x + 0.1, surface - CHAIR.y * 0.5, z - DESK.z * 0.5 - 0.3))
+		if cubicle % 2 == 1:
+			_add(
+				"cabinet",
+				CABINET,
+				Vector3(x + CUBICLE_STEP * 0.5, surface - CABINET.y * 0.5, z - DESK.z * 0.2)
+			)
+
+
+## Ленточные окна у дальней стены зала: тёмное стекло ночи и переплёт.
+func _windows(span: Vector2, surface: float, far: float) -> void:
+	var length := span.y - span.x
+	var middle := (span.x + span.y) * 0.5
+	var y := surface - WINDOW_BAND.y - WINDOW_BAND.x * 0.5
+	var z := far + 0.06
+	_add("night", Vector3(length, WINDOW_BAND.x, 0.02), Vector3(middle, y, z))
+	for edge: float in [-1.0, 1.0]:
+		_add(
+			"frame",
+			Vector3(length, 0.06, 0.04),
+			Vector3(middle, y + edge * WINDOW_BAND.x * 0.5, z + 0.02)
+		)
+	for step: int in int(length / MULLION_STEP) + 1:
+		var x := span.x + step * MULLION_STEP
+		_add("frame", Vector3(0.05, WINDOW_BAND.x, 0.04), Vector3(x, y, z + 0.02))
+
+
+## Запоминает коробку: [param at] — x и y в плоскости правил, z сцены.
+func _add(kind: String, size: Vector3, at: Vector3) -> void:
+	if not _parts.has(kind):
+		_parts[kind] = [] as Array[Transform3D]
+	var place := WorldSpace.to_scene(Vector2(at.x, at.y))
+	place.z = at.z
+	(_parts[kind] as Array[Transform3D]).append(Transform3D(Basis.from_scale(size), place))
+
+
+func _commit(kind: String, material: StandardMaterial3D) -> void:
+	if not _parts.has(kind):
+		return
+	var places: Array[Transform3D] = _parts[kind]
+	var box := BoxMesh.new()
+	box.material = material
+	var many := MultiMesh.new()
+	many.transform_format = MultiMesh.TRANSFORM_3D
+	many.mesh = box
+	many.instance_count = places.size()
+	for index: int in places.size():
+		many.set_instance_transform(index, places[index])
+	var node := MultiMeshInstance3D.new()
+	node.name = kind.capitalize()
+	node.multimesh = many
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	node.layers = PropCatalog.RENDER_LAYER
+	add_child(node)

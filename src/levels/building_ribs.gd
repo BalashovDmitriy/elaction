@@ -99,6 +99,10 @@ func line_the_wall(index: int, inner: Vector2, openings: Array[Vector2]) -> void
 	# Бра — на пилястрах отеля (ADR-0048); на тёмном этаже свет погашен
 	# по правилам ROM, и светящееся бра спорило бы с темнотой.
 	var sconces := BuildingStyle.of(_identity).sconces and not _rules.is_unlit(index)
+	# Офис — стекло в рост (ADR-0056, решение 4): ни панели низа, ни
+	# пилястр перед ним, стойки ставит сама стена ([BuildingShell]).
+	if _identity.kind == BuildingIdentity.Kind.OFFICE:
+		return
 	for span in BuildingPlan.spans_between(gaps, inner):
 		_skirting(span, surface)
 		_pilasters(span, top, surface, sconces)
