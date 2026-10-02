@@ -83,7 +83,12 @@ const ENDLESS_LIVES: int = 99
 ## Число это — о сложности игры, и правится оно замером, а не подгонкой под
 ## зелёный тест (ADR-0016). Выросло — значит бой стал злее, и решать надо,
 ## хотели мы этого или нет.
-const DEATHS_ALLOWED: int = 5
+##
+## Замер 2026-10-02, после правил ROM (ADR-0053): возвращение без агентов на
+## этаже, толпа уходит в двери, выпуск не ближе 1.2 м — **1, 4, 6** на сидах 1–3.
+## Сид 3 и раньше стоял на пороге (5 из 5); бой по ROM чуть злее, и порог поднят
+## до шести решением пользователя.
+const DEATHS_ALLOWED: int = 6
 
 ## Сколько шагов боту даётся на то, чтобы хоть как-то продвинуться, прежде чем
 ## прогон признаётся зациклившимся.
@@ -285,6 +290,7 @@ func _play_tall(building_seed: int) -> void:
 	var frames := 0
 	var deepest := 0
 	var watchdog := _Watchdog.new()
+	var lamps_before := level.lamps().size()
 	while not cleared[0] and frames < TALL_BUDGET:
 		bot.step()
 		await _tick()
@@ -311,6 +317,10 @@ func _play_tall(building_seed: int) -> void:
 		game.documents_total,
 		"сид %d: документы собраны не все" % building_seed
 	)
+	# Бот сбивает лампы из кабины (ADR-0053, решение 4): без этого прогон не
+	# проверял бы темноту вовсе.
+	assert_gt(bot.lamp_shots, 0, "сид %d: бот ни разу не выстрелил по лампе" % building_seed)
+	assert_lt(level.lamps().size(), lamps_before, "сид %d: ни одна лампа не упала" % building_seed)
 	_drop(level)
 
 

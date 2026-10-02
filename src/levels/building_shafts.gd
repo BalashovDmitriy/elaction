@@ -51,9 +51,13 @@ const BRACE_HEIGHT: float = 0.12
 const BOARD := Vector3(0.7, 0.26, 0.05)
 const BOARD_GAP: float = 0.06
 const BOARD_DIGITS := Color(0.55, 0.82, 1.0)
-## Стрелки хода на табло.
-const ARROW_UP := "\u25B2"
-const ARROW_DOWN := "\u25BC"
+## Стрелка хода на табло — треугольник геометрией, а не знак шрифта: ▲ и ▼ нет
+## ни в Exo 2, ни в прежнем Pixellari, и их рисовал системный запасной шрифт,
+## которого на другой машине может не быть. Размер стрелки, на сколько она
+## левее середины табло и на сколько цифры при ней правее, м.
+const ARROW := Vector3(0.09, 0.08, 0.008)
+const ARROW_SHIFT: float = 0.2
+const DIGITS_SHIFT: float = 0.06
 
 ## Панель кнопок сбоку портала: размер, высота середины, отступ от наличника,
 ## кнопка; цвет горящей и тёмной кнопки.
@@ -147,6 +151,8 @@ var _span := Vector2i(-1_000_000, 1_000_000)
 ## (направляющие, упоры, трос спуска), и панель кнопок в 12 см шириной
 ## сходила бы за трос.
 var _board_host: Node3D = null
+## Треугольник стрелки, один на все табло.
+var _arrow_mesh: PrismMesh = null
 
 
 ## Табло и кнопки одного портала.
@@ -154,6 +160,9 @@ class ShaftBoard:
 	extends RefCounted
 	var floor_index: int = 0
 	var digits: Label3D = null
+	var arrow: MeshInstance3D = null
+	## Середина табло: от неё цифры сдвигаются, когда горит стрелка.
+	var center: Vector3 = Vector3.ZERO
 	var up_button: MeshInstance3D = null
 	var down_button: MeshInstance3D = null
 	## Какая кнопка горит: [constant Intent.UP], [constant Intent.DOWN] или 0.
@@ -317,13 +326,29 @@ func _build_board(x: float, index: int, surface: float) -> void:
 	frame.position.z = WorldSpace.BACK_WALL_Z + PANEL_THICKNESS + 0.06
 	_board_host.add_child(frame)
 	board.digits = Label3D.new()
-	board.digits.font = NeonStyle.font(700)
+	board.digits.font = NeonStyle.scene_font(700)
 	board.digits.font_size = 64
 	board.digits.pixel_size = 0.0034
 	board.digits.modulate = BOARD_DIGITS
 	board.digits.outline_size = 0
-	board.digits.position = frame.position + Vector3(0.0, 0.0, BOARD.z * 0.5 + 0.003)
+	board.center = frame.position + Vector3(0.0, 0.0, BOARD.z * 0.5 + 0.003)
+	board.digits.position = board.center
 	_board_host.add_child(board.digits)
+	if _arrow_mesh == null:
+		_arrow_mesh = PrismMesh.new()
+		_arrow_mesh.size = ARROW
+		# Стрелка светится так же, как цифры рядом: [Label3D] не затеняется, и
+		# затеняемая стрелка на тёмном этаже гасла бы, а под лампой — пересвечивала.
+		var ink := StandardMaterial3D.new()
+		ink.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		ink.albedo_color = BOARD_DIGITS
+		_arrow_mesh.material = ink
+	board.arrow = MeshInstance3D.new()
+	board.arrow.mesh = _arrow_mesh
+	board.arrow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	board.arrow.position = board.center + Vector3(-ARROW_SHIFT, 0.0, ARROW.z * 0.5)
+	board.arrow.visible = false
+	_board_host.add_child(board.arrow)
 
 	var side := call_side(_rules, _plan, x, index)
 	if side != 0.0:
@@ -476,12 +501,12 @@ func _nearest_floor(car: ElevatorCar) -> int:
 ## Пишет на табло этаж и стрелку хода кабины [param heading] и зажигает кнопку
 ## [param call] — ту, в сторону которой кабина идёт к этому этажу.
 func _show(board: ShaftBoard, label: String, heading: float, call: float) -> void:
-	var arrow := ""
-	if heading == Intent.UP:
-		arrow = ARROW_UP
-	elif heading == Intent.DOWN:
-		arrow = ARROW_DOWN
-	board.digits.text = label if arrow.is_empty() else "%s %s" % [arrow, label]
+	board.digits.text = label
+	# Ход приходит из [method heading_of]: вверх, вниз или 0 — других не бывает.
+	var moving := heading != 0.0
+	board.arrow.visible = moving
+	board.arrow.rotation.z = PI if heading == Intent.DOWN else 0.0
+	board.digits.position = board.center + Vector3(DIGITS_SHIFT if moving else 0.0, 0.0, 0.0)
 	board.lit = call if board.up_button != null else 0.0
 	if board.up_button != null:
 		# Погасшая кнопка возвращается к тёмному металлу: без материала коробка

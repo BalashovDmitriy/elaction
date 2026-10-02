@@ -13,6 +13,8 @@ extends SceneTree
 ##     godot --headless --script res://tools/playthrough.gd -- --agents --at-once=8
 ##     godot --headless --script res://tools/playthrough.gd -- --agents --endless --skill=6
 ##     godot --headless --script res://tools/playthrough.gd -- --seeds=1 --trace --budget=3000
+##     godot --headless --script res://tools/playthrough.gd -- --agents --endless --dark-range=2.4
+##     godot --headless --script res://tools/playthrough.gd -- --agents --endless --no-lamps
 ##
 ## С [code]--trace[/code] раз в [constant TRACE_EVERY] шагов печатается, где бот
 ## и что вокруг: этаж, положение, стоит ли, едет ли, где ближайшая кабина. Это
@@ -40,6 +42,14 @@ const TRACE_EVERY: int = 300
 ## Навык здания: уровень сложности плюс пройденные здания (ADR-0027). С ним
 ## смертность бота меряется на каждом уровне, а не только на первом здании.
 var _skill: int = 0
+## С какой дистанции агент видит Otto в тени, м; меньше нуля — из правил.
+## Этим флагом подбиралось [member BuildingRules.agent_dark_fire_range]
+## (ADR-0053, решение 4).
+var _dark_range: float = -1.0
+## Бот не сбивает лампы: замер «без темноты» рядом с замером с ней.
+var _no_lamps: bool = false
+## Запрет выпуска у Otto, м; меньше нуля — из правил (ADR-0053, решение 3).
+var _release_gap: float = -1.0
 
 
 func _init() -> void:
@@ -77,6 +87,12 @@ func _run() -> void:
 			budget = maxi(argument.trim_prefix("--budget=").to_int(), 1)
 		elif argument.begins_with("--trace-every="):
 			trace_every = maxi(argument.trim_prefix("--trace-every=").to_int(), 1)
+		elif argument.begins_with("--dark-range="):
+			_dark_range = argument.trim_prefix("--dark-range=").to_float()
+		elif argument == "--no-lamps":
+			_no_lamps = true
+		elif argument.begins_with("--release-gap="):
+			_release_gap = argument.trim_prefix("--release-gap=").to_float()
 
 	Engine.time_scale = 4.0
 	var failures := 0
@@ -116,6 +132,10 @@ func _play(
 	level.rules.skill = _skill
 	if at_once > 0:
 		level.rules.agents_at_once_cap = at_once
+	if _dark_range >= 0.0:
+		level.rules.agent_dark_fire_range = _dark_range
+	if _release_gap >= 0.0:
+		level.rules.agent_release_gap = _release_gap
 	level.building_seed = building_seed
 	level.spawn_agents = agents
 	root.add_child(level)
@@ -130,7 +150,9 @@ func _play(
 	game.game_over.connect(on_game_over)
 
 	var bot := OttoBot.new(level)
+	bot.shoots_lamps = not _no_lamps
 	var rules := level.rules
+	var lamps_before := level.lamps().size()
 	var deepest := 0
 	var frames := 0
 	var deaths := 0
@@ -227,7 +249,7 @@ func _play(
 	var verdict := "прошёл" if ok else "НЕ ПРОШЁЛ"
 	print(
 		(
-			"  %s: шагов %d, этаж %d/%d, документы %d/%d, смертей %d, убито %d, очки %d"
+			"  %s: шагов %d, этаж %d/%d, документы %d/%d, смертей %d, убито %d, очки %d, ламп сбито %d/%d"
 			% [
 				verdict,
 				frames,
@@ -237,7 +259,9 @@ func _play(
 				game.documents_total,
 				deaths,
 				kills,
-				game.score
+				game.score,
+				lamps_before - level.lamps().size(),
+				lamps_before
 			]
 		)
 	)

@@ -77,8 +77,6 @@ const TEAR_HEIGHT: float = 0.45
 
 @export var speed: float = Arcade.speed(Arcade.CAR_PX)
 @export var floor_pause: float = 1.5
-## Встаёт ли кабина между этажами. Сверкой не подтверждено — см. ADR-0004.
-@export var stops_between_floors: bool = true
 
 var _motion := ElevatorMotion.new()
 var _occupant: PhysicsBody3D = null
@@ -248,7 +246,6 @@ func _physics_process(delta: float) -> void:
 func setup(stops: PackedFloat32Array, start_floor: int = 0) -> void:
 	_motion.speed = speed
 	_motion.floor_pause = floor_pause
-	_motion.stops_between_floors = stops_between_floors
 	_motion.setup(stops, start_floor)
 	_place(_motion.position)
 	_aligned_floor = _motion.aligned_floor()

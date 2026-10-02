@@ -51,17 +51,16 @@ func _run() -> void:
 	for time: int in _times:
 		for weather: int in _weathers:
 			await _combo(time, weather)
-	Weather.forced = -1
 	print("  кадры M24j в %s" % _folder)
 	get_tree().quit(0)
 
 
 func _combo(time: int, weather: int) -> void:
-	Weather.forced = weather
 	GameState.instance().start_game()
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	_level.rules = BuildingRules.new()
 	_level.rules.time_of_day = time as TimeOfDay.Kind
+	_level.rules.forced_weather = weather
 	_level.building_seed = _seed
 	_level.spawn_agents = false
 	add_child(_level)

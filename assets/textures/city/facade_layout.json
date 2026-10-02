@@ -8,6 +8,7 @@
     "stone"
   ],
   "tile_width": 4.0,
+  "gutter": 0.5,
   "density": 64,
   "rows": [
     {

@@ -12,6 +12,7 @@ const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
 ## Сколько кадров даётся геометрии и агентам, чтобы встать на места.
 const SETTLE_FRAMES: int = 4
+const ENEMY := preload("res://src/actors/enemy/enemy.tscn")
 
 ## Сколько кадров дверям даётся на то, чтобы выпустить всех, кого они могут.
 ##
@@ -166,15 +167,13 @@ func test_no_agent_walks_a_floor_far_from_otto() -> void:
 	_drop(level)
 
 
-## Возвращение в игру — не на то же место, где убили: агент оттуда никуда не
-## делся, и три жизни сгорали на одном пятачке.
+## Возвращение в игру по ROM (ADR-0053, решение 2): агент, убивший Otto, уходит
+## вместе со всеми живыми, а Otto встаёт в точке ROM своего этажа, а не там, где
+## погиб. Тело убитого раньше агента остаётся лежать.
 ##
-## Агент стоит неподвижно ([code]walk_speed[/code] = 0), и это не удобство, а
-## условие проверки. Ходящий успевает уйти за те 60 кадров, пока Otto лежит, и
-## «вернулся не туда, где убили» начинает зависеть от того, куда он ушёл: на
-## M18b кусок этажа стал короче, агент развернулся раньше — и проверка,
-## поставленная в M10 на настоящую поломку, стала мерить совпадение.
-func test_otto_comes_back_away_from_the_agent_that_killed_him() -> void:
+## Агент стоит неподвижно ([code]walk_speed[/code] = 0): так он точно ещё на
+## этаже, когда Otto возвращается, и проверяется уход, а не то, куда он дошёл.
+func test_otto_comes_back_to_the_rom_spot_and_the_agents_leave() -> void:
 	var level := _build(1, false)
 	await wait_physics_frames(SETTLE_FRAMES)
 
@@ -184,21 +183,39 @@ func test_otto_comes_back_away_from_the_agent_that_killed_him() -> void:
 	var spots := level.plan().safe_spots(rules, floor_index)
 	assert_gt(spots.size(), 1, "на этаже есть из чего выбирать")
 
-	# Агент ставится вплотную к первому свободному месту: раньше именно туда
-	# Otto и возвращался, потому что оно было первым по порядку.
-	var agent := preload("res://src/actors/enemy/enemy.tscn").instantiate() as Enemy
-	agent.walk_speed = 0.0
-	level.add_child(agent)
-	agent.global_position = WorldSpace.to_scene(Vector2(spots[0], surface))
-	agent.setup(level.otto, 1.0)
-	await wait_physics_frames(SETTLE_FRAMES)
+	var shooter := ENEMY.instantiate() as Enemy
+	shooter.walk_speed = 0.0
+	level.add_child(shooter)
+	shooter.global_position = WorldSpace.to_scene(Vector2(spots[0], surface))
+	shooter.setup(level.otto, 1.0)
+	var body := ENEMY.instantiate() as Enemy
+	level.add_child(body)
+	body.global_position = WorldSpace.to_scene(Vector2(spots[-1], surface))
+	body.setup(level.otto, -1.0)
+	# Из проёма агент выходит неуязвимым ([method Enemy.is_emerging]).
+	var emerged := 0
+	while body.is_emerging() and emerged < 120:
+		await wait_physics_frames(1)
+		emerged += 1
+	body.kill()
+	assert_true(body.is_dead(), "второго агента не убить")
 
 	level.otto.global_position = WorldSpace.to_scene(Vector2(spots[0], surface))
 	level.otto.kill()
-	await wait_physics_frames(60)
+	var waited := 0
+	while level.otto.is_dead() and waited < 120:
+		await wait_physics_frames(1)
+		waited += 1
+	await wait_physics_frames(1)
 
+	assert_false(is_instance_valid(shooter), "убивший Otto агент не ушёл")
+	assert_true(is_instance_valid(body), "тело агента убрали вместе с живыми")
+	# Третий этаж тридцатиэтажки — двадцать седьмой ROM: Otto остаётся на нём.
+	assert_eq(_floor_of(rules, level.otto), floor_index, "Otto вернулся не на свой этаж")
 	var back := WorldSpace.to_plane(level.otto.global_position).x
-	assert_gt(absf(back - spots[0]), 0.01, "Otto вернулся под тот же ствол")
+	var red_x := RespawnSpot.red_door_x(level.doors(), rules, floor_index)
+	var spot := RespawnSpot.choose(level.plan(), rules, floor_index, red_x)
+	assert_almost_eq(back, spot, 0.01, "Otto вернулся не в точку ROM")
 	_drop(level)
 
 
@@ -324,6 +341,9 @@ func test_agents_step_out_next_to_otto() -> void:
 					continue
 				seen[id] = true
 				var floor_index := _floor_of(rules, agent)
+				# Этаж Otto — на миг выхода: погибший внизу возвращается не ниже
+				# пятого этажа ROM (ADR-0053, решение 2), и выпуск идёт за ним.
+				here = _floor_of(rules, level.otto)
 				assert_lte(
 					absi(floor_index - here),
 					1,
@@ -334,47 +354,3 @@ func test_agents_step_out_next_to_otto() -> void:
 				)
 		assert_gt(seen.size(), 0, "сид %d: никто не вышел" % building_seed)
 		_drop(level)
-
-
-## Погибший в кабине воскресает рядом с её шахтой, а не где попало.
-##
-## Над проёмом шахты нет куска этажа, и раньше возврат выбирал из всех мест —
-## на навыке 10 Otto воскресал в кармане за эскалатором, откуда хода нет
-## (перемер M18e). Теперь — ближайший к шахте кусок: с него в кабину садятся.
-##
-## Счёт — одна раскладка, и сцену ради него не поднимаем.
-func test_a_rider_killed_in_a_car_comes_back_beside_its_shaft() -> void:
-	for skill: int in [0, 10]:
-		var rules := BuildingRules.new()
-		rules.skill = skill
-		for building_seed: int in [1, 2, 3]:
-			var plan := BuildingPlan.generate(rules, building_seed)
-			for shaft in plan.shafts:
-				for index: int in range(maxi(shaft.top, 0), shaft.bottom + 1):
-					var spots := plan.safe_spots(rules, index)
-					if spots.is_empty():
-						continue
-					var chosen := plan.spots_on_the_same_piece(rules, index, shaft.x, spots)
-					assert_true(
-						_on_one_piece(plan, rules, index, chosen),
-						(
-							"навык %d, сид %d, этаж %d: возврат из шахты x=%.1f по разным кускам"
-							% [skill, building_seed, index, shaft.x]
-						)
-					)
-
-
-## Лежат ли все места на одном куске этажа — между одними и теми же проёмами.
-func _on_one_piece(
-	plan: BuildingPlan, rules: BuildingRules, index: int, spots: PackedFloat64Array
-) -> bool:
-	var pieces := BuildingPlan.spans_between(plan.blocks_on(rules, index), rules.floor_span(index))
-	for piece: Vector2 in pieces:
-		var inside := true
-		for x: float in spots:
-			if x < piece.x or x > piece.y:
-				inside = false
-				break
-		if inside:
-			return true
-	return false

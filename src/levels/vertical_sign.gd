@@ -104,7 +104,7 @@ func hang(rules: BuildingRules, identity: BuildingIdentity) -> void:
 		for letter in line:
 			var label := Label3D.new()
 			label.text = letter
-			label.font = NeonStyle.font(700)
+			label.font = NeonStyle.scene_font(700)
 			label.font_size = 96
 			label.pixel_size = LETTER_SIZE / 96.0
 			if _lit:

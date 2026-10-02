@@ -157,7 +157,7 @@ func _plate_the_doors(plan: BuildingPlan, identity: BuildingIdentity) -> void:
 		add_child(plate)
 		var label := Label3D.new()
 		label.text = text
-		label.font = NeonStyle.font(700)
+		label.font = NeonStyle.scene_font(700)
 		label.font_size = 24 if style.departments else 32
 		label.pixel_size = 0.0022
 		label.modulate = PLATE_INK

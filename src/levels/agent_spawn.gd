@@ -65,6 +65,20 @@ func release(slot: int, level: int) -> void:
 	_wait[slot] = Arcade.respawn_wait(level)
 
 
+## Otto вернулся в игру: все ячейки свободны, и выпуск в них идёт с задержками
+## ROM — 10, 25, 40 и 55 тиков (@2F61; ADR-0053, решение 2). Добавленные сверх
+## четырёх ячейки ждут дальше тем же шагом.
+func after_death() -> void:
+	var waits := Arcade.RESPAWN_WAIT_TICKS
+	var step := waits[1] - waits[0]
+	for index in _busy.size():
+		_busy[index] = false
+		var ticks := (
+			waits[index] if index < waits.size() else waits[-1] + step * (index - waits.size() + 1)
+		)
+		_wait[index] = Arcade.seconds(ticks)
+
+
 ## Этаж жребия: этаж Otto, выше или ниже, а с шансом по сложности — именно
 ## этаж Otto (@5A4C).
 func pick_floor(here: int, level: int) -> int:
@@ -77,3 +91,12 @@ func pick_floor(here: int, level: int) -> int:
 ## Случайный из годных; годных нет — -1.
 func pick(count: int) -> int:
 	return -1 if count <= 0 else rng.randi_range(0, count - 1)
+
+
+## Ближе ли дверь на этаже [param floor_index] в [param door_x] к Otto, чем
+## [member BuildingRules.agent_release_gap]. По умолчанию запрета нет, как в ROM
+## (ADR-0053, решение 3).
+func hugs(rules: BuildingRules, floor_index: int, here: int, door_x: float, otto: Node3D) -> bool:
+	if floor_index != here:
+		return false
+	return absf(door_x - otto.global_position.x) < rules.agent_release_gap

@@ -51,6 +51,11 @@ DENSITY = 64
 # Ширина плитки фасада, м: два модуля по 2 м или один на 4 м.
 TILE_WIDTH = 4.0
 
+# Поле по бокам столбца стиля, м: 32 пикселя — до шестого мипа соседний стиль
+# не подтекает на шов плитки (авторевью M24j). Столбец с полями — 320 пикселей,
+# кратно 64, и блок мипа не ложится на два столбца сразу.
+GUTTER = 0.5
+
 # Ряды плитки сверху вниз: имя и высота, м.
 ROWS = [("top", 1.0), ("floor", 3.0), ("ground", 3.0)]
 
@@ -301,15 +306,22 @@ def _compose() -> None:
 
     TARGET.mkdir(parents=True, exist_ok=True)
     width = round(TILE_WIDTH * DENSITY)
+    gutter = round(GUTTER * DENSITY)
+    stride = width + gutter * 2
     height = sum(round(h * DENSITY) for _, h in ROWS)
     names = list(STYLES)
-    sheets = {name: Image.new("RGB", (width * len(names), height)) for name in PASSES}
+    sheets = {name: Image.new("RGB", (stride * len(names), height)) for name in PASSES}
     for column, style in enumerate(names):
         top = 0
+        left = column * stride + gutter
         for row, row_height in ROWS:
             for name in PASSES:
                 piece = Image.open(BAKE / f"{style}_{row}_{name}.png").convert("RGB")
-                sheets[name].paste(piece, (column * width, top))
+                sheet = sheets[name]
+                sheet.paste(piece, (left, top))
+                # Поля — продолжение той же плитки: она повторяется по ширине.
+                sheet.paste(piece.crop((width - gutter, 0, width, piece.height)), (left - gutter, top))
+                sheet.paste(piece.crop((0, 0, gutter, piece.height)), (left + width, top))
             top += round(row_height * DENSITY)
     albedo = sheets["albedo"].convert("RGBA")
     albedo.putalpha(sheets["mask"].convert("L"))
@@ -319,11 +331,12 @@ def _compose() -> None:
     layout = {
         "styles": names,
         "tile_width": TILE_WIDTH,
+        "gutter": GUTTER,
         "density": DENSITY,
         "rows": [{"name": name, "height": h} for name, h in ROWS],
     }
     (TARGET / "facade_layout.json").write_text(json.dumps(layout, indent=2) + chr(10), encoding="utf-8")
-    print(f"записан атлас {width * len(names)}×{height} в {TARGET}")
+    print(f"записан атлас {stride * len(names)}×{height} в {TARGET}")
 
 
 def outside() -> int:

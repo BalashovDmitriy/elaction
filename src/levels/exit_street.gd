@@ -462,7 +462,7 @@ func _hang_sign(middle: float, width: float, face: float, neon: Color, lit: bool
 	)
 	var words := Label3D.new()
 	words.text = _names.pop_back() if not _names.is_empty() else SHOPS[0]
-	words.font = NeonStyle.font(700)
+	words.font = NeonStyle.scene_font(700)
 	words.font_size = 96
 	words.pixel_size = LETTERS / 96.0
 	words.shaded = false
@@ -540,7 +540,7 @@ func _hang_blade(x: float, face: float) -> void:
 	for letter in text:
 		var label := Label3D.new()
 		label.text = letter
-		label.font = NeonStyle.font(700)
+		label.font = NeonStyle.scene_font(700)
 		label.font_size = 96
 		label.pixel_size = BLADE_LETTER / 96.0
 		if is_lit():

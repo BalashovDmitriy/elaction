@@ -20,15 +20,17 @@ const CITY_FOG: Array[float] = [0.006, 0.02, 0.012]
 ## раскладки того же сида.
 const SALT: int = 0x5EA7_4E12
 
-## Погода, поставленная руками, или -1 — жребий по сиду. Ставят инструменты
-## кадров: сочетание времени суток и погоды снимается без подбора сида (M24j).
-static var forced: int = -1
+
+## Погода здания: поставленная руками в [member BuildingRules.forced_weather],
+## а без неё — жребий по сиду.
+static func of_building(rules: BuildingRules, building_seed: int) -> Kind:
+	if rules.forced_weather >= 0:
+		return rules.forced_weather as Kind
+	return of_seed(building_seed)
 
 
 ## Погода здания по его сиду.
 static func of_seed(building_seed: int) -> Kind:
-	if forced >= 0:
-		return forced as Kind
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([building_seed, SALT])
 	return rng.randi_range(0, Kind.size() - 1) as Kind

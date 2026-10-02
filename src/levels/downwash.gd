@@ -16,8 +16,18 @@ const DUST_SIZE: float = 0.5
 const DUST_COLOR := Color(0.55, 0.52, 0.48, 0.32)
 const DUST_REACH: float = 7.0
 
+## Поток от винта гонит и дождь: шар-отталкиватель частиц под осью винта
+## разносит струи вниз и в стороны, и они ложатся косо, по скорости. Радиус
+## шара, м, его сила, м/с², и какую долю высоты вертолёта над крышей он
+## занимает — середина между винтом и настилом.
+const GUST_RADIUS: float = 4.5
+const GUST_STRENGTH: float = 60.0
+const GUST_RISE: float = 0.5
+
 ## Высота крыши под вертолётом, сцена; NAN — крыши под ним нет.
 var deck: float = NAN
+
+var _gust := GPUParticlesAttractorSphere3D.new()
 
 
 func _init() -> void:
@@ -61,6 +71,11 @@ func _init() -> void:
 	look.disable_receive_shadows = true
 	quad.material = look
 	draw_pass_1 = quad
+	_gust.name = "Gust"
+	_gust.radius = GUST_RADIUS
+	_gust.strength = 0.0
+	_gust.attenuation = 1.0
+	add_child(_gust)
 
 
 ## Ставит кольцо под ось винта в [param x] и поднимает пыль, пока вертолёт
@@ -73,3 +88,11 @@ func follow(x: float, height: float, hovering: bool) -> void:
 	var low := hovering and height - deck < DUST_REACH
 	if emitting != low:
 		emitting = low
+	# Поток дождю — тот же, что пыли: пока вертолёт висит низко.
+	_gust.position = Vector3(0.0, maxf(height - deck, 0.0) * GUST_RISE, 0.0)
+	_gust.strength = -GUST_STRENGTH if low else 0.0
+
+
+## Шар, которым поток от винта разносит дождь.
+func gust() -> GPUParticlesAttractorSphere3D:
+	return _gust

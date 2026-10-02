@@ -54,13 +54,6 @@ const ALARM_CAR_DELAY: float = 0.6
 ## дверь отдаёт его за кромкой, и в кадр он уже входит своим ходом.
 const AGENT_SPAWN_MARGIN: int = 1
 
-## Ближе этого дверь агента не выпускает, м.
-##
-## Иначе агент появляется прямо на Otto: двери стоят на местах этажа, и стоящий
-## у двери получал выходящего в упор, — а с такого расстояния не помогают ни
-## уклонение, ни выстрел первым. Дверь просто ждёт, пока игрок отойдёт.
-const AGENT_SAFE_RELEASE: float = 2.88
-
 ## На сколько дальше того же запаса агент живёт, прежде чем его уберут.
 ##
 ## Больше запаса на выпуск нарочно: совпади они, агент у самой кромки то
@@ -142,6 +135,8 @@ var _posts: Array[AgentPost] = []
 var _spawn := AgentSpawn.new()
 ## Кто из агентов ждёт у двери, за которой Otto (ADR-0038, решение 2).
 var _watch := DoorWatch.new()
+## Лишние в толпе прошлого кадра: уход в дверь за ними держится ([AgentCrowd]).
+var _crowd: Dictionary = {}
 var _alert_left: float = 0.0
 ## Машина у выхода: пока она едет, здание ещё не сдано.
 var _car: ExitCar = null
@@ -292,6 +287,15 @@ func _process(_delta: float) -> void:
 ## Раскладка, по которой собрано здание.
 func plan() -> BuildingPlan:
 	return _plan
+
+
+## Висящие лампы здания. Упавшая убирает себя сама ([method Lamp._land]).
+func lamps() -> Array[Lamp]:
+	var hanging: Array[Lamp] = []
+	for lamp in _lamps:
+		if is_instance_valid(lamp) and lamp.is_hanging():
+			hanging.append(lamp)
+	return hanging
 
 
 ## Двери здания: по ним видно, какие красные ещё не собраны.
@@ -484,7 +488,7 @@ func _spawn_doors() -> void:
 	# кто начинает партию. Здесь объявляется только, сколько здесь документов.
 	var game := GameState.instance()
 	var documents := 0
-	var sky := Weather.of_seed(building_seed)
+	var sky := Weather.of_building(rules, building_seed)
 	for spot in _plan.doors:
 		var door := DOOR_SCENE.instantiate() as Door
 		door.position = WorldSpace.to_scene(Vector2(spot.x, rules.floor_surface(spot.floor_index)))
@@ -611,11 +615,15 @@ func _shroud_agents() -> void:
 	# один ([method DoorWatch.covers]), и считать их на каждого незачем.
 	var watch_blocks: Array[Vector2] = []
 	var blocks_counted := false
-	for agent in agents():
+	var everyone := agents()
+	_crowd = AgentCrowd.extras(everyone, rules, here, otto.global_position.x, _crowd)
+	for agent in everyone:
 		if agent.is_dead():
 			continue
 		var where := _floor_of(agent)
-		_shroud_agent(agent, where, agent.global_position.x, here, otto_in_the_dark)
+		_shroud_agent(
+			agent, where, agent.global_position.x, here, otto_in_the_dark, _crowd.has(agent)
+		)
 		if not blocks_counted and _watch.covers(where):
 			watch_blocks = _plan.blocks_on(rules, where)
 			blocks_counted = true
@@ -635,15 +643,20 @@ func _shroud_agents() -> void:
 ## Про Otto ([param here], [param target_in_the_dark]) считается снаружи: агентов
 ## до четырёх, а Otto один, и четыре одинаковых счёта за кадр ни к чему.
 ## [param where] и [param x] — тоже снаружи: у только что выпущенного агента
-## координата ещё коврика двери, а не его тела.
-func _shroud_agent(agent: Enemy, where: int, x: float, here: int, target_in_the_dark: bool) -> void:
+## координата ещё коврика двери, а не его тела. [param crowded] — агент лишний в
+## толпе своего этажа ([AgentCrowd]) и уходит в дверь.
+func _shroud_agent(
+	agent: Enemy, where: int, x: float, here: int, target_in_the_dark: bool, crowded: bool = false
+) -> void:
 	agent.set_in_the_dark(_lighting.is_dark_at(where, x))
 	agent.set_target_in_the_dark(target_in_the_dark)
 	# Стена делит только свой этаж: с другого этажа Otto и так не достать.
 	agent.set_target_behind_a_wall(
 		where == here and _plan.wall_between(here, x, otto.global_position.x)
 	)
-	var lift := AgentLifts.offer(_plan, rules, _cars, where, x, here)
+	# Лишнему в толпе кабину не предлагают: кабина у агента важнее двери, и он
+	# уехал бы к Otto, а не ушёл, — толпа у Otto только выросла бы.
+	var lift := NAN if crowded else AgentLifts.offer(_plan, rules, _cars, where, x, here)
 	agent.set_lift_at(lift)
 	# Далеко отставший агент уходит в ближайшую дверь, а не бродит до конца
 	# здания: его ячейка нужнее там, где игрок. Когда — решает ROM (@041F):
@@ -654,7 +667,8 @@ func _shroud_agent(agent: Enemy, where: int, x: float, here: int, target_in_the_
 		and is_nan(lift)
 		and not AgentLifts.can_ride(_plan, rules, where, x, here)
 	)
-	agent.set_exit_at(AgentLifts.nearest_door(_plan, rules, _cars, where, x) if stranded else NAN)
+	var leaves := stranded or crowded
+	agent.set_exit_at(AgentLifts.nearest_door(_plan, rules, _cars, where, x) if leaves else NAN)
 
 
 ## Ставит агента ждать у двери, за которой Otto, или снимает с поста
@@ -687,14 +701,6 @@ func agents() -> Array[Enemy]:
 	return found
 
 
-func _agents_on(index: int) -> Array[Enemy]:
-	var found: Array[Enemy] = []
-	for agent in agents():
-		if _floor_of(agent) == index:
-			found.append(agent)
-	return found
-
-
 ## Звук по месту Otto — правила в [PlaceSound]: на крыше и у ворот паркинга
 ## улица в полную силу, на этажах — из-за стекла; шаг по полу здания.
 func _listen_where_otto_is() -> void:
@@ -722,8 +728,9 @@ func _floor_of(node: Node3D) -> int:
 ## разрешает время в здании; пока Otto не на ногах или тревоги агентов нет — один
 ## (@5905, @59F4).
 ##
-## Поверх ROM остаются наши правила двери: не выпускать вплотную к Otto и
-## телеграф створки (ADR-0020). Агенты, отставшие на несколько этажей за кадр,
+## Поверх ROM остаётся телеграф створки (ADR-0020): дверь у самого Otto
+## выпускает, как и в ROM (@5AAB), но агент выходит, только когда она открылась
+## (ADR-0053, решение 3). Агенты, отставшие на несколько этажей за кадр,
 ## убираются, как раньше: ячейка им нужнее там, где игрок.
 func _tend_agents(span: Vector2i, delta: float) -> void:
 	var live := 0
@@ -797,7 +804,8 @@ func _try_to_spawn(span: Vector2i, live: int, per_floor: Dictionary) -> void:
 		if not _within(span, post.floor_index, AGENT_SPAWN_MARGIN):
 			continue
 		# Створка ещё идёт за прошлым агентом — дверь не в счёт.
-		if _too_close_to_otto(post, here) or not post.door.can_summon():
+		var door_x := post.door.mat_position().x
+		if not post.door.can_summon() or _spawn.hugs(rules, post.floor_index, here, door_x, otto):
 			continue
 		free.append(post)
 	if free.is_empty():
@@ -852,17 +860,6 @@ func _enlist_door(door: Door) -> void:
 	post.door = door
 	post.floor_index = rules.floor_index_near(door.mat_position().y)
 	_posts.append(post)
-
-
-## Стоит ли Otto вплотную к двери. Считается по горизонтали: дверь и Otto на
-## разных этажах друг другу не мешают, а этаж двери уже проверен полосой.
-##
-## Этаж Otto ([param here]) приходит снаружи: дверей в здании полсотни, и выводить
-## его из координаты заново для каждой — полсотни одинаковых счётов за кадр.
-func _too_close_to_otto(post: AgentPost, here: int) -> bool:
-	if post.floor_index != here:
-		return false
-	return absf(post.door.mat_position().x - otto.global_position.x) < AGENT_SAFE_RELEASE
 
 
 ## Попадает ли уровень в полосу [param span], растянутую на [param margin] этажей.
@@ -964,25 +961,36 @@ func _on_otto_died() -> void:
 	timer.timeout.connect(_respawn_otto)
 
 
-## Возвращает Otto в игру на том же этаже, но подальше от тех, кто его там убил.
-##
-## Место выбирается по живым агентам, а не по порядку мест: агент, убивший Otto,
-## никуда не делся, и возвращение на то же место — это смерть в петле. На пустом
-## этаже выбор вырождается в первое свободное место, как было раньше.
+## Возвращает Otto в игру по правилу ROM ([RespawnSpot]): этаж не ниже пятого
+## этажа ROM, место — у красной двери или в точке этажа. Живые агенты уходят,
+## а ячейки выпускают их снова с задержками (@2F44-2F6F): так возвращение не
+## встречает тот же ствол, что убил. Трупы остаются, как и до M24a, до конца
+## здания. Неуязвимость после возвращения — наша, в ROM её нет
+## (ADR-0053, решение 2).
 func _respawn_otto() -> void:
 	# Таймер висит на дереве, а не на уровне, и переживает его: погибший Otto,
 	# уровень которого убрали — выходом в меню или концом теста, — возвращался
 	# бы в здание, которого уже нет.
 	if not is_inside_tree():
 		return
-	var index := _floor_of(otto)
-	var surface := rules.floor_surface(index)
-	otto.global_position = WorldSpace.to_scene(Vector2(_safest_x(index), surface))
+	_clear_agents()
+	var index := RespawnSpot.floor_for(rules, _floor_of(otto))
+	var x := RespawnSpot.choose(_plan, rules, index, RespawnSpot.red_door_x(_doors, rules, index))
+	otto.global_position = WorldSpace.to_scene(Vector2(x, rules.floor_surface(index)))
 	otto.revive()
 	Sounds.play(Sounds.RESPAWN)
 	RunLog.write("respawn", {"at": RunLog.at(otto), "floor": index})
 
 
-func _safest_x(index: int) -> float:
-	var from_x := WorldSpace.to_plane(otto.global_position).x
-	return RespawnSpot.choose(_plan, rules, index, from_x, _agents_on(index))
+## Убирает живых агентов и тех, кому дверь уже открывается, и ставит ячейки на
+## задержки ROM ([method AgentSpawn.after_death]).
+func _clear_agents() -> void:
+	for agent in agents():
+		if not agent.is_dead():
+			agent.queue_free()
+	for post: AgentPost in _posts:
+		post.agent = null
+		post.opening = false
+		post.slot = -1
+		post.door.dismiss_agent()
+	_spawn.after_death()
