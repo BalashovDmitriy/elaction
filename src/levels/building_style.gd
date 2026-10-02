@@ -61,11 +61,17 @@ var door_mat_share: float = 0.0
 var door_bag_share: float = 0.0
 ## Доля ламп, что мигают: у жилого дома трубки старые (ADR-0055, решение 4).
 var flicker_share: float = 0.0
+## Свет ламп и его сила по типу ([BuildingAir], ADR-0056, решение 1).
+var lamp_light := BuildingAir.LAMP_LIGHT[BuildingIdentity.Kind.HOTEL]
+var lamp_gain: float = 1.0
 
 
 ## Стиль здания [param identity].
 static func of(identity: BuildingIdentity) -> BuildingStyle:
 	var style := BuildingStyle.new()
+	if identity != null:
+		style.lamp_light = BuildingAir.LAMP_LIGHT[identity.kind]
+		style.lamp_gain = BuildingAir.LAMP_GAIN[identity.kind]
 	if identity == null or identity.is_hotel():
 		style.door_hanger_share = 0.22
 		style.door_tray_share = 0.12

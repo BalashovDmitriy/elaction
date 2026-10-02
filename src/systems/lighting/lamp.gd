@@ -95,6 +95,10 @@ var fixture: BuildingStyle.Fixture = BuildingStyle.Fixture.PENDANT
 ## Лампа мигает (ADR-0055, решение 4): трубка вот-вот сдохнет. Только вид —
 ## зона светла, пока лампа цела, как в ROM; темноты мигание не делает.
 var flicker: bool = false
+## Цвет и сила света по типу здания ([BuildingAir], ADR-0056): ставит
+## [method dress_as] до входа в дерево.
+var light_colour := LIGHT_COLOR
+var light_gain: float = 1.0
 
 var _fall := LampFall.new()
 var _spot: SpotLight3D = null
@@ -156,6 +160,8 @@ func _ready() -> void:
 ## до [method Node.add_child], когда [member floor_index] и место уже стоят.
 func dress_as(style: BuildingStyle) -> void:
 	fixture = style.fixture
+	light_colour = style.lamp_light
+	light_gain = style.lamp_gain
 	var roll := hash([floor_index, roundi(position.x * 10.0), FLICKER_SALT]) % 1000
 	flicker = roll < int(style.flicker_share * 1000.0)
 
@@ -189,8 +195,9 @@ func _show_lit(lit: bool) -> void:
 
 ## Сила света лампы: полная или провал мигания.
 func _glow(lit: bool) -> void:
-	_spot.light_energy = SPOT_ENERGY if lit else SPOT_ENERGY * FLICKER_LOW
-	_fill.light_energy = FILL_ENERGY if lit else FILL_ENERGY * FLICKER_LOW
+	var gain := light_gain if lit else light_gain * FLICKER_LOW
+	_spot.light_energy = SPOT_ENERGY * gain
+	_fill.light_energy = FILL_ENERGY * gain
 
 
 func _physics_process(delta: float) -> void:
@@ -411,8 +418,8 @@ func _cylinder(
 
 func _make_spot() -> SpotLight3D:
 	var light := SpotLight3D.new()
-	light.light_color = LIGHT_COLOR
-	light.light_energy = SPOT_ENERGY
+	light.light_color = light_colour
+	light.light_energy = SPOT_ENERGY * light_gain
 	light.spot_range = SPOT_RANGE
 	light.spot_angle = SPOT_ANGLE
 	light.shadow_enabled = true
@@ -424,8 +431,8 @@ func _make_spot() -> SpotLight3D:
 
 func _make_fill() -> OmniLight3D:
 	var light := OmniLight3D.new()
-	light.light_color = LIGHT_COLOR
-	light.light_energy = FILL_ENERGY
+	light.light_color = light_colour
+	light.light_energy = FILL_ENERGY * light_gain
 	light.omni_range = FILL_RANGE
 	light.shadow_enabled = true
 	# Две полусферы, а не куб: вдвое-втрое меньше проходов тени. Заливка слабая

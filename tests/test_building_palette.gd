@@ -115,3 +115,67 @@ func test_neighbouring_rounds_differ() -> void:
 			HUE_GAP,
 			"раунды %d и %d красят этаж одинаково" % [number, number + 1]
 		)
+
+
+## Каждый тип — свой набор (ADR-0056, решение 2), и в каждом наборе темнота
+## читается против света ламп этого типа так же, как в наборе порта: разрыв
+## по яркости и оттенку, и погашенное не уходит в чёрное.
+func test_every_kind_keeps_the_dark_floor_readable_in_every_round() -> void:
+	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
+		var light: Color = BuildingAir.LAMP_LIGHT[kind]
+		for number: int in range(1, BuildingPalette.count() + 1):
+			var palette := BuildingPalette.of_round(number, kind)
+			var where := "тип %d, раунд %d" % [kind, number]
+			var dark := palette.dark.get_luminance()
+			assert_gt(light.get_luminance() - dark, LIGHT_GAP, where + ": темнота не темнее")
+			assert_gt(dark, DARK_FLOOR, where + ": темнота ушла в чёрное")
+			assert_gt(_hue_gap(light, palette.dark), HUE_GAP, where + ": только яркостью")
+			assert_gt(_apart(palette.shaft, palette.story), APART, where + ": шахта как стена")
+			assert_gt(_apart(palette.masonry, palette.story), APART, where + ": кладка как стена")
+
+
+## Темнота одинаково тёмная (решение 3): тон погашенной зоны у всех наборов
+## одной яркости.
+func test_the_dark_is_equally_dark_in_every_kind() -> void:
+	var lightest := 0.0
+	var darkest := 1.0
+	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
+		for number: int in range(1, BuildingPalette.count() + 1):
+			var dark := BuildingPalette.of_round(number, kind).dark.get_luminance()
+			lightest = maxf(lightest, dark)
+			darkest = minf(darkest, dark)
+	assert_lt(lightest - darkest, 0.06, "темнота у типов разной яркости")
+
+
+## Уровень переводит палитру раунда в набор своего типа; номер раунда тот же.
+func test_a_round_palette_moves_to_the_family_of_its_kind() -> void:
+	for number: int in range(1, BuildingPalette.count() + 1):
+		var hotel := BuildingPalette.of_round(number)
+		for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
+			var moved := BuildingPalette.of_kind(hotel, kind)
+			assert_eq(
+				moved, BuildingPalette.of_round(number, kind), "раунд %d, тип %d" % [number, kind]
+			)
+			assert_eq(
+				BuildingPalette.of_kind(moved, BuildingIdentity.Kind.HOTEL), hotel, "и обратно"
+			)
+	var custom := BuildingPalette.new()
+	assert_eq(
+		BuildingPalette.of_kind(custom, BuildingIdentity.Kind.OFFICE), custom, "своя — как есть"
+	)
+
+
+## Типы различаются на глаз: в одном раунде стены отеля, офиса и жилого дома
+## разного цвета.
+func test_kinds_paint_the_same_round_apart() -> void:
+	for number: int in range(1, BuildingPalette.count() + 1):
+		var kinds := BuildingIdentity.Kind.values()
+		for first: int in kinds.size():
+			for second: int in range(first + 1, kinds.size()):
+				var one := BuildingPalette.of_round(number, kinds[first])
+				var two := BuildingPalette.of_round(number, kinds[second])
+				assert_gt(
+					_apart(one.story, two.story),
+					APART * 0.5,
+					"раунд %d: типы одного цвета" % number
+				)

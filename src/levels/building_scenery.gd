@@ -59,7 +59,7 @@ func build(
 
 	_air = WorldEnvironment.new()
 	_air.name = "Air"
-	_air.environment = Atmosphere.environment(rules.palette.dark, rules.time_of_day)
+	_air.environment = Atmosphere.environment(rules.palette.dark, rules.time_of_day, identity.kind)
 	_ambient = _air.environment.ambient_light_energy
 	CityBackdrop.show_behind(_air.environment)
 	add_child(_air)
