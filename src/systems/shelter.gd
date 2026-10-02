@@ -24,6 +24,17 @@ static func over(body: Node3D, size: Vector3) -> GPUParticlesCollisionBox3D:
 	return shield
 
 
+## Подгоняет ловец [param shield] под позу: [param size] — габарит тела в ней,
+## низ на ступнях. Присевший, вставший на колено или лёгший укрыт по своему
+## росту: ловец в рост стоящего оставлял над ним сухой столб.
+static func fit(shield: GPUParticlesCollisionBox3D, size: Vector3) -> void:
+	var wide := Vector3(size.x * SPREAD, size.y, size.z * SPREAD)
+	if shield.size.is_equal_approx(wide):
+		return
+	shield.size = wide
+	shield.position = Vector3(0.0, size.y * 0.5, 0.0)
+
+
 ## Ловец по габариту видимого под [param body] — для машины и вертолёта, у
 ## которых нет одной коробки тела. Габарит — в осях [param body]; считается
 ## по цепочке узлов, а не по мировым осям: машину собирают до дерева. То, что

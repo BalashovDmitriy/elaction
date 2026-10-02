@@ -20,6 +20,10 @@ extends SkeletonModifier3D
 ## расстояния до своего плеча — в сторону.
 const HAND_FORWARD: float = 0.12
 const HAND_DOWN: float = 0.03
+## Насколько кисть поднимается, когда зонт поднимают над встречным, доли
+## роста, и как быстро, доли в секунду.
+const RAISE: float = 0.17
+const RAISE_RATE: float = 2.5
 const HAND_SIDE: float = 0.8
 ## Куда уходит локоть: вниз, назад и наружу — доли.
 const ELBOW_DOWN: float = 1.0
@@ -50,6 +54,10 @@ var forward := Vector3.FORWARD
 ## Какой рукой держит: «R» или «L». Улица отдаёт зонт руке, что ближе к
 ## камере: в дальней руке кулак закрыт корпусом, и трость будто росла из плеча.
 var side: String = "R"
+## Поднять ли зонт над встречным: тротуар узкий, и купола встречных по глубине
+## перекрываются — тот, кто идёт у витрин, поднимает свой над соседним, как
+## поднимают люди. Ставит улица; рука идёт к нему плавно.
+var raised: bool = false
 ## Где в последний кадр оказались кулак и низ трости, мировые оси, — для
 ## теста: вне модификатора скелет отдаёт позу анимации без правки.
 var last_fist := Vector3.ZERO
@@ -61,6 +69,7 @@ var _lower: int = -1
 var _wrist: int = -1
 var _middle: int = -1
 var _fingers: Array[PackedInt32Array] = []
+var _lift: float = 0.0
 
 
 func _ready() -> void:
@@ -96,8 +105,11 @@ func _process_modification() -> void:
 	var aside := shoulder - chest
 	aside = Vector3(aside.x, 0.0, aside.z)
 	aside -= ahead * aside.dot(ahead)
+	var step := RAISE_RATE * get_process_delta_time()
+	_lift = move_toward(_lift, 1.0 if raised else 0.0, step)
+	var down := HAND_DOWN - RAISE * smoothstep(0.0, 1.0, _lift)
 	var target := (
-		chest + ahead * HAND_FORWARD * tall + Vector3.DOWN * HAND_DOWN * tall + aside * HAND_SIDE
+		chest + ahead * HAND_FORWARD * tall + Vector3.DOWN * down * tall + aside * HAND_SIDE
 	)
 	var reach := clampf(shoulder.distance_to(target), 0.01, (upper_length + lower_length) * 0.999)
 	var along := (target - shoulder).normalized()

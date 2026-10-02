@@ -155,6 +155,8 @@ var _posed_state := OttoStateMachine.State.IDLE
 ## Скорость по горизонтали в полёте, м/с. Задаётся толчком и в воздухе не
 ## меняется: в ROM направление прыжка выбирается при старте (@43FA), а
 ## повернуться лицом в полёте можно (@42A7).
+## Ловец осадков на теле ([Shelter]).
+var _shelter: GPUParticlesCollisionBox3D = null
 var _air_speed: float = 0.0
 ## Кабина, внутри которой сейчас Otto. На крыше кабины она не заполняется:
 ## оттуда лифтом не управляют (ADR-0004, пункт 3).
@@ -225,7 +227,7 @@ func _notification(what: int) -> void:
 
 func _ready() -> void:
 	# Дождь и снег гаснут о голову и плечи (ADR-0054).
-	Shelter.over(self, Vector3(Proportions.BODY_WIDTH, Proportions.BODY, WorldSpace.BODY_DEPTH))
+	_shelter = Shelter.over(self, _cover())
 	add_to_group(Footing.OTTO_GROUP)
 	var standing := _shape_size(_standing_shape)
 	var crouching := _shape_size(_crouching_shape)
@@ -236,7 +238,17 @@ func _ready() -> void:
 	corpse = Corpse.new(self, _body)
 
 
+## Габарит тела под осадками: в рост или присев.
+func _cover() -> Vector3:
+	var tall := Proportions.CROUCH if is_crouching() else Proportions.BODY
+	return Vector3(Proportions.BODY_WIDTH, tall, WorldSpace.BODY_DEPTH)
+
+
 func _physics_process(delta: float) -> void:
+	# Ловец осадков — по позе; погибшего не держит: тело лежит на полу.
+	if _shelter != null:
+		_shelter.visible = not is_dead()
+		Shelter.fit(_shelter, _cover())
 	if _takedown != null:
 		# В сценке Otto стоит, где стоял: координатой и позой распоряжается
 		# режиссёр. Уязвим — пуля его найдёт (ADR-0040, решение 5).

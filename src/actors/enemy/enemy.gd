@@ -121,6 +121,8 @@ var step_sound: String = Sounds.STEP_CONCRETE
 ## достаёт значения по умолчанию — те же, что у здания по умолчанию.
 var _rules: BuildingRules = null
 
+## Ловец осадков на теле ([Shelter]).
+var _shelter: GPUParticlesCollisionBox3D = null
 var _brain := EnemyBrain.new()
 var _target: Otto = null
 var _in_the_dark: bool = false
@@ -182,7 +184,7 @@ func _notification(what: int) -> void:
 func _ready() -> void:
 	add_to_group(GROUP)
 	# Дождь и снег гаснут о шляпу и плечи (ADR-0054).
-	Shelter.over(self, Vector3(Proportions.BODY_WIDTH, Proportions.BODY, WorldSpace.BODY_DEPTH))
+	_shelter = Shelter.over(self, _cover())
 	_brain.emerge_time = emerge_time
 	_brain.same_line = same_line
 	# Стоячий рост берётся у самой формы, а не записывается вторым числом:
@@ -195,7 +197,21 @@ func _ready() -> void:
 	corpse = Corpse.new(self, _body)
 
 
+## Габарит тела под осадками: в рост, на колене или лёжа — лёжа вдоль пола.
+func _cover() -> Vector3:
+	match _brain.stance:
+		EnemyBrain.Stance.KNEEL:
+			return Vector3(Proportions.BODY_WIDTH, Proportions.KNEEL, WorldSpace.BODY_DEPTH)
+		EnemyBrain.Stance.PRONE:
+			return Vector3(Proportions.BODY * 0.9, Proportions.PRONE, WorldSpace.BODY_DEPTH)
+	return Vector3(Proportions.BODY_WIDTH, Proportions.BODY, WorldSpace.BODY_DEPTH)
+
+
 func _physics_process(delta: float) -> void:
+	# Ловец осадков — по позе; убитого не держит: тело лежит отдельно.
+	if _shelter != null:
+		_shelter.visible = not is_dead()
+		Shelter.fit(_shelter, _cover())
 	if _brain.is_dead():
 		return
 

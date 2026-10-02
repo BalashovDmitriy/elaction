@@ -75,7 +75,9 @@ func test_crowd_follows_time_and_weather() -> void:
 	assert_gt(umbrellas, 0, "в дождь ни одного зонта")
 	for weather: int in [Weather.Kind.CLEAR, Weather.Kind.RAIN, Weather.Kind.SNOW]:
 		for walker in _street(weather as Weather.Kind).people().get_children():
-			assert_not_null(walker.get_node_or_null("Shelter"), "дождь идёт сквозь прохожего")
+			assert_not_null(
+				walker.find_child("Shelter", true, false), "дождь идёт сквозь прохожего"
+			)
 			assert_eq(
 				walker.find_children("*Pistol*", "", true, false).size(), 0, "прохожий с пистолетом"
 			)
@@ -143,3 +145,20 @@ func _bare_parts(walker: Node) -> PackedStringArray:
 				):
 					found.append(shape.name)
 	return found
+
+
+## Под зонтом сухо от купола до земли: ловец едет с зонтом, а не стоит серединой
+## тела в рост человека.
+func test_umbrella_keeps_the_column_under_it_dry() -> void:
+	var rainy := _street(Weather.Kind.RAIN).people()
+	var checked := 0
+	for umbrella in rainy.find_children("Umbrella", "Node3D", true, false):
+		var dry := umbrella.get_node_or_null("Shelter") as GPUParticlesCollisionBox3D
+		assert_not_null(dry, "под зонтом мокро")
+		if dry == null:
+			continue
+		assert_almost_eq(dry.size.x, StreetPeople.CANOPY.x * 2.0, 0.01, "сухо не во весь купол")
+		var bottom := (umbrella as Node3D).position.y + dry.position.y - dry.size.y * 0.5
+		assert_lt(bottom, 0.2, "под зонтом сухо не до земли")
+		checked += 1
+	assert_gt(checked, 0, "в дождь ни одного зонта")

@@ -37,11 +37,14 @@ const POWDER_COLOR := Color(0.9, 0.93, 0.98, 0.26)
 const GUST_RADIUS: float = 4.5
 const GUST_STRENGTH: float = 60.0
 const GUST_RISE: float = 0.5
+## Плита под пылью — по настилу: ширина и глубина с запасом на разлёт, м.
+const DECK_PLATE := Vector3(24.0, 1.0, 8.0)
 
 ## Высота крыши под вертолётом, сцена; NAN — крыши под ним нет.
 var deck: float = NAN
 
 var _gust := GPUParticlesAttractorSphere3D.new()
+var _deck_plate := GPUParticlesCollisionBox3D.new()
 
 
 func _init() -> void:
@@ -94,6 +97,16 @@ func _init() -> void:
 	_gust.strength = 0.0
 	_gust.attenuation = 1.0
 	add_child(_gust)
+	# Шар потока толкает от себя и вниз: без столкновений пыль уходила сквозь
+	# настил на восемь метров — перед тридцатым этажом (замер авторевью M24l).
+	# Гаснет она о плиту под собой — на любой крыше, в любую погоду: карта
+	# высот крыши ([RoofCatch]) есть только в дождь и снег.
+	process.collision_mode = ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT
+	collision_base_size = 0.02
+	_deck_plate.name = "DeckPlate"
+	_deck_plate.size = DECK_PLATE
+	_deck_plate.position = Vector3(0.0, -0.05 - DECK_PLATE.y * 0.5, 0.0)
+	add_child(_deck_plate)
 
 
 ## Ставит полосу пыли под ось винта в [param x] и поднимает пыль, пока вертолёт
@@ -128,11 +141,6 @@ func lift_snow(brightness: float) -> void:
 	process.color_ramp = ramp
 	# Снег легче пыли: взлетает выше и опадает медленнее.
 	process.gravity = Vector3(0.0, 0.6, 0.0)
-	# Шар потока толкает от себя и вниз: без столкновений яркая снежная пыль
-	# уходила сквозь настил на восемь метров — перед тридцатым этажом (замер
-	# авторевью M24l). Гаснет она о карту высот крыши ([RoofCatch]).
-	process.collision_mode = ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT
-	collision_base_size = 0.02
 	var quad := draw_pass_1 as QuadMesh
 	quad.size = Vector2.ONE * POWDER_SIZE
 	var look := quad.material as StandardMaterial3D

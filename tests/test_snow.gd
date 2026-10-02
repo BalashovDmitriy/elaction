@@ -229,3 +229,27 @@ func test_snow_has_its_own_sound() -> void:
 			),
 			"нет файла звука %s" % name
 		)
+
+
+## Ловец осадков — по позе: присевший укрыт по своему росту, а не столбом в
+## рост стоящего (авторевью M24l).
+func test_the_shelter_fits_the_pose() -> void:
+	var body := Node3D.new()
+	add_child_autofree(body)
+	var shield := Shelter.over(body, Vector3(0.5, Proportions.BODY, 0.4))
+	Shelter.fit(shield, Vector3(0.5, Proportions.CROUCH, 0.4))
+	assert_almost_eq(shield.size.y, Proportions.CROUCH, 0.001, "присевший укрыт в рост")
+	assert_almost_eq(shield.position.y, Proportions.CROUCH * 0.5, 0.001, "ловец оторван от пола")
+
+
+## Пыль от винта гаснет о плиту настила в любую погоду, а не уходит сквозь
+## крышу перед тридцатым этажом.
+func test_rotor_dust_stops_at_the_deck_in_any_weather() -> void:
+	var wash := Downwash.new()
+	add_child_autofree(wash)
+	var process := wash.process_material as ParticleProcessMaterial
+	assert_eq(process.collision_mode, ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT)
+	var plate := wash.get_node_or_null("DeckPlate") as GPUParticlesCollisionBox3D
+	assert_not_null(plate, "под пылью нет плиты настила")
+	if plate != null:
+		assert_lt(plate.position.y + plate.size.y * 0.5, 0.0, "плита выше настила")
