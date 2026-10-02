@@ -120,6 +120,8 @@ var density: Density = Density.NORMAL
 ## Горят ли фары потока: днём в ясную погоду — нет (ADR-0052, решение 3).
 var headlights: bool = true
 
+## Идёт ли снег: тогда на машинах потока снег (ADR-0054).
+var _snowy: bool = false
 var _rng := RandomNumberGenerator.new()
 var _street: float = 0.0
 var _near := Lane.new()
@@ -141,9 +143,11 @@ func build(
 	street: float,
 	building_seed: int,
 	time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT,
-	lights: bool = true
+	lights: bool = true,
+	snowy: bool = false
 ) -> void:
 	name = "Traffic"
+	_snowy = snowy
 	_street = street
 	headlights = lights
 	_rng.seed = hash([building_seed, SALT])
@@ -376,6 +380,8 @@ func _add_car(lane: Lane, x: float) -> Car:
 	var model := CarModel.build(choice)
 	model.scale = Vector3(1.0, 1.0, Garage.CAR_WIDTH / _depth_of(choice.model, model))
 	root.add_child(model)
+	if _snowy:
+		CarModel.snow_on(model)
 	if headlights:
 		var halo := ExitCar.halo()
 		# Своим именем: «Halo» — ореол дождя ([RainLook]), и в сухую погоду его

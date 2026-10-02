@@ -215,7 +215,7 @@ func build(
 	_park_a_car(_left - _rng.randf_range(12.0, 17.0))
 	_traffic = StreetTraffic.new()
 	add_child(_traffic)
-	_traffic.build(_left, _street, building_seed, time, _lights > 0.0)
+	_traffic.build(_left, _street, building_seed, time, _lights > 0.0, Weather.is_snowing(weather))
 	_flush_multimeshes()
 	if Weather.is_raining(weather):
 		_build_rain()

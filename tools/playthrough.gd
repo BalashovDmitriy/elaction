@@ -15,6 +15,7 @@ extends SceneTree
 ##     godot --headless --script res://tools/playthrough.gd -- --seeds=1 --trace --budget=3000
 ##     godot --headless --script res://tools/playthrough.gd -- --agents --endless --dark-range=2.4
 ##     godot --headless --script res://tools/playthrough.gd -- --agents --endless --no-lamps
+##     godot --headless --script res://tools/playthrough.gd -- --agents --endless --weather=3
 ##
 ## С [code]--trace[/code] раз в [constant TRACE_EVERY] шагов печатается, где бот
 ## и что вокруг: этаж, положение, стоит ли, едет ли, где ближайшая кабина. Это
@@ -50,6 +51,9 @@ var _dark_range: float = -1.0
 var _no_lamps: bool = false
 ## Запрет выпуска у Otto, м; меньше нуля — из правил (ADR-0053, решение 3).
 var _release_gap: float = -1.0
+## Погода руками ([enum Weather.Kind]); меньше нуля — жребий по сиду. Этим
+## флагом мерили скользкую крышу в снег (ADR-0054, решение 4).
+var _weather: int = -1
 
 
 func _init() -> void:
@@ -91,6 +95,8 @@ func _run() -> void:
 			_dark_range = argument.trim_prefix("--dark-range=").to_float()
 		elif argument == "--no-lamps":
 			_no_lamps = true
+		elif argument.begins_with("--weather="):
+			_weather = argument.trim_prefix("--weather=").to_int()
 		elif argument.begins_with("--release-gap="):
 			_release_gap = argument.trim_prefix("--release-gap=").to_float()
 
@@ -136,6 +142,7 @@ func _play(
 		level.rules.agent_dark_fire_range = _dark_range
 	if _release_gap >= 0.0:
 		level.rules.agent_release_gap = _release_gap
+	level.rules.forced_weather = _weather
 	level.building_seed = building_seed
 	level.spawn_agents = agents
 	root.add_child(level)

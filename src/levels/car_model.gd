@@ -16,6 +16,7 @@ extends RefCounted
 ## `CarInterior`, точка плафона `DomeLight` и поворотники (ADR-0046, решение 1).
 
 ## Длина по бамперам, м — та же, по которой [ExitCar] ставит машину у выхода.
+const SNOW_CAP := preload("res://src/levels/snow_cap.gdshader")
 const LENGTH: float = Proportions.CAR_LENGTH
 
 ## Модели в жребии. Первая — спортивная, её берёт первое здание.
@@ -90,6 +91,15 @@ static func build(choice: Choice = Choice.new()) -> Node3D:
 	# Дождь и снег гаснут о кузов, а не идут сквозь машину (ADR-0054).
 	Shelter.over_meshes(car)
 	return car
+
+
+## Снег на кузове ([code]snow_cap.gdshader[/code]) — накладным материалом на
+## все его части, поверх своей краски (ADR-0054).
+static func snow_on(car: Node3D) -> void:
+	var cap := ShaderMaterial.new()
+	cap.shader = SNOW_CAP
+	for node in car.find_children("*", "MeshInstance3D", true, false):
+		(node as MeshInstance3D).material_overlay = cap
 
 
 ## Колёса машины: узлы, которые крутятся, когда она едет.

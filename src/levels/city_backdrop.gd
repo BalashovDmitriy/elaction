@@ -122,6 +122,7 @@ func build(
 	_house_look = (houses.multimesh.mesh as BoxMesh).material as ShaderMaterial
 	_house_look.set_shader_parameter("lit_share", CityPlan.LIT_SHARE * TimeOfDay.lit_windows(time))
 	_house_look.set_shader_parameter("window_glow", WINDOW_GLOW[time])
+	_house_look.set_shader_parameter("snow", 1.0 if Weather.is_snowing(weather) else 0.0)
 	_view.add_child(CitySky.light(time, weather))
 	# Детали города (M22): верхи, огни, неон, зарево улиц.
 	_view.add_child(CityDetails.crowns(blocks, _ground, _crown_look()))
