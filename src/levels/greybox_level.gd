@@ -523,7 +523,7 @@ static func lamp_height(of_rules: BuildingRules) -> float:
 
 
 func _spawn_lamps() -> void:
-	var fixture := BuildingStyle.of(identity).fixture
+	var style := BuildingStyle.of(identity)
 	for spot in _plan.lamps:
 		var lamp := LAMP_SCENE.instantiate() as Lamp
 		var hang := rules.floor_surface(spot.floor_index) - lamp_height(rules)
@@ -531,7 +531,7 @@ func _spawn_lamps() -> void:
 		# Этаж лампы известен здесь, и обратно из координаты его не выводят: под
 		# потолком она ближе к полу этажа выше, чем к своему.
 		lamp.floor_index = spot.floor_index
-		lamp.fixture = fixture
+		lamp.dress_as(style)
 		# Зона лампы считается от того, что висит: правило темноты узнаёт о
 		# лампе здесь же, где она вешается.
 		_lighting.hang(spot.floor_index, spot.x)

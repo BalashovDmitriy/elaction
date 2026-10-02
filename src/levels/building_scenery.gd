@@ -91,6 +91,9 @@ func build(
 	props.name = "Props"
 	add_child(props)
 	props.build(rules, plan, dressing, identity)
+	var wear := WallWear.new()
+	add_child(wear)
+	wear.build(rules, WallWear.lay(rules, plan, building_seed, identity, dressing))
 
 	var city := CityBackdrop.new()
 	_city = city

@@ -59,6 +59,8 @@ var door_tray_share: float = 0.0
 ## Мелочи у дверей квартир: коврик у порога и пакет с покупками — доля дверей.
 var door_mat_share: float = 0.0
 var door_bag_share: float = 0.0
+## Доля ламп, что мигают: у жилого дома трубки старые (ADR-0055, решение 4).
+var flicker_share: float = 0.0
 
 
 ## Стиль здания [param identity].
@@ -106,4 +108,5 @@ static func _residential(style: BuildingStyle) -> BuildingStyle:
 	style.apartment_letters = true
 	style.door_mat_share = 0.55
 	style.door_bag_share = 0.1
+	style.flicker_share = 0.12
 	return style
