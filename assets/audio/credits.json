@@ -89,6 +89,12 @@
   "licence": "CC0 1.0",
   "url": "https://freesound.org/people/koirankarva84581682/sounds/664770/"
  },
+ "car_pass_slush": {
+  "title": "Cars_driving_slush_road",
+  "author": "Zabuhailo",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/Zabuhailo/sounds/190997/"
+ },
  "car_start": {
   "title": "Car Start",
   "author": "snakebarney",
@@ -389,6 +395,30 @@
   "licence": "CC0 1.0",
   "url": "https://freesound.org/people/atleastrelatively/sounds/816413/"
  },
+ "step_snow": {
+  "title": "Crispy_snow_footsteps-01",
+  "author": "Lumamorph",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/Lumamorph/sounds/615658/"
+ },
+ "step_snow.2": {
+  "title": "Crispy_snow_footsteps-01",
+  "author": "Lumamorph",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/Lumamorph/sounds/615658/"
+ },
+ "step_snow.3": {
+  "title": "Crispy_snow_footsteps-01",
+  "author": "Lumamorph",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/Lumamorph/sounds/615658/"
+ },
+ "step_snow.4": {
+  "title": "Crispy_snow_footsteps-01",
+  "author": "Lumamorph",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/Lumamorph/sounds/615658/"
+ },
  "theme": {
   "title": "Spy Glass",
   "author": "Kevin MacLeod (incompetech.com)",
@@ -496,5 +526,11 @@
   "author": "kyles",
   "licence": "CC0 1.0",
   "url": "https://freesound.org/people/kyles/sounds/454072/"
+ },
+ "wind_snow": {
+  "title": "swirling winter wind gusty grains sand",
+  "author": "kyles",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/kyles/sounds/454213/"
  }
 }

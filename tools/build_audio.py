@@ -258,6 +258,16 @@ SOUNDS: dict[str, list[Source]] = {
                               loop=2.0, level="ambience", trim=False)],
     "wind": [freesound(454072, 612689, "kyles", "rushing air, distant skyline", CC0, start=5.0,
                        end=67.0, loop=2.0, level="ambience", trim=False)],
+    # Снег (M24l, ADR-0054): ветер, шаги по снегу и шины по каше — выбраны
+    # пользователем на слух со страницы прослушивания.
+    "wind_snow": [freesound(454213, 612689, "kyles", "swirling winter wind gusty grains sand",
+                            CC0, start=5.0, end=67.0, loop=2.0, level="ambience", trim=False)],
+    "step_snow": [freesound(615658, 10150854, "Lumamorph", "Crispy_snow_footsteps-01", CC0,
+                            mono=True, start=at, length=0.42, fade_out=0.08, trim=False,
+                            gain=-8.0) for at in (3.47, 4.52, 5.92, 8.01)],
+    "car_pass_slush": [freesound(190997, 2580450, "Zabuhailo", "Cars_driving_slush_road", BY4,
+                                 mono=True, start=20.0, end=32.0, loop=1.0, fade_in=0.3,
+                                 gain=-2.0, trim=False)],
     "thunder_near": [freesound(840628, 16682330, "loganzsound", "close-up thunder strike", CC0,
                                end=9.0, fade_out=2.5, level="jingle", gain=2.0)],
     "thunder_far": [freesound(855569, 18648074, "Shuhmi", "distant dry thunderclap", BY4,
@@ -271,7 +281,7 @@ SOUNDS: dict[str, list[Source]] = {
 }
 
 # Что звучит петлёй: сшивка нужна им, а форматом — OGG.
-LONG = {"winch", "car_pass", "alarm", "city_morning", "city_day", "city_evening", "theme", "theme_morning", "theme_day", "theme_evening", "alarm_theme", "menu_theme", "game_over_theme", "city", "rain",
+LONG = {"winch", "car_pass", "car_pass_slush", "wind_snow", "alarm", "city_morning", "city_day", "city_evening", "theme", "theme_morning", "theme_day", "theme_evening", "alarm_theme", "menu_theme", "game_over_theme", "city", "rain",
         "rain_window", "wind", "room_tone", "shaft_hum", "elevator_hum", "escalator_hum",
         "car_away", "helicopter", "helicopter_pass", "garage_gate", "thunder_near", "thunder_far", "neon_buzz", "building_bonus", "game_over"}
 

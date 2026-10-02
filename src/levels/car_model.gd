@@ -15,6 +15,8 @@ extends RefCounted
 ## каждой — проём водительской двери, дверь `DriverDoor` на петле, салон
 ## `CarInterior`, точка плафона `DomeLight` и поворотники (ADR-0046, решение 1).
 
+## Снег на кузове в снегопад ([method snow_on]).
+const SNOW_CAP := preload("res://src/levels/snow_cap.gdshader")
 ## Длина по бамперам, м — та же, по которой [ExitCar] ставит машину у выхода.
 const LENGTH: float = Proportions.CAR_LENGTH
 
@@ -87,7 +89,24 @@ static func build(choice: Choice = Choice.new()) -> Node3D:
 			var wanted := _material_for(material.resource_name if material else "", paint)
 			if wanted != null:
 				mesh_instance.set_surface_override_material(surface, wanted)
+	# Дождь и снег гаснут о кузов, а не идут сквозь машину (ADR-0054).
+	Shelter.over_meshes(car)
 	return car
+
+
+## Снег на кузове ([code]snow_cap.gdshader[/code]) — накладным материалом на
+## его части, поверх своей краски (ADR-0054). [param amount] — сколько
+## снега: 1 — шапка, меньше — налёт. Колёса и салон — без снега: катящееся
+## колесо несло бы белую полосу по верху шины, а сиденья под стеклом белели бы
+## сугробом в салоне.
+static func snow_on(car: Node3D, amount: float = 1.0) -> void:
+	var cap := ShaderMaterial.new()
+	cap.shader = SNOW_CAP
+	cap.set_shader_parameter("amount", amount)
+	for node in car.find_children("*", "MeshInstance3D", true, false):
+		if node.name.begins_with("Wheel") or node.name.begins_with("CarInterior"):
+			continue
+		(node as MeshInstance3D).material_overlay = cap
 
 
 ## Колёса машины: узлы, которые крутятся, когда она едет.

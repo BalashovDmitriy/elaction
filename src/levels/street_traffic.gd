@@ -120,6 +120,8 @@ var density: Density = Density.NORMAL
 ## Горят ли фары потока: днём в ясную погоду — нет (ADR-0052, решение 3).
 var headlights: bool = true
 
+## Идёт ли снег: тогда на машинах потока снег (ADR-0054).
+var _snowy: bool = false
 var _rng := RandomNumberGenerator.new()
 var _street: float = 0.0
 var _near := Lane.new()
@@ -141,9 +143,11 @@ func build(
 	street: float,
 	building_seed: int,
 	time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT,
-	lights: bool = true
+	lights: bool = true,
+	snowy: bool = false
 ) -> void:
 	name = "Traffic"
+	_snowy = snowy
 	_street = street
 	headlights = lights
 	_rng.seed = hash([building_seed, SALT])
@@ -293,7 +297,9 @@ func _pass_by(car: Car, camera: Camera3D) -> void:
 	if absf(car.x - camera.global_position.x) > maxf(car.speed, 1.0) * PASS_LEAD:
 		return
 	car.heard = true
-	var voice := Sounds.source(car.node, Sounds.CAR_PASS, PASS_REACH)
+	# В снег шины шуршат по каше (ADR-0054).
+	var tyres := Sounds.CAR_PASS_SLUSH if _snowy else Sounds.CAR_PASS
+	var voice := Sounds.source(car.node, tyres, PASS_REACH)
 	voice.volume_db = PASS_DB
 	voice.finished.connect(voice.queue_free)
 	voice.play()
@@ -376,6 +382,8 @@ func _add_car(lane: Lane, x: float) -> Car:
 	var model := CarModel.build(choice)
 	model.scale = Vector3(1.0, 1.0, Garage.CAR_WIDTH / _depth_of(choice.model, model))
 	root.add_child(model)
+	if _snowy:
+		CarModel.snow_on(model)
 	if headlights:
 		var halo := ExitCar.halo()
 		# Своим именем: «Halo» — ореол дождя ([RainLook]), и в сухую погоду его

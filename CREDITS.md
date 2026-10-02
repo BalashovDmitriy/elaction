@@ -17,7 +17,8 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 
 | Что | Автор | Лицензия | Источник |
 |---|---|---|---|
-| Ultimate Modular Men Pack (Otto, агенты, пилот вертолёта) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/ultimatemodularcharacters.html) |
+| Ultimate Modular Men Pack (Otto, агенты, пилот вертолёта, прохожие) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/ultimatemodularcharacters.html) |
+| Ultimate Modular Women Pack (прохожие) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/ultimatemodularwomen.html) |
 | Cars Pack (машины у выхода) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/cars.html) |
 | Universal Animation Library (движение Otto и агентов) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/universalanimationlibrary.html) |
 
@@ -207,6 +208,12 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `rain` | steady rain in the city | roofusj | CC0 1.0 | [freesound.org](https://freesound.org/people/roofusj/sounds/217236/) |
 | `rain_window` | Rain on Windows, Interior | InspectorJ | CC-BY 4.0 | [freesound.org](https://freesound.org/people/InspectorJ/sounds/346642/) |
 | `wind` | rushing air, distant skyline | kyles | CC0 1.0 | [freesound.org](https://freesound.org/people/kyles/sounds/454072/) |
+| `wind_snow` | swirling winter wind gusty grains sand | kyles | CC0 1.0 | [freesound.org](https://freesound.org/people/kyles/sounds/454213/) |
+| `step_snow` | Crispy_snow_footsteps-01 | Lumamorph | CC0 1.0 | [freesound.org](https://freesound.org/people/Lumamorph/sounds/615658/) |
+| `step_snow.2` | Crispy_snow_footsteps-01 | Lumamorph | CC0 1.0 | [freesound.org](https://freesound.org/people/Lumamorph/sounds/615658/) |
+| `step_snow.3` | Crispy_snow_footsteps-01 | Lumamorph | CC0 1.0 | [freesound.org](https://freesound.org/people/Lumamorph/sounds/615658/) |
+| `step_snow.4` | Crispy_snow_footsteps-01 | Lumamorph | CC0 1.0 | [freesound.org](https://freesound.org/people/Lumamorph/sounds/615658/) |
+| `car_pass_slush` | Cars_driving_slush_road | Zabuhailo | CC-BY 4.0 | [freesound.org](https://freesound.org/people/Zabuhailo/sounds/190997/) |
 | `thunder_near` | close-up thunder strike | loganzsound | CC0 1.0 | [freesound.org](https://freesound.org/people/loganzsound/sounds/840628/) |
 | `thunder_far` | distant dry thunderclap | Shuhmi | CC-BY 4.0 | [freesound.org](https://freesound.org/people/Shuhmi/sounds/855569/) |
 | `room_tone` | hotel corridor | addiofbaddi | CC0 1.0 | [freesound.org](https://freesound.org/people/addiofbaddi/sounds/241659/) |

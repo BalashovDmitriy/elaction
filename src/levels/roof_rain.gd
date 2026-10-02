@@ -24,15 +24,11 @@ extends Node3D
 ## вокруг лампы — ореол, разбитый на струи. Дымка — объёмный туман, её нет на
 ## низком; ореол и капли — на любом уровне.
 ##
-## Карта высот снимается один раз и только со слоя [constant LAYER]: на него
-## [method catch_on] переводит неподвижное на крыше. Otto и агенты в ней не
-## числятся — снятые на месте, где стояли при сборке, они оставили бы в дожде
-## дыру в форме человека.
+## Карта высот, крышки над проёмами и слой крыши — общие со снегом
+## ([RoofCatch]).
 
-## Слой, с которого снимается карта высот дождя и на который ложится мокрый
-## настил. Двадцатый: остальные слои в проекте не заняты, и камеры и свет видят
-## все двадцать.
-const LAYER: int = 1 << 19
+## Слой крыши ([constant RoofCatch.LAYER]): на него ложится мокрый настил.
+const LAYER: int = RoofCatch.LAYER
 
 ## Капель на «высоком» ([method Graphics.rain_share]), высота неба над
 ## настилом, скорость, м/с, и снос на метр падения. Падают быстрее настоящего
@@ -54,9 +50,6 @@ const SPRAY_LOOK := {
 ## коридора — не дальше, иначе капли вставали бы перед плитой крыши.
 const BACK_Z: float = -3.0
 const FRONT_Z: float = WorldSpace.CORRIDOR_DEPTH * 0.5 - 0.08
-
-## Толщина крышки над проёмом крыши, м: капля за шаг частиц проходит 15 см.
-const LID_DEPTH: float = 0.4
 
 ## Шаг частиц: на 120 в секунду капля за шаг проходит 15 см, и брызги встают
 ## почти там, где она коснулась, а не под настилом.
@@ -112,15 +105,12 @@ var _box := AABB()
 ## Собирает дождь над крышей здания по правилам и плану. [param lamp] —
 ## лампа над крышей: у неё ореол, её конус виден в дымке.
 func build(rules: BuildingRules, plan: BuildingPlan, lamp: OmniLight3D) -> void:
-	var bounds := rules.floor_span(BuildingRules.ROOF)
 	var deck := WorldSpace.height_to_scene(rules.floor_surface(BuildingRules.ROOF))
-	var edge := BuildingShell.COPING_OVERHANG + 0.1
-	_box = AABB(
-		Vector3(bounds.x - edge, deck - 0.6, BACK_Z - 0.3),
-		Vector3(bounds.y - bounds.x + edge * 2.0, HEIGHT + 1.0, FRONT_Z - BACK_Z + 0.6)
-	)
-	_catch()
-	_cover_the_gaps(rules, plan, deck)
+	_box = RoofCatch.box(rules, BACK_Z, FRONT_Z, HEIGHT)
+	_catcher = RoofCatch.catcher(_box, "RainCatcher")
+	add_child(_catcher)
+	for lid in RoofCatch.lids(rules, plan, _box, SPEED.y / float(TICKS)):
+		add_child(lid)
 	_rain(rules, deck)
 	_splash()
 	_ripple(rules, deck)
@@ -135,16 +125,7 @@ func build(rules: BuildingRules, plan: BuildingPlan, lamp: OmniLight3D) -> void:
 ## Переводит на слой [constant LAYER] неподвижное на крыше под [param roots]:
 ## по нему снимается карта высот и на него ложится мокрый настил.
 func catch_on(roots: Array[Node]) -> void:
-	for root in roots:
-		for node: Node in root.find_children("*", "GeometryInstance3D", true, false):
-			var shape := node as GeometryInstance3D
-			if shape is GPUParticles3D:
-				continue
-			if shape.get_aabb().size == Vector3.ZERO:
-				continue
-			var reach := shape.global_transform * shape.get_aabb()
-			if reach.intersects(_box):
-				shape.layers |= LAYER
+	RoofCatch.mark(roots, _box)
 
 
 ## Сколько капель, брызг и кругов по уровню качества. На низком кругов и
@@ -181,35 +162,6 @@ func mist() -> FogVolume:
 ## Ореол лампы над крышей — для теста.
 func halo() -> MeshInstance3D:
 	return _halo
-
-
-func _catch() -> void:
-	_catcher = GPUParticlesCollisionHeightField3D.new()
-	_catcher.name = "RainCatcher"
-	_catcher.size = _box.size
-	_catcher.position = _box.get_center()
-	_catcher.resolution = GPUParticlesCollisionHeightField3D.RESOLUTION_1024
-	_catcher.update_mode = GPUParticlesCollisionHeightField3D.UPDATE_MODE_WHEN_MOVED
-	_catcher.heightfield_mask = LAYER
-	add_child(_catcher)
-
-
-## Невидимые крышки над проёмами в плите крыши — над верхней шахтой.
-##
-## Машинное отделение накрывает шахту только у задней стены, а проём идёт
-## сквозь плиту на всю глубину. Капли перед домиком падали бы в шахту и
-## дальше вниз — перед порталом тридцатого этажа, то есть дождём в здании.
-## Крышка — на уровне настила: там у шахты, стоящей на крыше, крыша кабины.
-func _cover_the_gaps(rules: BuildingRules, plan: BuildingPlan, deck: float) -> void:
-	for gap in plan.gaps_on(rules, BuildingRules.ROOF):
-		var lid := GPUParticlesCollisionBox3D.new()
-		lid.name = "Lid"
-		lid.size = Vector3(gap.y - gap.x + 0.1, LID_DEPTH, _box.size.z)
-		# Верх крышки чуть выше настила: капля гаснет, уйдя под верх на шаг
-		# частиц, и так гаснет вровень с настилом, а не под ним.
-		var top := deck + SPEED.y / float(TICKS)
-		lid.position = Vector3((gap.x + gap.y) * 0.5, top - LID_DEPTH * 0.5, _box.get_center().z)
-		add_child(lid)
 
 
 func _rain(rules: BuildingRules, deck: float) -> void:

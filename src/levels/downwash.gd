@@ -2,19 +2,33 @@ class_name Downwash
 extends GPUParticles3D
 
 ## Пыль под винтом вертолёта (ADR-0052, решение 6): поток от винта гонит её по
-## крыше кольцом, пока вертолёт висит низко, и она оседает, когда он уходит.
-## Кольцо — на крыше под осью винта, у плоскости игры.
+## крыше веером, пока вертолёт висит низко, и она оседает, когда он уходит.
+## Полоса пыли — на крыше под осью винта, у плоскости игры.
 
-## Сколько частиц, их жизнь, с, кольцо, откуда их поднимает, м, скорость
-## разлёта, м/с, и цвет.
+## Сколько частиц, их жизнь, с, полуширина полосы, откуда их поднимает, м,
+## скорость разлёта, м/с, и цвет.
 ## Пыль встаёт, пока вертолёт висит не выше [constant DUST_REACH] над крышей.
 const DUST_COUNT: int = 70
 const DUST_LIFE: float = 1.4
-const DUST_RING := Vector2(0.6, 2.6)
+const DUST_HALF_WIDTH: float = 2.6
+## Полуглубина полосы пыли, м: в пределах настила крыши, не перед фасадом.
+const DUST_DEPTH: float = 0.5
+## Направление разлёта — вверх с наклоном к камере на сотую. Ровно вверх
+## Godot кладёт веер [member ParticleProcessMaterial.flatness] в плоскость YZ —
+## к камере и в здание, — а с наклоном по Z веер ложится в плоскость кадра,
+## XY (замер: [method GPUParticles3D.capture_aabb], авторевью M24l).
+const DUST_DIRECTION := Vector3(0.0, 1.0, 0.01)
 const DUST_SPEED := Vector2(2.5, 5.0)
 const DUST_SIZE: float = 0.5
 const DUST_COLOR := Color(0.55, 0.52, 0.48, 0.32)
 const DUST_REACH: float = 7.0
+
+## В снег поток поднимает с покрова снежную пыль (ADR-0054): гуще, белее,
+## крупнее облаком и дольше висит.
+const POWDER_COUNT: int = 120
+const POWDER_LIFE: float = 2.4
+const POWDER_SIZE: float = 0.6
+const POWDER_COLOR := Color(0.9, 0.93, 0.98, 0.26)
 
 ## Поток от винта гонит и дождь: шар-отталкиватель частиц под осью винта
 ## разносит струи вниз и в стороны, и они ложатся косо, по скорости. Радиус
@@ -23,11 +37,14 @@ const DUST_REACH: float = 7.0
 const GUST_RADIUS: float = 4.5
 const GUST_STRENGTH: float = 60.0
 const GUST_RISE: float = 0.5
+## Плита под пылью — по настилу: ширина и глубина с запасом на разлёт, м.
+const DECK_PLATE := Vector3(24.0, 1.0, 8.0)
 
 ## Высота крыши под вертолётом, сцена; NAN — крыши под ним нет.
 var deck: float = NAN
 
 var _gust := GPUParticlesAttractorSphere3D.new()
+var _deck_plate := GPUParticlesCollisionBox3D.new()
 
 
 func _init() -> void:
@@ -40,15 +57,16 @@ func _init() -> void:
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	visibility_aabb = AABB(Vector3(-8.0, -1.0, -8.0), Vector3(16.0, 4.0, 16.0))
 	var process := ParticleProcessMaterial.new()
-	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
-	process.emission_ring_axis = Vector3.UP
-	process.emission_ring_radius = DUST_RING.y
-	process.emission_ring_inner_radius = DUST_RING.x
-	process.emission_ring_height = 0.05
-	process.direction = Vector3(0.0, 0.15, 0.0)
-	process.spread = 10.0
-	process.radial_velocity_min = DUST_SPEED.x
-	process.radial_velocity_max = DUST_SPEED.y
+	# Полосой вдоль крыши, а не кольцом: кольцо выносило пыль вперёд за фасад,
+	# и она висела перед тридцатым этажом. Разлёт — веером в плоскости кадра:
+	# в стороны и вверх ([member ParticleProcessMaterial.flatness]).
+	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	process.emission_box_extents = Vector3(DUST_HALF_WIDTH, 0.05, DUST_DEPTH)
+	process.direction = DUST_DIRECTION
+	process.spread = 80.0
+	process.flatness = 1.0
+	process.initial_velocity_min = DUST_SPEED.x
+	process.initial_velocity_max = DUST_SPEED.y
 	process.gravity = Vector3(0.0, 0.3, 0.0)
 	process.damping_min = 1.5
 	process.damping_max = 2.5
@@ -65,6 +83,9 @@ func _init() -> void:
 	quad.size = Vector2.ONE * DUST_SIZE
 	var look := StandardMaterial3D.new()
 	look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	# Мягкий клуб, а не квадрат: без картинки частица рисовалась квадратом
+	# цвета, и на снегу это было видно сразу (M24l).
+	look.albedo_texture = _puff()
 	look.vertex_color_use_as_albedo = true
 	look.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 	look.shading_mode = BaseMaterial3D.SHADING_MODE_PER_VERTEX
@@ -76,9 +97,19 @@ func _init() -> void:
 	_gust.strength = 0.0
 	_gust.attenuation = 1.0
 	add_child(_gust)
+	# Шар потока толкает от себя и вниз: без столкновений пыль уходила сквозь
+	# настил на восемь метров — перед тридцатым этажом (замер авторевью M24l).
+	# Гаснет она о плиту под собой — на любой крыше, в любую погоду: карта
+	# высот крыши ([RoofCatch]) есть только в дождь и снег.
+	process.collision_mode = ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT
+	collision_base_size = 0.02
+	_deck_plate.name = "DeckPlate"
+	_deck_plate.size = DECK_PLATE
+	_deck_plate.position = Vector3(0.0, -0.05 - DECK_PLATE.y * 0.5, 0.0)
+	add_child(_deck_plate)
 
 
-## Ставит кольцо под ось винта в [param x] и поднимает пыль, пока вертолёт
+## Ставит полосу пыли под ось винта в [param x] и поднимает пыль, пока вертолёт
 ## на высоте [param height] сцены ниже [constant DUST_REACH] над крышей и
 ## [param hovering].
 func follow(x: float, height: float, hovering: bool) -> void:
@@ -93,6 +124,47 @@ func follow(x: float, height: float, hovering: bool) -> void:
 	_gust.strength = -GUST_STRENGTH if low else 0.0
 
 
-## Шар, которым поток от винта разносит дождь.
+## Пыль становится снежной: покров на крыше лежит под винтом (ADR-0054).
+## [param brightness] — яркость снега во время суток ([method SnowLook.brightness]):
+## снежная пыль светится, как хлопья, а не берёт слабый свет крыши.
+func lift_snow(brightness: float) -> void:
+	amount = POWDER_COUNT
+	lifetime = POWDER_LIFE
+	var process := process_material as ParticleProcessMaterial
+	var fade := Gradient.new()
+	fade.offsets = PackedFloat32Array([0.0, 0.2, 1.0])
+	fade.colors = PackedColorArray(
+		[Color(POWDER_COLOR, 0.0), POWDER_COLOR, Color(POWDER_COLOR, 0.0)]
+	)
+	var ramp := GradientTexture1D.new()
+	ramp.gradient = fade
+	process.color_ramp = ramp
+	# Снег легче пыли: взлетает выше и опадает медленнее.
+	process.gravity = Vector3(0.0, 0.6, 0.0)
+	var quad := draw_pass_1 as QuadMesh
+	quad.size = Vector2.ONE * POWDER_SIZE
+	var look := quad.material as StandardMaterial3D
+	look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	look.albedo_color = Color(SnowLook.TINT * brightness, 1.0)
+
+
+## Шар, которым поток от винта разносит дождь и снег.
 func gust() -> GPUParticlesAttractorSphere3D:
 	return _gust
+
+
+## Клуб пыли: круглое пятно, плотное в середине и тающее к краю.
+static func _puff() -> GradientTexture2D:
+	var spot := GradientTexture2D.new()
+	spot.fill = GradientTexture2D.FILL_RADIAL
+	spot.fill_from = Vector2(0.5, 0.5)
+	spot.fill_to = Vector2(1.0, 0.5)
+	spot.width = 64
+	spot.height = 64
+	var fade := Gradient.new()
+	fade.offsets = PackedFloat32Array([0.0, 0.45, 1.0])
+	fade.colors = PackedColorArray(
+		[Color.WHITE, Color(1.0, 1.0, 1.0, 0.45), Color(1.0, 1.0, 1.0, 0.0)]
+	)
+	spot.gradient = fade
+	return spot

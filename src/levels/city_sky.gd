@@ -58,12 +58,13 @@ static func _all() -> Dictionary:
 
 
 ## Какая панорама у этого времени и погоды. В туман и дождь утром и днём —
-## свои; вечером и ночью — одна пасмурная, ночью приглушённая.
+## свои, в снег — туманная, белёсая; вечером и ночью — одна пасмурная, ночью
+## приглушённая.
 static func key_of(time: TimeOfDay.Kind, weather: Weather.Kind) -> String:
 	if weather == Weather.Kind.CLEAR:
 		return ["morning_clear", "day_clear", "evening_clear", "night_clear"][time]
 	if time == TimeOfDay.Kind.MORNING or time == TimeOfDay.Kind.DAY:
-		return "fog" if weather == Weather.Kind.FOG else "rain"
+		return "rain" if weather == Weather.Kind.RAIN else "fog"
 	return "dusk_overcast"
 
 

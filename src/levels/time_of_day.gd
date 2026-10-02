@@ -126,6 +126,8 @@ static func sun_energy(kind: Kind, weather: Weather.Kind) -> float:
 		return energy * 0.3
 	if weather == Weather.Kind.RAIN:
 		return energy * 0.2
+	if weather == Weather.Kind.SNOW:
+		return energy * 0.35
 	return energy
 
 

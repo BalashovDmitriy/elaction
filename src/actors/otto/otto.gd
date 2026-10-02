@@ -81,6 +81,9 @@ const PRESS_ACTIONS: Array[StringName] = [&"jump", &"shoot"]
 ## В оригинале Otto приседает на месте. Оставлено переключателем для настройки.
 @export var can_move_while_crouching: bool = false
 
+## Стоит ли Otto на заснеженном настиле: ставит снег крыши ([SnowTracks]).
+var icy: bool = false
+
 ## Чем звучит шаг: пол ставит здание — ковёр отеля, камень конторы и крыши.
 var step_sound: String = Sounds.STEP_CONCRETE
 ## Шаг этажа здания, м: упавший больше чем на этаж разбивается (ADR-0037,
@@ -152,6 +155,8 @@ var _posed_state := OttoStateMachine.State.IDLE
 ## Скорость по горизонтали в полёте, м/с. Задаётся толчком и в воздухе не
 ## меняется: в ROM направление прыжка выбирается при старте (@43FA), а
 ## повернуться лицом в полёте можно (@42A7).
+## Ловец осадков на теле ([Shelter]).
+var _shelter: GPUParticlesCollisionBox3D = null
 var _air_speed: float = 0.0
 ## Кабина, внутри которой сейчас Otto. На крыше кабины она не заполняется:
 ## оттуда лифтом не управляют (ADR-0004, пункт 3).
@@ -221,6 +226,9 @@ func _notification(what: int) -> void:
 
 
 func _ready() -> void:
+	# Дождь и снег гаснут о голову и плечи (ADR-0054).
+	_shelter = Shelter.over(self, _cover())
+	add_to_group(Footing.OTTO_GROUP)
 	var standing := _shape_size(_standing_shape)
 	var crouching := _shape_size(_crouching_shape)
 	_headroom = standing.y - crouching.y
@@ -230,7 +238,17 @@ func _ready() -> void:
 	corpse = Corpse.new(self, _body)
 
 
+## Габарит тела под осадками: в рост или присев.
+func _cover() -> Vector3:
+	var tall := Proportions.CROUCH if is_crouching() else Proportions.BODY
+	return Vector3(Proportions.BODY_WIDTH, tall, WorldSpace.BODY_DEPTH)
+
+
 func _physics_process(delta: float) -> void:
+	# Ловец осадков — по позе; погибшего не держит: тело лежит на полу.
+	if _shelter != null:
+		_shelter.visible = not is_dead()
+		Shelter.fit(_shelter, _cover())
 	if _takedown != null:
 		# В сценке Otto стоит, где стоял: координатой и позой распоряжается
 		# режиссёр. Уязвим — пуля его найдёт (ADR-0040, решение 5).
@@ -285,7 +303,11 @@ func _physics_process(delta: float) -> void:
 		velocity.y = jump_speed
 
 	if is_on_floor() or state == OttoStateMachine.State.DEAD:
-		_air_speed = _horizontal_speed(_snapshot, state)
+		var wanted := _horizontal_speed(_snapshot, state)
+		# От скорости, с которой тело шло на самом деле, — после стены и борта
+		# кабины, — а не от задуманной: упёршийся в стену на снегу иначе ещё
+		# четверть секунды «тормозил» в неё, прежде чем пойти назад.
+		_air_speed = Footing.step(velocity.x, wanted, icy and is_on_floor(), delta)
 	velocity.x = _within_the_car(_air_speed)
 	if not is_on_floor():
 		velocity.y = maxf(velocity.y - gravity * delta, -max_fall_speed)
@@ -857,7 +879,9 @@ func _step_sound() -> void:
 	if frame == _stepped_on or frame == 1 or not is_on_floor():
 		return
 	_stepped_on = frame
-	Sounds.play(Sounds.STEP_METAL if _on_metal() else step_sound)
+	# На заснеженном настиле — хруст снега (ADR-0054).
+	var sound := Sounds.STEP_SNOW if icy else step_sound
+	Sounds.play(Sounds.STEP_METAL if _on_metal() else sound)
 
 
 ## Стоит ли Otto на металле — в кабине или на её крыше: шаг там звонкий

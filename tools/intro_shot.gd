@@ -38,6 +38,8 @@ var _model: bool = false
 var _full: bool = false
 var _time: int = TimeOfDay.Kind.NIGHT
 var _series: int = 0
+## Погода руками, или -1 — жребий по сиду.
+var _weather: int = -1
 var _shot_steps: Dictionary = {}
 var _tick: int = 0
 
@@ -56,6 +58,8 @@ func _ready() -> void:
 			_full = true
 		elif argument.begins_with("--time="):
 			_time = clampi(argument.trim_prefix("--time=").to_int(), 0, 3)
+		elif argument.begins_with("--weather="):
+			_weather = clampi(argument.trim_prefix("--weather=").to_int(), -1, 3)
 		elif argument.begins_with("--series="):
 			_series = maxi(argument.trim_prefix("--series=").to_int(), 0)
 	DirAccess.make_dir_recursive_absolute("res://screens/%s" % _folder)
@@ -73,6 +77,7 @@ func _run() -> void:
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	_level.rules = BuildingRules.new()
 	_level.rules.time_of_day = _time as TimeOfDay.Kind
+	_level.rules.forced_weather = _weather
 	_level.building_seed = _seed
 	_level.spawn_agents = false
 	_level.full_intro = _full

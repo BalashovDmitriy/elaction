@@ -30,6 +30,10 @@ uniform float density = 64.0;
 uniform vec2 atlas_size = vec2(1920.0, 448.0);
 
 uniform vec3 roof_colour : source_color = vec3(0.16, 0.16, 0.17);
+// Снег на крышах (M24l, ADR-0054): 0 — сухо, 1 — крыши под снегом, с
+// проплешинами по шуму — у вентиляции и вдоль кромок снег тает.
+uniform float snow = 0.0;
+uniform vec3 snow_colour : source_color = vec3(0.8, 0.83, 0.88);
 
 // Окна: какая доля горит, сила света комнаты, вспышка молнии в стёклах.
 uniform float lit_share = 0.35;
@@ -76,6 +80,16 @@ void fragment() {
 	if (face.y > 0.5) {
 		ALBEDO = roof_colour;
 		ROUGHNESS = 0.92;
+		if (snow > 0.0) {
+			// Проплешины — по клетке в полтора метра, у кромки — чаще.
+			vec2 cell = floor(at.xz / 1.5);
+			float bald = hash1(dot(cell, vec2(12.9898, 78.233)) + custom.y * 31.0);
+			vec2 edge = min(at.xz, size.xz - at.xz);
+			float rim = smoothstep(0.0, 1.2, min(edge.x, edge.y));
+			float cover = snow * mix(0.55, 1.0, step(0.18, bald)) * mix(0.6, 1.0, rim);
+			ALBEDO = mix(roof_colour, snow_colour, cover);
+			ROUGHNESS = mix(0.92, 0.8, cover);
+		}
 	} else {
 		// Где на фасаде: s — вдоль, h — высота от земли.
 		float s = at.x;

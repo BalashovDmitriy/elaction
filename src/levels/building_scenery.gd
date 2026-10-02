@@ -34,6 +34,8 @@ var identity: BuildingIdentity = null
 ## Воздух здания и дождь над крышей: их перестраивает [method apply_graphics].
 var _air: WorldEnvironment = null
 var _rain_node: RoofRain = null
+## Снег над крышей, если идёт снег (ADR-0054).
+var _snow_node: RoofSnow = null
 var _roof_light: OmniLight3D = null
 var _sun: DirectionalLight3D = null
 ## Крыша и её техника: с них снимается карта высот дождя.
@@ -103,6 +105,13 @@ func build(
 		_rain_node.build(rules, plan, _roof_light)
 		_rain_node.catch_on(_roof_parts)
 		sign_board.glow_in_rain()
+	elif Weather.is_snowing(weather):
+		# Хлопья гаснут о ту же карту высот, покров лёг заранее (ADR-0054).
+		_snow_node = RoofSnow.new()
+		_snow_node.name = "RoofSnow"
+		add_child(_snow_node)
+		_snow_node.build(rules, plan, rules.time_of_day)
+		_snow_node.catch_on(_roof_parts)
 	# Молнии — только в грозу: в ясную ночь, в туман и в дождь днём воздух
 	# покадрово не трогается (ADR-0051, решение 7).
 	set_process(_city.has_lightning())
@@ -158,16 +167,24 @@ func sun() -> DirectionalLight3D:
 	return _sun
 
 
-## Дождь над крышей гаснет и о то, что на ней построили другие строители
-## уровня: плиту и парапеты, машинное отделение, торцы плит ([RoofRain]).
+## Дождь и снег над крышей гаснут и о то, что на ней построили другие
+## строители уровня: плиту и парапеты, машинное отделение, торцы плит
+## ([RoofCatch]); на это же ложится снежный покров.
 func catch_rain(roots: Array[Node]) -> void:
 	if _rain_node != null:
 		_rain_node.catch_on(roots)
+	if _snow_node != null:
+		_snow_node.catch_on(roots)
 
 
 ## Дождь над крышей — чтобы тест мог проверить, где гаснут капли.
 func roof_rain() -> RoofRain:
 	return _rain_node
+
+
+## Снег над крышей — для теста.
+func roof_snow() -> RoofSnow:
+	return _snow_node
 
 
 ## Отражения, контактные тени и объёмный туман по уровню качества (ADR-0030,

@@ -56,6 +56,9 @@ const WATCH_REACH: float = 0.12
 @export var emerge_time: float = 0.6
 @export var same_line: float = 0.45
 
+## Стоит ли агент на заснеженном настиле: ставит снег крыши ([SnowTracks]).
+var icy: bool = false
+
 ## Луч прицела: горит, пока агент замахивается. По нему от выстрела уходит
 ## игрок — и бот тестов (ADR-0037, решение 5). Ставит сам агент.
 var laser: AimLaser = null
@@ -118,6 +121,8 @@ var step_sound: String = Sounds.STEP_CONCRETE
 ## достаёт значения по умолчанию — те же, что у здания по умолчанию.
 var _rules: BuildingRules = null
 
+## Ловец осадков на теле ([Shelter]).
+var _shelter: GPUParticlesCollisionBox3D = null
 var _brain := EnemyBrain.new()
 var _target: Otto = null
 var _in_the_dark: bool = false
@@ -178,6 +183,8 @@ func _notification(what: int) -> void:
 
 func _ready() -> void:
 	add_to_group(GROUP)
+	# Дождь и снег гаснут о шляпу и плечи (ADR-0054).
+	_shelter = Shelter.over(self, _cover())
 	_brain.emerge_time = emerge_time
 	_brain.same_line = same_line
 	# Стоячий рост берётся у самой формы, а не записывается вторым числом:
@@ -190,7 +197,21 @@ func _ready() -> void:
 	corpse = Corpse.new(self, _body)
 
 
+## Габарит тела под осадками: в рост, на колене или лёжа — лёжа вдоль пола.
+func _cover() -> Vector3:
+	match _brain.stance:
+		EnemyBrain.Stance.KNEEL:
+			return Vector3(Proportions.BODY_WIDTH, Proportions.KNEEL, WorldSpace.BODY_DEPTH)
+		EnemyBrain.Stance.PRONE:
+			return Vector3(Proportions.BODY * 0.9, Proportions.PRONE, WorldSpace.BODY_DEPTH)
+	return Vector3(Proportions.BODY_WIDTH, Proportions.BODY, WorldSpace.BODY_DEPTH)
+
+
 func _physics_process(delta: float) -> void:
+	# Ловец осадков — по позе; убитого не держит: тело лежит отдельно.
+	if _shelter != null:
+		_shelter.visible = not is_dead()
+		Shelter.fit(_shelter, _cover())
 	if _brain.is_dead():
 		return
 
@@ -266,7 +287,8 @@ func _physics_process(delta: float) -> void:
 			# и у проёма его не караулит (ADR-0027, решение 3а).
 			_brain.turn_around()
 	walking = _turn_holds(delta, walking)
-	velocity.x = walk_speed * _brain.facing if walking else 0.0
+	var wanted := walk_speed * _brain.facing if walking else 0.0
+	velocity.x = Footing.step(velocity.x, wanted, icy and is_on_floor(), delta)
 	_apply_gravity(delta)
 	move_and_slide()
 	_hold_the_plane()
@@ -681,7 +703,8 @@ func _step_sound() -> void:
 	if frame == _stepped_on or frame == 1 or not is_on_floor():
 		return
 	_stepped_on = frame
-	Sounds.play_at(get_parent(), step_sound, global_position, STEP_REACH, STEP_DB)
+	var sound := Sounds.STEP_SNOW if icy else step_sound
+	Sounds.play_at(get_parent(), sound, global_position, STEP_REACH, STEP_DB)
 
 
 ## Агент приседает или ложится от пули — шорох одежды.
