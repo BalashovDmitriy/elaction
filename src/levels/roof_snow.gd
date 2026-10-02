@@ -40,6 +40,7 @@ const COVER_NORMAL_FADE: float = 0.55
 var _flakes: GPUParticles3D = null
 var _catcher: GPUParticlesCollisionHeightField3D = null
 var _cover: Decal = null
+var _tracks: SnowTracks = null
 var _box := AABB()
 
 
@@ -54,6 +55,10 @@ func build(rules: BuildingRules, plan: BuildingPlan, time: TimeOfDay.Kind) -> vo
 		add_child(lid)
 	_snow(rules, deck, time)
 	_lay(rules, deck)
+	_tracks = SnowTracks.new()
+	add_child(_tracks)
+	var bounds := rules.floor_span(BuildingRules.ROOF)
+	_tracks.watch(deck, bounds.x, bounds.y)
 	add_to_group(Graphics.GROUP)
 	apply_graphics()
 
@@ -82,6 +87,11 @@ func catcher() -> GPUParticlesCollisionHeightField3D:
 ## Покров — для теста.
 func cover() -> Decal:
 	return _cover
+
+
+## Следы на настиле — для теста.
+func tracks() -> SnowTracks:
+	return _tracks
 
 
 ## Хлопья сыплются над настилом со сдвигом против ветра: снесённые, они ложатся

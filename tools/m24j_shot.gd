@@ -67,6 +67,8 @@ func _combo(time: int, weather: int) -> void:
 	var tag := "%d%s_%s" % [time, TIME_NAMES[time], WEATHER_NAMES[weather]]
 	if _only == "" or _only == "roof":
 		await _shoot_floor("%s_roof" % tag, BuildingRules.ROOF)
+	if _only == "walk":
+		await _shoot_walk("%s_walk" % tag)
 	if _only == "" or _only == "floor":
 		await _shoot_floor("%s_floor" % tag, 2)
 	if _only == "" or _only == "garage":
@@ -89,6 +91,22 @@ func _shoot_floor(label: String, index: int) -> void:
 		push_error("этаж %d: вставать некуда" % index)
 		return
 	_place(spots[spots.size() / 2], index)
+	await _shoot(label)
+
+
+## Otto проходит по крыше туда и обратно, и кадр — с цепочкой следов на снегу
+## (M24l, ADR-0054). Только по флагу [code]--only=walk[/code]: в остальные
+## погоды цепочки нет, и общий набор кадров её не ждёт.
+func _shoot_walk(label: String) -> void:
+	await _level.wait_for_the_landing()
+	# Вертолёт улетает: без него виден весь настил.
+	for _frame: int in 360:
+		await get_tree().physics_frame
+	for action: StringName in [&"move_right", &"move_left"]:
+		Input.action_press(action)
+		for _frame: int in 70:
+			await get_tree().physics_frame
+		Input.action_release(action)
 	await _shoot(label)
 
 

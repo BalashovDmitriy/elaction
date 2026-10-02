@@ -20,10 +20,10 @@ const DUST_REACH: float = 7.0
 
 ## В снег поток поднимает с покрова снежную пыль (ADR-0054): гуще, белее,
 ## крупнее облаком и дольше висит.
-const POWDER_COUNT: int = 180
+const POWDER_COUNT: int = 120
 const POWDER_LIFE: float = 2.4
-const POWDER_SIZE: float = 0.8
-const POWDER_COLOR := Color(0.9, 0.93, 0.98, 0.42)
+const POWDER_SIZE: float = 0.6
+const POWDER_COLOR := Color(0.9, 0.93, 0.98, 0.26)
 
 ## Поток от винта гонит и дождь: шар-отталкиватель частиц под осью винта
 ## разносит струи вниз и в стороны, и они ложатся косо, по скорости. Радиус

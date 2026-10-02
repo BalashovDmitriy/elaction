@@ -56,6 +56,9 @@ const WATCH_REACH: float = 0.12
 @export var emerge_time: float = 0.6
 @export var same_line: float = 0.45
 
+## Стоит ли агент на заснеженном настиле: ставит снег крыши ([SnowTracks]).
+var icy: bool = false
+
 ## Луч прицела: горит, пока агент замахивается. По нему от выстрела уходит
 ## игрок — и бот тестов (ADR-0037, решение 5). Ставит сам агент.
 var laser: AimLaser = null
@@ -268,7 +271,8 @@ func _physics_process(delta: float) -> void:
 			# и у проёма его не караулит (ADR-0027, решение 3а).
 			_brain.turn_around()
 	walking = _turn_holds(delta, walking)
-	velocity.x = walk_speed * _brain.facing if walking else 0.0
+	var wanted := walk_speed * _brain.facing if walking else 0.0
+	velocity.x = Footing.step(velocity.x, wanted, icy and is_on_floor(), delta)
 	_apply_gravity(delta)
 	move_and_slide()
 	_hold_the_plane()

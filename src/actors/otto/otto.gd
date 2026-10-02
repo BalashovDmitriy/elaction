@@ -81,6 +81,9 @@ const PRESS_ACTIONS: Array[StringName] = [&"jump", &"shoot"]
 ## В оригинале Otto приседает на месте. Оставлено переключателем для настройки.
 @export var can_move_while_crouching: bool = false
 
+## Стоит ли Otto на заснеженном настиле: ставит снег крыши ([SnowTracks]).
+var icy: bool = false
+
 ## Чем звучит шаг: пол ставит здание — ковёр отеля, камень конторы и крыши.
 var step_sound: String = Sounds.STEP_CONCRETE
 ## Шаг этажа здания, м: упавший больше чем на этаж разбивается (ADR-0037,
@@ -223,6 +226,7 @@ func _notification(what: int) -> void:
 func _ready() -> void:
 	# Дождь и снег гаснут о голову и плечи (ADR-0054).
 	Shelter.over(self, Vector3(Proportions.BODY_WIDTH, Proportions.BODY, WorldSpace.BODY_DEPTH))
+	add_to_group(Footing.OTTO_GROUP)
 	var standing := _shape_size(_standing_shape)
 	var crouching := _shape_size(_crouching_shape)
 	_headroom = standing.y - crouching.y
@@ -287,7 +291,8 @@ func _physics_process(delta: float) -> void:
 		velocity.y = jump_speed
 
 	if is_on_floor() or state == OttoStateMachine.State.DEAD:
-		_air_speed = _horizontal_speed(_snapshot, state)
+		var wanted := _horizontal_speed(_snapshot, state)
+		_air_speed = Footing.step(_air_speed, wanted, icy and is_on_floor(), delta)
 	velocity.x = _within_the_car(_air_speed)
 	if not is_on_floor():
 		velocity.y = maxf(velocity.y - gravity * delta, -max_fall_speed)

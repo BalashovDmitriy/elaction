@@ -152,3 +152,34 @@ func test_the_rotor_lifts_snow_powder() -> void:
 	assert_eq(process.emission_shape, ParticleProcessMaterial.EMISSION_SHAPE_BOX)
 	assert_lte(process.emission_box_extents.z, 0.6, "пыль выходит за настил к камере")
 	assert_true(process.attractor_interaction_enabled, "пыль не слушает поток")
+
+
+## Otto идёт по заснеженной крыше — за ним цепочка следов, а отпущенный он не
+## встаёт на месте, а проскальзывает (решения 2 и 4). На сухой крыше — сразу.
+func test_otto_leaves_prints_and_slides_on_the_snowy_roof() -> void:
+	for snowy: bool in [true, false]:
+		GameState.instance().start_game()
+		var level := LEVEL_SCENE.instantiate() as GreyboxLevel
+		level.rules = BuildingRules.new()
+		level.rules.forced_weather = Weather.Kind.SNOW if snowy else Weather.Kind.CLEAR
+		level.building_seed = 1
+		level.spawn_agents = false
+		add_child_autofree(level)
+		assert_true(await level.wait_for_the_landing(), "Otto не встал на крышу")
+		var otto := level.otto
+		Input.action_press(&"move_right")
+		await wait_physics_frames(50)
+		var walking := absf(otto.velocity.x)
+		Input.action_release(&"move_right")
+		await wait_physics_frames(1)
+		var after := absf(otto.velocity.x)
+		var scenery := level.get_node("Scenery") as BuildingScenery
+		if snowy:
+			assert_true(otto.icy, "на заснеженном настиле Otto не скользит")
+			assert_gt(scenery.roof_snow().tracks().count(), 2, "за Otto нет следов")
+			assert_gt(after, walking * 0.5, "отпущенный на снегу встал как вкопанный")
+		else:
+			assert_false(otto.icy, "сухая крыша скользкая")
+			assert_almost_eq(after, 0.0, 0.01, "на сухой крыше Otto проскальзывает")
+		level.queue_free()
+		await wait_physics_frames(1)
