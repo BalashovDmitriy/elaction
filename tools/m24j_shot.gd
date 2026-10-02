@@ -18,7 +18,7 @@ const SETTLE_FRAMES: int = 50
 const BUILDING_SEED: int = 1
 
 const TIME_NAMES: PackedStringArray = ["morning", "day", "evening", "night"]
-const WEATHER_NAMES: PackedStringArray = ["clear", "fog", "rain"]
+const WEATHER_NAMES: PackedStringArray = ["clear", "fog", "rain", "snow"]
 
 var _level: GreyboxLevel = null
 var _folder: String = FOLDER
