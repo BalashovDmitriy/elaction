@@ -63,6 +63,13 @@ BATCH_COST = 8.0
 # дальше только добирает бюджет шагов — на настоящем здании это минуты.
 STALLED_MARKERS = ("бот зациклился",)
 
+# Jolt под нехваткой потоков: очередь задач физики переполнилась, и движок
+# ждёт, пока она освободится, — шаг доходит до конца, но GUT считает строку
+# ошибки движка провалом теста. На CI (2026-10-02) так упал test_car_cut.gd;
+# локально шесть параллельных прогонов того же задания чистые. Задание с этой
+# строкой повторяется один раз: настоящий провал повторится и во второй раз.
+JOLT_STARVED = "Jolt Physics job system exceeded the maximum number of jobs"
+
 # Скрипт, не прошедший разбор, молча выпадает из прогона: GUT считает тесты
 # остальных файлов и рапортует об успехе. Поэтому ищем следы поломки отдельно.
 BROKEN_SCRIPT_MARKERS = (
@@ -295,6 +302,20 @@ def run_job(godot: str, job: Job, home: Path, real_time: bool) -> tuple[int, str
     return code, output, time.monotonic() - started
 
 
+def run_job_once_more(
+    godot: str, job: Job, home: Path, real_time: bool
+) -> tuple[int, str, float, bool]:
+    """Задание, а упавшее от нехватки потоков у Jolt — ещё раз.
+
+    Последнее поле — был ли повтор: его печатают, чтобы он не проходил молча.
+    """
+    code, output, took = run_job(godot, job, home, real_time)
+    if verdict(code, output, job.label()) and JOLT_STARVED in output:
+        code, output, again = run_job(godot, job, home, real_time)
+        return code, output, took + again, True
+    return code, output, took, False
+
+
 def verdict(code: int, output: str, where: str) -> str:
     """Что не так с заданием, или пустая строка, если всё в порядке."""
     if code != 0 and SUCCESS_MARKER in output:
@@ -381,12 +402,16 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="elaction-tests-") as shared:
         with ThreadPoolExecutor(max_workers=workers) as pool:
             running = {
-                pool.submit(run_job, godot, job, Path(shared) / f"job{number}", args.real_time): job
+                pool.submit(
+                    run_job_once_more, godot, job, Path(shared) / f"job{number}", args.real_time
+                ): job
                 for number, job in enumerate(jobs)
             }
             for done in as_completed(running):
                 job = running[done]
-                code, output, took = done.result()
+                code, output, took, retried = done.result()
+                if retried:
+                    print(f"  {job.label()}: у Jolt кончилась очередь задач — повтор", flush=True)
                 timings.append((took, job.label()))
                 tests += passing(output)
                 trouble = verdict(code, output, job.label())
