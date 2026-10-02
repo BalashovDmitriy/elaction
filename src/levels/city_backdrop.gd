@@ -150,6 +150,9 @@ func build(
 				_lightning = Lightning.new()
 				_lightning.setup(building_seed, Vector2(0.0, rules.width), _ground)
 				_view.add_child(_lightning)
+		Weather.Kind.SNOW:
+			# Слои хлопьев у камеры, как струи дождя (ADR-0054).
+			SnowLook.city(_camera, time)
 
 	var layer := CanvasLayer.new()
 	layer.name = "CityLayer"

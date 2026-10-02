@@ -23,7 +23,7 @@ const WEATHER_NAMES: PackedStringArray = ["clear", "fog", "rain", "snow"]
 var _level: GreyboxLevel = null
 var _folder: String = FOLDER
 var _times: Array[int] = [0, 1, 2, 3]
-var _weathers: Array[int] = [0, 1, 2]
+var _weathers: Array[int] = [0, 1, 2, 3]
 ## Какие кадры снимать: roof, floor, garage, street, room; пусто — все. Улица у
 ## выезда (M24k, ADR-0052, решение 3) снимается камерой без Otto: он на неё не
 ## выходит.
