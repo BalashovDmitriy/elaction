@@ -37,6 +37,7 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `bed_double` | Bed Double | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/BuRay4fVFr) |
 | `bed_hotel` | Bed | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/rXo5Rkl5LC) |
 | `bench_hotel` | Bench | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/jLxjFxFRpw) |
+| `bicycle` | Bicycle | Poly by Google | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/19VoUuA2pcN) |
 | `bins` | Bins | Dilan Shah | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/75lHRN19gMY) |
 | `bookshelf` | Bookshelf | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/30Iealxb0p) |
 | `cabinet` | Cabinet | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/wOiMrnUuhe) |
@@ -46,6 +47,7 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `copier` | Office Printer / Copier | Bruno Oliveira | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/bgNnmejxBa-) |
 | `corkboard` | Wall Corkboard | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/U8yQZ9l0HZ) |
 | `couch_medium` | Couch Medium | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/fFfoi1LNKY) |
+| `counter_sink` | Counter Sink | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/iruxBemFwO) |
 | `curtains` | Curtains Double | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/kkeII96j9N) |
 | `desk` | Desk | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/V86Go2rlnq) |
 | `dresser` | Dresser | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/Ud8QR8Ku9e) |
@@ -54,25 +56,37 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `fire_exit_sign` | Fire Exit Sign | J-Toastie | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/gpft2tHZv4) |
 | `fire_extinguisher` | Fire Extinguisher | dook | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/LtrzDvRya9) |
 | `floor_lamp` | Light Floor | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/eBQtooeh43) |
+| `fridge` | Refrigirator | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/G2vcjG4nvK) |
 | `grandfather_clock` | Grandfathers Clock | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/09YKIkFZnA) |
 | `houseplant_a` | Houseplant | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/Kr4kr7OCCQ) |
 | `houseplant_b` | Houseplant | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/bfLOqIV5uP) |
 | `houseplant_c` | Houseplant | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/dveIJ0xNpX) |
+| `kettle` | Kettle | MilkAndBanana | CC0 1.0 | [poly.pizza](https://poly.pizza/m/XggUrd5f03) |
 | `light_stand` | Light Stand | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/9L6lLUl9sD) |
 | `lounge_chair` | Chair | CMHT Oculus | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/aVo4dG09vfD) |
+| `mailboxes` | Mailboxes, своя | elaction | MIT | `tools/build_residential.py` |
 | `message_board` | Message board | Poly by Google | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/fDpegPgEB0j) |
+| `microwave` | Kitchen Microwave | Kenney | CC0 1.0 | [poly.pizza](https://poly.pizza/m/vUsvf2HGDv) |
 | `night_stand` | Night Stand | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/A9vPgVUrF9) |
 | `night_stand_b` | Night Stand | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/9LI73c5uFA) |
 | `office_chair` | Office Chair | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/UfKvrZBK6C) |
 | `painting` | Painting | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/Pi6oReAizt) |
+| `paper_bag` | Bag | Kenney | CC0 1.0 | [poly.pizza](https://poly.pizza/m/fLNcjJnsJi) |
 | `potted_plant` | Potted Plant | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/GJ3Bm5FDE4) |
+| `radiator` | Radiator, своя | elaction | MIT | `tools/build_residential.py` |
 | `roof_antenna` | Roof Antenna | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/Fbdg52kqJ6) |
 | `roof_exit` | Roof Exit | J-Toastie | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/GEB4pWBI8l) |
 | `rug` | Rug | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/7H5qKjuxVY) |
 | `satellite_dish` | Satellite Dish | Kenney | CC0 1.0 | [poly.pizza](https://poly.pizza/m/IDRrztoAMB) |
+| `sofa` | Sofa | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/vuo7KBehok) |
 | `solar_panel` | Solar Panel Structure | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/snXloZEimW) |
+| `stove` | Oven | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/VNjPRwui7t) |
+| `stroller` | Pram, своя | elaction | MIT | `tools/build_residential.py` |
 | `table_lamp` | Table Lamp | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/9Mo3JruPHY) |
+| `trash_bag` | Trash Bag | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/jYrMKg2Q7C) |
+| `trash_bags` | Trash Bags | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/eitNk4I4R1) |
 | `trashcan` | Trashcan | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/vlVx279xut) |
+| `tv_old` | old tv | Justin Randall | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/9y-mTmCyefL) |
 | `vending_machine` | Vending Machine | dook | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/yNG4vqWVq0) |
 | `vent` | Vent | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/UDFcnJ0U73) |
 | `wall_art_02` | Wall Art 02 | Jarlan Perez | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/8jLn8Mvk8v2) |
@@ -98,6 +112,9 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `office_wall` | [PaintedPlaster017](https://ambientcg.com/view?id=PaintedPlaster017) | ambientCG | CC0 1.0 |
 | `office_wainscot` | [Plastic010](https://ambientcg.com/view?id=Plastic010) | ambientCG | CC0 1.0 |
 | `office_pilaster` | [Concrete034](https://ambientcg.com/view?id=Concrete034) | ambientCG | CC0 1.0 |
+| `residential_wall` | [PaintedPlaster015](https://ambientcg.com/view?id=PaintedPlaster015) | ambientCG | CC0 1.0 |
+| `residential_wainscot` | [PaintedBricks003](https://ambientcg.com/view?id=PaintedBricks003) | ambientCG | CC0 1.0 |
+| `residential_pilaster` | [PaintedBricks001](https://ambientcg.com/view?id=PaintedBricks001) | ambientCG | CC0 1.0 |
 | `shaft_plates` | [MetalPlates006](https://ambientcg.com/view?id=MetalPlates006) | ambientCG | CC0 1.0 |
 | `shaft_concrete` | [Concrete046](https://ambientcg.com/view?id=Concrete046) | ambientCG | CC0 1.0 |
 | `tread_plate` | [DiamondPlate008A](https://ambientcg.com/view?id=DiamondPlate008A) | ambientCG | CC0 1.0 |

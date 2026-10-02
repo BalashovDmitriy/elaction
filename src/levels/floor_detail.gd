@@ -28,6 +28,9 @@ const RUNNER_COLOR := Color(0.26, 0.08, 0.09)
 const RUNNER_EDGE_COLOR := Color(0.62, 0.5, 0.26)
 const SEAM_COLOR := Color(0.09, 0.09, 0.1)
 const JOINT_COLOR := Color(0.07, 0.08, 0.09)
+## Шахматка: пикселей на плитку в фактуре и блеск натёртой плитки.
+const CHECKER_PIXELS: int = 32
+const CHECKER_ROUGHNESS: float = 0.45
 
 var _rules: BuildingRules = null
 var _plan: BuildingPlan = null
@@ -50,7 +53,7 @@ func build(rules: BuildingRules, plan: BuildingPlan, style: BuildingStyle = null
 		"runner", GreyboxLook.surface(RUNNER_COLOR.lerp(rules.palette.masonry.darkened(0.55), 0.6))
 	)
 	_commit("edge", GreyboxLook.surface(RUNNER_EDGE_COLOR))
-	_commit("carpet", GreyboxLook.surface(_style.tile_color))
+	_commit("carpet", _checker() if _style.checker else GreyboxLook.surface(_style.tile_color))
 	_commit("tile_seam", GreyboxLook.surface(_style.tile_color.darkened(0.35)))
 	_commit("seam", GreyboxLook.surface(SEAM_COLOR))
 	_commit("joint", GreyboxLook.surface(JOINT_COLOR))
@@ -119,6 +122,10 @@ func _carpet_tiles(span: Vector2, surface: float) -> void:
 	var middle := (span.x + span.y) * 0.5
 	var depth := WorldSpace.CORRIDOR_DEPTH
 	_add("carpet", Vector3(length, RUNNER.y, depth), Vector3(middle, surface - RUNNER.y * 0.5, 0.0))
+	# Шахматка рисуется фактурой с затиркой в координатах мира: тысячи
+	# плиток коробками стоили бы мультимеш на десятки тысяч штук.
+	if _style.checker:
+		return
 	var step := _style.tile_step
 	for across in int(length / step):
 		var x := span.x + step * (float(across) + 1.0)
@@ -130,6 +137,30 @@ func _carpet_tiles(span: Vector2, surface: float) -> void:
 			Vector3(length, 0.004, SEAM),
 			Vector3(middle, surface - RUNNER.y - 0.001, z)
 		)
+
+
+## Плитка шахматкой жилого дома (ADR-0055, решение 4): две плитки на две,
+## между ними тёмная затирка, раскладка в координатах мира — шов ложится
+## в одну линию на всех этажах.
+func _checker() -> StandardMaterial3D:
+	var cells := CHECKER_PIXELS * 2
+	var image := Image.create(cells, cells, false, Image.FORMAT_RGB8)
+	var grout := _style.tile_color.lerp(_style.tile_alt, 0.5).darkened(0.4)
+	for y in cells:
+		for x in cells:
+			var dark := (x / CHECKER_PIXELS + y / CHECKER_PIXELS) % 2 == 1
+			var colour := _style.tile_alt if dark else _style.tile_color
+			if x % CHECKER_PIXELS == 0 or y % CHECKER_PIXELS == 0:
+				colour = grout
+			image.set_pixel(x, y, colour)
+	var material := StandardMaterial3D.new()
+	material.albedo_texture = ImageTexture.create_from_image(image)
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	material.roughness = CHECKER_ROUGHNESS
+	material.uv1_triplanar = true
+	material.uv1_world_triplanar = true
+	material.uv1_scale = Vector3.ONE / (_style.tile_step * 2.0)
+	return material
 
 
 ## Стоит ли точка стены в проёме двери или в портале шахты: стыку там не место.

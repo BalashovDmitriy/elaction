@@ -14,6 +14,7 @@
 
     python tools/build_textures.py           # скачать и собрать всё
     python tools/build_textures.py --local   # только своё, без сети
+    python tools/build_textures.py --only residential_wall  # одну фактуру
 
 Пишет в `assets/textures/<имя>/`: `albedo.png`, `normal.png`, `roughness.png`.
 """
@@ -40,6 +41,11 @@ AMBIENT: dict[str, tuple[str, bool]] = {
     "office_wall": ("PaintedPlaster017", True),
     "office_wainscot": ("Plastic010", True),
     "office_pilaster": ("Concrete034", True),
+    # Жилой дом (ADR-0055, решение 4): облупленная краска сверху, крашеный
+    # глазурованный кирпич понизу, крашеный кирпич простенков.
+    "residential_wall": ("PaintedPlaster015", True),
+    "residential_wainscot": ("PaintedBricks003", True),
+    "residential_pilaster": ("PaintedBricks001", True),
     "shaft_plates": ("MetalPlates006", False),
     "shaft_concrete": ("Concrete046", True),
     "tread_plate": ("DiamondPlate008A", False),
@@ -132,11 +138,14 @@ def _normal_from(height: Image.Image, strength: float) -> Image.Image:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Фактуры стен, шахты и крыши.")
     parser.add_argument("--local", action="store_true", help="только свои, без сети")
+    parser.add_argument("--only", nargs="*", default=[], help="только эти фактуры ambientCG")
     arguments = parser.parse_args()
-    _wallpaper()
+    if not arguments.only:
+        _wallpaper()
     if not arguments.local:
         for name, (asset, grey) in AMBIENT.items():
-            _ambient(name, asset, grey)
+            if not arguments.only or name in arguments.only:
+                _ambient(name, asset, grey)
     print(f"Фактуры в {OUT.relative_to(PROJECT_ROOT).as_posix()}/")
     return 0
 

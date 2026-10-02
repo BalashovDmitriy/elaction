@@ -1,9 +1,10 @@
 extends GutTest
 
-## Комната за дверью (ADR-0047): номер отеля или кабинет офиса.
+## Комната за дверью (ADR-0047, ADR-0055): номер отеля, кабинет офиса или
+## квартира.
 ##
 ## Комната — жребий двери, поэтому проверяется не одна удачная, а любая: на
-## сотне жребиев обоих типов главный предмет стоит в створе двери и виден в
+## сотне жребиев каждого типа главный предмет стоит в створе двери и виден в
 ## проём, мебель не заходит туда, где ходит створка, и ничто не торчит из
 ## комнаты. Дверь собирает комнату, когда створка трогается, и убирает, когда
 ## та закрылась.
@@ -18,22 +19,23 @@ const HERO_REACH: float = Door.LEAF_SIZE.x * 0.5
 ## Сколько кадров ждать, пока створка откроется и закроется.
 const PATIENCE: int = 240
 
-## Главные предметы: кровать — в номере, стол или рабочее место — в кабинете.
+## Главные предметы: кровать — в номере и спальне, стол или рабочее место — в
+## кабинете, мойка — на кухне, диван — в гостиной.
 const HEROES: PackedStringArray = [
-	"bed_hotel", "bed_double", "desk", "workstation_a", "workstation_b"
+	"bed_hotel", "bed_double", "desk", "workstation_a", "workstation_b", "counter_sink", "sofa"
 ]
 
 
-func _room(is_hotel: bool, seed: int) -> DoorRoom:
-	var room := DoorRoom.build(is_hotel, seed)
+func _room(kind: BuildingIdentity.Kind, seed: int) -> DoorRoom:
+	var room := DoorRoom.build(kind, seed)
 	add_child_autofree(room)
 	return room
 
 
 func test_the_main_piece_stands_in_the_doorway() -> void:
-	for is_hotel: bool in [true, false]:
+	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
 		for seed: int in DRAWS:
-			var room := _room(is_hotel, seed)
+			var room := _room(kind, seed)
 			var heroes := room.placed.filter(
 				func(item: Dictionary) -> bool: return HEROES.has(item["prop"])
 			)
@@ -49,9 +51,9 @@ func test_the_main_piece_stands_in_the_doorway() -> void:
 
 
 func test_furniture_keeps_clear_of_the_swinging_leaf() -> void:
-	for is_hotel: bool in [true, false]:
+	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
 		for seed: int in DRAWS:
-			var room := _room(is_hotel, seed)
+			var room := _room(kind, seed)
 			for item: Dictionary in room.placed:
 				var size: Vector3 = item["size"]
 				var reach := float(item["from_wall"]) + size.z
@@ -63,9 +65,9 @@ func test_furniture_keeps_clear_of_the_swinging_leaf() -> void:
 
 
 func test_the_room_holds_its_furniture_inside() -> void:
-	for is_hotel: bool in [true, false]:
+	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
 		for seed: int in DRAWS / 4:
-			var room := _room(is_hotel, seed)
+			var room := _room(kind, seed)
 			var box := PropCatalog.bounds_of(room)
 			assert_gte(box.position.y, -0.01, "жребий %d: ничего под полом" % seed)
 			assert_lte(box.end.y, DoorRoom.HEIGHT + 0.01, "жребий %d: ничего над потолком" % seed)
@@ -79,17 +81,47 @@ func test_the_room_holds_its_furniture_inside() -> void:
 			)
 
 
+## Мебель не уходит за боковые стены комнаты: у квартиры ряд из трёх предметов
+## шире половины комнаты, и без упора холодильник и торшер вылезали за стену
+## (кадры M24m). Повёрнутый телевизор шире своего габарита — допуск на него.
+func test_furniture_stays_between_the_side_walls() -> void:
+	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
+		for seed: int in DRAWS:
+			var room := _room(kind, seed)
+			var shell := _shell_of(room)
+			for item: Dictionary in room.placed:
+				var half := (item["size"] as Vector3).x * 0.5
+				var x := float(item["x"])
+				var where := "тип %d, жребий %d: %s" % [kind, seed, item["prop"]]
+				assert_gte(x - half, shell.position.x - 0.12, where + " за левой стеной")
+				assert_lte(x + half, shell.end.x + 0.12, where + " за правой стеной")
+
+
+## Оболочка комнаты — её коробки: пол, потолок и стены.
+func _shell_of(room: DoorRoom) -> AABB:
+	var shell := AABB()
+	var first := true
+	for child: Node in room.get_children():
+		var box := child as MeshInstance3D
+		if box == null or not (box.mesh is BoxMesh):
+			continue
+		var part := box.transform * box.mesh.get_aabb()
+		shell = part if first else shell.merge(part)
+		first = false
+	return shell
+
+
 ## У крайнего места этажа до наружной стены меньше, чем комната со сдвигом
 ## уходит от проёма: комната упирается в стену и из силуэта здания не торчит
 ## (авторевью M24i). Мебель стоит от проёма, а не от стен, — меряется сама
 ## комната, её оболочка.
 func test_a_room_at_the_end_of_the_floor_stays_inside_the_building() -> void:
 	var margin := BuildingRules.new().margin
-	for is_hotel: bool in [true, false]:
+	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
 		for seed: int in DRAWS / 4:
 			for side: float in [-1.0, 1.0]:
 				var span := Vector2(-margin, 20.0) if side < 0.0 else Vector2(-20.0, margin)
-				var room := DoorRoom.build(is_hotel, seed, null, span)
+				var room := DoorRoom.build(kind, seed, null, span)
 				autofree(room)
 				var shell := AABB()
 				var first := true
@@ -105,8 +137,8 @@ func test_a_room_at_the_end_of_the_floor_stays_inside_the_building() -> void:
 
 
 func test_every_room_has_its_light_and_window() -> void:
-	for is_hotel: bool in [true, false]:
-		var room := _room(is_hotel, 7)
+	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
+		var room := _room(kind, 7)
 		assert_not_null(room.find_child("RoomLight", true, false), "свет комнаты")
 		assert_not_null(room.find_child("Window", true, false), "окно на город")
 		var light := room.find_child("RoomLight", true, false) as OmniLight3D
@@ -155,8 +187,8 @@ func test_a_bare_door_stays_dark() -> void:
 ## На тёмном этаже комната без своего света: светится только окно с городом
 ## (решение пользователя, M24i).
 func test_a_room_on_a_dark_floor_keeps_the_dark() -> void:
-	for is_hotel: bool in [true, false]:
-		var room := DoorRoom.build(is_hotel, 5, null, Vector2(-INF, INF), true)
+	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
+		var room := DoorRoom.build(kind, 5, null, Vector2(-INF, INF), true)
 		add_child_autofree(room)
 		assert_eq(room.find_children("*", "Light3D", true, false).size(), 0, "своего света нет")
 		assert_not_null(room.find_child("Window", true, false), "окно на город есть")

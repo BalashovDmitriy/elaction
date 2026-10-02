@@ -78,21 +78,23 @@ func test_the_building_sign_is_dark_by_day() -> void:
 ## ночью — свет комнаты, как в M24i; на тёмном этаже ночью — ни того, ни другого.
 func test_the_room_behind_the_door_follows_the_daylight() -> void:
 	for time: TimeOfDay.Kind in _times():
-		for is_hotel: bool in [true, false]:
+		for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
 			var room := DoorRoom.build(
-				is_hotel, 17, null, Vector2(-INF, INF), false, time, Weather.Kind.CLEAR
+				kind, 17, null, Vector2(-INF, INF), false, time, Weather.Kind.CLEAR
 			)
 			autofree(room)
 			var sun := room.find_children("WindowSun", "SpotLight3D", true, false).size()
 			var lamp := room.find_children("RoomLight", "OmniLight3D", true, false).size()
 			var glow := room.find_children("LampGlow", "OmniLight3D", true, false).size()
 			var day := TimeOfDay.is_daytime(time)
-			var tag := "время %d, %s" % [time, "отель" if is_hotel else "офис"]
+			var tag := "время %d, тип %d" % [time, kind]
 			assert_eq(sun, 1 if day else 0, "%s: солнце из окна" % tag)
 			assert_eq(lamp, 0 if day else 1, "%s: свет комнаты" % tag)
 			if day:
 				assert_eq(glow, 0, "%s: лампа на тумбе погашена" % tag)
-	var dark := DoorRoom.build(true, 17, null, Vector2(-INF, INF), true, TimeOfDay.Kind.NIGHT)
+	var dark := DoorRoom.build(
+		BuildingIdentity.Kind.HOTEL, 17, null, Vector2(-INF, INF), true, TimeOfDay.Kind.NIGHT
+	)
 	autofree(dark)
 	assert_eq(dark.find_children("*", "Light3D", true, false).size(), 0, "тёмный этаж без света")
 
@@ -143,8 +145,8 @@ func test_the_day_street_is_busier_than_the_night_one() -> void:
 ## закрывает, стекло прозрачное, и пока комната открыта, город за зданием
 ## рисуется — он и виден в окне.
 func test_the_room_window_opens_onto_the_city() -> void:
-	for is_hotel: bool in [true, false]:
-		var room := DoorRoom.build(is_hotel, 23)
+	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
+		var room := DoorRoom.build(kind, 23)
 		var before := DoorRoom.open_count
 		add_child_autofree(room)
 		assert_eq(DoorRoom.open_count, before + 1, "открытая комната на счету")

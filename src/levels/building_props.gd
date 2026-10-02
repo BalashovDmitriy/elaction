@@ -21,9 +21,11 @@ const PLATE_GAP: float = 0.14
 ## ([constant FloorSigns.STANDOFF]): у края простенка рядом с дверью стоит
 ## пилястра, и табличка на самой стене тонула в ней целиком (авторевью M21b).
 const PLATE_Z: float = WorldSpace.BACK_WALL_Z + BuildingRibs.PILASTER_DEPTH + 0.01
-## Таблички: латунь с тёмными цифрами в отеле, сталь в офисе.
+## Таблички: латунь с тёмными цифрами в отеле, сталь в офисе, тусклый
+## алюминий в жилом доме.
 const PLATE_HOTEL := Color(0.62, 0.48, 0.22)
 const PLATE_OFFICE := Color(0.55, 0.57, 0.6)
+const PLATE_RESIDENTIAL := Color(0.46, 0.46, 0.44)
 const PLATE_INK := Color(0.08, 0.07, 0.06)
 
 ## Труба под потолком: толщина, м. Висит перед пилястрами — они выступают из
@@ -131,7 +133,13 @@ func _hang(prop: BuildingDressing.PropSpot) -> void:
 ## направо, как в гостинице: 2904 — четвёртая дверь двадцать девятого этажа.
 func _plate_the_doors(plan: BuildingPlan, identity: BuildingIdentity) -> void:
 	var counted := {}
-	var metal := GreyboxLook.metal(PLATE_HOTEL if identity.is_hotel() else PLATE_OFFICE)
+	var plate_tone := PLATE_OFFICE
+	match identity.kind:
+		BuildingIdentity.Kind.HOTEL:
+			plate_tone = PLATE_HOTEL
+		BuildingIdentity.Kind.RESIDENTIAL:
+			plate_tone = PLATE_RESIDENTIAL
+	var metal := GreyboxLook.metal(plate_tone)
 	var style := BuildingStyle.of(identity)
 	var doors := plan.doors.duplicate()
 	doors.sort_custom(
@@ -146,6 +154,9 @@ func _plate_the_doors(plan: BuildingPlan, identity: BuildingIdentity) -> void:
 		# У офиса табличка шире: отдел над номером кабинета (ADR-0048).
 		var size := PLATE
 		var text := room
+		# У квартиры — этаж и буква по порядку двери, как 12C (ADR-0055).
+		if style.apartment_letters:
+			text = "%d%s" % [number, String.chr(64 + int(counted[door.floor_index]))]
 		if style.departments:
 			var names := BuildingStyle.DEPARTMENTS
 			text = "%s\n%s" % [names[hash([number, room]) % names.size()], room]

@@ -113,7 +113,7 @@ func follow(level: GreyboxLevel) -> void:
 	_level = level
 	_shown_floor = -2
 	if level != null and level.identity != null:
-		_neon = VerticalSign.NEON_HOTEL if level.identity.is_hotel() else VerticalSign.NEON_OFFICE
+		_neon = VerticalSign.neon_of(level.identity)
 		_building.text = " ".join(level.identity.sign_lines())
 	_restyle()
 	refresh()

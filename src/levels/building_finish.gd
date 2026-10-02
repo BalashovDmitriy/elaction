@@ -4,8 +4,9 @@ extends RefCounted
 ## Отделка здания: материалы с фактурой (ADR-0033, решения 5, 6 и 8).
 ##
 ## До M21b стены были заливкой одного цвета и читались «квадратами». Теперь у
-## стены рисунок: обои в отеле, штукатурка в офисе; нижняя панель — дерево или
-## пластик, пилястры — мрамор или бетон; шахта — металлические листы и бетон,
+## стены рисунок: обои в отеле, штукатурка в офисе, краска в жилом доме; нижняя
+## панель — дерево, пластик или краска темнее, пилястры — мрамор, бетон или
+## крашеный кирпич; шахта — металлические листы и бетон,
 ## порог портала — рифлёная сталь, крыша — гравий. Фактуры собирает
 ## `tools/build_textures.py` в `assets/textures/`.
 ##
@@ -34,14 +35,18 @@ static var _cache: Dictionary = {}
 
 ## Задняя стена коридора в тоне [param tone].
 static func wall(identity: BuildingIdentity, tone: Color) -> StandardMaterial3D:
-	var name := "hotel_wall" if identity.is_hotel() else "office_wall"
-	return _textured(name, tone, WALLPAPER_REPEAT, 0.0)
+	return _textured(identity.key() + "_wall", tone, WALLPAPER_REPEAT, 0.0)
 
 
 ## Нижняя панель стены.
 static func wainscot(identity: BuildingIdentity, tone: Color) -> StandardMaterial3D:
-	if identity.is_hotel():
-		return _textured("hotel_wainscot", WOOD_TINT, WOOD_REPEAT, 0.0)
+	match identity.kind:
+		BuildingIdentity.Kind.HOTEL:
+			return _textured("hotel_wainscot", WOOD_TINT, WOOD_REPEAT, 0.0)
+		BuildingIdentity.Kind.RESIDENTIAL:
+			# Стены в два тона (ADR-0055, решение 4): низ — крашеный глазурованный
+			# кирпич, темнее верха, как в подъездах Нью-Йорка.
+			return _textured("residential_wainscot", tone.darkened(0.35), WOOD_REPEAT, 0.0)
 	return _textured(
 		"office_wainscot", GreyboxLook.SKIRTING.lerp(tone, 0.25).lightened(0.2), WOOD_REPEAT, 0.0
 	)
@@ -49,8 +54,7 @@ static func wainscot(identity: BuildingIdentity, tone: Color) -> StandardMateria
 
 ## Пилястры простенков.
 static func pilaster(identity: BuildingIdentity, tone: Color) -> StandardMaterial3D:
-	var name := "hotel_pilaster" if identity.is_hotel() else "office_pilaster"
-	return _textured(name, tone.lightened(0.5), STONE_REPEAT, 0.0)
+	return _textured(identity.key() + "_pilaster", tone.lightened(0.5), STONE_REPEAT, 0.0)
 
 
 ## Задняя стена шахты — металлические листы с болтами.

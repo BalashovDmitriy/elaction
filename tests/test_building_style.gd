@@ -53,6 +53,42 @@ func test_hotel_and_office_styles_differ_in_every_look() -> void:
 	assert_false(hotel.crown.is_equal_approx(office.crown), "карниз разный")
 
 
+## Жилой дом не похож ни на отель, ни на офис (ADR-0055, решение 4): свой
+## светильник, плитка шахматкой, глазок, буквы квартир, коврики у дверей.
+func test_a_residential_style_differs_from_both() -> void:
+	var home := BuildingStyle.of(BuildingIdentity.typed(BuildingIdentity.Kind.RESIDENTIAL))
+	for kind: BuildingIdentity.Kind in [BuildingIdentity.Kind.HOTEL, BuildingIdentity.Kind.OFFICE]:
+		var other := BuildingStyle.of(BuildingIdentity.typed(kind))
+		assert_ne(home.fixture, other.fixture, "светильник свой")
+		assert_ne(home.checker, other.checker, "шахматка — только в жилом доме")
+		assert_ne(home.peephole, other.peephole, "глазок — у квартир")
+		assert_ne(home.apartment_letters, other.apartment_letters, "буквы квартир")
+		assert_false(home.leaf_tone.is_equal_approx(other.leaf_tone), "створка своего цвета")
+	assert_false(home.runner, "дорожки нет")
+	assert_gt(home.door_mat_share, 0.0, "коврики у дверей")
+	var red := GreyboxLook.DOOR_RED
+	var gap := Vector3(home.leaf_tone.r - red.r, home.leaf_tone.g - red.g, home.leaf_tone.b - red.b)
+	assert_gt(gap.length(), 0.4, "створка квартиры не путается с красной дверью")
+
+
+func test_a_residential_building_hangs_domes_and_peepholes() -> void:
+	var level := await _level(BuildingIdentity.Kind.RESIDENTIAL)
+	assert_eq(level.identity.kind, BuildingIdentity.Kind.RESIDENTIAL, "здание — жилой дом")
+	for lamp: Lamp in level.find_children("*", "Lamp", true, false):
+		assert_eq(lamp.fixture, BuildingStyle.Fixture.DOME, "в жилом доме — тарелка")
+	var peepholes := 0
+	var mats := 0
+	for door: Door in level.doors():
+		if door.find_child("Peephole", true, false) != null:
+			peepholes += 1
+		if door.find_child("Doormat", true, false) != null:
+			mats += 1
+		assert_null(door.find_child("VisionGlass", true, false), "стекла в двери квартиры нет")
+	assert_gt(peepholes, 0, "у дверей квартир глазок")
+	assert_gt(mats, 0, "у дверей квартир коврики")
+	assert_eq(level.find_children("Sconce", "", true, false).size(), 0, "бра нет")
+
+
 func test_an_office_hangs_panels_and_glazed_doors() -> void:
 	var level := await _level(BuildingIdentity.Kind.OFFICE)
 	assert_false(level.identity.is_hotel(), "здание — офис")
