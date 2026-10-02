@@ -179,6 +179,7 @@ var _glow: OmniLight3D = null
 var _lamp: SpotLight3D = null
 var _rain: Array[GPUParticles3D] = []
 var _snow: StreetSnow = null
+var _people: StreetPeople = null
 var _traffic: StreetTraffic = null
 ## Колода вывесок: лавки на одной улице не повторяются.
 var _names: Array[String] = []
@@ -216,6 +217,11 @@ func build(
 	_traffic = StreetTraffic.new()
 	add_child(_traffic)
 	_traffic.build(_left, _street, building_seed, time, _lights > 0.0, Weather.is_snowing(weather))
+	_people = StreetPeople.new()
+	add_child(_people)
+	var walk_from := _at(_left - FROM, _floor, 0.0)
+	var walk_to := _at(_left, _floor, 0.0)
+	_people.build(walk_from.x, walk_to.x, walk_from.y, building_seed, time, weather)
 	_flush_multimeshes()
 	if Weather.is_raining(weather):
 		_build_rain()
@@ -819,7 +825,7 @@ func _build_rain() -> void:
 ## по карте высот, снятой со слоя улицы, как на крыше ([RoofCatch]). Машины
 ## потока в карте не числятся: о них гасит их ловец ([Shelter]).
 func _catch() -> void:
-	var moving: Array[Node] = [_traffic]
+	var moving: Array[Node] = [_traffic, _people]
 	StreetSnow.mark(self, moving)
 	var from := _at(_left - FROM, _street, 0.0)
 	var to := _at(_left, _street, 0.0)
@@ -839,6 +845,11 @@ func _build_snow() -> void:
 	var from := _at(_left - FROM, _street, 0.0)
 	var to := _at(_left, _street, 0.0)
 	_snow.build(from.x, to.x, from.y, NEAR_Z, FACADE_Z - SETBACK, _time)
+
+
+## Прохожие на тротуаре — для теста.
+func people() -> StreetPeople:
+	return _people
 
 
 ## Снег над улицей — для теста; null, если снега нет.

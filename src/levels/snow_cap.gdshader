@@ -9,6 +9,8 @@ render_mode blend_mix, depth_draw_never, specular_disabled;
 uniform vec3 colour : source_color = vec3(0.84, 0.87, 0.92);
 // С какого наклона грань уже под снегом: 1 — только горизонталь.
 uniform float threshold = 0.62;
+// Сколько снега лежит: 1 — шапка, меньше — налёт, сквозь который видно своё.
+uniform float amount = 1.0;
 
 varying vec3 world_normal;
 varying vec3 local_at;
@@ -29,5 +31,5 @@ void fragment() {
 	cover *= mix(0.65, 1.0, grain);
 	ALBEDO = colour;
 	ROUGHNESS = 0.85;
-	ALPHA = cover * 0.95;
+	ALPHA = cover * 0.95 * amount;
 }

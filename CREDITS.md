@@ -17,7 +17,8 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 
 | Что | Автор | Лицензия | Источник |
 |---|---|---|---|
-| Ultimate Modular Men Pack (Otto, агенты, пилот вертолёта) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/ultimatemodularcharacters.html) |
+| Ultimate Modular Men Pack (Otto, агенты, пилот вертолёта, прохожие) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/ultimatemodularcharacters.html) |
+| Ultimate Modular Women Pack (прохожие) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/ultimatemodularwomen.html) |
 | Cars Pack (машины у выхода) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/cars.html) |
 | Universal Animation Library (движение Otto и агентов) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/universalanimationlibrary.html) |
 

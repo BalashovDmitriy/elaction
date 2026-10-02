@@ -94,10 +94,12 @@ static func build(choice: Choice = Choice.new()) -> Node3D:
 
 
 ## Снег на кузове ([code]snow_cap.gdshader[/code]) — накладным материалом на
-## все его части, поверх своей краски (ADR-0054).
-static func snow_on(car: Node3D) -> void:
+## все его части, поверх своей краски (ADR-0054). [param amount] — сколько
+## снега: 1 — шапка, меньше — налёт.
+static func snow_on(car: Node3D, amount: float = 1.0) -> void:
 	var cap := ShaderMaterial.new()
 	cap.shader = SNOW_CAP
+	cap.set_shader_parameter("amount", amount)
 	for node in car.find_children("*", "MeshInstance3D", true, false):
 		(node as MeshInstance3D).material_overlay = cap
 
