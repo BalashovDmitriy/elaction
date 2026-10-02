@@ -69,6 +69,8 @@ func _combo(time: int, weather: int) -> void:
 		await _shoot_floor("%s_roof" % tag, BuildingRules.ROOF)
 	if _only == "walk":
 		await _shoot_walk("%s_walk" % tag)
+	if _only == "people":
+		await _shoot_people(tag)
 	if _only == "" or _only == "floor":
 		await _shoot_floor("%s_floor" % tag, 2)
 	if _only == "" or _only == "garage":
@@ -140,6 +142,32 @@ func _shoot_street(label: String) -> void:
 	var point := WorldSpace.to_scene(Vector2(left - 9.0, street - 4.5))
 	camera.snap_to(Vector2(point.x, point.y))
 	await _shoot(label)
+	camera.follow(_level.otto)
+
+
+## Прохожие у выезда крупно (M24l, ADR-0054, решение 11): камера наезжает на
+## каждого из первых трёх и ведёт его, пока кадр встаёт, — видно, во что одет и
+## как несёт зонт. Только по флагу [code]--only=people[/code].
+func _shoot_people(tag: String) -> void:
+	await _shoot_street("%s_street" % tag)
+	var camera := get_viewport().get_camera_3d() as SideCamera
+	var people := _level.find_child("People", true, false) as StreetPeople
+	if camera == null or people == null:
+		return
+	camera.follow(null)
+	for index in mini(people.get_child_count(), 3):
+		var walker := people.get_child(index) as Node3D
+		for _frame: int in SETTLE_FRAMES:
+			var at := walker.global_position
+			var centre := Vector2(at.x, at.y + 1.0)
+			camera.apply_bounds(Rect2(-1000.0, -1000.0, 4000.0, 4000.0), false)
+			camera.snap_to(centre)
+			camera.close_up(1.0, centre)
+			await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		var image := get_viewport().get_texture().get_image()
+		image.save_png("%s/%s_person%d.png" % [_folder, tag, index])
+	camera.close_up(0.0, Vector2.ZERO)
 	camera.follow(_level.otto)
 
 

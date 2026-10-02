@@ -67,16 +67,58 @@ func test_walkers_dress_for_the_weather() -> void:
 	assert_eq(Passerby.dress_for(Weather.Kind.RAIN), Passerby.Dress.WET)
 	assert_eq(Passerby.dress_for(Weather.Kind.CLEAR), Passerby.Dress.LIGHT)
 	var cold := _street(Weather.Kind.SNOW).people()
-	for walker in cold.get_children():
-		assert_eq(
-			walker.find_children("Coat", "BoneAttachment3D", true, false).size(),
-			1,
-			"в снег без пальто"
-		)
 	var knits := cold.find_children("Hat", "BoneAttachment3D", true, false).size()
 	knits += cold.find_children("Scarf", "BoneAttachment3D", true, false).size()
 	assert_gt(knits, 0, "в снег ни шапки, ни шарфа")
-	var light := _street(Weather.Kind.CLEAR).people()
-	assert_eq(
-		light.find_children("Coat", "BoneAttachment3D", true, false).size(), 0, "в ясную в пальто"
-	)
+
+
+## В снег под зонтами не ходят: зонты — только в дождь.
+func test_no_umbrellas_in_the_snow() -> void:
+	var snowy := _street(Weather.Kind.SNOW).people()
+	assert_eq(snowy.find_children("Umbrella", "Node3D", true, false).size(), 0, "зонт в снег")
+
+
+## Ревизия по всем шестнадцати сочетаниям времени и погоды (просьба
+## пользователя): кроме ясных утра и дня, открыта только голова — у каждого
+## прохожего кожа корпуса, ног и ступней одета.
+func test_no_bare_skin_unless_its_light_weather() -> void:
+	for time: int in TimeOfDay.Kind.size():
+		for weather: int in Weather.Kind.size():
+			var dress := Passerby.dress_for(weather as Weather.Kind, time as TimeOfDay.Kind)
+			var street := _street(weather as Weather.Kind, time as TimeOfDay.Kind)
+			for walker in street.people().get_children():
+				var bare := _bare_parts(walker)
+				if dress == Passerby.Dress.LIGHT:
+					continue
+				assert_true(
+					bare.is_empty(),
+					"время %d, погода %d: открыто %s" % [time, weather, ", ".join(bare)]
+				)
+			street.queue_free()
+	assert_eq(Passerby.dress_for(Weather.Kind.CLEAR, TimeOfDay.Kind.DAY), Passerby.Dress.LIGHT)
+	assert_eq(Passerby.dress_for(Weather.Kind.CLEAR, TimeOfDay.Kind.NIGHT), Passerby.Dress.MILD)
+	assert_eq(Passerby.dress_for(Weather.Kind.FOG, TimeOfDay.Kind.DAY), Passerby.Dress.MILD)
+
+
+## Части тела, где под одеждой видна кожа — цвет из тонов кожи.
+func _bare_parts(walker: Node) -> PackedStringArray:
+	var found := PackedStringArray()
+	for node in walker.find_children("*", "MeshInstance3D", true, false):
+		var shape := node as MeshInstance3D
+		if shape.name.ends_with("_Head") or shape.mesh == null:
+			continue
+		for surface in shape.mesh.get_surface_count():
+			var source := shape.mesh.surface_get_material(surface)
+			if source == null or not source.resource_name.begins_with("Skin"):
+				continue
+			var look := shape.get_surface_override_material(surface) as BaseMaterial3D
+			for tone in Passerby.SKINS:
+				if (
+					look != null
+					and (
+						look.albedo_color.is_equal_approx(tone)
+						or look.albedo_color.is_equal_approx(tone * 0.85)
+					)
+				):
+					found.append(shape.name)
+	return found

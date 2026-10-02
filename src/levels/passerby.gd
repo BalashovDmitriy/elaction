@@ -7,9 +7,12 @@ extends RefCounted
 ## Поверх — свой цвет одежды, волос и кожи и свой рост: толпа из одних и тех же
 ## восьми моделей читалась бы клонами.
 
-## Как одет прохожий по погоде: налегке, от дождя или от холода
-## ([method dress_for]).
-enum Dress { LIGHT, WET, COLD }
+## Как одет прохожий ([method dress_for]; ADR-0054, решение 11):
+## [code]LIGHT[/code] — налегке, ясным утром и днём; [code]MILD[/code] — в куртке,
+## в туман и ясным вечером и ночью; [code]WET[/code] — от дождя;
+## [code]COLD[/code] — от холода, в снег. Кроме налегке, открыто только лицо:
+## руки в рукавах и перчатках, ноги в брюках, на ногах ботинки.
+enum Dress { LIGHT, MILD, WET, COLD }
 
 const MEN: Array[PackedScene] = [
 	preload("res://assets/models/people/men_casual_2.glb"),
@@ -23,8 +26,8 @@ const WOMEN: Array[PackedScene] = [
 	preload("res://assets/models/people/women_suit.glb"),
 	preload("res://assets/models/people/women_worker.glb"),
 ]
-## Кто одет по непогоде — номера в [constant MEN] и [constant WOMEN]: в дождь
-## и снег платьев, шорт и футболок на улице нет.
+## Кто одет не налегке — номера в [constant MEN] и [constant WOMEN]: в
+## прохладу, дождь и снег платьев, шорт и футболок на улице нет.
 const MEN_COATED: Array[int] = [1, 2, 3]
 const WOMEN_COATED: Array[int] = [2, 3]
 
@@ -64,6 +67,18 @@ const CLOTHES: Array[Color] = [
 	Color(0.3, 0.2, 0.13),
 	Color(0.1, 0.24, 0.18)
 ]
+## Рукава и перчатки там, где налегке голая рука, — без цветов кожи:
+## коричневый и бежевый рукав читался голой рукой.
+const SLEEVES: Array[Color] = [
+	Color(0.1, 0.13, 0.24),
+	Color(0.17, 0.18, 0.2),
+	Color(0.05, 0.05, 0.06),
+	Color(0.3, 0.32, 0.18),
+	Color(0.36, 0.08, 0.1),
+	Color(0.22, 0.32, 0.48),
+	Color(0.45, 0.46, 0.48),
+	Color(0.1, 0.24, 0.18)
+]
 ## Пальто и плащи: тёмные зимние и цветные дождевые.
 const COATS: Array[Color] = [
 	Color(0.08, 0.08, 0.1),
@@ -89,15 +104,25 @@ const COLD_COAT: float = 1.0
 const COLD_HAT: float = 0.65
 const COLD_SCARF: float = 0.7
 const WET_COAT: float = 0.85
-## Размеры в осях модели пака (она ростом 1.85): полы пальто — от бёдер до
-## колена, шапка — на макушке, шарф — на шее.
-const COAT_HEM := Vector3(0.2, 0.27, 0.52)
-const COAT_DROP: float = -0.27
-const HAT := Vector2(0.2, 0.15)
-const SCARF := Vector2(0.075, 0.14)
-## Материалы корпуса, что под пальто не перекрашиваются: воротник рубашки и
-## галстук видны из-за отворотов.
-const UNDER_COAT: Array[String] = ["White", "Tie"]
+## Размеры в осях модели пака (она ростом 1.85): шапка — вязаная, по голове
+## — радиус, высота и подъём над костью головы; шарф — внутренний и внешний
+## радиус и подъём над костью шеи. Полы пальто деталью на кости не делаются:
+## жёсткий подол на бёдрах при шаге читался сумкой (кадры M24l) — пальто это
+## корпус в его цвете, рукава до перчаток и тёмные брюки.
+const HAT := Vector3(0.172, 0.14, 0.165)
+## Отворот шапки: толщина кольца.
+const HAT_CUFF: float = 0.035
+const SCARF := Vector3(0.055, 0.1, 0.0)
+## Что под пальто видно из-за отворотов: галстук. Остальной корпус — в цвет
+## пальто: светлая футболка под ним читалась бы голой грудью.
+const UNDER_COAT: Array[String] = ["Tie"]
+## Чем закрыто то, что налегке открыто: брюки или колготки, ботинки.
+const LEGWEAR: Array[Color] = [
+	Color(0.07, 0.07, 0.08), Color(0.13, 0.14, 0.18), Color(0.22, 0.2, 0.18), Color(0.1, 0.12, 0.2)
+]
+const BOOTS: Array[Color] = [
+	Color(0.05, 0.04, 0.04), Color(0.2, 0.12, 0.07), Color(0.12, 0.12, 0.13)
+]
 
 ## Головы, которых прохожему не надо: у рабочих — каска.
 const HELMET_HEADS: Array[String] = ["Worker"]
@@ -108,23 +133,26 @@ const HEIGHT_SPREAD: float = 0.05
 static var _donors: Dictionary = {}
 
 
-## Во что одеты на улице в погоду [param weather]: в снег — от холода, в
-## дождь — от дождя, иначе налегке.
-static func dress_for(weather: Weather.Kind) -> Dress:
+## Во что одеты на улице в погоду [param weather] во время суток [param time]:
+## в снег — от холода, в дождь — от дождя, в туман и ясными вечером и ночью —
+## в куртках, ясными утром и днём — налегке.
+static func dress_for(weather: Weather.Kind, time: TimeOfDay.Kind = TimeOfDay.Kind.DAY) -> Dress:
 	if Weather.is_snowing(weather):
 		return Dress.COLD
 	if Weather.is_raining(weather):
 		return Dress.WET
+	if weather == Weather.Kind.FOG or not TimeOfDay.is_daytime(time):
+		return Dress.MILD
 	return Dress.LIGHT
 
 
 ## Собирает прохожего ростом около [param height], одетого по [param dress].
 static func make(rng: RandomNumberGenerator, height: float, dress: Dress) -> Node3D:
-	var wet := dress != Dress.LIGHT
+	var covered := dress != Dress.LIGHT
 	var woman := rng.randf() < 0.5
 	var pool := WOMEN if woman else MEN
 	var allowed: Array[int] = []
-	if wet:
+	if covered:
 		allowed = WOMEN_COATED if woman else MEN_COATED
 	else:
 		for index in pool.size():
@@ -132,13 +160,18 @@ static func make(rng: RandomNumberGenerator, height: float, dress: Dress) -> Nod
 	var base := pool[allowed[rng.randi_range(0, allowed.size() - 1)]].instantiate() as Node3D
 	for part in PARTS:
 		var donor := _part_of(pool[allowed[rng.randi_range(0, allowed.size() - 1)]], part)
+		# Не налегке ноги — только в брюках: шорты и юбка с голыми ногами под
+		# тёмным «колготками» читались пятнами (кадры M24l).
+		if part == "Legs" and covered and donor != null and _bare(donor):
+			donor = _covered_legs(pool, rng)
 		if part == "Head" and donor != null and _helmeted(donor):
 			donor = _part_of(pool[_bare_head(pool, rng)], part)
 		var mine := _find_part(base, part)
 		if donor != null and mine != null:
 			mine.mesh = donor.mesh
 			mine.skin = donor.skin
-	_recolour(base, rng)
+	var coat := _coat_for(rng, dress)
+	_recolour(base, rng, dress, coat)
 	_wrap_up(base, rng, dress)
 	var tall := _height_of(base)
 	if tall > 0.0:
@@ -162,6 +195,25 @@ static func _find_part(model: Node, part: String) -> MeshInstance3D:
 	return null
 
 
+## Есть ли у части открытая кожа.
+static func _bare(part: MeshInstance3D) -> bool:
+	for surface in part.mesh.get_surface_count():
+		var look := part.mesh.surface_get_material(surface)
+		if look != null and look.resource_name.begins_with("Skin"):
+			return true
+	return false
+
+
+## Ноги в брюках — от любой модели [param pool], у которой они такие.
+static func _covered_legs(pool: Array[PackedScene], rng: RandomNumberGenerator) -> MeshInstance3D:
+	var dressed: Array[MeshInstance3D] = []
+	for scene in pool:
+		var legs := _part_of(scene, "Legs")
+		if legs != null and not _bare(legs):
+			dressed.append(legs)
+	return dressed[rng.randi_range(0, dressed.size() - 1)] if not dressed.is_empty() else null
+
+
 ## Голова в каске: её меш назван по модели рабочего.
 static func _helmeted(head: MeshInstance3D) -> bool:
 	return HELMET_HEADS.any(func(word: String) -> bool: return head.name.begins_with(word))
@@ -177,68 +229,95 @@ static func _bare_head(pool: Array[PackedScene], rng: RandomNumberGenerator) -> 
 	return bare[rng.randi_range(0, bare.size() - 1)] if not bare.is_empty() else 0
 
 
+## Пальто по погоде: в холод — у всех, тёмное; в дождь — плащ у большинства;
+## [code]Color(0, 0, 0, 0)[/code] — без пальто.
+static func _coat_for(rng: RandomNumberGenerator, dress: Dress) -> Color:
+	if dress == Dress.COLD and rng.randf() < COLD_COAT:
+		return COATS[rng.randi_range(0, COATS.size() - 1)]
+	if dress == Dress.WET and rng.randf() < WET_COAT:
+		return RAINCOATS[rng.randi_range(0, RAINCOATS.size() - 1)]
+	return Color(0.0, 0.0, 0.0, 0.0)
+
+
 ## Одежда — из палитры горожанина, свой цвет на каждую вещь; волосы — всё на
-## голове, кроме кожи, глаз и бровей; кожа — из тонов.
-static func _recolour(model: Node3D, rng: RandomNumberGenerator) -> void:
+## голове, кроме кожи, глаз и бровей; кожа — из тонов. Не налегке открыто
+## только лицо: кожа корпуса — рукава и перчатки в цвет пальто или куртки,
+## кожа ног — брюки, ступней — ботинки. Под пальто весь корпус — в его цвет.
+static func _recolour(model: Node3D, rng: RandomNumberGenerator, dress: Dress, coat: Color) -> void:
 	var skin := SKINS[rng.randi_range(0, SKINS.size() - 1)]
 	var hair := HAIRS[rng.randi_range(0, HAIRS.size() - 1)]
+	var jacket := coat if coat.a > 0.0 else SLEEVES[rng.randi_range(0, SLEEVES.size() - 1)]
+	var legwear := LEGWEAR[rng.randi_range(0, LEGWEAR.size() - 1)]
+	var boots := BOOTS[rng.randi_range(0, BOOTS.size() - 1)]
+	var covered := dress != Dress.LIGHT
 	var outfit: Dictionary = {}
 	for node in model.find_children("*", "MeshInstance3D", true, false):
 		var shape := node as MeshInstance3D
-		var on_head := shape.name.ends_with("_Head")
+		var part := _part_name(shape)
 		for surface in shape.mesh.get_surface_count():
 			var source := shape.mesh.surface_get_material(surface) as BaseMaterial3D
 			if source == null:
 				continue
 			var name := source.resource_name
 			var look := source.duplicate() as BaseMaterial3D
-			if name.begins_with("Skin"):
+			var bare := name.begins_with("Skin")
+			if part == "Head":
+				if name == "Eye":
+					continue
+				look.albedo_color = skin if bare else hair
+			elif bare and covered:
+				look.albedo_color = {"Body": jacket, "Legs": legwear}.get(part, boots)
+			elif bare:
 				look.albedo_color = skin * (0.85 if name != "Skin" else 1.0)
-			elif name == "Eye":
-				continue
-			elif name.begins_with("Hair") or name == "Eyebrows" or name == "Moustache" or on_head:
-				look.albedo_color = hair
+			elif part == "Body" and covered and not UNDER_COAT.has(name) and name != "White":
+				# Верх и рукава — одна вещь: пальто, а без него — кофта с длинным
+				# рукавом. Рукава другого цвета читались пришитыми руками.
+				look.albedo_color = jacket
+			elif part == "Feet" and covered:
+				look.albedo_color = boots
 			else:
-				if not outfit.has(name):
-					outfit[name] = CLOTHES[rng.randi_range(0, CLOTHES.size() - 1)]
-				look.albedo_color = outfit[name]
+				# Одна вещь — один цвет: у рабочих брюк наколенники и у жилета
+				# вставки своим материалом, и пёстрые они читались пятнами.
+				var piece := name if name == "White" or name == "Tie" else part
+				if not outfit.has(piece):
+					outfit[piece] = CLOTHES[rng.randi_range(0, CLOTHES.size() - 1)]
+				look.albedo_color = outfit[piece]
 			shape.set_surface_override_material(surface, look)
 
 
-## Одевает по погоде: пальто с полами до колен, шапка и шарф — деталями на
-## костях скелета, корпус под пальто — в цвет пальто.
+## Часть модели, которой принадлежит меш: Head, Body, Legs, Feet или пусто.
+static func _part_name(shape: MeshInstance3D) -> String:
+	for part in PARTS:
+		if shape.name.ends_with("_" + part):
+			return part
+	return ""
+
+
+## Одевает по погоде: шапка и шарф — деталями на костях скелета.
 static func _wrap_up(model: Node3D, rng: RandomNumberGenerator, dress: Dress) -> void:
-	if dress == Dress.LIGHT:
-		return
 	var skeleton := model.find_child("Skeleton3D", true, false) as Skeleton3D
 	if skeleton == null:
 		return
 	var cold := dress == Dress.COLD
-	if rng.randf() < (COLD_COAT if cold else WET_COAT):
-		var tones := COATS if cold else RAINCOATS
-		var coat := tones[rng.randi_range(0, tones.size() - 1)]
-		_coat_the_body(model, coat)
-		var hem := CylinderMesh.new()
-		hem.top_radius = COAT_HEM.x
-		hem.bottom_radius = COAT_HEM.y
-		hem.height = COAT_HEM.z
-		hem.radial_segments = 12
-		hem.cap_top = false
-		hem.cap_bottom = false
-		_wear(skeleton, "Hips", hem, coat, Vector3(0.0, COAT_DROP, 0.0), "Coat")
 	if cold and rng.randf() < COLD_HAT:
+		# Вязаная шапка: купол по ширине причёски от лба вверх и отворот
+		# кольцом. Шаром по голове она сползала на глаза повязкой (кадры M24l).
 		var hat := SphereMesh.new()
 		hat.radius = HAT.x
-		hat.height = HAT.x
+		hat.height = HAT.y
 		hat.is_hemisphere = true
 		var knit := KNITS[rng.randi_range(0, KNITS.size() - 1)]
-		_wear(skeleton, "Head", hat, knit, Vector3(0.0, HAT.y, 0.0), "Hat")
+		_wear(skeleton, "Head", hat, knit, Vector3(0.0, HAT.z, 0.0), "Hat")
+		var cuff := TorusMesh.new()
+		cuff.inner_radius = HAT.x - HAT_CUFF
+		cuff.outer_radius = HAT.x + HAT_CUFF * 0.3
+		_wear(skeleton, "Head", cuff, knit.darkened(0.15), Vector3(0.0, HAT.z, 0.0), "HatCuff")
 	if cold and rng.randf() < COLD_SCARF:
 		var scarf := TorusMesh.new()
 		scarf.inner_radius = SCARF.x
 		scarf.outer_radius = SCARF.y
 		var wool := KNITS[rng.randi_range(0, KNITS.size() - 1)]
-		_wear(skeleton, "Neck", scarf, wool, Vector3.ZERO, "Scarf")
+		_wear(skeleton, "Neck", scarf, wool, Vector3(0.0, SCARF.z, 0.0), "Scarf")
 
 
 ## Деталь одежды [param mesh] цвета [param tone] на кости [param bone]: едет
@@ -263,23 +342,6 @@ static func _wear(
 	piece.mesh = mesh
 	piece.position = offset
 	holder.add_child(piece)
-
-
-## Корпус под пальто — в цвет пальто, кроме воротника и галстука.
-static func _coat_the_body(model: Node3D, coat: Color) -> void:
-	for node in model.find_children("*", "MeshInstance3D", true, false):
-		var shape := node as MeshInstance3D
-		if not shape.name.ends_with("_Body"):
-			continue
-		for surface in shape.mesh.get_surface_count():
-			var source := shape.mesh.surface_get_material(surface) as BaseMaterial3D
-			if source == null or source.resource_name.begins_with("Skin"):
-				continue
-			if UNDER_COAT.has(source.resource_name):
-				continue
-			var look := shape.get_surface_override_material(surface) as BaseMaterial3D
-			if look != null:
-				look.albedo_color = coat
 
 
 ## Рост модели по её видимому, м.

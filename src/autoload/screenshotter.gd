@@ -400,6 +400,21 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "floor", "actions": [], "hold": 0.6},
 		{"label": "walking_on", "actions": ["move_right"], "hold": 1.6},
 	],
+	# M24l: снег. Маршрут M24j — первое здание партии в погоду своего сида;
+	# снег во все времена суток, улица с прохожими и следы — tools/m24j_shot.tscn
+	# с --weather=3 (--only=walk — цепочка следов).
+	"M24L":
+	[
+		{"label": "rope", "actions": [], "hold": 0.4},
+		{"label": "roof", "actions": [], "hold": 1.2},
+		{"label": "roof_walk", "actions": ["move_right"], "hold": 2.5},
+		{"label": "to_the_shaft", "actions": ["move_right"], "hold": 2.9},
+		{"label": "riding_down", "actions": ["move_down"], "hold": 1.4},
+		{"label": "stopped", "actions": [], "hold": 1.6},
+		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
+		{"label": "floor", "actions": [], "hold": 0.6},
+		{"label": "walking_on", "actions": ["move_right"], "hold": 1.6},
+	],
 	"M19":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},

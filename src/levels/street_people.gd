@@ -3,17 +3,13 @@ extends Node3D
 
 ## Прохожие у выезда (ADR-0054, решение 3): горожане из паков Quaternius идут
 ## по дальнему тротуару в обе стороны и уходят за край улицы, а оттуда
-## приходят другие. Днём их больше, ночью — единицы; в дождь и снег у
-## большинства зонт, в снег на зонте снег. Капли и хлопья гаснут о них
+## приходят другие. Днём их больше, ночью — единицы; в дождь у большинства
+## зонт, в снег — шапки и шарфы, без зонтов. Капли и хлопья гаснут о них
 ## ([Shelter]), а не идут насквозь.
 ##
 ## Прохожий — собран из частей моделей пака ([Passerby]) и идёт их же
 ## ходьбой: шаг подогнан к скорости, и ноги не скользят. Механики у прохожих
 ## нет: в игру они не вмешиваются.
-
-## Снег на зонте — налёт, а не шапка: купол пологий, и шапкой он был бы
-## белым целиком.
-const UMBRELLA_SNOW: float = 0.2
 
 ## Сколько прохожих на улице по времени суток: утро, день, вечер, ночь.
 const COUNT: Array[int] = [4, 7, 5, 2]
@@ -26,11 +22,13 @@ const SPEED := Vector2(1.05, 1.45)
 const CLIP_SPEED: float = 1.05
 ## Рост прохожего — как у Otto: улица в том же масштабе.
 const HEIGHT: float = Proportions.BODY
-## Какая доля прохожих в непогоду идёт под зонтом.
+## Какая доля прохожих в дождь идёт под зонтом.
 const UMBRELLA_SHARE: float = 0.7
-## Зонт: радиус и высота купола, длина ручки, м; цвета куполов.
+## Зонт: радиус и высота купола, длина трости от кисти, м; цвета куполов.
 const CANOPY := Vector2(0.5, 0.26)
-const SHAFT: float = 0.8
+const SHAFT: float = 0.82
+## На сколько основание купола выше кисти, м: кисть у груди, купол над головой.
+const ABOVE_HAND: float = 0.62
 const CANOPY_TONES: Array[Color] = [
 	Color(0.06, 0.06, 0.07), Color(0.32, 0.05, 0.06), Color(0.08, 0.12, 0.22), Color(0.2, 0.2, 0.22)
 ]
@@ -66,13 +64,14 @@ func build(
 	name = "People"
 	_span = Vector2(from - BEYOND, to + BEYOND)
 	_rng.seed = hash([building_seed, "people"])
-	var wet := Weather.is_raining(weather) or Weather.is_snowing(weather)
-	_dress = Passerby.dress_for(weather)
+	# Зонты — только в дождь: в снег под зонтом не ходят (просьба пользователя).
+	var rainy := Weather.is_raining(weather)
+	_dress = Passerby.dress_for(weather, time)
 	for index in COUNT[time]:
 		var walker := Walker.new()
 		var leftward := index % 2 == 0
 		walker.speed = _rng.randf_range(SPEED.x, SPEED.y) * (-1.0 if leftward else 1.0)
-		walker.node = _person(wet and _rng.randf() < UMBRELLA_SHARE, Weather.is_snowing(weather))
+		walker.node = _person(rainy and _rng.randf() < UMBRELLA_SHARE, leftward)
 		walker.node.position = Vector3(
 			_rng.randf_range(_span.x, _span.y), walk, LANES.x if leftward else LANES.y
 		)
@@ -109,22 +108,30 @@ func _process(delta: float) -> void:
 
 ## Прохожий: собран из частей пака ростом с Otto, одет по погоде, под зонтом
 ## или без.
-func _person(umbrella: bool, snowy: bool) -> Node3D:
+func _person(umbrella: bool, leftward: bool) -> Node3D:
 	var root := Node3D.new()
 	root.name = "Walker"
 	var model := Passerby.make(_rng, HEIGHT, _dress)
 	root.add_child(model)
 	var cover := Vector3(Proportions.BODY_WIDTH, HEIGHT, WorldSpace.BODY_DEPTH)
 	if umbrella:
-		var canopy := _umbrella(snowy)
+		var canopy := _umbrella()
 		root.add_child(canopy)
+		# Зонт в руке: кисть держит ручку, зонт идёт за кистью ([UmbrellaGrip]).
+		var grip := UmbrellaGrip.new()
+		grip.name = "Grip"
+		grip.umbrella = canopy
+		grip.forward = Vector3.LEFT if leftward else Vector3.RIGHT
+		# Ближняя к камере рука: идущему налево — левая, направо — правая.
+		grip.side = "L" if leftward else "R"
+		(model.find_child("Skeleton3D", true, false) as Skeleton3D).add_child(grip)
 		cover = Vector3(CANOPY.x * 2.0, HEIGHT + CANOPY.y + 0.1, CANOPY.x * 2.0)
 	Shelter.over(root, cover)
 	return root
 
 
-## Зонт над головой: купол и ручка, в руке у плеча. В снег на куполе снег.
-func _umbrella(snowy: bool) -> Node3D:
+## Зонт в дождь: начало — ручка в кисти, над ней трость и купол над головой.
+func _umbrella() -> Node3D:
 	var umbrella := Node3D.new()
 	umbrella.name = "Umbrella"
 	var look := StandardMaterial3D.new()
@@ -137,13 +144,14 @@ func _umbrella(snowy: bool) -> Node3D:
 	dome.radius = CANOPY.x
 	dome.height = CANOPY.y * 2.0
 	dome.is_hemisphere = true
-	dome.radial_segments = 12
-	dome.rings = 4
+	dome.radial_segments = 28
+	dome.rings = 10
 	dome.material = look
 	var canopy := MeshInstance3D.new()
 	canopy.name = "Canopy"
 	canopy.mesh = dome
-	canopy.position = Vector3(0.0, HEIGHT - 0.12, 0.0)
+	canopy.position = Vector3(0.0, ABOVE_HAND, 0.0)
+	canopy.scale = Vector3(1.0, 0.75, 1.0)
 	umbrella.add_child(canopy)
 	var stick := CylinderMesh.new()
 	stick.top_radius = 0.012
@@ -153,8 +161,6 @@ func _umbrella(snowy: bool) -> Node3D:
 	var pole := MeshInstance3D.new()
 	pole.name = "Pole"
 	pole.mesh = stick
-	pole.position = Vector3(0.0, HEIGHT - 0.12 - SHAFT * 0.5, 0.12)
+	pole.position = Vector3(0.0, SHAFT * 0.5, 0.0)
 	umbrella.add_child(pole)
-	if snowy:
-		CarModel.snow_on(umbrella, UMBRELLA_SNOW)
 	return umbrella
