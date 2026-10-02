@@ -139,6 +139,16 @@ const LASER_SLACK: float = 0.1
 ## ([member ElevatorMotion.settle_distance]).
 const SETTLE_BY_ITSELF: float = 0.3
 
+## Сбивает ли бот лампы. Лампу сбивают из кабины, как в аркаде
+## (`test_a_lamp_is_out_of_reach_from_the_floor`): ствол едущего Otto проходит
+## её высоту. До ADR-0053 бот ламп не трогал, и прогон не проверял ровно то,
+## ради чего заведена темнота, — что из тени Otto видно только вблизи
+## ([member BuildingRules.agent_dark_fire_range]). Выключается для замера
+## «без ламп» (`tools/playthrough.gd`, флаг [code]--no-lamps[/code]).
+var shoots_lamps: bool = true
+## Сколько раз бот стрелял по лампе: для замера.
+var lamp_shots: int = 0
+
 var _level: GreyboxLevel
 var _rules: BuildingRules
 var _otto: Otto
@@ -244,6 +254,36 @@ func step() -> void:
 	# Поэтому на ходу бот стреляет только вперёд: разворот спорил бы с шагом.
 	if threat != null and (aiming or is_equal_approx(_otto.facing(), _side_of(threat))):
 		_press(&"shoot")
+	elif shoots_lamps and _lamp_in_line() != null and _press(&"shoot"):
+		lamp_shots += 1
+		_decision = "сбиваю лампу"
+
+
+## Лампа, в которую уйдёт пуля, если выстрелить сейчас, или null: Otto едет в
+## кабине, ствол на высоте лампы, лампа перед ним, в поле боя и не за стеной.
+## Разворачиваться к лампе бот не станет — в кабине разворот это шаг, а шаг на
+## ходу уводит к борту; лампа на другой стороне достанется следующей поездке.
+##
+## Пока своя пуля в полёте, по лампе бот не стреляет: лампа висит, пока пуля не
+## долетела, и стреляй он каждый свободный кадр — высадил бы в неё все три пули
+## ([constant Gun.MAX_LIVE_BULLETS]) и встретил бы следующего агента без патрона.
+func _lamp_in_line() -> Lamp:
+	if not _otto.is_riding() or Bullet.any_in_flight(_otto.get_tree(), Bullet.FROM_OTTO):
+		return null
+	var muzzle := _otto.global_position.y + _otto.shot_height_standing
+	var reach := Proportions.LAMP.y * 0.5
+	var x := _otto.global_position.x
+	for lamp in _level.lamps():
+		var ahead := (lamp.global_position.x - x) * _otto.facing()
+		if ahead <= 0.0 or ahead > ENGAGE:
+			continue
+		if absf(lamp.global_position.y - muzzle) > reach:
+			continue
+		# Пуля за стену не уходит: такой выстрел — патрон в стену.
+		if _level.plan().wall_between(lamp.floor_index, x, lamp.global_position.x):
+			continue
+		return lamp
+	return null
 
 
 ## Пишет в журнал прогона решение бота, когда оно поменялось.
@@ -266,7 +306,9 @@ func _advance(floor_index: int) -> void:
 		_ride_on()
 		return
 	if _otto.is_riding() and not _car_aligned_under_otto():
-		# Кабина стоит между этажами — увёл её с линии огня. Довести до этажа.
+		# Кабина между этажами — увёл её с линии огня. Отпущенная, она и сама
+		# доедет до этажа по ходу (ADR-0053, решение 1), но бот ведёт её к
+		# ближнему: он бывает и позади.
 		var nearest := _rules.floor_surface(floor_index)
 		_decision = "довожу кабину до этажа %d" % floor_index
 		# Вблизи этажа кабина дотягивает сама, стоит только отпустить: держать

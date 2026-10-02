@@ -317,8 +317,11 @@ def passing(output: str) -> int:
     """Сколько тестов прошло по итогу GUT."""
     total = 0
     for line in output.splitlines():
-        if "Passing Tests" in line:
-            total += int(line.split()[-1])
+        # Когда не прошёл ни один, GUT пишет «none», а не 0: без проверки разбор
+        # ронял весь прогон, и список упавших до печати не доходил.
+        count = line.split()[-1] if "Passing Tests" in line else ""
+        if count.isdigit():
+            total += int(count)
     return total
 
 

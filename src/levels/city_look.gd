@@ -78,11 +78,13 @@ const STONE_TINTS: Array[Color] = [
 	Color(0.52, 0.5, 0.48),
 ]
 
-## Атлас фасадов: размер, пикселей на метр, ширина плитки и ряды, м
+## Атлас фасадов: размер, пикселей на метр, ширина плитки, поле по бокам столбца
+## стиля и ряды, м
 ## (`assets/textures/city/facade_layout.json`).
-const ATLAS_SIZE := Vector2(1536.0, 448.0)
+const ATLAS_SIZE := Vector2(1920.0, 448.0)
 const ATLAS_DENSITY: float = 64.0
 const TILE_WIDTH: float = 4.0
+const GUTTER: float = 0.5
 const ROW_TOP: float = 1.0
 const ROW_FLOOR: float = 3.0
 const ROW_GROUND: float = 3.0
@@ -97,6 +99,7 @@ static func building() -> ShaderMaterial:
 	look.set_shader_parameter("orm_atlas", ORM_ATLAS)
 	look.set_shader_parameter("styles", float(Style.size()))
 	look.set_shader_parameter("tile_width", TILE_WIDTH)
+	look.set_shader_parameter("gutter", GUTTER)
 	look.set_shader_parameter("top_height", ROW_TOP)
 	look.set_shader_parameter("floor_height", ROW_FLOOR)
 	look.set_shader_parameter("ground_height", ROW_GROUND)

@@ -52,7 +52,7 @@ func build(
 	building_seed: int,
 	building_identity: BuildingIdentity = BuildingIdentity.new()
 ) -> void:
-	weather = Weather.of_seed(building_seed)
+	weather = Weather.of_building(rules, building_seed)
 	identity = building_identity
 
 	_air = WorldEnvironment.new()

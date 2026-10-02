@@ -170,6 +170,11 @@ func hang(hang_height: float, headroom: float = 0.0) -> void:
 	_cord.add_child(canopy)
 
 
+## Висит ли лампа: не сбита. Сбитую боту целить незачем ([OttoBot]).
+func is_hanging() -> bool:
+	return not _fall.falling and not _fall.has_landed()
+
+
 ## Сбита выстрелом. Повторные попадания ничего не меняют, в том числе и по уже
 ## упавшей: [method queue_free] убирает её лишь в конце кадра, и до тех пор она
 ## продолжает ловить пули.

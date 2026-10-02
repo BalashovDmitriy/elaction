@@ -228,3 +228,26 @@ func test_no_mist_or_halos_when_dry() -> void:
 	assert_eq(level.find_children("Mist", "FogVolume", true, false).size(), 0, "дымка в сухую")
 	assert_eq(level.find_children("Halo", "MeshInstance3D", true, false).size(), 0, "ореол в сухую")
 	remove_child(level)
+
+
+## Поток от винта разносит дождь (ADR-0053): пока вертолёт висит низко, под
+## осью винта стоит отталкиватель частиц, а капли его слушают; ушёл вертолёт
+## вверх — поток стих.
+func test_the_rotor_wash_pushes_the_rain() -> void:
+	var wash := Downwash.new()
+	add_child_autofree(wash)
+	wash.deck = 10.0
+	wash.follow(3.0, 10.0 + 4.0, true)
+	var gust := wash.gust()
+	assert_lt(gust.strength, 0.0, "низко висит — поток гонит капли прочь")
+	assert_between(gust.global_position.y, 10.0, 14.0, "шар между настилом и винтом")
+	wash.follow(3.0, 10.0 + Downwash.DUST_REACH + 1.0, true)
+	assert_eq(gust.strength, 0.0, "высоко — потока нет")
+	wash.follow(3.0, 10.0 + 4.0, false)
+	assert_eq(gust.strength, 0.0, "не висит — потока нет")
+	var drops := RainLook.streaks(
+		10, 1.0, Vector3.ONE, Vector2(8.0, 10.0), 0.1, Vector2(0.01, 0.4), null
+	)
+	add_child_autofree(drops)
+	var process := drops.process_material as ParticleProcessMaterial
+	assert_true(process.attractor_interaction_enabled, "капли не слушают поток")

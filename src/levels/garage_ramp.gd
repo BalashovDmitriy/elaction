@@ -94,7 +94,7 @@ func build(rules: BuildingRules, building_seed: int = 1) -> void:
 	_street = _surface - rules.floor_height
 	_left = rules.floor_span(rules.floors - 1).x
 	_width = WorldSpace.CORRIDOR_DEPTH + 0.4
-	_weather = Weather.of_seed(building_seed)
+	_weather = Weather.of_building(rules, building_seed)
 	_street_node = ExitStreet.new()
 	add_child(_street_node)
 	_street_node.build(_left, _street, building_seed, _weather, rules.time_of_day)

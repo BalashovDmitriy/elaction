@@ -253,8 +253,12 @@ func test_an_agent_in_the_dark_still_sees_a_lit_otto() -> void:
 	# второе место могло попасть в ту же погашенную — тогда проверялось бы не то.
 	assert_false(level.is_dark_at(_floor(level), pair.y), "Otto стоит в освещённой зоне")
 	var agent := _agent_at(level, pair.x, signf(pair.y - pair.x))
-	var shots := await _shots_within(level, WATCH_FRAMES)
+	# Тень сверяется до дуэли, а не после: попавший агент убивает Otto, а
+	# вернувшийся по ROM Otto уводит с этажа всех живых агентов (ADR-0053,
+	# решение 2), и к концу наблюдения этого агента уже нет.
+	await wait_physics_frames(1)
 	assert_true(agent.is_in_the_dark(), "агент стоит в тени")
+	var shots := await _shots_within(level, WATCH_FRAMES)
 	assert_gt(shots, 0, "и всё равно видит освещённого Otto")
 	remove_child(level)
 

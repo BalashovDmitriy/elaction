@@ -174,9 +174,14 @@ table_50D8 row = pose(+0C, >=7 -> -3)*2 + facing: [height above feet, x offset L
 - same floor (@5D13): mode 0x0D, target x = 0x40 + random(0..15); when reached (|dx| < 3, @5411-5419) -> pause 7 ticks, new
   target. => agents do not chase Otto horizontally; they stroll and fire whenever facing him (and always when alerted).
 - random action/pause timer (@04E6-0528): 10 or 7 (+random) ticks between decisions, halved odds of long pause when alerted.
-- despawn (@041F-04E5): if an agent on the ground is on a floor other than the dense one and its screen feet are >= 0x50 px
-  (80 px, ~1.7 floors) from Otto's, and floor >= 8 and != 20, it gets mode 0x0C = walk to the nearest existing door and
-  re-enter it (@55B0: situation IN_ROOM) => agents left behind go back into doors.
+- despawn (@041F-04E5): an agent on the ground goes back into a door (mode 0x0C = walk to the nearest existing door and
+  re-enter it, @55B0: situation IN_ROOM) on either of two triggers, both only on floors >= 8 and != 20, x within $10..$DF (@0472):
+  - crowd (@041F-0432, @0458): c = the first of floors Otto-1, Otto, Otto+1 with >= 3 agents ($28 if none); an agent ON floor c
+    leaves. (Corrected 2026-10-02: the first reading said "a floor other than the dense one", which is the opposite.)
+  - left behind (@045E): its screen feet are >= 0x50 px (80 px, ~1.7 floors) below Otto's (agent +16 >= Otto +16, one direction).
+  => agents left behind and agents of an over-full floor go back into doors.
+- the nearest-door search splits the floor at the centre (@049F: cp $7B) and looks at the left or the right 4 slots only; floor 20's
+  wall stands at $AC, not at the centre, so an agent between $7B and $AC would be sent behind the wall => floor 20 is excluded.
 - walking speed 2 px/tick like Otto (Part 2). No "keep distance" logic found.
 
 ### Hitboxes and bullet hit (enemy_shot_collision_08F8)
@@ -255,3 +260,32 @@ Elevator record at $837D, 8 bytes: +00 cab floor height above the floor of store
 ### Empty shaft
 - walking into an opening without a cab: held at the edge; after 8 ticks of pushing (@301C, ~0.54 s) he drops
   (CS_FALLING, $C3) at 6 px/tick (@3BBB); landing on the bottom or on a cab roof kills ($C4) at any height.
+
+## Part 6 (2026-10-02: open questions after M24k)
+
+### Player cab after releasing up/down
+- input only sets the direction: @45C5-45D4 return without writing when nothing is pressed; @0F99-0FA5 resets every command
+  to $80 ("no move") each tick; @0EFD-0F0E copies a real command into elevator_directions_array_8081 and clears its pause.
+- @5DDB-5E48: while the pause is non-zero the speed is 0; with the pause at 0 the cab stops only when its floor height reaches
+  0 or $30 (@5E1E) => **no stop between floors**. Then pause $1E = 30 ticks (2.0 s; random 5..20 ticks for shafts 1, 2, 4, 5,
+  @5E3F) and it moves on by itself. Direction reverses at the range ends (@5E5A, @5E70).
+- agents in a cab: same entry (@45B4 -> @4674), their up/down input (+17) is cleared on boarding (@1AEA) => passive riders
+  (medium confidence).
+
+### Respawn after death
+- floor = max(5, floor of death) (@7633-763D); x = $67, or the red door x if that floor (< 31) still has an uncollected red
+  door (@2FAA-2FE7: 0x24 + 24*slot on floors >= 7, $1C / $D4 on floors 1-6).
+- all four enemy slots are cleared (@2F44-2F5F) and get spawn delays 10, 25, 40, 55 ticks (@2F61-2F6F; +10 must reach 0, @5A5E,
+  decremented @5B1C). Elevators are re-initialised (@7670 -> @2A68 -> @2C08). Building state (red doors, lamps) is kept.
+- **no invulnerability**: the hit test (@08F8) needs state 2 and not dying; no timer anywhere. Only DSW3 bit 6 (@08BB).
+
+### Spawn distance from Otto
+- must_spawn_enemy_5AAB-5ADB checks only the floor range, the floor-20 case, the red door and the door mask => **no distance
+  check**: a door next to Otto may open. Coming out takes ~9 ticks (skill >= 2) or ~17 (skill < 2) (@3C3E-3C8A).
+
+### Floor 20
+- door mask $66 = doors 1, 2, 5, 6; a wall at x $AC leaves door 6 ($B0) alone on the right, reached by escalator only.
+- @5ADF: floor 20 picked AND Otto on floor 20 AND Otto x >= $AE AND alarm (timer msb >= $10) => door 6 is forced (skips the
+  red-door and mask checks): during the alarm Otto cannot hide behind the wall.
+- agents route around the wall via the escalator x (@5BC6-5BEB); firing across it is blocked (@0590-05E0); door 5 comes out
+  facing left (@3DDC). One lamp only ($81E6 = 2), probably for the wall too (not verified).

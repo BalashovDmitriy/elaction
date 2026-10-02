@@ -3,9 +3,9 @@ extends GutTest
 ## Кабина, в которую вошли на ходу (ADR-0037, решение 1).
 ##
 ## Otto садится в кабину вровень с этажом или шагнув на её пол, пока она
-## подъезжает. Во втором случае он её ещё не вёл, и встать между этажами ей не
-## с чего: невровень с этажом из неё не выйти, и оба застыли бы навсегда. Работает
-## без сцены, как и [code]test_elevator_motion.gd[/code].
+## подъезжает. Между этажами кабина не встаёт ни так, ни так (ADR-0053,
+## решение 1): невровень с этажом из неё не выйти, и оба застыли бы навсегда.
+## Работает без сцены, как и [code]test_elevator_motion.gd[/code].
 
 const TOP: float = 0.0
 const MIDDLE: float = 100.0
@@ -38,21 +38,23 @@ func test_car_boarded_on_the_way_carries_on_to_its_floor() -> void:
 	assert_true(motion.is_aligned(), "доехала до этажа, куда шла")
 
 
-func test_car_boarded_on_the_way_obeys_and_then_stops_between_floors() -> void:
-	# Повёл — значит и остановил сам: дальше кабина снова встаёт по отпусканию.
+func test_car_boarded_on_the_way_obeys_and_then_runs_on_to_a_floor() -> void:
+	# Повёл и отпустил — кабина доезжает до этажа по ходу, а не встаёт.
 	var motion := _shaft(2)
 	_run(motion, 1.2, 0.0, false)
-	var stopped := _run(motion, 0.3, ElevatorMotion.UP, true)
-	assert_almost_eq(_run(motion, 1.0, 0.0, true), stopped, 0.01)
-	assert_false(motion.is_aligned(), "остановленная пассажиром — между этажами")
+	_run(motion, 0.3, ElevatorMotion.UP, true)
+	# Отпущена между дном и серединой на ходу вверх: доезжает до середины, а не
+	# возвращается на дно, с которого ушла.
+	assert_almost_eq(_run(motion, 2.0, 0.0, true), MIDDLE, 0.01, "доехала не до этажа по ходу")
+	assert_true(motion.is_aligned(), "отпущенная пассажиром — на этаже")
 
 
-func test_the_next_passenger_starts_unsteered() -> void:
-	# Пассажир повёл и вышел; следующий входит на ходу — кабина снова доезжает.
+func test_the_next_passenger_rides_on_to_a_floor() -> void:
+	# Пассажир повёл и вышел; следующий входит на ходу — кабина доезжает.
 	var motion := _shaft(2)
 	_run(motion, 0.6, ElevatorMotion.UP, true)
 	_run(motion, 0.8, 0.0, true)
 	_run(motion, 1.2, 0.0, false)
 	assert_false(motion.is_aligned(), "пустая кабина снова в пути")
 	_run(motion, 1.0, 0.0, true)
-	assert_true(motion.is_aligned(), "вошедший на ходу её не вёл — доехала")
+	assert_true(motion.is_aligned(), "вошедший на ходу — доехала")

@@ -9,7 +9,6 @@ const LAYOUT := "res://assets/textures/city/facade_layout.json"
 
 
 func after_all() -> void:
-	Weather.forced = -1
 	GameState.instance().reset()
 
 
@@ -86,6 +85,12 @@ func test_the_atlas_matches_its_build() -> void:
 		total += heights[index]
 	var albedo := load("res://assets/textures/city/facade_albedo.png") as Texture2D
 	assert_eq(float(albedo.get_width()), CityLook.ATLAS_SIZE.x, "ширина атласа")
+	# Столбец стиля — плитка и поля по бокам: без полей дальний мип смешивал
+	# соседние стили и рисовал черту каждые 4 м (авторевью M24j).
+	assert_eq(float(layout["gutter"]), CityLook.GUTTER, "поле столбца")
+	assert_gt(CityLook.GUTTER, 0.0, "атлас без полей")
+	var column := (CityLook.TILE_WIDTH + CityLook.GUTTER * 2.0) * CityLook.ATLAS_DENSITY
+	assert_eq(CityLook.ATLAS_SIZE.x, column * CityLook.Style.size(), "столбцы с полями")
 	assert_eq(float(albedo.get_height()), total * CityLook.ATLAS_DENSITY, "высота атласа")
 
 

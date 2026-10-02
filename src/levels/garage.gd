@@ -853,7 +853,7 @@ func _hang_signs() -> void:
 static func label(text: String, weight: int, height: float, color: Color) -> Label3D:
 	var painted := Label3D.new()
 	painted.text = text
-	painted.font = NeonStyle.font(weight)
+	painted.font = NeonStyle.scene_font(weight)
 	painted.font_size = 64
 	painted.pixel_size = height / 64.0
 	painted.modulate = color

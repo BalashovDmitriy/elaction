@@ -112,6 +112,45 @@ func test_the_parking_is_p_on_the_boards() -> void:
 	assert_eq(Garage.LEVEL_MARK, "P", "колонны паркинга — P-01, P-02…")
 
 
+## Всё, что табло пишет текстом, есть в шрифте игры: знак, которого в Exo 2 нет,
+## рисует системный запасной шрифт, а на машине без него — пустой квадрат. Так
+## было со стрелками ▲▼ до того, как их сделали геометрией.
+func test_every_board_label_is_in_the_game_font() -> void:
+	var font := NeonStyle.scene_font(700)
+	var rules := BuildingRules.new()
+	for index in range(BuildingRules.ROOF, rules.floors):
+		var label := BuildingShafts.floor_label(rules, index)
+		for at in label.length():
+			assert_true(
+				font.has_char(label.unicode_at(at)),
+				"этаж %d: знака «%s» нет в шрифте" % [index, label[at]]
+			)
+
+
+## Стрелка хода — треугольник рядом с цифрами: показан, пока кабина едет, остриём
+## туда, куда она едет; цифры при нём сдвигаются, текст табло — только этаж.
+func test_the_heading_arrow_is_geometry() -> void:
+	var level := _level()
+	var shafts := _shafts(level)
+	assert_not_null(shafts, "шахт нет")
+	if shafts == null:
+		return
+	var column := shafts._boards.values()[0] as Dictionary
+	var board := column.values()[0] as BuildingShafts.ShaftBoard
+	assert_not_null(board.arrow, "у табло нет стрелки")
+	shafts._show(board, "7", Intent.UP, 0.0)
+	assert_true(board.arrow.visible, "едет вверх — стрелка видна")
+	assert_almost_eq(board.arrow.rotation.z, 0.0, 0.001, "вверх — остриём вверх")
+	assert_eq(board.digits.text, "7", "в тексте только этаж")
+	assert_gt(board.digits.position.x, board.center.x, "цифры уступили место стрелке")
+	shafts._show(board, "7", Intent.DOWN, 0.0)
+	assert_almost_eq(board.arrow.rotation.z, PI, 0.001, "вниз — остриём вниз")
+	shafts._show(board, "7", 0.0, 0.0)
+	assert_false(board.arrow.visible, "стоит — стрелки нет")
+	assert_almost_eq(board.digits.position.x, board.center.x, 0.001, "цифры посередине")
+	remove_child(level)
+
+
 ## Панель кнопок не встаёт на наличник двери соседнего места и на её табличку —
 ## на любом здании. Проёма выхода в задней стене с M24b нет: выход — ворота
 ## паркинга в торце ([GarageGate]).
@@ -167,3 +206,13 @@ func test_the_sign_spells_the_building_and_hangs_outside() -> void:
 		for label in sign_board.find_children("*", "Label3D", true, false):
 			assert_gt((label as Node3D).global_position.x, outer, "буква внутри здания")
 		remove_child(level)
+
+
+## Надписи в сцене — с мипмапами, HUD и меню — без них (ADR-0053, решение 9):
+## дальняя табличка не мерцает, а текст интерфейса остаётся резким.
+func test_scene_text_has_mipmaps_and_the_hud_does_not() -> void:
+	var scene := NeonStyle.scene_font(700).base_font as FontFile
+	var hud := NeonStyle.font(700).base_font as FontFile
+	assert_true(scene.generate_mipmaps, "у надписей в сцене нет мипмапов")
+	assert_false(hud.generate_mipmaps, "мипмапы проросли в HUD")
+	assert_ne(scene, hud, "сцена и HUD делят один шрифт")

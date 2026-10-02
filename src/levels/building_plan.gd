@@ -292,9 +292,8 @@ func safe_x(rules: BuildingRules, floor_index: int) -> float:
 
 ## Все места уровня, где можно стоять, слева направо.
 ##
-## Нужны тому, кто выбирает между ними: возвращение в игру идёт не на первое
-## попавшееся, а на самое дальнее от живых агентов — иначе Otto воскресает под
-## тем же стволом, который его убил, и три жизни сгорают на одном месте.
+## Нужны тому, кто выбирает между ними: возвращение в игру встаёт на ближайшее
+## к точке ROM ([RespawnSpot]), а не на первое попавшееся.
 ##
 ## Массив двойной точности, а не одинарной: места сравниваются с координатами
 ## раскладки через [method @GlobalScope.is_equal_approx], и округление до float32
@@ -308,41 +307,6 @@ func safe_spots(rules: BuildingRules, floor_index: int) -> PackedFloat64Array:
 		if _is_clear(rules, floor_index, x):
 			spots.append(x)
 	return spots
-
-
-## Места из [param spots] того же куска этажа, на котором стоит [param from_x].
-##
-## Возвращаться Otto обязан на свою сторону: этаж режут проёмы и глухие стены
-## (ADR-0024, решение 5), и за стеной может не оказаться ни лифта, ни эскалатора.
-## Место выбирается по живым агентам, а самое дальнее от них — как раз за стеной:
-## без этого отбора Otto воскресал бы там, откуда не уйти, и умирал бы туда снова.
-##
-## Погибший в кабине стоит над проёмом шахты, ни в одном куске: тогда берётся
-## ближайший кусок с местами — с него в кабину садятся. Отдай тут всё, Otto
-## воскресал бы в кармане за эскалатором, откуда хода нет (перемер M18e).
-##
-## Здесь, а не в уровне: счёт — одна раскладка, и проверяется он без сцены.
-##
-## Мест нет ни в одном куске — отдаётся всё, что было: остаться вовсе без места
-## хуже, чем встать не на своей половине.
-func spots_on_the_same_piece(
-	rules: BuildingRules, floor_index: int, from_x: float, spots: PackedFloat64Array
-) -> PackedFloat64Array:
-	var pieces := spans_between(blocks_on(rules, floor_index), rules.floor_span(floor_index))
-	var best := PackedFloat64Array()
-	var best_gap := INF
-	for piece: Vector2 in pieces:
-		var same := PackedFloat64Array()
-		for x: float in spots:
-			if x >= piece.x and x <= piece.y:
-				same.append(x)
-		if same.is_empty():
-			continue
-		var gap := maxf(maxf(piece.x - from_x, from_x - piece.y), 0.0)
-		if gap < best_gap:
-			best_gap = gap
-			best = same
-	return spots if best.is_empty() else best
 
 
 func _is_clear(rules: BuildingRules, floor_index: int, x: float) -> bool:

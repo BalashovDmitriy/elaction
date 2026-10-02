@@ -18,7 +18,6 @@ func before_all() -> void:
 
 func after_all() -> void:
 	Engine.time_scale = 1.0
-	Weather.forced = -1
 	GameState.instance().reset()
 
 
@@ -168,8 +167,7 @@ func test_the_sun_lights_only_the_outdoors() -> void:
 func test_every_time_and_weather_builds() -> void:
 	for kind: int in TimeOfDay.Kind.size():
 		for weather: int in Weather.Kind.size():
-			Weather.forced = weather
-			var level := _build(kind as TimeOfDay.Kind)
+			var level := _build(kind as TimeOfDay.Kind, weather)
 			var scenery := level.get_node("Scenery") as BuildingScenery
 			assert_eq(scenery.weather, weather as Weather.Kind)
 			var city := level.get_node("Scenery/City") as CityBackdrop
@@ -177,14 +175,14 @@ func test_every_time_and_weather_builds() -> void:
 			assert_eq(city.has_lightning(), storm, "время %d, погода %d: гроза" % [kind, weather])
 			level.queue_free()
 			await wait_physics_frames(1)
-	Weather.forced = -1
 
 
-func _build(kind: TimeOfDay.Kind) -> GreyboxLevel:
+func _build(kind: TimeOfDay.Kind, weather: int = -1) -> GreyboxLevel:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
 	level.rules = BuildingRules.new()
 	level.rules.time_of_day = kind
+	level.rules.forced_weather = weather
 	level.building_seed = 1
 	level.spawn_agents = false
 	add_child(level)

@@ -49,19 +49,14 @@ func test_driven_car_goes_down() -> void:
 	assert_almost_eq(_run(motion, 0.5, ElevatorMotion.DOWN, true), 50.0, 0.01)
 
 
-func test_released_car_stops_between_floors() -> void:
+## Отпущенная кабина не встаёт между этажами, а доезжает до этажа по ходу,
+## как в ROM (@5E1E), и там стоит: дальше сама не едет (ADR-0053, решение 1).
+func test_released_car_runs_on_to_the_floor_ahead() -> void:
 	var motion := _shaft(2)
-	_run(motion, 0.3, ElevatorMotion.UP, true)
-	assert_almost_eq(_run(motion, 1.0, 0.0, true), 170.0, 0.01)
-	assert_false(motion.is_aligned(), "кабина встала между этажами")
-
-
-func test_released_car_finishes_to_floor_when_free_stop_is_off() -> void:
-	var motion := _shaft(2)
-	motion.stops_between_floors = false
 	_run(motion, 0.3, ElevatorMotion.UP, true)
 	assert_almost_eq(_run(motion, 2.0, 0.0, true), MIDDLE, 0.01)
 	assert_true(motion.is_aligned(), "кабина довелась до этажа")
+	assert_almost_eq(_run(motion, 5.0, 0.0, true), MIDDLE, 0.01, "с пассажиром сама не едет")
 
 
 func test_car_does_not_leave_shaft_at_the_top() -> void:
@@ -132,10 +127,12 @@ func test_velocity_reports_real_movement() -> void:
 	motion.update(STEP, ElevatorMotion.DOWN, true)
 	assert_almost_eq(motion.velocity, 100.0, 0.5)
 
-	# Отъезжаем подальше: рядом с этажом кабина сама дотянет до него.
+	# Отпущенная кабина доезжает до этажа по ходу и только там встаёт.
 	_run(motion, 0.4, ElevatorMotion.DOWN, true)
 	motion.update(STEP, 0.0, true)
-	assert_true(motion.is_stopped())
+	assert_false(motion.is_stopped(), "отпущенная между этажами едет дальше")
+	_run(motion, 2.0, 0.0, true)
+	assert_true(motion.is_stopped(), "на этаже встала")
 
 
 func test_shaft_with_one_floor_stays_put() -> void:

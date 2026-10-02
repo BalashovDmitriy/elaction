@@ -19,6 +19,9 @@ const EDGE_LIT: int = 6
 
 ## Начертания переменного Exo 2 по весу: одно на вес, а не на каждую подпись.
 static var _fonts: Dictionary = {}
+## То же для надписей в сцене ([method scene_font]) и их общая основа.
+static var _scene_fonts: Dictionary = {}
+static var _scene_base: FontFile = null
 
 
 ## Exo 2 нужного веса: 400 — текст, 600 — подписи, 700–800 — цифры и заголовки.
@@ -30,6 +33,24 @@ static func font(weight: int) -> FontVariation:
 	variation.base_font = FONT
 	variation.variation_opentype = {"wght": weight}
 	_fonts[weight] = variation
+	return variation
+
+
+## Exo 2 для надписей в сцене — табличек, табло, вывесок: с мипмапами. Шрифт
+## импортирован без них, и мелкая или дальняя надпись в 3D мерцала; включить их
+## в импорте — значит смягчить и весь HUD с меню, которые рисуются в свой
+## размер. Поэтому мипмапы — только у копии для сцены (ADR-0053, решение 9).
+static func scene_font(weight: int) -> FontVariation:
+	var found: Variant = _scene_fonts.get(weight)
+	if found != null:
+		return found as FontVariation
+	if _scene_base == null:
+		_scene_base = FONT.duplicate() as FontFile
+		_scene_base.generate_mipmaps = true
+	var variation := FontVariation.new()
+	variation.base_font = _scene_base
+	variation.variation_opentype = {"wght": weight}
+	_scene_fonts[weight] = variation
 	return variation
 
 

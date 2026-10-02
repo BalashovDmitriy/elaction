@@ -19,12 +19,15 @@ uniform sampler2D orm_atlas : filter_linear_mipmap_anisotropic, repeat_disable;
 
 uniform float styles = 6.0;
 uniform float tile_width = 4.0;
+// Поле по бокам столбца стиля в атласе, м: продолжение той же плитки, чтобы на
+// дальних мипах соседний стиль не подтекал на шов (tools/build_city.py).
+uniform float gutter = 0.5;
 // Ряды атласа, м, и сколько пикселей атласа на метр — из раскладки сборки.
 uniform float top_height = 1.0;
 uniform float floor_height = 3.0;
 uniform float ground_height = 3.0;
 uniform float density = 64.0;
-uniform vec2 atlas_size = vec2(1536.0, 448.0);
+uniform vec2 atlas_size = vec2(1920.0, 448.0);
 
 uniform vec3 roof_colour : source_color = vec3(0.16, 0.16, 0.17);
 
@@ -85,7 +88,7 @@ void fragment() {
 		}
 		float h = at.y;
 		float style = clamp(custom.x, 0.0, styles - 1.0);
-		float column = style * tile_width + mod(s, tile_width);
+		float column = style * (tile_width + gutter * 2.0) + gutter + mod(s, tile_width);
 		// Ряд атласа и высота внутри него, м: первый этаж, этаж, карниз.
 		float row_top = 0.0;
 		float within = 0.0;

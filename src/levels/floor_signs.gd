@@ -112,7 +112,7 @@ func _hang_on(index: int) -> void:
 
 	var label := Label3D.new()
 	label.text = label_of(_rules, index)
-	label.font = NeonStyle.font(700)
+	label.font = NeonStyle.scene_font(700)
 	label.font_size = FONT_SIZE
 	label.pixel_size = Proportions.FLOOR_DIGIT / (float(FONT_SIZE) * DIGIT_SHARE)
 	label.modulate = DIGIT
