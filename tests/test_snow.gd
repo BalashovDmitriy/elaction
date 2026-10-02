@@ -81,3 +81,74 @@ func test_flakes_are_dimmer_at_night() -> void:
 	var night := SnowLook.brightness(TimeOfDay.Kind.NIGHT)
 	var day := SnowLook.brightness(TimeOfDay.Kind.DAY)
 	assert_lt(night, day, "ночной снег ярче дневного")
+
+
+## Капли и хлопья гаснут о людей, машины и вертолёт, а не идут сквозь них
+## ([Shelter]): у каждого тела свой ловец частиц.
+func test_bodies_shelter_from_rain_and_snow() -> void:
+	var otto := preload("res://src/actors/otto/otto.tscn").instantiate() as Otto
+	add_child_autofree(otto)
+	var agent := preload("res://src/actors/enemy/enemy.tscn").instantiate() as Enemy
+	add_child_autofree(agent)
+	for body: Node3D in [otto, agent]:
+		var shield := body.get_node_or_null("Shelter") as GPUParticlesCollisionBox3D
+		assert_not_null(shield, "%s без ловца: дождь идёт сквозь него" % body.name)
+		if shield != null:
+			assert_almost_eq(shield.size.y, Proportions.BODY, 0.01, "ловец не в рост")
+	var car := CarModel.build()
+	autofree(car)
+	assert_not_null(car.get_node_or_null("Shelter"), "у машины нет ловца")
+	var helicopter := Helicopter.new()
+	add_child_autofree(helicopter)
+	var hull := helicopter.find_child("Shelter", true, false) as GPUParticlesCollisionBox3D
+	assert_not_null(hull, "у вертолёта нет ловца")
+	if hull != null:
+		assert_lt(hull.size.x, 9.0, "ловец вертолёта во весь винт — под ним сухая коробка")
+
+
+## На улице выезда капли и хлопья гаснут о маркизы и мостовую по карте высот
+## улицы; машины потока в ней не числятся, машина у бордюра — да.
+func test_the_street_catches_rain_and_snow() -> void:
+	for weather: int in [Weather.Kind.RAIN, Weather.Kind.SNOW]:
+		var street := ExitStreet.new()
+		add_child_autofree(street)
+		street.build(0.0, 0.0, 1, weather as Weather.Kind, TimeOfDay.Kind.NIGHT)
+		var catcher := (
+			street.get_node_or_null("StreetCatcher") as GPUParticlesCollisionHeightField3D
+		)
+		assert_not_null(catcher, "погода %d: улица не ловит осадки" % weather)
+		if catcher == null:
+			continue
+		assert_eq(catcher.heightfield_mask, StreetSnow.LAYER)
+		for node in street.traffic().find_children("*", "GeometryInstance3D", true, false):
+			assert_eq(
+				(node as GeometryInstance3D).layers & StreetSnow.LAYER,
+				0,
+				"машина потока в карте высот: по ней снег скользил бы"
+			)
+		var parked := street.get_node("ParkedCar")
+		var on_layer := 0
+		for node in parked.find_children("*", "GeometryInstance3D", true, false):
+			if (node as GeometryInstance3D).layers & StreetSnow.LAYER:
+				on_layer += 1
+		assert_gt(on_layer, 0, "машина у бордюра не ловит снег")
+	var snowy := ExitStreet.new()
+	add_child_autofree(snowy)
+	snowy.build(0.0, 0.0, 1, Weather.Kind.SNOW, TimeOfDay.Kind.DAY)
+	var flakes := snowy.snow().flakes().process_material as ParticleProcessMaterial
+	assert_eq(flakes.collision_mode, ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT)
+
+
+## В снег винт поднимает снежную пыль: мягкие клубы, светящиеся, в пределах
+## настила по глубине — не перед фасадом.
+func test_the_rotor_lifts_snow_powder() -> void:
+	var wash := Downwash.new()
+	add_child_autofree(wash)
+	wash.lift_snow(SnowLook.brightness(TimeOfDay.Kind.DAY))
+	var look := (wash.draw_pass_1 as QuadMesh).material as StandardMaterial3D
+	assert_not_null(look.albedo_texture, "пыль — квадратами")
+	assert_eq(look.shading_mode, BaseMaterial3D.SHADING_MODE_UNSHADED, "снежная пыль серая")
+	var process := wash.process_material as ParticleProcessMaterial
+	assert_eq(process.emission_shape, ParticleProcessMaterial.EMISSION_SHAPE_BOX)
+	assert_lte(process.emission_box_extents.z, 0.6, "пыль выходит за настил к камере")
+	assert_true(process.attractor_interaction_enabled, "пыль не слушает поток")

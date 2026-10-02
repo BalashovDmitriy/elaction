@@ -33,15 +33,17 @@ static func box(rules: BuildingRules, back_z: float, front_z: float, height: flo
 	)
 
 
-## Карта высот, снимаемая с коробки [param over].
-static func catcher(over: AABB, name: String) -> GPUParticlesCollisionHeightField3D:
+## Карта высот, снимаемая с коробки [param over] со слоя [param mask].
+static func catcher(
+	over: AABB, name: String, mask: int = LAYER
+) -> GPUParticlesCollisionHeightField3D:
 	var caught := GPUParticlesCollisionHeightField3D.new()
 	caught.name = name
 	caught.size = over.size
 	caught.position = over.get_center()
 	caught.resolution = GPUParticlesCollisionHeightField3D.RESOLUTION_1024
 	caught.update_mode = GPUParticlesCollisionHeightField3D.UPDATE_MODE_WHEN_MOVED
-	caught.heightfield_mask = LAYER
+	caught.heightfield_mask = mask
 	return caught
 
 

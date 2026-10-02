@@ -87,6 +87,8 @@ static func build(choice: Choice = Choice.new()) -> Node3D:
 			var wanted := _material_for(material.resource_name if material else "", paint)
 			if wanted != null:
 				mesh_instance.set_surface_override_material(surface, wanted)
+	# Дождь и снег гаснут о кузов, а не идут сквозь машину (ADR-0054).
+	Shelter.over_meshes(car)
 	return car
 
 

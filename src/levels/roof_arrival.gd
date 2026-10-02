@@ -143,7 +143,8 @@ func begin(
 	landing: Vector2,
 	bounds: Rect2,
 	full: bool = false,
-	daytime: bool = false
+	daytime: bool = false,
+	snow: float = -1.0
 ) -> void:
 	_host = host
 	_otto = otto
@@ -158,7 +159,7 @@ func begin(
 	Outdoors.mark(_helicopter)
 	_helicopter.daytime = daytime
 	# Над техникой крыши — с запасом; на саму крышу поток от винта гонит пыль.
-	_helicopter.avoid(obstacles, deck)
+	_helicopter.avoid(obstacles, deck, snow)
 	# Над высокой техникой — башней, антенной — вертолёт висит выше обычного.
 	var hover := _helicopter.safe_hover(WorldSpace.to_scene(landing - Vector2(0.0, HOVER_HEIGHT)))
 	_helicopter.fly_in(hover, not full)

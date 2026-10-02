@@ -9,13 +9,17 @@ extends RefCounted
 ## ветра, с разбросом направления и скорости: снег, который летит строем,
 ## читается помехой экрана, а не снегом.
 
+const FLAKE_SHADER := preload("res://src/levels/snow_flake.gdshader")
+
 ## Цвет снега: чуть холодный белый.
-const TINT := Color(0.93, 0.95, 1.0)
+const TINT := Color(0.84, 0.9, 1.0)
 
 ## Яркость хлопьев ночью и днём: ночью снег виден светом города и ламп, сам
 ## по себе он серый.
 const NIGHT_BRIGHTNESS: float = 0.42
 const DAY_BRIGHTNESS: float = 1.0
+## Какая доля яркости — свет неба; остальное хлопку дают лампы и солнце.
+const AMBIENT_SHARE: float = 0.75
 
 ## Разброс направления хлопьев, градусы. Шума частиц ([member
 ## ParticleProcessMaterial.turbulence_enabled]) у снега нет: в Godot он
@@ -70,30 +74,20 @@ static func flakes(
 	snow.process_material = process
 	snow.draw_pass_1 = flake_mesh(size, brightness)
 	snow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Солнце светит только на слой снаружи ([Outdoors]): без него днём хлопья
+	# были бы плоскими пятнами без света.
+	snow.layers |= Outdoors.LAYER
 	return snow
 
 
-## Квад хлопка: мягкое пятно, всегда к камере.
+## Квад хлопка: рыхлый комок из мягких сгустков, к камере, крутится и
+## покачивается ([code]snow_flake.gdshader[/code]). [param brightness] — свет
+## неба на нём без ламп.
 static func flake_mesh(size: float, brightness: float) -> QuadMesh:
-	var spot := GradientTexture2D.new()
-	spot.fill = GradientTexture2D.FILL_RADIAL
-	spot.fill_from = Vector2(0.5, 0.5)
-	spot.fill_to = Vector2(1.0, 0.5)
-	spot.width = 32
-	spot.height = 32
-	var fade := Gradient.new()
-	fade.offsets = PackedFloat32Array([0.0, 0.35, 1.0])
-	fade.colors = PackedColorArray(
-		[Color.WHITE, Color(1.0, 1.0, 1.0, 0.75), Color(1.0, 1.0, 1.0, 0.0)]
-	)
-	spot.gradient = fade
-	var look := StandardMaterial3D.new()
-	look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	look.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	look.albedo_texture = spot
-	look.albedo_color = Color(TINT * brightness, 0.9)
-	look.disable_receive_shadows = true
+	var look := ShaderMaterial.new()
+	look.shader = FLAKE_SHADER
+	look.set_shader_parameter("tint", TINT)
+	look.set_shader_parameter("ambient", brightness * AMBIENT_SHARE)
 	var quad := QuadMesh.new()
 	quad.size = Vector2.ONE * size
 	quad.material = look

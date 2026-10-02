@@ -274,6 +274,9 @@ func _init() -> void:
 	_body.name = "Body"
 	add_child(_body)
 	_dress()
+	# Дождь и снег гаснут о фюзеляж, но не о диск винта и трос (ADR-0054).
+	var spinning: Array[Node] = [_rotor, _tail_rotor, _rope]
+	Shelter.over_meshes(_body, spinning)
 
 
 ## Начинает прилёт: вертолёт появляется за левым краем и идёт к [param hover] —
@@ -340,8 +343,9 @@ func rope_point(along: float) -> Vector3:
 
 ## Что на крыше мешает полёту: габариты в координатах сцены. Путь прилёта,
 ## висение и уход идут над ними с запасом [constant CLEARANCE]. [param deck] —
-## высота самой крыши, сцена: на неё поток от винта гонит пыль ([Downwash]).
-func avoid(obstacles: Array[AABB], deck: float = NAN) -> void:
+## высота самой крыши, сцена: на неё поток от винта гонит пыль ([Downwash]), в
+## снег — снежную яркостью [param snow]; меньше нуля — снега нет.
+func avoid(obstacles: Array[AABB], deck: float = NAN, snow: float = -1.0) -> void:
 	_obstacles = obstacles
 	if is_nan(deck):
 		return
@@ -349,6 +353,8 @@ func avoid(obstacles: Array[AABB], deck: float = NAN) -> void:
 		_dust = Downwash.new()
 		add_child(_dust)
 	_dust.deck = deck
+	if snow >= 0.0:
+		_dust.lift_snow(snow)
 
 
 ## Точка висения над [param hover], поднятая над техникой крыши, если нужно.

@@ -212,7 +212,10 @@ func _ready() -> void:
 		_on_alarm_raised(false)
 	var bounds := Rect2(0.0, 0.0, rules.width, rules.total_height())
 	var daytime := TimeOfDay.is_daytime(rules.time_of_day)
-	_arrival.begin(self, otto, landing, bounds, full_intro, daytime)
+	# В снег винт поднимает снежную пыль (ADR-0054).
+	var snowy := Weather.is_snowing(Weather.of_building(rules, building_seed))
+	var snow := SnowLook.brightness(rules.time_of_day) if snowy else -1.0
+	_arrival.begin(self, otto, landing, bounds, full_intro, daytime, snow)
 
 
 ## Гасит всё, что уехало из кадра. Ламп в здании тридцать, а в кадр влезает

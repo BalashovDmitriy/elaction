@@ -221,6 +221,8 @@ func _notification(what: int) -> void:
 
 
 func _ready() -> void:
+	# Дождь и снег гаснут о голову и плечи (ADR-0054).
+	Shelter.over(self, Vector3(Proportions.BODY_WIDTH, Proportions.BODY, WorldSpace.BODY_DEPTH))
 	var standing := _shape_size(_standing_shape)
 	var crouching := _shape_size(_crouching_shape)
 	_headroom = standing.y - crouching.y

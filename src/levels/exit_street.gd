@@ -178,6 +178,7 @@ var _road: StandardMaterial3D = null
 var _glow: OmniLight3D = null
 var _lamp: SpotLight3D = null
 var _rain: Array[GPUParticles3D] = []
+var _snow: StreetSnow = null
 var _traffic: StreetTraffic = null
 ## Колода вывесок: лавки на одной улице не повторяются.
 var _names: Array[String] = []
@@ -218,6 +219,10 @@ func build(
 	_flush_multimeshes()
 	if Weather.is_raining(weather):
 		_build_rain()
+	elif Weather.is_snowing(weather):
+		_build_snow()
+	if Weather.is_raining(weather) or Weather.is_snowing(weather):
+		_catch()
 	add_to_group(Graphics.GROUP)
 	apply_graphics()
 
@@ -225,7 +230,8 @@ func build(
 ## Асфальт мостовой: в дождь темнее и блестит — в нём ловятся огни.
 static func road_material(weather: Weather.Kind) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
-	if Weather.is_raining(weather):
+	# В снег под колеями тот же мокрый асфальт, что в дождь (ADR-0054).
+	if Weather.is_raining(weather) or Weather.is_snowing(weather):
 		material.albedo_color = ASPHALT_WET
 		material.roughness = ASPHALT_WET_ROUGHNESS
 	else:
@@ -766,6 +772,11 @@ func _build_rain() -> void:
 	)
 	drops.name = "Drops"
 	drops.position = _at((from + _left) * 0.5, _street - height, (front + back) * 0.5)
+	# Гаснут о маркизы, машины и мостовую, а не по таймеру ([method _catch]).
+	(drops.process_material as ParticleProcessMaterial).collision_mode = (
+		ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT
+	)
+	drops.collision_base_size = 0.02
 	drops.visibility_aabb = AABB(
 		Vector3(-(_left - from), -height - 1.0, -8.0),
 		Vector3((_left - from) * 2.0, height + 2.0, 16.0)
@@ -802,6 +813,37 @@ func _build_rain() -> void:
 	)
 	add_child(ripples)
 	_rain.append(ripples)
+
+
+## Капли и хлопья гаснут о маркизы, машину у бордюра, тротуар и мостовую —
+## по карте высот, снятой со слоя улицы, как на крыше ([RoofCatch]). Машины
+## потока в карте не числятся: о них гасит их ловец ([Shelter]).
+func _catch() -> void:
+	var moving: Array[Node] = [_traffic]
+	StreetSnow.mark(self, moving)
+	var from := _at(_left - FROM, _street, 0.0)
+	var to := _at(_left, _street, 0.0)
+	var over := AABB(
+		Vector3(from.x, from.y - 0.5, FACADE_Z - SETBACK),
+		Vector3(to.x - from.x, StreetSnow.HEIGHT + 1.5, NEAR_Z - FACADE_Z + SETBACK)
+	)
+	add_child(RoofCatch.catcher(over, "StreetCatcher", StreetSnow.LAYER))
+
+
+## Снег над улицей и покров с колеями ([StreetSnow]). Покров ложится на всё
+## неподвижное на улице — и на машину у бордюра, она стоит, — но не на поток:
+## по едущей машине наклейка скользила бы пятнами.
+func _build_snow() -> void:
+	_snow = StreetSnow.new()
+	add_child(_snow)
+	var from := _at(_left - FROM, _street, 0.0)
+	var to := _at(_left, _street, 0.0)
+	_snow.build(from.x, to.x, from.y, NEAR_Z, FACADE_Z - SETBACK, _time)
+
+
+## Снег над улицей — для теста; null, если снега нет.
+func snow() -> StreetSnow:
+	return _snow
 
 
 ## Пятно света: плоскость с круглым градиентом цвета [param tone], складывается

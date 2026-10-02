@@ -178,6 +178,8 @@ func _notification(what: int) -> void:
 
 func _ready() -> void:
 	add_to_group(GROUP)
+	# Дождь и снег гаснут о шляпу и плечи (ADR-0054).
+	Shelter.over(self, Vector3(Proportions.BODY_WIDTH, Proportions.BODY, WorldSpace.BODY_DEPTH))
 	_brain.emerge_time = emerge_time
 	_brain.same_line = same_line
 	# Стоячий рост берётся у самой формы, а не записывается вторым числом:
