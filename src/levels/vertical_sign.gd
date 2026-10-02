@@ -34,7 +34,7 @@ const RISE: float = 0.4
 ## (ADR-0055, решение 3). Не цвета огоньков игры (ADR-0023, решение 6).
 const NEON_HOTEL := Color(1.0, 0.25, 0.55)
 const NEON_OFFICE := Color(0.3, 0.85, 1.0)
-const NEON_RESIDENTIAL := Color(0.62, 0.4, 1.0)
+const NEON_RESIDENTIAL := Color(0.45, 0.42, 1.0)
 const PANEL := Color(0.07, 0.07, 0.09)
 
 ## Отсвет: яркость и радиус, м.
