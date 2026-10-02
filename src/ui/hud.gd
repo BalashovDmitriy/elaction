@@ -58,6 +58,8 @@ var _documents: Array[HudIcon] = []
 var _lives: Array[HudIcon] = []
 var _lives_more: Label = null
 var _building: Label = null
+## Прибавка очков: всплывает над местом и у счёта, счёт набегает.
+var _bursts: ScoreBursts = null
 var _floor: Label = null
 var _round: Label = null
 var _alarm: PanelContainer = null
@@ -111,9 +113,11 @@ func _notification(what: int) -> void:
 ## Здание, за которым следит HUD: его имя, цвет вывески и этаж Otto.
 func follow(level: GreyboxLevel) -> void:
 	_level = level
+	_bursts.follow(level)
 	_shown_floor = -2
 	if level != null and level.identity != null:
-		_neon = VerticalSign.NEON_HOTEL if level.identity.is_hotel() else VerticalSign.NEON_OFFICE
+		_neon = VerticalSign.neon_of(level.identity)
+		_bursts.neon = _neon
 		_building.text = " ".join(level.identity.sign_lines())
 	_restyle()
 	refresh()
@@ -123,7 +127,7 @@ func follow(level: GreyboxLevel) -> void:
 ## сигналов у партии много, а полей мало, и разбирать их по одному незачем.
 func refresh() -> void:
 	var game := GameState.instance()
-	_score.text = format_score(game.score)
+	_bursts.show_score(game.score)
 	for index in _documents.size():
 		_documents[index].set_state(index < game.documents_collected, _neon)
 	_documents_row_visible(game.documents_total)
@@ -247,6 +251,10 @@ func _build() -> void:
 	left_box.add_child(_score_caption)
 	_score = _label(56, INK, 700)
 	left_box.add_child(_score)
+	_bursts = ScoreBursts.new()
+	_bursts.name = "ScoreBursts"
+	root.add_child(_bursts)
+	_bursts.watch(_score)
 	var docs := HBoxContainer.new()
 	docs.add_theme_constant_override("separation", 6)
 	left_box.add_child(docs)

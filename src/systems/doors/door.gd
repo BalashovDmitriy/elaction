@@ -93,6 +93,27 @@ const HANGER := Vector3(0.09, 0.22, 0.008)
 const HANGER_COLOR := Color(0.72, 0.1, 0.12)
 ## Соль жребия мелочей у двери: свой, чтобы не ходить в ногу с комнатой.
 const LITTLE_SALT: int = 0x7A_B1E5
+## Жизнь за дверью квартиры (ADR-0055, решение 8): соль жребия, откуда звук,
+## докуда слышно, м, и насколько тише прочих звуков, дБ, — он глухой, из-за
+## двери.
+const LIFE_SALT: int = 0x11FE
+const LIFE_AT := Vector3(0.0, 1.2, -0.3)
+const LIFE_REACH: float = 7.0
+const LIFE_DB: float = -6.0
+## Глазок квартиры: размер и высота над низом створки, м.
+const PEEPHOLE := Vector3(0.035, 0.035, 0.02)
+const PEEPHOLE_RISE: float = 1.55
+## Коврик у порога квартиры, м, и его цвета.
+const DOORMAT := Vector3(0.9, 0.015, 0.5)
+const DOORMAT_RIM := Color(0.12, 0.11, 0.1)
+const DOORMAT_TONES: Array[Color] = [
+	Color(0.36, 0.26, 0.16), Color(0.2, 0.26, 0.2), Color(0.34, 0.14, 0.12), Color(0.28, 0.28, 0.3)
+]
+## Пакет с покупками, м, и его начинка.
+const BAG := Vector3(0.3, 0.38, 0.2)
+const BAG_COLOR := Color(0.62, 0.48, 0.3)
+const LOAF_COLOR := Color(0.78, 0.6, 0.34)
+const GREENS_COLOR := Color(0.24, 0.46, 0.18)
 
 ## Краски занятой створки по тону: их две на все двери (створка и филёнки).
 static var _occupied_paints: Dictionary = {}
@@ -135,6 +156,8 @@ var _red_light: SpotLight3D = null
 ## Этаж двери в полосе горящих: за кадром бра не горит, как и лампы
 ## ([method set_light_in_view]). Дверь вне уровня — в тестах — считается в кадре.
 var _in_view: bool = true
+## Жизнь за дверью квартиры; у остальных дверей — нет.
+var _life: DoorLife = null
 ## Своё табло на время, пока Otto внутри: общий материал огонька дышал бы у всех
 ## красных дверей здания разом. И часы дыхания — по физике: на паузе оно стоит.
 var _pulse: StandardMaterial3D = null
@@ -197,6 +220,7 @@ func _physics_process(delta: float) -> void:
 	_cycle.tick(delta)
 	_refresh_look()
 	_breathe(delta)
+	_listen(delta)
 
 	if _stepping_out != null:
 		# Выходит на камеру, пока створка закрывается.
@@ -441,6 +465,18 @@ func furnish(
 	_room_seed = seed
 	_room_span = span
 	_furnished = true
+	if identity != null and identity.kind == BuildingIdentity.Kind.RESIDENTIAL:
+		_life = DoorLife.of(hash([seed, LIFE_SALT]))
+
+
+## Жизнь за закрытой дверью квартиры: изредка глухой звук ([DoorLife]).
+func _listen(delta: float) -> void:
+	if _life == null:
+		return
+	var audible := _in_view and _cycle.is_shut() and not has_document
+	var heard := _life.advance(delta, audible)
+	if heard != "":
+		Sounds.play_at(self, heard, global_position + LIFE_AT, LIFE_REACH, LIFE_DB)
 
 
 ## Комната за дверью, пока створка открыта; иначе null.
@@ -453,9 +489,9 @@ func _open_the_room(along: float) -> void:
 	if not _furnished:
 		return
 	if along > 0.0 and _room == null:
-		var hotel := _room_identity == null or _room_identity.is_hotel()
+		var kind := BuildingIdentity.Kind.HOTEL if _room_identity == null else _room_identity.kind
 		_room = DoorRoom.build(
-			hotel, _room_seed, _room_identity, _room_span, _room_unlit, _room_time, _room_weather
+			kind, _room_seed, _room_identity, _room_span, _room_unlit, _room_time, _room_weather
 		)
 		add_child(_room)
 	elif along <= 0.0 and _room != null:
@@ -544,6 +580,11 @@ func _dress_leaf() -> void:
 	if _style.vision_glass:
 		_leaf.add_child(_vision_glass(front, bottom))
 	var chrome := GreyboxLook.metal(_style.handle_tone)
+	if _style.peephole:
+		var eye := GreyboxLook.box(PEEPHOLE, chrome)
+		eye.name = "Peephole"
+		eye.position = Vector3(0.0, bottom + PEEPHOLE_RISE, front + PEEPHOLE.z * 0.5)
+		_leaf.add_child(eye)
 	var handle_x := LEAF_SIZE.x * 0.5 - 0.14
 	var rosette := GreyboxLook.box(ROSETTE, chrome)
 	rosette.position = Vector3(handle_x, bottom + HANDLE_RISE, front + ROSETTE.z * 0.5)
@@ -575,8 +616,9 @@ func _vision_glass(front: float, bottom: float) -> MeshInstance3D:
 	return glass
 
 
-## Мелочи номера отеля жребием двери: табличка на ручке и газета или поднос у
-## порога. У красной двери и в офисе их нет.
+## Мелочи у двери жребием двери: у номера отеля — табличка на ручке и газета
+## или поднос у порога, у квартиры — коврик и пакет с покупками (ADR-0055).
+## У красной двери и в офисе их нет.
 func _little_things(lever: MeshInstance3D) -> void:
 	if not _furnished or has_document:
 		return
@@ -591,6 +633,14 @@ func _little_things(lever: MeshInstance3D) -> void:
 		var tray := _tray() if rng.randf() < 0.5 else _newspaper()
 		tray.position = Vector3(LEAF_SIZE.x * 0.5 + 0.28, 0.0, WorldSpace.BACK_WALL_Z + 0.3)
 		add_child(tray)
+	if rng.randf() < _style.door_mat_share:
+		add_child(_doormat(rng))
+	if rng.randf() < _style.door_bag_share:
+		var bag := _grocery_bag()
+		bag.position = Vector3(
+			-(LEAF_SIZE.x * 0.5 + 0.3), 0.0, WorldSpace.BACK_WALL_Z + BAG.z * 0.5 + 0.08
+		)
+		add_child(bag)
 
 
 ## Поднос с посудой после ужина в номере.
@@ -624,6 +674,41 @@ func _newspaper() -> Node3D:
 	var holder := Node3D.new()
 	holder.add_child(paper)
 	return holder
+
+
+## Коврик у порога квартиры: тёмная кайма, середина своего цвета жребием.
+## Лежит перед проёмом, а не в нём: створка ходит над ним.
+func _doormat(rng: RandomNumberGenerator) -> Node3D:
+	var mat := Node3D.new()
+	mat.name = "Doormat"
+	mat.position = Vector3(0.0, 0.0, WorldSpace.BACK_WALL_Z + DOORMAT.z * 0.5 + 0.06)
+	var rim := GreyboxLook.box(DOORMAT, GreyboxLook.surface(DOORMAT_RIM))
+	rim.position.y = DOORMAT.y * 0.5
+	mat.add_child(rim)
+	var tone := DOORMAT_TONES[rng.randi_range(0, DOORMAT_TONES.size() - 1)]
+	var middle := GreyboxLook.box(
+		Vector3(DOORMAT.x - 0.08, DOORMAT.y, DOORMAT.z - 0.08), GreyboxLook.surface(tone)
+	)
+	middle.position.y = DOORMAT.y * 0.5 + 0.002
+	mat.add_child(middle)
+	return mat
+
+
+## Бумажный пакет с покупками у двери: сверху торчат батон и зелень.
+func _grocery_bag() -> Node3D:
+	var bag := Node3D.new()
+	bag.name = "GroceryBag"
+	var paper := GreyboxLook.box(BAG, GreyboxLook.surface(BAG_COLOR))
+	paper.position.y = BAG.y * 0.5
+	bag.add_child(paper)
+	var loaf := GreyboxLook.box(Vector3(0.07, 0.16, 0.07), GreyboxLook.surface(LOAF_COLOR))
+	loaf.position = Vector3(-0.06, BAG.y + 0.03, 0.0)
+	loaf.rotation.z = 0.25
+	bag.add_child(loaf)
+	var greens := GreyboxLook.box(Vector3(0.1, 0.08, 0.08), GreyboxLook.surface(GREENS_COLOR))
+	greens.position = Vector3(0.06, BAG.y + 0.02, 0.01)
+	bag.add_child(greens)
+	return bag
 
 
 ## Наличник вокруг проёма на задней стене: стойки и перемычка.

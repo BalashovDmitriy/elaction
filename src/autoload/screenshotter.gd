@@ -415,6 +415,20 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "floor", "actions": [], "hold": 0.6},
 		{"label": "walking_on", "actions": ["move_right"], "hold": 1.6},
 	],
+	# Жилой дом (ADR-0055): съёмка идёт в первом жилом здании партии без соли
+	# ([constant CAPTURE_KINDS]) — тот же маршрут крыша — шахта — этаж.
+	"M24M":
+	[
+		{"label": "roof", "actions": [], "hold": 1.2},
+		{"label": "roof_walk", "actions": ["move_right"], "hold": 2.5},
+		{"label": "to_the_shaft", "actions": ["move_right"], "hold": 2.9},
+		{"label": "riding_down", "actions": ["move_down"], "hold": 1.4},
+		{"label": "stopped", "actions": [], "hold": 1.6},
+		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
+		{"label": "floor", "actions": [], "hold": 0.6},
+		{"label": "walking_on", "actions": ["move_right"], "hold": 1.6},
+		{"label": "walking_back", "actions": ["move_left"], "hold": 2.4},
+	],
 	"M19":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},
@@ -427,6 +441,9 @@ const AUTO_PLANS: Dictionary = {
 	],
 }
 const DEFAULT_PLAN := "M1"
+## В каком типе здания идёт съёмка вехи: партия начинается с первого здания
+## этого типа. Остальные вехи — с первого здания, отеля.
+const CAPTURE_KINDS: Dictionary = {"M24M": BuildingIdentity.Kind.RESIDENTIAL}
 
 var _milestone: String = MANUAL_FOLDER
 
@@ -551,6 +568,15 @@ func _plan_for(milestone: String) -> Array:
 		return AUTO_PLANS[key]
 	push_warning("Нет плана съёмки для вехи «%s», снимается %s" % [milestone, DEFAULT_PLAN])
 	return AUTO_PLANS[DEFAULT_PLAN]
+
+
+## С какого здания начинать партию на съёмке вехи ([constant CAPTURE_KINDS]):
+## без соли сид здания — его номер. Без съёмки — с первого.
+static func start_building() -> int:
+	var key := _milestone_from_cmdline().to_upper()
+	if not CAPTURE_KINDS.has(key):
+		return 1
+	return BuildingIdentity.first_of(CAPTURE_KINDS[key])
 
 
 static func _milestone_from_cmdline() -> String:

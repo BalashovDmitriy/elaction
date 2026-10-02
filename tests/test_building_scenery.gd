@@ -154,6 +154,7 @@ func test_neon_signs_do_not_wear_the_colours_of_game_signs() -> void:
 	var glowing: Array[Color] = [
 		VerticalSign.NEON_HOTEL,
 		VerticalSign.NEON_OFFICE,
+		VerticalSign.NEON_RESIDENTIAL,
 		BuildingShafts.BOARD_DIGITS,
 		BuildingShafts.CALL_LIT,
 	]

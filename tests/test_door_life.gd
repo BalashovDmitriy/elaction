@@ -1,0 +1,59 @@
+extends GutTest
+
+## Жизнь за дверью квартиры (ADR-0055, решение 8): звук редкий, только у
+## закрытой двери на этаже в кадре, и жребий двери повторяется.
+
+
+func test_a_door_sounds_now_and_then() -> void:
+	var life := DoorLife.of(7)
+	var heard: Array[String] = []
+	for _step: int in 600 * 60:
+		var sound := life.advance(1.0 / 60.0, true)
+		if sound != "":
+			heard.append(sound)
+	# За десять минут — от четырёх до десяти раз: пауза от минуты до двух с половиной.
+	assert_between(heard.size(), 4, 11, "звук редкий")
+	for sound: String in heard:
+		assert_has(DoorLife.SOUNDS, sound, "звук из своего набора")
+
+
+func test_a_silent_door_keeps_its_clock() -> void:
+	var life := DoorLife.of(3)
+	for _step: int in 600 * 60:
+		assert_eq(life.advance(1.0 / 60.0, false), "", "неслышная дверь молчит")
+	var first := ""
+	for _step: int in 200 * 60:
+		first = life.advance(1.0 / 60.0, true)
+		if first != "":
+			break
+	assert_ne(first, "", "заслышав, звучит в свой срок, без накопленного залпа")
+
+
+func test_the_same_door_lives_the_same_life() -> void:
+	var one := DoorLife.of(11)
+	var two := DoorLife.of(11)
+	for _step: int in 300 * 60:
+		assert_eq(one.advance(1.0 / 60.0, true), two.advance(1.0 / 60.0, true))
+
+
+func test_the_step_sounds_the_floor_of_each_kind() -> void:
+	var steps := {
+		BuildingIdentity.Kind.HOTEL: Sounds.STEP_CARPET,
+		BuildingIdentity.Kind.OFFICE: Sounds.STEP_CONCRETE,
+		BuildingIdentity.Kind.RESIDENTIAL: Sounds.STEP_LINO,
+	}
+	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
+		var building := BuildingIdentity.typed(kind)
+		assert_eq(PlaceSound.step_at(false, building), steps[kind], "тип %d: шаг по полу" % kind)
+		assert_eq(PlaceSound.step_at(true, building), Sounds.STEP_CONCRETE, "на крыше — бетон")
+
+
+func test_each_kind_has_its_own_room_tone() -> void:
+	var tones := {}
+	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
+		var loops := Sounds.weather_loops(Weather.Kind.CLEAR, false, TimeOfDay.Kind.NIGHT, kind)
+		assert_eq(loops.size(), 1, "внутри — одна петля")
+		tones[loops[0]] = true
+		var outdoors := Sounds.weather_loops(Weather.Kind.CLEAR, true, TimeOfDay.Kind.NIGHT, kind)
+		assert_false(outdoors.has(Sounds.room_tone_of(kind)), "снаружи тишины коридора нет")
+	assert_eq(tones.size(), BuildingIdentity.Kind.size(), "тишина коридора своя у типа")

@@ -1,10 +1,11 @@
 extends Node3D
 
-## Комнаты за дверью (ADR-0047): четыре номера и четыре кабинета жребием.
+## Комнаты за дверью (ADR-0047, ADR-0055): по ряду на тип здания — четыре
+## номера, четыре кабинета и квартиры: кухня, гостиная, спальня и ещё кухня.
 ##
 ## Каждая стоит за стеной коридора с проёмом двери и открытой створкой, кадр
 ## — ортокамерой с наклоном игры ([constant SideCamera.TILT_DEGREES]). Первый
-## кадр — все восемь в проёмах, как в игре; второй — без стены: вся комната
+## кадр — все в проёмах, как в игре; второй — без стены: вся комната
 ## целиком, чтобы видеть, что стоит и где.
 ##
 ## Запуск:
@@ -22,11 +23,17 @@ const STEP: float = 5.0
 const PER_ROW: int = 4
 const ROW_STEP: float = Proportions.FLOOR
 const SETTLE_FRAMES: int = 20
+## Ряд квартир: какие комнаты в нём по порядку.
+const HOMES: Array[DoorRoom.Home] = [
+	DoorRoom.Home.KITCHEN, DoorRoom.Home.LIVING, DoorRoom.Home.BEDROOM, DoorRoom.Home.KITCHEN
+]
 
 var _folder: String = "M24i"
 var _walls: Array[Node3D] = []
 var _time: int = TimeOfDay.Kind.NIGHT
 var _weather: int = Weather.Kind.CLEAR
+## Сколько жребиев квартиры отброшено, пока не выпала нужная комната.
+var _tries: int = 0
 
 
 func _ready() -> void:
@@ -55,21 +62,15 @@ func _stage() -> void:
 	var world := WorldEnvironment.new()
 	world.environment = environment
 	add_child(world)
-	var hotel := BuildingIdentity.new()
-	var office := BuildingIdentity.new()
-	office.kind = BuildingIdentity.Kind.OFFICE
-	for index: int in PER_ROW * 2:
-		var is_hotel := index < PER_ROW
+	var kinds := BuildingIdentity.Kind.values()
+	for index: int in PER_ROW * kinds.size():
+		var kind: BuildingIdentity.Kind = kinds[index / PER_ROW]
 		var spot := Vector3((index % PER_ROW) * STEP, -(index / PER_ROW) * ROW_STEP, 0.0)
-		var room := DoorRoom.build(
-			is_hotel,
-			index * 7919 + 13,
-			hotel if is_hotel else office,
-			Vector2(-INF, INF),
-			false,
-			_time as TimeOfDay.Kind,
-			_weather as Weather.Kind
-		)
+		var room := _room(kind, index)
+		while room.home != HOMES[index % PER_ROW] and kind == BuildingIdentity.Kind.RESIDENTIAL:
+			room.free()
+			_tries += 1
+			room = _room(kind, index + _tries * PER_ROW * kinds.size())
 		room.position = spot
 		add_child(room)
 		var wall := _corridor_wall()
@@ -78,14 +79,28 @@ func _stage() -> void:
 		_walls.append(wall)
 	var camera := Camera3D.new()
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	camera.size = ROW_STEP * 2.0 + 0.6
+	camera.size = ROW_STEP * BuildingIdentity.Kind.size() + 0.6
 	var tilt := deg_to_rad(SideCamera.TILT_DEGREES)
-	var centre := Vector3(STEP * (PER_ROW - 1) * 0.5, -ROW_STEP * 0.5 + 1.2, 0.0)
+	var rows := BuildingIdentity.Kind.size()
+	var centre := Vector3(STEP * (PER_ROW - 1) * 0.5, -ROW_STEP * (rows - 1) * 0.5 + 1.2, 0.0)
 	camera.position = centre + Vector3(0.0, SideCamera.DISTANCE * tan(tilt), SideCamera.DISTANCE)
 	camera.rotation.x = -tilt
 	camera.far = 60.0
 	add_child(camera)
 	camera.make_current()
+
+
+## Комната типа [param kind] жребием [param draw].
+func _room(kind: BuildingIdentity.Kind, draw: int) -> DoorRoom:
+	return DoorRoom.build(
+		kind,
+		draw * 7919 + 13,
+		BuildingIdentity.typed(kind),
+		Vector2(-INF, INF),
+		false,
+		_time as TimeOfDay.Kind,
+		_weather as Weather.Kind
+	)
 
 
 ## Стена коридора с проёмом двери и створкой, распахнутой в комнату, и лампа

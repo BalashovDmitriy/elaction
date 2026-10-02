@@ -17,8 +17,8 @@ extends RefCounted
 ## комнате за дверью ([DoorRoom]) — в коридор не идёт.
 enum Place { FLOOR, WALL, ROOF, TOP, ROOM }
 
-## Для какого здания: отель, офис, любое.
-enum Fit { HOTEL, OFFICE, ANY }
+## Для какого здания: отель, офис, жилой дом, любое.
+enum Fit { HOTEL, OFFICE, RESIDENTIAL, ANY }
 
 ## Слой рендера обстановки. Предметы видны, как все, но тень от заливки ламп не
 ## отбрасывают: заливка — слабый широкий свет, её тень от стула на кадре не
@@ -281,6 +281,13 @@ static func _build() -> Dictionary:
 		# Приёмная у кабинетов: кресло для посетителей и торшер (ADR-0048).
 		Entry.of("lounge_chair", Place.FLOOR, Fit.OFFICE, 0.85),
 		Entry.of("light_stand", Place.FLOOR, Fit.OFFICE, 1.6),
+		# Пол, жилой дом (ADR-0055, решение 4): подъезд, а не гостиная —
+		# батарея, велосипед у стены, мешки с мусором до утра.
+		Entry.of("radiator", Place.FLOOR, Fit.RESIDENTIAL, 0.68),
+		Entry.of("stroller", Place.FLOOR, Fit.RESIDENTIAL, 1.0),
+		Entry.of("bicycle", Place.FLOOR, Fit.RESIDENTIAL, 1.0),
+		Entry.of("trash_bags", Place.FLOOR, Fit.RESIDENTIAL, 0.55),
+		Entry.of("trash_bag", Place.FLOOR, Fit.RESIDENTIAL, 0.6),
 		# Стены: картины — везде, остальное — по зданию. Wall Art пришли
 		# спиной к камере, Painting — плашмя.
 		Entry.of("painting", Place.WALL, Fit.ANY, 0.6).tilted(90.0),
@@ -296,6 +303,7 @@ static func _build() -> Dictionary:
 		Entry.of("vent", Place.WALL, Fit.OFFICE, 0.35),
 		Entry.of("air_vent", Place.WALL, Fit.OFFICE, 0.45, 90.0),
 		Entry.of("fire_exit_sign", Place.WALL, Fit.ANY, 0.3, -90.0).raised(2.35),
+		Entry.of("mailboxes", Place.WALL, Fit.RESIDENTIAL, 0.66).raised(1.35),
 		# Комната за дверью (ADR-0047): в неё видно в открытую створку. Рабочие
 		# места dook пришли боком — столом к +X.
 		Entry.of("bed_hotel", Place.ROOM, Fit.HOTEL, 0.8),
@@ -308,6 +316,16 @@ static func _build() -> Dictionary:
 		Entry.of("office_chair", Place.ROOM, Fit.OFFICE, 1.05),
 		Entry.of("workstation_a", Place.ROOM, Fit.OFFICE, 1.45, 90.0),
 		Entry.of("workstation_b", Place.ROOM, Fit.OFFICE, 1.35, 90.0),
+		# Квартира (ADR-0055, решение 5): кухня, гостиная, спальня — кровать
+		# и тумбы берутся у номера отеля.
+		Entry.of("fridge", Place.ROOM, Fit.RESIDENTIAL, 1.7),
+		Entry.of("stove", Place.ROOM, Fit.RESIDENTIAL, 0.92),
+		Entry.of("counter_sink", Place.ROOM, Fit.RESIDENTIAL, 1.06),
+		Entry.of("kettle", Place.TOP, Fit.RESIDENTIAL, 0.24),
+		Entry.of("microwave", Place.TOP, Fit.RESIDENTIAL, 0.3, 180.0),
+		Entry.of("tv_old", Place.ROOM, Fit.RESIDENTIAL, 0.9, 180.0),
+		Entry.of("sofa", Place.ROOM, Fit.RESIDENTIAL, 0.78),
+		Entry.of("paper_bag", Place.TOP, Fit.RESIDENTIAL, 0.38, 90.0),
 		# Крыша (ADR-0033, решение 8).
 		Entry.of("water_tower", Place.ROOF, Fit.ANY, 4.5),
 		Entry.of("water_tank", Place.ROOF, Fit.ANY, 2.5),

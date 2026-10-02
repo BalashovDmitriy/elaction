@@ -13,6 +13,10 @@ extends Node
 ## выгода — тесты создают свой экземпляр и глобального не трогают.
 
 signal score_changed(value: int)
+## Очки начислены: сколько и где — точка сцены, над которой HUD покажет
+## прибавку; [constant AT_OTTO] — над Otto (документ). [param popup] = false —
+## без прибавки над местом: у бонуса за здание своя панель.
+signal scored(points: int, at: Vector3, popup: bool)
 signal documents_changed(collected: int, total: int)
 signal lives_changed(value: int)
 
@@ -30,6 +34,10 @@ signal building_changed(number: int)
 signal alarm_raised
 
 ## Таблица очков оригинала (ADR-0005, пункт 1 и ADR-0006, пункт 5).
+## Где показать прибавку очков, если события в сцене нет: над Otto ([signal scored]).
+const AT_OTTO := Vector3.INF
+## Прибавка всплывает над головой убитого, а не у ног.
+const OVER_HEAD := Vector3(0.0, 1.9, 0.0)
 const DOCUMENT_SCORE: int = 500
 const ENEMY_SHOT_SCORE: int = 100
 const LAMP_SCORE: int = 300
@@ -132,7 +140,7 @@ func stop_game() -> void:
 ## только здесь — смерть её не снимала и не снимет. Бонус — по ROM: 1000 × номер
 ## здания, но не больше чем за десятое (`Arcade.building_bonus`).
 func finish_building() -> void:
-	add_score(Arcade.building_bonus(building))
+	add_score(Arcade.building_bonus(building), AT_OTTO, false)
 	building += 1
 	alarm.enter_building()
 	building_changed.emit(building)
@@ -193,9 +201,11 @@ func lose_life() -> bool:
 	return false
 
 
-func add_score(points: int) -> void:
+## Начисляет [param points] очков за событие в точке сцены [param at].
+func add_score(points: int, at: Vector3 = AT_OTTO, popup: bool = true) -> void:
 	score += points
 	score_changed.emit(score)
+	scored.emit(points, at, popup)
 	_check_extra_life()
 
 

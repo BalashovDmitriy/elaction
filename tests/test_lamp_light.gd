@@ -84,3 +84,27 @@ func test_back_in_frame_the_lamp_is_whole_again() -> void:
 	lamp.set_light_visible(true, true)
 	for light: Light3D in _lights(lamp):
 		assert_true(light.visible and light.shadow_enabled, "%s снова с тенью" % light.get_class())
+
+
+## Мигающая лампа жилого дома, сбитая пулей, не зажигает погашенный
+## рассеиватель снова: мигание отпускает свет во всю силу, а вид сбитой лампы
+## остаётся за [method Lamp.shoot_down] (авторевью M24m: светилась на лету).
+func test_a_shot_flickering_lamp_stays_dark() -> void:
+	var lamp := LAMP_SCENE.instantiate() as Lamp
+	lamp.flicker = true
+	add_child_autofree(lamp)
+	lamp.hang(HANG, HANG + 0.5)
+	var diffuser := lamp.find_children("*", "MeshInstance3D", true, false).filter(
+		func(node: Node) -> bool: return (node as MeshInstance3D).mesh is SphereMesh
+	)
+	assert_eq(diffuser.size(), 1, "у плафона один рассеиватель")
+	if diffuser.is_empty():
+		return
+	var glass := diffuser[0] as MeshInstance3D
+	assert_eq(glass.material_override, GreyboxLook.marker(GreyboxLook.LAMP), "целая светится")
+	lamp.shoot_down()
+	var dark := glass.material_override
+	assert_ne(dark, GreyboxLook.marker(GreyboxLook.LAMP), "сбитая погасла")
+	lamp._process(1.0 / 60.0)
+	assert_eq(glass.material_override, dark, "мигание не зажгло её снова")
+	assert_false(lamp.is_processing(), "сбитая больше не мигает")

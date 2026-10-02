@@ -523,7 +523,7 @@ static func lamp_height(of_rules: BuildingRules) -> float:
 
 
 func _spawn_lamps() -> void:
-	var fixture := BuildingStyle.of(identity).fixture
+	var style := BuildingStyle.of(identity)
 	for spot in _plan.lamps:
 		var lamp := LAMP_SCENE.instantiate() as Lamp
 		var hang := rules.floor_surface(spot.floor_index) - lamp_height(rules)
@@ -531,7 +531,7 @@ func _spawn_lamps() -> void:
 		# Этаж лампы известен здесь, и обратно из координаты его не выводят: под
 		# потолком она ближе к полу этажа выше, чем к своему.
 		lamp.floor_index = spot.floor_index
-		lamp.fixture = fixture
+		lamp.dress_as(style)
 		# Зона лампы считается от того, что висит: правило темноты узнаёт о
 		# лампе здесь же, где она вешается.
 		_lighting.hang(spot.floor_index, spot.x)
@@ -587,7 +587,7 @@ func _on_lamp_crushed(agent: Enemy) -> void:
 		return
 	agent.kill(true)
 	var points := GameState.kill_score(GameState.LAMP_SCORE, agent.is_in_the_dark())
-	GameState.instance().add_score(points)
+	GameState.instance().add_score(points, agent.global_position + GameState.OVER_HEAD)
 
 
 ## Лампа долетела до пола: её зона гаснет и обратно уже не загорается.
@@ -881,6 +881,7 @@ func _release_agent(post: AgentPost) -> Enemy:
 	# Правила отдаются до дерева: так агент входит в него уже настроенным, и
 	# заводить себе значения по умолчанию ему не приходится.
 	agent.apply_rules(rules)
+	AgentWardrobe.dress(agent, identity)
 	# Сеется до [method Enemy.setup]: выход из двери уже тянет из генератора
 	# длину первого перехода, и несеянный он дал бы её случайной — прогон бота
 	# переставал бы повторяться с первого же агента.

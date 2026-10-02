@@ -283,7 +283,7 @@ func _kill() -> void:
 	_agent.set_meta(Corpse.HIT_POINT, _head_of(_agent))
 	_agent.kill(false, _scene.corpse)
 	_agent.held = false
-	GameState.instance().add_score(score)
+	GameState.instance().add_score(score, _agent.global_position + GameState.OVER_HEAD)
 	Sounds.play(Sounds.BLOW)
 	Sounds.play_tuned(Sounds.BLOW, BOOM_PITCH, BOOM_DB)
 	_apply_world()

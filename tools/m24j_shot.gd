@@ -10,6 +10,7 @@ extends Node3D
 ##     godot --path . res://tools/m24j_shot.tscn
 ##     godot --path . res://tools/m24j_shot.tscn -- --time=1 --weather=0
 ##     godot --path . res://tools/m24j_shot.tscn -- --only=roof
+##     godot --path . res://tools/m24j_shot.tscn -- --only=floor --kind=2 --floor=24
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
@@ -29,6 +30,11 @@ var _weathers: Array[int] = [0, 1, 2, 3]
 ## выходит.
 var _only: String = ""
 var _seed: int = BUILDING_SEED
+## Тип здания ([enum BuildingIdentity.Kind]): `--kind=2` — жилой дом. −1 — как
+## выпадет у первого здания партии, отель.
+var _kind: int = -1
+## Какой этаж снимать кадром floor: `--floor=24` — стилобат внизу.
+var _floor: int = 2
 
 
 func _ready() -> void:
@@ -39,6 +45,10 @@ func _ready() -> void:
 			_weathers = [argument.trim_prefix("--weather=").to_int()]
 		elif argument.begins_with("--only="):
 			_only = argument.trim_prefix("--only=")
+		elif argument.begins_with("--kind="):
+			_kind = argument.trim_prefix("--kind=").to_int()
+		elif argument.begins_with("--floor="):
+			_floor = argument.trim_prefix("--floor=").to_int()
 		elif argument.begins_with("--seed="):
 			_seed = argument.trim_prefix("--seed=").to_int()
 		elif argument.begins_with("--folder="):
@@ -57,6 +67,10 @@ func _run() -> void:
 
 func _combo(time: int, weather: int) -> void:
 	GameState.instance().start_game()
+	if _kind >= 0:
+		GameState.instance().building = BuildingIdentity.first_of(
+			_kind as BuildingIdentity.Kind, _seed
+		)
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	_level.rules = BuildingRules.new()
 	_level.rules.time_of_day = time as TimeOfDay.Kind
@@ -72,7 +86,7 @@ func _combo(time: int, weather: int) -> void:
 	if _only == "people":
 		await _shoot_people(tag)
 	if _only == "" or _only == "floor":
-		await _shoot_floor("%s_floor" % tag, 2)
+		await _shoot_floor("%s_floor" % tag, _floor)
 	if _only == "" or _only == "garage":
 		var bottom := _level.rules.floors - 1
 		_place(_level.plan().exit_x + 2.5, bottom)

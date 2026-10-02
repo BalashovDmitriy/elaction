@@ -346,5 +346,89 @@
   "author": "Quaternius",
   "licence": "CC0 1.0",
   "url": "https://poly.pizza/m/9L6lLUl9sD"
+ },
+ "fridge": {
+  "title": "Refrigirator",
+  "author": "CreativeTrio",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/G2vcjG4nvK"
+ },
+ "stove": {
+  "title": "Oven",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/VNjPRwui7t"
+ },
+ "counter_sink": {
+  "title": "Counter Sink",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/iruxBemFwO"
+ },
+ "kettle": {
+  "title": "Kettle",
+  "author": "MilkAndBanana",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/XggUrd5f03"
+ },
+ "microwave": {
+  "title": "Kitchen Microwave",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/vUsvf2HGDv"
+ },
+ "tv_old": {
+  "title": "old tv",
+  "author": "Justin Randall",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/9y-mTmCyefL"
+ },
+ "sofa": {
+  "title": "Sofa",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/vuo7KBehok"
+ },
+ "paper_bag": {
+  "title": "Bag",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/fLNcjJnsJi"
+ },
+ "bicycle": {
+  "title": "Bicycle",
+  "author": "Poly by Google",
+  "licence": "CC-BY 3.0",
+  "url": "https://poly.pizza/m/19VoUuA2pcN"
+ },
+ "trash_bags": {
+  "title": "Trash Bags",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/eitNk4I4R1"
+ },
+ "trash_bag": {
+  "title": "Trash Bag",
+  "author": "Quaternius",
+  "licence": "CC0 1.0",
+  "url": "https://poly.pizza/m/jYrMKg2Q7C"
+ },
+ "mailboxes": {
+  "title": "Mailboxes",
+  "author": "elaction",
+  "licence": "MIT",
+  "url": "tools/build_residential.py"
+ },
+ "stroller": {
+  "title": "Pram",
+  "author": "elaction",
+  "licence": "MIT",
+  "url": "tools/build_residential.py"
+ },
+ "radiator": {
+  "title": "Radiator",
+  "author": "elaction",
+  "licence": "MIT",
+  "url": "tools/build_residential.py"
  }
 }

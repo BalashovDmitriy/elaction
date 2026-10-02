@@ -10,6 +10,7 @@ extends Node3D
 ## Запуск:
 ##     godot --path . res://tools/props_shot.tscn
 ##     godot --path . res://tools/props_shot.tscn -- --raw --folder=M21b
+##     godot --path . res://tools/props_shot.tscn -- --raw --only=fridge,stove
 
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 const PROPS_DIR := "res://assets/models/props"
@@ -20,6 +21,8 @@ const PER_ROW: int = 8
 
 var _folder: String = "M21b"
 var _raw: bool = false
+## Только эти модели: `--only=fridge,stove`. Пусто — весь каталог.
+var _only := PackedStringArray()
 
 
 func _ready() -> void:
@@ -28,6 +31,8 @@ func _ready() -> void:
 			_folder = argument.trim_prefix("--folder=")
 		elif argument == "--raw":
 			_raw = true
+		elif argument.begins_with("--only="):
+			_only = argument.trim_prefix("--only=").split(",")
 	DirAccess.make_dir_recursive_absolute("res://screens/%s" % _folder)
 	SCREENSHOTTER.mark_ignored_by_engine(ProjectSettings.globalize_path("res://screens"))
 	get_window().size = Vector2i(1920, 1080)
@@ -38,7 +43,7 @@ func _ready() -> void:
 func _names() -> PackedStringArray:
 	var found := PackedStringArray()
 	for file in DirAccess.get_files_at(PROPS_DIR):
-		if file.ends_with(".glb"):
+		if file.ends_with(".glb") and (_only.is_empty() or _only.has(file.get_basename())):
 			found.append(file.get_basename())
 	found.sort()
 	return found
@@ -91,7 +96,9 @@ func _stage() -> void:
 	var camera := Camera3D.new()
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 	var rows := ceili(float(names.size()) / PER_ROW)
-	camera.size = rows * 3.2 + 1.0
+	# Высота кадра — по рядам, но не уже ряда целиком: с `--only` ряд один, и
+	# кадр по одной высоте ряда резал бы края.
+	camera.size = maxf(rows * 3.2 + 1.0, PER_ROW * STEP * 9.0 / 16.0 + 0.5)
 	camera.position = Vector3((PER_ROW - 1) * STEP * 0.5, -(rows - 1) * 1.6 + 1.0, 20.0)
 	add_child(camera)
 

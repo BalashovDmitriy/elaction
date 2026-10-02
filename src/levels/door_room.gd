@@ -1,7 +1,8 @@
 class_name DoorRoom
 extends Node3D
 
-## Комната за дверью (ADR-0047): номер отеля или кабинет офиса.
+## Комната за дверью (ADR-0047): номер отеля, кабинет офиса или квартира
+## жилого дома (ADR-0055, решение 5).
 ##
 ## Видна, пока створка открыта: ортокамера смотрит в проём почти в лоб, и в
 ## нём — задняя стена комнаты с окном и тем, что стоит перед ней, и полоса пола
@@ -20,6 +21,8 @@ extends Node3D
 ## Координаты — двери: X вдоль стены от середины проёма, Y — от пола, Z —
 ## сцены, комната за задней стеной коридора.
 
+## Какая квартира за дверью: кухня, гостиная с телевизором или спальня.
+enum Home { KITCHEN, LIVING, BEDROOM }
 ## Размер комнаты, м: ширина вдоль стены и глубина от стены коридора.
 const WIDTH: float = 4.2
 const DEPTH: float = 3.6
@@ -38,9 +41,10 @@ const WINDOW := Vector2(1.2, 1.35)
 const WINDOW_SILL: float = 0.9
 const FRAME: float = 0.06
 ## Свет комнаты: под потолком, без тени. Отель — тёплый, офис — холодный
-## белый ламп дневного света.
+## белый ламп дневного света, квартира — лампа накаливания.
 const HOTEL_LIGHT := Color(1.0, 0.76, 0.5)
 const OFFICE_LIGHT := Color(0.86, 0.93, 1.0)
+const HOME_LIGHT := Color(1.0, 0.82, 0.6)
 const LIGHT_ENERGY: float = 2.3
 const LIGHT_RANGE: float = 4.6
 ## Лампа на тумбе — свой тёплый огонёк рядом с абажуром.
@@ -52,6 +56,26 @@ const HOTEL_WALL := Color(0.62, 0.5, 0.4)
 const HOTEL_FLOOR := Color(0.32, 0.1, 0.1)
 const OFFICE_WALL := Color(0.66, 0.68, 0.7)
 const OFFICE_FLOOR := Color(0.26, 0.28, 0.31)
+const HOME_WALL := Color(0.6, 0.58, 0.46)
+const HOME_FLOOR := Color(0.34, 0.22, 0.14)
+## Телевизор в темноте (ADR-0055, решение 5): голубой свет экрана мерцает —
+## яркость, радиус, м, и как быстро меняется картинка, раз в секунду.
+const TV_LIGHT := Color(0.55, 0.7, 1.0)
+const TV_ENERGY: float = 1.4
+const TV_RANGE: float = 2.6
+const TV_FLICKER: float = 7.0
+## Телевизор повёрнут к дивану на столько градусов: экран видно и в проём.
+const TV_TURN: float = 25.0
+## Зазор ряда гостиной, м: повёрнутый телевизор выходит передним углом за свой
+## габарит на 0.27 м к дивану, и при узком зазоре угол входил в подлокотник.
+const LIVING_GAP: float = 0.3
+## Отступ ряда мебели от задней стены, м: по нему ряд считает, насколько
+## [method _put] ужмёт глубокий предмет.
+const ROW_FROM_WALL: float = 0.02
+## Верх столешницы кухни в долях роста мойки: кран выше столешницы.
+const COUNTER_TOP: float = 0.85
+## Мебель не ближе этого к боковым стенам комнаты, м.
+const INNER_MARGIN: float = 0.08
 const CEILING := Color(0.85, 0.83, 0.8)
 const WINDOW_FRAME := Color(0.9, 0.88, 0.84)
 const WINDOW_SHADER := preload("res://src/levels/room_window.gdshader")
@@ -68,6 +92,7 @@ const SUN_PITCH: float = 44.0
 ## Картины и доски на стене комнаты — те же, что в коридоре.
 const HOTEL_ART: PackedStringArray = ["painting", "wall_art_02", "wall_art_03", "wall_art_05"]
 const OFFICE_ART: PackedStringArray = ["whiteboard", "calendar", "corkboard", "analog_clock"]
+const HOME_ART: PackedStringArray = ["painting", "wall_art_03", "wall_art_06", "analog_clock"]
 
 ## Сколько комнат сейчас открыто: пока хоть одна, город за зданием рисуется,
 ## даже когда здание закрыло весь кадр, — его видно в окне.
@@ -76,7 +101,9 @@ static var open_count: int = 0
 ## Что стоит в комнате: имя предмета каталога, где (X вдоль стены, Z от задней
 ## стены комнаты к коридору, м) и поворот, градусы. Тестам и кадрам.
 var placed: Array[Dictionary] = []
-var hotel: bool = true
+var kind: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL
+## Какая комната квартиры: только в жилом доме.
+var home: Home = Home.LIVING
 ## Этаж тёмный по правилам ROM: своего света у комнаты нет, светится только
 ## окно с городом — темнота этажа не нарушается (решение пользователя, M24i).
 var dark: bool = false
@@ -86,15 +113,17 @@ var weather: Weather.Kind = Weather.Kind.CLEAR
 
 var _wall_look: StandardMaterial3D = null
 var _shift: float = 0.0
+var _tv_glow: OmniLight3D = null
+var _tv_clock: float = 0.0
 
 
-## Собирает комнату: [param is_hotel] — номер отеля или кабинет, [param seed] —
+## Собирает комнату: [param which] — тип здания, [param seed] —
 ## жребий двери, [param identity] — здание, его отделка. [param span] — этаж
 ## от стены до стены по X двери: за его наружные стены комната не выходит.
 ## [param unlit] — этаж тёмный: комната без своего света ([member dark]).
 ## [param when] и [param sky] — время суток и погода за окном.
 static func build(
-	is_hotel: bool,
+	which: BuildingIdentity.Kind,
 	seed: int,
 	identity: BuildingIdentity = null,
 	span: Vector2 = Vector2(-INF, INF),
@@ -104,7 +133,7 @@ static func build(
 ) -> DoorRoom:
 	var room := DoorRoom.new()
 	room.name = "Room"
-	room.hotel = is_hotel
+	room.kind = which
 	room.dark = unlit
 	room.time = when
 	room.weather = sky
@@ -115,18 +144,35 @@ static func build(
 	# стены, пола и потолка (авторевью M24i). Жребий тот же, сдвиг — в упор.
 	var half := (WIDTH + WALL) * 0.5
 	var shift := clampf(rng.randf_range(-SHIFT, SHIFT), span.x + half, span.y - half)
+	if which == BuildingIdentity.Kind.RESIDENTIAL:
+		room.home = rng.randi_range(0, Home.size() - 1) as Home
 	room._shell(shift, identity)
 	var window_x := shift + rng.randf_range(-0.3, 0.3)
 	room._window(window_x, rng)
-	if is_hotel:
-		room._furnish_hotel(rng)
-	else:
-		room._furnish_office(rng)
+	match which:
+		BuildingIdentity.Kind.HOTEL:
+			room._furnish_hotel(rng)
+		BuildingIdentity.Kind.OFFICE:
+			room._furnish_office(rng)
+		BuildingIdentity.Kind.RESIDENTIAL:
+			room._furnish_home(rng, window_x)
 	if room.is_sunlit():
 		room._sun_in(window_x)
 	elif not unlit:
-		room._light(shift, is_hotel)
+		room._light(shift)
+	# Кадр нужен только мерцанию телевизора.
+	room.set_process(room._tv_glow != null)
 	return room
+
+
+func _process(delta: float) -> void:
+	if _tv_glow == null:
+		return
+	# Картинка меняется скачками, а не плавно: так мерцает экран.
+	_tv_clock += delta * TV_FLICKER
+	var frame := floorf(_tv_clock)
+	var shade := 0.55 + 0.45 * absf(sin(frame * 12.9898 + 0.3 * sin(frame * 3.1)))
+	_tv_glow.light_energy = TV_ENERGY * shade
 
 
 func _enter_tree() -> void:
@@ -150,13 +196,21 @@ static func back_z() -> float:
 
 ## Пол, потолок, задняя и боковые стены.
 func _shell(shift: float, identity: BuildingIdentity) -> void:
-	var wall_tone := HOTEL_WALL if hotel else OFFICE_WALL
+	var wall_tone := HOTEL_WALL
+	var floor_tone := HOTEL_FLOOR
+	match kind:
+		BuildingIdentity.Kind.OFFICE:
+			wall_tone = OFFICE_WALL
+			floor_tone = OFFICE_FLOOR
+		BuildingIdentity.Kind.RESIDENTIAL:
+			wall_tone = HOME_WALL
+			floor_tone = HOME_FLOOR
 	var wall := (
 		BuildingFinish.wall(identity, wall_tone)
 		if identity != null
 		else GreyboxLook.surface(wall_tone)
 	)
-	var floor_look := GreyboxLook.surface(HOTEL_FLOOR if hotel else OFFICE_FLOOR)
+	var floor_look := GreyboxLook.surface(floor_tone)
 	var middle := WorldSpace.BACK_WALL_Z - DEPTH * 0.5
 	_box(Vector3(WIDTH, 0.02, DEPTH), Vector3(shift, 0.01, middle), floor_look)
 	_box(
@@ -174,7 +228,8 @@ func _shell(shift: float, identity: BuildingIdentity) -> void:
 		)
 
 
-## Окно на город в задней стене с рамой и подоконником; у отеля — шторы.
+## Окно на город в задней стене с рамой и подоконником; у отеля и в комнатах
+## квартиры — шторы, в кабинете и на кухне — жалюзи.
 func _window(x: float, rng: RandomNumberGenerator) -> void:
 	_wall_around(x)
 	var glass := QuadMesh.new()
@@ -182,7 +237,7 @@ func _window(x: float, rng: RandomNumberGenerator) -> void:
 	var look := ShaderMaterial.new()
 	look.shader = WINDOW_SHADER
 	look.set_shader_parameter(&"seed", rng.randf() * 100.0)
-	look.set_shader_parameter(&"blinds", 0.0 if hotel else 1.0)
+	look.set_shader_parameter(&"blinds", 1.0 if _blinds() else 0.0)
 	glass.material = look
 	var pane := MeshInstance3D.new()
 	pane.name = "Window"
@@ -207,8 +262,15 @@ func _window(x: float, rng: RandomNumberGenerator) -> void:
 	_box(
 		Vector3(WINDOW.x + 0.2, 0.04, 0.16), Vector3(x, WINDOW_SILL - 0.02, back_z() + 0.08), frame
 	)
-	if hotel:
+	if not _blinds():
 		_put("curtains", x, 0.12, 0.0, WINDOW.x + 0.9)
+
+
+## Жалюзи на окне вместо штор: в кабинете и на кухне.
+func _blinds() -> bool:
+	if kind == BuildingIdentity.Kind.OFFICE:
+		return true
+	return kind == BuildingIdentity.Kind.RESIDENTIAL and home == Home.KITCHEN
 
 
 ## Задняя стена с проёмом под окно: слева, справа, над окном и под ним.
@@ -269,6 +331,111 @@ func _furnish_office(rng: RandomNumberGenerator) -> void:
 	_hang(OFFICE_ART[rng.randi_range(0, OFFICE_ART.size() - 1)], desk_x, 1.7)
 
 
+## Квартира жребием двери: кухня, гостиная или спальня. [param window] — где
+## окно по X двери: на кухне под ним мойка.
+func _furnish_home(rng: RandomNumberGenerator, window: float) -> void:
+	match home:
+		Home.KITCHEN:
+			_furnish_kitchen(rng, window)
+		Home.LIVING:
+			_furnish_living(rng)
+		Home.BEDROOM:
+			_furnish_bedroom(rng)
+
+
+## Кухня: гарнитур вдоль стены — мойка под окном в створе двери, по одну
+## сторону плита с чайником, по другую холодильник; на краю столешницы —
+## микроволновка или пакет с покупками, над плитой календарь.
+func _furnish_kitchen(rng: RandomNumberGenerator, window: float) -> void:
+	var stove_first := rng.randf() < 0.5
+	var names: Array[String] = ["stove", "counter_sink", "fridge"]
+	if not stove_first:
+		names.reverse()
+	var at := _row(names, 1, clampf(window, -0.45, 0.45))
+	for index: int in names.size():
+		_put(names[index], at[index], 0.02, 0.0)
+	var stove := PropCatalog.footprint("stove")
+	var stove_x := at[names.find("stove")]
+	_put_on("kettle", stove_x - stove.x * 0.15, stove.y, 0.04)
+	var sink := PropCatalog.footprint("counter_sink")
+	var sink_x := at[1]
+	var counter_top := sink.y * COUNTER_TOP
+	var edge := 1.0 if stove_first else -1.0
+	var on_counter := "microwave" if rng.randf() < 0.5 else "paper_bag"
+	_put_on(on_counter, sink_x + edge * sink.x * 0.32, counter_top, 0.06)
+	_hang("calendar", stove_x, 1.65)
+
+
+## Гостиная: диван у стены в створе, телевизор-тумба сбоку экраном к дивану,
+## торшер с другой стороны, ковёр, картина над диваном. В темноте экран
+## светит голубым.
+func _furnish_living(rng: RandomNumberGenerator) -> void:
+	var side := -1.0 if rng.randf() < 0.5 else 1.0
+	# Ряд почти во всю комнату: телевизор — в ту сторону, куда комната сдвинута,
+	# иначе стена отодвигала диван из створа.
+	if absf(_shift) > 0.2:
+		side = signf(_shift)
+	var names: Array[String] = ["tv_old", "sofa", "floor_lamp"]
+	if side > 0.0:
+		names.reverse()
+	var sofa_index := names.find("sofa")
+	var at := _row(names, sofa_index, side * rng.randf_range(0.0, 0.15), LIVING_GAP)
+	var sofa := _put("sofa", at[sofa_index], 0.02, 0.0)
+	var tv_x := at[names.find("tv_old")]
+	# Поворот на +угол уводит лицо предмета к +X: телевизор с краю `side`
+	# смотрит обратно, к дивану, — а не в боковую стену.
+	var tv := _put("tv_old", tv_x, 0.3, -side * TV_TURN)
+	_put("floor_lamp", at[names.find("floor_lamp")], 0.08, 0.0)
+	_put("rug", at[sofa_index], sofa.z * 0.6, 0.0, 1.9)
+	_hang(HOME_ART[rng.randi_range(0, HOME_ART.size() - 1)], at[sofa_index], 1.6)
+	if not dark and not is_sunlit():
+		_tv_light(tv_x, tv.y)
+
+
+## Спальня: двуспальная кровать в створе, тумбы с обеих сторон — у одной лампа,
+## ковёр и картина над изголовьем. Комод в ряд не влезал: кровать с тумбами
+## уже в три метра.
+func _furnish_bedroom(rng: RandomNumberGenerator) -> void:
+	var side := -1.0 if rng.randf() < 0.5 else 1.0
+	var names: Array[String] = ["night_stand", "bed_double", "night_stand_b"]
+	if side < 0.0:
+		names.reverse()
+	var at := _row(names, 1, side * rng.randf_range(0.0, 0.3), 0.12)
+	var bed := _put("bed_double", at[1], 0.02, 0.0)
+	var stand_x := at[names.find("night_stand")]
+	_put("night_stand", stand_x, 0.05, 0.0)
+	if not dark and not is_sunlit():
+		_lamp_glow(stand_x)
+	_put("night_stand_b", at[names.find("night_stand_b")], 0.05, 0.0)
+	_put("rug", at[1], bed.z * 0.55, 0.0, 1.8)
+	_hang(HOME_ART[rng.randi_range(0, HOME_ART.size() - 1)], at[1], 1.75)
+
+
+## Ряд предметов вдоль задней стены вплотную, через [param gap] м: середина
+## [param hero]-го встаёт в [param hero_x], ряд целиком сдвигается внутрь
+## комнаты, если упёрся в стену. Возвращает середины по порядку.
+##
+## Ширина — та, с которой предмет встанет: [method _put] ужимает глубокое
+## (двуспальная кровать — до трёх четвертей), и по габариту каталога тумбы
+## отходили от кровати на сорок сантиметров.
+func _row(names: Array[String], hero: int, hero_x: float, gap: float = 0.03) -> PackedFloat64Array:
+	var centres := PackedFloat64Array()
+	var cursor := 0.0
+	for name: String in names:
+		var size := PropCatalog.footprint(name)
+		var width := size.x * _depth_fit(size, ROW_FROM_WALL)
+		centres.append(cursor + width * 0.5)
+		cursor += width + gap
+	var span := cursor - gap
+	var offset := hero_x - centres[hero]
+	var inner := WIDTH * 0.5 - INNER_MARGIN
+	offset = maxf(offset, _shift - inner)
+	offset = minf(offset, _shift + inner - span)
+	for index: int in centres.size():
+		centres[index] += offset
+	return centres
+
+
 ## Ставит предмет каталога задом к задней стене комнаты: [param x] — середина
 ## вдоль стены, [param from_wall] — отступ от стены, м, [param yaw] —
 ## доповорот, градусы. [param width] — привести к ширине вместо роста каталога.
@@ -282,12 +449,11 @@ func _put(prop: String, x: float, from_wall: float, yaw: float, width: float = 0
 	if width > 0.0 and size.x > 0.001:
 		node.scale = Vector3.ONE * (width / size.x)
 		size *= width / size.x
-	var room_for := DEPTH - LEAF_CLEAR - from_wall
-	if size.z > room_for and size.z > 0.001:
-		var fit := room_for / size.z
-		node.scale *= fit
-		size *= fit
+	var fit := _depth_fit(size, from_wall)
+	node.scale *= fit
+	size *= fit
 	node.rotation.y = deg_to_rad(yaw)
+	x = _between_walls(x, size.x)
 	# У предмета каталога нуль — у задней грани: к стене он ставится одним
 	# сдвигом. Развёрнутый лицом к стене (кресло у стола) уходит от нуля к
 	# стене — его нуль на свою глубину дальше.
@@ -296,6 +462,37 @@ func _put(prop: String, x: float, from_wall: float, yaw: float, width: float = 0
 	add_child(node)
 	placed.append({"prop": prop, "x": x, "size": size, "from_wall": from_wall, "yaw": yaw})
 	return size
+
+
+## Во сколько раз [method _put] ужмёт предмет габаритом [param size] у отступа
+## [param from_wall]: глубже, чем места до створки, — сжимается целиком.
+static func _depth_fit(size: Vector3, from_wall: float) -> float:
+	var room_for := DEPTH - LEAF_CLEAR - from_wall
+	if size.z > room_for and size.z > 0.001:
+		return room_for / size.z
+	return 1.0
+
+
+## Середина предмета шириной [param width], сдвинутая от боковых стен внутрь
+## комнаты: жребий ставит мебель от проёма, а комната сдвинута своим жребием, и
+## у края цветок кабинета уходил за стену (тест M24m).
+func _between_walls(x: float, width: float) -> float:
+	var inner := WIDTH * 0.5 - INNER_MARGIN - width * 0.5
+	if inner <= 0.0:
+		return _shift
+	return clampf(x, _shift - inner, _shift + inner)
+
+
+## Ставит мелочь поверх мебели: [param top] — высота её верха, м,
+## [param from_wall] — отступ от задней стены.
+func _put_on(prop: String, x: float, top: float, from_wall: float) -> void:
+	var node := PropCatalog.make(prop, true)
+	if node == null:
+		return
+	var size := PropCatalog.bounds_of(node).size
+	node.position = Vector3(x, top, back_z() + from_wall)
+	add_child(node)
+	placed.append({"prop": prop, "x": x, "size": size, "from_wall": from_wall, "yaw": 0.0})
 
 
 ## Вешает картину или доску на заднюю стену: середина на высоте [param y].
@@ -310,10 +507,16 @@ func _hang(prop: String, x: float, y: float) -> void:
 
 
 ## Свет комнаты под потолком.
-func _light(shift: float, is_hotel: bool) -> void:
+func _light(shift: float) -> void:
 	var light := OmniLight3D.new()
 	light.name = "RoomLight"
-	light.light_color = HOTEL_LIGHT if is_hotel else OFFICE_LIGHT
+	match kind:
+		BuildingIdentity.Kind.OFFICE:
+			light.light_color = OFFICE_LIGHT
+		BuildingIdentity.Kind.RESIDENTIAL:
+			light.light_color = HOME_LIGHT
+		_:
+			light.light_color = HOTEL_LIGHT
 	light.light_energy = LIGHT_ENERGY
 	light.omni_range = LIGHT_RANGE
 	light.shadow_enabled = false
@@ -340,6 +543,18 @@ func _sun_in(x: float) -> void:
 	# Прожектор светит по −Z; разворот на 180° — в комнату, наклон — вниз.
 	sun.rotation = Vector3(-deg_to_rad(SUN_PITCH), PI, 0.0)
 	add_child(sun)
+
+
+## Голубой свет экрана телевизора перед ним: мерцает в [method _process].
+func _tv_light(x: float, height: float) -> void:
+	_tv_glow = OmniLight3D.new()
+	_tv_glow.name = "TvGlow"
+	_tv_glow.light_color = TV_LIGHT
+	_tv_glow.light_energy = TV_ENERGY
+	_tv_glow.omni_range = TV_RANGE
+	_tv_glow.shadow_enabled = false
+	_tv_glow.position = Vector3(x, height * 0.6, back_z() + 0.9)
+	add_child(_tv_glow)
 
 
 ## Тёплый огонёк лампы на тумбе.

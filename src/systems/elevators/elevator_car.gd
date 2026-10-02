@@ -474,7 +474,7 @@ func _crush_those_underneath(speed: float) -> void:
 			# пули и лампы (ADR-0010).
 			if _carries_otto():
 				var points := GameState.kill_score(GameState.CRUSH_SCORE, agent.is_in_the_dark())
-				GameState.instance().add_score(points)
+				GameState.instance().add_score(points, agent.global_position + GameState.OVER_HEAD)
 			continue
 		var victim := body as Otto
 		if victim == null:

@@ -15,11 +15,10 @@ func _rules(skill: int) -> BuildingRules:
 
 
 func _identities() -> Array[BuildingIdentity]:
-	var hotel := BuildingIdentity.new()
-	var office := BuildingIdentity.new()
-	office.kind = BuildingIdentity.Kind.OFFICE
-	office.name = BuildingIdentity.OFFICE_NAMES[0]
-	return [hotel, office]
+	var all: Array[BuildingIdentity] = []
+	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
+		all.append(BuildingIdentity.typed(kind))
+	return all
 
 
 ## Что на этаже мебель задевать не вправе: проёмы дверей, шахты с наличниками
@@ -121,17 +120,19 @@ func test_wall_decor_keeps_off_shafts_and_tall_furniture() -> void:
 
 
 ## Предметы — из своего здания: в отеле нет кулеров и картотек, в офисе —
-## напольных часов и комодов. Труб на виду в отеле нет.
+## напольных часов и комодов, в жилом доме — ни того, ни другого, зато коляска
+## и почтовые ящики. Труб на виду в отеле нет.
 func test_each_building_gets_its_own_things() -> void:
 	var rules := _rules(5)
 	for identity in _identities():
-		var other := PropCatalog.Fit.OFFICE if identity.is_hotel() else PropCatalog.Fit.HOTEL
 		for building_seed: int in SEEDS:
 			var plan := BuildingPlan.generate(rules, building_seed)
 			var dressing := BuildingDressing.lay(rules, plan, building_seed, identity)
 			for item in dressing.props + dressing.decor:
-				assert_ne(
-					PropCatalog.entry(item.name).fit, other, "%s не из этого здания" % item.name
+				var fit := PropCatalog.entry(item.name).fit
+				assert_true(
+					fit == identity.fit() or fit == PropCatalog.Fit.ANY,
+					"%s не из этого здания" % item.name
 				)
 			if identity.is_hotel():
 				assert_eq(dressing.pipes.size(), 0, "в отеле трубы на виду")

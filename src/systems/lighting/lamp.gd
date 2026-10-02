@@ -48,6 +48,12 @@ const FILL_RANGE_UNSHADOWED: float = 3.0
 ## в кадре наверху здания, где кадр в бюджете.
 const FILL_SHADOW_CAP: int = 4
 const FILL_ENERGY: float = 1.5
+## Мигание: пауза между сериями и длина одного провала, с, насколько гаснет
+## свет в провале и соль жребия, какая лампа мигает.
+const FLICKER_PAUSE := Vector2(2.5, 7.0)
+const FLICKER_BLINK := Vector2(0.04, 0.12)
+const FLICKER_LOW: float = 0.15
+const FLICKER_SALT: int = 0xF11C
 
 ## Тёплый цвет лампы против холодного общего тона палитры (ADR-0023, решение 3).
 const LIGHT_COLOR := Color(1.0, 0.9, 0.7)
@@ -67,6 +73,11 @@ const BOWL := Vector2(0.27, 0.13)
 const PANEL_BOX := Vector3(0.6, 0.1, 0.34)
 const PANEL_DIFFUSER := Vector3(0.56, 0.05, 0.38)
 const PANEL_COLOR := Color(0.82, 0.84, 0.86)
+## Тарелка жилого дома (ADR-0055): радиус и глубина стекла, латунная чашка над
+## ним, м. Шире абажура не выходит — мишень та же.
+const DOME := Vector2(0.24, 0.1)
+const DOME_CAP := Vector2(0.07, 0.04)
+const DOME_CAP_COLOR := Color(0.55, 0.46, 0.28)
 
 @export var fall_speed: float = 7.8
 
@@ -81,6 +92,9 @@ var floor_index: int = 0
 ## Вид светильника по типу здания: плафон отеля или короб офиса. Ставит
 ## уровень до добавления в дерево ([BuildingStyle]).
 var fixture: BuildingStyle.Fixture = BuildingStyle.Fixture.PENDANT
+## Лампа мигает (ADR-0055, решение 4): трубка вот-вот сдохнет. Только вид —
+## зона светла, пока лампа цела, как в ROM; темноты мигание не делает.
+var flicker: bool = false
 
 var _fall := LampFall.new()
 var _spot: SpotLight3D = null
@@ -94,6 +108,12 @@ var _above_floor: float = SPOT_RANGE
 var _cord: MeshInstance3D = null
 ## Рассеиватель абажура: светится, пока лампа цела (ADR-0031, решение 3).
 var _diffuser: MeshInstance3D = null
+## Мигание: часы до следующей вспышки, сколько гаснуть ещё и тусклый
+## рассеиватель на время, пока лампа погасла.
+var _flicker_wait: float = 0.0
+var _flicker_left: int = 0
+var _flicker_rng := RandomNumberGenerator.new()
+var _dim: StandardMaterial3D = null
 
 @onready var _crush_zone: Area3D = $CrushZone
 @onready var _visual: MeshInstance3D = $Visual
@@ -124,6 +144,53 @@ func _ready() -> void:
 	add_to_group(Graphics.GROUP)
 	apply_graphics()
 	add_child(_fill)
+	set_process(flicker)
+	if flicker:
+		_flicker_rng.seed = hash([floor_index, roundi(position.x * 10.0)])
+		_flicker_wait = _flicker_rng.randf_range(FLICKER_PAUSE.x, FLICKER_PAUSE.y)
+		_dim = GreyboxLook.surface(GreyboxLook.LAMP.darkened(0.45))
+
+
+## Вид лампы по стилю здания [param style]: светильник и, на доле ламп жилого
+## дома, мигание — жребий по этажу и месту, одна лампа мигает всегда. Звать
+## до [method Node.add_child], когда [member floor_index] и место уже стоят.
+func dress_as(style: BuildingStyle) -> void:
+	fixture = style.fixture
+	var roll := hash([floor_index, roundi(position.x * 10.0), FLICKER_SALT]) % 1000
+	flicker = roll < int(style.flicker_share * 1000.0)
+
+
+## Мигание: долгая пауза, затем серия коротких провалов. Сбитая не мигает.
+func _process(delta: float) -> void:
+	if not is_hanging():
+		# Свет — во всю силу до конца падения, а рассеиватель уже погасила
+		# [method shoot_down]: зажжённый заново, он светился бы на лету.
+		_glow(true)
+		set_process(false)
+		return
+	_flicker_wait -= delta
+	if _flicker_wait > 0.0:
+		return
+	if _flicker_left == 0:
+		_flicker_left = _flicker_rng.randi_range(2, 5) * 2
+	_flicker_left -= 1
+	# Чётный шаг — тьма, нечётный — снова свет; последний — свет и пауза.
+	_show_lit(_flicker_left % 2 == 0)
+	_flicker_wait = _flicker_rng.randf_range(FLICKER_BLINK.x, FLICKER_BLINK.y)
+	if _flicker_left == 0:
+		_flicker_wait = _flicker_rng.randf_range(FLICKER_PAUSE.x, FLICKER_PAUSE.y)
+
+
+func _show_lit(lit: bool) -> void:
+	_glow(lit)
+	if _diffuser != null:
+		_diffuser.material_override = GreyboxLook.marker(GreyboxLook.LAMP) if lit else _dim
+
+
+## Сила света лампы: полная или провал мигания.
+func _glow(lit: bool) -> void:
+	_spot.light_energy = SPOT_ENERGY if lit else SPOT_ENERGY * FLICKER_LOW
+	_fill.light_energy = FILL_ENERGY if lit else FILL_ENERGY * FLICKER_LOW
 
 
 func _physics_process(delta: float) -> void:
@@ -250,6 +317,9 @@ func _dress_fixture() -> void:
 	if fixture == BuildingStyle.Fixture.PANEL:
 		_dress_panel(box)
 		return
+	if fixture == BuildingStyle.Fixture.DOME:
+		_dress_dome(box)
+		return
 	var shade := _cylinder(SHADE.x, SHADE.z, GreyboxLook.metal(SHADE_COLOR), SHADE.y)
 	shade.position = Vector3(0.0, box.size.y * 0.5 - SHADE.z * 0.5, 0.0)
 	# Светильник не отбрасывает тени: источник сидит внутри него, и абажур с
@@ -295,6 +365,32 @@ func _dress_panel(box: BoxShape3D) -> void:
 	_diffuser.material_override = GreyboxLook.marker(GreyboxLook.LAMP)
 	_diffuser.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_diffuser.position = Vector3(0.0, top - PANEL_BOX.y - PANEL_DIFFUSER.y * 0.5, 0.0)
+	add_child(_diffuser)
+
+
+## Светильник жилого дома (ADR-0055, решение 4): стеклянная тарелка на короткой
+## трубке под латунной чашкой. Висит посередине формы лампы, как и короб офиса:
+## мишень та же, а тарелка у самого потолка пряталась бы за кромкой плиты.
+func _dress_dome(box: BoxShape3D) -> void:
+	var brass := GreyboxLook.metal(DOME_CAP_COLOR)
+	var stem := _cylinder(0.012, box.size.y * 0.5, brass)
+	stem.position = Vector3(0.0, box.size.y * 0.25, 0.0)
+	stem.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(stem)
+	var cap := _cylinder(DOME_CAP.x, DOME_CAP.y, brass, DOME_CAP.x * 0.6)
+	cap.position = Vector3(0.0, DOME_CAP.y * 0.5, 0.0)
+	cap.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(cap)
+	var glass := SphereMesh.new()
+	glass.radius = DOME.x
+	glass.height = DOME.y * 2.0
+	glass.is_hemisphere = true
+	_diffuser = MeshInstance3D.new()
+	_diffuser.mesh = glass
+	_diffuser.material_override = GreyboxLook.marker(GreyboxLook.LAMP)
+	_diffuser.rotation.x = PI
+	_diffuser.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_diffuser.position = Vector3.ZERO
 	add_child(_diffuser)
 
 
