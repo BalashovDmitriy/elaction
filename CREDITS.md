@@ -234,6 +234,15 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `thunder_near` | close-up thunder strike | loganzsound | CC0 1.0 | [freesound.org](https://freesound.org/people/loganzsound/sounds/840628/) |
 | `thunder_far` | distant dry thunderclap | Shuhmi | CC-BY 4.0 | [freesound.org](https://freesound.org/people/Shuhmi/sounds/855569/) |
 | `room_tone` | hotel corridor | addiofbaddi | CC0 1.0 | [freesound.org](https://freesound.org/people/addiofbaddi/sounds/241659/) |
+| `room_tone_office` | Empty Office Space Room Tone with Aircon SFX | Soup_UnderScore | CC0 1.0 | [freesound.org](https://freesound.org/people/Soup_UnderScore/sounds/708021/) |
+| `room_tone_residential` | 1st floor apartment hallway, neighbors talking | SpliceSound | CC0 1.0 | [freesound.org](https://freesound.org/people/SpliceSound/sounds/338104/) |
+| `door_tv` | car_crash_interior_ambience_w_television_next_door | markb | CC-BY 4.0 | [freesound.org](https://freesound.org/people/markb/sounds/104578/) |
+| `door_dog` | dog next doors room-tone 0407 PM 240215_0660 | klankbeeld | CC-BY 4.0 | [freesound.org](https://freesound.org/people/klankbeeld/sounds/773829/) |
+| `door_argue` | Two People Argue - Part 1 | SieuAmThanh | CC0 1.0 | [freesound.org](https://freesound.org/people/SieuAmThanh/sounds/848362/) |
+| `step_lino` | Footsteps Boots_Linoleum | roman_gens | CC-BY 4.0 | [freesound.org](https://freesound.org/people/roman_gens/sounds/475080/) |
+| `step_lino.2` | Footsteps Boots_Linoleum | roman_gens | CC-BY 4.0 | [freesound.org](https://freesound.org/people/roman_gens/sounds/475080/) |
+| `step_lino.3` | Footsteps Boots_Linoleum | roman_gens | CC-BY 4.0 | [freesound.org](https://freesound.org/people/roman_gens/sounds/475080/) |
+| `step_lino.4` | Footsteps Boots_Linoleum | roman_gens | CC-BY 4.0 | [freesound.org](https://freesound.org/people/roman_gens/sounds/475080/) |
 | `shaft_hum` | low hum control room | gchase | CC0 1.0 | [freesound.org](https://freesound.org/people/gchase/sounds/144046/) |
 | `neon_buzz` | bulb buzz loop | Nox_Sound | CC0 1.0 | [freesound.org](https://freesound.org/people/Nox_Sound/sounds/553075/) |
 

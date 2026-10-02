@@ -149,17 +149,35 @@
   "licence": "CC0 1.0",
   "url": "https://kenney.nl/assets/music-jingles"
  },
+ "door_argue": {
+  "title": "Two People Argue - Part 1",
+  "author": "SieuAmThanh",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/SieuAmThanh/sounds/848362/"
+ },
  "door_close": {
   "title": "wooden door close",
   "author": "joedeshon",
   "licence": "CC-BY 4.0",
   "url": "https://freesound.org/people/joedeshon/sounds/117415/"
  },
+ "door_dog": {
+  "title": "dog next doors room-tone 0407 PM 240215_0660",
+  "author": "klankbeeld",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/klankbeeld/sounds/773829/"
+ },
  "door_open": {
   "title": "Door, Front, Opening",
   "author": "InspectorJ",
   "licence": "CC-BY 4.0",
   "url": "https://freesound.org/people/InspectorJ/sounds/431117/"
+ },
+ "door_tv": {
+  "title": "car_crash_interior_ambience_w_television_next_door",
+  "author": "markb",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/markb/sounds/104578/"
  },
  "elevator_hum": {
   "title": "hotel elevator ride",
@@ -323,6 +341,18 @@
   "licence": "CC0 1.0",
   "url": "https://freesound.org/people/addiofbaddi/sounds/241659/"
  },
+ "room_tone_office": {
+  "title": "Empty Office Space Room Tone with Aircon SFX",
+  "author": "Soup_UnderScore",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/Soup_UnderScore/sounds/708021/"
+ },
+ "room_tone_residential": {
+  "title": "1st floor apartment hallway, neighbors talking",
+  "author": "SpliceSound",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/SpliceSound/sounds/338104/"
+ },
  "rope_drop": {
   "title": "rbhRopeRMX1",
   "author": "nicStage",
@@ -388,6 +418,30 @@
   "author": "Kenney",
   "licence": "CC0 1.0",
   "url": "https://kenney.nl/assets/impact-sounds"
+ },
+ "step_lino": {
+  "title": "Footsteps Boots_Linoleum",
+  "author": "roman_gens",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/roman_gens/sounds/475080/"
+ },
+ "step_lino.2": {
+  "title": "Footsteps Boots_Linoleum",
+  "author": "roman_gens",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/roman_gens/sounds/475080/"
+ },
+ "step_lino.3": {
+  "title": "Footsteps Boots_Linoleum",
+  "author": "roman_gens",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/roman_gens/sounds/475080/"
+ },
+ "step_lino.4": {
+  "title": "Footsteps Boots_Linoleum",
+  "author": "roman_gens",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/roman_gens/sounds/475080/"
  },
  "step_metal": {
   "title": "metal footstep",

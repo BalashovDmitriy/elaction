@@ -93,6 +93,13 @@ const HANGER := Vector3(0.09, 0.22, 0.008)
 const HANGER_COLOR := Color(0.72, 0.1, 0.12)
 ## Соль жребия мелочей у двери: свой, чтобы не ходить в ногу с комнатой.
 const LITTLE_SALT: int = 0x7A_B1E5
+## Жизнь за дверью квартиры (ADR-0055, решение 8): соль жребия, откуда звук,
+## докуда слышно, м, и насколько тише прочих звуков, дБ, — он глухой, из-за
+## двери.
+const LIFE_SALT: int = 0x11FE
+const LIFE_AT := Vector3(0.0, 1.2, -0.3)
+const LIFE_REACH: float = 7.0
+const LIFE_DB: float = -6.0
 ## Глазок квартиры: размер и высота над низом створки, м.
 const PEEPHOLE := Vector3(0.035, 0.035, 0.02)
 const PEEPHOLE_RISE: float = 1.55
@@ -149,6 +156,8 @@ var _red_light: SpotLight3D = null
 ## Этаж двери в полосе горящих: за кадром бра не горит, как и лампы
 ## ([method set_light_in_view]). Дверь вне уровня — в тестах — считается в кадре.
 var _in_view: bool = true
+## Жизнь за дверью квартиры; у остальных дверей — нет.
+var _life: DoorLife = null
 ## Своё табло на время, пока Otto внутри: общий материал огонька дышал бы у всех
 ## красных дверей здания разом. И часы дыхания — по физике: на паузе оно стоит.
 var _pulse: StandardMaterial3D = null
@@ -211,6 +220,7 @@ func _physics_process(delta: float) -> void:
 	_cycle.tick(delta)
 	_refresh_look()
 	_breathe(delta)
+	_listen(delta)
 
 	if _stepping_out != null:
 		# Выходит на камеру, пока створка закрывается.
@@ -455,6 +465,18 @@ func furnish(
 	_room_seed = seed
 	_room_span = span
 	_furnished = true
+	if identity != null and identity.kind == BuildingIdentity.Kind.RESIDENTIAL:
+		_life = DoorLife.of(hash([seed, LIFE_SALT]))
+
+
+## Жизнь за закрытой дверью квартиры: изредка глухой звук ([DoorLife]).
+func _listen(delta: float) -> void:
+	if _life == null:
+		return
+	var audible := _in_view and _cycle.is_shut() and not has_document
+	var heard := _life.advance(delta, audible)
+	if heard != "":
+		Sounds.play_at(self, heard, global_position + LIFE_AT, LIFE_REACH, LIFE_DB)
 
 
 ## Комната за дверью, пока створка открыта; иначе null.

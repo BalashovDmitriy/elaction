@@ -236,6 +236,7 @@ func _start_game() -> void:
 	_menu.close()
 	_hud.visible = true
 	GameState.instance().start_game(_new_salt())
+	GameState.instance().building = SCREENSHOTTER.start_building()
 	# HUD перерисовывать не надо: start_game и start_building внутри здания
 	# шлют все сигналы, на которые он подписан.
 	_enter_building()

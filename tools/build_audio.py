@@ -95,6 +95,8 @@ class Source:
     # Сколько оставить после срезки тишины, с; 0 — всё. Так из записи с серией
     # щелчков берётся один щелчок.
     length: float = 0.0
+    # Срез верхов выше стольких герц: звук из-за двери или стены; 0 — без среза.
+    muffle: float = 0.0
 
 
 def freesound(sound: int, user: int, author: str, title: str, licence: str, **kw) -> Source:
@@ -268,6 +270,31 @@ SOUNDS: dict[str, list[Source]] = {
     "car_pass_slush": [freesound(190997, 2580450, "Zabuhailo", "Cars_driving_slush_road", BY4,
                                  mono=True, start=20.0, end=32.0, loop=1.0, fade_in=0.3,
                                  gain=-2.0, trim=False)],
+    # Жилой дом и офис (M24m, ADR-0055, решение 8): фон коридора, жизнь за
+    # дверью квартиры и шаг по линолеуму — выбраны пользователем на слух со
+    # страницы прослушивания. Записанное вблизи приглушено срезом верхов.
+    "room_tone_office": [freesound(708021, 14714083, "Soup_UnderScore",
+                                   "Empty Office Space Room Tone with Aircon SFX", CC0,
+                                   start=10.0, end=70.0, loop=2.0, level="ambience", gain=-4.0,
+                                   trim=False)],
+    "room_tone_residential": [freesound(338104, 1480854, "SpliceSound",
+                                        "1st floor apartment hallway, neighbors talking", CC0,
+                                        start=10.0, end=70.0, loop=2.0, level="ambience",
+                                        gain=-4.0, trim=False)],
+    "door_tv": [freesound(104578, 103289, "markb",
+                          "car_crash_interior_ambience_w_television_next_door", BY4, mono=True,
+                          start=40.0, length=12.0, muffle=900.0, fade_in=0.4, fade_out=1.0,
+                          trim=False, gain=-6.0)],
+    "door_dog": [freesound(773829, 1648170, "klankbeeld",
+                           "dog next doors room-tone 0407 PM 240215_0660", BY4, mono=True,
+                           start=2.0, length=12.0, fade_in=0.3, fade_out=1.0, trim=False,
+                           gain=-6.0)],
+    "door_argue": [freesound(848362, 7554526, "SieuAmThanh", "Two People Argue - Part 1", CC0,
+                             mono=True, start=2.0, length=12.0, muffle=700.0, fade_in=0.4,
+                             fade_out=1.0, trim=False, gain=-6.0)],
+    "step_lino": [freesound(475080, 6858456, "roman_gens", "Footsteps Boots_Linoleum", BY4,
+                            mono=True, start=at, length=0.42, fade_out=0.08, trim=False,
+                            gain=-9.0) for at in (16.88, 18.04, 19.29, 22.39)],
     "thunder_near": [freesound(840628, 16682330, "loganzsound", "close-up thunder strike", CC0,
                                end=9.0, fade_out=2.5, level="jingle", gain=2.0)],
     "thunder_far": [freesound(855569, 18648074, "Shuhmi", "distant dry thunderclap", BY4,
@@ -282,7 +309,8 @@ SOUNDS: dict[str, list[Source]] = {
 
 # Что звучит петлёй: сшивка нужна им, а форматом — OGG.
 LONG = {"winch", "car_pass", "car_pass_slush", "wind_snow", "alarm", "city_morning", "city_day", "city_evening", "theme", "theme_morning", "theme_day", "theme_evening", "alarm_theme", "menu_theme", "game_over_theme", "city", "rain",
-        "rain_window", "wind", "room_tone", "shaft_hum", "elevator_hum", "escalator_hum",
+        "rain_window", "wind", "room_tone", "room_tone_office", "room_tone_residential",
+        "door_tv", "door_dog", "door_argue", "shaft_hum", "elevator_hum", "escalator_hum",
         "car_away", "helicopter", "helicopter_pass", "garage_gate", "thunder_near", "thunder_far", "neon_buzz", "building_bonus", "game_over"}
 
 
@@ -320,6 +348,14 @@ def _rms_db(signal: np.ndarray) -> float:
     return 20.0 * np.log10(np.sqrt(np.mean(loud * loud)) + 1e-12)
 
 
+def _muffle(signal: np.ndarray, rate: int, cutoff: float) -> np.ndarray:
+    """Глухо, как из-за двери: плавный срез верхов выше [cutoff] герц (4-й порядок)."""
+    spectrum = np.fft.rfft(signal, axis=0)
+    freqs = np.fft.rfftfreq(len(signal), 1.0 / rate)
+    gain = 1.0 / (1.0 + (freqs / cutoff) ** 4)
+    return np.fft.irfft(spectrum * gain[:, None], n=len(signal), axis=0)
+
+
 def _shape(source: Source, signal: np.ndarray, rate: int) -> np.ndarray:
     length = len(signal)
     start = _seconds(source.start, length, rate)
@@ -337,6 +373,8 @@ def _shape(source: Source, signal: np.ndarray, rate: int) -> np.ndarray:
             signal = signal[max(0, above[0] - int(0.004 * rate)) :]
     if source.length > 0:
         signal = signal[: int(source.length * rate)]
+    if source.muffle > 0:
+        signal = _muffle(signal, rate, source.muffle)
 
     if tail > 0:
         body = len(signal) - tail

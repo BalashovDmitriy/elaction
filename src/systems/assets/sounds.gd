@@ -127,6 +127,15 @@ const STEP_SNOW := "step_snow"
 const CAR_PASS_SLUSH := "car_pass_slush"
 const RAIN_WINDOW := "rain_window"
 const ROOM_TONE := "room_tone"
+## Свой фон коридора у офиса и жилого дома (ADR-0055, решение 8); у отеля —
+## прежний [constant ROOM_TONE].
+const ROOM_TONE_OFFICE := "room_tone_office"
+const ROOM_TONE_RESIDENTIAL := "room_tone_residential"
+## Жизнь за дверью квартиры ([DoorLife]) и шаг по линолеуму жилого дома.
+const DOOR_TV := "door_tv"
+const DOOR_DOG := "door_dog"
+const DOOR_ARGUE := "door_argue"
+const STEP_LINO := "step_lino"
 const THUNDER_NEAR := "thunder_near"
 const THUNDER_FAR := "thunder_far"
 const SHAFT_HUM := "shaft_hum"
@@ -201,6 +210,12 @@ const AMBIENCE: PackedStringArray = [
 	WIND_SNOW,
 	RAIN_WINDOW,
 	ROOM_TONE,
+	ROOM_TONE_OFFICE,
+	ROOM_TONE_RESIDENTIAL,
+	DOOR_TV,
+	DOOR_DOG,
+	DOOR_ARGUE,
+	STEP_LINO,
 	THUNDER_NEAR,
 	THUNDER_FAR,
 	SHAFT_HUM,
@@ -234,6 +249,8 @@ const LOOPED: PackedStringArray = [
 	WIND_SNOW,
 	RAIN_WINDOW,
 	ROOM_TONE,
+	ROOM_TONE_OFFICE,
+	ROOM_TONE_RESIDENTIAL,
 	SHAFT_HUM,
 	NEON_BUZZ,
 ]
@@ -438,17 +455,38 @@ static func set_weather(weather: Weather.Kind, time: TimeOfDay.Kind = TimeOfDay.
 ## на этажах — тишина коридора и, в дождь, дождь за стеклом. Гром сюда не
 ## входит: он приходит от молний.
 ##
-## Улица — своя на время суток [param time] (ADR-0052, решение 8).
+## Улица — своя на время суток [param time] (ADR-0052, решение 8), тишина
+## коридора — своя у типа здания [param building] (ADR-0055, решение 8).
 static func weather_loops(
-	weather: Weather.Kind, outdoors: bool, time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT
+	weather: Weather.Kind,
+	outdoors: bool,
+	time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT,
+	building: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL
 ) -> PackedStringArray:
 	var raining := Weather.is_raining(weather)
 	if outdoors:
 		var outside := WIND_SNOW if Weather.is_snowing(weather) else WIND
 		return PackedStringArray([city_for(time), RAIN if raining else outside])
 	if raining:
-		return PackedStringArray([ROOM_TONE, RAIN_WINDOW])
-	return PackedStringArray([ROOM_TONE])
+		return PackedStringArray([room_tone_of(building), RAIN_WINDOW])
+	return PackedStringArray([room_tone_of(building)])
+
+
+## Тишина коридора здания типа [param building].
+static func room_tone_of(building: BuildingIdentity.Kind) -> String:
+	match building:
+		BuildingIdentity.Kind.OFFICE:
+			return ROOM_TONE_OFFICE
+		BuildingIdentity.Kind.RESIDENTIAL:
+			return ROOM_TONE_RESIDENTIAL
+	return ROOM_TONE
+
+
+## Тип здания, в котором партия: по нему тишина коридора.
+static func set_building(building: BuildingIdentity.Kind) -> void:
+	var director := AudioDirector.instance()
+	if director != null:
+		director.set_building(building)
 
 
 ## Улица во время суток [param time]: утром птицы, днём плотный гул, вечером
