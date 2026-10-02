@@ -26,6 +26,10 @@ const DIR := "res://assets/textures/wear"
 const TAGS: PackedStringArray = ["tag_0", "tag_1", "tag_2", "tag_3"]
 const STAINS: PackedStringArray = ["stain_0", "stain_1"]
 const CRACKS: PackedStringArray = ["crack_0", "crack_1"]
+## Голый кирпич, где осыпалась штукатурка (ADR-0056, решение 4).
+const BRICKS: PackedStringArray = ["brick_0", "brick_1"]
+const BRICK_RISE := Vector2(1.55, 2.05)
+const BRICK_WIDTH: float = 1.0
 
 ## Сколько следов на этаже: с каким шансом свободное место его получает.
 const CHANCE: float = 0.45
@@ -128,10 +132,14 @@ static func _draw(rng: RandomNumberGenerator, index: int, x: float) -> Mark:
 		mark.image = TAGS[rng.randi_range(0, TAGS.size() - 1)]
 		mark.rise = rng.randf_range(TAG_RISE.x, TAG_RISE.y)
 		mark.width = TAG_WIDTH
-	elif roll < 0.8:
+	elif roll < 0.68:
 		mark.image = STAINS[rng.randi_range(0, STAINS.size() - 1)]
 		mark.rise = rng.randf_range(STAIN_RISE.x, STAIN_RISE.y)
 		mark.width = STAIN_WIDTH
+	elif roll < 0.82:
+		mark.image = BRICKS[rng.randi_range(0, BRICKS.size() - 1)]
+		mark.rise = rng.randf_range(BRICK_RISE.x, BRICK_RISE.y)
+		mark.width = BRICK_WIDTH
 	else:
 		mark.image = CRACKS[rng.randi_range(0, CRACKS.size() - 1)]
 		mark.rise = rng.randf_range(CRACK_RISE.x, CRACK_RISE.y)
