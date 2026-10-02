@@ -130,6 +130,19 @@ const HELMET_HEADS: Array[String] = ["Worker"]
 ## Насколько прохожие разного роста, доля.
 const HEIGHT_SPREAD: float = 0.05
 
+
+## Часть модели библиотеки: меш, скин и имя узла, по которому видно каску.
+class Part:
+	extends RefCounted
+	var mesh: Mesh = null
+	var skin: Skin = null
+	var node_name: String = ""
+
+
+## Части моделей библиотеки по сцене: по имени части — [Part]. Хранятся
+## ресурсы, а не узлы: модель разворачивается один раз и сразу освобождается.
+## Узлы вне дерева сами не уходят, и кэш узлов держал бы восемь моделей до
+## выхода из игры, а на выходе — утечкой (авторевью M24l).
 static var _donors: Dictionary = {}
 
 
@@ -180,12 +193,23 @@ static func make(rng: RandomNumberGenerator, height: float, dress: Dress) -> Nod
 	return base
 
 
-## Часть [param part] модели [param scene] из библиотеки: модели
-## разворачиваются один раз и держатся вне дерева только ради своих мешей.
-static func _part_of(scene: PackedScene, part: String) -> MeshInstance3D:
+## Часть [param part] модели [param scene] из библиотеки или null.
+static func _part_of(scene: PackedScene, part: String) -> Part:
 	if not _donors.has(scene):
-		_donors[scene] = scene.instantiate()
-	return _find_part(_donors[scene] as Node, part)
+		var parts: Dictionary = {}
+		var model := scene.instantiate()
+		for part_name in PARTS:
+			var shape := _find_part(model, part_name)
+			if shape == null:
+				continue
+			var piece := Part.new()
+			piece.mesh = shape.mesh
+			piece.skin = shape.skin
+			piece.node_name = shape.name
+			parts[part_name] = piece
+		model.free()
+		_donors[scene] = parts
+	return (_donors[scene] as Dictionary).get(part) as Part
 
 
 static func _find_part(model: Node, part: String) -> MeshInstance3D:
@@ -196,7 +220,7 @@ static func _find_part(model: Node, part: String) -> MeshInstance3D:
 
 
 ## Есть ли у части открытая кожа.
-static func _bare(part: MeshInstance3D) -> bool:
+static func _bare(part: Part) -> bool:
 	for surface in part.mesh.get_surface_count():
 		var look := part.mesh.surface_get_material(surface)
 		if look != null and look.resource_name.begins_with("Skin"):
@@ -205,8 +229,8 @@ static func _bare(part: MeshInstance3D) -> bool:
 
 
 ## Ноги в брюках — от любой модели [param pool], у которой они такие.
-static func _covered_legs(pool: Array[PackedScene], rng: RandomNumberGenerator) -> MeshInstance3D:
-	var dressed: Array[MeshInstance3D] = []
+static func _covered_legs(pool: Array[PackedScene], rng: RandomNumberGenerator) -> Part:
+	var dressed: Array[Part] = []
 	for scene in pool:
 		var legs := _part_of(scene, "Legs")
 		if legs != null and not _bare(legs):
@@ -215,8 +239,8 @@ static func _covered_legs(pool: Array[PackedScene], rng: RandomNumberGenerator) 
 
 
 ## Голова в каске: её меш назван по модели рабочего.
-static func _helmeted(head: MeshInstance3D) -> bool:
-	return HELMET_HEADS.any(func(word: String) -> bool: return head.name.begins_with(word))
+static func _helmeted(head: Part) -> bool:
+	return HELMET_HEADS.any(func(word: String) -> bool: return head.node_name.begins_with(word))
 
 
 ## Номер модели в [param pool], у которой голова без каски.
@@ -350,7 +374,7 @@ static func _height_of(model: Node3D) -> float:
 	var bottom := INF
 	for node in model.find_children("*", "GeometryInstance3D", true, false):
 		var shape := node as GeometryInstance3D
-		var box := Shelter._relative(model, shape) * shape.get_aabb()
+		var box := Shelter.relative(model, shape) * shape.get_aabb()
 		top = maxf(top, box.end.y)
 		bottom = minf(bottom, box.position.y)
 	return top - bottom if top > bottom else 0.0

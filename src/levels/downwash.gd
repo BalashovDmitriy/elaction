@@ -2,17 +2,22 @@ class_name Downwash
 extends GPUParticles3D
 
 ## Пыль под винтом вертолёта (ADR-0052, решение 6): поток от винта гонит её по
-## крыше кольцом, пока вертолёт висит низко, и она оседает, когда он уходит.
-## Кольцо — на крыше под осью винта, у плоскости игры.
+## крыше веером, пока вертолёт висит низко, и она оседает, когда он уходит.
+## Полоса пыли — на крыше под осью винта, у плоскости игры.
 
-## Сколько частиц, их жизнь, с, кольцо, откуда их поднимает, м, скорость
-## разлёта, м/с, и цвет.
+## Сколько частиц, их жизнь, с, полуширина полосы, откуда их поднимает, м,
+## скорость разлёта, м/с, и цвет.
 ## Пыль встаёт, пока вертолёт висит не выше [constant DUST_REACH] над крышей.
 const DUST_COUNT: int = 70
 const DUST_LIFE: float = 1.4
-const DUST_RING := Vector2(0.6, 2.6)
+const DUST_HALF_WIDTH: float = 2.6
 ## Полуглубина полосы пыли, м: в пределах настила крыши, не перед фасадом.
 const DUST_DEPTH: float = 0.5
+## Направление разлёта — вверх с наклоном к камере на сотую. Ровно вверх
+## Godot кладёт веер [member ParticleProcessMaterial.flatness] в плоскость YZ —
+## к камере и в здание, — а с наклоном по Z веер ложится в плоскость кадра,
+## XY (замер: [method GPUParticles3D.capture_aabb], авторевью M24l).
+const DUST_DIRECTION := Vector3(0.0, 1.0, 0.01)
 const DUST_SPEED := Vector2(2.5, 5.0)
 const DUST_SIZE: float = 0.5
 const DUST_COLOR := Color(0.55, 0.52, 0.48, 0.32)
@@ -53,8 +58,8 @@ func _init() -> void:
 	# и она висела перед тридцатым этажом. Разлёт — веером в плоскости кадра:
 	# в стороны и вверх ([member ParticleProcessMaterial.flatness]).
 	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	process.emission_box_extents = Vector3(DUST_RING.y, 0.05, DUST_DEPTH)
-	process.direction = Vector3.UP
+	process.emission_box_extents = Vector3(DUST_HALF_WIDTH, 0.05, DUST_DEPTH)
+	process.direction = DUST_DIRECTION
 	process.spread = 80.0
 	process.flatness = 1.0
 	process.initial_velocity_min = DUST_SPEED.x
@@ -91,7 +96,7 @@ func _init() -> void:
 	add_child(_gust)
 
 
-## Ставит кольцо под ось винта в [param x] и поднимает пыль, пока вертолёт
+## Ставит полосу пыли под ось винта в [param x] и поднимает пыль, пока вертолёт
 ## на высоте [param height] сцены ниже [constant DUST_REACH] над крышей и
 ## [param hovering].
 func follow(x: float, height: float, hovering: bool) -> void:
@@ -123,6 +128,11 @@ func lift_snow(brightness: float) -> void:
 	process.color_ramp = ramp
 	# Снег легче пыли: взлетает выше и опадает медленнее.
 	process.gravity = Vector3(0.0, 0.6, 0.0)
+	# Шар потока толкает от себя и вниз: без столкновений яркая снежная пыль
+	# уходила сквозь настил на восемь метров — перед тридцатым этажом (замер
+	# авторевью M24l). Гаснет она о карту высот крыши ([RoofCatch]).
+	process.collision_mode = ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT
+	collision_base_size = 0.02
 	var quad := draw_pass_1 as QuadMesh
 	quad.size = Vector2.ONE * POWDER_SIZE
 	var look := quad.material as StandardMaterial3D

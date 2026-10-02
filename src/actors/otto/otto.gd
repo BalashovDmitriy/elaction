@@ -292,7 +292,10 @@ func _physics_process(delta: float) -> void:
 
 	if is_on_floor() or state == OttoStateMachine.State.DEAD:
 		var wanted := _horizontal_speed(_snapshot, state)
-		_air_speed = Footing.step(_air_speed, wanted, icy and is_on_floor(), delta)
+		# От скорости, с которой тело шло на самом деле, — после стены и борта
+		# кабины, — а не от задуманной: упёршийся в стену на снегу иначе ещё
+		# четверть секунды «тормозил» в неё, прежде чем пойти назад.
+		_air_speed = Footing.step(velocity.x, wanted, icy and is_on_floor(), delta)
 	velocity.x = _within_the_car(_air_speed)
 	if not is_on_floor():
 		velocity.y = maxf(velocity.y - gravity * delta, -max_fall_speed)

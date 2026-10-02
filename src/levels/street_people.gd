@@ -37,17 +37,20 @@ const CANOPY_TONES: Array[Color] = [
 const BEYOND: float = 3.0
 
 
-## Прохожий: узел, скорость со знаком и анимация.
+## Прохожий: узел, скорость со знаком, его ходьба и хват зонта — или null.
 class Walker:
 	extends RefCounted
 	var node: Node3D = null
 	var speed: float = 0.0
+	var player: AnimationPlayer = null
+	var grip: UmbrellaGrip = null
 
 
 var _walkers: Array[Walker] = []
 var _span := Vector2.ZERO
 var _rng := RandomNumberGenerator.new()
 var _dress := Passerby.Dress.LIGHT
+var _active: bool = true
 
 
 ## Выводит прохожих на тротуар от [param from] до [param to] по x сцены, на
@@ -77,7 +80,9 @@ func build(
 		)
 		walker.node.rotation.y = -PI * 0.5 if leftward else PI * 0.5
 		add_child(walker.node)
+		walker.grip = walker.node.find_child("Grip", true, false) as UmbrellaGrip
 		var player := walker.node.find_child("AnimationPlayer", true, false) as AnimationPlayer
+		walker.player = player
 		if player != null:
 			# Ходьба пака приходит из glTF без петли: доиграв шаг, прохожий
 			# застывал и плыл по тротуару статуей.
@@ -93,6 +98,27 @@ func build(
 ## Сколько прохожих на улице — для теста.
 func count() -> int:
 	return _walkers.size()
+
+
+## Идут прохожие, только пока выезд в кадре, как поток машин
+## ([method StreetTraffic.set_active]): ходьба скелетов и хват зонта на каждый
+## кадр — работа на всё здание, а улицу видно только у выезда (авторевью
+## M24l). Зовёт улица каждый кадр, поэтому — только по смене.
+func set_active(on: bool) -> void:
+	if on == _active:
+		return
+	_active = on
+	set_process(on)
+	for walker in _walkers:
+		if walker.player != null:
+			walker.player.active = on
+		if walker.grip != null:
+			walker.grip.active = on
+
+
+## Идут ли прохожие — для теста.
+func is_active() -> bool:
+	return _active
 
 
 func _process(delta: float) -> void:

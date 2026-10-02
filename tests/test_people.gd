@@ -29,6 +29,27 @@ func test_walkers_keep_walking() -> void:
 	assert_gt(before.angle_to(after), 0.02, "ноги не двигаются: прохожий плывёт")
 
 
+## Прохожие идут, только пока выезд в кадре, как поток машин: вне кадра ходьба
+## и хват зонта стоят, а в кадре идут снова.
+func test_walkers_rest_while_the_street_is_out_of_view() -> void:
+	var street := _street(Weather.Kind.RAIN)
+	var people := street.people()
+	street.show_light(false)
+	assert_false(people.is_active(), "вне кадра прохожие идут")
+	var walker := people.get_child(0) as Node3D
+	var before := walker.position
+	await wait_seconds(0.2)
+	assert_eq(walker.position, before, "вне кадра прохожий сдвинулся")
+	var grips := people.find_children("Grip", "", true, false)
+	assert_gt(grips.size(), 0, "в дождь ни одного зонта в руке")
+	for node in grips:
+		assert_false((node as UmbrellaGrip).active, "хват зонта считается вне кадра")
+	street.show_light(true)
+	await wait_seconds(0.2)
+	assert_true(people.is_active(), "в кадре прохожие стоят")
+	assert_ne(walker.position, before, "в кадре прохожий не идёт")
+
+
 ## Прохожие разные: из частей разных моделей и в своих цветах.
 func test_walkers_differ() -> void:
 	var people := _street(Weather.Kind.CLEAR).people()

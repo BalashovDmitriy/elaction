@@ -24,6 +24,16 @@ const HEIGHT: float = 16.0
 ## её оси, м.
 const RUT: float = 0.24
 const WHEEL_TRACK: float = 0.78
+## Где по глубине идут колёса обеих полос потока ([StreetTraffic]). Числом,
+## а не двумя циклами по полосам и сторонам: [method rut_at] зовётся на каждую
+## точку покрова — их сотни тысяч, — и массивы на каждый вызов стоили половину
+## сборки покрова, 60 мс из 120 (авторевью M24l).
+const WHEEL_LINES: Array[float] = [
+	StreetTraffic.NEAR_LANE_Z - WHEEL_TRACK,
+	StreetTraffic.NEAR_LANE_Z + WHEEL_TRACK,
+	StreetTraffic.FAR_LANE_Z - WHEEL_TRACK,
+	StreetTraffic.FAR_LANE_Z + WHEEL_TRACK,
+]
 
 ## Снег: цвет рыхлого и раскатанного, цвет мокрой колеи; насколько высоко над
 ## улицей лежит покров — до карнизов домов через дорогу.
@@ -86,9 +96,8 @@ func cover() -> Decal:
 ## Снег, раскатанный колёсами, на глубине [param z]: 1 — колея, 0 — рыхлый.
 static func rut_at(z: float) -> float:
 	var nearest := INF
-	for lane: float in [StreetTraffic.NEAR_LANE_Z, StreetTraffic.FAR_LANE_Z]:
-		for side: float in [-1.0, 1.0]:
-			nearest = minf(nearest, absf(z - (lane + side * WHEEL_TRACK)))
+	for line: float in WHEEL_LINES:
+		nearest = minf(nearest, absf(z - line))
 	return clampf(1.0 - (nearest - RUT) / RUT, 0.0, 1.0)
 
 
@@ -96,9 +105,12 @@ func _snow(
 	from: float, to: float, street: float, front: float, back: float, time: TimeOfDay.Kind
 ) -> void:
 	var drift := HEIGHT / RoofSnow.FALL.x * RoofSnow.WIND
+	# Жизнь — до тротуара и самому косому хлопку, поток — прежний, как на крыше
+	# ([method RoofSnow._snow]).
+	var slowest := SnowLook.slowest_fall(RoofSnow.FALL, RoofSnow.WIND)
 	_flakes = SnowLook.flakes(
-		FLAKES,
-		(HEIGHT + 1.0) / RoofSnow.FALL.x,
+		roundi(FLAKES * RoofSnow.FALL.x / slowest),
+		(HEIGHT + 1.0) / slowest,
 		Vector3((to - from + drift) * 0.5, 0.3, (front - back) * 0.5),
 		RoofSnow.FALL,
 		RoofSnow.WIND,

@@ -251,8 +251,8 @@ func road() -> StandardMaterial3D:
 	return _road
 
 
-## Настоящий свет улицы: горит, пока выезд в кадре. Поток тоже едет только тогда.
-## Днём в ясную источников нет вовсе ([method is_lit]).
+## Настоящий свет улицы: горит, пока выезд в кадре. Поток и прохожие тоже идут
+## только тогда. Днём в ясную источников нет вовсе ([method is_lit]).
 func show_light(on: bool) -> void:
 	if _glow != null:
 		_glow.visible = on
@@ -260,6 +260,8 @@ func show_light(on: bool) -> void:
 		_lamp.visible = on
 	if _traffic != null:
 		_traffic.set_active(on)
+	if _people != null:
+		_people.set_active(on)
 
 
 ## Поток машин улицы (ADR-0044, решение 1).
@@ -779,10 +781,15 @@ func _build_rain() -> void:
 	drops.name = "Drops"
 	drops.position = _at((from + _left) * 0.5, _street - height, (front + back) * 0.5)
 	# Гаснут о маркизы, машины и мостовую, а не по таймеру ([method _catch]).
+	# Шаг частиц — как на крыше ([constant RoofRain.TICKS]): на тридцати в
+	# секунду капля за шаг проходит до 60 см и гасла уже под маркизой и в
+	# салоне машины, а не на них (авторевью M24l).
 	(drops.process_material as ParticleProcessMaterial).collision_mode = (
 		ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT
 	)
 	drops.collision_base_size = 0.02
+	drops.fixed_fps = RoofRain.TICKS
+	drops.interpolate = true
 	drops.visibility_aabb = AABB(
 		Vector3(-(_left - from), -height - 1.0, -8.0),
 		Vector3((_left - from) * 2.0, height + 2.0, 16.0)

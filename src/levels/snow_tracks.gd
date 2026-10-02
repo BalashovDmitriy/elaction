@@ -30,6 +30,9 @@ static var _sole: ImageTexture = null
 
 var _deck: float = 0.0
 var _span := Vector2.ZERO
+## Проёмы шахт в настиле, по x: над ними под ногами кабина — её пол или крыша
+## вровень с настилом, — металл, а не снег.
+var _shafts: Array[Vector2] = []
 var _prints: Array[Decal] = []
 var _next: int = 0
 ## Где каждый шёл последний отпечаток и какой ногой: по id тела.
@@ -38,11 +41,13 @@ var _left_foot: Dictionary = {}
 
 
 ## Следит за настилом крыши на высоте [param deck] сцены, от [param from] до
-## [param to] по x.
-func watch(deck: float, from: float, to: float) -> void:
+## [param to] по x. [param shafts] — проёмы шахт в настиле: кто стоит над
+## проёмом, стоит на кабине — не скользит и следов не оставляет.
+func watch(deck: float, from: float, to: float, shafts: Array[Vector2] = []) -> void:
 	name = "Tracks"
 	_deck = deck
 	_span = Vector2(from, to)
+	_shafts = shafts
 
 
 ## Сколько отпечатков уже лежит — для теста.
@@ -66,6 +71,7 @@ func _physics_process(_delta: float) -> void:
 			and absf(feet.y - _deck) < ON_DECK
 			and feet.x >= _span.x
 			and feet.x <= _span.y
+			and not _over_a_shaft(feet.x)
 		)
 		body.set(&"icy", on_deck)
 		var id := body.get_instance_id()
@@ -82,6 +88,14 @@ func _physics_process(_delta: float) -> void:
 		_left_foot[id] = left
 		_last[id] = feet
 		_stamp(feet, signf(feet.x - from.x), left)
+
+
+## Над проёмом ли шахты [param x]: там под ногами кабина, а не настил.
+func _over_a_shaft(x: float) -> bool:
+	for gap in _shafts:
+		if x > gap.x and x < gap.y:
+			return true
+	return false
 
 
 func _stamp(at: Vector3, heading: float, left: bool) -> void:

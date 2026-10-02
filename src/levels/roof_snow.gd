@@ -14,8 +14,9 @@ extends Node3D
 ## ложится только на грани, которые смотрят вверх, и только на неподвижное —
 ## Otto, агенты и вертолёт на слое не числятся и остаются без снега.
 
-## Хлопьев на «высоком» ([method Graphics.rain_share]), высота неба над
-## настилом, скорость падения, м/с, ветер вбок, м/с, размер хлопка.
+## Хлопьев на «высоком» ([method Graphics.rain_share]) — на жизнь по одной
+## скорости падения [code]FALL.x[/code], — высота неба над настилом, скорость
+## падения, м/с, ветер вбок, м/с, размер хлопка.
 const FLAKES: int = 1400
 const HEIGHT: float = 8.0
 const FALL := Vector2(1.1, 1.9)
@@ -58,7 +59,8 @@ func build(rules: BuildingRules, plan: BuildingPlan, time: TimeOfDay.Kind) -> vo
 	_tracks = SnowTracks.new()
 	add_child(_tracks)
 	var bounds := rules.floor_span(BuildingRules.ROOF)
-	_tracks.watch(deck, bounds.x, bounds.y)
+	# Над проёмами шахт под ногами кабина — металл, а не снег.
+	_tracks.watch(deck, bounds.x, bounds.y, plan.gaps_on(rules, BuildingRules.ROOF))
 	add_to_group(Graphics.GROUP)
 	apply_graphics()
 
@@ -95,16 +97,22 @@ func tracks() -> SnowTracks:
 
 
 ## Хлопья сыплются над настилом со сдвигом против ветра: снесённые, они ложатся
-## на крышу, а не уходят за парапет вниз по фасаду.
+## на крышу, а не уходят за парапет вниз по фасаду. Сдвиг — на меньший снос с
+## левого края и на больший с правого ([method SnowLook.slant]): иначе у левого
+## парапета до настила не долетал ни один хлопок, а у правого часть уходила
+## за отлив (авторевью M24l).
 func _snow(rules: BuildingRules, deck: float, time: TimeOfDay.Kind) -> void:
 	var bounds := rules.floor_span(BuildingRules.ROOF)
 	var fall := HEIGHT + 0.3
-	var drift := fall / FALL.x * WIND
-	var from := bounds.x - BuildingShell.COPING_OVERHANG
-	var to := bounds.y + BuildingShell.COPING_OVERHANG - drift
+	var slant := SnowLook.slant(FALL, WIND)
+	var from := bounds.x - BuildingShell.COPING_OVERHANG - fall * slant.x
+	var to := bounds.y + BuildingShell.COPING_OVERHANG - fall * slant.y
+	# Жизнь — до настила и самому косому хлопку; хлопьев — на тот же поток, что
+	# при жизни по одной скорости падения: дольше живущий дольше лежит погасшим.
+	var slowest := SnowLook.slowest_fall(FALL, WIND)
 	_flakes = SnowLook.flakes(
-		FLAKES,
-		(HEIGHT + 1.0) / FALL.x,
+		roundi(FLAKES * FALL.x / slowest),
+		(HEIGHT + 1.0) / slowest,
 		Vector3((to - from) * 0.5, 0.3, (FRONT_Z - BACK_Z) * 0.5),
 		FALL,
 		WIND,

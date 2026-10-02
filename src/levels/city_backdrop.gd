@@ -69,7 +69,8 @@ var _view: SubViewport = null
 var _camera: Camera3D = null
 var _ground: float = 0.0
 var _rules: BuildingRules = null
-## Струи дождя у камеры города: их долю пересчитывает уровень качества.
+## Струи дождя или хлопья снега у камеры города: их долю пересчитывает уровень
+## качества.
 var _rain_layers: Array[GPUParticles3D] = []
 var _city_air: Environment = null
 ## Материал домов: в него — доля горящих окон и вспышка молнии.
@@ -152,8 +153,9 @@ func build(
 				_lightning.setup(building_seed, Vector2(0.0, rules.width), _ground)
 				_view.add_child(_lightning)
 		Weather.Kind.SNOW:
-			# Слои хлопьев у камеры, как струи дождя (ADR-0054).
-			SnowLook.city(_camera, time)
+			# Слои хлопьев у камеры, как струи дождя (ADR-0054); доля — по
+			# уровню качества, как у дождя.
+			_rain_layers = SnowLook.city(_camera, time)
 
 	var layer := CanvasLayer.new()
 	layer.name = "CityLayer"

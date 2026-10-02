@@ -80,6 +80,25 @@ static func flakes(
 	return snow
 
 
+## Снос хлопка на метр падения при падении [param fall] и ветре [param wind]:
+## наименьший и наибольший. Хлопок летит под средним углом [method flakes] с
+## разбросом [constant SPREAD] в обе стороны, и сносит его от 2 до 6 м на
+## восьми метрах, а не на одно число.
+static func slant(fall: Vector2, wind: float) -> Vector2:
+	var mean := atan(wind / ((fall.x + fall.y) * 0.5))
+	var spread := deg_to_rad(SPREAD)
+	return Vector2(tan(mean - spread), tan(mean + spread))
+
+
+## Скорость по высоте самого медленного и самого косого хлопка, м/с: по ней
+## считается жизнь хлопьев. По одной скорости падения [param fall].x жизнь
+## кончалась раньше, чем косой хлопок долетал, и он гас в воздухе — над
+## крышей на метр, над тротуаром на два (авторевью M24l).
+static func slowest_fall(fall: Vector2, wind: float) -> float:
+	var steepest := atan(wind / ((fall.x + fall.y) * 0.5)) + deg_to_rad(SPREAD)
+	return fall.x * cos(steepest)
+
+
 ## Квад хлопка: рыхлый комок из мягких сгустков, к камере, крутится и
 ## покачивается ([code]snow_flake.gdshader[/code]). [param brightness] — свет
 ## неба на нём без ламп.
@@ -100,8 +119,10 @@ static func brightness(time: TimeOfDay.Kind) -> float:
 
 
 ## Снегопад города: слои хлопьев у камеры. Слои — детьми [param camera]: едут
-## с ней, а хлопья падают в мире.
-static func city(camera: Camera3D, time: TimeOfDay.Kind) -> void:
+## с ней, а хлопья падают в мире. Отдаёт слои: их число хлопьев город
+## пересчитывает по уровню качества, как струи дождя.
+static func city(camera: Camera3D, time: TimeOfDay.Kind) -> Array[GPUParticles3D]:
+	var made: Array[GPUParticles3D] = []
 	for index in CITY_LAYERS.size():
 		var layer := CITY_LAYERS[index]
 		var reach := float(layer["depth"])
@@ -121,3 +142,5 @@ static func city(camera: Camera3D, time: TimeOfDay.Kind) -> void:
 			Vector3(reach * 4.0 + 80.0, 120.0, reach * 2.0 + 80.0)
 		)
 		camera.add_child(snow)
+		made.append(snow)
+	return made

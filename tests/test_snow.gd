@@ -76,6 +76,26 @@ func test_the_city_snows() -> void:
 	assert_eq(layers, SnowLook.CITY_LAYERS.size(), "слоёв снегопада в городе")
 
 
+## На низком уровне снегопад города реже, как струи дождя: слои пересчитывает
+## уровень качества.
+func test_the_city_snow_follows_quality() -> void:
+	var was := Graphics.quality
+	Graphics.quality = Graphics.Quality.LOW
+	var city := CityBackdrop.new()
+	add_child_autofree(city)
+	city.build(BuildingRules.new(), 1, Weather.Kind.SNOW, TimeOfDay.Kind.NIGHT)
+	Graphics.quality = was
+	var layers := city.find_children("Snow*", "GPUParticles3D", true, false)
+	assert_false(layers.is_empty(), "в городе нет снегопада")
+	for node in layers:
+		var layer := node as GPUParticles3D
+		assert_lt(
+			layer.amount,
+			int(layer.get_meta(RainLook.FULL)),
+			"%s на низком в полную силу" % layer.name
+		)
+
+
 ## Ночью хлопья тусклее, чем днём: свой свет у снега — от города и ламп.
 func test_flakes_are_dimmer_at_night() -> void:
 	var night := SnowLook.brightness(TimeOfDay.Kind.NIGHT)
@@ -151,7 +171,15 @@ func test_the_rotor_lifts_snow_powder() -> void:
 	var process := wash.process_material as ParticleProcessMaterial
 	assert_eq(process.emission_shape, ParticleProcessMaterial.EMISSION_SHAPE_BOX)
 	assert_lte(process.emission_box_extents.z, 0.6, "пыль выходит за настил к камере")
+	# Ровно вверх Godot кладёт плоский веер в плоскость YZ — к камере.
+	assert_eq(process.flatness, 1.0)
+	assert_ne(process.direction.z, 0.0, "веер пыли — к камере, а не в плоскости кадра")
 	assert_true(process.attractor_interaction_enabled, "пыль не слушает поток")
+	assert_eq(
+		process.collision_mode,
+		ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT,
+		"поток уносит снежную пыль сквозь настил"
+	)
 
 
 ## Otto идёт по заснеженной крыше — за ним цепочка следов, а отпущенный он не

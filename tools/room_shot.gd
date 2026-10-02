@@ -36,7 +36,8 @@ func _ready() -> void:
 		elif argument.begins_with("--time="):
 			_time = clampi(argument.trim_prefix("--time=").to_int(), 0, 3)
 		elif argument.begins_with("--weather="):
-			_weather = clampi(argument.trim_prefix("--weather=").to_int(), 0, 2)
+			var wanted := argument.trim_prefix("--weather=").to_int()
+			_weather = clampi(wanted, 0, Weather.Kind.size() - 1)
 	DirAccess.make_dir_recursive_absolute("res://screens/%s" % _folder)
 	SCREENSHOTTER.mark_ignored_by_engine(ProjectSettings.globalize_path("res://screens"))
 	get_window().size = Vector2i(1920, 1080)
