@@ -12,9 +12,10 @@ extends RefCounted
 ##
 ## Без узлов: строят по нему [FloorDetail], [Door], [Lamp], [BuildingProps].
 
-## Светильник этажа: подвесной плафон отеля, офисная лампа дневного света или
-## стеклянная тарелка жилого дома.
-enum Fixture { PENDANT, PANEL, DOME }
+## Светильник этажа: подвесной плафон, офисная лампа дневного света,
+## стеклянная тарелка или голая лампочка жилого дома, люстра отеля (ADR-0056,
+## решение 5).
+enum Fixture { PENDANT, PANEL, DOME, BULB, CHANDELIER }
 
 ## Отделы на табличках офиса.
 const DEPARTMENTS: PackedStringArray = [
@@ -70,6 +71,12 @@ var wainscot_height: float = BuildingRibs.SKIRTING_HEIGHT
 var rail_tone := GreyboxLook.TRIM
 ## Свет ламп и его сила по типу ([BuildingAir], ADR-0056, решение 1).
 var lamp_light := BuildingAir.LAMP_LIGHT[BuildingIdentity.Kind.HOTEL]
+## Доля ламп, что висят голой лампочкой на проводе вместо [member fixture]:
+## у жилого дома плафоны побиты (ADR-0056, решение 5).
+var bulb_share: float = 0.0
+## Доля этажей с трубой под потолком: на виду — только в жилом доме, у офиса
+## их прячет подвесной потолок (ADR-0056, решение 5).
+var pipe_share: float = 0.0
 var lamp_gain: float = 1.0
 
 
@@ -81,6 +88,7 @@ static func of(identity: BuildingIdentity) -> BuildingStyle:
 		style.lamp_gain = BuildingAir.LAMP_GAIN[identity.kind]
 	if identity == null or identity.is_hotel():
 		style.decor_share = 0.5
+		style.fixture = Fixture.CHANDELIER
 		style.wainscot_height = 1.25
 		style.rail_tone = WallFeatures.GILT
 		style.door_hanger_share = 0.22
@@ -125,5 +133,7 @@ static func _residential(style: BuildingStyle) -> BuildingStyle:
 	style.door_mat_share = 0.55
 	style.door_bag_share = 0.1
 	style.flicker_share = 0.12
+	style.bulb_share = 0.4
+	style.pipe_share = 0.8
 	style.decor_share = 0.45
 	return style

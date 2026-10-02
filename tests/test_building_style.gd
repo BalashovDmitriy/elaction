@@ -67,7 +67,11 @@ func test_a_residential_building_hangs_domes_and_peepholes() -> void:
 	var level := await _level(BuildingIdentity.Kind.RESIDENTIAL)
 	assert_eq(level.identity.kind, BuildingIdentity.Kind.RESIDENTIAL, "здание — жилой дом")
 	for lamp: Lamp in level.find_children("*", "Lamp", true, false):
-		assert_eq(lamp.fixture, BuildingStyle.Fixture.DOME, "в жилом доме — тарелка")
+		assert_has(
+			[BuildingStyle.Fixture.DOME, BuildingStyle.Fixture.BULB],
+			lamp.fixture,
+			"в жилом доме — тарелка или голая лампочка"
+		)
 	var peepholes := 0
 	var mats := 0
 	for door: Door in level.doors():

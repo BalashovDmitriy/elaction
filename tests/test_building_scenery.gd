@@ -115,17 +115,17 @@ func test_props_keep_off_doors_lamps_shafts_and_walls() -> void:
 
 ## Труба видна: висит ниже полосы, которую закрывает кромка перекрытия, и не
 ## проходит сквозь шахту, полотно эскалатора и табличку этажа. Трубы на виду —
-## только в офисе (ADR-0033): там их и проверяем.
+## только в жилом доме (ADR-0056, решение 5): там их и проверяем.
 func test_pipes_show_below_the_slab_edge_and_skip_what_they_would_cover() -> void:
 	var laid := 0
 	var front := BuildingProps.pipe_z() + BuildingProps.PIPE_THICKNESS * 0.5
-	var office := BuildingIdentity.new()
-	office.kind = BuildingIdentity.Kind.OFFICE
+	var home := BuildingIdentity.new()
+	home.kind = BuildingIdentity.Kind.RESIDENTIAL
 	for skill: int in SKILLS:
 		var rules := _rules(skill)
 		for building_seed: int in SEEDS:
 			var plan := BuildingPlan.generate(rules, building_seed)
-			var dressing := BuildingDressing.lay(rules, plan, building_seed, office)
+			var dressing := BuildingDressing.lay(rules, plan, building_seed, home)
 			for index: int in dressing.pipes:
 				var where := "навык %d, сид %d, этаж %d" % [skill, building_seed, index]
 				assert_gte(

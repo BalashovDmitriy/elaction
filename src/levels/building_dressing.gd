@@ -44,9 +44,6 @@ const WALL_WIDTH: float = PropCatalog.WALL_MAX_WIDTH
 ## что стоит сверху: лампа на комоде заходила на низ картины.
 const TALL: float = 1.25
 
-## С каким шансом под потолком этажа офиса идёт труба. В отеле труб на виду нет.
-const PIPE_CHANCE: float = 0.4
-
 ## Смешивается с сидом, чтобы обстановка не повторяла жребий раскладки.
 const SALT: int = 0x0DEC_0A7E
 
@@ -71,6 +68,7 @@ static func lay(
 	var floor_items := PropCatalog.pick(PropCatalog.Place.FLOOR, identity.fit())
 	var wall_items := PropCatalog.pick(PropCatalog.Place.WALL, identity.fit())
 	var decor_share := BuildingStyle.of(identity).decor_share
+	var pipe_share := BuildingStyle.of(identity).pipe_share
 	# У офиса задняя стена — стекло (ADR-0056, решение 4): на нём не висит ничего.
 	if identity.kind == BuildingIdentity.Kind.OFFICE:
 		wall_items.clear()
@@ -108,7 +106,7 @@ static func lay(
 				continue
 			last = hung.name
 			dressing.decor.append(_spot(hung.name, index, x))
-		if not identity.is_hotel() and rng.randf() < PIPE_CHANCE:
+		if rng.randf() < pipe_share:
 			dressing.pipes.append(index)
 	return dressing
 
