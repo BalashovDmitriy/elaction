@@ -6,8 +6,8 @@ extends Node3D
 ## У офиса вместо задней стены — стеклянные перегородки, и за ними виден зал на
 ## всю глубину плиты: ряды кубиклов с перегородками в рост сидящего, столы,
 ## мониторы со светящимися экранами, кресла, шкафы-картотеки, а у дальней стены
-## — ленточные окна на ночной город. Отдельной комнаты за дверью у офиса нет:
-## дверь открывается в этот зал.
+## — ленточные окна на город: ночью тёмные, днём светятся небом. Отдельной
+## комнаты за дверью у офиса нет: дверь открывается в этот зал.
 ##
 ## Только вид: тел нет, теней нет — набор на всё здание мультимешами по одному
 ## на деталь, и в проходе теней ламп он не участвует (бюджет кадра внизу
@@ -35,7 +35,7 @@ const MULLION_STEP: float = 1.2
 const EDGE: float = 0.6
 
 ## Цвета: стол, перегородки кубиклов (ткань), корпус монитора, экран, кресло,
-## шкаф, окна и переплёт.
+## шкаф, окна ночью и переплёт.
 const DESK_COLOUR := Color(0.52, 0.47, 0.4)
 const FABRIC := Color(0.36, 0.4, 0.46)
 const CASE := Color(0.12, 0.12, 0.13)
@@ -59,12 +59,8 @@ func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 		var inner := Vector2(
 			bounds.x + BuildingShell.WALL_WIDTH, bounds.y - BuildingShell.WALL_WIDTH
 		)
-		var cuts := plan.gaps_on(rules, index)
-		for wall in plan.walls:
-			if wall.floor_index == index:
-				cuts.append(wall.band(rules))
 		var lit := not rules.is_unlit(index)
-		for span: Vector2 in BuildingPlan.spans_between(cuts, inner):
+		for span: Vector2 in BuildingPlan.spans_between(plan.blocks_on(rules, index), inner):
 			_windows(span, surface, far)
 			for row: float in ROWS:
 				_row(span, surface, back - row, lit)
@@ -75,7 +71,7 @@ func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 	_commit("screen_off", GreyboxLook.surface(CASE.lightened(0.1)))
 	_commit("chair", GreyboxLook.surface(CHAIR_COLOUR))
 	_commit("cabinet", GreyboxLook.metal(CABINET_COLOUR))
-	_commit("night", GreyboxLook.polished(NIGHT_GLASS))
+	_commit("night", TimeOfDay.window_look(rules.time_of_day, NIGHT_GLASS))
 	_commit("frame", GreyboxLook.metal(FRAME))
 
 
@@ -106,7 +102,8 @@ func _row(span: Vector2, surface: float, z: float, lit: bool) -> void:
 			)
 
 
-## Ленточные окна у дальней стены зала: тёмное стекло ночи и переплёт.
+## Ленточные окна у дальней стены зала: стекло по времени суток
+## ([method TimeOfDay.window_look]) и переплёт.
 func _windows(span: Vector2, surface: float, far: float) -> void:
 	var length := span.y - span.x
 	var middle := (span.x + span.y) * 0.5

@@ -51,6 +51,8 @@ const SLOTS_PER_BAY: int = 2
 var _rules: BuildingRules
 var _plan: BuildingPlan
 var _identity: BuildingIdentity = BuildingIdentity.new()
+## Вид по типу здания: один на здание, а спрашивают его на каждом простенке.
+var _style: BuildingStyle = null
 
 
 func setup(
@@ -59,6 +61,7 @@ func setup(
 	_rules = rules
 	_plan = plan
 	_identity = identity
+	_style = BuildingStyle.of(identity)
 
 
 ## Что за здание: по нему отделка стены и пилястр.
@@ -86,6 +89,10 @@ func edge_of(slab: Rect2) -> void:
 ## [param inner] — стена от стены, [param openings] — проёмы дверей и выхода;
 ## проёмы шахт добавляются здесь: створки шахты стоят на той же стене.
 func line_the_wall(index: int, inner: Vector2, openings: Array[Vector2]) -> void:
+	# Офис — стекло в рост (ADR-0056, решение 4): ни панели низа, ни
+	# пилястр перед ним, стойки ставит сама стена ([BuildingShell]).
+	if _style.glass_wall:
+		return
 	var surface := _rules.floor_surface(index)
 	var top := _rules.story_top(index)
 	var gaps := openings.duplicate()
@@ -98,11 +105,7 @@ func line_the_wall(index: int, inner: Vector2, openings: Array[Vector2]) -> void
 
 	# Бра — на пилястрах отеля (ADR-0048); на тёмном этаже свет погашен
 	# по правилам ROM, и светящееся бра спорило бы с темнотой.
-	var sconces := BuildingStyle.of(_identity).sconces and not _rules.is_unlit(index)
-	# Офис — стекло в рост (ADR-0056, решение 4): ни панели низа, ни
-	# пилястр перед ним, стойки ставит сама стена ([BuildingShell]).
-	if _identity.kind == BuildingIdentity.Kind.OFFICE:
-		return
+	var sconces := _style.sconces and not _rules.is_unlit(index)
 	for span in BuildingPlan.spans_between(gaps, inner):
 		_skirting(span, surface)
 		_pilasters(span, top, surface, sconces)
@@ -110,8 +113,7 @@ func line_the_wall(index: int, inner: Vector2, openings: Array[Vector2]) -> void
 
 func _skirting(span: Vector2, surface: float) -> void:
 	var width := span.y - span.x
-	var style := BuildingStyle.of(_identity)
-	var height := style.wainscot_height
+	var height := _style.wainscot_height
 	_add_part(
 		Rect2(span.x, surface - height, width, height),
 		BuildingFinish.wainscot(_identity, _rules.palette.story),
@@ -120,7 +122,7 @@ func _skirting(span: Vector2, surface: float) -> void:
 	)
 	_add_part(
 		Rect2(span.x, surface - height - RAIL_HEIGHT, width, RAIL_HEIGHT),
-		GreyboxLook.metal(style.rail_tone),
+		GreyboxLook.metal(_style.rail_tone),
 		WorldSpace.BACK_WALL_Z,
 		RAIL_DEPTH
 	)

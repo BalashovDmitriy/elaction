@@ -49,36 +49,6 @@ func _apart(first: Color, second: Color) -> float:
 	return sqrt(2.0 * dr * dr + 4.0 * dg * dg + 3.0 * db * db) / 3.0
 
 
-func test_every_round_keeps_the_dark_floor_readable() -> void:
-	for number: int in range(1, BuildingPalette.count() + 1):
-		var palette := BuildingPalette.of_round(number)
-		# Горящий этаж — свет лампы: он и отличает его от погашенного (ADR-0010).
-		var lit := Lamp.LIGHT_COLOR.get_luminance()
-		var dark := palette.dark.get_luminance()
-		assert_gt(lit - dark, LIGHT_GAP, "раунд %d: погашенный этаж не темнее горящего" % number)
-		assert_gt(dark, DARK_FLOOR, "раунд %d: погашенный этаж ушёл в чёрное" % number)
-		assert_gt(
-			_hue_gap(Lamp.LIGHT_COLOR, palette.dark),
-			HUE_GAP,
-			"раунд %d: погашенный отличается только яркостью" % number
-		)
-
-
-func test_every_round_keeps_the_shaft_apart_from_the_wall() -> void:
-	for number: int in range(1, BuildingPalette.count() + 1):
-		var palette := BuildingPalette.of_round(number)
-		assert_gt(
-			_apart(palette.shaft, palette.story),
-			APART,
-			"раунд %d: шахта не отличается от стены" % number
-		)
-		assert_gt(
-			_apart(palette.masonry, palette.story),
-			APART,
-			"раунд %d: кладка не отличается от стены" % number
-		)
-
-
 ## Набор конечный и зацикливается: раунды в оригинале идут по кругу.
 func test_the_set_repeats_itself() -> void:
 	var size := BuildingPalette.count()
@@ -105,21 +75,25 @@ func test_rules_take_the_palette_of_their_round() -> void:
 ##
 ## Последняя пара — не «четвёртый и пятый», а «четвёртый и первый»: набор идёт
 ## по кругу, и на его стыке раунды тоже соседние. Без этой пары набор мог бы
-## замкнуться сам на себя одним и тем же цветом, и заметил бы это игрок.
+## замкнуться сам на себя одним и тем же цветом, и заметил бы это игрок. С M24n
+## наборов три (ADR-0056, решение 2) — и в каждом раунды разные.
 func test_neighbouring_rounds_differ() -> void:
-	for number: int in range(1, BuildingPalette.count() + 1):
-		var here := BuildingPalette.of_round(number)
-		var next := BuildingPalette.of_round(number + 1)
-		assert_gt(
-			_hue_gap(here.story, next.story),
-			HUE_GAP,
-			"раунды %d и %d красят этаж одинаково" % [number, number + 1]
-		)
+	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
+		for number: int in range(1, BuildingPalette.count() + 1):
+			var here := BuildingPalette.of_round(number, kind)
+			var next := BuildingPalette.of_round(number + 1, kind)
+			assert_gt(
+				_hue_gap(here.story, next.story),
+				HUE_GAP,
+				"тип %d: раунды %d и %d красят этаж одинаково" % [kind, number, number + 1]
+			)
 
 
 ## Каждый тип — свой набор (ADR-0056, решение 2), и в каждом наборе темнота
 ## читается против света ламп этого типа так же, как в наборе порта: разрыв
-## по яркости и оттенку, и погашенное не уходит в чёрное.
+## по яркости и оттенку, и погашенное не уходит в чёрное. Горящий этаж — свет
+## лампы: он и отличает его от погашенного (ADR-0010). Шахта и кладка — не в
+## тон стены.
 func test_every_kind_keeps_the_dark_floor_readable_in_every_round() -> void:
 	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
 		var light: Color = BuildingAir.LAMP_LIGHT[kind]

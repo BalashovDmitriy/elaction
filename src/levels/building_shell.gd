@@ -210,7 +210,7 @@ func _build_room() -> void:
 	var far := GreyboxLook.surface(GreyboxLook.SKY_WALL)
 	var back_z := WorldSpace.BACK_WALL_Z - PANEL_THICKNESS * 0.5
 	var far_z := WorldSpace.BACK_WALL_Z - WorldSpace.ROOM_DEPTH
-	var glazed := _ribs.identity().kind == BuildingIdentity.Kind.OFFICE
+	var glazed := BuildingStyle.of(_ribs.identity()).glass_wall
 	if glazed:
 		var hall := OpenSpace.new()
 		add_child(hall)
@@ -311,8 +311,6 @@ func _build_block(rect: Rect2, material: StandardMaterial3D, depth: float) -> vo
 	_panels.add_child(block)
 
 
-## Стена, которая только видна: без тела, толщиной [constant PANEL_THICKNESS],
-## серединой на [param z].
 ## Стеклянная перегородка офиса в задней стене: стекло и алюминиевые стойки
 ## с шагом [constant GLASS_MULLION], без тел — как и сама стена.
 func _build_glass(rect: Rect2) -> void:
@@ -339,6 +337,8 @@ func _build_glass(rect: Rect2) -> void:
 	_build_panel(Rect2(rect.position.x, rect.end.y - 0.08, rect.size.x, 0.08), frame, z + 0.03)
 
 
+## Стена, которая только видна: без тела, толщиной [constant PANEL_THICKNESS],
+## серединой на [param z].
 func _build_panel(rect: Rect2, material: StandardMaterial3D, z: float) -> void:
 	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
 		return

@@ -61,13 +61,16 @@ const SALT: int = 0x57A1_7E
 var marks: Array[Mark] = []
 
 
-## Следы здания: только у жилого дома, у остальных — пусто.
+## Следы здания: только у жилого дома, у остальных — пусто. [param features] —
+## устройство стены ([WallFeatures]): окна, щитки и двери стоят на тех же
+## местах, и тэг под окном или кирпич под дверью лестницы торчали бы из-за них.
 static func lay(
 	rules: BuildingRules,
 	plan: BuildingPlan,
 	building_seed: int,
 	identity: BuildingIdentity,
-	dressing: BuildingDressing
+	dressing: BuildingDressing,
+	features: Array[WallFeatures.Feature] = []
 ) -> Array[Mark]:
 	var found: Array[Mark] = []
 	if identity == null or identity.kind != BuildingIdentity.Kind.RESIDENTIAL:
@@ -81,9 +84,19 @@ static func lay(
 			if not hung.has(spot.floor_index):
 				hung[spot.floor_index] = PackedFloat64Array()
 			(hung[spot.floor_index] as PackedFloat64Array).append(spot.x)
+	# Устройство стены — занятые отрезки по этажам, как двери и шахты.
+	var built := {}
+	for feature: WallFeatures.Feature in features:
+		if not built.has(feature.floor_index):
+			built[feature.floor_index] = [] as Array[Vector2]
+		var half: float = WallFeatures.HALF[feature.kind]
+		(built[feature.floor_index] as Array[Vector2]).append(
+			Vector2(feature.x - half, feature.x + half)
+		)
 	# Этаж выхода — гараж: там своя отделка (ADR-0038).
 	for index: int in rules.floors - 1:
 		var zones := BuildingDressing.blocked_zones(rules, plan, index)
+		zones.append_array(built.get(index, [] as Array[Vector2]))
 		var decor: PackedFloat64Array = hung.get(index, PackedFloat64Array())
 		for x: float in BuildingDressing.wall_spots(rules, plan, index):
 			if rng.randf() >= CHANCE or _near_decor(decor, x):

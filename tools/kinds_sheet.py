@@ -37,7 +37,9 @@ def main() -> int:
     sheet = Image.new("RGB", (tile[0] * len(FLOORS), tile[1] * len(KINDS)))
     for row, _name in enumerate(KINDS):
         for column, floor in enumerate(FLOORS):
-            folder = f"{args.milestone}/kinds/k{row}_f{floor}"
+            # Своя папка на время и погоду: кадр зовётся по ним, и в общей папке
+            # «последний по имени» был бы кадром прошлого прогона (3night после 1day).
+            folder = f"{args.milestone}/kinds/t{args.time}_w{args.weather}/k{row}_f{floor}"
             code, output = run(godot, [
                 "res://tools/m24j_shot.tscn", "--", "--only=floor", f"--kind={row}",
                 f"--floor={floor}", f"--time={args.time}", f"--weather={args.weather}",

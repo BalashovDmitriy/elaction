@@ -113,13 +113,17 @@ func test_a_hotel_lights_its_pilasters_but_not_on_dark_floors() -> void:
 
 ## Стена офиса — стекло с залом за ним (ADR-0056, решение 4); у отеля и жилого
 ## дома зала нет. Зал без тел и без теней, на тёмном этаже экраны не светятся.
+## Стыков панелей стены перед стеклом нет: тёмные полосы висели бы на нём.
 func test_only_an_office_opens_its_hall_behind_glass() -> void:
 	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
 		var level := await _level(kind)
 		var halls := level.find_children("OpenSpace", "OpenSpace", true, false)
+		var joints := level.get_node_or_null("Scenery/FloorDetail/Joint")
 		if kind != BuildingIdentity.Kind.OFFICE:
 			assert_eq(halls.size(), 0, "тип %d: зала нет" % kind)
+			assert_not_null(joints, "тип %d: стыки панелей на стене" % kind)
 			continue
+		assert_null(joints, "у стекла офиса стыков панелей нет")
 		assert_eq(halls.size(), 1, "у офиса зал за стеклом")
 		var hall := halls[0] as OpenSpace
 		assert_eq(hall.find_children("*", "PhysicsBody3D", true, false).size(), 0, "зал без тел")
@@ -130,6 +134,35 @@ func test_only_an_office_opens_its_hall_behind_glass() -> void:
 				assert_eq(
 					many.cast_shadow, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, "без теней"
 				)
+
+
+## Картина висит над поручнем панели низа стены: у отеля панель высокая
+## (ADR-0056, решение 4), и низ картины в 0.9 м уходил за поручень.
+## Повторные предметы движок переименовывает, и по каталогу узнаётся первый
+## каждого вида — этого хватает: высота у вида одна.
+func test_wall_decor_hangs_above_the_wainscot() -> void:
+	for kind: BuildingIdentity.Kind in [
+		BuildingIdentity.Kind.HOTEL, BuildingIdentity.Kind.RESIDENTIAL
+	]:
+		var level := await _level(kind)
+		var rules := level.rules
+		var style := BuildingStyle.of(level.identity)
+		var rail_top := style.wainscot_height + BuildingRibs.RAIL_HEIGHT
+		var hung := 0
+		for item: Node in level.get_node("Scenery/Props").get_children():
+			var entry := PropCatalog.entry(String(item.name))
+			if entry == null or entry.place != PropCatalog.Place.WALL:
+				continue
+			var bottom := WorldSpace.to_plane((item as Node3D).position).y
+			# Этаж, над полом которого висит предмет: ближайший пол снизу.
+			var index := int(ceilf((bottom - rules.sky_height) / rules.floor_height)) - 1
+			assert_gte(
+				rules.floor_surface(index) - bottom,
+				rail_top - 0.001,
+				"тип %d: %s за поручнем" % [kind, item.name]
+			)
+			hung += 1
+		assert_gt(hung, 0, "тип %d: на стенах ничего" % kind)
 
 
 ## Дверь офиса открывается в зал: своей комнаты за ней нет.

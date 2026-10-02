@@ -91,12 +91,15 @@ func build(
 	props.name = "Props"
 	add_child(props)
 	props.build(rules, plan, dressing, identity)
+	# Устройство стены раньше следов: след обходит окна и двери, а не ложится
+	# под них.
+	var laid := WallFeatures.lay(rules, plan, building_seed, identity, dressing)
 	var wear := WallWear.new()
 	add_child(wear)
-	wear.build(rules, WallWear.lay(rules, plan, building_seed, identity, dressing))
+	wear.build(rules, WallWear.lay(rules, plan, building_seed, identity, dressing, laid))
 	var features := WallFeatures.new()
 	add_child(features)
-	features.build(rules, WallFeatures.lay(rules, plan, building_seed, identity, dressing))
+	features.build(rules, laid)
 	Sounds.set_building(identity.kind)
 
 	var city := CityBackdrop.new()

@@ -67,10 +67,9 @@ static func lay(
 	var step := rules.slot_x(1) - rules.slot_x(0)
 	var floor_items := PropCatalog.pick(PropCatalog.Place.FLOOR, identity.fit())
 	var wall_items := PropCatalog.pick(PropCatalog.Place.WALL, identity.fit())
-	var decor_share := BuildingStyle.of(identity).decor_share
-	var pipe_share := BuildingStyle.of(identity).pipe_share
+	var style := BuildingStyle.of(identity)
 	# У офиса задняя стена — стекло (ADR-0056, решение 4): на нём не висит ничего.
-	if identity.kind == BuildingIdentity.Kind.OFFICE:
+	if style.glass_wall:
 		wall_items.clear()
 	# Этаж выхода — гараж: пустой, с одной машиной (ADR-0031, решение 4).
 	for index in rules.floors - 1:
@@ -99,14 +98,14 @@ static func lay(
 		for x: float in wall_spots(rules, plan, index):
 			if _under_tall(on_floor, x) or _beside_shaft(rules, plan, index, x):
 				continue
-			if rng.randf() >= decor_share:
+			if rng.randf() >= style.decor_share:
 				continue
 			var hung := _draw(rng, wall_items, WALL_WIDTH, last)
 			if hung == null:
 				continue
 			last = hung.name
 			dressing.decor.append(_spot(hung.name, index, x))
-		if rng.randf() < pipe_share:
+		if rng.randf() < style.pipe_share:
 			dressing.pipes.append(index)
 	return dressing
 

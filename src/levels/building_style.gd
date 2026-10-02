@@ -71,13 +71,17 @@ var wainscot_height: float = BuildingRibs.SKIRTING_HEIGHT
 var rail_tone := GreyboxLook.TRIM
 ## Свет ламп и его сила по типу ([BuildingAir], ADR-0056, решение 1).
 var lamp_light := BuildingAir.LAMP_LIGHT[BuildingIdentity.Kind.HOTEL]
+var lamp_gain: float = BuildingAir.LAMP_GAIN[BuildingIdentity.Kind.HOTEL]
 ## Доля ламп, что висят голой лампочкой на проводе вместо [member fixture]:
 ## у жилого дома плафоны побиты (ADR-0056, решение 5).
 var bulb_share: float = 0.0
 ## Доля этажей с трубой под потолком: на виду — только в жилом доме, у офиса
 ## их прячет подвесной потолок (ADR-0056, решение 5).
 var pipe_share: float = 0.0
-var lamp_gain: float = 1.0
+## Задняя стена — стекло в рост двери, за ним зал [OpenSpace] (офис, ADR-0056,
+## решение 4): на стене ничего не висит, панели низа, пилястр и стыков нет,
+## своей комнаты у двери нет.
+var glass_wall: bool = false
 
 
 ## Стиль здания [param identity].
@@ -110,6 +114,7 @@ static func of(identity: BuildingIdentity) -> BuildingStyle:
 	style.sign_tone = Color(0.82, 0.92, 1.0)
 	style.fixture = Fixture.PANEL
 	style.departments = true
+	style.glass_wall = true
 	return style
 
 

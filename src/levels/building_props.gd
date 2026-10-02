@@ -21,6 +21,11 @@ const PLATE_GAP: float = 0.14
 ## ([constant FloorSigns.STANDOFF]): у края простенка рядом с дверью стоит
 ## пилястра, и табличка на самой стене тонула в ней целиком (авторевью M21b).
 const PLATE_Z: float = WorldSpace.BACK_WALL_Z + BuildingRibs.PILASTER_DEPTH + 0.01
+## У стекла офиса пилястр нет (ADR-0056, решение 4): табличка — на стекле,
+## перед наличником двери и стойками перегородки, а не в воздухе перед ними.
+const GLASS_PLATE_Z: float = WorldSpace.BACK_WALL_Z + Door.FRAME_DEPTH + 0.01
+## Зазор предмета на стене над поручнем панели низа, м.
+const PANEL_CLEAR: float = 0.02
 ## Таблички: латунь с тёмными цифрами в отеле, сталь в офисе, тусклый
 ## алюминий в жилом доме.
 const PLATE_HOTEL := Color(0.62, 0.48, 0.22)
@@ -45,6 +50,10 @@ const PIPE_MIN_LENGTH: float = 0.3
 const PIPE := Color(0.22, 0.22, 0.24)
 
 var _rules: BuildingRules = null
+## Ниже этого над полом предмет на стене не висит, м: верх панели низа стены с
+## поручнем. У отеля она в рост картины (ADR-0056, решение 4), и низ картины
+## уходил за поручень.
+var _panel_top: float = 0.0
 
 
 ## Середина трубы по глубине: перед пилястрами, с зазором.
@@ -97,6 +106,7 @@ func build(
 	identity: BuildingIdentity = BuildingIdentity.new()
 ) -> void:
 	_rules = rules
+	_panel_top = BuildingStyle.of(identity).wainscot_height + BuildingRibs.RAIL_HEIGHT
 	for prop in dressing.props:
 		_stand(prop)
 	for item in dressing.decor:
@@ -116,14 +126,16 @@ func _stand(prop: BuildingDressing.PropSpot) -> void:
 	add_child(item)
 
 
-## Предмет на стене: серединой на высоте из каталога.
+## Предмет на стене: серединой на высоте из каталога, но не ниже верха панели
+## низа стены ([member _panel_top]).
 func _hang(prop: BuildingDressing.PropSpot) -> void:
 	var item := PropCatalog.make(prop.name)
 	if item == null:
 		return
 	var entry := PropCatalog.entry(prop.name)
 	var height := PropCatalog.footprint(prop.name).y
-	var bottom := _rules.floor_surface(prop.floor_index) - entry.centre + height * 0.5
+	var low := maxf(entry.centre - height * 0.5, _panel_top + PANEL_CLEAR)
+	var bottom := _rules.floor_surface(prop.floor_index) - low
 	item.position = WorldSpace.to_scene(Vector2(prop.x, bottom))
 	item.position.z = WorldSpace.BACK_WALL_Z + STANDOFF
 	add_child(item)
@@ -141,6 +153,7 @@ func _plate_the_doors(plan: BuildingPlan, identity: BuildingIdentity) -> void:
 			plate_tone = PLATE_RESIDENTIAL
 	var metal := GreyboxLook.metal(plate_tone)
 	var style := BuildingStyle.of(identity)
+	var plate_z := GLASS_PLATE_Z if style.glass_wall else PLATE_Z
 	var doors := plan.doors.duplicate()
 	doors.sort_custom(
 		func(a: BuildingPlan.DoorSpot, b: BuildingPlan.DoorSpot) -> bool: return a.x < b.x
@@ -164,7 +177,7 @@ func _plate_the_doors(plan: BuildingPlan, identity: BuildingIdentity) -> void:
 			x += (size.x - PLATE.x) * 0.5
 		var plate := GreyboxLook.box(size, metal)
 		plate.position = WorldSpace.to_scene(Vector2(x, y))
-		plate.position.z = PLATE_Z + PLATE.z * 0.5
+		plate.position.z = plate_z + PLATE.z * 0.5
 		add_child(plate)
 		var label := Label3D.new()
 		label.text = text
