@@ -65,8 +65,6 @@ const CAR_DOOR := "car_door"
 const CAR_START := "car_start"
 const GARAGE_GATE := "garage_gate"
 const BASEMENT_OPEN := "basement_open"
-## Otto's death jingle: it sounds over the death itself.
-const DEATH_JINGLE := "death_jingle"
 
 ## M24k: gaps found by the sound audit (ADR-0052, decision 7): a bullet into a
 ## wall and into metal, an agent's shot, a body hitting the floor, a crush, entering the
@@ -205,7 +203,6 @@ const EFFECTS: PackedStringArray = [
 	BUILDING_BONUS,
 	EXTRA_LIFE,
 	GAME_OVER,
-	DEATH_JINGLE,
 	UI_MOVE,
 	UI_SELECT,
 	UI_BACK,
@@ -284,9 +281,7 @@ const AMBIENCE: PackedStringArray = [
 ]
 
 ## Jingles: they duck the track while they play (ADR-0036, decision 6).
-const JINGLES: PackedStringArray = [
-	DOCUMENT, EXTRA_LIFE, BUILDING_BONUS, GAME_OVER, DEATH_JINGLE, RECORD
-]
+const JINGLES: PackedStringArray = [DOCUMENT, EXTRA_LIFE, BUILDING_BONUS, GAME_OVER, RECORD]
 
 ## Menu sounds: like jingles, they go to [constant INTERFACE_BUS].
 const INTERFACE: PackedStringArray = [UI_MOVE, UI_SELECT, UI_BACK, BONUS_TICK]

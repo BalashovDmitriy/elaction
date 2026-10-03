@@ -6,9 +6,9 @@ The `status-updated` hook checks this.
 | | |
 |---|---|
 | **Updated** | 2026-10-03 |
-| **Current milestone** | none — M24p is merged; next in the plan is M25 (optional) |
-| **Branch** | `fix/review-sweep` — fixes after the whole-game review |
-| **State** | M24p and the English translation are merged into `main`. A whole-game review found no crash or softlock; its findings are fixed in `fix/review-sweep` ([ADR-0060](adr/0060-review-sweep.md)). Awaiting PR |
+| **Current milestone** | none — next in the plan is M24q, animation frame by frame; then M25 (optional) |
+| **Branch** | `feat/m24q-animation-plan` — the M24q plan and the death horn removed |
+| **State** | The whole-game review sweep is merged (PR #69, [ADR-0060](adr/0060-review-sweep.md)). The comic horn over Otto's death is removed at the user's request. Awaiting PR |
 | **Rollback point** | `main` holds the 3D build since M19; 2D remains in history, `d5774df` |
 
 ## Where we are now
@@ -348,6 +348,12 @@ of the kind's own style with a freight elevator gate, music and hall ambience ch
 
 ## What's next
 
+- **M24q — animation, frame by frame** (user's request, 2026-10-03): every animation
+  reviewed frame by frame and finished — Otto leaving the helicopter, agents opening doors
+  and stepping out instead of appearing, Otto opening and closing doors himself, the missing
+  frames of takedowns, deaths in unnatural poses (clip or ragdoll), shots that should leave
+  from the pistol's muzzle; also buildings flickering behind the menu in night fog. A big
+  milestone. Plan in [EPIC.md](EPIC.md).
 - **M25 — online leaderboard** (optional).
 
 In the credits the author is listed as "Idea & development" instead of "Game creator",

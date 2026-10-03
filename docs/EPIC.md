@@ -1182,6 +1182,29 @@ mission has its own place and its own finale. Questions — 2026-10-03.
 - [x] Shots of the three kinds, tests on any building, the frame budget
 - [x] Code review, `check.ps1`, README
 
+### M24q · Animation, frame by frame
+
+Requested by the user on 2026-10-03, after the whole-game review — a big one. Every animation in the
+game is reviewed frame by frame, and what looks unnatural or skips a step is finished.
+Before the code: a check against the original and questions, as for any milestone.
+
+- [ ] Frame-by-frame pass over all animations: a series of frames for each one (tools in
+      `tools/*_shot.gd`), a list of what is missing or looks wrong
+- [ ] Otto leaving the helicopter: today it looks unnatural
+- [ ] Agents coming out of doors: the door opens and the agent just appears — he should
+      open it and step out
+- [ ] Otto entering a door: he vanishes instead of going in and closing the door behind him
+- [ ] Otto coming out of a door: the door opens and he is already there — he should open
+      it himself and step out
+- [ ] Takedowns: a careful frame-by-frame review of every scene, the missing frames added
+- [ ] Deaths in unnatural poses: find out whether it is the death clip or the ragdoll
+      physics (joint limits, the hand-over from clip to ragdoll), and fix whichever it is
+- [ ] Shots: check that the bullet and the flash leave from the pistol's muzzle, for Otto
+      and agents, in every stance (standing, crouching, kneeling, prone, on the move)
+- [ ] Not animation, but in the same pass: buildings flicker behind the main menu at night
+      in fog — find the cause (fog against the city SubViewport, depth precision, LOD) and fix
+- [ ] Shots of every animation, tests, code review, `check.ps1`, README
+
 ### M25 · Online leaderboard (optional)
 
 The only part where a backend and docker compose will appear

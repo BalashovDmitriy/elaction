@@ -155,8 +155,6 @@ SOUNDS: dict[str, list[Source]] = {
                              end=2.4, fade_out=0.5, level="jingle")],
     "building_bonus": [macleod("Rollin at 5", start=-13.0, end=-7.3, fade_in=0.03,
                                fade_out=0.35, level="jingle", trim=False, excerpt=True)],
-    "death_jingle": [freesound(362204, 6629901, "TaranP", "horn_fail_wahwah_3", CC0,
-                               end=3.4, fade_out=0.4, level="jingle", gain=-3.0)],
     "game_over": [macleod("Hard Boiled", start=-8.5, fade_in=0.03, fade_out=0.35,
                           level="jingle", trim=False, excerpt=True)],
     # --- Effects.
