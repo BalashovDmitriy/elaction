@@ -1,30 +1,29 @@
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled, fog_disabled;
 
-// Завеса дождя между рядами домов города (M24a, ADR-0037, решение 3,
-// дополнение): тонкие полосы бегут вниз, каждая своей скоростью. Своего цвета
-// у них почти нет — завесу видно только там, где за ней светло: окна, неон,
-// зарево улиц, вспышка молнии. Как дождь, снятый против света: на тёмном небе
-// его нет.
+// Rain curtain between the rows of the city's houses (M24a, ADR-0037, decision 3, addendum): thin
+// streaks run down, each at its own speed. They have almost no colour of their own — the curtain is
+// visible only where it is bright behind it: windows, neon, the glow of streets, a lightning flash.
+// Like rain shot against the light: on a dark sky it is not there.
 //
-// Полос два слоя разной частоты, густота гуляет медленными порывами. Тонкие
-// полосы сглажены по экрану: иначе на ходу камеры они мерцали бы, как тонкие
-// окна до M24a. Туман на завесу не ложится — сложение с туманом высветляло
-// город.
+// There are two layers of streaks of different frequency, the density drifts in slow gusts. The
+// thin streaks are antialiased in screen space: otherwise they would flicker as the camera moves,
+// like the thin windows before M24a. Fog does not apply to the curtain — adding fog brightened the
+// city.
 
 uniform sampler2D screen : hint_screen_texture, filter_linear_mipmap;
 uniform vec3 tint : source_color = vec3(0.75, 0.82, 1.0);
-// Сколько завеса несёт света за ней и собственный слабый блеск.
+// How much of the light behind it the curtain carries, and its own faint sheen.
 uniform float gain = 3.0;
 uniform float base = 0.015;
 uniform float speed = 24.0;
-// Полос на метр по ширине, длина полосы, м, и наклон — снос на метр падения.
+// Streaks per metre of width, streak length, m, and slant — drift per metre of fall.
 uniform float density = 0.9;
 uniform float streak = 3.0;
 uniform float slant = 0.12;
-// Насколько размыт свет за завесой.
+// How blurred the light behind the curtain is.
 uniform float lod = 3.0;
-// Потолок: во вспышке молнии завеса не горит белым.
+// Cap: in a lightning flash the curtain does not burn white.
 uniform float cap = 1.5;
 
 varying vec3 world;
@@ -54,7 +53,7 @@ float strands(float scale, float seed) {
 void fragment() {
 	float gust = 0.55 + 0.45 * sin(world.x * 0.03 + world.y * 0.01 - TIME * 0.7) * sin(world.x * 0.011 + TIME * 0.23);
 	float rain = strands(1.0, 0.0) + strands(1.9, 5.3) * 0.6;
-	// Край завесы тает сверху и снизу: у неё нет видимой кромки.
+	// The curtain's edge fades at the top and bottom: it has no visible rim.
 	float edge = smoothstep(0.0, 0.15, UV.y) * (1.0 - smoothstep(0.85, 1.0, UV.y));
 	vec3 behind = textureLod(screen, SCREEN_UV, lod).rgb;
 	ALBEDO = (min(behind * gain, vec3(cap)) + tint * base) * rain * gust * edge;

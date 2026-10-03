@@ -1,44 +1,44 @@
 class_name UmbrellaGrip
 extends SkeletonModifier3D
 
-## Прохожий несёт зонт (ADR-0054, решение 11; замечания пользователя —
-## «человек должен нести зонт, а не модель зонта перемещается вместе с
-## человеком», «рука не держит зонт»).
+## A pedestrian carries an umbrella (ADR-0054, decision 11; user remarks:
+## "a person must carry the umbrella, not have an umbrella model moving along with the
+## person", "the hand does not hold the umbrella").
 ##
-## Поверх ходьбы пака одна рука держит трость, как держат зонт: локоть
-## согнут и прижат, предплечье вперёд и чуть вверх, кисть у нижних рёбер
-## пальцами вверх по трости, пальцы сжаты в кулак вокруг неё. Трость проходит
-## через середину кулака и стоит отвесно; зонт покачивается с шагом, потому что
-## кисть идёт за грудью. Левая рука по-прежнему машет.
+## On top of the pack's walk, one arm holds the shaft the way an umbrella is held: the
+## elbow bent and pressed in, the forearm forward and slightly up, the hand at the lower
+## ribs with fingers up along the shaft, the fingers clenched into a fist around it. The
+## shaft passes through the middle of the fist and stands plumb; the umbrella sways with
+## the step because the hand follows the chest. The left arm still swings.
 ##
-## Модификатор работает после анимации ([SkeletonModifier3D]): ходьба пака
-## ставит позу, хват правит в ней одну руку. Все точки — в мировых осях, а
-## поворот кости — от её нынешнего направления к нужному: оси скелета
-## импортированной модели с осями самой модели не совпадают.
+## The modifier runs after the animation ([SkeletonModifier3D]): the pack's walk sets
+## the pose, the grip fixes one arm in it. All points are in world axes, and a bone
+## rotation goes from its current direction to the desired one: the skeleton axes of an
+## imported model do not match the axes of the model itself.
 
-## Где кисть относительно груди, доли роста: вперёд, вниз, и какую долю
-## расстояния до своего плеча — в сторону.
+## Where the hand is relative to the chest, fractions of height: forward, down, and what
+## fraction of the distance to its shoulder sideways.
 const HAND_FORWARD: float = 0.12
 const HAND_DOWN: float = 0.03
-## Насколько кисть поднимается, когда зонт поднимают над встречным, доли
-## роста, и как быстро, доли в секунду.
+## How far the hand rises when the umbrella is raised over an oncoming pedestrian,
+## fractions of height, and how fast, fractions per second.
 const RAISE: float = 0.17
 const RAISE_RATE: float = 2.5
 const HAND_SIDE: float = 0.8
-## Куда уходит локоть: вниз, назад и наружу — доли.
+## Where the elbow goes: down, back and outward, as fractions.
 const ELBOW_DOWN: float = 1.0
 const ELBOW_BACK: float = 0.6
 const ELBOW_OUT: float = 0.3
-## Где в кисти середина кулака: доля пути от запястья к основанию среднего
-## пальца.
+## Where in the hand the middle of the fist is: the fraction of the way from the wrist to
+## the base of the middle finger.
 const PALM: float = 0.85
-## Насколько трость выходит под кулаком, доли роста.
+## How far the shaft sticks out below the fist, fractions of height.
 const BELOW_FIST: float = 0.05
-## Рост модели пака в её единицах.
+## Height of the pack model in its own units.
 const MODEL_HEIGHT: float = 1.85
 
-## Пальцы: по суставам от ладони, последний — конец пальца; сторона руки —
-## окончанием имени.
+## Fingers: by joints from the palm, the last one is the fingertip; the arm side is
+## given by the name suffix.
 const FINGERS: Array[Array] = [
 	["Index1", "Index2", "Index3", "Index4"],
 	["Middle1", "Middle2", "Middle3", "Middle4"],
@@ -47,19 +47,21 @@ const FINGERS: Array[Array] = [
 	["Thumb1", "Thumb2", "Thumb3"],
 ]
 
-## Зонт: его начало — низ трости, под кулаком.
+## The umbrella: its origin is the bottom of the shaft, below the fist.
 var umbrella: Node3D = null
-## Куда идёт прохожий, мировые оси; ставит улица.
+## Where the pedestrian is heading, world axes; set by the street.
 var forward := Vector3.FORWARD
-## Какой рукой держит: «R» или «L». Улица отдаёт зонт руке, что ближе к
-## камере: в дальней руке кулак закрыт корпусом, и трость будто росла из плеча.
+## Which hand holds it: "R" or "L". The street gives the umbrella to the hand closer to
+## the camera: in the far hand the fist is hidden by the torso, and the shaft seemed to
+## grow out of the shoulder.
 var side: String = "R"
-## Поднять ли зонт над встречным: тротуар узкий, и купола встречных по глубине
-## перекрываются — тот, кто идёт у витрин, поднимает свой над соседним, как
-## поднимают люди. Ставит улица; рука идёт к нему плавно.
+## Whether to raise the umbrella over an oncoming pedestrian: the sidewalk is narrow,
+## and the canopies of oncoming people overlap in depth, so whoever walks by the shop
+## windows raises theirs over the neighbor's, as people do. Set by the street; the arm
+## moves to it smoothly.
 var raised: bool = false
-## Где в последний кадр оказались кулак и низ трости, мировые оси, — для
-## теста: вне модификатора скелет отдаёт позу анимации без правки.
+## Where the fist and the bottom of the shaft ended up in the last frame, world axes, for
+## the test: outside the modifier the skeleton returns the animation pose without the fix.
 var last_fist := Vector3.ZERO
 var last_pole := Vector3.ZERO
 
@@ -122,12 +124,13 @@ func _process_modification() -> void:
 	var wrist := shoulder + along * reach
 	_aim(skeleton, _upper, _lower, to_bones * elbow)
 	_aim(skeleton, _lower, _wrist, to_bones * wrist)
-	# Кисть — пальцами вверх по трости, чуть вперёд: так держат ручку зонта.
+	# The hand with fingers up along the shaft, slightly forward: this is how an umbrella
+	# handle is held.
 	var hand_length := _at(skeleton, _wrist).distance_to(_at(skeleton, _middle))
 	var up_the_pole := (Vector3.UP + ahead * 0.25).normalized()
 	_aim(skeleton, _wrist, _middle, to_bones * (wrist + up_the_pole * hand_length))
 	var fist := wrist + (_at(skeleton, _middle) - wrist) * PALM
-	# Пальцы — в кулак: каждый сустав тянется к трости, на её оси под кулаком.
+	# Fingers into a fist: each joint reaches for the shaft, on its axis below the fist.
 	var hold := fist + Vector3.DOWN * hand_length * 0.15
 	for chain in _fingers:
 		for index in chain.size() - 1:
@@ -142,9 +145,9 @@ func _at(skeleton: Skeleton3D, bone: int) -> Vector3:
 	return skeleton.global_transform * skeleton.get_bone_global_pose(bone).origin
 
 
-## Поворачивает кость [param bone] так, чтобы её потомок [param child] пришёл
-## в [param point], оси скелета. Поворот — от нынешнего направления кости к
-## нужному: так он не зависит от того, по какой оси пак кладёт кости.
+## Rotates bone [param bone] so that its child [param child] comes to [param point],
+## skeleton axes. The rotation goes from the bone's current direction to the desired
+## one: this way it does not depend on which axis the pack lays bones along.
 func _aim(skeleton: Skeleton3D, bone: int, child: int, point: Vector3) -> void:
 	var pose := skeleton.get_bone_global_pose(bone)
 	var now := (skeleton.get_bone_global_pose(child).origin - pose.origin).normalized()

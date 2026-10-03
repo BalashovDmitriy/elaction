@@ -1,62 +1,63 @@
 class_name BuildingRoute
 extends RefCounted
 
-## Достижимость по зданию: куда можно попасть из точки старта.
+## Reachability across the building: where one can get from the starting point.
 ##
-## Этаж разрезан проёмами на куски, и пешком ходить можно только внутри куска.
-## Между кусками и этажами переносят шахты и эскалаторы — по ним и строится граф.
+## A floor is cut by openings into pieces, and on foot one can only move within a piece.
+## Shafts and escalators carry between pieces and floors — the graph is built on them.
 ##
-## Падения в граф не входят намеренно: если здание проходимо без них, оно проходимо
-## тем более. А падение больше чем на этаж вдобавок смертельно.
+## Falls are left out of the graph on purpose: if the building is passable without them, it
+## is all the more passable with them. And a fall of more than a floor is fatal besides.
 ##
-## Всё считается по раскладке, без узлов и физики, поэтому проверяется на десятках
-## сидов за доли секунды — а именно на редких сидах и вылезают дыры в генерации.
+## Everything is computed from the layout, without nodes and physics, so it is checked on
+## dozens of seeds in a fraction of a second — and it is on rare seeds that generation holes
+## show up.
 
-## На сколько заходить в кусок этажа от его края, м. Столько нужно, чтобы стоять
-## на нём, а не на самой кромке проёма.
+## How far into a floor piece to go from its edge, m. That much is needed to stand
+## on it rather than on the very edge of an opening.
 const STEP_INSIDE: float = 0.3
 
-## Допуск на примыкание: на дробную арифметику, и только на неё.
+## Adjacency tolerance: for floating-point arithmetic, and only for it.
 ##
-## Раньше он был метровым, и на этом граф обещал связь, которой нет: внутренняя
-## стена шириной почти метр (ADR-0024, решение 5) укладывалась в допуск целиком,
-## и кусок за ней считался доступным прямо из кабины. Здание с таким «переходом»
-## проходило проверку, а игрок упирался в стену.
+## It used to be a metre, and with it the graph promised a connection that did not exist:
+## an inner wall almost a metre wide (ADR-0024, decision 5) fit into the tolerance entirely,
+## and the piece behind it counted as reachable straight from the cab. A building with such a
+## "passage" passed the check, and the player ran into a wall.
 const TOUCHING_SLACK: float = 0.05
 
 
-## Узлы, куда можно добраться из точки старта. Ключ — «этаж:кусок».
+## Nodes reachable from the starting point. Key — "floor:piece".
 static func reachable(plan: BuildingPlan, rules: BuildingRules) -> Dictionary:
 	return reachable_in(plan, rules, _floor_segments(plan, rules))
 
 
-## Куски всех уровней: уровень -> пары «левый край, правый край».
+## Pieces of all levels: level -> "left edge, right edge" pairs.
 ##
-## Отдаются наружу, чтобы считать узлы пачкой: [method node_in] по готовым кускам
-## стоит копейки, а сами куски — это перебор всей раскладки.
+## Exposed so nodes can be computed in bulk: [method node_in] over ready pieces
+## costs next to nothing, while the pieces themselves are a pass over the whole layout.
 ##
-## Словарь, а не список: уровни считаются от [constant BuildingRules.ROOF], то есть
-## от −1, а [code]Array[-1][/code] в GDScript отдаёт последний элемент — крыша молча
-## притворялась бы первым этажом вместо того, чтобы уронить обход (ADR-0014).
+## A dictionary, not a list: levels count from [constant BuildingRules.ROOF], i.e.
+## from −1, and [code]Array[-1][/code] in GDScript returns the last element — the roof would
+## silently pretend to be the first floor instead of crashing the traversal (ADR-0014).
 static func segments(plan: BuildingPlan, rules: BuildingRules) -> Dictionary:
 	return _floor_segments(plan, rules)
 
 
-## Узел точки уровня по готовым кускам из [method segments]. По нему проверяют,
-## ведёт ли туда маршрут: [method reachable] возвращает набор таких же узлов.
+## Node of a level point by the ready pieces from [method segments]. It is used to check
+## whether the route leads there: [method reachable] returns a set of the same nodes.
 static func node_in(floors: Dictionary, floor_index: int, x: float) -> String:
 	return _node(floor_index, _segment_at(floors[floor_index], x))
 
 
-## Те же узлы, что и у [method reachable], но по готовым кускам из
-## [method segments]: кто их уже посчитал, второй раз за перебор не платит.
+## The same nodes as [method reachable], but from the ready pieces of
+## [method segments]: whoever has already computed them does not pay twice per pass.
 static func reachable_in(
 	plan: BuildingPlan, rules: BuildingRules, floors: Dictionary
 ) -> Dictionary:
 	var links: Dictionary = _graph(plan, rules, floors, false)["links"]
 
-	# Спуск начинается с крыши, а не с верхнего этажа: туда Otto попадает лифтом,
-	# и здание, до которого от крыши не добраться, непроходимо.
+	# The descent starts from the roof, not from the top floor: Otto gets there by elevator,
+	# and a building that cannot be reached from the roof is impassable.
 	var from := BuildingRules.ROOF
 	var start := _node(from, _segment_at(floors[from], plan.safe_x(rules, from)))
 	var seen := {start: true}
@@ -72,14 +73,14 @@ static func reachable_in(
 	return seen
 
 
-## Проходимо ли здание: все документы собираются и выход достижим.
+## Whether the building is passable: all documents can be collected and the exit is reachable.
 static func is_winnable(plan: BuildingPlan, rules: BuildingRules) -> bool:
 	return unreachable_spots(plan, rules).is_empty()
 
 
-## Что недостижимо из точки старта: описания мест, по одному на каждое.
+## What is unreachable from the starting point: descriptions of places, one per place.
 ##
-## Возвращает описания, а не индексы, чтобы упавший тест сразу говорил, где дыра.
+## Returns descriptions rather than indices so a failed test says at once where the hole is.
 static func unreachable_spots(plan: BuildingPlan, rules: BuildingRules) -> Array[String]:
 	var floors := _floor_segments(plan, rules)
 	var seen := reachable_in(plan, rules, floors)
@@ -99,17 +100,17 @@ static func unreachable_spots(plan: BuildingPlan, rules: BuildingRules) -> Array
 	return missing
 
 
-## Ничего ли не отрезано: документы и выход достижимы, и **все куски этажа
-## [param floor_index] тоже**.
+## Whether nothing is cut off: documents and the exit are reachable, and **all pieces of
+## floor [param floor_index] too**.
 ##
-## Второе — про карманы. Стена режет свой этаж надвое, и отрезанная половина
-## бывает никому не нужна: документа в ней нет, [method is_winnable] её не
-## замечает, — а бот, зайдя туда, встаёт до конца прогона (сид 1, 22-й этаж,
-## 3001 шаг «хода нет»).
+## The second part is about pockets. A wall cuts its floor in two, and the cut-off half
+## may be of no use to anyone: there is no document in it, [method is_winnable] does not
+## notice it — and a bot that walks in there gets stuck till the end of the run (seed 1,
+## floor 22, 3001 steps of "no move").
 ##
-## Считать это числом достижимых узлов нельзя, в отличие от двухэтажной пары:
-## пара меняет только рёбра, а стена заводит новый узел, и число их растёт
-## само по себе. Поэтому спрашивается именно про куски этажа.
+## This cannot be measured by the number of reachable nodes, unlike the two-floor pair:
+## a pair changes only edges, while a wall adds a new node, and their number grows
+## by itself. So the question is asked specifically about the floor's pieces.
 static func nothing_is_cut_off(plan: BuildingPlan, rules: BuildingRules, floor_index: int) -> bool:
 	var floors := _floor_segments(plan, rules)
 	var seen := reachable_in(plan, rules, floors)
@@ -130,33 +131,33 @@ static func nothing_is_cut_off(plan: BuildingPlan, rules: BuildingRules, floor_i
 	return true
 
 
-## Готовый к ходьбе граф здания: куски уровней и подписанные переходы между ними.
+## The building graph ready for walking: level pieces and labelled transitions between them.
 ##
-## Считается один раз на здание и отдаётся тому, кто по нему ходит: раскладка за
-## партию не меняется, а [method step_toward] зовут каждый кадр.
+## Computed once per building and handed to whoever walks it: the layout does not change
+## during a game, and [method step_toward] is called every frame.
 ##
-## Отдельно от [method reachable]: тому достаточно знать, связаны ли узлы, а
-## идущему нужно знать чем — к какой шахте идти и на каком уровне выходить.
+## Separate from [method reachable]: that one only needs to know whether nodes are linked,
+## while a walker needs to know by what — which shaft to go to and at which level to get out.
 static func walkable(plan: BuildingPlan, rules: BuildingRules) -> Dictionary:
 	var pieces := _floor_segments(plan, rules)
 	return {
 		"pieces": pieces,
 		"moves": _graph(plan, rules, pieces, true)["moves"],
-		# Докуда дотянется тот, кто стоит в кабине: она перекрывает проём собой,
-		# и выйти из неё можно в любой край.
+		# How far someone standing in the cab can reach: it covers the opening itself,
+		# and one can step out of it to either side.
 		"reach": rules.shaft_width * 0.5 + TOUCHING_SLACK,
 	}
 
 
-## Первый шаг к цели по готовому графу из [method walkable].
+## The first step towards the goal over the ready graph from [method walkable].
 ##
-## Отдаётся один шаг, а не весь маршрут: идущий пересчитывает решение каждый
-## кадр — он промахивается мимо кабины, дерётся, падает и сходит с места, и
-## запомненный маршрут устарел бы к следующему кадру.
+## One step is returned, not the whole route: the walker re-evaluates the decision every
+## frame — he misses the cab, fights, falls and moves off his spot, and a
+## remembered route would be stale by the next frame.
 ##
-## Ключи ответа: [code]kind[/code] — [code]walk[/code], [code]shaft[/code] или
-## [code]escalator[/code]; [code]x[/code] — куда идти; [code]floor[/code] — на
-## каком уровне оказаться. Пустой словарь — цель недостижима.
+## Answer keys: [code]kind[/code] — [code]walk[/code], [code]shaft[/code] or
+## [code]escalator[/code]; [code]x[/code] — where to go; [code]floor[/code] — at
+## which level to end up. An empty dictionary — the goal is unreachable.
 static func step_toward(
 	graph: Dictionary, from_floor: int, from_x: float, to_floor: int, to_x: float
 ) -> Dictionary:
@@ -164,10 +165,10 @@ static func step_toward(
 	var moves: Dictionary = graph["moves"]
 	var goal := _node(to_floor, _segment_at(pieces[to_floor], to_x))
 
-	# Отправных точек может быть несколько. Стоящий в кабине стоит в проёме, а у
-	# проёма куска этажа нет: выйти он волен в любой край, и оба ему открыты.
-	# Отдать один — значит запереть его в том, который выпал первым, и он будет
-	# ездить туда-сюда, пытаясь попасть в соседний.
+	# There can be several starting points. Someone standing in a cab stands in an opening, and
+	# an opening has no floor piece: he is free to step out to either side, and both are open
+	# to him. Returning one would lock him into whichever came first, and he would
+	# ride back and forth trying to get into the neighbouring one.
 	var first: Dictionary = {}
 	var queue: Array[String] = []
 	for segment: int in _segments_near(pieces[from_floor], from_x, float(graph["reach"])):
@@ -189,29 +190,29 @@ static func step_toward(
 	return {}
 
 
-## Точка внутри куска, ближайшая к [param x]: с отступом от краёв, чтобы в неё
-## можно было прийти и на ней устоять.
+## The point inside a piece closest to [param x]: with a margin from the edges, so one
+## can get to it and stand on it.
 ##
-## Кусок уже двух отступов — берётся его середина: это тесная полоска между
-## проёмами, и точнее в ней не встанешь.
+## If the piece is narrower than two margins, its middle is taken: it is a tight strip
+## between openings, and one cannot stand any more precisely in it.
 static func _inside(piece: Vector2, x: float) -> float:
 	if piece.y - piece.x <= STEP_INSIDE * 2.0:
 		return (piece.x + piece.y) * 0.5
 	return clampf(x, piece.x + STEP_INSIDE, piece.y - STEP_INSIDE)
 
 
-## Граф здания: кто с кем связан и, по запросу, чем именно.
+## The building graph: who is linked to whom and, on request, by what exactly.
 ##
-## Один обход на оба ответа. Раньше их было два — [code]_moves[/code] и
-## [code]_links[/code], — и они считали одно и то же по-разному: правка под
-## двухэтажную пару (ADR-0025, решение 1) прошла бы в одном и не прошла
-## в другом, а расходились они уже на вырожденном конце эскалатора.
+## One traversal for both answers. There used to be two — [code]_moves[/code] and
+## [code]_links[/code] — and they computed the same thing differently: a change for
+## the two-floor pair (ADR-0025, decision 1) would land in one and not
+## in the other, and they already diverged on a degenerate escalator end.
 ##
-## [param detailed] — нужна ли подпись каждого перехода. Обходу достижимости
-## довольно соседей, а идущему нужно знать, чем воспользоваться и где он
-## окажется. Словарь на ребро стоит дорого, а [method is_winnable] зовётся
-## около десяти раз на здание — поэтому подпись считается по запросу, но
-## правило, кто с кем связан, остаётся одно на оба ответа.
+## [param detailed] — whether each transition needs a label. The reachability traversal
+## is content with neighbours, while a walker needs to know what to use and where he
+## ends up. A dictionary per edge is expensive, and [method is_winnable] is called
+## about ten times per building — so the label is computed on request, but
+## the rule of who is linked to whom stays one for both answers.
 static func _graph(
 	plan: BuildingPlan, rules: BuildingRules, pieces: Dictionary, detailed: bool
 ) -> Dictionary:
@@ -219,23 +220,23 @@ static func _graph(
 	var moves: Dictionary = {}
 
 	for shaft in plan.shafts:
-		# Кабина связывает уровни своей шахты, а заодно оба края проёма на одном
-		# уровне: сквозь стоящую кабину проходят насквозь. Ход на тот же уровень
-		# выглядит пустым, но он и есть переход через проём — без него половины
-		# этажа, разрезанного шахтой, друг для друга недостижимы.
+		# A cab links the levels of its shaft, and also both edges of the opening on the same
+		# level: one walks straight through a standing cab. A move to the same level
+		# looks empty, but it is exactly the passage through the opening — without it the halves
+		# of a floor cut by a shaft are unreachable from each other.
 		#
-		# Узлы посадки — тремя параллельными массивами, а не словарём на узел.
-		# Словарь здесь стоил вдвое всей генерации: шахт дюжина, узлов у каждой
-		# десятки, а перебор их попарно — квадрат. Замер: 24.5 мс на здание
-		# против 12.2 после.
+		# Boarding nodes — three parallel arrays, not a dictionary per node.
+		# A dictionary here cost twice the whole generation: a dozen shafts, each with dozens
+		# of nodes, and pairing them is quadratic. Measured: 24.5 ms per building
+		# against 12.2 after.
 		var nodes: Array[String] = []
 		var on_floor := PackedInt32Array()
-		# Выходят не на ось шахты, а в сам кусок: иначе переход через проём
-		# кончался бы ровно в кабине, и «дошёл» наступало, не сходя с места.
+		# One steps out not onto the shaft axis but into the piece itself: otherwise the passage
+		# through the opening would end right in the cab, and "arrived" would come without moving.
 		var inside := PackedFloat64Array()
-		# Возит ли кабина с этого узла. Считается заранее, а не в переборе:
-		# [method BuildingPlan.ShaftSpot.ride_span] заводит [Vector2i], а
-		# перебор идёт квадратом от числа узлов.
+		# Whether the cab carries from this node. Computed in advance, not in the pass:
+		# [method BuildingPlan.ShaftSpot.ride_span] creates a [Vector2i], and
+		# the pass is quadratic in the number of nodes.
 		var rides := PackedByteArray()
 		var span := shaft.ride_span()
 		for index in range(shaft.top, shaft.bottom + 1):
@@ -250,9 +251,9 @@ static func _graph(
 			for to_index in nodes.size():
 				if from_index == to_index:
 					continue
-				# Переход через проём — на своём этаже, и его даёт любая стоящая
-				# кабина. Поездка — только туда, куда довезёт любой из ярусов
-				# пары: вошедший не выбирает, какой ярус его встретит.
+				# The passage through the opening is on its own floor, and any standing cab
+				# provides it. A ride goes only where any of the pair's tiers
+				# would take you: whoever enters does not choose which tier meets him.
 				var to_floor := on_floor[to_index]
 				var from_floor := on_floor[from_index]
 				if to_floor != from_floor and (rides[from_index] == 0 or rides[to_index] == 0):
@@ -274,13 +275,13 @@ static func _graph(
 		var top_segment := _segment_at(pieces[upper], escalator.x)
 		var landing := escalator.landing(rules)
 		var bottom_segment := _segment_at(pieces[upper + 1], landing)
-		# -1 — конец эскалатора попал в проём или за стену. Узла с таким номером
-		# на этаже нет, и связывать его нельзя: обход пометил бы его достижимым,
-		# а после этого достижимой считалась бы любая точка этажа внутри дыры.
+		# -1 — the escalator end fell into an opening or behind a wall. There is no node with such a
+		# number on the floor, and it cannot be linked: the traversal would mark it reachable,
+		# and after that any floor point inside the hole would count as reachable.
 		if top_segment < 0 or bottom_segment < 0:
 			push_error("эскалатор на этаже %d упирается в проём" % upper)
 			continue
-		# Эскалатор ходит в обе стороны: с площадки внизу на нём поднимаются.
+		# The escalator goes both ways: from the landing below one rides up on it.
 		var above := _node(upper, top_segment)
 		var below := _node(upper + 1, bottom_segment)
 		_join(links, above, below)
@@ -292,7 +293,7 @@ static func _graph(
 	return {"links": links, "moves": moves}
 
 
-## Отмечает, что из одного узла можно попасть в другой.
+## Marks that one node can be reached from another.
 static func _join(links: Dictionary, from_node: String, to_node: String) -> void:
 	if not links.has(from_node):
 		links[from_node] = [] as Array[String]
@@ -300,8 +301,8 @@ static func _join(links: Dictionary, from_node: String, to_node: String) -> void
 		links[from_node].append(to_node)
 
 
-## [param x] — куда идти, чтобы воспользоваться переходом; [param to_x] — где
-## окажешься. У шахты это одно и то же, у эскалатора — разные концы полотна.
+## [param x] — where to go to use the transition; [param to_x] — where
+## you end up. For a shaft they are the same, for an escalator — different ends of the belt.
 static func _offer(
 	moves: Dictionary,
 	from_node: String,
@@ -316,15 +317,15 @@ static func _offer(
 	moves[from_node].append({"kind": kind, "x": x, "to_x": to_x, "floor": to_floor, "to": to_node})
 
 
-## Куски каждого уровня: пары «левый край, правый край» между тем, что ходьбу
-## прерывает.
+## Pieces of each level: "left edge, right edge" pairs between whatever interrupts
+## walking.
 ##
-## Режут и проёмы, и внутренние стены ([method BuildingPlan.blocks_on]): сквозь
-## стену не пройти, хотя пол под ней есть. Перекрытие при этом остаётся целым —
-## его считают по одним проёмам, ADR-0024, решение 5.
+## Both openings and inner walls cut ([method BuildingPlan.blocks_on]): one cannot pass
+## through a wall even though there is floor under it. The slab stays whole in that case —
+## it is computed from openings alone, ADR-0024, decision 5.
 ##
-## Границы берутся у самого уровня: здание расширяется книзу, и кусок во всю
-## ширину здания вёл бы на узком этаже сквозь стену на улицу.
+## The bounds are taken from the level itself: the building widens downwards, and a piece
+## the full width of the building would lead, on a narrow floor, through a wall to the street.
 static func _floor_segments(plan: BuildingPlan, rules: BuildingRules) -> Dictionary:
 	var floors: Dictionary = {}
 	for index in rules.levels():
@@ -333,33 +334,33 @@ static func _floor_segments(plan: BuildingPlan, rules: BuildingRules) -> Diction
 	return floors
 
 
-## Куски этажа, примыкающие к столбцу шириной [param width] вокруг [param x].
+## Floor pieces adjacent to a column of width [param width] around [param x].
 static func _segments_touching(pieces: Array, x: float, width: float) -> Array[int]:
 	var half := width * 0.5
 	var found: Array[int] = []
 	for index in pieces.size():
 		var piece: Vector2 = pieces[index]
-		# Либо кусок доходит до края столбца, либо столбец целиком внутри него.
+		# Either the piece reaches the edge of the column, or the column is entirely inside it.
 		if piece.y >= x - half - TOUCHING_SLACK and piece.x <= x + half + TOUCHING_SLACK:
 			found.append(index)
 	return found
 
 
-## Куски, из которых точка достижима пешком: тот, в котором она лежит, а если
-## она в проёме — все, чей край к ней примыкает.
+## Pieces from which a point is reachable on foot: the one it lies in, and if
+## it is in an opening — all whose edge adjoins it.
 ##
-## Отдельно от [method _segment_at]: тому «нигде» — законный ответ, по которому
-## достижимость отказывается связывать узел. А идущему нужен ответ всегда: он
-## бывает и в проёме — стоя в кабине лифта, — и выйти оттуда может в любую
-## сторону, потому что кабина перекрывает проём собой.
+## Separate from [method _segment_at]: for that one "nowhere" is a legitimate answer, on
+## which reachability refuses to link the node. But a walker always needs an answer: he
+## can be in an opening too — standing in an elevator cab — and can step out of it to either
+## side, because the cab covers the opening itself.
 static func _segments_near(pieces: Array, x: float, reach: float) -> Array[int]:
 	var here := _segment_at(pieces, x)
 	if here >= 0:
 		return [here] as Array[int]
 
-	# Дальше кабины тянуться некуда: в проёме шире неё пола нет, и стоять там
-	# некому. Не нашлось ни одного края — отдаётся ближайший: лучше неточный
-	# ответ, чем застрявший навсегда.
+	# There is nothing to reach beyond the cab: in an opening wider than it there is no floor,
+	# and no one stands there. If no edge was found, the nearest one is returned: an inexact
+	# answer is better than one stuck forever.
 	var found: Array[int] = []
 	var nearest := -1
 	var best := INF

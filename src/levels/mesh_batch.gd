@@ -1,37 +1,37 @@
 class_name MeshBatch
 extends RefCounted
 
-## Набор примитивов без тел и теней: копит коробки, цилиндры и шары по
-## материалу, а потом сдаёт по одному мультимешу на пару «форма — материал».
+## A set of primitives without bodies or shadows: accumulates boxes, cylinders and
+## spheres by material, then hands over one multimesh per "shape, material" pair.
 ##
-## Так собраны open space офиса (ADR-0056, решение 4) и залы особых этажей
-## (ADR-0057, решение 5): деталей тысячи, а вызовов отрисовки — десятки. В
-## проходе теней ламп набор не участвует — бюджет кадра внизу здания
-## (ADR-0042, решение 2).
+## This is how the office open space (ADR-0056, decision 4) and the halls of special
+## floors (ADR-0057, decision 5) are built: thousands of details, but only dozens of draw
+## calls. The set takes no part in the lamp shadow pass: the frame budget at the bottom
+## of the building (ADR-0042, decision 2).
 ##
-## Координаты — x и y в плоскости правил (y вниз), z сцены.
+## Coordinates: x and y in the rules plane (y down), scene z.
 
 enum Shape { BOX, CYLINDER, SPHERE }
 
-## Места деталей по ключу "форма:материал" или "меш:id" и чем их рисовать.
+## Detail placements keyed by "shape:material" or "mesh:id", and what to draw them with.
 var _places: Dictionary = {}
 var _materials: Dictionary = {}
 var _meshes: Dictionary = {}
 
 
-## Коробка габарита [param size] серединой в [param at].
+## A box of size [param size] centered at [param at].
 func box(material: Material, size: Vector3, at: Vector3) -> void:
 	_put(Shape.BOX, material, Transform3D(Basis.from_scale(size), scene_of(at)))
 
 
-## Коробка, стоящая на полу [param surface]: [param at] — x, высота низа над
-## полом и z.
+## A box standing on the floor [param surface]: [param at] is x, the height of the bottom
+## above the floor, and z.
 func box_on(material: Material, size: Vector3, surface: float, at: Vector3) -> void:
 	box(material, size, Vector3(at.x, surface - at.y - size.y * 0.5, at.z))
 
 
-## Вертикальный цилиндр радиусом [param radius] и высотой [param height]: [param
-## at] — x, высота низа над полом [param surface] и z оси.
+## A vertical cylinder with radius [param radius] and height [param height]: [param
+## at] is x, the height of the bottom above the floor [param surface], and the axis z.
 func cylinder_on(
 	material: Material, radius: float, height: float, surface: float, at: Vector3
 ) -> void:
@@ -40,7 +40,7 @@ func cylinder_on(
 	_put(Shape.CYLINDER, material, Transform3D(basis, place))
 
 
-## Лежачий цилиндр вдоль X: труба длиной [param length] серединой в [param at].
+## A lying cylinder along X: a pipe of length [param length] centered at [param at].
 func pipe_x(material: Material, radius: float, length: float, at: Vector3) -> void:
 	var basis := (
 		Basis(Vector3.BACK, PI * 0.5)
@@ -49,12 +49,12 @@ func pipe_x(material: Material, radius: float, length: float, at: Vector3) -> vo
 	_put(Shape.CYLINDER, material, Transform3D(basis, scene_of(at)))
 
 
-## Шар диаметром [param size] серединой в [param at].
+## A sphere of diameter [param size] centered at [param at].
 func sphere(material: Material, size: float, at: Vector3) -> void:
 	_put(Shape.SPHERE, material, Transform3D(Basis.from_scale(Vector3.ONE * size), scene_of(at)))
 
 
-## Готовый меш (мебель пака) на месте [param place] сцены.
+## A ready mesh (pack furniture) at scene placement [param place].
 func mesh(source: Mesh, place: Transform3D) -> void:
 	var key := "mesh:%d" % source.get_instance_id()
 	if not _places.has(key):
@@ -63,9 +63,9 @@ func mesh(source: Mesh, place: Transform3D) -> void:
 	(_places[key] as Array[Transform3D]).append(place)
 
 
-## Места всех накопленных деталей, до [method commit]. Тестам: под
-## headless-движком мультимеш места не хранит и отдаёт единичные — проверка
-## по нему не видела бы ни одной детали.
+## Placements of all accumulated details, before [method commit]. For tests: under the
+## headless engine a multimesh does not store placements and returns identity ones, so a
+## check against it would see no details at all.
 func places() -> Array[Transform3D]:
 	var all: Array[Transform3D] = []
 	for each: Array in _places.values():
@@ -73,7 +73,7 @@ func places() -> Array[Transform3D]:
 	return all
 
 
-## Сдаёт накопленное узлами в [param parent] на слой обстановки.
+## Hands over what was accumulated as nodes in [param parent] on the dressing layer.
 func commit(parent: Node3D) -> void:
 	for key: String in _places:
 		var places: Array[Transform3D] = _places[key]
@@ -107,7 +107,7 @@ func _put(shape: Shape, material: Material, place: Transform3D) -> void:
 	(_places[key] as Array[Transform3D]).append(place)
 
 
-## Точка сцены по x и y плоскости правил и z сцены.
+## A scene point from x and y in the rules plane and scene z.
 static func scene_of(at: Vector3) -> Vector3:
 	var place := WorldSpace.to_scene(Vector2(at.x, at.y))
 	place.z = at.z

@@ -1,92 +1,92 @@
 class_name BuildingShell
 extends Node3D
 
-## Оболочка здания: перекрытия, наружные стены, внутренние стены и комната
-## за коридором.
+## Building shell: slabs, outer walls, inner walls and the room
+## behind the corridor.
 ##
-## Своим узлом, как [BuildingShafts] и [BuildingRibs]: уровень собирает здание из
-## нескольких строителей, и держать их в одном файле — значит держать в одном
-## файле всё здание разом. Правил тут нет, только геометрия по готовой раскладке.
+## As its own node, like [BuildingShafts] and [BuildingRibs]: the level assembles the building from
+## several builders, and keeping them in one file means keeping the whole building in one
+## file at once. There are no rules here, only geometry from a finished layout.
 ##
-## Что чем режется, решает [BuildingPlan], и счёта у него два: плита — проёмами
-## ([method BuildingPlan.gaps_on]), ходьба — проёмами и стенами (ADR-0024,
-## решение 5). Оболочка строит по первому: стена стоит на плите, а не вместо неё.
+## What cuts what is decided by [BuildingPlan], and it has two counts: the slab — by openings
+## ([method BuildingPlan.gaps_on]), walking — by openings and walls (ADR-0024,
+## decision 5). The shell builds by the first: a wall stands on the slab, not instead of it.
 
-## Толщина наружной стены уровня, м.
+## Thickness of the level's outer wall, m.
 const WALL_WIDTH: float = 0.48
 
-## Толщина стены, у которой нет тела: её только видно.
+## Thickness of a wall that has no body: it is only seen.
 const PANEL_THICKNESS: float = 0.1
 
-## Ширина выхода из здания, м. До M24b оболочка резала ею проём в задней стене;
-## с M24b выход — машина у ворот паркинга в торце ([Garage]), садятся в неё у
-## водительской двери ([constant ExitBoarding.DOOR_REACH]), и проёма в задней
-## стене нет. Осталась мерой места выхода на плане: чужие машины паркинга его
-## обходят ([method Garage.keep_out] — через [constant Proportions.EXIT_WIDTH]).
+## Width of the building exit, m. Before M24b the shell cut an opening this wide in the back wall;
+## since M24b the exit is a car at the garage gate in the end wall ([Garage]), boarded at
+## the driver door ([constant ExitBoarding.DOOR_REACH]), and there is no opening in the back
+## wall. It remains the measure of the exit spot on the plan: other cars in the garage
+## avoid it ([method Garage.keep_out] — via [constant Proportions.EXIT_WIDTH]).
 ##
-## С Otto в M18c не вырос, а сузился: шире его не пускает шаг места. Кабина
-## соседней шахты начинается в 0.9 м от середины выхода, и прежние 1.92 м
-## заходили за неё на 6 см; 2.56 м, которые дал бы рост в 4/3, вырезали бы ещё
-## и стену над соседней дверью (ADR-0026, решение 7). Otto шириной 0.72 проходит
-## в 1.68 свободно.
+## It did not grow with Otto in M18c, it narrowed: the slot pitch does not let it be wider. The cab
+## of the neighbouring shaft starts 0.9 m from the middle of the exit, and the former 1.92 m
+## went over it by 6 cm; the 2.56 m that growth by 4/3 would give would also cut out
+## the wall above the neighbouring door (ADR-0026, decision 7). Otto, 0.72 wide, passes
+## through 1.68 freely.
 const EXIT_WIDTH: float = Proportions.EXIT_WIDTH
 
-## Насколько тон палитры раунда входит в материалы: задняя стена берёт тон
-## этажа, наружные стены — кладку (ADR-0029, решение 5). Немного: палитра —
-## оттенок раунда, а не заливка, и читаемость держится на всех.
+## How much of the round palette tone goes into materials: the back wall takes the
+## floor tone, outer walls — the masonry (ADR-0029, decision 5). A little: the palette is
+## a round's tint, not a fill, and readability holds everywhere.
 const PALETTE_SHARE: float = 0.18
 
-## Доля тона этажа палитры в задней стене — больше, чем в кладке: на 18% раунды
-## на кадре не различались (вопрос пользователя, ADR-0031, решение 5).
+## Share of the palette floor tone in the back wall — more than in the masonry: at 18% rounds
+## could not be told apart in the frame (user's question, ADR-0031, decision 5).
 const STORY_SHARE: float = 0.45
 
-## Во сколько раз задняя стена тёмного этажа темнее светлой (ADR-0029, решение 6).
-## Кадры M18e: на сумрачной башне тёмный этаж без ламп отличался от светлого
-## слабо — стена отражала общий тон так же, как на светлом.
+## How many times darker the back wall of a dark floor is than a lit one (ADR-0029, decision 6).
+## M18e frames: in the dusky tower a dark floor without lamps differed from a lit one
+## weakly — the wall reflected the overall tone the same way as on a lit one.
 const UNLIT_SHADE: float = 0.45
 
-## Стеклянная стена офиса (ADR-0056, решение 4): цвет и прозрачность стекла,
-## шаг стоек и их тон.
+## Office glass wall (ADR-0056, decision 4): glass colour and transparency,
+## mullion pitch and their tone.
 const GLASS := Color(0.55, 0.7, 0.78, 0.07)
 const GLASS_MULLION: float = 1.8
 const GLASS_FRAME := Color(0.62, 0.65, 0.7)
 
-## Парапет крыши: видимая высота, отлив сверху и его свес, м (ADR-0031, решение 2).
+## Roof parapet: visible height, the coping on top and its overhang, m (ADR-0031, decision 2).
 const PARAPET_HEIGHT: float = 1.05
-## Наибольший вынос карниза парапета, м: запас коробок, в которых крыша ловит
-## осадки ([RoofCatch]). Где капля ещё ложится на карниз и откуда капает с его
-## кромки — по выносу карниза своего здания ([method coping_overhang]).
+## The largest parapet cornice overhang, m: the margin of the boxes in which the roof catches
+## precipitation ([RoofCatch]). Where a drop still lands on the cornice and where it drips from its
+## edge — by the cornice overhang of its own building ([method coping_overhang]).
 const COPING_OVERHANG: float = 0.22
-## Карниз парапета по типу здания (ADR-0058, решение 1): у отеля — каменный
-## карниз с выносом, у офиса — тонкий алюминиевый отлив, у жилого дома —
-## кирпичный пояс с терракотовой плиткой. Высота и вынос, м, и цвет по [enum
+## Parapet cornice by building kind (ADR-0058, decision 1): the hotel has a stone
+## cornice with an overhang, the office — a thin aluminium coping, the residential building —
+## a brick band with terracotta tile. Height and overhang, m, and colour by [enum
 ## BuildingIdentity.Kind].
 const KIND_COPING: Array[Vector2] = [Vector2(0.22, 0.2), Vector2(0.08, 0.06), Vector2(0.14, 0.12)]
 const KIND_COPING_COLOUR: Array[Color] = [
 	Color(0.62, 0.56, 0.46), Color(0.7, 0.72, 0.75), Color(0.52, 0.27, 0.18)
 ]
 
-## Залы особых этажей (ADR-0057): их свет гасит уровень по кадру.
+## Halls of special floors (ADR-0057): the level turns their light off by frame.
 var halls: FloorHall = null
 
 var _rules: BuildingRules = null
 var _plan: BuildingPlan = null
 var _ribs: BuildingRibs = null
-## Стены без тел отдельным узлом: их много, и в дереве они не должны мешаться
-## среди тел, по которым ходят.
+## Walls without bodies as a separate node: there are many, and in the tree they must not get mixed
+## in among the bodies people walk on.
 var _panels: Node3D = null
 
 
-## Вынос карниза парапета у здания типа [param kind], м ([constant KIND_COPING]):
-## с его кромки капает дождь, до неё сыплются капли и хлопья.
+## Parapet cornice overhang of a building of kind [param kind], m ([constant KIND_COPING]):
+## rain drips from its edge, drops and flakes fall up to it.
 static func coping_overhang(kind: BuildingIdentity.Kind) -> float:
 	return KIND_COPING[kind].x
 
 
-## Куски перекрытия уровня прямоугольниками правил.
+## Pieces of the level's slab as rules rectangles.
 ##
-## Статический и публичный: по нему проверяют, что проём режет плиту именно там,
-## где обещала раскладка, — без сцены и без узлов.
+## Static and public: it is used to check that an opening cuts the slab exactly where
+## the layout promised — without a scene and without nodes.
 static func slab_segments(
 	surface: float, gaps: Array[Vector2], bounds: Vector2, thickness: float
 ) -> Array[Rect2]:
@@ -96,8 +96,8 @@ static func slab_segments(
 	return rects
 
 
-## Строит оболочку целиком. [param ribs] получает торцы плит и простенки —
-## рёбра ставятся по той же геометрии, что и стены, и вторым обходом разъехались бы.
+## Builds the whole shell. [param ribs] gets slab edges and piers —
+## ribs are placed by the same geometry as the walls, and a second pass would make them diverge.
 func build(rules: BuildingRules, plan: BuildingPlan, ribs: BuildingRibs) -> void:
 	_rules = rules
 	_plan = plan
@@ -111,7 +111,7 @@ func build(rules: BuildingRules, plan: BuildingPlan, ribs: BuildingRibs) -> void
 
 
 func _build_floors() -> void:
-	# Перекрытие — пол: полированный, в него ложатся отражения (ADR-0023, решение 5).
+	# The slab is a floor: polished, reflections fall into it (ADR-0023, decision 5).
 	var slab := GreyboxLook.polished(GreyboxLook.SLAB)
 	var wall := GreyboxLook.surface(GreyboxLook.WALL.lerp(_rules.palette.masonry, PALETTE_SHARE))
 
@@ -119,16 +119,16 @@ func _build_floors() -> void:
 		var surface := _rules.floor_surface(index)
 		var bounds := _rules.floor_span(index)
 		var gaps := _plan.gaps_on(_rules, index)
-		# Перекрытие шире собственных стен там, где силуэт делает ступень: оно же
-		# потолок нижнего этажа, а тот шире своего верхнего соседа.
+		# The slab is wider than its own walls where the silhouette makes a step: it is also
+		# the ceiling of the floor below, and that one is wider than its upper neighbour.
 		var holes := _plan.escalator_holes_on(_rules, index)
 		for rect in slab_segments(
 			surface, gaps + holes, _rules.slab_span(index), _rules.slab_height
 		):
 			_build_solid(rect, slab)
 			_ribs.edge_of(rect)
-		# Под эскалатором плита вырезана только в задней полосе коридора: перед
-		# ней пол цельный, за задней стеной — пол комнаты (ADR-0044, решение 10).
+		# Under an escalator the slab is cut only in the back strip of the corridor: in front of
+		# it the floor is solid, behind the back wall — the room floor (ADR-0044, decision 10).
 		for hole: Vector2 in holes:
 			var rect := Rect2(hole.x, surface, hole.y - hole.x, _rules.slab_height)
 			_build_solid_between(
@@ -142,13 +142,13 @@ func _build_floors() -> void:
 		_build_inner_walls(index, surface, wall)
 
 
-## Внутренние стены этажа: глухие, от пола до потолка (ADR-0024, решение 5).
+## Inner walls of a floor: solid, from floor to ceiling (ADR-0024, decision 5).
 ##
-## Сквозь них не проходят ни люди, ни пули, и агент за стеной Otto не достаёт.
-## Где они стоят, решает раскладка: она же убрала те, что запирали документ или
-## выход, и граф достижимости считает куски этажа уже с ними.
+## Neither people nor bullets pass through them, and an agent behind a wall cannot reach Otto.
+## Where they stand is decided by the layout: it also removed those that locked a document or
+## the exit, and the reachability graph counts the floor pieces with them already.
 func _build_inner_walls(index: int, surface: float, material: StandardMaterial3D) -> void:
-	# От низа перекрытия сверху до пола: стена стоит на плите, а не вместо неё.
+# From the underside of the slab above to the floor: a wall stands on the slab, not instead of it.
 	var top := _rules.story_top(index)
 	var height := surface - top
 	if height <= 0.0:
@@ -160,11 +160,11 @@ func _build_inner_walls(index: int, surface: float, material: StandardMaterial3D
 		_build_solid(Rect2(band.x, top, band.y - band.x, height), material)
 
 
-## Боковые стены уровня. Идут ступенями вслед за силуэтом, а не сплошными
-## столбцами во всю высоту: здание расширяется книзу (ADR-0014, пункт 3).
+## Side walls of the level. They go in steps following the silhouette, not as solid
+## full-height columns: the building widens toward the bottom (ADR-0014, point 3).
 ##
-## У крыши стена доходит до верха мира: это парапет, и он же не даёт шагнуть
-## с крыши мимо здания. Прыжок берёт 2.4 м, и низкий бортик Otto перемахнул бы.
+## At the roof the wall goes up to the top of the world: it is the parapet, and it also keeps one
+## from stepping off the roof past the building. A jump takes 2.4 m: Otto would clear a low rail.
 func _build_side_walls(
 	index: int, surface: float, bounds: Vector2, material: StandardMaterial3D
 ) -> void:
@@ -176,18 +176,18 @@ func _build_side_walls(
 	if index == BuildingRules.ROOF:
 		_build_parapets(surface, bounds, top, material)
 		return
-	# Левая стена паркинга — тело без вида: в ней ворота, и видимые куски
-	# вокруг проёма ставит [Garage] (ADR-0038, решение 3). Otto в ворота не
-	# выходит — тело целое.
+	# The garage's left wall is a body without looks: it has the gate, and the visible pieces
+	# around the opening are placed by [Garage] (ADR-0038, decision 3). Otto does not go out
+	# through the gate — the body is whole.
 	var garage := index == _rules.floors - 1
 	_build_solid(Rect2(bounds.x, top, WALL_WIDTH, height), material, not garage)
 	_build_solid(Rect2(bounds.y - WALL_WIDTH, top, WALL_WIDTH, height), material)
 
 
-## Стены крыши: тело во всю высоту неба — прыжок берёт почти два метра, и низкий
-## бортик Otto перемахнул бы, — а видно только парапет по пояс с отливом сверху
-## (ADR-0031, решение 2). До M20 видна была вся стена, и по краям крыши стояли
-## тёмные столбы до верха кадра.
+## Roof walls: a body the full height of the sky — a jump takes almost two metres, and Otto
+## would clear a low rail — while only a waist-high parapet with coping on top is visible
+## (ADR-0031, decision 2). Before M20 the whole wall was visible, and dark columns up to the top
+## of the frame stood at the roof edges.
 func _build_parapets(
 	surface: float, bounds: Vector2, top: float, material: StandardMaterial3D
 ) -> void:
@@ -208,19 +208,19 @@ func _build_parapets(
 		_build_block(cap, coping, WorldSpace.CORRIDOR_DEPTH + WorldSpace.ROOM_DEPTH + 0.1)
 
 
-## Комната за коридором: задняя стена с проёмами дверей и дальняя стена.
+## The room behind the corridor: the back wall with door openings and the far wall.
 ##
-## Это и есть глубина кадра по ADR-0021, решение 1: игра идёт в плоскости, а
-## объём — за задней стеной, и виден он в проёмы. Проёмы режутся тем же
-## [method BuildingPlan.spans_between], что и перекрытия: дверь занимает в стене
-## ровно свою ширину, над ней — перемычка до потолка.
+## This is the frame depth per ADR-0021, decision 1: play happens in a plane, and
+## volume is behind the back wall, seen through the openings. Openings are cut by the same
+## [method BuildingPlan.spans_between] as the slabs: a door takes exactly its width
+## in the wall, above it — a lintel up to the ceiling.
 ##
-## Крыша стены не получает: над ней небо, а за ней — город ([CityBackdrop]).
-## Нижний этаж — тоже: он паркинг, и зал за проездом строит [Garage]
-## (ADR-0038, решение 3).
+## The roof gets no wall: above it is sky, and behind it — the city ([CityBackdrop]).
+## The bottom floor — neither: it is the garage, the hall behind the driveway is built by [Garage]
+## (ADR-0038, decision 3).
 func _build_room() -> void:
-	# Стена — фактура типа здания в тоне этажа (ADR-0033, решение 5): рисунок
-	# даёт фактура, цвет — раунд.
+	# The wall is the building kind's texture in the floor tone (ADR-0033, decision 5): the pattern
+	# comes from the texture, the colour — from the round.
 	var tone := GreyboxLook.BACK_WALL.lerp(_rules.palette.story, STORY_SHARE)
 	var paper := tone.lightened(0.55)
 	var lit_back := BuildingFinish.wall(_ribs.identity(), paper)
@@ -235,7 +235,7 @@ func _build_room() -> void:
 		var hall := OpenSpace.new()
 		add_child(hall)
 		hall.build(_rules, _plan)
-	# Залы особых этажей (ADR-0057, решение 3): за коридором вместо стены.
+	# Halls of special floors (ADR-0057, decision 3): behind the corridor instead of a wall.
 	halls = FloorHall.new()
 	add_child(halls)
 	halls.build(_rules, _plan)
@@ -259,8 +259,8 @@ func _build_room() -> void:
 				)
 				continue
 			if glazed:
-				# Офис (ADR-0056, решение 4): стекло в рост двери, над ним —
-				# сплошная полоса до потолка, за стеклом — зал [OpenSpace].
+				# Office (ADR-0056, decision 4): glass at door height, above it —
+				# a solid strip up to the ceiling, behind the glass — an [OpenSpace] hall.
 				_build_panel(Rect2(span.x, top, span.y - span.x, lintel_top - top), back, back_z)
 				_build_glass(Rect2(span.x, lintel_top, span.y - span.x, surface - lintel_top))
 				continue
@@ -274,8 +274,8 @@ func _build_room() -> void:
 		_build_panel(Rect2(inner.x, top, inner.y - inner.x, surface - top), far, far_z)
 
 
-## Проёмы дверей в задней стене этажа. Выход с M24b — ворота паркинга в
-## торце ([Garage]), а не проём в задней стене.
+## Door openings in a floor's back wall. Since M24b the exit is the garage gate in
+## the end wall ([Garage]), not an opening in the back wall.
 func _openings_on(index: int) -> Array[Vector2]:
 	var openings: Array[Vector2] = []
 	var half := Door.LEAF_SIZE.x * 0.5
@@ -285,15 +285,15 @@ func _openings_on(index: int) -> Array[Vector2]:
 	return openings
 
 
-## Коробка с телом на месте прямоугольника правил: по ней ходят и об неё
-## останавливаются пули.
+## A box with a body in place of a rules rectangle: people walk on it and bullets
+## stop against it.
 ##
-## Глубиной на коридор и комнату вместе: перекрытие — пол не только коридора,
-## но и комнаты за стеной, иначе в проём двери было бы видно пустоту под ногами.
-## Передняя грань приходится на переднюю грань коридора, а не на плоскость игры.
+## Deep enough for the corridor and the room together: the slab is the floor not only of the
+## corridor but also of the room behind the wall, otherwise the door opening would show emptiness
+## underfoot. The front face falls on the corridor's front face, not on the play plane.
 ##
-## [param shown] — видна ли коробка: стена крыши выше парапета — тело без вида.
-## Не `visible`: так зовут свойство [Node3D], и параметр его заслонял бы.
+## [param shown] — whether the box is visible: the roof wall above the parapet is a bare body.
+## Not `visible`: that is the name of a [Node3D] property, and the parameter would shadow it.
 func _build_solid(rect: Rect2, material: StandardMaterial3D, shown: bool = true) -> void:
 	var depth := WorldSpace.CORRIDOR_DEPTH + WorldSpace.ROOM_DEPTH
 	var size := Vector3(rect.size.x, rect.size.y, depth)
@@ -314,8 +314,8 @@ func _build_solid(rect: Rect2, material: StandardMaterial3D, shown: bool = true)
 	add_child(body)
 
 
-## Тело с видом на месте прямоугольника, но не во всю глубину, а от [param front]
-## до [param back] по Z сцены: кусок плиты вокруг проёма эскалатора.
+## A body with looks in place of a rectangle, but not the full depth, from [param front]
+## to [param back] along scene Z: a piece of slab around an escalator opening.
 func _build_solid_between(
 	rect: Rect2, material: StandardMaterial3D, front: float, back: float
 ) -> void:
@@ -332,8 +332,8 @@ func _build_solid_between(
 	add_child(body)
 
 
-## Коробка без тела на месте прямоугольника, глубиной [param depth] от передней
-## грани коридора — как у тел оболочки.
+## A box without a body in place of a rectangle, [param depth] deep from the corridor's front
+## face — as with shell bodies.
 func _build_block(rect: Rect2, material: StandardMaterial3D, depth: float) -> void:
 	var block := GreyboxLook.box(Vector3(rect.size.x, rect.size.y, depth), material)
 	block.position = WorldSpace.to_scene(rect.get_center())
@@ -341,9 +341,9 @@ func _build_block(rect: Rect2, material: StandardMaterial3D, depth: float) -> vo
 	_panels.add_child(block)
 
 
-## Чем зал особого этажа отделён от коридора на простенке [param span]
-## (ADR-0057, решение 3): над проёмом в рост двери — полоса стены до потолка, в
-## проёме — стекло, сетка-рабица на стойках или ничего: колонны ставят рёбра
+## What separates a special floor hall from the corridor on pier [param span]
+## (ADR-0057, decision 3): above the door-height opening — a wall strip up to the ceiling, in
+## the opening — glass, chain-link mesh on posts or nothing: the columns are placed by the ribs
 ## ([method BuildingRibs.line_the_wall]).
 func _build_screen(
 	screen: FloorRole.Screen,
@@ -363,8 +363,8 @@ func _build_screen(
 			_build_mesh(opening)
 
 
-## Сетка-рабица технического этажа на стальных стойках, без тел — как стена;
-## поперечина — поверху.
+## Chain-link mesh of the technical floor on steel posts, without bodies — like a wall;
+## a crossbar — on top.
 func _build_mesh(rect: Rect2) -> void:
 	_build_infill(
 		rect,
@@ -375,9 +375,9 @@ func _build_mesh(rect: Rect2) -> void:
 	)
 
 
-## Стеклянная перегородка офиса в задней стене: стекло и алюминиевые стойки
-## с шагом [constant GLASS_MULLION], без тел — как и сама стена; поперечина —
-## понизу. Стекло — одно на здание и на залы особых этажей ([method HallLook.glass]).
+## Office glass partition in the back wall: glass and aluminium mullions
+## with pitch [constant GLASS_MULLION], without bodies — like the wall itself; a crossbar —
+## at the bottom. One glass per building and for the special floor halls ([method HallLook.glass]).
 func _build_glass(rect: Rect2) -> void:
 	_build_infill(
 		rect,
@@ -388,8 +388,8 @@ func _build_glass(rect: Rect2) -> void:
 	)
 
 
-## Перегородка в проёме [param rect] задней стены: полотно [param sheet] без
-## теней, стойки [param post] с шагом [param step] и поперечина [param rail].
+## A partition in opening [param rect] of the back wall: pane [param sheet] without
+## shadows, posts [param post] with pitch [param step] and crossbar [param rail].
 func _build_infill(
 	rect: Rect2, sheet: StandardMaterial3D, post: StandardMaterial3D, step: float, rail: Rect2
 ) -> void:
@@ -408,8 +408,8 @@ func _build_infill(
 	_build_panel(rail, post, z + 0.03)
 
 
-## Стена, которая только видна: без тела, толщиной [constant PANEL_THICKNESS],
-## серединой на [param z].
+## A wall that is only seen: without a body, [constant PANEL_THICKNESS] thick,
+## centred at [param z].
 func _build_panel(rect: Rect2, material: StandardMaterial3D, z: float) -> void:
 	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
 		return

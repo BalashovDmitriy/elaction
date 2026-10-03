@@ -1,99 +1,105 @@
-# ADR-0052 · M24k: время суток для остального, кинематографичное начало, пробелы в звуке
+# ADR-0052 · M24k: time of day for the rest, a cinematic start, gaps in the sound
 
-- **Статус:** принято
-- **Дата:** 2026-10-01
-- **Дополняет:** [ADR-0051](0051-time-of-day.md) (время суток),
-  [ADR-0038](0038-building-start-and-end.md) (вертолёт и выход),
-  [ADR-0049](0049-own-helicopter.md) (своя модель вертолёта),
-  [ADR-0036](0036-sound-from-libraries.md) (звук из библиотек),
-  [ADR-0047](0047-room-behind-the-door.md) (комната за дверью)
+- **Status:** accepted
+- **Date:** 2026-10-01
+- **Extends:** [ADR-0051](0051-time-of-day.md) (time of day),
+  [ADR-0038](0038-building-start-and-end.md) (helicopter and exit),
+  [ADR-0049](0049-own-helicopter.md) (our own helicopter model),
+  [ADR-0036](0036-sound-from-libraries.md) (sound from libraries),
+  [ADR-0047](0047-room-behind-the-door.md) (the room behind the door)
 
-## Контекст
+## Context
 
-В M24j время суток получили город, небо, воздух здания и правило темноты. Всё
-остальное осталось ночным: улица у выезда с огнями и витринами, окно комнаты за
-дверью с ночным городом, вывеска здания, музыка и фон снаружи. Вступление
-здания — вертолёт влетает, спускает трос, Otto съезжает — короткое и без
-режиссуры: двери у вертолёта нет, она нарисована откаченной, трос просто
-вытягивается из лебёдки.
+In M24j the city, the sky, the building air and the darkness rule got time of day.
+Everything else stayed at night: the street at the exit with lights and shop windows,
+the window of the room behind a door with the night city, the building sign, music and
+outdoor ambience. The building intro — the helicopter flies in, lowers the rope, Otto
+slides down — is short and without direction: the helicopter has no door, it is drawn
+pushed back, the rope simply extends from the winch.
 
-Пользователь попросил кинематографичное начало (2026-10-01): вертолёт
-подлетает, дверь открывается, Otto вылезает и спускается на тросе, вертолёт
-улетает, дверь закрывается, трос убирается. И отдельно — «там вроде не
-хватает звуков каких-то, порисёрчи это. Нужно будет закрыть пробелы».
+The user asked for a cinematic start (2026-10-01): the helicopter approaches, the door
+opens, Otto climbs out and descends on the rope, the helicopter flies away, the door
+closes, the rope is pulled in. And separately — "some sounds seem to be missing there,
+research this. The gaps will need to be closed".
 
-**Сверка с оригиналом.** В аркаде 1983 года Otto не прилетает: он соскальзывает
-по тросу с соседней крыши на крышу здания, без вертолёта, музыки на этом нет,
-есть короткий мотив начала. Вертолёт с M24b — решение ремейка (ADR-0038,
-решение 1), и режиссура вступления — его продолжение. Времени суток в аркаде
-нет (ADR-0051). В звуке у аркады: шаги, выстрелы, лифт, двери, лампа, смерть,
-сирена тревоги; рикошетов и шагов агентов нет — у ремейка ориентир не ROM, а
-«что видно, то и слышно» (ADR-0036).
+**Check against the original.** In the 1983 arcade Otto does not fly in: he slides down
+a rope from the neighboring roof onto the building's roof, without a helicopter, there
+is no music on this, there is a short start motif. The helicopter since M24b is the
+remake's decision (ADR-0038, decision 1), and the intro direction is its continuation.
+The arcade has no time of day (ADR-0051). In the arcade's sound: footsteps, shots, the
+elevator, doors, the lamp, death, the alarm siren; there are no ricochets or agent
+footsteps — the remake's reference is not the ROM but "what is seen is heard"
+(ADR-0036).
 
-**Аудит звука** (2026-10-01): прошли все места, где происходит видимое, и
-сверили с вызовами `Sounds`. Без звука оказались: пуля в стену, пол и металл;
-шаги агентов; прыжок и приземление Otto; приезд с троса; шаги по металлу;
-падение тел и давка; выстрел агента не отличается от выстрела Otto; вход в
-замедление добивания и последней смерти; трогание и остановка кабины; поток
-машин на улице, гудки, поворотник, открытие дверцы машины Otto; сирена в миг
-тревоги; треск мигающего неона; тиканье набегающего бонуса; новый рекорд;
-возвращение Otto после смерти; пауза. Фон снаружи один, ночной, в любое время
-суток, а неон вывески гудит и днём.
+**Sound audit** (2026-10-01): we went through all the places where something visible
+happens and checked them against `Sounds` calls. Found without sound: a bullet into a
+wall, floor and metal; agent footsteps; Otto's jump and landing; arrival off the rope;
+footsteps on metal; bodies falling and crushing; an agent's shot does not differ from
+Otto's; entering the takedown and last-death slowdown; the cab starting and stopping;
+street traffic, horns, the turn signal, opening the door of Otto's car; the siren at
+the moment of alarm; the crackle of blinking neon; the ticking of the counting bonus; a
+new high score; Otto returning after death; pause. The outdoor ambience is a single
+night one at any time of day, and the sign neon hums in the day too.
 
-## Решения
+## Decisions
 
-Вопросы заданы пользователю 2026-10-01, двумя блоками и страницей прослушивания.
+Questions asked of the user on 2026-10-01, in two blocks and with a listening page.
 
-1. **Музыка по времени суток.** Ночь — прежние четыре темы нуар-джаза; утро —
-   Shades of Spring и Walking Along, день — George Street Shuffle и Opportunity
-   Walks, вечер — Apero Hour и Backbay Lounge (Kevin MacLeod, CC-BY 4.0), трек —
-   жребием по сиду здания. Выбраны пользователем на слух. Тема тревоги — одна на
-   любое время суток: сирену узнают сразу.
-2. **Поток машин у выезда по времени суток:** жребий плотности остаётся, но
-   время сдвигает его доли — днём улица плотнее всего, утром и вечером обычная,
-   ночью чаще свободна.
-3. **Улица у выезда.** Дома через дорогу во все времена суток — запечённый
-   фасад пака M24j, как у города на заднике (просьба пользователя: ночную
-   тоже, «всё в едином стиле»). Утром, днём и вечером их освещает солнце
-   здания, ночью — горящие окна, неон и настоящий свет фонаря; улица — на слое
-   солнца ([`Outdoors`](../../src/systems/lighting/outdoors.gd)). Фонарь, неон
-   лавок и вывеска на кронштейнах горят по силе огней времени суток
-   (`TimeOfDay.street_lights`): днём в ясную погоду погашены, утром и вечером
-   горят. Фары потока днём горят только в непогоду.
-4. **Вывеска здания:** утром и днём неон погашен — трубки видны в свету дня,
-   не гудят и не мигают; вечером и ночью горит, как было.
-5. **Комната за дверью:** утром и днём в окне светлое небо и дома, свет под
-   потолком и лампа на тумбе погашены, из окна падает солнце — в непогоду
-   рассеянный холодный свет. Вечером и ночью — как было, вечером за окном закат.
-6. **Кинематографичное начало.** Сдвижная дверь вертолёта — отдельной деталью
-   модели: в висении отъезжает назад с лязгом, в проёме загорается салон, на
-   уходе задвигается обратно. Бухту троса сбрасывают — он разматывается до
-   крыши с покачиванием в потоке от винта; на уходе лебёдка выбирает его в
-   салон, потом закрывается дверь. Otto выглядывает в проём, садится на порог,
-   берётся за трос, соскальзывает и быстро съезжает на руках, тормозя у крыши,
-   — и приземляется с приседом. Камера — наезд без смены ракурса, как у
-   добиваний: крупнее на двери, ведёт Otto по тросу, отъезжает к игровому
-   кадру. В первом здании партии вступление полное, 10–12 с; дальше короткое,
-   около 6 с: вертолёт уже висит с открытой дверью. Пропуск — как был, прыжком,
-   выстрелом или паузой. За остеклением — пилот, на уходе кивает. Уход: нос
-   вниз, крен, вверх и вбок с разгоном за край кадра; поток от винта гонит
-   пыль по крыше; дождь он не сдувает.
-7. **Пробелы в звуке закрываются в этой вехе.** Каждый новый звук выбран
-   пользователем на слух из кандидатов freesound и Kenney (CC0 и CC-BY), как в
-   M23. Шаги агентов — те же записи, что у Otto, на месте агента и тише;
-   выстрел агента — своя запись, на месте. Замедление мира понижает тон звуков
-   мира. Звонок кабины не возвращается — его убрал пользователь в M21.
-8. **Фон снаружи — свой на каждое время суток:** утро — птицы и редкие машины,
-   день — плотный гул города, вечер — город тише; ночь — как была. Днём неон
-   не гудит.
+1. **Music by time of day.** Night — the previous four noir-jazz themes; morning —
+   Shades of Spring and Walking Along, day — George Street Shuffle and Opportunity
+   Walks, evening — Apero Hour and Backbay Lounge (Kevin MacLeod, CC-BY 4.0), the track
+   by draw on the building seed. Chosen by the user by ear. The alarm theme is one for
+   any time of day: the siren is recognized immediately.
+2. **Traffic at the exit by time of day:** the density draw stays, but the time shifts
+   its shares — in the day the street is densest, in the morning and evening normal, at
+   night more often free.
+3. **The street at the exit.** The buildings across the road at all times of day are
+   the baked M24j pack facade, like the city in the backdrop (the user's request: the
+   night one too, "everything in one style"). In the morning, day and evening they are
+   lit by the building's sun, at night by lit windows, neon and the real light of a
+   street lamp; the street is on the sun layer
+   ([`Outdoors`](../../src/systems/lighting/outdoors.gd)). The street lamp, the shop
+   neon and the bracket sign are lit by the time-of-day light strength
+   (`TimeOfDay.street_lights`): in the day in clear weather they are off, in the
+   morning and evening they are on. Traffic headlights in the day are on only in bad
+   weather.
+4. **The building sign:** in the morning and day the neon is off — the tubes are visible
+   in daylight, do not hum and do not blink; in the evening and at night it is lit, as
+   before.
+5. **The room behind the door:** in the morning and day the window shows a bright sky
+   and buildings, the ceiling light and the nightstand lamp are off, sun falls from the
+   window — in bad weather diffuse cold light. In the evening and at night — as before,
+   in the evening a sunset outside the window.
+6. **A cinematic start.** The helicopter's sliding door is a separate part of the
+   model: while hovering it slides back with a clang, the cabin lights up in the
+   opening, on leaving it slides shut again. The coil of rope is thrown out — it unwinds
+   to the roof, swaying in the rotor downwash; on leaving the winch reels it into the
+   cabin, then the door closes. Otto looks out of the opening, sits on the sill, grabs
+   the rope, slips off and quickly slides down hand over hand, braking at the roof —
+   and lands in a crouch. The camera — a push-in without changing the angle, as with
+   takedowns: closer at the door, follows Otto down the rope, pulls back to the game
+   frame. In the first building of a game the intro is full, 10–12 s; after that short,
+   about 6 s: the helicopter is already hovering with the door open. Skipping is as
+   before, by jump, shot or pause. Behind the glazing — a pilot, who nods on leaving.
+   Leaving: nose down, bank, up and sideways accelerating past the edge of the frame;
+   the rotor downwash drives dust across the roof; it does not blow away the rain.
+7. **Gaps in the sound are closed in this milestone.** Each new sound is chosen by the
+   user by ear from freesound and Kenney candidates (CC0 and CC-BY), as in M23. Agent
+   footsteps are the same recordings as Otto's, at the agent's position and quieter;
+   the agent's shot is its own recording, positional. The world slowdown lowers the
+   pitch of world sounds. The cab chime does not come back — the user removed it in
+   M21.
+8. **Outdoor ambience — its own for each time of day:** morning — birds and occasional
+   cars, day — a dense city hum, evening — the city quieter; night — as before. In the
+   day the neon does not hum.
 
-## Последствия
+## Consequences
 
-- Здание по-прежнему одно на все времена суток: время меняет вид, свет и звук,
-  а раскладка, бой и механика темноты — только ночью, как в ADR-0051.
-- Новые позы Otto кодом — выглянуть из проёма и сидеть на пороге — в таблице
-  [`FigurePoses`](../../src/systems/assets/figure_poses.gd), как присед и трос.
-- Модель вертолёта пересобирается `tools/build_helicopter.py`: дверь и пилот —
-  отдельные узлы, остекление прозрачное.
-- Звуков становится больше на два десятка имён; все проходят тест имён,
-  вариантов и авторов, как в M23.
+- The building is still one for all times of day: time changes look, light and sound,
+  while layout, combat and the darkness mechanic — only at night, as in ADR-0051.
+- New Otto code poses — looking out of the opening and sitting on the sill — are in the
+  [`FigurePoses`](../../src/systems/assets/figure_poses.gd) table, like crouch and rope.
+- The helicopter model is rebuilt by `tools/build_helicopter.py`: the door and pilot are
+  separate nodes, the glazing is transparent.
+- Sounds grow by a couple of dozen names; all pass the names, variants and authors test,
+  as in M23.

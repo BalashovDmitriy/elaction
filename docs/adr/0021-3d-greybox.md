@@ -1,157 +1,154 @@
-# ADR-0021 · 3D-greybox: плоскость игры, глубина комнаты и порядок переезда
+# ADR-0021 · 3D greybox: play plane, room depth and order of the move
 
-- **Статус:** принято; добор 2D из решения 6 сделан не в M20, а в M22
-  ([ADR-0030](0030-grading-and-quality.md), решение 8). Проверка окон, которую
-  «Как проверяем» отложил, не вернулась: окон в стенах здания нет, город за ним —
-  отдельная сцена
-- **Дата:** 2026-09-20
+- **Status:** accepted; the 2D cleanup from decision 6 was done not in M20 but in M22
+  ([ADR-0030](0030-grading-and-quality.md), decision 8). The window check that
+  "How we check" postponed did not come back: there are no windows in the building walls, the city
+  behind it is a separate scene
+- **Date:** 2026-09-20
 
-## Контекст
+## Context
 
-M15 — первая веха пивота. [ADR-0019](0019-3d-pivot.md) решил, что переезжаем на
-3D-узлы, запираем Z у игровых тел и не трогаем ядро правил. Он же оставил
-нерешённым то, что вылезает при первой же попытке собрать здание мешами.
+M15 is the first milestone of the pivot. [ADR-0019](0019-3d-pivot.md) decided that we move to 3D
+nodes, lock Z for game bodies and do not touch the rule core. It also left undecided what shows up
+at the very first attempt to assemble the building from meshes.
 
-Проба [`tools/look3d.gd`](../../tools/look3d.gd) расставила игровые вещи **в разных
-плоскостях**: дверь у задней стены комнаты (`-DEPTH + 0.45`, глубина комнаты 7 м),
-шахта лифта у камеры (`-1.0`). В 2D они все лежат в одной плоскости, и разница была
-не видна. С запертой Z так нельзя: до двери в семи метрах Otto не дойдёт, не двигаясь
-вглубь, а двигаться вглубь ADR-0019 запрещает прямо.
+The trial [`tools/look3d.gd`](../../tools/look3d.gd) placed game things **in different planes**:
+the door at the back wall of the room (`-DEPTH + 0.45`, room depth 7 m), the elevator shaft by the
+camera (`-1.0`). In 2D they all lie in one plane, and the difference was not visible. With Z locked
+this is impossible: Otto cannot reach a door seven metres away without moving into the depth, and
+ADR-0019 directly forbids moving into the depth.
 
-Замер того, что предстоит трогать:
+A count of what is to be touched:
 
-| | файлов |
+| | files |
 |---|---|
-| Трогают 2D-узлы: `src/` | 19 |
-| Трогают 2D-узлы: `tests/` | 9 |
-| `Vector2` как математика плоскости, узлов не трогают | 12 |
+| Touch 2D nodes: `src/` | 19 |
+| Touch 2D nodes: `tests/` | 9 |
+| `Vector2` as plane math, do not touch nodes | 12 |
 
-## Решения
+## Decisions
 
-### 1. Плоскость игры одна, глубина живёт за ней
+### 1. There is one play plane, depth lives behind it
 
-Всё, с чем игрок взаимодействует, стоит в **одной плоскости Z = 0**: Otto, агенты,
-пули, кабина, двери, лампы, документы, эскалаторы. Ничто игровое не смещается по Z
-ни на сантиметр — иначе «дотянулся или нет» перестаёт быть свойством правил и
-становится свойством расстановки мешей.
+Everything the player interacts with stands in **one plane Z = 0**: Otto, agents, bullets, the cab,
+doors, lamps, documents, escalators. Nothing gameplay-related shifts along Z by even a centimetre —
+otherwise "reached it or not" stops being a property of the rules and becomes a property of mesh
+placement.
 
-Глубина берётся не разносом игровых объектов, а устройством комнаты:
+Depth comes not from spreading game objects apart but from the structure of the room:
 
-- **Коридор** в плоскости игры, неглубокий (порядка 2 м). В нём происходит всё.
-- **Задняя стена коридора** несёт двери, окна и створки шахт. Дверь — проём в этой
-  стене, и её порог лежит ровно в плоскости игры.
-- **Объём комнаты за стеной**, до 7 м, как в пробе. Он виден в проёмы открытых
-  дверей и в окна, и именно он даёт глубину, туман и дальний план.
+- **The corridor** in the play plane, shallow (about 2 m). Everything happens in it.
+- **The back wall of the corridor** carries doors, windows and shaft doors. A door is an opening in
+  this wall, and its threshold lies exactly in the play plane.
+- **The room volume behind the wall**, up to 7 m, as in the trial. It is visible through the
+  openings of open doors and through windows, and it is what gives depth, fog and the far plane.
 
-Отвергнуто: ставить игру у задней стены, а комнату перед ней. Туман и расфокус
-работали бы в полную силу, но всё, что стоит спереди, загораживает Otto, а
-[ADR-0019](0019-3d-pivot.md), решение 5, ставит читаемость выше кино.
+Rejected: putting the game at the back wall and the room in front of it. Fog and defocus would work
+at full strength, but everything standing in front would block Otto, and
+[ADR-0019](0019-3d-pivot.md), decision 5, puts readability above cinema.
 
-### 2. `Vector2` остаётся в слое правил
+### 2. `Vector2` stays in the rule layer
 
-Игра плоская, и координата плоскости — `Vector2`. Это не наследие 2D-движка, и
-менять её на `Vector3` в правилах незачем: `BuildingPlan`, `BuildingRoute`,
-`BuildingRules`, `EnemyBrain`, `DocumentRoute`, `VisibleFloors` и их тесты
-переезжают, не изменившись ни в одной строке.
+The game is flat, and the plane coordinate is a `Vector2`. This is not a legacy of the 2D engine,
+and there is no reason to change it to `Vector3` in the rules: `BuildingPlan`, `BuildingRoute`,
+`BuildingRules`, `EnemyBrain`, `DocumentRoute`, `VisibleFloors` and their tests move without a
+single line changed.
 
-Перевод делает слой узлов, в одном месте — [`WorldSpace`](../../src/systems/world_space.gd).
-Если такой перевод понадобился внутри класса правил, значит правило залезло в
-представление — и это ошибка, а не необходимость.
+The conversion is done by the node layer, in one place — [`WorldSpace`](../../src/systems/world_space.gd).
+If such a conversion was needed inside a rule class, the rule has crept into the presentation — and
+that is a mistake, not a necessity.
 
-**Y разворачивается при переводе, и это не мелочь.** У правил Y растёт вниз:
-`floor_surface` увеличивается с номером этажа, нулевой этаж — верхний. Так было
-в 2D, и трогать это нельзя. У сцены Y растёт вверх, как во всём остальном Godot:
-туда смотрит `Vector3.UP` у `CharacterBody3D`, оттуда же светит направленный свет.
+**Y is flipped in the conversion, and this is no trifle.** In the rules Y grows downward:
+`floor_surface` increases with the floor number, floor zero is the top one. That is how it was in
+2D, and it must not be touched. In the scene Y grows upward, as in the rest of Godot: that is where
+`Vector3.UP` of `CharacterBody3D` points, and that is where directional light shines from.
 
-Разворачивать знак в каждом узле по месту — самый дешёвый способ потерять веху:
-ошибка в знаке не падает, а тихо ставит этаж вверх ногами. Поэтому `WorldSpace`
-и держит обе стороны перевода, и покрыт тестом без сцены.
+Flipping the sign in each node locally is the cheapest way to lose a milestone: a sign error does
+not crash but quietly puts a floor upside down. That is why `WorldSpace` holds both sides of the
+conversion and is covered by a test without a scene.
 
-### 3. Конвертируем на месте, точка отката — `main`
+### 3. We convert in place, the rollback point is `main`
 
-2D-уровень не остаётся рядом за флагом. Ветка `feat/m15-3d-greybox` переписывает
-слой узлов на месте, и всю веху играбельной сборки на ветке нет.
+The 2D level does not stay alongside behind a flag. The branch `feat/m15-3d-greybox` rewrites the
+node layer in place, and for the whole milestone there is no playable build on the branch.
 
-Требование [ADR-0019](0019-3d-pivot.md), решение 4 — «2D-сборка обязана собираться,
-пока 3D не прошла бота» — выполняется `main`: там лежит M14, собирается и играется.
-Ветка мержится только после DoD, то есть когда бот прошёл здание в 3D.
+The requirement of [ADR-0019](0019-3d-pivot.md), decision 4 — "the 2D build must keep building
+until 3D has passed the bot" — is met by `main`: M14 is there, it builds and plays. The branch is
+merged only after the DoD, that is, when the bot has completed the building in 3D.
 
-Отвергнуто: вести обе сцены за флагом запуска. Всегда есть во что играть и что
-сравнивать, но цена — половина `src/` в двух экземплярах и двойной набор сценовых
-тестов на всю веху; а сравнивать есть с чем и так, `main` под рукой.
+Rejected: running both scenes behind a launch flag. There is always something to play and compare,
+but the cost is half of `src/` in two copies and a double set of scene tests for the whole
+milestone; and there is something to compare with anyway, `main` is at hand.
 
-### 4. Света в greybox ровно столько, чтобы правило темноты было живым
+### 4. There is exactly as much light in the greybox as keeps the darkness rule alive
 
-Один источник на этаж, без SSR, объёмного тумана, грейдинга и глубины резкости —
-это всё M17. Причина не в красоте: правило «сбитая лампа гасит этаж насовсем»
-([ADR-0007](0007-lamps-and-darkness.md)) покрыто тестами, и гасить их на веху
-значит потерять сетку ровно там, где переезд вероятнее всего что-то сломает.
+One source per floor, without SSR, volumetric fog, grading and depth of field — all of that is M17.
+The reason is not beauty: the rule "a shot-down lamp darkens the floor permanently"
+([ADR-0007](0007-lamps-and-darkness.md)) is covered by tests, and switching them off for the
+milestone means losing the safety net exactly where the move is most likely to break something.
 
-Погашенный этаж в greybox отличается от горящего так же, как в 2D, — тоном, а не
-яркостью ([ADR-0017](0017-spectrum-palette-and-shafts.md)): агенты в темноте
-продолжают стрелять.
+A darkened floor in the greybox differs from a lit one in the same way as in 2D — by tone, not
+brightness ([ADR-0017](0017-spectrum-palette-and-shafts.md)): agents in the dark keep shooting.
 
-### 5. Сценовые тесты переписываются по ходу, а не отключаются блоком
+### 5. Scene tests are rewritten along the way, not disabled in a block
 
-Каждая система переезжает вместе со своим тестом. Дольше, но ни одного дня без
-сетки — а поймать, что переезд что-то сломал, больше нечем: правила не менялись,
-значит любая поломка будет именно в слое узлов.
+Each system moves together with its test. Slower, but not a single day without a safety net — and
+there is nothing else to catch the move breaking something: the rules did not change, so any
+breakage will be in the node layer.
 
-### 6. Выбрасываем по мере замены, а не заранее
+### 6. We throw out as things get replaced, not up front
 
 `TiledRect`, `SpriteTextures`, `AreaLight`, `LightTextures`, `BuildingBackdrop`,
-`Skyline`, `postprocess.tscn`, `tools/render_env.py` и спрайты окружения уходят
-тогда, когда у них не остаётся читателей, и ни минутой раньше. Порядок — из
-[ADR-0019](0019-3d-pivot.md), решение 8; добор того, что осталось висеть, — M20.
+`Skyline`, `postprocess.tscn`, `tools/render_env.py` and the environment sprites go when they have
+no readers left, and not a minute earlier. The order is from
+[ADR-0019](0019-3d-pivot.md), decision 8; cleaning up what is left hanging — M20.
 
-## Чего в вехе нет
+## What is not in the milestone
 
-- **Моделей и анимаций.** Otto, агенты и машина — коробки. Модели в M16.
-- **Материалов и красивого света.** Один источник на этаж, дальше M17.
-- **Наклона камеры.** Камера строго боковая, как в 2D. Наклон — открытый вопрос
-  вехи света ([ADR-0019](0019-3d-pivot.md), решение 6), и трогать его в греев-боксе
-  нечем: пол всё равно пустой.
-- **Обстановки и заднего плана.** Объём комнаты за стеной пустой. Наполнение — M19.
+- **Models and animations.** Otto, agents and the car are boxes. Models in M16.
+- **Materials and beautiful lighting.** One source per floor, the rest in M17.
+- **Camera tilt.** The camera is strictly from the side, as in 2D. Tilt is an open question of the
+  lighting milestone ([ADR-0019](0019-3d-pivot.md), decision 6), and there is nothing to tilt it
+  for in the greybox: the floor is empty anyway.
+- **Dressing and background.** The room volume behind the wall is empty. Filling it — M19.
 
-## Как проверяем
+## How we check
 
-**DoD вехи:** бот проходит тридцатиэтажное здание в 3D-сцене из серых коробок, и ни
-один тест правил при этом не правился.
+**Milestone DoD:** the bot completes the thirty-floor building in a 3D scene of grey boxes, and not
+a single rule test was edited along the way.
 
-Второе условие проверяется механически, `git diff` по слою правил. Классы делятся
-на две группы, и спрос с них разный.
+The second condition is checked mechanically, by `git diff` over the rule layer. The classes split
+into two groups, and the demands on them differ.
 
-**Диф обязан быть строго пустым** — эти классы длин в себе не держат вовсе, всё
-приходит извне: `building_plan.gd`, `building_route.gd`, `document_route.gd`,
+**The diff must be strictly empty** — these classes hold no lengths at all, everything comes from
+outside: `building_plan.gd`, `building_route.gd`, `document_route.gd`,
 `otto_state_machine.gd`, `shaft_hazards.gd`, `door_cycle.gd`, `door_visit.gd`,
-`visible_floors.gd` и все их тесты.
+`visible_floors.gd` and all their tests.
 
-**Диф обязан быть только перемасштабированием констант** — эти три держат в себе
-длины по умолчанию: `building_rules.gd` (геометрия здания и числа боя),
+**The diff must be only a rescaling of constants** — these three hold default lengths:
+`building_rules.gd` (building geometry and combat numbers),
 `elevator_motion.gd` (`speed`, `settle_distance`, `FLOOR_EPSILON`),
-`enemy_brain.gd` (`same_line`, `fire_range`, рост в трёх стойках). Деление на сто —
-это [ADR-0019](0019-3d-pivot.md), решение 3: смена единицы измерения, а не смена
-правила. Пропорции и отношения между числами не меняются ни одно, и ровно это
-проверяет `test_proportions.gd`, остающийся зелёным без правок в утверждениях.
-Ничего, кроме деления констант, в этих трёх файлах быть не должно.
+`enemy_brain.gd` (`same_line`, `fire_range`, height in three stances). Division by a hundred is
+[ADR-0019](0019-3d-pivot.md), decision 3: a change of unit, not a change of rule. Not a single
+proportion or ratio between numbers changes, and exactly this is checked by `test_proportions.gd`,
+which stays green without edits to its assertions. Nothing but dividing constants may appear in
+these three files.
 
-Если диф выходит за эти рамки — либо правило было написано неправильно, либо
-переезд делается неправильно, и разбираться надо до того, как веха закроется.
+If the diff goes beyond these bounds — either the rule was written wrong or the move is being done
+wrong, and it must be sorted out before the milestone closes.
 
-**Один такой случай веха нашла.** `ElevatorMotion._move_towards` засчитывал
-прибытие к остановке сравнением остатка с шагом кадра без допуска. На пикселях
-остаток и шаг сходились с точностью до бита, и правило работало на удаче; на
-метрах, с остановками во `float32`, остаток оказался больше шага на миллионную.
-Кабина вставала в микроне от верхней остановки — «выровненной» по
-`FLOOR_EPSILON`, — но паузы не получала и разворачивалась на следующем кадре.
-Бот на крыше тридцатиэтажки ждал её сутки игрового времени. Правка — допуск
-в одну строку в самом правиле, покрыта тестом без сцены. Это ровно тот исход,
-ради которого пункт написан: диф в `elevator_motion.gd` больше, чем деление
-констант, и здесь сказано почему.
+**The milestone found one such case.** `ElevatorMotion._move_towards` counted arrival at a stop by
+comparing the remainder with the frame step without a tolerance. In pixels the remainder and the
+step matched to the bit, and the rule worked by luck; in metres, with stops in `float32`, the
+remainder turned out a millionth larger than the step. The cab stopped a micron from the top stop —
+"aligned" by `FLOOR_EPSILON` — but got no pause and turned around on the next frame. The bot on the
+roof of the thirty-floor building waited for it a whole day of game time. The fix is a one-line
+tolerance in the rule itself, covered by a test without a scene. This is exactly the outcome the
+item was written for: the diff in `elevator_motion.gd` is larger than dividing constants, and here
+it is said why.
 
-Второе, что вылезло, — не в правилах, а в их тестах. `test_building_rules.gd`
-и `test_building_silhouette.gd` задавали высоту этажа и плиту, а небо, ширину и
-отступ брали из умолчаний правил. Пока умолчания были 480 и 3840, точные
-равенства сходились в любом float; на 4.8 и 38.4 они поплыли на последнем бите.
-Тесты теперь задают все длины сами — как `test_elevator_motion.gd` делал с самого
-начала. Утверждения не тронуты.
+The second thing that showed up was not in the rules but in their tests. `test_building_rules.gd`
+and `test_building_silhouette.gd` set the floor height and slab, but took the sky, width and margin
+from the rules' defaults. While the defaults were 480 and 3840, exact equalities held in any float;
+at 4.8 and 38.4 they drifted on the last bit. The tests now set all lengths themselves — as
+`test_elevator_motion.gd` did from the very beginning. The assertions are untouched.

@@ -1,11 +1,11 @@
 extends GutTest
 
-## Детали города и погода M22: верхи домов и вывески по сиду, молния — серия
-## вспышек, которая гаснет.
+## City details and M22 weather: building tops and signs by seed, lightning — a series
+## of flashes that fades.
 
 
-## Верхи и вывески повторяются по сиду, а раскладка кварталов — та же, что до
-## деталей: жребий деталей свой.
+## Tops and signs repeat by seed, while the block layout is the same as before
+## the details: the details have their own draw.
 func test_crowns_follow_the_seed_and_do_not_move_the_blocks() -> void:
 	var first := CityPlan.generate(4, 0.0, 40.0)
 	var again := CityPlan.generate(4, 0.0, 40.0)
@@ -42,7 +42,7 @@ func test_the_sign_colours_are_not_game_signs() -> void:
 			)
 
 
-## Молния — серия вспышек через паузу, и после серии небо снова тёмное.
+## Lightning is a series of flashes with a pause, and after the series the sky is dark again.
 func test_lightning_flashes_and_goes_dark() -> void:
 	var lightning := Lightning.new()
 	add_child_autofree(lightning)
@@ -60,8 +60,8 @@ func test_lightning_flashes_and_goes_dark() -> void:
 	assert_lt(lightning.level(), 0.2, "и гаснет")
 
 
-## Разряд виден с камеры города: ломаная идёт сверху вниз, её треугольники
-## обращены от камеры, и с отсечением задних граней она не рисовалась вовсе.
+## The strike is visible from the city camera: the polyline goes top to bottom, its triangles
+## face away from the camera, and with back-face culling it was not drawn at all.
 func test_the_bolt_is_drawn_from_both_sides() -> void:
 	var lightning := Lightning.new()
 	add_child_autofree(lightning)
@@ -81,7 +81,7 @@ func test_the_bolt_is_drawn_from_both_sides() -> void:
 	assert_eq(look.cull_mode, BaseMaterial3D.CULL_DISABLED, "разряд отсекается гранью")
 
 
-## Молния, огни и неон — без источников света: бюджет ламп кадра не растёт.
+## Lightning, lights and neon — without light sources: the frame's lamp budget does not grow.
 func test_the_city_details_add_no_lights() -> void:
 	var blocks := CityPlan.generate(2, 0.0, 40.0)
 	var nodes: Array[Node] = [

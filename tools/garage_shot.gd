@@ -1,16 +1,16 @@
 extends Node3D
 
-## Кадры паркинга M24b (ADR-0038, решение 3): ворота слева, середина зала,
-## ворота открытыми и паркинг с погашенной зоной.
+## M24b garage shots (ADR-0038, decision 3): the gate on the left, the middle of the
+## hall, the gate open and the garage with a darkened zone.
 ##
-## Otto ставится по раскладке, как в [code]layout_shot.gd[/code]: до нижнего
-## этажа сценарий съёмки по времени не доходит. `--wide` снимает весь этаж
-## общим планом — камеру отводят, чтобы увидеть паркинг целиком; игрок так его
-## не видит, кадр — для проверки раскладки глазом.
+## Otto is placed by the layout, as in [code]layout_shot.gd[/code]: the timed capture
+## script does not reach the bottom floor. `--wide` shoots the whole floor as a wide
+## shot — the camera is pulled back to see the whole garage; the player does not see it
+## this way, the shot is for checking the layout by eye.
 ##
-## Рендер настоящий, не headless — нужен экран.
+## The render is real, not headless — a screen is needed.
 ##
-## Запуск:
+## Launch:
 ##     godot --path . res://tools/garage_shot.tscn
 ##     godot --path . res://tools/garage_shot.tscn -- --seed=3 --folder=M24b
 ##     godot --path . res://tools/garage_shot.tscn -- --wide --quality=0
@@ -19,7 +19,7 @@ const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
 const FOLDER := "res://screens/M24b"
 const SETTLE_FRAMES: int = 45
-## Во сколько раз шире обычного кадр общего плана.
+## How many times wider than usual the wide shot is.
 const WIDE_ZOOM: float = 2.6
 
 var _level: GreyboxLevel = null
@@ -75,8 +75,8 @@ func _run() -> void:
 	get_tree().quit(0)
 
 
-## Точка рядом с [param x], где Otto не встанет у водительской двери машины:
-## кадр паркинга снимается без Otto, садящегося в машину.
+## A point near [param x] where Otto will not stand at the car's driver door: the garage
+## shot is taken without Otto getting into the car.
 func _clear_x(x: float) -> float:
 	var exit_x := _level.plan().exit_x
 	if absf(x - exit_x) < BuildingShell.EXIT_WIDTH + 0.5:

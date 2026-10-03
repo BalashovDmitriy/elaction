@@ -1,18 +1,18 @@
 extends GutTest
 
-## Выезд из паркинга — тоннель, пандус и улица ([GarageRamp], [ExitStreet]) —
-## на любом здании: ничего из выезда не залезает в здание и не стоит на пути
-## машины, грани разных материалов не лежат в одной плоскости, а свет выезда —
-## не больше двух источников без тени, и горят они, только пока выезд в кадре.
+## The garage exit — tunnel, ramp and street ([GarageRamp], [ExitStreet]) —
+## on any building: nothing of the exit gets into the building or stands in the car's
+## way, faces of different materials do not lie in one plane, and the exit light is
+## no more than two shadowless sources, lit only while the exit is in frame.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const SEEDS: Array[int] = [1, 2, 3, 7]
 
-## Допуск «в одной плоскости», м.
+## "In one plane" tolerance, m.
 const COPLANAR: float = 0.001
-## Сколько над проездом должно быть пусто на пути машины, м: машина с запасом.
+## How much must be empty above the driveway on the car's path, m: a car with a margin.
 const HEADROOM: float = 1.6
-## Глубина здания в сцене: от лица коридора до дальней стены паркинга с запасом.
+## Building depth in the scene: from the corridor face to the far garage wall with a margin.
 const BUILDING_Z := Vector2(-8.4, WorldSpace.CORRIDOR_DEPTH * 0.5)
 
 
@@ -62,7 +62,7 @@ func test_the_exit_lights_are_few_unshadowed_and_off_in_play() -> void:
 	var level := _build(2)
 	var ramp := level.garage().gate.ramp()
 	var lights := ramp.lights()
-	# С M24k фонарь у бордюра светит по-настоящему (ADR-0052, решение 3).
+	# Since M24k the street light by the curb casts real light (ADR-0052, decision 3).
 	assert_between(lights.size(), 1, 3, "свет выезда — от одного до трёх источников")
 	for light in lights:
 		assert_false(light.shadow_enabled, "%s кладёт тень" % light.name)
@@ -74,8 +74,8 @@ func test_the_exit_lights_are_few_unshadowed_and_off_in_play() -> void:
 	level.otto.global_position = WorldSpace.to_scene(
 		Vector2(rules.floor_span(bottom).x + 4.0, rules.floor_surface(bottom))
 	)
-	# Вступление на первых кадрах возвращает камере границы здания — кадр
-	# выезда ставится заново каждый кадр.
+	# In the first frames the intro returns the building bounds to the camera — the exit
+	# frame is set anew every frame.
 	for _frame in 3:
 		level.otto.apply_camera_bounds(ExitBoarding.exit_frame(rules))
 		await wait_process_frames(1)
@@ -84,8 +84,8 @@ func test_the_exit_lights_are_few_unshadowed_and_off_in_play() -> void:
 	remove_child(level)
 
 
-## Здание сида [param building_seed]: тип — по кругу от сида, у каждого типа
-## свой вход с улицы (ADR-0058, решение 5) — и проверки выезда идут по всем.
+## Building of seed [param building_seed]: the kind goes round-robin by seed, each kind
+## has its own street entrance (ADR-0058, decision 5) — and the exit checks cover all.
 func _build(building_seed: int) -> GreyboxLevel:
 	GameState.instance().start_game()
 	var kind := (building_seed % BuildingIdentity.Kind.size()) as BuildingIdentity.Kind
@@ -99,7 +99,7 @@ func _build(building_seed: int) -> GreyboxLevel:
 	return level
 
 
-## Полоса машины по глубине, Z сцены: по мешам её модели.
+## The car's band in depth, scene Z: by the meshes of its model.
 func _car_lane(level: GreyboxLevel) -> Vector2:
 	var car := level.find_child("ExitCar", true, false) as Node3D
 	var low := INF
@@ -114,8 +114,8 @@ func _car_lane(level: GreyboxLevel) -> Vector2:
 	return Vector2(low, high)
 
 
-## Стоит ли коробка [param box] на пути машины: в её полосе по глубине и ниже
-## [constant HEADROOM] над проездом хоть где-то по своей длине.
+## Whether box [param box] stands in the car's way: in its depth band and below
+## [constant HEADROOM] above the driveway anywhere along its length.
 func _blocks(rules: BuildingRules, box: AABB, lane: Vector2) -> bool:
 	if box.end.z <= lane.x or box.position.z >= lane.y:
 		return false
@@ -129,33 +129,33 @@ func _blocks(rules: BuildingRules, box: AABB, lane: Vector2) -> bool:
 	return false
 
 
-## Меши выезда: [AABB в сцене, материал, наклонён ли (или не коробка), коробка
-## ли без поворота]. Пятна света и надписи — не в счёт: они не преграда.
+## Exit meshes: [AABB in the scene, material, whether tilted (or not a box), whether
+## an unrotated box]. Light pools and lettering do not count: they are not obstacles.
 func _parts(root: Node) -> Array[Array]:
 	var found: Array[Array] = []
 	for node: Node in root.find_children("*", "MeshInstance3D", true, false):
 		var part := node as MeshInstance3D
-		# Клин грунта под подъёмом повторяет пандус, а коробка его — нет.
+		# The soil wedge under the rise follows the ramp, but its box does not.
 		if part.mesh is PlaneMesh or part.mesh is QuadMesh or part.mesh is PrismMesh:
 			continue
 		if part.get_parent() is MultiMeshInstance3D:
 			continue
-		# Поток машин (M24h) — не геометрия выезда: он едет по той же полосе,
-		# что и машина Otto, и въезжает из-за угла здания нарочно. Его правила —
-		# в test_street_traffic.
+		# Street traffic (M24h) is not exit geometry: it drives along the same lane
+		# as Otto's car, and comes from around the building corner on purpose. Its rules are
+		# in test_street_traffic.
 		if _in_traffic(part):
 			continue
 		var basis := part.global_basis.orthonormalized()
 		var straight := basis.is_equal_approx(Basis.IDENTITY)
 		var box := part.global_transform * part.mesh.get_aabb()
 		var plain_box := part.mesh is BoxMesh and straight
-		# Машина у бордюра — модель, и путь её не пересекает: она через дорогу.
+		# The car by the curb is a model, and its path does not cross it: it is across the road.
 		var tilted := not straight and part.mesh is BoxMesh
 		found.append([box, part.material_override, tilted, plain_box])
 	return found
 
 
-## Часть ли это машины потока ([StreetTraffic]).
+## Whether this is part of a traffic car ([StreetTraffic]).
 func _in_traffic(node: Node) -> bool:
 	var up := node.get_parent()
 	while up != null:
@@ -165,8 +165,8 @@ func _in_traffic(node: Node) -> bool:
 	return false
 
 
-## Пары коробок разных материалов с гранью в одной плоскости и одной нормалью,
-## которые перекрываются по площади. Боковые грани, по x, камера видит ребром.
+## Pairs of boxes of different materials with a face in one plane and with one normal
+## that overlap in area. Side faces, along x, the camera sees edge-on.
 func _clashes(boxes: Array[Array]) -> Array[String]:
 	var clashes: Array[String] = []
 	for i in boxes.size():

@@ -1,9 +1,9 @@
 extends GutTest
 
-## Тесты состояния поездки на эскалаторе.
+## Tests of the escalator ride state.
 ##
-## RIDE снимается и ставится снаружи, как и DEAD: пока Otto везут, ввод игрока
-## не действует (ADR-0004, пункт 8).
+## RIDE is cleared and set from outside, like DEAD: while Otto is being carried, the
+## player's input has no effect (ADR-0004, point 8).
 
 
 func _snapshot(move: float = 0.0, crouch: bool = false, jump: bool = false) -> OttoInput:

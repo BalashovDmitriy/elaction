@@ -1,10 +1,12 @@
 extends GutTest
 
-## Свет внизу здания дешевле (ADR-0044, решение 11): лампы гаснут и за краем
-## кадра по X, а тень заливки кладут только ближайшие к середине кадра.
+## Light at the bottom of the building is cheaper (ADR-0044, decision 11): lamps also go out beyond
+## the frame edge along X, and only the ones nearest to the middle of the frame cast the fill
+## shadow.
 ##
-## Замер M24h: стилобат в полтора кадра шириной, и на нижних этажах горели и
-## клали тени лампы, которых в кадре нет, — кадр вдвое дороже верхних этажей.
+## M24h measurement: the podium is a frame and a half wide, and on the lower floors lamps that are
+## not in the frame were lit and cast shadows — the frame was twice as expensive as on the upper
+## floors.
 
 const VIEW := Rect2(10.0, 0.0, 23.5, 13.2)
 const LAMP_SCENE := preload("res://src/systems/lighting/lamp.tscn")
@@ -44,11 +46,11 @@ func test_fill_shadows_go_to_the_lamps_nearest_the_middle() -> void:
 		assert_between(x, 19.0, 25.0, "ближние к середине: %.1f" % x)
 
 
-## Тень заливки достаётся только лампам, которые тень кладут: запасной этаж и
-## лампа из-за края полосы теней места не занимают (авторевью M24h).
+## The fill shadow goes only to lamps that cast shadows: a margin floor and a lamp beyond the edge
+## of the shadow band do not take a slot (M24h code review).
 func test_fill_shadows_skip_lamps_that_cast_no_shadow() -> void:
 	var lamps: Array[Lamp] = []
-	# x, этаж: у середины — лампа запасного этажа; за полосой — ещё одна.
+	# x, floor: at the middle — a lamp of the margin floor; beyond the band — one more.
 	for spot: Vector2 in [
 		Vector2(21.0, 6.0), Vector2(18.0, 5.0), Vector2(25.0, 5.0), Vector2(40.0, 5.0)
 	]:

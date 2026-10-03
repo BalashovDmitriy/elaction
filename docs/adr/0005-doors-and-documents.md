@@ -1,112 +1,114 @@
-# ADR-0005 · Двери, документы и выход из здания
+# ADR-0005 · Doors, documents and leaving the building
 
-- **Статус:** принято; красных дверей — 5–10 по навыку, [ADR-0028](0028-building-by-the-map.md),
-  решение 3
-- **Дата:** 2026-09-12
+- **Status:** accepted; red doors — 5–10 by skill level, [ADR-0028](0028-building-by-the-map.md),
+  decision 3
+- **Date:** 2026-09-12
 
-## Контекст
+## Context
 
-M3 — веха про красные двери и документы. Как и перед M2, механика сверена с оригиналом
-до начала работы: на M2 сверка изменила три решения из четырёх, и повторять эту работу
-задним числом дороже.
+M3 is the milestone about red doors and documents. As before M2, the mechanics were checked
+against the original before work started: in M2 the check changed three decisions out of four,
+and redoing that work after the fact is more expensive.
 
-StrategyWiki по-прежнему закрыта Cloudflare, поэтому источники — Wikipedia, Hardcore
-Gaming 101, инструкция к NES-версии и цитаты StrategyWiki из поисковой выдачи. Ссылки —
-в конце. NES-порт отличается от аркады, поэтому его инструкция использована только там,
-где подтверждается другим источником.
+StrategyWiki is still behind Cloudflare, so the sources are Wikipedia, Hardcore Gaming 101, the
+NES version manual and StrategyWiki quotes from search results. Links are at the end. The NES
+port differs from the arcade, so its manual is used only where another source confirms it.
 
-Сверка подтвердила большую часть плана, изменила один пункт вехи и добавила механику,
-которой в эпике не было.
+The check confirmed most of the plan, changed one item of the milestone and added a mechanic
+that was not in the epic.
 
-## Решения
+## Decisions
 
-### 1. Документ за красной дверью, 500 очков
+### 1. A document behind a red door, 500 points
 
-Подтверждено Wikipedia: «collecting secret documents (500 points per) whose locations
-are marked by red doors». Собранная дверь перестаёт быть красной и дальше ведёт себя
-как обычная.
+Confirmed by Wikipedia: "collecting secret documents (500 points per) whose locations
+are marked by red doors". A collected door stops being red and from then on behaves
+like an ordinary one.
 
-Заодно нашлась вся таблица очков — она понадобится в M4: выстрел 100, прыжок ногой 150,
-лампа на голову 300, документ 500, бонус за здание 1000 × его номер.
+Along the way the whole score table turned up — it will be needed in M4: shot 100, jump kick
+150, lamp on the head 300, document 500, building bonus 1000 × its number.
 
-### 2. Вход — с коврика и по нажатию «вверх»
+### 2. Entry — from the mat and by pressing "up"
 
-В оригинале перед дверью лежит коврик: «To enter the red door, stand directly on a white
-square in front of the door», и стоять надо лицом к двери.
+In the original a mat lies in front of the door: "To enter the red door, stand directly on a
+white square in front of the door", and one must stand facing the door.
 
-**Мы добавляем явное нажатие «вверх».** Это отход от буквы оригинала, принятый сознательно:
+**We add an explicit "up" press.** This is a deliberate departure from the letter of the
+original:
 
-1. Направление взгляда Otto в проекте пока не хранится — оно появится с анимациями в M7.
-2. Вход по одной лишь остановке втягивал бы в дверь любого, кто остановился на коврике.
-3. «Встал на площадку и нажал направление» — уже принятый в проекте способ
-   взаимодействия: так работают и кабина, и эскалатор (ADR-0004, пункты 1 и 8).
+1. Otto's facing direction is not stored in the project yet — it will appear with animations
+   in M7.
+2. Entry by merely stopping would pull into the door anyone who stopped on the mat.
+3. "Stand on the pad and press a direction" is already the project's established way of
+   interacting: the cab and the escalator work this way too (ADR-0004, items 1 and 8).
 
-### 3. Дверь — это комната, в которой прячутся
+### 3. A door is a room to hide in
 
-Механики не было в эпике. Войдя, Otto остаётся внутри **до пяти секунд**, после чего его
-выбрасывает наружу автоматически; выйти раньше можно нажатием в сторону дверной ручки.
+This mechanic was not in the epic. Having entered, Otto stays inside **for up to five
+seconds**, after which he is thrown out automatically; leaving earlier is possible by pressing
+toward the door handle.
 
 > Once you enter a red door, you can stay inside for up to five seconds, and after that,
 > if you have not left the room, you will automatically exit.
 
-Это укрытие от врагов, и в M4 оно станет частью боя. Само поведение двери реализуется
-сразу: без него дверь не дверь.
+This is cover from enemies, and in M4 it becomes part of combat. The door behaviour itself is
+implemented right away: without it a door is not a door.
 
-### 4. Обычные двери — засады, но не в этой вехе
+### 4. Ordinary doors are ambushes, but not in this milestone
 
 > Enemy agents, armed and lying in wait behind the blue doors, will try to ambush you.
 
-В M3 обычная дверь получает сцену и состояния «закрыта / открывается / открыта».
-Выпускать из неё врагов будет M4.
+In M3 an ordinary door gets a scene and the states "closed / opening / open".
+Releasing enemies from it is for M4.
 
-### 5. Выход не блокируется — Otto возвращают наверх
+### 5. The exit is not blocked — Otto is sent back up
 
-**Здесь план вехи расходился с оригиналом.** В эпике было записано «блокировка финального
-выхода, пока документы не собраны». В оригинале выход открыт всегда:
+**Here the milestone plan diverged from the original.** The epic said "block the final exit
+until the documents are collected". In the original the exit is always open:
 
 > If a red door is missed and the building is exited, you will be returned to the first
 > missing red door… he will be transported to the highest floor that still has an
 > unopened red door and must work his way back down.
 
-Причём это не столько наказание, сколько приём: игроки нарочно спускаются к выходу, чтобы
-их закинуло к двери, до которой тяжело добраться иначе.
+And this is not so much a punishment as a technique: players deliberately go down to the exit
+to get thrown to a door that is hard to reach otherwise.
 
-Блокировка выхода такой игры не даёт, поэтому реализуется перенос.
+Blocking the exit does not allow that kind of play, so the transfer is implemented.
 
-### 6. Счёт и прогресс — в автолоаде `GameState`
+### 6. Score and progress — in the `GameState` autoload
 
-Очки, собранные документы, позже жизни и номер этажа живут в одном синглтоне с сигналами.
-HUD и двери связываются через него, а не напрямую друг с другом — как предписывают
-`docs/conventions.md` для взаимодействия несвязанных систем.
+Points, collected documents, later lives and the floor number live in a single singleton with
+signals. The HUD and doors connect through it rather than directly to each other — as
+`docs/conventions.md` prescribes for interaction between unrelated systems.
 
-### 7. Двери пока описываются константами уровня
+### 7. Doors are described by level constants for now
 
-Как шахта и эскалатор в M2. Перевод всей геометрии на `Resource` остаётся одной задачей
-M5: делать его посреди вехи про двери — значит смешать две несвязанные работы.
+Like the shaft and the escalator in M2. Moving all geometry to `Resource` remains a single task
+of M5: doing it in the middle of the doors milestone would mix two unrelated pieces of work.
 
-## Что осталось несверенным
+## What remains unchecked
 
-| Вопрос | Как закрыть |
+| Question | How to close it |
 |---|---|
-| Сколько красных дверей на здание | MAME. Hardcore Gaming 101 говорит про пять документов на уровень, другие источники числа не называют |
-| Ровно ли пять секунд длится укрытие | MAME, замер по кадрам |
-| Открывается ли обычная дверь от игрока или только от врага | Закрыт в M24h по ROM (@3BDA): игрока пускает только красная дверь с документом — [ADR-0044](0044-street-and-cab.md) |
+| How many red doors per building | MAME. Hardcore Gaming 101 mentions five documents per level, other sources give no number |
+| Whether cover lasts exactly five seconds | MAME, frame-by-frame measurement |
+| Whether an ordinary door opens for the player or only for an enemy | Closed in M24h by ROM (@3BDA): only a red door with a document lets the player in — [ADR-0044](0044-street-and-cab.md) |
 
-## Последствия
+## Consequences
 
-- **`GameState` — первый синглтон состояния игры.** До сих пор автолоад был один и
-  служебный (`Screenshotter`). Появляется место, куда M4 положит жизни, а M5 — переход
-  между зданиями.
-- **Otto получает ещё одно состояние, которым распоряжается мир.** После `RIDE` из M2
-  добавляется пребывание внутри двери: ввод игрока в нём не действует, а сам Otto скрыт.
-- **Перенос к несобранной двери — первая механика, которой нужно знать про всё здание
-  целиком**, а не про один этаж. В M5, когда этажи станут стримиться, это место
-  придётся пересмотреть.
+- **`GameState` is the first game-state singleton.** Until now there was one autoload, and it
+  was a utility (`Screenshotter`). There is now a place where M4 will put lives, and M5 the
+  transition between buildings.
+- **Otto gets one more state that the world controls.** After `RIDE` from M2, being inside a
+  door is added: player input does not act in it, and Otto himself is hidden.
+- **The transfer to an uncollected door is the first mechanic that needs to know about the
+  whole building**, not one floor. In M5, when floors start streaming, this place will have to
+  be revisited.
 
-## Источники
+## Sources
 
 - [Elevator Action — Wikipedia](https://en.wikipedia.org/wiki/Elevator_Action)
 - [Elevator Action — Hardcore Gaming 101](https://hg101.kontek.net/elevatoraction/elevatoraction.htm)
-- [Инструкция к NES-версии](http://www.world-of-nintendo.com/manuals/nes/elevator_action.shtml)
+- [NES version manual](http://www.world-of-nintendo.com/manuals/nes/elevator_action.shtml)
 - [Elevator Action/Gameplay — StrategyWiki](https://strategywiki.org/wiki/Elevator_Action/Gameplay)
-  (недоступна напрямую, цитаты получены из выдачи поисковика)
+  (not directly reachable, quotes obtained from search results)

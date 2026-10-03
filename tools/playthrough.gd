@@ -1,13 +1,12 @@
 extends SceneTree
 
-## Прогон настоящего здания ботом: 30 этажей, как в игре.
+## A run of the real building by the bot: 30 floors, as in the game.
 ##
-## Тест прохождения гоняет здание на четыре этажа с одной шахтой — этого хватает
-## проверить, что бот вообще умеет спускаться, но не то, во что играет игрок.
-## Здесь собирается ровно то здание, которое собирает игра, и по нему видно,
-## где спуск встаёт.
+## The playthrough test runs a four-floor building with one shaft — that is enough to check that the
+## bot can go down at all, but not what the player plays. Here exactly the building the game
+## assembles is built, and it shows where the descent gets stuck.
 ##
-## Запуск:
+## Run:
 ##     godot --headless --script res://tools/playthrough.gd -- --seeds=1,2,3
 ##     godot --headless --script res://tools/playthrough.gd -- --seeds=1 --agents
 ##     godot --headless --script res://tools/playthrough.gd -- --agents --at-once=8
@@ -17,42 +16,40 @@ extends SceneTree
 ##     godot --headless --script res://tools/playthrough.gd -- --agents --endless --no-lamps
 ##     godot --headless --script res://tools/playthrough.gd -- --agents --endless --weather=3
 ##
-## С [code]--trace[/code] раз в [constant TRACE_EVERY] шагов печатается, где бот
-## и что вокруг: этаж, положение, стоит ли, едет ли, где ближайшая кабина. Это
-## инструмент на случай «застрял», когда итоговая строка говорит лишь этаж.
-## [code]--budget=N[/code] укорачивает прогон под такую диагностику, а
-## [code]--trace-every=N[/code] делает трассу мельче.
+## With [code]--trace[/code], every [constant TRACE_EVERY] steps it prints where the bot is and what
+## is around: floor, position, whether it stands, whether it rides, where the nearest cab is. This
+## is a tool for the "stuck" case, when the summary line only gives the floor.
+## [code]--budget=N[/code] shortens the run for such diagnostics, and [code]--trace-every=N[/code]
+## makes the trace finer.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
-## Потолок на здание, **шагов бота**. Один шаг — два физических кадра, как и
-## в тестах. Тридцать этажей и пять документов — это минуты игрового времени,
-## поэтому бюджет крупный.
+## Cap for the building, in **bot steps**. One step is two physics frames, as in the tests. Thirty
+## floors and five documents are minutes of game time, so the budget is large.
 ##
-## Половина прежних 24000: те считались кадрами, а шаг стоит двух — оставленное
-## как есть число молча удвоило бы потолок по часам. Замер вехи — 1992–3176 шагов.
+## Half of the former 24000: those were counted in frames, and a step costs two — the number left as
+## it was would silently double the cap in clock time. The milestone measurement is 1992–3176 steps.
 const STEP_BUDGET: int = 12000
 
-## Сколько жизней выдаётся боту в бесконечном прогоне. Столько же, сколько
-## в тесте: числа обоих должны сходиться (`docs/testing.md`, пункт 4).
+## How many lives the bot gets in an endless run. The same as in the test: the numbers of both must
+## agree (`docs/testing.md`, item 4).
 const ENDLESS_LIVES: int = 99
 
-## Как часто печатать трассу, шагов бота.
+## How often to print the trace, in bot steps.
 const TRACE_EVERY: int = 300
 
-## Навык здания: уровень сложности плюс пройденные здания (ADR-0027). С ним
-## смертность бота меряется на каждом уровне, а не только на первом здании.
+## Building skill: difficulty level plus cleared buildings (ADR-0027). With it the bot's death rate
+## is measured at every level, not only on the first building.
 var _skill: int = 0
-## С какой дистанции агент видит Otto в тени, м; меньше нуля — из правил.
-## Этим флагом подбиралось [member BuildingRules.agent_dark_fire_range]
-## (ADR-0053, решение 4).
+## From what distance an agent sees Otto in shadow, m; below zero — from the rules. [member
+## BuildingRules.agent_dark_fire_range] was tuned with this flag (ADR-0053, decision 4).
 var _dark_range: float = -1.0
-## Бот не сбивает лампы: замер «без темноты» рядом с замером с ней.
+## The bot does not shoot down lamps: a "no darkness" measurement next to the one with it.
 var _no_lamps: bool = false
-## Запрет выпуска у Otto, м; меньше нуля — из правил (ADR-0053, решение 3).
+## Release ban near Otto, m; below zero — from the rules (ADR-0053, decision 3).
 var _release_gap: float = -1.0
-## Погода руками ([enum Weather.Kind]); меньше нуля — жребий по сиду. Этим
-## флагом мерили скользкую крышу в снег (ADR-0054, решение 4).
+## Weather set by hand ([enum Weather.Kind]); below zero — a draw by seed. This flag was used to
+## measure the slippery roof in snow (ADR-0054, decision 4).
 var _weather: int = -1
 
 
@@ -63,11 +60,11 @@ func _init() -> void:
 func _run() -> void:
 	var seeds: Array[int] = [1, 2, 3]
 	var agents := false
-	# Жизни не кончаются: так видно, проходится ли здание вообще, отдельно от
-	# того, хватает ли на него трёх жизней.
+	# Lives do not run out: this shows whether the building can be passed at all, separately from
+	# whether three lives are enough for it.
 	var endless := false
-	# Потолок живых агентов: 0 — брать из правил. Подбор этого числа и есть
-	# главный рычаг плотности боя, и крутить его надо не правкой файла.
+	# Cap on living agents: 0 — take from the rules. Tuning this number is the main lever of combat
+	# density, and it should be turned without editing the file.
 	var at_once := 0
 	var trace := false
 	var trace_every := TRACE_EVERY
@@ -123,7 +120,7 @@ func _play(
 	var game := GameState.instance()
 	game.reset()
 	game.start_game()
-	# Журнал прогона по флагу `--log=путь`: `{seed}` в пути — номер сида.
+	# Run log by the `--log=path` flag: `{seed}` in the path is the seed number.
 	for argument: String in OS.get_cmdline_user_args():
 		if argument.begins_with(RunLog.FLAG):
 			var path := argument.trim_prefix(RunLog.FLAG).replace(
@@ -150,9 +147,9 @@ func _play(
 	var cleared := [false]
 	level.building_cleared.connect(func() -> void: cleared[0] = true)
 	var over := [false]
-	# [GameState] — синглтон и переживает здание, поэтому связь снимается в конце
-	# прогона: иначе на третьем сиде по «партия окончена» срабатывали бы три
-	# замыкания подряд, и каждое держало бы своё уже убранное здание.
+	# [GameState] is a singleton and outlives the building, so the connection is removed at the end of
+	# the run: otherwise on the third seed "game over" would fire three closures in a row, and each
+	# would hold its own already removed building.
 	var on_game_over := func() -> void: over[0] = true
 	game.game_over.connect(on_game_over)
 
@@ -163,12 +160,12 @@ func _play(
 	var deepest := 0
 	var frames := 0
 	var deaths := 0
-	# Убитые агенты: по ним видно, дрался бот или пробегал мимо. Считаются по
-	# телам, а не по очкам: лампа убивает не хуже пули, а очки у них разные.
+	# Killed agents: they show whether the bot fought or ran past. Counted by bodies, not points: a
+	# lamp kills no worse than a bullet, but the points differ.
 	var kills := 0
 	var counted: Dictionary = {}
 	var was_dead := false
-	# Сколько шагов этаж не менялся: по этому видно застревание, а не медленность.
+	# How many steps the floor has not changed: this shows getting stuck, not slowness.
 	var stuck := 0
 	var last_floor := -1
 
@@ -179,25 +176,24 @@ func _play(
 		)
 	)
 
-	# Жизни выдаются разом и с запасом — ровно так же, как в прогоне с боем
-	# (`tests/test_building_playthrough.gd`, ENDLESS_LIVES). Подливание на нуле
-	# меняло бы ход партии в самый острый её момент, и инструмент мерил бы уже
-	# другую игру: на сиде 1 он давал две смерти там, где тест насчитывал четыре.
-	# Инструмент и тест обязаны мерить одно и то же (`docs/testing.md`, пункт 4).
+	# Lives are given all at once and with margin — exactly as in the run with combat
+	# (`tests/test_building_playthrough.gd`, ENDLESS_LIVES). Topping up at zero would change the course
+	# of the game at its sharpest moment, and the tool would measure a different game: on seed 1 it
+	# gave two deaths where the test counted four. The tool and the test must measure the same thing
+	# (`docs/testing.md`, item 4).
 	if endless:
 		game.lives = ENDLESS_LIVES
 		game.lives_changed.emit(game.lives)
 
 	while not cleared[0] and frames < budget:
 		bot.step()
-		# Два кадра на решение — ровно столько же, сколько у бота в тестах.
-		# Там это выходит из `wait_physics_frames(1)`, который ждёт два кадра,
-		# и на M13 оставлено правилом: бот должен быть самой грубой петлёй
-		# управления, какая случится с игрой (`docs/testing.md`, пункт 4).
+		# Two frames per decision — exactly as many as the bot gets in the tests. There this comes from
+		# `wait_physics_frames(1)`, which waits two frames, and on M13 it was kept as a rule: the bot must
+		# be the coarsest control loop the game will ever have (`docs/testing.md`, item 4).
 		#
-		# Инструмент обязан водить Otto так же, как тест. На M18a они разошлись
-		# — здесь был один кадр, там два, — и сид 2 проходил в инструменте,
-		# не проходя в тесте. Разбор занял три коммита и увёл в баланс боя.
+		# The tool must drive Otto the same way as the test. On M18a they diverged — here it was one
+		# frame, there two — and seed 2 passed in the tool while failing in the test. The investigation
+		# took three commits and drifted into combat balance.
 		await physics_frame
 		await physics_frame
 		frames += 1
@@ -281,13 +277,14 @@ func _play(
 	return ok
 
 
-## Кто стоит рядом с Otto: три ближайших агента с расстоянием до него.
+## Who stands near Otto: the three nearest agents with their distance to him.
 ##
-## Всех подряд печатать нельзя: в настоящем здании их под шестьдесят, и строка
-## смерти вырастает на весь экран. Интересны только те, кто до Otto достаёт.
+## Printing all of them is not an option: in the real building there are about sixty, and the death
+## line grows to the whole screen. Only those who can reach Otto are of interest.
 func _around(level: GreyboxLevel) -> String:
 	var here := _at(level.otto)
-	# Трупы лежат до конца здания (ADR-0037, решение 6), а интересны живые.
+	# Corpses lie until the end of the building (ADR-0037, decision 6), and the living ones are of
+	# interest.
 	var near: Array[Enemy] = []
 	for agent in level.agents():
 		if not agent.is_dead():
@@ -305,10 +302,10 @@ func _around(level: GreyboxLevel) -> String:
 	return " | агентов %d, ближайшие: %s" % [near.size(), ", ".join(parts)]
 
 
-## Чем его, скорее всего, достали: ближайшая вражеская пуля и ближайшая кабина.
+## What most likely got him: the nearest enemy bullet and the nearest cab.
 ##
-## Без этого смерть «в кабине» неотличима от смерти под кабиной, а это разные
-## беды: первая лечится балансом, вторая — правилами шахты.
+## Without this a death "in a cab" is indistinguishable from a death under a cab, and these are
+## different troubles: the first is cured by balance, the second by shaft rules.
 func _killer(level: GreyboxLevel) -> String:
 	var here := _at(level.otto)
 	var parts := PackedStringArray()
@@ -340,14 +337,14 @@ func _killer(level: GreyboxLevel) -> String:
 	return " | " + ", ".join(parts)
 
 
-## Где узел стоит в плоскости правил: прогон, как и бот, думает там же, где
-## раскладка, и переводит из сцены в одном месте.
+## Where the node stands in the rules plane: the run, like the bot, thinks in the same place as the
+## layout and converts from the scene in one place.
 static func _at(node: Node3D) -> Vector2:
 	return WorldSpace.to_plane(node.global_position)
 
 
-## Кабины на этаже Otto и ближайшая к нему по вертикали: по ним видно, ждёт ли
-## бот кабину, которая не приходит, или стоит рядом с той, что пришла.
+## Cabs on Otto's floor and the one nearest to him vertically: they show whether the bot is waiting
+## for a cab that does not come, or standing next to one that has arrived.
 func _cars_near(level: GreyboxLevel) -> String:
 	var here := _at(level.otto)
 	var nearest := ""
@@ -364,7 +361,7 @@ func _cars_near(level: GreyboxLevel) -> String:
 	return "" if nearest.is_empty() else " | ближайшая " + nearest
 
 
-## Что бот держит нажатым после своего шага: по этому видно, решил ли он идти.
+## What the bot holds pressed after its step: this shows whether it decided to walk.
 func _held_keys() -> String:
 	var keys := PackedStringArray()
 	for action: StringName in [

@@ -1,24 +1,24 @@
 extends GutTest
 
-## Страница «Авторы» (ADR-0042, решение 6).
+## The "Credits" page (ADR-0042, decision 6).
 ##
-## Правят `CREDITS.md`, а игра читает собранный из него `assets/credits.json`:
-## забытая пересборка молча оставила бы нового автора без строки в игре.
-## Поэтому тест разбирает `CREDITS.md` тем же правилом, что
-## `tools/build_credits.py`, и сверяет с тем, что прочтёт страница.
+## `CREDITS.md` is edited, while the game reads `assets/credits.json` built from it:
+## a forgotten rebuild would silently leave a new author without a line in the game.
+## So the test parses `CREDITS.md` by the same rule as
+## `tools/build_credits.py`, and compares with what the page will read.
 
 const SOURCE := "res://CREDITS.md"
 const SECTIONS := {
-	"Люди и машины": "UI_CREDITS_ACTORS",
-	"Обстановка и крыша": "UI_CREDITS_PROPS",
-	"Фактуры": "UI_CREDITS_TEXTURES",
-	"Город и небо": "UI_CREDITS_CITY",
-	"Звук": "UI_CREDITS_SOUND",
-	"Шрифты": "UI_CREDITS_FONTS",
+	"People and cars": "UI_CREDITS_ACTORS",
+	"Props and roof": "UI_CREDITS_PROPS",
+	"Textures": "UI_CREDITS_TEXTURES",
+	"City and sky": "UI_CREDITS_CITY",
+	"Sound": "UI_CREDITS_SOUND",
+	"Fonts": "UI_CREDITS_FONTS",
 }
 
 
-## Авторы по разделам из `CREDITS.md`: ключ раздела — имена по порядку.
+## Authors by section from `CREDITS.md`: section key — names in order.
 func _from_markdown() -> Dictionary:
 	var found: Dictionary = {}
 	var key := ""
@@ -40,9 +40,9 @@ func _from_markdown() -> Dictionary:
 		if header.is_empty():
 			header = cells
 			continue
-		if cells[0].begins_with("---") or not header.has("Автор"):
+		if cells[0].begins_with("---") or not header.has("Author"):
 			continue
-		var name := cells[header.find("Автор")]
+		var name := cells[header.find("Author")]
 		if name != "elaction" and not (found[key] as Array).has(name):
 			(found[key] as Array).append(name)
 	return found

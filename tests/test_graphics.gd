@@ -1,8 +1,8 @@
 extends GutTest
 
-## Уровни качества (ADR-0030, решение 5; ADR-0034): каждый включает то, что
-## обещает таблица, уровни идут по возрастанию, правил игры уровень не трогает,
-## а первый запуск выбирает уровень по замеру.
+## Quality levels (ADR-0030, decision 5; ADR-0034): each enables what the
+## table promises, levels go in ascending order, the level does not touch the game rules,
+## and the first launch chooses the level by measurement.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
@@ -15,7 +15,7 @@ func after_all() -> void:
 	GameState.instance().reset()
 
 
-## Таблица ADR-0034: на каждом уровне — ровно то, что обещано.
+## The ADR-0034 table: each level has exactly what is promised.
 func test_each_level_turns_on_what_it_promises() -> void:
 	var expected := {
 		Graphics.Quality.LOW: [false, false, false, false, false, false],
@@ -36,7 +36,7 @@ func test_each_level_turns_on_what_it_promises() -> void:
 		assert_eq(got, expected[level], "уровень %d" % level)
 
 
-## Сглаживание и тени — на окне: ни один уровень не хуже нижнего.
+## Anti-aliasing and shadows are on the window: no level is worse than the lowest.
 func test_the_window_gets_sharper_with_each_level() -> void:
 	var root := get_tree().root
 	var last_atlas := 0
@@ -52,8 +52,8 @@ func test_the_window_gets_sharper_with_each_level() -> void:
 	assert_eq(root.msaa_3d, Viewport.MSAA_4X, "«Ультра» — MSAA ×4")
 
 
-## Каждая таблица по уровню — на все уровни: новый уровень без столбца упал бы
-## индексом посреди партии.
+## Every per-level table covers all levels: a new level without a column would fail
+## with an index error in the middle of a game.
 func test_every_per_level_table_covers_every_level() -> void:
 	var size := Graphics.Quality.size()
 	assert_eq(Graphics.CITY_SHARE.size(), size)
@@ -64,8 +64,8 @@ func test_every_per_level_table_covers_every_level() -> void:
 	assert_eq(Graphics.FOG_GRID.size(), size)
 
 
-## «Ультра» доходит до воздуха и ламп стоящего здания: отражённый свет и свет в
-## тумане.
+## "Ultra" reaches the atmosphere and lamps of a standing building: bounced light and light
+## in the fog.
 func test_ultra_reaches_the_air_and_the_lamps() -> void:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
@@ -86,7 +86,7 @@ func test_ultra_reaches_the_air_and_the_lamps() -> void:
 	remove_child(level)
 
 
-## Замер спускается по ступени, пока кадр не уложится, и не ниже низкого.
+## The measurement steps down until the frame fits, and not below low.
 func test_the_probe_steps_down_until_the_frame_fits() -> void:
 	var slow := QualityProbe.TARGET_MS + 3.0
 	assert_eq(QualityProbe.step(Graphics.Quality.ULTRA, slow), Graphics.Quality.HIGH)
@@ -98,8 +98,8 @@ func test_the_probe_steps_down_until_the_frame_fits() -> void:
 	)
 
 
-## Время вышло, а уровень не доказан: на слабой карте разогрев «Ультра» не
-## успевает пройти за отведённые секунды, и «Ультра» ей не достаётся.
+## Time ran out and the level is not proven: on a weak card the "Ultra" warm-up does not
+## manage to pass in the allotted seconds, and it does not get "Ultra".
 func test_a_timed_out_probe_does_not_keep_an_unproven_level() -> void:
 	assert_eq(
 		QualityProbe.settle(Graphics.Quality.ULTRA, PackedFloat64Array()),
@@ -118,7 +118,8 @@ func test_a_timed_out_probe_does_not_keep_an_unproven_level() -> void:
 	)
 
 
-## Игрок выбрал уровень, пока шёл замер: замер уходит и выбор не перебивает.
+## The player chose a level while the measurement was running: the measurement leaves and
+## does not override the choice.
 func test_the_probe_gives_way_to_the_players_choice() -> void:
 	var settings := GameSettings.new()
 	var probe := QualityProbe.new()
@@ -134,14 +135,14 @@ func test_the_probe_gives_way_to_the_players_choice() -> void:
 	assert_eq(Graphics.quality, Graphics.Quality.LOW, "замер вернул свой уровень")
 
 
-## Медиана, а не среднее: один долгий кадр загрузки уровень не опускает.
+## Median, not mean: one long loading frame does not lower the level.
 func test_one_slow_frame_does_not_drop_the_level() -> void:
 	var frames := PackedFloat64Array([4.0, 4.2, 3.9, 60.0, 4.1])
 	assert_lt(QualityProbe.median(frames), QualityProbe.TARGET_MS)
 
 
-## Замер — один раз: выбранный уровень помечается, и уровень до M22 считается
-## выбранным игроком.
+## Measuring happens once: the chosen level is marked, and a level from before M22 counts as
+## chosen by the player.
 func test_the_measured_level_is_remembered() -> void:
 	var path := "user://test_settings_quality.cfg"
 	var fresh := GameSettings.new()

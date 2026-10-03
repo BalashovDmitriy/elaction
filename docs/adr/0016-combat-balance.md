@@ -1,21 +1,21 @@
-# ADR-0016 · Баланс боя и уклонение агентов
+# ADR-0016 · Combat balance and agent dodging
 
-- **Статус:** принято; пункты 1, 2, 5 и 6 заменены правилами ROM — сложность
-  здания и злость агента, увёртка по пуле, формулы в `Arcade`, 3–4 агента на здание
-  ([ADR-0027](0027-rom-combat.md), решения 1–3); пункт 3 снят — спрайтов нет с
-  [ADR-0022](0022-actors-rig.md). Пункт 8 в силе, порог смертей с M18e — пять
+- **Status:** accepted; items 1, 2, 5 and 6 replaced by ROM rules — building difficulty and agent
+  anger, dodging by bullet, formulas in `Arcade`, 3–4 agents per building
+  ([ADR-0027](0027-rom-combat.md), decisions 1–3); item 3 lifted — there are no sprites since
+  [ADR-0022](0022-actors-rig.md). Item 8 in force, the death threshold since M18e is five
   ([ADR-0028](0028-building-by-the-map.md))
-- **Дата:** 2026-09-16
+- **Date:** 2026-09-16
 
-## Контекст
+## Context
 
-M10 починила геометрию и выпуск агентов, но оставила открытым бой: с включёнными
-агентами бот вставал на пятом этаже и проигрывал дуэль раз за разом. Числа тогда
-не крутились намеренно — бот не умеет уклоняться, а присед и прыжок по
-[ADR-0006](0006-combat-and-enemies.md), пункт 3, и есть уклонение. Веха начинается
-с замера, а не с правки чисел.
+M10 fixed the geometry and agent release but left combat open: with agents enabled the bot got
+stuck on the fifth floor and lost the duel again and again. The numbers were deliberately not
+tweaked then — the bot cannot dodge, and crouching and jumping per
+[ADR-0006](0006-combat-and-enemies.md), item 3, are exactly dodging. The milestone starts with a
+measurement, not with changing numbers.
 
-### Что нашла сверка
+### What the check found
 
 > …the enemy agents will begin to **shoot more frequently**, their **bullets will
 > travel more quickly**, and they will begin to **take evasive action** to avoid being
@@ -23,248 +23,245 @@ M10 починила геометрию и выпуск агентов, но о�
 > position to avoid bullets at a lower level, and they will sometimes shoot from this
 > position as well.
 
-Три оси роста: скорострельность, скорость пули, уклонение агентов. **Дальности
-стрельбы среди них нет.**
+Three axes of growth: rate of fire, bullet speed, agent dodging. **Shooting range is not among
+them.**
 
-### Что у нас
+### What we have
 
-`Enemy.set_menace()` растит дальность и скорострельность:
+`Enemy.set_menace()` grows range and rate of fire:
 
 ```gdscript
 _brain.fire_range = base * _menace
 _brain.fire_cooldown = fire_cooldown / _menace
 ```
 
-Скорость пули (180 px/с) не растёт вовсе, уклонения у агентов нет. То есть мы растим
-ту ось, которой в оригинале нет, и не растим две, которые есть.
+Bullet speed (180 px/s) does not grow at all, and agents do not dodge. That is, we grow the axis
+the original does not have and do not grow two that it does.
 
-Это уже аукалось. `MENACE_CAP` заводился именно из-за дальности: «по тревоге дальность
-выстрела уходила на 900 px при 1120 px полезного этажа — агент простреливал почти весь
-этаж, и хода игроку не оставалось» (комментарий к `MENACE_CAP` в `building_rules.gd`). Растущая дальность отбирает у игрока
-саму возможность подойти; растущая скорость пули отбирает только время на реакцию.
+This has already backfired. `MENACE_CAP` was introduced precisely because of range: "during the
+alarm the shot range went up to 900 px with 1120 px of usable floor — an agent covered almost the
+whole floor with fire, and the player was left no move" (comment on `MENACE_CAP` in
+`building_rules.gd`). Growing range takes away from the player the very possibility of
+approaching; growing bullet speed takes away only reaction time.
 
-### Уклонение у нас уже работает — им просто никто не пользуется
+### Dodging already works for us — nobody uses it
 
-Высоты сходятся, и присед с прыжком спасают уже сегодня:
+The heights line up, and crouching and jumping already save Otto today:
 
-| | коллизия | выстрел агента на −20 |
+| | collision | agent shot at −20 |
 |---|---|---|
-| Otto стоя | −28…0 | попадание |
-| Otto присев | −18…0 | проходит выше |
-| Otto в прыжке | тело поднято | проходит ниже |
+| Otto standing | −28…0 | hit |
+| Otto crouching | −18…0 | passes above |
+| Otto jumping | body raised | passes below |
 
-Значит, 324 смерти бота из M10 — не приговор балансу. Это приговор боту.
+So the bot's 324 deaths from M10 are not a verdict on the balance. They are a verdict on the bot.
 
-## Решения
+## Decisions
 
-### 1. Растим то, что растит оригинал
+### 1. Grow what the original grows
 
-`agent_menace` перестаёт трогать дальность и начинает трогать скорость пули:
+`agent_menace` stops touching range and starts touching bullet speed:
 
-- **скорострельность** — пауза между выстрелами делится на злость (как было);
-- **скорость пули** — умножается на злость (новое);
-- **дальность** — заморожена на своём значении (было: умножалась).
+- **rate of fire** — the pause between shots is divided by anger (as before);
+- **bullet speed** — multiplied by anger (new);
+- **range** — frozen at its value (was: multiplied).
 
-Дальность остаётся правилом «агент стреляет, когда ты подошёл», а не способом
-сделать этаж непроходимым.
+Range stays the rule "an agent shoots when you have come close", not a way to make a floor
+impassable.
 
-**Потолок злости сохраняется,** хотя в вопросе он был назван ненужным — это была
-поспешность. Без потолка пауза между выстрелами стремится к нулю, а пуля к
-бесконечной скорости; потолок по-прежнему нужен, просто теперь он ограничивает
-другие две величины, и его значение подбирается заново замером.
+**The anger cap is kept,** although in the question it was called unnecessary — that was haste.
+Without a cap the pause between shots tends to zero and the bullet to infinite speed; the cap is
+still needed, it just limits the other two quantities now, and its value is chosen anew by
+measurement.
 
-### 2. Агенты уклоняются: колено против высокой пули, лёжа против низкой
+### 2. Agents dodge: kneel against a high bullet, prone against a low one
 
-Три стойки вместо одной:
+Three stances instead of one:
 
-| Стойка | Коллизия | Чем пробивается |
+| Stance | Collision | What gets through |
 |---|---|---|
-| Стоя | 26 px | любой выстрел |
-| На колене | ~17 px | низкий выстрел присевшего Otto (−10) |
-| Лёжа | ~8 px | только удар ногой |
+| Standing | 26 px | any shot |
+| Kneeling | ~17 px | the low shot of a crouching Otto (−10) |
+| Prone | ~8 px | only the kick |
 
-Лёжа агент неуязвим для обеих пуль — и это не дыра, а замысел. Удар ногой в прыжке
-бьёт зоной −28…0, то есть достаёт лежащего, и в таблице очков оригинала он стоит
-дороже выстрела (150 против 100, ADR-0006, пункт 5). Лежачий агент — это повод
-подойти и ударить, а не повод стрелять в пустоту.
+Prone, an agent is invulnerable to both bullets — and this is not a hole but the intent. The jump
+kick strikes with a −28…0 zone, that is, it reaches a prone agent, and in the original's score
+table it is worth more than a shot (150 versus 100, ADR-0006, item 5). A prone agent is a reason
+to come up and kick, not a reason to shoot into empty air.
 
-Уклонение включается злостью: в первых зданиях агенты только стоят, дальше начинают
-приседать, ещё дальше — ложиться. Порог задаётся правилами здания.
+Dodging is turned on by anger: in the first buildings agents only stand, further on they start
+kneeling, further still — going prone. The threshold is set by the building rules.
 
-### 3. Ассеты: колено — уже нарисованная поза, новая нужна одна
+### 3. Assets: kneeling is an already drawn pose, only one new one is needed
 
-Агенту не рендерятся `crouch`, `jump` и `kick` — «ему этого не умеет EnemyBrain».
-Теперь умеет: `crouch` перестаёт исключаться и служит позой «на колене». Новой
-рисуется только `prone`.
+The agent does not get `crouch`, `jump` and `kick` rendered — "EnemyBrain cannot do that for
+him". Now it can: `crouch` stops being excluded and serves as the "kneeling" pose. Only `prone`
+is drawn anew.
 
-Выстрел из положения на колене и лёжа отдельной позой не показывается: у пули есть
-своя вспышка (`Bullet.FLASH_*`), и её видно. Плодить `crouch_shoot` и `prone_shoot`
-значило бы удвоить набор ради кадра, который держится 0.18 с.
+Shooting from kneeling and prone is not shown with a separate pose: the bullet has its own flash
+(`Bullet.FLASH_*`), and it is visible. Breeding `crouch_shoot` and `prone_shoot` would double the
+set for a frame that lasts 0.18 s.
 
-### 4. Бот учится уклоняться — иначе баланс нечем измерить
+### 4. The bot learns to dodge — otherwise there is nothing to measure balance with
 
-Бот присаживается под высокую пулю и прыгает через низкую. Без этого замер меряет
-не игру, а бота: сейчас он стоит под выстрелом и умирает там, где живой игрок
-приседает.
+The bot crouches under a high bullet and jumps over a low one. Without this the measurement
+measures not the game but the bot: right now it stands under a shot and dies where a live player
+crouches.
 
-Уклонение идёт по летящим пулям, а не по позе стрелка: пуля — это узел с координатой
-и скоростью, и «успею ли я присесть» считается по ней честно.
+Dodging goes by bullets in flight, not by the shooter's pose: a bullet is a node with a position
+and velocity, and "will I have time to crouch" is computed honestly from it.
 
-### 5. Числа боя переезжают в правила здания
+### 5. Combat numbers move into the building rules
 
-Дальность, пауза, скорость пули и пороги уклонения задаются `BuildingRules`, как уже
-заданы злость и плотность дверей. Сейчас они разложены по `@export` самого агента,
-и подобрать их по зданиям нельзя, не трогая сцену.
+Range, pause, bullet speed and dodge thresholds are set by `BuildingRules`, as anger and door
+density already are. Right now they are spread over the agent's own `@export`s, and they cannot
+be tuned per building without touching the scene.
 
-### 6. Живых агентов в здании — не больше потолка
+### 6. Live agents in the building — no more than a cap
 
-`agents_at_once`, по умолчанию восемь. Полоса выпуска — девять этажей, и внизу
-здания на каждом из них по две двери: без потолка живых набиралось до восемнадцати,
-и нижние этажи выходили тиром, где стреляют со всех сторон разом. Восемь — это
-примерно по одному на этаж полосы и трое-четверо в кадре, то есть столько, сколько
-видно в аркадном оригинале.
+`agents_at_once`, eight by default. The release band is nine floors, and at the bottom of the
+building each has two doors: without a cap up to eighteen were alive, and the lower floors became
+a shooting gallery with fire from all sides at once. Eight is roughly one per floor of the band
+and three or four in the frame, that is, as many as are visible in the arcade original.
 
-Потолок — не только про сложность. Полсотни тел с физикой и ИИ мы уже убирали
-в M10 ([ADR-0014](0014-building-architecture.md), пункт 5), и это та же мера,
-доведённая до конца: дверь по-прежнему ждёт свою паузу, а уровень вдобавок
-выпускает за кадр не больше одного и выбирает того, чья дверь ближе к игроку.
+The cap is not only about difficulty. We already removed fifty bodies with physics and AI in M10
+([ADR-0014](0014-building-architecture.md), item 5), and this is the same measure carried to the
+end: a door still waits for its pause, and on top of that the level releases no more than one per
+frame and picks the one whose door is closest to the player.
 
-Замер: без потолка бот с теми же числами доходит до 10–19 этажа и теряет три жизни,
-с потолком — проходит здание целиком.
+Measurement: without the cap the bot with the same numbers reaches floor 10–19 and loses three
+lives; with the cap it completes the whole building.
 
-### 7. DoD — бот проходит на трёх жизнях
+### 7. DoD — the bot completes on three lives
 
-Настоящее здание, агенты включены, жизней три, без поблажек. Уезжает в тесты и в CI.
+The real building, agents on, three lives, no allowances. Goes into tests and CI.
 
-Бот всё равно играет хуже человека: он не отступает, не пользуется дверями и не
-считает наперёд. Поэтому это нижняя планка, а не мерило удовольствия — но нижняя
-планка, которая повторяется и не зависит от настроения.
+The bot still plays worse than a human: it does not retreat, does not use doors and does not
+think ahead. So this is a lower bar, not a measure of enjoyment — but a lower bar that repeats
+and does not depend on mood.
 
-**Заменено пунктом 8.** Сам прогон остался, изменилась мера.
+**Replaced by item 8.** The run itself stayed; the measure changed.
 
-### 8. Мера боя — число смертей, а не «дожил на трёх жизнях»
+### 8. The combat measure is the number of deaths, not "survived on three lives"
 
-*Дополнение от 2026-09-22, веха M18a.*
+*Addendum of 2026-09-22, milestone M18a.*
 
-Проверка из пункта 7 отвечала «да» или «нет», и обрыв между ними приходился ровно
-на интересное место. Замер после M18a: смертей **1, 1 и 3** на трёх сидах. По старому
-критерию это «два в порядке, один провал», хотя между вторым и третьим — одна смерть.
-Куда ползёт сложность, по такому ответу не видно вовсе.
+The check of item 7 answered "yes" or "no", and the cliff between them fell exactly on the
+interesting place. Measurement after M18a: **1, 1 and 3** deaths on three seeds. By the old
+criterion this is "two fine, one failure", although between the second and third there is one
+death. Where difficulty is drifting cannot be seen from such an answer at all.
 
-Три жизни к тому же переносились на бота без основания: живой игрок отступает,
-прячется за дверями и считает наперёд, то есть тратит жизни иначе. Число три —
-про игрока, а не про бота.
+Moreover, three lives were carried over to the bot without grounds: a live player retreats, hides
+behind doors and thinks ahead, that is, spends lives differently. The number three is about the
+player, not the bot.
 
-**Решение:** в прогоне с боем жизни боту не ограничены (`ENDLESS_LIVES`), партия
-всегда доходит до конца, а проверяется **число смертей** против порога
-`DEATHS_ALLOWED`. Числа каждого сида печатаются в вывод прогона, даже когда тест
-зелёный: по ним видно направление.
+**Decision:** in the run with combat the bot's lives are unlimited (`ENDLESS_LIVES`), the game
+always reaches the end, and what is checked is **the number of deaths** against the threshold
+`DEATHS_ALLOWED`. The numbers for each seed are printed to the run's output even when the test is
+green: they show the direction.
 
-Порог поставлен с запасом — шесть: сид 1 от прогона к прогону не повторялся,
-и закреплять в проверке шум нельзя. Правится он замером, как и
-остальные числа боя, а не подгонкой под зелёный тест.
+The threshold is set with a margin — six: seed 1 did not repeat from run to run, and noise must
+not be locked into a check. It is changed by measurement, like the other combat numbers, not by
+fitting to a green test.
 
-**Что это даёт дальше.** Смертность бота на прогоне — готовая шкала сложности:
-на ней можно строить уровни сложности, задавая их порогом смертей, а не на глаз.
+**What this gives further on.** The bot's death rate on the run is a ready difficulty scale:
+difficulty levels can be built on it, set by a death threshold rather than by eye.
 
-**Чего это не отменяет.** Проходимость по-прежнему обязательна: здание должно быть
-пройдено целиком и со всеми документами. Безлимит снимает вопрос «хватило ли жизней»,
-а не вопрос «проходится ли здание».
+**What this does not cancel.** Traversability is still mandatory: the building must be completed
+in full and with all documents. Unlimited lives removes the question "were there enough lives",
+not the question "can the building be completed".
 
-## Почему первые замеры вехи ничего не мерили
+## Why the milestone's first measurements measured nothing
 
-Бот не выстрелил ни разу за всю веху. И ни разу не прыгнул.
+The bot did not fire once in the whole milestone. And did not jump once.
 
-Выстрел и прыжок Otto читает по фронту нажатия (`is_action_just_pressed`), а бот
-каждый кадр отпускал всё, что держал, и тут же нажимал заново. Отпускание и
-нажатие в одном кадре фронтом не считаются: действие пропадает целиком. Держаться
-работало — ходьба, присед, «вниз» в кабине, — а одиночные нет.
+Otto reads the shot and the jump by the press edge (`is_action_just_pressed`), and the bot
+released everything it held every frame and immediately pressed it again. A release and a press
+in the same frame do not count as an edge: the action disappears entirely. Holding worked —
+walking, crouching, "down" in the cab — but single presses did not.
 
-Поэтому таблица замеров, на которой веха встала, описывала игру, в которой Otto
-умеет только приседать:
+So the measurement table on which the milestone stalled described a game in which Otto could only
+crouch:
 
-| Что мерили | Ниже всего этаж | Документов | Убито |
+| What was measured | Lowest floor | Documents | Killed |
 |---|---|---|---|
-| M10, бот не уклоняется | 0–3 из 29 | 0 из 5 | 0 |
-| «Бот уклоняется» | 2–3 | 0 | 0 |
-| «+ замах 0.35 с» | 6–12 | 1–2 | 0 |
-| «+ огонь не мешает уклонению» | 10–18 | 2–3 | 0 |
+| M10, bot does not dodge | 0–3 of 29 | 0 of 5 | 0 |
+| "Bot dodges" | 2–3 | 0 | 0 |
+| "+ 0.35 s wind-up" | 6–12 | 1–2 | 0 |
+| "+ firing does not block dodging" | 10–18 | 2–3 | 0 |
 
-Ноль убитых во всех строках и был тем самым знаком, который стоило заметить: агенты
-гибли только под лампами. Теперь это ловит тест `test_bot_fights.gd` — бот обязан
-убить агента, стоящего у него на линии.
+Zero kills in every row was exactly the sign worth noticing: agents died only under lamps. Now
+the test `test_bot_fights.gd` catches this — the bot must kill an agent standing in its line.
 
-## Чем веха кончилась
+## How the milestone ended
 
-Замер ботом по настоящему зданию, три жизни, здание первое. Последняя строка —
-сиды 1–6, остальные сняты на 1–3, пока веха ещё не проходилась.
+Bot measurement on the real building, three lives, first building. The last row is seeds 1–6,
+the others were taken on 1–3 while the milestone was not yet completable.
 
-| Что сделано | Ниже всего этаж | Документов | Убито | Смертей |
+| What was done | Lowest floor | Documents | Killed | Deaths |
 |---|---|---|---|---|
-| Было после M10 | 0–3 из 29 | 0 из 5 | 0 | 3 |
-| Бот стреляет по-настоящему | 10–19 | 1–4 | 6–52 | 3 |
-| + дуэль вместо прохода мимо | 10–19 | 2–4 | 6–52 | 3 |
-| + потолок живых агентов | **29 из 29** | **5 из 5** | 7–19 | 0–2 |
+| After M10 | 0–3 of 29 | 0 of 5 | 0 | 3 |
+| The bot really shoots | 10–19 | 1–4 | 6–52 | 3 |
+| + duel instead of walking past | 10–19 | 2–4 | 6–52 | 3 |
+| + cap on live agents | **29 of 29** | **5 of 5** | 7–19 | 0–2 |
 
-**DoD достигнут.** Здание проходится на трёх жизнях, и в тестах это
+**DoD reached.** The building is completed on three lives, and in the tests this is
 `test_bot_survives_the_real_building_with_agents`.
 
-Что бот научился делать в вехе:
+What the bot learned to do in the milestone:
 
-- **Драться, а не проходить мимо.** Агента, который может в него попасть, бот
-  встречает приседанием и огнём: присед — это и разворот на месте, и уклонение
-  (пуля агента идёт в 20 px над полом, присевший Otto — 18 px), а выстрел из
-  приседа достаёт и стоящего, и вставшего на колено. Прежде он шёл сквозь
-  стоящего на линии агента, и на трёх-четырёх пикселях размен был мгновенным.
-- **Не стоять в дуэли вечно.** Через две секунды бот идёт напролом: агент бывает
-  и недосягаем, а двери подсылают следующего каждые три секунды.
-- **Стрелять из кабины.** Присесть там нельзя (ADR-0004, пункт 2), поэтому
-  единственная защита — выстрелить первым, и на остановке бот разворачивается
-  на любого, кто на линии.
+- **Fight instead of walking past.** An agent that can hit it, the bot meets by crouching and
+  firing: crouching is both turning in place and dodging (the agent's bullet goes 20 px above the
+  floor, a crouching Otto is 18 px), and a shot from a crouch reaches both a standing and a
+  kneeling agent. Before, it walked through an agent standing in its line, and at three or four
+  pixels the exchange was instant.
+- **Not stand in a duel forever.** After two seconds the bot pushes through: an agent can also be
+  out of reach, and doors send the next one every three seconds.
+- **Shoot from the cab.** Crouching is not possible there (ADR-0004, item 2), so the only defence
+  is to shoot first, and at a stop the bot turns toward anyone in its line.
 
-### Уклонение кончалось смертью от той же пули
+### Dodging ended in death from the same bullet
 
-Нашлось это не тестом и не замером, а съёмкой поз: агент, уклонившийся от
-выстрела, раз за разом оказывался мёртвым через долю секунды.
+This was found not by a test or a measurement but by shooting poses: an agent who dodged a shot
+again and again turned up dead a fraction of a second later.
 
-«Летит ли она в меня» считалось по стороне: пуля справа, летит влево — значит,
-в меня. Как только она миновала середину тела, сторона менялась, и агент
-распрямлялся — прямо под пулей, которая всё ещё была внутри его габарита.
-Уклонение работало ровно до момента попадания.
+"Is it flying at me" was computed by side: the bullet is to the right and flying left — so it is
+at me. As soon as it passed the middle of the body, the side changed, and the agent straightened
+up — right under the bullet that was still inside his bounds. Dodging worked exactly until the
+moment of impact.
 
-Считается теперь не сторона, а сколько пуле осталось: она опасна, пока не вышла
-за спину на половину ширины тела **и всю свою длину** — середину она минует
-хвостом вперёд, и одной полуширины не хватает, чтобы разминуться с грудью.
-Длину пуля называет сама (`Bullet.half_length`), а не повторяет числом у каждого,
-кто от неё уклоняется. То же исправлено у бота — Otto попадался бы так же,
-просто некому было заметить.
+Now what is computed is not the side but how far the bullet has left to go: it is dangerous until
+it has passed behind the back by half the body width **and its whole length** — it passes the
+middle tail first, and one half-width is not enough to clear the chest. The bullet states its
+length itself (`Bullet.half_length`) rather than everyone who dodges it repeating it as a number.
+The same was fixed for the bot — Otto would have been caught the same way, there was just nobody
+to notice.
 
-Числа, подобранные замером и оригиналом **не** подтверждённые: замах 0.35 с, пороги
-уклонения 1.4 и 1.8, расстояние, ближе которого дверь не выпускает агента, — 96 px,
-потолок живых агентов — 8. Все помечены на сверку.
+Numbers chosen by measurement and **not** confirmed by the original: a 0.35 s wind-up, dodge
+thresholds 1.4 and 1.8, the distance closer than which a door does not release an agent — 96 px,
+the live-agent cap — 8. All are marked for checking.
 
-## Чего веха не закрыла
+## What the milestone did not close
 
-**У приседа нет цены.** Пуля агента всегда идёт в 20 px над полом — и стоя, и на
-колене, и лёжа, — а присевший Otto ниже. Значит, присевшего не берёт вообще ничто:
-ни один агент, ни сколько угодно их разом. Ходить присев нельзя, и единственное,
-что наказывает за отсидку, — сирена.
+**Crouching has no cost.** The agent's bullet always goes 20 px above the floor — standing,
+kneeling and prone alike — and a crouching Otto is lower. So nothing at all hits a crouching Otto:
+not a single agent, nor any number of them at once. You cannot walk while crouching, and the only
+thing that punishes sitting it out is the siren.
 
-Оригинал это закрывает: агент «will sometimes shoot from this position as well»,
-то есть его выстрел с колена идёт низко и достаёт присевшего. У нас низкого
-выстрела нет вовсе. Это не правка числа, а новая механика со своей сверкой,
-поэтому она не в этой вехе — но без неё любой баланс боя стоит на честном слове
-игрока.
+The original closes this: an agent "will sometimes shoot from this position as well", that is,
+his shot from a knee goes low and reaches a crouching player. We have no low shot at all. This is
+not a number change but a new mechanic with its own check, so it is not in this milestone — but
+without it any combat balance rests on the player's word of honour.
 
-## Чего в вехе нет
+## What is not in the milestone
 
-- **Агенты не ездят на лифте.** В оригинале ездят; отложено ещё с ADR-0006.
-- **Экстренный режим «hurry-up»** из оригинала — у нас его роль играет сирена
-  ([ADR-0009](0009-game-loop-and-alarm.md)), отдельной ступени сложности не заводим.
-- **Темнота не слабеет в поздних зданиях** — это правило света, а не боя, и лежит
-  рядом с ADR-0010.
+- **Agents do not ride the elevator.** In the original they do; postponed since ADR-0006.
+- **The original's "hurry-up" emergency mode** — for us the siren plays that role
+  ([ADR-0009](0009-game-loop-and-alarm.md)); no separate difficulty step is introduced.
+- **Darkness does not weaken in later buildings** — that is a lighting rule, not a combat one,
+  and it sits next to ADR-0010.
 
-## Источники
+## Sources
 
 - [XP Arcade · Elevator Action](https://retroxp.beehiiv.com/p/xp-arcade-elevator-action)
 - [Wikipedia · Elevator Action](https://en.wikipedia.org/wiki/Elevator_Action)

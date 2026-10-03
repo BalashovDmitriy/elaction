@@ -1,104 +1,101 @@
 class_name Arcade
 extends RefCounted
 
-## Правила аркадного ROM — боя и здания — одной таблицей.
+## The rules of the arcade ROM — combat and building — in one table.
 ##
-## Числа и формулы взяты из аннотированного дизассемблера ROM (jotd, перенос на
-## Amiga); выводы с адресами — в `docs/reference/arcade-rom.md`, решения — в
-## [ADR-0027](../../docs/adr/0027-rom-combat.md) и
-## [ADR-0028](../../docs/adr/0028-building-by-the-map.md). Адрес рядом с числом — место
-## в `src/elevator_z80.asm` того проекта: по нему число перепроверяется.
+## Numbers and formulas are taken from the annotated ROM disassembly (jotd, Amiga port); conclusions
+## with addresses are in `docs/reference/arcade-rom.md`, decisions are in
+## [ADR-0027](../../docs/adr/0027-rom-combat.md) and
+## [ADR-0028](../../docs/adr/0028-building-by-the-map.md). The address next to a number is its place
+## in that project's `src/elevator_z80.asm`: the number can be rechecked by it.
 ##
-## Оригинал считает в тиках логики: кадр 59.19 Гц (драйвер MAME `taitosj`),
-## логика раз в четыре кадра. Таблица отдаёт секунды и метры, а тики держит
-## у себя: так формула читается рядом с ROM, а остальной код о тиках не знает.
+## The original counts in logic ticks: a frame is 59.19 Hz (MAME driver `taitosj`), logic runs once
+## every four frames. The table gives seconds and metres and keeps ticks to itself: this way a
+## formula reads next to the ROM, and the rest of the code does not know about ticks.
 ##
-## Здесь — правила, а не размеры: высоты стоек и пуль лежат в [Proportions].
+## These are rules, not sizes: the heights of stances and bullets live in [Proportions].
 
-## Поза, в которой агент стреляет.
+## The pose in which the agent shoots.
 enum Pose { STAND, CROUCH, PRONE, ON_THE_MOVE }
 
-## Секунд в тике логики: 4 кадра по 1/59.19 с.
+## Seconds per logic tick: 4 frames of 1/59.19 s.
 const TICK: float = 4.0 / 59.19
 
-## Потолок сложности и злости (@592F, @5AFC).
+## Cap on difficulty and anger (@592F, @5AFC).
 const TOP: int = 15
 
-## Тревога: 4096 тиков, ~277 с (@466E).
+## Alarm: 4096 ticks, ~277 s (@466E).
 const ALARM_TICKS: int = 4096
 
-## Бонус за сданное здание: ставка и с какого здания он перестаёт расти (@5793).
+## Bonus for a cleared building: the rate and from which building it stops growing (@5793).
 const BUILDING_BONUS: int = 1000
 const BUILDING_BONUS_TOP: int = 10
 
-## Шаг ходьбы Otto и агента, px за тик (@4450/@445F) — одна процедура на обоих.
+## Walking step of Otto and an agent, px per tick (@4450/@445F) — one routine for both.
 const WALK_PX: float = 2.0
 
-## Пуля Otto, px за тик (table_50D8).
+## Otto's bullet, px per tick (table_50D8).
 const OTTO_BULLET_PX: float = 8.0
 
-## Во сколько раз пули летят быстрее ROM — у Otto и у агентов (ADR-0037,
-## решение 5). **Нарочный отход от оригинала**, решение пользователя: пуля ROM
-## идёт через кадр 2,6 с и читается ползущей. Таблицы ROM при этом не тронуты —
-## множитель стоит поверх них одним числом, и тесты ROM держат прежние значения.
+## How many times faster than the ROM bullets fly — Otto's and the agents' (ADR-0037, decision 5).
+## **A deliberate departure from the original**, the user's decision: the ROM bullet crosses the
+## frame in 2.6 s and reads as crawling. The ROM tables are left untouched — the multiplier sits on
+## top of them as one number, and the ROM tests keep the old values.
 ##
-## Вместе со скоростью растёт и дальность, с которой агент замечает пулю
-## ([method dodge_reach]): время на уклонение остаётся тем же, что в ROM.
+## Along with the speed, the distance at which an agent notices a bullet grows too ([method
+## dodge_reach]): the time to dodge stays the same as in the ROM.
 const BULLET_PACE: float = 3.0
 
-## Кабина, px за тик (@45D8).
+## Cab, px per tick (@45D8).
 const CAR_PX: float = 2.0
 
-## Сколько тиков действует тревога агентов после выстрела Otto или посадки
-## агента в кабину (@59C8, @1AED).
+## How many ticks the agents' alarm lasts after Otto's shot or an agent boarding a cab (@59C8,
+## @1AED).
 const ALERT_TICKS: int = 90
 
-## Сколько Otto сидит за красной дверью, тиков: ровно 70, ~4,73 с ($82ED = $46,
-## @2A5B). Раньше не выйти — решение пользователя (ADR-0038, решение 2); в ROM
-## можно, толкнув от двери через 9 тиков.
+## How long Otto stays behind a red door, ticks: exactly 70, ~4.73 s ($82ED = $46, @2A5B). He cannot
+## leave earlier — the user's decision (ADR-0038, decision 2); in the ROM you can, by pushing away
+## from the door after 9 ticks.
 const ROOM_TICKS: int = 70
 
-## Отставший агент уходит в ближайшую дверь (@041F-04E5): если его ступни на
-## экране в 80 px и дальше от ступней Otto — и только на этажах ROM с восьмого.
-## Этаж — 48 px, так что стоящему на полу это два этажа.
+## A lagging agent goes into the nearest door (@041F-04E5): if his feet are on screen 80 px or
+## farther from Otto's feet — and only on ROM floors from the eighth. A floor is 48 px, so for one
+## standing on the floor this is two floors.
 ##
-## Третье условие ROM — «кроме двадцатого» — не взято, и это не отступление:
-## ROM ищет ближайшую дверь по своей половине этажа (@049F, раздел по $7B), а
-## стена двадцатого стоит не посередине ($AC), и агента послало бы в дверь за
-## стеной. Наш поиск ([method AgentLifts.nearest_door]) и так берёт только
-## дверь, до которой дойти (ADR-0053, решение 6).
+## The third ROM condition — "except the twentieth" — is not taken, and this is not a departure: the
+## ROM searches for the nearest door within its half of the floor (@049F, split by $7B), and the
+## wall of the twentieth does not stand in the middle ($AC), so the agent would be sent to a door
+## beyond the wall. Our search ([method AgentLifts.nearest_door]) already takes only a door that can
+## be reached (ADR-0053, decision 6).
 const LEAVE_PX: float = 80.0
 const LEAVE_FROM_FLOOR: int = 8
 
-## Толпа: на этаже Otto, выше или ниже стоит столько агентов или больше — и
-## лишние уходят в ближайшую дверь (@041F-0458), на тех же этажах ROM, что и
-## отставшие. Остаются [code]CROWD - 1[/code] ближних к Otto (ADR-0053,
-## решение 5).
+## Crowd: if this many agents or more stand on Otto's floor, above or below — the extra ones go into
+## the nearest door (@041F-0458), on the same ROM floors as the lagging ones. The [code]CROWD -
+## 1[/code] closest to Otto remain (ADR-0053, decision 5).
 const CROWD: int = 3
 
-## Возвращение Otto после гибели (@7633, @2FAA): не ниже пятого этажа ROM, у
-## красной двери этажа, если документ за ней ещё не взят, а без неё — в точке
-## $67 из 256 px ширины этажа, ступни посередине спрайта в 8 px. Агенты этажей
-## уходят, ячейки выпускают их снова через 10, 25, 40 и 55 тиков (@2F61)
-## (ADR-0053, решение 2).
+## Otto's return after death (@7633, @2FAA): no lower than the fifth ROM floor, at the floor's red
+## door if the document behind it has not been taken yet, and without one — at point $67 of the 256
+## px floor width, feet in the middle of the 8 px sprite. The floors' agents leave, the cells
+## release them again after 10, 25, 40 and 55 ticks (@2F61) (ADR-0053, decision 2).
 const RESPAWN_FROM_FLOOR: int = 5
 const RESPAWN_SHARE: float = (0x67 + 4) / 256.0
 const RESPAWN_WAIT_TICKS: Array[int] = [10, 25, 40, 55]
 
-## Насколько близко пуля Otto должна подлететь, чтобы агент от неё уворачивался,
-## px (@05F5).
+## How close Otto's bullet must come for an agent to dodge it, px (@05F5).
 const DODGE_REACH_PX: float = 20.0
 
-## В какой полосе над полом пуля Otto заставляет агента уворачиваться, px
-## (@05F5): выше и ниже она проходит мимо и так.
+## In what band above the floor Otto's bullet makes an agent dodge, px (@05F5): above and below it
+## misses anyway.
 const DODGE_BAND_PX := Vector2(6.0, 24.0)
 
-## Шанс увернуться за тик по злости, из 256 (odds_table_0659).
+## Chance to dodge per tick by anger, out of 256 (odds_table_0659).
 const DODGE_ODDS: Array[int] = [0, 0, 2, 2, 4, 8, 16, 16, 32, 32, 64, 64, 96, 128, 196, 255]
 
-## Выбор позы выстрела по злости — пороги из 256 для пар злости (table_1D75 для
-## агентов 1–2, table_1D95 для 3–4). Бросок ниже первого — стоя, ниже второго —
-## присев, ниже третьего — лёжа, выше — выстрел на ходу.
+## Choice of shooting pose by anger — thresholds out of 256 for pairs of anger values (table_1D75
+## for agents 1–2, table_1D95 for 3–4). A roll below the first — standing, below the second —
+## crouching, below the third — lying, above — shooting on the move.
 const POSE_THRESHOLDS: Array[Vector3i] = [
 	Vector3i(0xC4, 0xC4, 0xC4),
 	Vector3i(0x80, 0xC4, 0xC4),
@@ -120,12 +117,12 @@ const POSE_THRESHOLDS_LATE: Array[Vector3i] = [
 	Vector3i(0x00, 0x00, 0x40),
 ]
 
-## Этажей в здании оригинала. Считаются снизу: первый — нижний, тридцатый —
-## верхний; нулевой — подвал с машиной, его у нас нет (ADR-0028, решение 1).
+## Floors in the original building. Counted from the bottom: the first is the lowest, the thirtieth
+## the top; zero is the basement with the car, we do not have it (ADR-0028, decision 1).
 const FLOORS: int = 30
 
-## Двери этажа — маска восьми мест, этаж 0..30 (table_280E). Здание оригинала
-## одно, и двери в нём стоят на одних и тех же местах в каждом раунде.
+## Floor doors — a mask of eight places, floor 0..30 (table_280E). The original has one building,
+## and its doors stand in the same places in every round.
 const DOOR_MASKS: Array[int] = [
 	0x00,
 	0x81,
@@ -160,12 +157,11 @@ const DOOR_MASKS: Array[int] = [
 	0x66,
 ]
 
-## Тёмные этажи: ламп на них нет вовсе (@2719), убийство стоит как в темноте
-## (@56A1).
+## Dark floors: there are no lamps on them at all (@2719), a kill is scored as in darkness (@56A1).
 const DARK_FLOORS := Vector2i(11, 15)
 
-## Полосы красных дверей: этажи ROM включительно и сколько красных в полосе по
-## навыку 0..8 (@27D2, таблицы @282D–@2874). На этаже не больше одной.
+## Red door bands: ROM floors inclusive and how many red doors in a band by skill 0..8 (@27D2,
+## tables @282D–@2874). No more than one per floor.
 const RED_DOOR_BANDS: Array[Vector2i] = [
 	Vector2i(1, 6),
 	Vector2i(8, 8),
@@ -177,10 +173,10 @@ const RED_DOOR_BANDS: Array[Vector2i] = [
 	Vector2i(26, 30),
 ]
 
-## Квоты красных дверей по полосам [constant RED_DOOR_BANDS] и навыку 0..8.
+## Red door quotas by band [constant RED_DOOR_BANDS] and skill 0..8.
 ##
-## Строки — [Array], а не [PackedInt32Array]: константа из литералов под типом
-## упакованного массива читается по индексу мусором (Godot 4.7).
+## Rows are [Array], not [PackedInt32Array]: a constant made of literals typed as a packed array
+## reads garbage by index (Godot 4.7).
 const RED_DOOR_QUOTAS: Array[Array] = [
 	[0, 1, 2, 2, 2, 2, 3, 4, 5],
 	[0, 0, 0, 1, 1, 1, 1, 1, 1],
@@ -192,52 +188,52 @@ const RED_DOOR_QUOTAS: Array[Array] = [
 	[0, 0, 0, 0, 1, 1, 1, 0, 0],
 ]
 
-## Выше этого навыка квоты красных дверей не растут (@27D6).
+## Above this skill red door quotas do not grow (@27D6).
 const RED_DOOR_SKILL_TOP: int = 8
 
 
-## Тики в секунды.
+## Ticks to seconds.
 static func seconds(ticks: float) -> float:
 	return ticks * TICK
 
 
-## Секунды в тики.
+## Seconds to ticks.
 static func ticks(time: float) -> float:
 	return time / TICK
 
 
-## Скорость в метрах в секунду по шагу в пикселях за тик.
+## Speed in metres per second from a step in pixels per tick.
 static func speed(px_per_tick: float) -> float:
 	return px_per_tick * Proportions.PX / TICK
 
 
-## Навык партии: уровень сложности (DIP 0–3) плюс пройденные здания (@2EAD, @0A0A).
+## Game skill: difficulty level (DIP 0–3) plus cleared buildings (@2EAD, @0A0A).
 static func skill(level: int, building: int) -> int:
 	return maxi(level, 0) + maxi(building - 1, 0)
 
 
-## Сложность сейчас: навык плюс время в здании (compute_difficulty_592F).
+## Difficulty now: skill plus time in the building (compute_difficulty_592F).
 ##
-## До тревоги +1 каждые 1024 тика (~69 с), после — каждые 256 (~17 с).
+## Before the alarm +1 every 1024 ticks (~69 s), after — every 256 (~17 s).
 static func difficulty(skill_level: int, time: float) -> int:
 	var msb := int(ticks(time) / 256.0)
 	var grown := msb - 12 if msb >= 16 else msb / 4
 	return mini(TOP, skill_level + grown)
 
 
-## Злость агента: при выходе — сложность, потом +1 каждые 256 тиков (@5AA4, @5AFC).
+## Agent anger: on coming out — the difficulty, then +1 every 256 ticks (@5AA4, @5AFC).
 static func aggression(at_spawn: int, age: float) -> int:
 	return mini(TOP, at_spawn + int(ticks(age) / 256.0))
 
 
-## Сколько агентов в здании разом: 3, а 4 — когда навык·4 + время ≥ 14 (@594D).
+## How many agents in the building at once: 3, and 4 when skill·4 + time ≥ 14 (@594D).
 static func agents_at_once(skill_level: int, time: float) -> int:
 	var msb := int(ticks(time) / 256.0)
 	return 4 if skill_level * 4 + msb >= 14 else 3
 
 
-## Сколько агентов разом на этаже возле Otto: 1 первые ~51 с, 2 до ~3.4 мин,
-## потом 3 (@5905). Пока Otto не на полу и тревоги агентов нет — 1 (@59F4).
+## How many agents at once on the floor near Otto: 1 for the first ~51 s, 2 until ~3.4 min, then 3
+## (@5905). While Otto is not on the floor and there is no agent alarm — 1 (@59F4).
 static func agents_per_floor(time: float, otto_on_foot: bool, alert: bool) -> int:
 	if not otto_on_foot or not alert:
 		return 1
@@ -247,34 +243,33 @@ static func agents_per_floor(time: float, otto_on_foot: bool, alert: bool) -> in
 	return 2 if msb < 12 else 3
 
 
-## Шанс, что агент выйдет именно на этаже Otto, из 1 (@5A4C).
+## Chance that an agent comes out exactly on Otto's floor, out of 1 (@5A4C).
 static func own_floor_chance(level: int) -> float:
 	return float(level * 4) / 256.0
 
 
-## Сколько дверь ждёт смены после агента, с: max(0, 80 − 6·сложность) (@3866).
+## How long a door waits for a change after an agent, s: max(0, 80 − 6·difficulty) (@3866).
 static func respawn_wait(level: int) -> float:
 	return seconds(maxi(0, 0x50 - 6 * level))
 
 
-## Замах перед выстрелом, с: max(0, 10 − злость) тиков (@1BDF).
+## Wind-up before a shot, s: max(0, 10 − anger) ticks (@1BDF).
 static func wind_up(anger: int) -> float:
 	return seconds(maxi(0, 10 - anger))
 
 
-## Пауза после выстрела, с: max(0, 80 − 8·злость) тиков (@0055).
+## Pause after a shot, s: max(0, 80 − 8·anger) ticks (@0055).
 static func cooldown(anger: int) -> float:
 	return seconds(maxi(0, 80 - 8 * anger))
 
 
-## Сколько длится действие агента — выстрел или увёртка, с: max(7, замах + 2)
-## тиков (@1C7A).
+## How long an agent action lasts — a shot or a dodge, s: max(7, wind-up + 2) ticks (@1C7A).
 static func action_time(anger: int) -> float:
 	return seconds(maxi(7, maxi(0, 10 - anger) + 2))
 
 
-## Скорость пули агента, м/с: min(8, навык/4 + 6) px за тик, в тревоге на шаг
-## быстрее, но не выше 8 (@463D).
+## Agent bullet speed, m/s: min(8, skill/4 + 6) px per tick, during the alarm one step faster, but
+## no higher than 8 (@463D).
 static func agent_bullet_speed(skill_level: int, alarmed: bool) -> float:
 	var step := mini(8, skill_level / 4 + 6)
 	if alarmed:
@@ -282,27 +277,26 @@ static func agent_bullet_speed(skill_level: int, alarmed: bool) -> float:
 	return speed(float(step))
 
 
-## Скорость пули в игре, м/с, по шагу ROM в пикселях за тик: ROM, умноженный
-## на [constant BULLET_PACE] (ADR-0037, решение 5).
+## Bullet speed in the game, m/s, from a ROM step in pixels per tick: the ROM multiplied by
+## [constant BULLET_PACE] (ADR-0037, decision 5).
 static func bullet_speed(px_per_tick: float) -> float:
 	return speed(px_per_tick) * BULLET_PACE
 
 
-## Скорость пули агента в игре, м/с: [method agent_bullet_speed] с
-## [constant BULLET_PACE].
+## Agent bullet speed in the game, m/s: [method agent_bullet_speed] with [constant BULLET_PACE].
 static func agent_shot_speed(skill_level: int, alarmed: bool) -> float:
 	return agent_bullet_speed(skill_level, alarmed) * BULLET_PACE
 
 
-## С какого расстояния агент замечает летящую в него пулю Otto, м: 20 px ROM
-## (@05F5), растянутые на [constant BULLET_PACE]. Пуля быстрее во столько же
-## раз, и от замеченной до попадания проходит то же время, что в ROM.
+## From what distance an agent notices Otto's bullet flying at him, m: 20 ROM px (@05F5), stretched
+## by [constant BULLET_PACE]. The bullet is faster by the same factor, and the same time passes from
+## noticing to impact as in the ROM.
 static func dodge_reach() -> float:
 	return DODGE_REACH_PX * Proportions.PX * BULLET_PACE
 
 
-## Поза выстрела по злости и броску 0..255. [param late] — агенты 3–4, у них
-## своя таблица: они чаще стреляют на ходу.
+## Shooting pose by anger and a roll 0..255. [param late] — agents 3–4, they have their own table:
+## they shoot on the move more often.
 static func fire_pose(anger: int, roll: int, late: bool = false) -> Pose:
 	var table := POSE_THRESHOLDS_LATE if late else POSE_THRESHOLDS
 	var limits: Vector3i = table[clampi(anger, 0, TOP) / 2]
@@ -315,20 +309,20 @@ static func fire_pose(anger: int, roll: int, late: bool = false) -> Pose:
 	return Pose.ON_THE_MOVE
 
 
-## Шанс увернуться от пули за один тик по злости, из 1.
+## Chance to dodge a bullet in one tick by anger, out of 1.
 static func dodge_chance(anger: int) -> float:
 	return float(DODGE_ODDS[clampi(anger, 0, TOP)]) / 256.0
 
 
-## Этаж ROM для нашего этажа: наш счёт идёт сверху, ROM — снизу (ADR-0028,
-## решение 1). Здание другой высоты растягивает карту по доле высоты, а не
-## обрывает её: тесты собирают и шестиэтажные.
+## ROM floor for our floor: our count goes from the top, the ROM's from the bottom (ADR-0028,
+## decision 1). A building of a different height stretches the map by the share of height rather
+## than cutting it off: tests assemble six-floor ones too.
 static func rom_floor(index: int, floors: int) -> int:
 	var from_bottom := float(floors - index) * float(FLOORS) / float(maxi(floors, 1))
 	return clampi(roundi(from_bottom), 1, FLOORS)
 
 
-## Сколько дверей на этаже ROM — мест в его маске (table_280E).
+## How many doors are on a ROM floor — places in its mask (table_280E).
 static func doors_on_floor(rom: int) -> int:
 	var mask := DOOR_MASKS[clampi(rom, 0, FLOORS)]
 	var count := 0
@@ -338,18 +332,18 @@ static func doors_on_floor(rom: int) -> int:
 	return count
 
 
-## Тёмный ли этаж ROM: без ламп и с ценой убийства как в темноте (@2719, @56A1).
+## Whether a ROM floor is dark: no lamps and a kill priced as in darkness (@2719, @56A1).
 static func is_dark_floor(rom: int) -> bool:
 	return rom >= DARK_FLOORS.x and rom <= DARK_FLOORS.y
 
 
-## Сколько красных дверей в полосе [param band] на этом навыке (@27D2).
+## How many red doors are in band [param band] at this skill (@27D2).
 static func red_doors_in_band(band: int, skill_level: int) -> int:
 	var quotas: Array = RED_DOOR_QUOTAS[band]
 	return int(quotas[clampi(skill_level, 0, RED_DOOR_SKILL_TOP)])
 
 
-## Сколько красных дверей в здании на этом навыке: 5, 6 … 10.
+## How many red doors are in the building at this skill: 5, 6 … 10.
 static func red_doors(skill_level: int) -> int:
 	var total := 0
 	for band in RED_DOOR_BANDS.size():
@@ -357,25 +351,24 @@ static func red_doors(skill_level: int) -> int:
 	return total
 
 
-## Бонус за сданное здание [param building]: 1000 × min(10, навык − DIP + 1)
-## (@5793). Навык — это DIP плюс пройденные здания ([method skill]), так что
-## множитель — номер здания, и с десятого бонус больше не растёт.
+## Bonus for cleared building [param building]: 1000 × min(10, skill − DIP + 1) (@5793). Skill is
+## DIP plus cleared buildings ([method skill]), so the multiplier is the building number, and from
+## the tenth the bonus no longer grows.
 static func building_bonus(building: int) -> int:
 	return BUILDING_BONUS * clampi(building, 1, BUILDING_BONUS_TOP)
 
 
-## Уходит ли в дверь агент на этаже ROM [param rom], отставший от Otto на
-## [param floors_apart] этажей (@041F-04E5). Шахта в сторону Otto — отдельное
-## наше условие (ADR-0027, решение 3а), его проверяет уровень.
+## Whether an agent on ROM floor [param rom], lagging behind Otto by [param floors_apart] floors,
+## goes into a door (@041F-04E5). The shaft toward Otto is our own separate condition (ADR-0027,
+## decision 3a), the level checks it.
 static func agent_leaves(rom: int, floors_apart: int) -> bool:
 	var apart_px := absf(float(floors_apart)) * Proportions.FLOOR / Proportions.PX
 	return apart_px >= LEAVE_PX and rom >= LEAVE_FROM_FLOOR
 
 
-## Сколько агентов на этаже ROM [param rom], где их стоит [param count], должны
-## уйти в двери (@041F-0458): лишние сверх [code]CROWD - 1[/code], и только с
-## восьмого этажа ROM, как и отставшие. Этажи — Otto, выше и ниже; их отбирает
-## уровень.
+## How many agents on ROM floor [param rom], where [param count] of them stand, must go into doors
+## (@041F-0458): the extra ones beyond [code]CROWD - 1[/code], and only from the eighth ROM floor,
+## like the lagging ones. The floors are Otto's, above and below; the level selects them.
 static func crowd_leavers(rom: int, count: int) -> int:
 	if rom < LEAVE_FROM_FLOOR or count < CROWD:
 		return 0

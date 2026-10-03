@@ -1,17 +1,17 @@
 extends GutTest
 
-## Тесты правил посещения двери.
+## Tests of the door visit rules.
 ##
-## Ход визита — как в ROM (ADR-0038, решение 2): створка открывается, гость уходит
-## внутрь, она закрывается за ним, ровно через 70 тиков от стука он снаружи.
-## Раньше не выйти ничем: ввода у [method DoorVisit.tick] нет вовсе, и узел
-## двери проверяется на это отдельно, в [code]test_red_door.gd[/code].
+## The visit goes as in the ROM (ADR-0038, decision 2): the leaf opens, the guest goes inside, it
+## closes behind him, exactly 70 ticks after the knock he is outside. There is no way to leave
+## earlier: [method DoorVisit.tick] has no input at all, and the door node is checked for this
+## separately, in [code]test_red_door.gd[/code].
 ##
-## «Взвод» входа не прихоть: зажатый «вверх» после выхода втягивал бы гостя
-## обратно без конца. Это нашло авторевью M3.
+## The "arming" of entry is not a whim: "up" held after exit would pull the guest back in endlessly.
+## The M3 code review found this.
 ##
-## Створку ведёт [DoorCycle], и здесь она идёт рядом — ровно так, как их сводит
-## узел двери: визит только говорит, когда ей пора пойти (ADR-0020, решение 1).
+## The leaf is driven by [DoorCycle], and here it runs alongside — exactly as the door node brings
+## them together: the visit only says when it is time for the leaf to move (ADR-0020, decision 1).
 
 const STEP: float = 1.0 / 60.0
 const LEAF_TIME: float = 0.25
@@ -25,14 +25,14 @@ func _visit() -> DoorVisit:
 	return visit
 
 
-## Створка, как её ведёт узел двери у гостя.
+## The leaf, as the door node drives it for a guest.
 func _cycle() -> DoorCycle:
 	var cycle := DoorCycle.new()
 	cycle.travel_time = LEAF_TIME
 	return cycle
 
 
-## Один кадр двери с гостем: створка, затем визит, и створка исполняет подсказку.
+## One door frame with a guest: the leaf, then the visit, and the leaf carries out the hint.
 func _frame(visit: DoorVisit, cycle: DoorCycle) -> DoorVisit.Cue:
 	cycle.tick(STEP)
 	var cue := visit.tick(STEP, cycle.is_open())
@@ -44,7 +44,7 @@ func _frame(visit: DoorVisit, cycle: DoorCycle) -> DoorVisit.Cue:
 	return cue
 
 
-## Впускает гостя, как это делает узел двери: стук открывает створку.
+## Lets the guest in, as the door node does: the knock opens the leaf.
 func _admitted() -> Array:
 	var visit := _visit()
 	var cycle := _cycle()
@@ -106,7 +106,7 @@ func test_the_leaf_is_shut_while_the_guest_is_inside() -> void:
 		hiding_frames += 1
 		if cycle.is_shut():
 			shut_frames += 1
-	# Прячется он через ход створки, ещё ход она закрывается — дальше закрыта.
+	# He hides after one leaf movement, after another one it closes — from then on it is closed.
 	var expected := visit.hide_time - LEAF_TIME * 3.0
 	assert_gt(float(shut_frames) * STEP, expected - STEP * 3.0, "за ним створка закрыта")
 	assert_gt(hiding_frames, shut_frames, "а сперва закрывается у него за спиной")
@@ -133,7 +133,7 @@ func test_the_leaf_opens_to_let_him_out_and_he_is_out_exactly_on_time() -> void:
 func test_the_guest_waits_for_a_leaf_that_is_late() -> void:
 	var visit := _visit()
 	visit.admit()
-	# Створка стоит закрытой: ни спрятаться, ни выйти, сколько бы ни прошло.
+	# The leaf stays closed: neither hiding nor leaving, however much time passes.
 	for _frame_index: int in 600:
 		assert_ne(visit.tick(STEP, false), DoorVisit.Cue.OUT, "сквозь закрытую не выходят")
 	assert_false(visit.is_hiding(), "и не прячутся")

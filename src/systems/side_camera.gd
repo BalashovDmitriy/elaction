@@ -1,89 +1,89 @@
 class_name SideCamera
 extends Camera3D
 
-## Ортографическая камера сбоку, наклонённая чуть сверху.
+## Orthographic side camera, tilted slightly from above.
 ##
-## Держит только то, что обязано быть в узле: читает размер окна, двигает
-## трансформ, зовёт правило. Само правило — [CameraBounds], и оно без сцены.
+## Holds only what must be in a node: reads the window size, moves
+## the transform, calls the rule. The rule itself is [CameraBounds], and it has no scene.
 ##
-## Наклон — свойство камеры, а не мира (ADR-0023, решение 1). Плоскость игры,
-## попадания и полоса видимых этажей считаются как считались: камера лишь стоит
-## выше цели, чтобы её ось прошла через точку плоскости игры, и видит по
-## вертикали чуть больше. Строго сбоку верх перекрытия — полоска нулевой
-## толщины, и отражений в полу не было бы никогда.
+## The tilt is a property of the camera, not the world (ADR-0023, decision 1). The play plane,
+## hits and the visible floors band are computed as before: the camera only stands
+## above the target so that its axis passes through a point of the play plane, and sees
+## a bit more vertically. Strictly from the side the top of a slab is a strip of zero
+## thickness, and there would never be any reflections in the floor.
 
-## Половина высоты кадра, м.
+## Half of the frame height, m.
 ##
-## Кадр показывает 3.67 этажа — столько, сколько поле здания у оригинала: 176 px
-## при шаге этажа 48 (ADR-0026, решение 4). До M18c было 10.8 м и ровно три
-## этажа. По ширине при 16:9 это 23.5 м — 7.8 просвета против 6.4 у оригинала:
-## поле аркады уже экрана, и совпасть по обеим осям нельзя.
+## The frame shows 3.67 floors — as much as the original's building field: 176 px
+## at a floor pitch of 48 (ADR-0026, decision 4). Before M18c it was 10.8 m and exactly three
+## floors. In width at 16:9 this is 23.5 m — 7.8 clearances against 6.4 in the original:
+## the arcade field is narrower than the screen, and both axes cannot match.
 ##
-## Ортокамера наклонена, и на плоскости игры кадр выше её размера в 1/cos(наклона)
-## раз ([method _read_frame]). Поэтому размер меньше поля на этот косинус: без
-## поправки в кадр входило 3.72 этажа вместо 3.67 (авторевью M18c). Число —
-## cos(10°): функции в константу GDScript не пускает.
+## The orthocamera is tilted, and on the play plane the frame is taller than its size by 1/cos(tilt)
+## ([method _read_frame]). So the size is smaller than the field by that cosine: without
+## the correction 3.72 floors fit in the frame instead of 3.67 (code review M18c). The number is
+## cos(10°): GDScript does not allow functions in a constant.
 const DEFAULT_HALF_HEIGHT: float = Proportions.FIELD * 0.5 * 0.98480775
 
-## Насколько камера отодвинута от плоскости игры вдоль своей оси, м.
+## How far the camera is moved back from the play plane along its axis, m.
 ##
-## Ортокамере расстояние безразлично для масштаба, но не для отсечения: всё,
-## что ближе [member near], не рисуется, а коридор и актёры стоят на Z = 0.
+## For an orthocamera distance does not matter for scale, but it does for clipping: everything
+## closer than [member near] is not drawn, and the corridor and actors stand at Z = 0.
 const DISTANCE: float = 20.0
 
-## Наклон сверху, градусы. Десять открывают пол коридора полосой в треть метра —
-## в неё ложатся отражения и пятна ламп, — а этажи остаются параллельными
-## полосами кадра. Перспектива отвергнута: у неё верх и низ кадра в разном
-## масштабе, и правило «этаж — полоса кадра» пришлось бы пересчитывать.
+## Tilt from above, degrees. Ten reveal the corridor floor as a strip a third of a metre wide —
+## reflections and lamp spots fall into it — while floors stay parallel
+## strips of the frame. Perspective was rejected: the top and bottom of its frame are at different
+## scales, and the rule "a floor is a frame strip" would have to be recomputed.
 const TILT_DEGREES: float = 10.0
 
-## Во сколько раз уже кадр на крупном плане сценки добивания (ADR-0040).
+## How many times narrower the frame is on a takedown scene close-up (ADR-0040).
 const CLOSE_UP_SIZE: float = 0.38
-## Свет камеры на фигуры: холодный, как лунный, и слабый — силуэт, а не
-## освещённая фигура.
+## Camera light on figures: cold, like moonlight, and weak — a silhouette, not
+## a lit figure.
 const ACTOR_FILL_COLOR := Color(0.62, 0.7, 0.95)
 const ACTOR_FILL_ENERGY: float = 0.35
 
-## Толчок камеры на ударе добивания (ADR-0050): сдвиг кадра, м, крен, рад, и
-## добавочный наезд — доля размера кадра — при толчке в полную силу; за сколько
-## секунд настоящего времени он гаснет и как часто дрожит, Гц. Время — не мира:
-## мир на ударе почти стоит, а толчок должен пройти.
+## Camera kick on the takedown hit (ADR-0050): frame shift, m, roll, rad, and
+## extra zoom — a fraction of the frame size — at a full-strength kick; in how many
+## seconds of real time it fades and how often it shakes, Hz. Time is not the world's:
+## the world almost stands still on the hit, but the kick must pass.
 const KICK_SHIFT: float = 0.09
 const KICK_ROLL: float = 0.04
 const KICK_ZOOM: float = 0.12
 const KICK_FADE: float = 0.45
 const KICK_RATE: float = 19.0
 
-## Скорость сглаживания. Число то же, что стояло у [Camera2D] в 2D-сцене.
+## Smoothing speed. The same number that [Camera2D] had in the 2D scene.
 @export var smoothing_speed: float = 8.0
 
 var _bounds := CameraBounds.new()
-## Кадр по правилам боя: 16:9 и без сглаживания, см. [method rule_view].
+## The frame by combat rules: 16:9 and without smoothing, see [method rule_view].
 var _rule_bounds := CameraBounds.new()
-## За кем едет камера. Пустой — камера стоит там, где её поставили.
+## Whom the camera follows. Empty — the camera stays where it was put.
 var _target: Node3D = null
 var _centre := Vector2.ZERO
-## Слушатель позиционного звука. Стоит в плоскости игры, а не у камеры: камера
-## отодвинута на [constant DISTANCE], и без него каждый источник — гул кабины,
-## «динь», створка двери — был бы дальше своего `max_distance` и молчал бы.
-## В 2D слушателем был центр кадра, и дальности подобраны под него.
+## Positional sound listener. It stands in the play plane, not at the camera: the camera
+## is moved back by [constant DISTANCE], and without it every source — cab hum,
+## "ding", door leaf — would be farther than its `max_distance` and silent.
+## In 2D the listener was the centre of the frame, and the ranges were tuned for it.
 ##
-## Заводится в [method Node._ready], а не при объявлении: узел, созданный полем и
-## не попавший в дерево, никто не освобождает — сцена Otto, поднятая тестом ради
-## размера формы и тут же выброшенная, оставляла бы его сиротой.
+## Created in [method Node._ready], not at declaration: a node created by a field and
+## not added to the tree is freed by nobody — an Otto scene spawned by a test for
+## the shape size and immediately thrown away would leave it orphaned.
 var _listener: AudioListener3D = null
-## Крупный план: насколько наехали, 0–1, и на что. Ведёт его режиссёр сценки.
+## Close-up: how far zoomed in, 0–1, and on what. The scene director drives it.
 var _close: float = 0.0
 var _close_point := Vector2.ZERO
-## Сила толчка, 0–1, и сколько он уже идёт, с настоящего времени.
+## Kick strength, 0–1, and how long it has been going, s of real time.
 var _kick: float = 0.0
 var _kick_age: float = 0.0
 
 
 func _ready() -> void:
 	projection = PROJECTION_ORTHOGONAL
-	# Камера смотрит вдоль -Z, стоя перед плоскостью игры; отрицательный поворот
-	# вокруг X опускает взгляд.
+	# The camera looks along -Z, standing in front of the play plane; a negative rotation
+	# around X lowers the gaze.
 	rotation = Vector3(-_tilt(), 0.0, 0.0)
 	size = DEFAULT_HALF_HEIGHT * 2.0
 	near = 0.05
@@ -94,7 +94,7 @@ func _ready() -> void:
 	add_child(actor_fill())
 
 	_listener = AudioListener3D.new()
-	# По оси камеры до плоскости игры: с наклоном это дальше, чем [constant DISTANCE].
+	# Along the camera axis to the play plane: with the tilt this is farther than [constant DISTANCE].
 	_listener.position = Vector3(0.0, 0.0, -DISTANCE / cos(_tilt()))
 	add_child(_listener)
 	_listener.make_current()
@@ -104,8 +104,8 @@ func _process(delta: float) -> void:
 	if _target == null:
 		return
 	var wanted := _bounds.clamp_centre(_target_point().lerp(_close_point, _close))
-	# На крупном плане ход задаёт режиссёр плавной кривой, а мир вокруг замедлен:
-	# сглаживание по замедленным часам волокло бы кадр позади пары.
+	# On a close-up the director sets the motion with a smooth curve, and the world around is slowed:
+	# smoothing by the slowed clock would drag the frame behind the pair.
 	if _close > 0.0:
 		_centre = wanted
 	else:
@@ -114,20 +114,20 @@ func _process(delta: float) -> void:
 	_shake(delta)
 
 
-## Толкает кадр: сдвиг, крен и добавочный наезд, гаснущие за [constant
-## KICK_FADE] с настоящего времени. [param strength] — 0–1.
+## Kicks the frame: shift, roll and extra zoom, fading over [constant
+## KICK_FADE] of real time. [param strength] — 0–1.
 func kick(strength: float) -> void:
 	_kick = clampf(strength, 0.0, 1.0)
 	_kick_age = 0.0
 
 
-## Идёт ли толчок. Тестам.
+## Whether a kick is running. For tests.
 func is_kicked() -> bool:
 	return _kick > 0.0
 
 
-## Настоящее время толчка — шаг кадра без замедления мира, а не часы: под
-## прогоном тестов с `--fixed-fps` часы и кадры расходятся (run_tests.py).
+## Real kick time is the frame step without world slowdown, not the clock: under
+## a test run with `--fixed-fps` the clock and the frames diverge (run_tests.py).
 func _shake(delta: float) -> void:
 	if _kick <= 0.0:
 		return
@@ -148,10 +148,10 @@ func _shake(delta: float) -> void:
 	size = DEFAULT_HALF_HEIGHT * 2.0 * lerpf(1.0, CLOSE_UP_SIZE, _close) * (1.0 - KICK_ZOOM * force)
 
 
-## Свет камеры на фигуры: слабый, по оси взгляда, только на слой фигур
-## ([constant FigureRig.RENDER_LAYER]). Им, а не обводкой, Otto и агенты
-## читаются на погашенном этаже (ADR-0042, решение 7): окружение ему не
-## подчиняется, и темнота этажа остаётся темнотой. Без тени и мимо тумана.
+## Camera light on figures: weak, along the view axis, only on the figure layer
+## ([constant FigureRig.RENDER_LAYER]). It, not an outline, makes Otto and agents
+## readable on a darkened floor (ADR-0042, decision 7): the surroundings are not
+## affected by it, and the floor's darkness stays darkness. No shadow and bypassing fog.
 static func actor_fill() -> DirectionalLight3D:
 	var light := DirectionalLight3D.new()
 	light.name = "ActorFill"
@@ -164,17 +164,17 @@ static func actor_fill() -> DirectionalLight3D:
 	return light
 
 
-## За кем ехать. Обычно это Otto.
+## Whom to follow. Usually Otto.
 func follow(target: Node3D) -> void:
 	_target = target
 	if target != null:
 		snap_to(_target_point())
 
 
-## Крупный план сценки добивания (ADR-0040): [param amount] 0 — обычный кадр,
-## 1 — уже в [constant CLOSE_UP_SIZE] раза и с серединой в [param point]
-## (координаты сцены). Кадр боя ([method rule_view]) крупный план не трогает:
-## кто кого видит, решает он, и наезд камеры бой менять не должен.
+## Takedown scene close-up (ADR-0040): [param amount] 0 — the regular frame,
+## 1 — [constant CLOSE_UP_SIZE] times narrower and centred at [param point]
+## (scene coordinates). The close-up does not touch the combat frame ([method rule_view]):
+## it decides who sees whom, and a camera zoom must not change combat.
 func close_up(amount: float, point: Vector2) -> void:
 	_close = clampf(amount, 0.0, 1.0)
 	_close_point = point
@@ -182,29 +182,29 @@ func close_up(amount: float, point: Vector2) -> void:
 	_read_frame()
 
 
-## Ставит камеру на место без сглаживания.
+## Puts the camera in place without smoothing.
 ##
-## Нужно на старте уровня и при возвращении в игру: иначе камера приезжает
-## к воскресшему Otto через полсекунды, и эти полсекунды игрок смотрит туда,
-## где его убили.
+## Needed at level start and when returning to play: otherwise the camera arrives
+## at the resurrected Otto half a second later, and for that half second the player looks at
+## where he was killed.
 func snap_to(point: Vector2) -> void:
 	_centre = _bounds.clamp_centre(point)
 	global_position = _perch(_centre)
 
 
-## Границы, за которые камере нельзя выходить. Приходят в координатах правил
-## (Y вниз) и переводятся здесь: снаружи о развороте Y знать не должны.
+## Bounds the camera must not go beyond. They come in rules coordinates
+## (Y down) and are converted here: the outside must not know about the Y flip.
 ##
-## Границы приходят вместе с расстановкой уровня, когда цель уже стоит на
-## месте. Поэтому камера встаёт на неё, а не на прежнюю середину: та осталась
-## от [method follow], позванного из [method Node._ready] Otto, когда он ещё
-## стоял в начале координат, — и от неё камера полсекунды ехала бы вбок через
-## пустое здание. [Camera2D] такого не делал: он вставал на место первым кадром.
+## Bounds come with the level's placement, when the target already stands in
+## place. So the camera snaps to it rather than to the former middle: that one was left
+## by [method follow], called from Otto's [method Node._ready] when he still
+## stood at the origin — and from it the camera would ride sideways for half a second across
+## the empty building. [Camera2D] did not do this: it snapped into place on the first frame.
 ##
-## [param snap] = false оставляет камеру ехать к новым границам сглаживанием: так
-## кадр вступления, пущенный выше верха мира, опускается к зданию (ADR-0038).
+## [param snap] = false lets the camera ride to the new bounds with smoothing: this way
+## the intro frame, set above the top of the world, comes down to the building (ADR-0038).
 func apply_bounds(rect: Rect2, snap: bool = true) -> void:
-	# Низ правил — это верх сцены, и наоборот.
+	# The bottom of the rules is the top of the scene, and vice versa.
 	var lowest := WorldSpace.height_to_scene(rect.end.y)
 	var highest := WorldSpace.height_to_scene(rect.position.y)
 	_bounds.limits = Rect2(rect.position.x, lowest, rect.size.x, highest - lowest)
@@ -213,36 +213,36 @@ func apply_bounds(rect: Rect2, snap: bool = true) -> void:
 		snap_to(_target_point() if _target != null else _centre)
 
 
-## Что сейчас в кадре, в координатах правил.
+## What is in the frame now, in rules coordinates.
 func view() -> Rect2:
 	return _to_plane(_bounds.view_at(_centre))
 
 
-## Кадр, по которому решает бой, в координатах правил: тот же, что у игрока,
-## но при 16:9 и без сглаживания — встаёт на цель сразу.
+## The frame combat decides by, in rules coordinates: the same as the player's,
+## but at 16:9 and without smoothing — it snaps to the target at once.
 ##
-## Кадр игрока едет в [method Node._process] по настенным часам и шире на
-## широком окне. Исход партии обязан идти от физики (`docs/testing.md`, правило
-## из M18b): по кадру игрока агент стрелял бы или нет в зависимости от машины
-## и размера окна, и прогон бота переставал бы повторяться (ADR-0027, решение 3а).
+## The player's frame moves in [method Node._process] by the wall clock and is wider on a
+## wide window. The outcome of a game must come from physics (`docs/testing.md`, a rule
+## from M18b): by the player's frame an agent would shoot or not depending on the machine
+## and window size, and the bot run would stop repeating (ADR-0027, decision 3a).
 func rule_view() -> Rect2:
 	var centre := _centre if _target == null else _rule_bounds.clamp_centre(_target_point())
 	return _to_plane(_rule_bounds.view_at(centre))
 
 
-## Кадр сцены — в координаты правил: Y там растёт вниз.
+## Scene frame — into rules coordinates: Y grows downward there.
 static func _to_plane(scene_view: Rect2) -> Rect2:
 	var top := WorldSpace.height_to_plane(scene_view.end.y)
 	return Rect2(scene_view.position.x, top, scene_view.size.x, scene_view.size.y)
 
 
-## Где сейчас цель, в координатах сцены. Z отбрасывается: кадр плоский.
+## Where the target is now, in scene coordinates. Z is dropped: the frame is flat.
 func _target_point() -> Vector2:
 	return Vector2(_target.global_position.x, _target.global_position.y)
 
 
-## Где стоит камера, чтобы её ось прошла через [param centre] в плоскости игры:
-## выше на «расстояние × tg(наклон)», иначе наклон смотрел бы под ноги цели.
+## Where the camera stands so that its axis passes through [param centre] in the play plane:
+## higher by "distance × tan(tilt)", otherwise the tilt would look at the target's feet.
 func _perch(centre: Vector2) -> Vector3:
 	return Vector3(centre.x, centre.y + DISTANCE * tan(_tilt()), DISTANCE)
 
@@ -251,11 +251,11 @@ func _tilt() -> float:
 	return deg_to_rad(TILT_DEGREES)
 
 
-## Пересчитывает половины кадра по размеру окна: ширина кадра зависит от
-## соотношения сторон, и на другом окне она другая.
+## Recomputes the frame halves by window size: the frame width depends on
+## the aspect ratio, and on another window it is different.
 ##
-## По вертикали наклонённая камера накрывает в плоскости игры чуть больше своего
-## размера — на 1/cos(наклон): кадр режет плоскость под углом.
+## Vertically a tilted camera covers a bit more than its size in the play plane
+## — by 1/cos(tilt): the frame cuts the plane at an angle.
 func _read_frame() -> void:
 	var window := get_viewport().get_visible_rect().size
 	var aspect := window.x / maxf(window.y, 1.0)

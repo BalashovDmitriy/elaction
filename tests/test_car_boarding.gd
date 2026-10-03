@@ -1,47 +1,47 @@
 extends GutTest
 
-## Otto у шахты с кабиной, идущей к его этажу, никогда не застывает вместе с ней
-## (ADR-0037, решение 1).
+## Otto at a shaft with a cab heading to his floor never freezes together with it
+## (ADR-0037, decision 1).
 ##
-## Отзыв после M23: Otto становился пассажиром, едва тело заходило в проём, хотя
-## кабина была ещё на пару метров ниже этажа. Занятая кабина без команды стоит,
-## невровень с этажом из неё не шагнуть — оба стояли навсегда. Так же — с
-## кабиной сверху и с двухэтажной парой. Поэтому проверка идёт на любом здании:
-## на нескольких сидах, у каждой шахты, с кабиной снизу и сверху. Исход
-## допустим один из двух: Otto может идти (он не в кабине или кабина вровень
-## с этажом) или погиб. Застыть в кабине между этажами он не должен.
+## Feedback after M23: Otto became a passenger as soon as his body entered the opening, though
+## the cab was still a couple of metres below the floor. An occupied cab without a command stands,
+## and one cannot step out of it off level — both stood forever. Same with
+## a cab from above and with a double-deck pair. So the check runs on any building:
+## on several seeds, at each shaft, with the cab below and above. One of two
+## outcomes is allowed: Otto can walk (he is not in a cab or the cab is level
+## with the floor) or he died. He must not freeze in a cab between floors.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
 const SEEDS: Array[int] = [1, 2, 3]
 
-## Сколько кадров даётся зданию, чтобы встать на места, и Otto — чтобы встать.
+## How many frames the building is given to settle into place, and Otto — to stand.
 const SETTLE_FRAMES: int = 4
 
-## Насколько далеко от этажа кабина, когда Otto трогается к шахте, м.
+## How far from the floor the cab is when Otto sets off to the shaft, m.
 ##
-## Две дистанции, по очереди от шахты к шахте. Ближняя — Otto подходит, когда
-## кабина уже почти пришла: снизу он шагает на её пол, сверху упирается в днище.
-## Дальняя — кабина ещё в метре: снизу он упирается в крышу или падает на пол
-## кабины, сверху — в днище. Именно с дальней в M23 Otto и садился в кабину.
+## Two distances, alternating from shaft to shaft. Near — Otto approaches when
+## the cab has almost arrived: from below he steps onto its floor, from above he hits its underside.
+## Far — the cab is still a metre away: from below he hits its roof or falls onto the cab's
+## floor, from above — into its underside. It was with the far one that Otto boarded the cab in M23.
 const TRIGGERS: Array[float] = [1.3, 0.6]
 
-## На сколько от края шахты стоит Otto, ожидая кабину, м, от края до края тела.
+## How far from the shaft edge Otto stands waiting for the cab, m, edge to body edge.
 const WAIT_GAP: float = 0.4
 
-## Сколько шагов бота ждать, пока кабина дойдёт до дистанции: пауза на этаже
-## и перегон, с запасом.
+## How many bot steps to wait for the cab to reach the distance: the pause on a floor
+## and the run, with margin.
 const APPROACH_STEPS: int = 200
 
-## Сколько шагов Otto идёт к шахте, прежде чем исход считается состоявшимся:
-## кабина доходит, стоит паузу, он входит — пара секунд под time_scale 4.
+## How many steps Otto walks to the shaft before the outcome counts as settled:
+## the cab arrives, stands its pause, he enters — a couple of seconds under time_scale 4.
 const WALK_STEPS: int = 90
 
-## Сколько шагов подряд пассажир может стоять в кабине между этажами, прежде
-## чем это считается застыванием. Кабина в пути не стоит ни шага.
+## How many steps in a row a passenger may stand in a cab between floors before
+## it counts as freezing. A cab in transit does not stand a single step.
 const FROZEN_STEPS: int = 20
 
-## Сколько шагов ждать, пока уровень вернёт погибшего Otto в игру.
+## How many steps to wait for the level to return a dead Otto to play.
 const RESPAWN_STEPS: int = 120
 
 
@@ -66,7 +66,7 @@ func _build(building_seed: int) -> GreyboxLevel:
 	return level
 
 
-## Кабины со своим ходом — по одной на шахту, в порядке шахт.
+## Cabs with their own motion — one per shaft, in shaft order.
 func _cars(level: GreyboxLevel) -> Array[ElevatorCar]:
 	var found: Array[ElevatorCar] = []
 	for child: Node in level.get_children():
@@ -76,8 +76,8 @@ func _cars(level: GreyboxLevel) -> Array[ElevatorCar]:
 	return found
 
 
-## Остановки ведущей кабины — так же, как их считает уровень: верхний ярус пары
-## на нижний этаж шахты не спускается.
+## Stops of the leading cab — the same way the level counts them: the upper deck of a pair
+## does not go down to the shaft's bottom floor.
 func _stops(level: GreyboxLevel, shaft: BuildingPlan.ShaftSpot) -> PackedFloat32Array:
 	var lowest := shaft.bottom - 1 if shaft.double_deck else shaft.bottom
 	var stops := PackedFloat32Array()
@@ -86,12 +86,12 @@ func _stops(level: GreyboxLevel, shaft: BuildingPlan.ShaftSpot) -> PackedFloat32
 	return stops
 
 
-## Где стоит кабина, которая придёт к этажу Otto первой, и какой это этаж.
+## Where the cab that will reach Otto's floor first stands, and which floor that is.
 ##
-## Снизу — ведущая с нижней своей остановки, на этаж выше неё. Сверху — с
-## верхней, на этаж ниже; у пары этажом ниже ведущей стоит ярус, и первым
-## к этажу приходит он — поэтому этаж Otto ещё на один ниже. Короткой полосе
-## проверять нечего: пустой вектор.
+## From below — the leading one from its bottom stop, to the floor above it. From above — from
+## the top, to the floor below; for a pair a deck stands one floor below the leading one, and it
+## reaches the floor first — so Otto's floor is one more below. A short run
+## has nothing to check: an empty vector.
 func _approach(shaft: BuildingPlan.ShaftSpot, from_below: bool) -> Vector2i:
 	var lowest := shaft.bottom - 1 if shaft.double_deck else shaft.bottom
 	var deck := 1 if shaft.double_deck else 0
@@ -107,8 +107,8 @@ func _plane(node: Node3D) -> Vector2:
 	return WorldSpace.to_plane(node.global_position)
 
 
-## Ставит Otto у шахты на этаже [param index], с той стороны, где есть пол.
-## Возвращает сторону, -1 или +1, или 0, если пола у шахты нет с обеих сторон.
+## Places Otto at the shaft on floor [param index], on the side that has floor.
+## Returns the side, -1 or +1, or 0 if there is no floor at the shaft on either side.
 func _stand_by(level: GreyboxLevel, shaft: BuildingPlan.ShaftSpot, index: int) -> float:
 	var surface := level.rules.floor_surface(index)
 	var aside := level.rules.shaft_width * 0.5 + Proportions.BODY_WIDTH * 0.5 + WAIT_GAP
@@ -122,7 +122,7 @@ func _stand_by(level: GreyboxLevel, shaft: BuildingPlan.ShaftSpot, index: int) -
 	return 0.0
 
 
-## Возвращает погибшего Otto в игру руками уровня и ждёт, пока тот это сделает.
+## Returns a dead Otto to play by the level's hands and waits until it has done so.
 func _wait_for_respawn(level: GreyboxLevel) -> void:
 	var left := RESPAWN_STEPS
 	while level.otto.is_dead() and left > 0:
@@ -159,15 +159,15 @@ func test_otto_never_freezes_with_an_arriving_car() -> void:
 				checked += 1
 				boarded += outcome
 		remove_child(level)
-	# Проверка, которая ни разу не сработала, ничего не проверяет.
+	# A check that never fired checks nothing.
 	assert_gt(checked, 10, "встреч с кабиной проверено слишком мало: %d" % checked)
 	assert_gt(boarded, 5, "Otto сел в подошедшую кабину слишком редко: %d" % boarded)
 
 
-## Одна встреча: кабина идёт к этажу Otto, он трогается к шахте на дистанции.
+## One encounter: the cab heads to Otto's floor, he sets off to the shaft at the distance.
 ##
-## Возвращает 1, если Otto сел в кабину вровень с этажом, 0 — если исход
-## другой, но допустимый, и -1, если встречу поставить не удалось.
+## Returns 1 if Otto boarded the cab level with the floor, 0 — if the outcome
+## was different but allowed, and -1 if the encounter could not be set up.
 func _meet(
 	level: GreyboxLevel,
 	car: ElevatorCar,
@@ -179,8 +179,8 @@ func _meet(
 	GameState.instance().lives = GameState.STARTING_LIVES
 	await _wait_for_respawn(level)
 	var otto := level.otto
-	# Сначала Otto встаёт, потом кабина ставится: пока он ищет пол, пустая
-	# кабина успела бы уехать.
+	# First Otto stands, then the cab is placed: while he looks for the floor, an empty
+	# cab would manage to leave.
 	var side := await _stand_by(level, shaft, plan.y)
 	if side == 0.0:
 		return -1
@@ -228,11 +228,11 @@ func _meet(
 	return 1 if boarded else 0
 
 
-## На сколько ниже ведущей стоит кабина, которая придёт к этажу Otto: у пары
-## сверху первым приходит ярус, и дистанцию до этажа считать надо по нему.
+## How much lower than the leading one stands the cab that will reach Otto's floor: for a pair
+## from above the deck arrives first, and the distance to the floor must be counted by it.
 func _deck_drop(level: GreyboxLevel, shaft: BuildingPlan.ShaftSpot, plan: Vector2i) -> float:
 	if not shaft.double_deck or plan.y < plan.x:
 		return 0.0
-	# Ведущая идёт сверху, ярус — этажом ниже неё: до этажа Otto она на этаж
-	# дальше, чем ярус.
+	# The leading one comes from above, the deck is one floor below it: it is one floor further
+	# from Otto's floor than the deck.
 	return level.rules.floor_height

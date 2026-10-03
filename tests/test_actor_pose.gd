@@ -1,10 +1,10 @@
 extends GutTest
 
-## Тесты выбора позы актёра.
+## Tests of actor pose selection.
 ##
-## Проверяется правило, а не отдельная поза: **каждое** состояние машины
-## состояний обязано попадать в нарисованную позу. Иначе новое состояние
-## однажды покажет розовый квадрат заглушки — и покажет его игроку, а не тесту.
+## The rule is checked, not a single pose: **every** state of the state
+## machine must map to a drawn pose. Otherwise a new state will
+## one day show the pink placeholder square — and show it to the player, not to a test.
 
 
 func _every_state() -> Array[OttoStateMachine.State]:
@@ -24,8 +24,8 @@ func test_every_state_of_otto_has_a_pose() -> void:
 
 
 func test_every_pose_of_otto_is_reachable() -> void:
-	# Обратная проверка: нарисованное должно быть кому показать. Иначе ассеты
-	# копятся в репозитории мёртвым грузом, а веха считает их работой.
+	# The reverse check: what is drawn must have someone to show it. Otherwise assets
+	# pile up in the repository as dead weight, and the milestone counts them as work.
 	var shown: Array[String] = []
 	for state: OttoStateMachine.State in _every_state():
 		for crushed: bool in [false, true]:
@@ -39,14 +39,14 @@ func test_every_pose_of_otto_is_reachable() -> void:
 							if not shown.has(pose):
 								shown.append(pose)
 
-	# Трос выбирает не состояние, а тот, кто везёт ([member Otto.ride_look]).
+	# The rope is chosen not by the state but by who carries ([member Otto.ride_look]).
 	shown.append(ActorPose.ROPE)
-	# И позы вступления — их ставит вертолёт ([member Otto.ride_pose]).
+	# And the intro poses — the helicopter sets them ([member Otto.ride_pose]).
 	shown.append_array(ActorPose.ARRIVAL_POSES)
 	for pose: String in ActorPose.OTTO_POSES:
 		assert_true(shown.has(pose), "поза %s кому-то нужна" % pose)
-	# И наоборот — как у агента: показать можно только нарисованное. Без этого
-	# опечатка в [ActorPose] дошла бы до игрока розовым квадратом заглушки.
+	# And the other way round — as for the agent: only what is drawn can be shown. Without this
+	# a typo in [ActorPose] would reach the player as the pink placeholder square.
 	for pose: String in shown:
 		assert_true(ActorPose.OTTO_POSES.has(pose), "поза %s нарисована" % pose)
 
@@ -59,8 +59,8 @@ func test_every_pose_of_the_agent_is_reachable() -> void:
 				for falling: bool in [false, true]:
 					for shooting: bool in [false, true]:
 						for phase: int in ActorPose.WALK_FRAMES:
-							# Стойки перебираются наравне с остальным: с M11 агент
-							# уклоняется, и у колена с положением лёжа свои позы.
+							# Stances are walked on par with the rest: since M11 the agent
+							# dodges, and kneeling and lying down have their own poses.
 							for stance: EnemyBrain.Stance in _stances():
 								var pose := ActorPose.of_agent(
 									dead, walking, crushed, falling, shooting, float(phase), stance
@@ -75,8 +75,8 @@ func test_every_pose_of_the_agent_is_reachable() -> void:
 
 
 func test_death_tells_how_it_happened() -> void:
-	# Раздавленный показан своей картинкой — это и есть находка сверки перед
-	# вехой (ADR-0011, пункт 12).
+	# A crushed actor is shown with his own picture — this is the very finding of the
+	# pre-milestone check against the original (ADR-0011, item 12).
 	var dead := OttoStateMachine.State.DEAD
 	assert_eq(ActorPose.of_otto(dead, false, true, false, 0.0), "dead_0", "падает")
 	assert_eq(ActorPose.of_otto(dead, false, false, false, 0.0), "dead_1", "лежит")
@@ -89,7 +89,7 @@ func test_the_dead_do_not_shoot() -> void:
 
 
 func test_walking_cycles_three_frames() -> void:
-	# Фаза растёт дробно, кадр меняется на целых: цикл обязан замыкаться.
+	# The phase grows fractionally, the frame changes on integers: the cycle must close.
 	assert_eq(ActorPose.walk_frame(0.0), "walk_0")
 	assert_eq(ActorPose.walk_frame(0.9), "walk_0", "дробная часть кадр не меняет")
 	assert_eq(ActorPose.walk_frame(1.0), "walk_1")
@@ -98,9 +98,9 @@ func test_walking_cycles_three_frames() -> void:
 
 
 func test_the_phase_never_skips_a_frame_of_the_cycle() -> void:
-	# Длину цикла знает один WALK_FRAMES, и продвижение фазы обязано считать её
-	# так же, как выбор кадра. Разойдутся — последний кадр ходьбы не покажется
-	# никогда, и заметить это на глаз нельзя: шаг просто станет короче.
+	# Only WALK_FRAMES knows the cycle length, and phase advancement must count it
+	# the same way as frame selection. If they diverge, the last walk frame will never
+	# show, and it cannot be noticed by eye: the step simply becomes shorter.
 	var phase := 0.0
 	var seen: Array[String] = []
 	for _step: int in 120:
@@ -113,19 +113,19 @@ func test_the_phase_never_skips_a_frame_of_the_cycle() -> void:
 
 
 func test_a_broken_phase_does_not_break_the_frame() -> void:
-	# Фаза приходит из накопителя времени, и отрицательной ей быть незачем —
-	# но кадр всё равно обязан остаться кадром, а не «walk_-1».
+	# The phase comes from a time accumulator, and it has no reason to be negative —
+	# but the frame must still remain a frame, not "walk_-1".
 	assert_eq(ActorPose.walk_frame(-1.0), "walk_0")
 
 
-## Все стойки агента. Перечислены руками: enum в GDScript не перебирается
-## значениями, а список из трёх строк честнее, чем обход Stance.keys().
+## All agent stances. Listed by hand: an enum in GDScript cannot be iterated by
+## values, and a list of three lines is more honest than walking Stance.keys().
 func _stances() -> Array[EnemyBrain.Stance]:
 	return [EnemyBrain.Stance.STAND, EnemyBrain.Stance.KNEEL, EnemyBrain.Stance.PRONE]
 
 
 func test_every_way_of_dying_counts_as_down() -> void:
-	# Промах здесь оставит труп стоять — у того, кто когда-нибудь спросит.
+	# A miss here will leave a corpse standing — for whoever asks some day.
 	for crushed: bool in [true, false]:
 		for falling: bool in [true, false]:
 			var pose := ActorPose.of_otto(OttoStateMachine.State.DEAD, crushed, falling, false, 0.0)
@@ -145,7 +145,7 @@ func test_the_living_and_upright_are_not_down() -> void:
 
 
 func test_the_knee_and_the_crouch_are_one_pose() -> void:
-	# Агент на колене и присевший Otto показываются одинаково — так было и в 2D.
+	# A kneeling agent and a crouching Otto are shown the same way — as it was in 2D.
 	var kneeling := ActorPose.of_agent(
 		false, false, false, false, false, 0.0, EnemyBrain.Stance.KNEEL
 	)
@@ -154,8 +154,8 @@ func test_the_knee_and_the_crouch_are_one_pose() -> void:
 	assert_eq(kneeling, ActorPose.CROUCH)
 
 
-## Приземление показывается, только пока Otto стоит (ADR-0039): шагнул — идёт,
-## присел — сидит, выстрелил — стреляет.
+## Landing is shown only while Otto stands (ADR-0039): stepped — he walks,
+## crouched — he sits, fired — he shoots.
 func test_landing_shows_only_while_standing() -> void:
 	var idle := OttoStateMachine.State.IDLE
 	assert_eq(

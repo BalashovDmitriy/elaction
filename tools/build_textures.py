@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""Фактуры стен, шахты и крыши (ADR-0033, решения 5, 6 и 8).
+"""Textures for walls, shaft and roof (ADR-0033, decisions 5, 6 and 8).
 
-Две половины:
+Two halves:
 
-- **с ambientCG** (CC0) — дерево, мрамор, штукатурка, пластик, бетон,
-  металлические листы, рифлёная сталь, гравий: набор 1K, уменьшенный до
-  [SIZE] — на нашем масштабе метр стены это около 80 пикселей экрана;
-- **своя** — обои отеля в полоску с мелким узором: у ambientCG обои однотонные,
-  а гостиничный коридор узнают по рисунку. Рисуется кодом, как звук.
+- **from ambientCG** (CC0): wood, marble, plaster, plastic, concrete,
+  metal sheets, checker-plate steel, gravel: a 1K set scaled down to
+  [SIZE]; at our scale a meter of wall is about 80 screen pixels;
+- **our own**: striped hotel wallpaper with a small pattern: ambientCG wallpapers are
+  plain, and a hotel corridor is recognized by its pattern. Drawn in code, like sound.
 
-Цвет кладётся в оттенках серого там, где тон даёт палитра раунда
-(`BuildingPalette`): фактура несёт рисунок, раунд — цвет.
+Color is stored in shades of gray where the tone comes from the round palette
+(`BuildingPalette`): the texture carries the pattern, the round carries the color.
 
-    python tools/build_textures.py           # скачать и собрать всё
-    python tools/build_textures.py --local   # только своё, без сети
-    python tools/build_textures.py --only residential_wall  # одну фактуру
+    python tools/build_textures.py           # download and build everything
+    python tools/build_textures.py --local   # only our own, no network
+    python tools/build_textures.py --only residential_wall  # a single texture
 
-Пишет в `assets/textures/<имя>/`: `albedo.png`, `normal.png`, `roughness.png`.
+Writes to `assets/textures/<name>/`: `albedo.png`, `normal.png`, `roughness.png`.
 """
 
 from __future__ import annotations
@@ -34,15 +34,15 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 OUT = PROJECT_ROOT / "assets/textures"
 SIZE = 512
 
-# Имя в игре → набор ambientCG и красить ли его серым под тон раунда.
+# Name in the game → ambientCG set, and whether to make it gray for the round tone.
 AMBIENT: dict[str, tuple[str, bool]] = {
     "hotel_wainscot": ("Wood051", False),
     "hotel_pilaster": ("Marble012", True),
     "office_wall": ("PaintedPlaster017", True),
     "office_wainscot": ("Plastic010", True),
     "office_pilaster": ("Concrete034", True),
-    # Жилой дом (ADR-0055, решение 4): облупленная краска сверху, крашеный
-    # глазурованный кирпич понизу, крашеный кирпич простенков.
+    # Residential building (ADR-0055, decision 4): peeling paint on top, painted
+    # glazed brick at the bottom, painted brick on the piers.
     "residential_wall": ("PaintedPlaster015", True),
     "residential_wainscot": ("PaintedBricks003", True),
     "residential_pilaster": ("PaintedBricks001", True),
@@ -76,8 +76,8 @@ def _ambient(name: str, asset: str, grey: bool) -> None:
     archive = _fetch(asset)
     albedo = _pick(archive, "_Color.jpg").convert("RGB")
     if grey:
-        # Серый с поднятой серединой: тон раунда умножается на светлое, иначе
-        # тёмная фактура съела бы цвет.
+        # Gray with a raised middle: the round tone is multiplied by something light, otherwise
+        # a dark texture would eat the color.
         albedo = ImageOps.autocontrast(ImageOps.grayscale(albedo), cutoff=1)
         albedo = albedo.point(lambda v: int(190 + v * 0.22)).convert("RGB")
     normal = _pick(archive, "_NormalGL.jpg").convert("RGB")
@@ -87,10 +87,10 @@ def _ambient(name: str, asset: str, grey: bool) -> None:
 
 
 def _wallpaper() -> None:
-    """Обои отеля: широкая полоса, узкая полоса, между ними ромбики.
+    """Hotel wallpaper: a wide stripe, a narrow stripe, little diamonds between them.
 
-    Рисунок — в светлом сером: цвет даёт палитра раунда. Рельеф — слабое
-    тиснение по тому же рисунку, чтобы свет лампы скользил по обоям.
+    The pattern is in light gray: the color comes from the round palette. The relief is a
+    faint embossing of the same pattern, so that lamp light glides over the wallpaper.
     """
     size = SIZE
     height = Image.new("L", (size, size), 0)
@@ -101,11 +101,11 @@ def _wallpaper() -> None:
             u = x % band
             value = 0.0
             if u < band * 0.45:
-                value = 0.55  # широкая полоса
+                value = 0.55  # wide stripe
             elif band * 0.55 < u < band * 0.62:
-                value = 0.9  # узкая
+                value = 0.9  # narrow
             else:
-                # Ромбик в межполосье через каждые полполосы по высоте.
+                # A diamond between the stripes every half stripe in height.
                 cx = band * 0.785
                 cy = (y // (band // 2)) * (band // 2) + band // 4
                 if abs(u - cx) / (band * 0.12) + abs(y - cy) / (band * 0.16) < 1.0:
@@ -120,7 +120,7 @@ def _wallpaper() -> None:
 
 
 def _normal_from(height: Image.Image, strength: float) -> Image.Image:
-    """Карта нормалей (OpenGL, Y вверх) по карте высот разностями соседей."""
+    """Normal map (OpenGL, Y up) from a height map by neighbor differences."""
     size = height.size[0]
     src = height.load()
     out = Image.new("RGB", (size, size))

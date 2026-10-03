@@ -1,15 +1,15 @@
 shader_type spatial;
 render_mode blend_mix, depth_draw_never, specular_disabled;
 
-// Снег на машине (M24l, ADR-0054): накладной материал поверх кузова. Белое
-// ложится на всё, что смотрит вверх, — крышу, капот, багажник, — с рваным
-// краем по шуму в осях машины: снег едет с ней, а не скользит по ней, как
-// наклейка в мире.
+// Snow on a car (M24l, ADR-0054): an overlay material on top of the body. White
+// falls on everything facing up — roof, bonnet, boot — with a ragged
+// edge by noise in the car's axes: the snow rides with it rather than sliding over it like
+// a decal in the world.
 
 uniform vec3 colour : source_color = vec3(0.84, 0.87, 0.92);
-// С какого наклона грань уже под снегом: 1 — только горизонталь.
+// From what tilt a face is already under snow: 1 — only horizontal.
 uniform float threshold = 0.62;
-// Сколько снега лежит: 1 — шапка, меньше — налёт, сквозь который видно своё.
+// How much snow lies: 1 — a cap, less — a dusting through which the paint shows.
 uniform float amount = 1.0;
 
 varying vec3 world_normal;

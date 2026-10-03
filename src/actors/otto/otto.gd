@@ -1,114 +1,117 @@
 class_name Otto
 extends CharacterBody3D
 
-## Игрок — агент Otto.
+## The player: agent Otto.
 ##
-## Отвечает за физику, форму коллизии и вид. Решение о том, в каком он
-## состоянии, принимает [OttoStateMachine].
+## Responsible for physics, the collision shape and the look. The decision about what
+## state he is in is made by [OttoStateMachine].
 ##
-## Живёт в плоскости игры: Z заперт на [constant WorldSpace.PLAY_Z] и
-## возвращается туда после каждого шага физики (ADR-0021, решение 1). Ходить
-## вглубь Otto не будет — глубина это свойство картинки, а не движения.
+## Lives in the play plane: Z is locked to [constant WorldSpace.PLAY_Z] and
+## returns there after every physics step (ADR-0021, decision 1). Otto will not walk
+## into the depth: depth is a property of the picture, not of movement.
 
-## Otto погиб: пулей, падением больше чем на этаж или под кабиной.
+## Otto has died: from a bullet, a fall of more than one floor, or under a cab.
 signal died
 
 const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
 
-## Сколько держится поза выстрела, с. Выстрел мгновенный, а увидеть его надо.
+## How long the shot pose holds, s. The shot is instant, but it needs to be seen.
 const SHOOT_POSE_TIME: float = 0.18
 
-## Сколько Otto падает, прежде чем лечь: смерть — две позы (ADR-0011, пункт 12).
+## How long Otto falls before lying down: death is two poses (ADR-0011, item 12).
 const FALLING_TIME: float = 0.3
 
-## Сколько Otto неуязвим, вернувшись в игру, с.
+## How long Otto is invulnerable after returning to the game, s.
 ##
-## Возвращается он на этаж, где погиб, а агент, который его убил, никуда не делся
-## и стоит в своей зоне огня — без передышки вторая смерть приходит через четверть
-## секунды после первой, и три жизни сгорают на одном месте (ADR-0014, пункт 6).
+## He returns to the floor where he died, and the agent who killed him has not gone
+## anywhere and stands in his zone of fire: without a breather the second death comes a
+## quarter second after the first, and three lives burn out in one spot (ADR-0014,
+## item 6).
 const RESPAWN_GRACE: float = 1.5
 
-## Как часто мигает неуязвимый Otto, раз в секунду. Мигание — единственное, чем
-## передышка себя показывает: без него игрок не знает, что она вообще была.
+## How often invulnerable Otto blinks, times per second. Blinking is the only way the
+## breather shows itself: without it the player does not know it existed at all.
 const GRACE_BLINKS: float = 8.0
 
-## Насколько Otto может сместиться между двумя своими кадрами физики, м, и это
-## ещё не перестановка. Сам он двигается только внутри своего кадра; между
-## кадрами его переносят — уровень, тест, инструмент съёмки, — и такой перенос
-## не падение: без этого поставленный этажом ниже разбивался бы на ровном месте.
+## How far Otto can move between two of his physics frames, m, and it still is not
+## a teleport. He moves by himself only within his own frame; between
+## frames he is moved by others (the level, a test, the capture tool), and such a move
+## is not a fall: without this, being placed one floor lower would kill him for nothing.
 const TELEPORT_GAP: float = 0.5
 
-## Сколько надо пробыть в воздухе, чтобы касание пола было приземлением, с.
-## Прыжок длится около секунды, а кадр без опоры на уходящей вниз кабине — один.
+## How long to stay in the air for a floor contact to be a landing, s.
+## A jump lasts about a second, and a frame without support on a cab going down is one.
 const LANDING_AIR_TIME: float = 0.15
-## Вид Otto в поездке ([member ride_look]): висит на тросе, идёт по ступеням.
+## Otto's look during a ride ([member ride_look]): hangs on the rope, walks the steps.
 const LOOK_ROPE := "rope"
 const LOOK_WALK := "walk"
-## Входит в красную дверь вглубь и выходит из неё (ADR-0043, решение 4).
+## Goes into a red door into the depth and comes out of it (ADR-0043, decision 4).
 const LOOK_DOOR_IN := "door_in"
 const LOOK_DOOR_OUT := "door_out"
-## В проёме вертолёта и на его пороге: позу, глубину и разворот ставит
-## вступление ([member ride_pose]).
+## In the helicopter doorway and on its threshold: the pose, depth and turn are set by
+## the intro ([member ride_pose]).
 const LOOK_HELI := "heli"
-## Насколько вглубь проёма Otto уходит, м: из плоскости игры за стену.
+## How far into the opening Otto goes, m: out of the play plane behind the wall.
 const DOOR_WALK_DEPTH: float = 1.2
-## Качание на тросе: размах, радианы, и частота, рад/с.
+## Swinging on the rope: amplitude, radians, and frequency, rad/s.
 const ROPE_SWAY: float = 0.05
 const ROPE_SWAY_RATE: float = 2.2
 
-## Кнопки, нажатие которых может уйти на пропуск вступления ([method ride]).
+## Buttons whose press may be spent on skipping the intro ([method ride]).
 const PRESS_ACTIONS: Array[StringName] = [&"jump", &"shoot"]
 
-## Ходьба и пуля — по ROM: 2 и 8 px за тик логики (ADR-0027, решение 4); пуля
-## втрое быстрее ROM ([constant Arcade.BULLET_PACE], ADR-0037, решение 5).
+## Walking and the bullet follow the ROM: 2 and 8 px per logic tick (ADR-0027, decision
+## 4); the bullet is three times faster than in the ROM ([constant Arcade.BULLET_PACE],
+## ADR-0037, decision 5).
 @export var walk_speed: float = Arcade.speed(Arcade.WALK_PX)
-## Прыжок по ROM: ступни +25 px (1.88 м) за 14 тиков (0.95 с) — table_42E2.
-## Высота прыжка = jump_speed в квадрате, делённая на 2 · gravity: 7.9 и 16.6
-## дают те же 1.88 м за те же 0.95 с. До M18d прыжок был 2.4 м по физике.
+## The jump per the ROM: feet +25 px (1.88 m) over 14 ticks (0.95 s), table_42E2.
+## Jump height = jump_speed squared divided by 2 · gravity: 7.9 and 16.6
+## give the same 1.88 m over the same 0.95 s. Before M18d the jump was 2.4 m by physics.
 @export var jump_speed: float = 7.9
 @export var gravity: float = 16.6
 @export var bullet_speed: float = Arcade.bullet_speed(Arcade.OTTO_BULLET_PX)
-## Откуда вылетает пуля, от ног. Присев, Otto стреляет ниже — и его выстрел
-## проходит там, где стоящий враг его не перепрыгнет.
+## Where the bullet comes out, from the feet. Crouching, Otto shoots lower, and his shot
+## passes where a standing enemy cannot jump over it.
 ##
-## Числа — в [Proportions]: стоячая с кадра оригинала, до лампы под потолком
-## не достаёт и из прыжка — Otto упирается головой в потолок раньше
-## (ADR-0026, решение 5).
+## The numbers are in [Proportions]: the standing one is from a frame of the original;
+## it does not reach a lamp under the ceiling even from a jump: Otto hits the ceiling
+## with his head first (ADR-0026, decision 5).
 @export var shot_height_standing: float = Proportions.SHOT_HIGH
 @export var shot_height_crouching: float = Proportions.SHOT_LOW
 @export var muzzle_offset: float = Proportions.MUZZLE
 @export var max_fall_speed: float = 12.6
-## В оригинале Otto приседает на месте. Оставлено переключателем для настройки.
+## In the original Otto crouches in place. Kept as a switch for tuning.
 @export var can_move_while_crouching: bool = false
 
-## Стоит ли Otto на заснеженном настиле: ставит снег крыши ([SnowTracks]).
+## Whether Otto stands on a snowy deck: set by the roof snow ([SnowTracks]).
 var icy: bool = false
 
-## Чем звучит шаг: пол ставит здание — ковёр отеля, камень конторы и крыши.
+## What a step sounds like: the building sets the floor, the hotel carpet, the stone of
+## the office and the roof.
 var step_sound: String = Sounds.STEP_CONCRETE
-## Шаг этажа здания, м: упавший больше чем на этаж разбивается (ADR-0037,
-## решение 7). Ставит уровень из своих правил; по умолчанию — стандартный этаж.
+## The building's floor step, m: someone falling more than a floor dies (ADR-0037,
+## decision 7). Set by the level from its rules; by default, a standard floor.
 var floor_height: float = Proportions.FLOOR
-## Можно ли в Otto сейчас попасть так, чтобы он погиб. Нельзя за дверью и в её
-## проёме, на эскалаторе, в прилёте на крыше — везде, где ввод снят
-## ([constant OttoStateMachine.State.RIDE]), — и в передышку после возвращения в
-## игру. Агенты по этому придерживают выстрел: пуля сквозь неуязвимого читалась
-## бы как ошибка, а не как правило. Свойством, как и [member invulnerable]: так
-## оно рядом с ним и не множит методы узла.
+## Whether Otto can be hit right now so that he dies. Not behind a door or in its
+## doorway, on an escalator, while arriving on the roof: everywhere input is off
+## ([constant OttoStateMachine.State.RIDE]), and during the breather after returning to
+## the game. Agents hold their fire by this: a bullet through an invulnerable one would
+## read as a bug, not as a rule. A property, like [member invulnerable]: this way it is
+## next to it and does not multiply the node's methods.
 var hittable: bool:
 	get:
 		return _grace <= 0.0 and not _states.is_world_driven()
-## Идёт ли передышка после возвращения в игру: пуля в Otto попадает, но не
-## ранит. По этому [Bullet] решает, брызгать ли кровью. Свойством, а не методом:
-## пуля спрашивает его через [method Object.get], не зная класса Otto.
+## Whether the breather after returning to the game is on: a bullet hits Otto but does
+## not wound. By this [Bullet] decides whether to splatter blood. A property, not a
+## method: the bullet asks it through [method Object.get] without knowing Otto's class.
 var invulnerable: bool:
 	get:
 		return _grace > 0.0
 
-## Сценка добивания, в которой Otto сейчас (ADR-0040); null — ни в какой. Пока
-## она идёт, Otto не слушается ввода и не двигается сам — позы и место ему
-## ставит режиссёр. Ставит и снимает её режиссёр. Свойством, как [member hittable]:
-## методы узла упёрлись в предел линтера.
+## The takedown scene Otto is in now (ADR-0040); null means none. While
+## it runs, Otto does not obey input and does not move by himself: the director sets his
+## poses and place. The director sets and clears it. A property, like [member hittable]:
+## the node's methods have hit the linter limit.
 var takedown: TakedownScene:
 	get:
 		return _takedown
@@ -119,90 +122,91 @@ var takedown: TakedownScene:
 		_rest_here()
 		if director != null:
 			_body.face(_facing, true)
-## Фигура Otto: режиссёр сценки ставит ей позы и темп.
+## Otto's figure: the scene director sets its poses and tempo.
 var figure: FigureRig:
 	get:
 		return _body
-## Жребий сценки добивания. Сеет уровень от сида здания: от сценки зависят её
-## длина и миг смерти агента, и несеянный жребий делал бы прогон бота
-## неповторимым (`docs/testing.md`, правило из M18b).
+## Takedown scene draw. The level seeds it from the building seed: the scene's length and
+## the moment of the agent's death depend on it, and an unseeded draw would make the bot
+## run unrepeatable (`docs/testing.md`, a rule from M18b).
 var takedown_rng := RandomNumberGenerator.new()
-## Тело на суставах ([Corpse]): собирается с рождения, падает в миг смерти и
-## встаёт при возвращении в игру (ADR-0043, решение 12).
+## A jointed body ([Corpse]): built at birth, falls at the moment of death and
+## gets up on returning to the game (ADR-0043, decision 12).
 var corpse: Corpse = null
-## Как Otto выглядит, пока его везут ([method ride]), — ставит тот, кто везёт,
-## до [code]ride(true)[/code]: журнал прогона пишет его в начале поездки
-## (ADR-0043, решения 1 и 2). На тросе висит на руках, на эскалаторе идёт по
-## ступеням. Пусто — стоит.
+## How Otto looks while he is being carried ([method ride]): set by whoever carries him,
+## before [code]ride(true)[/code]: the run log writes it at the start of the ride
+## (ADR-0043, decisions 1 and 2). On the rope he hangs by his hands, on the escalator he
+## walks the steps. Empty means he stands.
 var ride_look: String = ""
-## Куда Otto смотрит, пока идёт по эскалатору: −1 влево, +1 вправо, 0 — куда
-## смотрел.
+## Where Otto looks while walking on the escalator: −1 left, +1 right, 0 means where he
+## was looking.
 var ride_facing: float = 0.0
-## Насколько Otto ушёл в проём двери: 0 — у коврика, 1 — внутри. Ставит дверь
-## по ходу створки.
+## How far Otto has gone into the door opening: 0 at the mat, 1 inside. Set by the door
+## following the leaf travel.
 var ride_progress: float = 0.0
-## Вступление здания (ADR-0052, решение 6), [constant LOOK_HELI]: какую позу
-## показать, насколько фигура в глубине от плоскости игры, м (минус — дальше от
-## камеры), и насколько она развёрнута к камере, 0–1.
+## The building intro (ADR-0052, decision 6), [constant LOOK_HELI]: which pose to
+## show, how deep the figure is from the play plane, m (minus is farther from the
+## camera), and how much it is turned toward the camera, 0–1.
 var ride_pose: String = ""
 var ride_depth: float = 0.0
 var ride_turn: float = 0.0
 
 var _states := OttoStateMachine.new()
-## Один снимок ввода на всё время жизни: перечитывается, а не создаётся заново.
+## One input snapshot for the whole lifetime: it is reread, not created anew.
 var _snapshot := OttoInput.new()
 var _posed_state := OttoStateMachine.State.IDLE
-## Скорость по горизонтали в полёте, м/с. Задаётся толчком и в воздухе не
-## меняется: в ROM направление прыжка выбирается при старте (@43FA), а
-## повернуться лицом в полёте можно (@42A7).
-## Ловец осадков на теле ([Shelter]).
+## Horizontal velocity in flight, m/s. Set by the push-off and does not change in the
+## air: in the ROM the jump direction is chosen at the start (@43FA), but
+## turning to face the other way in flight is allowed (@42A7).
+## The precipitation catcher on the body ([Shelter]).
 var _shelter: GPUParticlesCollisionBox3D = null
 var _air_speed: float = 0.0
-## Кабина, внутри которой сейчас Otto. На крыше кабины она не заполняется:
-## оттуда лифтом не управляют (ADR-0004, пункт 3).
+## The cab Otto is inside now. On the cab roof it is not set:
+## the elevator is not controlled from there (ADR-0004, item 3).
 var _car: ElevatorCar = null
-## Разница высот стоячей и сидячей формы: столько места нужно над головой.
+## Height difference between the standing and crouching shapes: this much room is needed
+## overhead.
 var _headroom: float = 0.0
-## Куда Otto смотрит: -1 влево, +1 вправо. Туда же летят его пули.
+## Where Otto looks: -1 left, +1 right. His bullets fly there too.
 var _facing: float = 1.0
-## Насколько Otto повёрнут спиной к камере, 0..1: садясь в машину, он
-## поворачивается к ней, а не шагает в глубину боком ([method turn_into_depth]).
+## How much Otto is turned with his back to the camera, 0..1: getting into the car, he
+## turns toward it instead of stepping sideways into the depth ([method turn_into_depth]).
 var _depth_turn: float = 0.0
-## Фаза ходьбы: целая часть — номер кадра из трёх.
+## Walk phase: the integer part is the frame number out of three.
 var _walk_phase: float = 0.0
-## Сколько ещё держать позу выстрела и позу падения, с.
+## How much longer to hold the shot pose and the fall pose, s.
 var _shooting: float = 0.0
 var _falling_over: float = 0.0
-## Придавлен кабиной: у такой смерти своя поза.
+## Crushed by a cab: such a death has its own pose.
 var _crushed: bool = false
-## На каком кадре ходьбы уже прозвучал шаг.
+## On which walk frame the step has already sounded.
 var _stepped_on: int = -1
 var _gun := Gun.new()
-## Высота последней опоры: от неё считается глубина падения, м сцены.
+## Height of the last support: the fall depth is counted from it, m of scene.
 ##
-## От опоры, а не от верхней точки полёта: свой прыжок ничего к падению не
-## прибавляет — спрыгнуть этажом ниже можно и с разбега, и с прыжка.
+## From the support, not from the top point of the flight: your own jump adds nothing
+## to the fall: you can jump one floor down both from a run and from a jump.
 var _support_y: float = 0.0
-## Стоял ли Otto на опоре в прошлом кадре: приземление — это переход.
+## Whether Otto stood on a support last frame: a landing is a transition.
 var _was_grounded: bool = true
-## Сколько Otto уже в воздухе, с: приземлением считается только настоящий
-## полёт, а не кадр без опоры на крыше кабины, уходящей вниз.
+## How long Otto has already been in the air, s: only a real flight counts as landing,
+## not a frame without support on the roof of a cab going down.
 var _air_time: float = 0.0
-## Паузы разворота и приземления (ADR-0039, решение 4).
+## Turn and landing pauses (ADR-0039, decision 4).
 var _locks := MoveLocks.new()
-## Сколько ещё показывать приземление, с.
+## How much longer to show the landing, s.
 var _landing: float = 0.0
-## Нажат ли прыжок во время восстановления: он сработает, как оно кончится.
+## Whether jump was pressed during recovery: it will fire when recovery ends.
 var _jump_waiting: bool = false
 var _takedown: TakedownScene = null
-## Какая сценка была прошлой: та же подряд не повторяется.
+## Which scene was the previous one: the same one does not repeat in a row.
 var _last_scene: String = ""
-## Где Otto закончил прошлый кадр физики: по этому видно перестановку.
+## Where Otto ended the previous physics frame: a teleport shows by this.
 var _last_position := Vector3.ZERO
-## Сколько ещё держится передышка после возвращения в игру, с.
+## How much longer the breather after returning to the game lasts, s.
 var _grace: float = 0.0
-## Кнопки, нажатие которых потрачено на пропуск вступления ([method ride]):
-## пока их держат, Otto их не слышит, отпустили — снова слышит.
+## Buttons whose press was spent on skipping the intro ([method ride]):
+## while they are held, Otto does not hear them; once released, he hears them again.
 var _spent_actions: Array[StringName] = []
 
 @onready var _standing_shape: CollisionShape3D = $StandingShape
@@ -211,9 +215,9 @@ var _spent_actions: Array[StringName] = []
 @onready var _camera: SideCamera = $Camera
 
 
-## Формы тела задаёт [Proportions], а не сцена: сразу после сборки сцены, ещё
-## до дерева. Тесты читают формы у свежей копии, не добавляя её в дерево, и
-## видеть они обязаны те же числа, что и игра.
+## Body shapes are set by [Proportions], not by the scene: right after the scene is
+## assembled, even before the tree. Tests read the shapes from a fresh copy without
+## adding it to the tree, and they must see the same numbers as the game.
 func _notification(what: int) -> void:
 	if what != NOTIFICATION_SCENE_INSTANTIATED:
 		return
@@ -226,7 +230,7 @@ func _notification(what: int) -> void:
 
 
 func _ready() -> void:
-	# Дождь и снег гаснут о голову и плечи (ADR-0054).
+	# Rain and snow die on the head and shoulders (ADR-0054).
 	_shelter = Shelter.over(self, _cover())
 	add_to_group(Footing.OTTO_GROUP)
 	var standing := _shape_size(_standing_shape)
@@ -238,32 +242,33 @@ func _ready() -> void:
 	corpse = Corpse.new(self, _body)
 
 
-## Габарит тела под осадками: в рост или присев.
+## Body size under precipitation: full height or crouched.
 func _cover() -> Vector3:
 	var tall := Proportions.CROUCH if is_crouching() else Proportions.BODY
 	return Vector3(Proportions.BODY_WIDTH, tall, WorldSpace.BODY_DEPTH)
 
 
 func _physics_process(delta: float) -> void:
-	# Ловец осадков — по позе; погибшего не держит: тело лежит на полу.
+	# The precipitation catcher follows the pose; it does not hold a dead one: the body lies
+	# on the floor.
 	if _shelter != null:
 		_shelter.visible = not is_dead()
 		Shelter.fit(_shelter, _cover())
 	if _takedown != null:
-		# В сценке Otto стоит, где стоял: координатой и позой распоряжается
-		# режиссёр. Уязвим — пуля его найдёт (ADR-0040, решение 5).
+		# In a scene Otto stands where he stood: the director controls his coordinate
+		# and pose. He is vulnerable: a bullet will find him (ADR-0040, decision 5).
 		velocity = Vector3.ZERO
 		_rest_here()
 		return
 	_grace = maxf(_grace - delta, 0.0)
 	if global_position.distance_to(_last_position) > TELEPORT_GAP:
-		# Переставили — уровень, тест или съёмка: с новой точки и считаем.
+		# Moved by the level, a test or a capture: we count from the new point.
 		_rest_here()
 	_snapshot.read_actions()
 	if not _spent_actions.is_empty():
 		_forget_spent_presses()
 	if _car != null:
-		# В кабине «вверх/вниз» ведут её, а присесть внутри нельзя.
+		# In a cab "up/down" drive it, and crouching inside is not possible.
 		_car.drive(vertical_intent())
 		_snapshot.crouch = false
 
@@ -271,22 +276,22 @@ func _physics_process(delta: float) -> void:
 	_landing = maxf(_landing - delta, 0.0)
 	_hold_the_feet()
 
-	# Машине состояний нужна скорость в координатах правил, где Y вниз:
-	# падение для неё положительно, как было в 2D.
+	# The state machine needs velocity in rules coordinates, where Y is down:
+	# falling is positive for it, as it was in 2D.
 	var state := _states.update(_snapshot, is_on_floor(), -velocity.y, _can_stand_up())
 
-	# Пока Otto забрал кто-то другой — эскалатор везёт или дверь спрятала —
-	# физика молчит: координатой распоряжается он, а не она.
+	# While someone else has taken Otto (an escalator carries him or a door hid him),
+	# physics is silent: that one controls the coordinate, not physics.
 	if state == OttoStateMachine.State.RIDE or state == OttoStateMachine.State.INDOORS:
 		velocity = Vector3.ZERO
-		# Его несут, а не роняют: падение с этой высоты не копится.
+		# He is carried, not dropped: the fall from this height does not accumulate.
 		_rest_here()
 		_apply_pose(state)
 		_update_look(delta)
 		return
 
 	if _snapshot.shoot_pressed and state != OttoStateMachine.State.DEAD:
-		# Вплотную к агенту кнопка выстрела добивает, вдали — стреляет (ADR-0040).
+		# Right next to an agent the fire button does a takedown, from afar it shoots (ADR-0040).
 		var target := _reachable_agent(state)
 		if target != null:
 			_take_down(
@@ -297,16 +302,16 @@ func _physics_process(delta: float) -> void:
 		if _gun.can_fire():
 			_fire()
 
-	# Импульс прыжка выдаётся в тот же кадр, пока тело ещё стоит на полу,
-	# поэтому гравитация его в этом кадре не съедает.
+	# The jump impulse is given in the same frame while the body still stands on the floor,
+	# so gravity does not eat it in this frame.
 	if _states.just_entered(OttoStateMachine.State.JUMP) and is_on_floor():
 		velocity.y = jump_speed
 
 	if is_on_floor() or state == OttoStateMachine.State.DEAD:
 		var wanted := _horizontal_speed(_snapshot, state)
-		# От скорости, с которой тело шло на самом деле, — после стены и борта
-		# кабины, — а не от задуманной: упёршийся в стену на снегу иначе ещё
-		# четверть секунды «тормозил» в неё, прежде чем пойти назад.
+		# From the velocity the body actually moved with (after the wall and the cab
+		# side), not from the intended one: otherwise someone pressed against a wall on snow
+		# would keep "braking" into it for a quarter second before moving back.
 		_air_speed = Footing.step(velocity.x, wanted, icy and is_on_floor(), delta)
 	velocity.x = _within_the_car(_air_speed)
 	if not is_on_floor():
@@ -317,21 +322,21 @@ func _physics_process(delta: float) -> void:
 
 	_track_fall()
 	if _takedown != null:
-		# Приземлился на агента: позу уже ставит режиссёр, своя её перебила бы.
+		# Landed on an agent: the director already sets the pose, his own would override it.
 		return
 	_last_position = global_position
 	_apply_pose(_states.state)
 	_update_look(delta)
 
 
-## Убивает Otto: пуля, падение больше чем на этаж, сдавливание кабиной.
+## Kills Otto: a bullet, a fall of more than a floor, crushing by a cab.
 ##
-## Во время передышки после возвращения в игру не делает ничего: неуязвимость
-## общая на все причины, а не только на пули — воскреснуть под кабиной так же
-## обидно, как под выстрелом.
+## During the breather after returning to the game it does nothing: the invulnerability
+## covers all causes, not only bullets: reviving under a cab is just as
+## annoying as under a shot.
 ##
-## [param crushed] — придавило кабиной: у такой смерти своя поза, в оригинале
-## раздавленный показан отдельной картинкой (ADR-0011, пункт 12).
+## [param crushed]: crushed by a cab; such a death has its own pose, in the original
+## the crushed one is shown as a separate picture (ADR-0011, item 12).
 func kill(crushed: bool = false) -> void:
 	if _grace > 0.0:
 		return
@@ -340,8 +345,8 @@ func kill(crushed: bool = false) -> void:
 		return
 	_crushed = crushed
 	if crushed:
-		# Только настоящая смерть: в передышке кабина зовёт это каждый шаг
-		# физики, пока Otto под ней, и давка звучала бы очередью.
+		# Only a real death: during the breather the cab calls this every physics
+		# step while Otto is under it, and the crush would sound like a volley.
 		Sounds.play(Sounds.CRUSH)
 		set_meta(&"death_cause", "crushed")
 	elif not has_meta(&"shooter"):
@@ -359,24 +364,25 @@ func is_dead() -> bool:
 	return _states.is_dead()
 
 
-## Стоит ли Otto на своих ногах — не в кабине, не на эскалаторе, не за дверью.
-## Пока нет, агентов на этаж выходит не больше одного (@59F4).
+## Whether Otto stands on his own feet: not in a cab, not on an escalator, not behind a
+## door. Until then no more than one agent comes out onto the floor (@59F4).
 func is_on_foot() -> bool:
 	return _car == null and not _states.is_world_driven()
 
 
-## Сидит ли Otto: агент тогда стреляет из приседа (@1CD8).
+## Whether Otto is crouching: an agent then shoots from a crouch (@1CD8).
 func is_crouching() -> bool:
 	return _states.state == OttoStateMachine.State.CROUCH
 
 
-## Скрылся ли Otto за дверью. Снаружи его нет, и агентам он не виден:
-## в оригинале войти в дверь значит сбить их со следа (ADR-0023, решение 8).
+## Whether Otto has hidden behind a door. He is not outside, and agents cannot see him:
+## in the original entering a door means throwing them off the trail (ADR-0023,
+## decision 8).
 func is_hidden() -> bool:
 	return _states.state == OttoStateMachine.State.INDOORS
 
 
-## Снимает из снимка ввода нажатия, потраченные на пропуск, пока кнопку держат.
+## Removes from the input snapshot the presses spent on the skip while the button is held.
 func _forget_spent_presses() -> void:
 	for action: StringName in _spent_actions.duplicate():
 		if not Input.is_action_pressed(action):
@@ -387,14 +393,14 @@ func _forget_spent_presses() -> void:
 			_snapshot.shoot_pressed = false
 
 
-## Разворот и приземление держат ноги (ADR-0039, решение 4): снимок ввода
-## теряет шаг, пока тело поворачивается, и прыжок, пока Otto восстанавливается.
-## Сторона берётся до этого — из того, что игрок нажал.
+## The turn and the landing hold the legs (ADR-0039, decision 4): the input snapshot
+## loses the step while the body turns, and the jump while Otto recovers.
+## The facing is taken before that, from what the player pressed.
 ##
-## Мёртвый не поворачивается: труп лежит той стороной, которой упал, — тыканье
-## в стрелки крутило бы тело, пока идёт отсчёт до возвращения в игру. Того, кого
-## везут или спрятали, ввод не касается вовсе. В воздухе поворачиваться лицом
-## можно без паузы (ROM @42A7): скорость полёта от этого не меняется.
+## A dead one does not turn: a corpse lies on the side it fell on; poking
+## the arrows would spin the body during the countdown to returning to the game. Input
+## does not touch someone being carried or hidden at all. In the air turning to face is
+## allowed without a pause (ROM @42A7): the flight velocity does not change from it.
 func _hold_the_feet() -> void:
 	if _states.is_dead() or _states.is_world_driven():
 		return
@@ -405,9 +411,9 @@ func _hold_the_feet() -> void:
 		_facing = side
 	if not _locks.can_walk():
 		_snapshot.move = 0.0
-	# Прыжок, нажатый во время восстановления, не пропадает, а ждёт его конца:
-	# пауза в 0.15 с короче реакции, и потерянное нажатие читалось бы как
-	# несработавшая кнопка. Отпустил кнопку раньше — передумал.
+	# A jump pressed during recovery is not lost but waits for its end:
+	# a 0.15 s pause is shorter than reaction time, and a lost press would read as
+	# a button that did not work. Released the button earlier: changed one's mind.
 	if not _locks.can_jump():
 		_jump_waiting = _jump_waiting or _snapshot.jump_pressed
 		_snapshot.jump_pressed = false
@@ -416,12 +422,12 @@ func _hold_the_feet() -> void:
 		_jump_waiting = false
 
 
-## Возвращает Otto в игру после смерти. Ставить его на место — дело уровня,
-## поэтому зовут это уже после переноса: опора, от которой считается падение,
-## берётся отсюда.
+## Returns Otto to the game after death. Putting him in place is the level's job,
+## so this is called after the move: the support the fall is counted from
+## is taken from here.
 ##
-## Без сброса [member _support_y] упавший в шахту возвращался бы с чужой
-## глубиной падения за спиной и разбивался бы на ровном месте.
+## Without resetting [member _support_y] someone who fell into a shaft would come back
+## with someone else's fall depth behind him and die for nothing.
 func revive() -> void:
 	_crushed = false
 	for key: StringName in [&"death_cause", &"shooter"]:
@@ -435,37 +441,38 @@ func revive() -> void:
 	velocity = Vector3.ZERO
 	_rest_here()
 	_grace = RESPAWN_GRACE
-	# Камера приезжает к воскресшему сразу: иначе полсекунды сглаживания игрок
-	# смотрит туда, где его убили.
+	# The camera arrives at the revived one at once: otherwise for half a second of
+	# smoothing the player looks at where he was killed.
 	_camera.snap_to(Vector2(global_position.x, global_position.y))
 	_repose()
 
 
-## Намерение по вертикали за последний кадр. По нему кабина, эскалатор и дверь
-## понимают, куда их просят, не читая [Input] сами.
+## Vertical intent over the last frame. By it the cab, the escalator and the door
+## understand where they are asked to go, without reading [Input] themselves.
 ##
-## Пока Otto не свой — мёртв, едет на эскалаторе или сидит за дверью — он не
-## просит ничего: иначе он продолжал бы вести кабину и просился бы в дверь
-## оттуда, где его уже нет. Снять такое состояние может только тот, кто его
-## поставил, а не игрок. В сценке добивания — тоже: снимок ввода в ней не
-## перечитывается, и застывшее «вверх» впустило бы Otto в дверь посреди сценки.
+## While Otto is not his own (dead, riding an escalator or sitting behind a door) he
+## asks for nothing: otherwise he would keep driving the cab and asking to enter a door
+## from where he no longer is. Such a state can be cleared only by whoever set it, not
+## by the player. The same in a takedown scene: the input snapshot is not reread in it,
+## and a frozen "up" would let Otto into a door in the middle of the scene.
 func vertical_intent() -> float:
 	return 0.0 if _states.is_world_driven() or _takedown != null else _snapshot.vertical
 
 
-## На сколько Otto ниже своей последней опоры, м. На опоре — ноль.
+## How far Otto is below his last support, m. On the support it is zero.
 func fall_height() -> float:
 	return maxf(_support_y - global_position.y, 0.0)
 
 
-## На сколько поднимает прыжок, м.
+## How high the jump lifts, m.
 func jump_height() -> float:
 	return jump_speed * jump_speed / (2.0 * gravity)
 
 
-## Otto скрылся за дверью или дверь выпустила его наружу — через 70 тиков ROM,
-## раньше не выйти (ADR-0038, решение 2). Пока внутри, снаружи его нет и ввод
-## игрока не действует; так же он прячется, пока его увозит машина у выхода.
+## Otto has hidden behind a door or the door has let him out, after 70 ROM ticks,
+## you cannot leave earlier (ADR-0038, decision 2). While inside, he is not outside and
+## the player's input has no effect; he hides the same way while the car at the exit
+## takes him away.
 func stay_indoors(inside: bool) -> void:
 	if inside:
 		_states.go_indoors()
@@ -474,30 +481,31 @@ func stay_indoors(inside: bool) -> void:
 	_repose()
 
 
-## Поворачивает Otto спиной к камере на долю [param weight]: 0 — вдоль этажа,
-## куда он смотрит, 1 — лицом в глубину. Так он садится в машину у выхода.
+## Turns Otto with his back to the camera by the fraction [param weight]: 0 is along the
+## floor where he looks, 1 is facing into the depth. This is how he gets into the car at
+## the exit.
 func turn_into_depth(weight: float) -> void:
 	_depth_turn = clampf(weight, 0.0, 1.0)
 
 
-## Otto встал на эскалатор или сошёл с него: пока едет, ввод игрока не
-## действует, а позицией распоряжается эскалатор. Трос вступления пользуется
-## тем же — Otto на нём тоже везут.
+## Otto stepped onto an escalator or off it: while riding, the player's input has no
+## effect, and the escalator controls the position. The intro rope uses
+## the same: Otto is carried on it too.
 ##
-## [param presses_spent] — отпуская, не слышать прыжка и выстрела, которые
-## держат прямо сейчас, пока их не отпустят. Так отпускает вступление, когда его
-## пропустили прыжком или выстрелом: то же нажатие иначе дошло бы и до Otto —
-## пропуск выстрелом стрелял бы, а пропуск прыжком прыгал. Глушится именно
-## нажатие, а не шаг физики: вступление видит кнопку по своему краю «отпущена —
-## нажата», а Otto — по [method Input.is_action_just_pressed], и шаг, в котором
-## нажатие видит каждый, не обязан совпасть.
+## [param presses_spent]: on release, do not hear the jump and shot that are
+## held right now until they are released. This is how the intro releases when it was
+## skipped with a jump or a shot: otherwise the same press would also reach Otto:
+## a skip with a shot would shoot, and a skip with a jump would jump. It is the
+## press that is muted, not the physics step: the intro sees the button by its own
+## "released, pressed" edge, and Otto by [method Input.is_action_just_pressed], and the
+## step in which each sees the press does not have to coincide.
 func ride(on: bool, presses_spent: bool = false) -> void:
 	RunLog.write("ride", {"on": on, "look": ride_look, "at": RunLog.at(self)})
 	if on:
 		_states.ride()
 	else:
 		_states.stop_riding()
-		# С троса Otto встаёт на крышу клипом приземления (ADR-0043, решение 1).
+		# From the rope Otto stands on the roof with the landing clip (ADR-0043, decision 1).
 		if ride_look == LOOK_ROPE:
 			_landing = FigurePoses.LAND_SHOW
 			Sounds.play(Sounds.LAND)
@@ -514,71 +522,71 @@ func ride(on: bool, presses_spent: bool = false) -> void:
 	_repose()
 
 
-## Otto вошёл в кабину и теперь ею управляет.
+## Otto entered a cab and now controls it.
 func board(car: ElevatorCar) -> void:
 	_car = car
 
 
-## Otto вышел из кабины.
+## Otto left the cab.
 func leave(car: ElevatorCar) -> void:
 	if _car == car:
 		_car = null
 
 
-## Едет ли Otto внутри кабины. Езда на крыше сюда не входит.
+## Whether Otto rides inside a cab. Riding on the roof does not count.
 func is_riding() -> bool:
 	return _car != null
 
 
-## Текущая скорость тела, в координатах правил.
+## The body's current velocity, in rules coordinates.
 ##
-## Вместе с [method is_grounded] образует публичный интерфейс для наблюдателей:
-## они зависят от API Otto, а не от того, что внутри он [CharacterBody3D] и что
-## у сцены Y смотрит вверх.
+## Together with [method is_grounded] it forms the public interface for observers:
+## they depend on Otto's API, not on the fact that inside he is a [CharacterBody3D] and
+## that the scene's Y points up.
 func motion() -> Vector2:
 	return WorldSpace.direction_to_plane(velocity)
 
 
-## Стоит ли Otto на поверхности.
+## Whether Otto stands on a surface.
 func is_grounded() -> bool:
 	return is_on_floor()
 
 
-## Что сейчас попадает в кадр, в координатах правил.
+## What falls into the frame now, in rules coordinates.
 ##
-## Камера едет за Otto, но упирается в края здания. Поэтому видимое место
-## считает тот, у кого камера, а не тот, кому оно нужно: снаружи пришлось бы
-## спрашивать и середину, и размер кадра, и размер окна.
+## The camera follows Otto but rests against the building's edges. So the visible area
+## is computed by whoever has the camera, not by whoever needs it: from outside one
+## would have to ask for the middle, the frame size and the window size.
 ##
-## [param for_combat] — кадр, по которому решает бой: агент в нём достаёт Otto
-## (ADR-0027, решение 3а). Тот же, что видит игрок, но не зависит ни от окна,
-## ни от сглаживания камеры — см. [method SideCamera.rule_view].
+## [param for_combat]: the frame combat decides by: an agent in it reaches Otto
+## (ADR-0027, decision 3a). The same one the player sees, but it depends neither on the
+## window nor on camera smoothing; see [method SideCamera.rule_view].
 func camera_view(for_combat: bool = false) -> Rect2:
 	return _camera.rule_view() if for_combat else _camera.view()
 
 
-## Куда Otto смотрит: -1 влево, +1 вправо. Туда же уйдёт его следующая пуля.
+## Where Otto looks: -1 left, +1 right. His next bullet will go there too.
 func facing() -> float:
 	return _facing
 
 
-## Границы камеры в координатах правил. [param snap] — встать на место сразу;
-## без него камера доедет к новым границам сглаживанием (конец вступления).
+## Camera bounds in rules coordinates. [param snap]: move into place at once;
+## without it the camera reaches the new bounds by smoothing (the end of the intro).
 func apply_camera_bounds(bounds: Rect2, snap: bool = true) -> void:
 	_camera.apply_bounds(bounds, snap)
 
 
-## Возвращает тело в плоскость игры.
+## Returns the body to the play plane.
 ##
-## [method move_and_slide] умеет вытолкнуть тело по Z, если оно хоть краем
-## задело грань под углом, и такой сдвиг не виден в боковом кадре вовсе:
-## Otto просто перестаёт доставать до того, до чего доставал.
+## [method move_and_slide] can push the body out along Z if it has touched an angled face
+## even with its edge, and such a shift is not visible in the side frame at all:
+## Otto simply stops reaching what he used to reach.
 func _hold_the_plane() -> void:
 	velocity.z = 0.0
 	global_position.z = WorldSpace.PLAY_Z
 
 
-## Выпускает пулю. Высоту полёта задаёт поза: присев, Otto стреляет ниже.
+## Fires a bullet. The flight height is set by the pose: crouching, Otto shoots lower.
 func _fire() -> void:
 	_shooting = SHOOT_POSE_TIME
 	Sounds.play(Sounds.SHOT)
@@ -590,7 +598,7 @@ func _fire() -> void:
 	bullet.speed = bullet_speed
 	bullet.collision_mask = Bullet.FROM_OTTO
 	bullet.hit_target.connect(_on_bullet_hit)
-	# Счётчик ведёт сам ствол: пуля кончается и попаданием, и на дальности.
+	# The gun itself keeps the count: a bullet ends both on a hit and at the range limit.
 	bullet.tree_exited.connect(_gun.bullet_spent)
 	get_parent().add_child(bullet)
 	var from := global_position + Vector3(0.0, height, 0.0)
@@ -600,7 +608,7 @@ func _fire() -> void:
 
 
 func _on_bullet_hit(target: Node3D) -> void:
-	# Пуля не разбирает, во что попала, — разбирает стрелявший.
+	# The bullet does not sort out what it hit; the shooter does.
 	var lamp := target as Lamp
 	if lamp != null:
 		lamp.shoot_down()
@@ -614,15 +622,15 @@ func _on_bullet_hit(target: Node3D) -> void:
 	_award_for(agent, GameState.ENEMY_SHOT_SCORE)
 
 
-## Начисляет очки за убитого агента: в темноте они дороже.
+## Awards points for a killed agent: in darkness they are worth more.
 func _award_for(agent: Enemy, base: int) -> void:
 	var points := GameState.kill_score(base, agent.is_in_the_dark())
 	GameState.instance().add_score(points, agent.global_position + GameState.OVER_HEAD)
 
 
-## Агент, которого Otto достаёт вплотную (ADR-0040), или null. Добивают стоя
-## на своих ногах — не в кабине, не присев, не в полёте, — живого и вышедшего
-## из двери; из нескольких — ближайшего.
+## The agent Otto reaches at close range (ADR-0040), or null. A takedown is done standing
+## on one's own feet (not in a cab, not crouching, not in flight), on a living agent who
+## has come out of a door; of several, the nearest.
 func _reachable_agent(state: OttoStateMachine.State) -> Enemy:
 	if _car != null or not is_on_floor() or Takedown.rides_a_car(self):
 		return null
@@ -645,15 +653,15 @@ func _reachable_agent(state: OttoStateMachine.State) -> Enemy:
 	return best
 
 
-## Приземлился вплотную к агенту — напрыгнул (ADR-0042, решение 9): сценка
-## сама, без кнопки. Приземление — только после настоящего полёта: кадр без
-## опоры на крыше уходящей вниз кабины не в счёт.
+## Landed right next to an agent: jumped on him (ADR-0042, decision 9): the scene starts
+## by itself, without a button. A landing only after a real flight: a frame without
+## support on the roof of a cab going down does not count.
 ##
-## Приземлившийся в кабину или на её крышу не напрыгивает — по той же причине,
-## что и не добивает кнопкой ([method _reachable_agent]): сценка замораживает
-## обоих, а кабина уезжает из-под пары (авторевью M24d).
+## Someone landing in a cab or on its roof does not jump on an agent, for the same reason
+## he does not do a takedown with the button ([method _reachable_agent]): the scene
+## freezes both, and the cab drives away from under the pair (M24d code review).
 func _land_on_a_target() -> bool:
-	# Убитый в полёте падает телом, а не напрыгивает.
+	# Killed in flight, he falls as a body instead of jumping on someone.
 	if _states.is_dead() or _air_time < LANDING_AIR_TIME:
 		return false
 	if _car != null or Takedown.rides_a_car(self):
@@ -671,7 +679,7 @@ func _land_on_a_target() -> bool:
 			agent = candidate
 	if agent == null:
 		return false
-	# Лицом к агенту: сценка ставит его перед Otto.
+	# Facing the agent: the scene places him in front of Otto.
 	var towards := agent.global_position.x - global_position.x
 	if not is_zero_approx(towards):
 		_facing = signf(towards)
@@ -685,23 +693,24 @@ func _take_down(agent: Enemy, side: int) -> void:
 	TakedownScene.play(self, agent, scene)
 
 
-## Есть ли над головой место, чтобы выпрямиться из приседа.
+## Whether there is room overhead to straighten up from a crouch.
 ##
-## Проверяется сидячей формой: если ею удаётся подняться на разницу высот,
-## то и стоячая поместится. Без этой проверки полная форма включалась бы
-## безусловно и выталкивала Otto сквозь перекрытие (долг M1).
+## Checked with the crouching shape: if it can rise by the height difference,
+## the standing one will fit too. Without this check the full shape would be switched on
+## unconditionally and push Otto through the slab (M1 debt).
 func _can_stand_up() -> bool:
 	if _states.state != OttoStateMachine.State.CROUCH:
 		return true
 	return not test_move(global_transform, Vector3(0.0, _headroom, 0.0))
 
 
-## Следит за падением: на опоре запоминает её высоту, а приземлившись, решает,
-## не разбился ли (ADR-0037, решение 7).
+## Tracks the fall: on a support remembers its height, and after landing decides
+## whether he has died (ADR-0037, decision 7).
 ##
-## Правило одно на пол, крышу кабины и дно шахты — всё это опора под ногами.
-## В кабине опора едет вместе с Otto: пол кабины под ним каждый кадр, и спуск
-## в ней падением не копится, даже если движок на кадр потеряет пол под ногами.
+## One rule for the floor, the cab roof and the shaft bottom: all of it is support
+## underfoot. In a cab the support rides with Otto: the cab floor is under him every
+## frame, and descending in it does not accumulate as a fall, even if the engine loses
+## the floor underfoot for a frame.
 func _track_fall() -> void:
 	var grounded := is_on_floor()
 	if grounded and not _was_grounded:
@@ -719,13 +728,13 @@ func _track_fall() -> void:
 		_support_y = global_position.y
 
 
-## Считает опорой то место, где Otto сейчас: сюда его поставили или донесли.
+## Treats the place where Otto is now as support: he was put or carried here.
 func _rest_here() -> void:
 	_support_y = global_position.y
 	_last_position = global_position
 	_was_grounded = true
-	# Полёт до перестановки или поездки не в счёт: иначе шаг с эскалатора в
-	# воздух дописывался бы к давнему прыжку и кончался приземлением.
+	# A flight before a move or a ride does not count: otherwise a step from an escalator
+	# into the air would be appended to an old jump and end in a landing.
 	_air_time = 0.0
 
 
@@ -736,23 +745,25 @@ func _horizontal_speed(input: OttoInput, state: OttoStateMachine.State) -> float
 		return 0.0
 	if absf(input.move) <= OttoStateMachine.MOVE_THRESHOLD:
 		return 0.0
-	# Движение аркадное, дискретное: наклон стика не меняет скорость.
+	# Movement is arcade-style, discrete: stick tilt does not change the speed.
 	return signf(input.move) * walk_speed
 
 
-## Скорость [param speed] в кабине: ходят в ней и на ходу, как в ROM (ADR-0044,
-## решение 4), но выйти можно, только пока этаж рядом — иначе борт — стена.
+## Speed [param speed] in a cab: you can walk in it even while it moves, as in the ROM
+## (ADR-0044, decision 4), but you can step out only while a floor is near: otherwise
+## the side is a wall.
 ##
-## И на земле, и в воздухе: скорость полёта берётся с земли, и прыжок с разбега
-## в едущей кабине иначе выносил бы Otto сквозь борт в шахту (авторевью M24h).
+## Both on the ground and in the air: the flight velocity is taken from the ground, and
+## a running jump in a moving cab would otherwise carry Otto through the side into the
+## shaft (M24h code review).
 func _within_the_car(speed: float) -> float:
 	if _car == null or is_zero_approx(speed) or _car.can_step_out():
 		return speed
 	return _up_to_the_car_wall(speed)
 
 
-## Скорость [param speed], урезанная так, чтобы шаг этого кадра кончился у
-## борта кабины, а не за ним.
+## Speed [param speed], trimmed so that this frame's step ends at the
+## cab side, not beyond it.
 func _up_to_the_car_wall(speed: float) -> float:
 	var towards := signf(speed)
 	var room := (_car.width() - Proportions.BODY_WIDTH) * 0.5
@@ -763,18 +774,19 @@ func _up_to_the_car_wall(speed: float) -> float:
 	return towards * minf(absf(speed), left / step)
 
 
-## Пересобирает позу прямо сейчас, не дожидаясь следующего [method _physics_process].
+## Rebuilds the pose right now without waiting for the next [method _physics_process].
 ##
-## Нужно тем, кто меняет состояние Otto снаружи, посреди кадра: формы коллизии
-## включаются отложенно, и без этого первый кадр после двери Otto провёл бы
-## бестелесным — [method move_and_slide] не нашёл бы под ним пола.
+## Needed by those who change Otto's state from outside, in the middle of a frame:
+## collision shapes are switched on deferred, and without this Otto would spend the
+## first frame after a door bodiless: [method move_and_slide] would find no floor under
+## him.
 func _repose() -> void:
 	_apply_pose(_states.state)
 
 
 func _apply_pose(state: OttoStateMachine.State) -> void:
-	# Поза — функция от состояния: пересобираем её только на переходах, иначе
-	# каждый физический кадр сыпал бы по два отложенных вызова в очередь.
+	# The pose is a function of state: we rebuild it only on transitions, otherwise
+	# every physics frame would drop two deferred calls into the queue.
 	if state == _posed_state:
 		return
 	var was := _posed_state
@@ -782,8 +794,8 @@ func _apply_pose(state: OttoStateMachine.State) -> void:
 	_state_sound(was, state)
 
 	var crouching := state == OttoStateMachine.State.CROUCH
-	# За дверью Otto нет вовсе, на эскалаторе он на виду — но достать нельзя
-	# ни там, ни там: «neither kill nor be killed» (ADR-0007, пункт 7).
+	# Behind a door Otto does not exist at all, on an escalator he is in view, but he cannot
+	# be hit in either place: "neither kill nor be killed" (ADR-0007, item 7).
 	var hidden := state == OttoStateMachine.State.INDOORS
 	var untouchable := hidden or state == OttoStateMachine.State.RIDE
 	_standing_shape.set_deferred("disabled", untouchable or crouching)
@@ -791,10 +803,11 @@ func _apply_pose(state: OttoStateMachine.State) -> void:
 	_body.visible = not hidden
 
 
-## Поза, которую Otto отыгрывает прямо сейчас.
+## The pose Otto is playing right now.
 ##
-## Выбирает её [ActorPose] — тот же, что выбирал спрайт, — а исполняет [FigureRig]
-## на скелете: между позами он интерполирует сам (ADR-0022, решение 2).
+## It is chosen by [ActorPose], the same one that chose the sprite, and performed by
+## [FigureRig] on the skeleton: it interpolates between poses itself (ADR-0022,
+## decision 2).
 func _pose() -> String:
 	if _states.state == OttoStateMachine.State.RIDE:
 		if ride_look == LOOK_ROPE:
@@ -808,7 +821,7 @@ func _pose() -> String:
 	)
 
 
-## Прозрачность тела: неуязвимый Otto мигает, остальные кадры он сплошной.
+## Body opacity: invulnerable Otto blinks, in the other frames he is solid.
 func _grace_alpha() -> float:
 	if _grace <= 0.0:
 		return 1.0
@@ -816,8 +829,8 @@ func _grace_alpha() -> float:
 	return 1.0 if phase < 0.5 else 0.25
 
 
-## Что меняется каждый кадр, а не на переходах: ход ходьбы, таймеры поз и
-## мигание передышки.
+## What changes every frame rather than on transitions: walk progress, pose timers and
+## the breather blinking.
 func _update_look(delta: float) -> void:
 	_shooting = maxf(_shooting - delta, 0.0)
 	_falling_over = maxf(_falling_over - delta, 0.0)
@@ -833,7 +846,7 @@ func _update_look(delta: float) -> void:
 
 	if riding and ride_facing != 0.0:
 		_facing = ride_facing
-	# Дуло — там, откуда вылетает пуля (ADR-0043, решение 16).
+	# The muzzle is where the bullet comes out from (ADR-0043, decision 16).
 	var crouching := _states.state == OttoStateMachine.State.CROUCH
 	var aim := shot_height_crouching if crouching else shot_height_standing
 	_body.aim_height = aim if _shooting > 0.0 else NAN
@@ -841,7 +854,7 @@ func _update_look(delta: float) -> void:
 	_body.show_pose(_pose())
 	_body.set_walk_phase(_walk_phase)
 	_body.face(_facing)
-	# На тросе Otto чуть качается маятником в плоскости игры.
+	# On the rope Otto swings slightly like a pendulum in the play plane.
 	var sway := 0.0
 	if riding and ride_look == LOOK_ROPE:
 		sway = sin(Time.get_ticks_msec() * 0.001 * ROPE_SWAY_RATE) * ROPE_SWAY
@@ -855,10 +868,10 @@ func _update_look(delta: float) -> void:
 	_body.set_transparency(1.0 - _grace_alpha())
 
 
-## Вход в дверь и выход (ADR-0043, решение 4): Otto поворачивается к двери и
-## уходит вглубь проёма, пока открывается створка; выходит на камеру, пока она
-## закрывается, и под конец поворачивается вдоль этажа. Двигается фигура, а не
-## тело: в плоскости игры Otto стоит на коврике.
+## Entering a door and coming out (ADR-0043, decision 4): Otto turns toward the door and
+## goes into the depth of the opening while the leaf opens; comes out toward the camera
+## while it closes, and at the end turns along the floor. The figure moves, not the
+## body: in the play plane Otto stands on the mat.
 func _walk_the_doorway(riding: bool) -> void:
 	var depth := 0.0
 	if riding and ride_look == LOOK_DOOR_IN:
@@ -866,27 +879,27 @@ func _walk_the_doorway(riding: bool) -> void:
 		_body.rotation.y = lerp_angle(_body.rotation.y, PI, clampf(ride_progress * 2.0, 0.0, 1.0))
 	elif riding and ride_look == LOOK_DOOR_OUT:
 		depth = ride_progress
-		# Лицом к камере, пока в проёме, вдоль этажа — вышедши.
+		# Facing the camera while in the opening, along the floor once out.
 		_body.rotation.y = lerp_angle(_body.rotation.y, 0.0, clampf(ride_progress * 2.0, 0.0, 1.0))
 	_body.position.z = -DOOR_WALK_DEPTH * depth
 
 
-## Шаг звучит на крайних кадрах ходьбы — тех, где нога ставится. На каждом
-## кадре цикла шагов выходило бы вдвое больше, чем делает Otto.
+## A step sounds on the extreme walk frames, the ones where a foot is planted. On every
+## frame of the cycle there would be twice as many steps as Otto takes.
 func _step_sound() -> void:
 	var frame := int(_walk_phase)
-	# Кадр помечается пройденным только вместе со звуком: помеченный в воздухе
-	# терял бы шаг насовсем — нога встала, а слышно ничего.
+	# A frame is marked as passed only together with the sound: one marked in the air
+	# would lose the step for good: the foot is planted, but nothing is heard.
 	if frame == _stepped_on or frame == 1 or not is_on_floor():
 		return
 	_stepped_on = frame
-	# На заснеженном настиле — хруст снега (ADR-0054).
+	# On a snowy deck, the crunch of snow (ADR-0054).
 	var sound := Sounds.STEP_SNOW if icy else step_sound
 	Sounds.play(Sounds.STEP_METAL if _on_metal() else sound)
 
 
-## Стоит ли Otto на металле — в кабине или на её крыше: шаг там звонкий
-## (ADR-0052, решение 7).
+## Whether Otto stands on metal, in a cab or on its roof: the step rings there
+## (ADR-0052, decision 7).
 func _on_metal() -> bool:
 	if _car != null:
 		return true
@@ -896,8 +909,8 @@ func _on_metal() -> bool:
 	return false
 
 
-## Звук перехода между состояниями: прыжок и присед (ADR-0052, решение 7).
-## Приземление звучит не здесь, а там, где его решает падение ([method _track_fall]).
+## The sound of a transition between states: jump and crouch (ADR-0052, decision 7).
+## Landing does not sound here but where the fall decides it ([method _track_fall]).
 func _state_sound(was: OttoStateMachine.State, now: OttoStateMachine.State) -> void:
 	if now == OttoStateMachine.State.JUMP:
 		Sounds.play(Sounds.JUMP)

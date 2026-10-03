@@ -1,78 +1,80 @@
 class_name GarageGate
 extends Node3D
 
-## Ворота паркинга в левом торце нижнего этажа (ADR-0038, решение 3): проём в
-## стене, рулонная штора, короб под потолком, маячок, полосы у порога,
-## вывеска EXIT и пандус наверх за воротами.
+## Garage gate in the left end wall of the bottom floor (ADR-0038, decision 3): an opening
+## in the wall, a roller shutter, a housing under the ceiling, a beacon, stripes at the
+## threshold, an EXIT sign and the ramp up beyond the gate.
 ##
-## Своим узлом, а не частью [Garage]: у ворот своё состояние — насколько
-## поднята штора, — и его двигает сдача здания, а не раскладка.
+## Its own node, not part of [Garage]: the gate has its own state — how far the shutter is
+## raised — and it is moved by finishing the building, not by the layout.
 ##
-## Камера видит торцевую стену ребром, и штора в её плоскости с камеры — черта
-## толщиной в пять сантиметров. Поэтому у шторы есть лицо: в проёме видна
-## задняя грань проёма, на ней — ламели шторы, и они сматываются вверх вместе
-## с настоящей шторой, открывая за собой рыжий свет фонаря над пандусом. Остальное, что говорит
-## «ворота», обращено к камере: короб, направляющая, маячок, полосы, вывеска.
+## The camera sees the end wall edge-on, and a shutter in its plane is, from the camera, a
+## line five centimetres thick. So the shutter has a face: in the opening the
+## back face of the opening is visible, the shutter slats are on it, and they roll up together
+## with the real shutter, revealing the orange light of the street light over the ramp
+## behind them. Everything else that says "gate" faces the camera: the housing, the guide,
+## the beacon, the stripes, the sign.
 ##
-## Тело стены остаётся целым — его строит [BuildingShell] невидимым, а видимые
-## куски вокруг проёма ставятся здесь. Otto в ворота не выходит; машина — вид
-## без тела — проезжает.
+## The wall body stays whole — [BuildingShell] builds it invisible, and the visible
+## pieces around the opening are placed here. Otto does not go out through the gate; the car
+## — looks without a body — drives through.
 
-## Сколько уходит на подъём шторы по умолчанию, с.
+## How long raising the shutter takes by default, s.
 const OPEN_TIME: float = 1.6
-## Высота проёма, м: машина с крышей в 1.2 м проходит с запасом.
+## Opening height, m: a car with a 1.2 m roof passes with a margin.
 const HEIGHT: float = 2.4
-## Короб шторы: вынос от стены и высота, м.
+## Shutter housing: projection from the wall and height, m.
 const BOX := Vector2(0.38, 0.3)
-## Штора и направляющие: толщина шторы, сечение направляющей, шаг ламелей и
-## нижняя планка (глубина, высота), м.
+## Shutter and guides: shutter thickness, guide cross-section, slat pitch and
+## bottom bar (depth, height), m.
 const SHUTTER_THICKNESS: float = 0.05
 const RAIL: float = 0.1
 const SLAT_PITCH: float = 0.12
 const SHUTTER_BAR := Vector2(0.06, 0.07)
-## Пандус за воротами: площадка у проёма, длина подъёма, м. Подъём — на этаж.
+## Ramp beyond the gate: landing by the opening, rise length, m. The rise is one floor.
 const RAMP_APRON: float = 3.0
 const RAMP_RUN: float = 12.0
 
 const SHUTTER := Color(0.64, 0.66, 0.68)
-## Маячок ворот — янтарный — и улица за шторой: натриевый фонарь над пандусом.
+## Gate beacon — amber — and the street behind the shutter: a sodium light over the ramp.
 const BEACON := Color(1.0, 0.55, 0.1)
 const OUTSIDE := Color(0.78, 0.5, 0.2)
 
-## Вывеска EXIT над воротами: зелёный огонёк, как у прежней вывески выхода
-## (ADR-0019, решение 5; ADR-0023, решение 6) — выход обязан читаться и на
-## погашенном этаже. Висит на перемычке, лицом к камере.
+## EXIT sign above the gate: a green indicator light, like the former exit sign
+## (ADR-0019, decision 5; ADR-0023, decision 6) — the exit must read even on a
+## dark floor. It hangs on the lintel, facing the camera.
 const EXIT_SIGN := Vector3(0.9, 0.24, 0.06)
 const EXIT_INK := Color(0.02, 0.12, 0.05)
 
-## Мотор шторы ([constant Sounds.GARAGE_GATE]): докуда слышно, м, и за сколько
-## он стихает, когда штора дошла до верха, с. Запись длиннее подъёма — мотор
-## гасится по штору, а не доигрывает впустую.
+## Shutter motor ([constant Sounds.GARAGE_GATE]): how far it is heard, m, and how fast
+## it fades when the shutter has reached the top, s. The recording is longer than the
+## rise — the motor is cut by the shutter rather than playing on for nothing.
 const VOICE_REACH: float = 16.0
 const VOICE_FADE: float = 0.4
 
-## Насколько открыты ворота: 0 — штора внизу, 1 — поднята в короб.
+## How open the gate is: 0 — shutter down, 1 — raised into the housing.
 var openness: float = 0.0:
 	set = set_openness
 
 var _rules: BuildingRules = null
 var _surface: float = 0.0
 var _top: float = 0.0
-## Штора, её нижняя планка и улица за ней: их двигает [member openness].
+## The shutter, its bottom bar and the street behind it: [member openness] moves them.
 var _roll: Node3D = null
 var _shutter_bar: MeshInstance3D = null
 var _outside: MeshInstance3D = null
-## Маячок над воротами: горит, пока штора ходит.
+## Beacon above the gate: lit while the shutter moves.
 var _beacon: MeshInstance3D = null
-## Мотор шторы: позиционный источник у проёма, заводится при первом подъёме.
+## Shutter motor: a positional source by the opening, started on the first raise.
 var _voice: AudioStreamPlayer3D = null
-## Выезд за воротами: у него фонарь, который горит, пока нижний этаж в кадре.
+## The exit beyond the gate: it has a street light that is lit while the bottom floor is in
+## frame.
 var _ramp: GarageRamp = null
-## Сид здания: по нему улица за выездом и её погода.
+## Building seed: the street beyond the exit and its weather go by it.
 var _seed: int = 1
 
 
-## Собирает ворота у левой стены нижнего этажа.
+## Builds the gate at the left wall of the bottom floor.
 func build(rules: BuildingRules, building_seed: int = 1) -> void:
 	_rules = rules
 	_seed = building_seed
@@ -87,9 +89,9 @@ func build(rules: BuildingRules, building_seed: int = 1) -> void:
 	set_openness(openness)
 
 
-## Поднимает штору за [param duration] секунд под мотор ворот. Идёт шагами
-## физики, как всё в сдаче здания: исход не должен зависеть от частоты кадров.
-## Возвращает твин — его [signal Tween.finished] и есть «ворота открыты».
+## Raises the shutter over [param duration] seconds to the gate motor sound. Runs in physics
+## steps, like everything in finishing a building: the outcome must not depend on frame rate.
+## Returns the tween — its [signal Tween.finished] is "the gate is open".
 func open(duration: float = OPEN_TIME) -> Tween:
 	_start_the_motor()
 	var tween := create_tween()
@@ -99,8 +101,8 @@ func open(duration: float = OPEN_TIME) -> Tween:
 	return tween
 
 
-## Мотор шторы звучит от проёма: слышно его рядом с воротами, а не по всему
-## зданию.
+## The shutter motor sounds from the opening: it is heard near the gate, not throughout the
+## building.
 func _start_the_motor() -> void:
 	if _voice == null:
 		var host := Node3D.new()
@@ -120,7 +122,7 @@ func _stop_the_motor() -> void:
 	fade.tween_callback(_voice.stop)
 
 
-## Открыты ли ворота целиком.
+## Whether the gate is fully open.
 func is_open() -> bool:
 	return openness >= 1.0
 
@@ -129,8 +131,8 @@ func set_openness(value: float) -> void:
 	openness = clampf(value, 0.0, 1.0)
 	if _roll == null:
 		return
-	# Штора сматывается вверх, в короб: узел шторы висит верхом у перемычки,
-	# и высота уходит снизу.
+	# The shutter rolls up into the housing: the shutter node hangs by its top at the lintel,
+	# and the height goes away from below.
 	var hanging := 1.0 - openness
 	_roll.visible = hanging > 0.005
 	_roll.scale.y = maxf(hanging, 0.001)
@@ -144,8 +146,8 @@ func set_openness(value: float) -> void:
 	_outside.visible = openness > 0.0
 
 
-## Проём: перемычка над ним во всю глубину и стена зала за ним — кладка, как у
-## наружных стен ([BuildingShell]); за шторой — свет фонаря над пандусом.
+## Opening: the lintel above it through the full depth and the hall wall behind it — masonry,
+## like the outer walls ([BuildingShell]); behind the shutter — the street light over the ramp.
 func _build_opening() -> void:
 	var masonry := GreyboxLook.surface(
 		GreyboxLook.WALL.lerp(_rules.palette.masonry, BuildingShell.PALETTE_SHARE)
@@ -159,8 +161,8 @@ func _build_opening() -> void:
 		masonry,
 		_at(x, (_top + gate_top) * 0.5, WorldSpace.CORRIDOR_DEPTH * 0.5 - full * 0.5)
 	)
-	# Стена за проёмом — до пола, не в толщу плиты: грани плиты и стены
-	# легли бы в одну плоскость.
+	# The wall behind the opening goes down to the floor, not into the slab: the slab and wall
+	# faces would lie in one plane.
 	var behind := full - WorldSpace.CORRIDOR_DEPTH
 	_box(
 		Vector3(wall, HEIGHT, behind),
@@ -175,8 +177,8 @@ func _build_opening() -> void:
 	)
 
 
-## Штора — узел, висящий верхом у перемычки: сматывая её, [member openness]
-## сжимает его по высоте. Нижняя планка ходит отдельно — она не сжимается.
+## The shutter is a node hanging by its top at the lintel: rolling it up, [member openness]
+## squeezes it in height. The bottom bar moves separately — it is not squeezed.
 func _build_shutter() -> void:
 	var wall := BuildingShell.WALL_WIDTH
 	var x := Garage.gate_x(_rules)
@@ -216,14 +218,14 @@ func _build_shutter() -> void:
 	)
 
 
-## Короб шторы на внутренней грани стены под потолком, направляющие по краям
-## проезда, маячок и полосы у порога — это и видно с камеры.
+## Shutter housing on the inner face of the wall under the ceiling, guides at the edges of
+## the driveway, the beacon and the threshold stripes — this is what the camera sees.
 func _build_frame() -> void:
 	var steel := GreyboxLook.metal(SHUTTER)
 	var yellow := GreyboxLook.surface(Garage.PAINT_YELLOW)
 	var black := GreyboxLook.surface(Garage.PAINT_BLACK)
 	var inner_x := Garage.inner_span(_rules).x
-	# Короб — сразу над проёмом, вывеска EXIT — над коробом.
+	# Housing — right above the opening, the EXIT sign — above the housing.
 	var box_top := _surface - HEIGHT - BOX.y
 	var lane := _lane()
 	_box(Vector3(BOX.x, BOX.y, lane), steel, _at(inner_x + BOX.x * 0.5, box_top + BOX.y * 0.5, 0.0))
@@ -247,9 +249,9 @@ func _build_frame() -> void:
 		_at(inner_x + BOX.x + 0.1, box_top + 0.08, lane * 0.5 - 0.1),
 		false
 	)
-	# Полосы у порога: жёлтые и чёрные вдоль проезда, поперёк ворот. Полосы
-	# поперёк проезда с наклонённой камеры слились бы: пол виден полосой. Концы —
-	# не вровень с направляющими.
+	# Threshold stripes: yellow and black along the driveway, across the gate. Stripes
+	# across the driveway would merge from the tilted camera: the floor is seen as a strip.
+	# The ends are not flush with the guides.
 	for index in 6:
 		_box(
 			Vector3(0.12, 0.005, lane - 0.04),
@@ -259,31 +261,33 @@ func _build_frame() -> void:
 		)
 
 
-## Пандус за воротами и выезд вокруг него — своим узлом ([GarageRamp]): с
-## выезда он в кадре, и собран разрезом, как здание. По пандусу уезжает машина.
+## The ramp beyond the gate and the exit around it — its own node ([GarageRamp]): from
+## the exit it is in frame, and it is built as a cross-section, like the building. The car
+## leaves along the ramp.
 func _build_ramp() -> void:
 	_ramp = GarageRamp.new()
 	add_child(_ramp)
 	_ramp.build(_rules, _seed)
 
 
-## Свет выезда — фонарь над пандусом и отсвет неона — горит, пока выезд в
-## кадре: камера за торцом здания, а нижние этажи в кадре. Зовёт уровень.
+## Exit light — the street light over the ramp and the neon glow — is lit while the exit is
+## in frame: the camera is past the building's end wall, and the bottom floors are in frame.
+## Called by the level.
 func show_street(in_view: bool) -> void:
 	if _ramp != null:
 		_ramp.show_light(in_view)
 
 
-## Выезд за воротами: тоннель, пандус и улица.
+## The exit beyond the gate: tunnel, ramp and street.
 func ramp() -> GarageRamp:
 	return _ramp
 
 
-## Вывеска EXIT на перемычке над воротами, лицом к камере.
+## EXIT sign on the lintel above the gate, facing the camera.
 func _hang_the_sign() -> void:
 	var left := _rules.floor_span(_rules.floors - 1).x
 	var sign_z := WorldSpace.CORRIDOR_DEPTH * 0.5 + EXIT_SIGN.z * 0.5 + 0.004
-	# Не `sign`: так зовут встроенную функцию, и местная переменная её заслонила бы.
+	# Not `sign`: that is the name of a built-in function, and a local variable would shadow it.
 	var board := GreyboxLook.box(EXIT_SIGN, GreyboxLook.light(GreyboxLook.SIGN_GREEN))
 	board.name = "ExitSign"
 	board.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -295,7 +299,7 @@ func _hang_the_sign() -> void:
 	board.add_child(words)
 
 
-## Проезд под короб: глубина коридора с зазором от его граней.
+## Driveway under the housing: the corridor depth with a clearance from its faces.
 static func _lane() -> float:
 	return WorldSpace.CORRIDOR_DEPTH - 0.1
 

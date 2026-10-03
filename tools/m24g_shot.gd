@@ -1,18 +1,18 @@
 extends Node3D
 
-## Снимки M24g — кабина режет тела, трупы стопкой (ADR-0043, решения 7–11).
+## M24g shots — the cab cuts bodies, corpses in a stack (ADR-0043, decisions 7–11).
 ##
-## Кабина ходит своим расписанием, и сценарий съёмки с выдержками её не
-## застаёт. Инструмент кладёт трупы в настоящем здании и снимает по событиям:
-## стопка из двух тел; тело поперёк порога стоящей кабины, миг разрыва и
-## площадка после ухода кабины; трупы на дне шахты, днище на полпути по ним,
-## кабина на полу и дно после её ухода.
+## The cab runs on its own schedule, and a shooting scenario with delays does not catch it. The tool
+## places corpses in a real building and shoots on events: a stack of two bodies; a body across the
+## threshold of a standing cab, the moment of the split and the landing after the cab leaves;
+## corpses at the bottom of a shaft, the cab floor halfway down on them, the cab on the floor and
+## the bottom after it leaves.
 ##
-## Запуск:
+## Run:
 ##     godot --path . res://tools/m24g_shot.tscn
 ##     godot --path . res://tools/m24g_shot.tscn -- --folder=M24G --seed=2
 ##
-## Кадры ложатся в screens/<папка>/ (папка локальная, в репозиторий не идёт).
+## Shots go to screens/<folder>/ (the folder is local, it does not go into the repository).
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
@@ -20,11 +20,11 @@ const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 
 const DEFAULT_FOLDER := "M24G"
 
-## Сколько кадров дать камере доехать до Otto: сглаживание у неё 8.0.
+## How many frames to give the camera to reach Otto: its smoothing is 8.0.
 const SETTLE_FRAMES: int = 60
-## Сколько кадров ждать события, прежде чем сдаться.
+## How many frames to wait for an event before giving up.
 const PATIENCE: int = 20000
-## Во сколько раз ускорять мир, пока ждём кабину.
+## How many times to speed up the world while waiting for the cab.
 const HURRY: float = 6.0
 
 var _level: GreyboxLevel = null
@@ -71,7 +71,7 @@ func _run() -> void:
 	get_tree().quit()
 
 
-## Вход в красную дверь вглубь и выход из неё (решение 4).
+## Entering a red door into depth and leaving it (decision 4).
 func _red_door() -> void:
 	var door: Door = null
 	for node: Node in _level.find_children("*", "Door", true, false):
@@ -93,7 +93,7 @@ func _red_door() -> void:
 	await _frames(40)
 
 
-## Эскалатор из деталей модели и Otto, идущий по ступеням (решения 2 и 3).
+## An escalator made of model parts and Otto walking up the steps (decisions 2 and 3).
 func _escalator() -> void:
 	var found := _level.find_children("*", "Escalator", true, false)
 	if found.is_empty():
@@ -110,8 +110,8 @@ func _escalator() -> void:
 	await _until(func() -> bool: return not escalator.is_busy())
 
 
-## Кабина одиночной шахты, которая не ходит в подвал и дно которой светлое:
-## на тёмном этаже срез не разглядеть.
+## The cab of a single shaft that does not go to the basement and whose bottom is lit: on a dark
+## floor the cut cannot be made out.
 func _pick_car() -> ElevatorCar:
 	for node: Node in _level.find_children("*", "ElevatorCar", true, false):
 		var car := node as ElevatorCar
@@ -158,7 +158,7 @@ func _bottom(car: ElevatorCar) -> void:
 	var bottom_y := (
 		WorldSpace.to_scene(Vector2(shaft.x, _level.rules.floor_surface(shaft.bottom))).y
 	)
-	# Трупы кладутся, пока кабина далеко наверху: иначе они легли бы на неё.
+	# Corpses are placed while the cab is far up: otherwise they would lie on it.
 	_hurry(true)
 	await _until(func() -> bool: return car.bottom() > bottom_y + Proportions.FLOOR * 2.0)
 	_hurry(false)
@@ -166,7 +166,7 @@ func _bottom(car: ElevatorCar) -> void:
 	var half := car.width() * 0.5
 	var side := 1.0 if _has_floor(middle + half + 2.4, bottom_y) else -1.0
 	await _put_otto(Vector3(middle + side * (half + 2.4), bottom_y, 0.0))
-	# Одно тело целиком под кабиной, второе поперёк её стенки со стороны Otto.
+	# One body entirely under the cab, the second across its wall on Otto's side.
 	await _corpse(Vector3(middle + side * 0.75, bottom_y + 0.02, 0.0), side)
 	await _corpse(Vector3(middle + side * (half + 1.1), bottom_y + 0.02, 0.0), side)
 	await _frames(60)
@@ -185,15 +185,15 @@ func _bottom(car: ElevatorCar) -> void:
 	await _shoot("08_bottom_after")
 
 
-## Есть ли пол этажа на высоте [param y] под точкой [param x].
+## Whether there is a floor at height [param y] under point [param x].
 func _has_floor(x: float, y: float) -> bool:
 	var from := Vector3(x, y + 0.5, WorldSpace.PLAY_Z)
 	var query := PhysicsRayQueryParameters3D.create(from, from - Vector3(0.0, 1.0, 0.0), 1)
 	return not get_world_3d().direct_space_state.intersect_ray(query).is_empty()
 
 
-## Ускоряет мир, пока ждём кабину, — вместе с частотой шагов физики: на
-## длинном шаге суставы трупов разлетались бы (docs/testing.md).
+## Speeds up the world while waiting for the cab — together with the physics step rate: on a long
+## step the corpses' joints would fly apart (docs/testing.md).
 func _hurry(on: bool) -> void:
 	Engine.time_scale = HURRY if on else 1.0
 	Engine.physics_ticks_per_second = int(60.0 * Engine.time_scale)

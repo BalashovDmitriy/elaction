@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""Проверка проекта движком Godot.
+"""Checking the project with the Godot engine.
 
-Godot умеет то, чего не умеют gdlint и gdformat: импортировать ресурсы, связать
-сцены со скриптами и поймать реальные ошибки разбора. Скрипт запускает
-`godot --headless --import`, а затем `--check-only` по каждому .gd.
+Godot can do what gdlint and gdformat cannot: import resources, link
+scenes to scripts and catch real parse errors. The script runs
+`godot --headless --import`, then `--check-only` on every .gd.
 
-Godot нередко завершается с кодом 0 даже при ошибках в скриптах, поэтому вывод
-дополнительно просматривается на маркеры ошибок.
+Godot often exits with code 0 even when scripts have errors, so the output
+is additionally scanned for error markers.
 
-Скрипты разбираются пачками: процесс движка грузит пачку скриптов
-(`tools/check_scripts.gd`), и пачки идут разом по числу потоков процессора.
-Загрузка компилирует скрипт со всем, от чего он зависит, — то же, что
-`--check-only`; по одному запуску на скрипт, подряд, две с половиной сотни
-стартов движка шли две с половиной минуты на 10–15 % процессора (M24j). Импорт
-— один и до них: разбор читает уже импортированные ресурсы.
+Scripts are parsed in batches: an engine process loads a batch of scripts
+(`tools/check_scripts.gd`), and batches run at once, as many as there are CPU threads.
+Loading compiles a script with everything it depends on, the same as
+`--check-only`; with one run per script, in sequence, two hundred and fifty
+engine starts took two and a half minutes at 10–15 % CPU (M24j). The import
+is a single one and comes before them: parsing reads already imported resources.
 
-Запуск:
-    python tools/godot_check.py              # полная проверка
-    python tools/godot_check.py --no-scripts # только импорт ресурсов
+Run:
+    python tools/godot_check.py              # full check
+    python tools/godot_check.py --no-scripts # resource import only
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ ERROR_PATTERNS: tuple[re.Pattern[str], ...] = (
 
 
 def find_errors(output: str) -> list[str]:
-    """Возвращает строки вывода, похожие на ошибки."""
+    """Returns output lines that look like errors."""
     return [
         line.strip()
         for line in output.splitlines()
@@ -53,16 +53,16 @@ def find_errors(output: str) -> list[str]:
 
 
 def import_resources(godot: str) -> tuple[int, str]:
-    """Импортирует ресурсы. На чистом чекауте — в два прохода.
+    """Imports resources. On a clean checkout, in two passes.
 
-    `project.godot` грузит `res://assets/i18n/*.translation` на старте движка,
-    а делает эти файлы тот же самый импорт — из `assets/i18n/ui.csv`. Файлы
-    генерируемые и в `.gitignore` (так предписывает стандартный Godot.gitignore),
-    поэтому на свежем клоне первый проход всегда ругается на их отсутствие,
-    хотя к концу прохода они уже лежат на месте.
+    `project.godot` loads `res://assets/i18n/*.translation` at engine startup,
+    and these files are produced by the same import, from `assets/i18n/ui.csv`. The files
+    are generated and in `.gitignore` (as the standard Godot.gitignore prescribes),
+    so on a fresh clone the first pass always complains that they are missing,
+    although by the end of the pass they are already in place.
 
-    Настоящая поломка ресурса никуда не девается и на втором проходе, так что
-    повтор ничего не прячет: судим по нему.
+    A real resource breakage does not go away on the second pass either, so
+    the repeat hides nothing: we judge by it.
     """
     code, output = run(godot, ["--headless", "--import"])
     if not find_errors(output):
@@ -79,15 +79,15 @@ def gd_scripts() -> list[Path]:
     return scripts
 
 
-# Сколько пачек на поток процессора: пачки неравны — одна тянет за собой
-# полпроекта зависимостей, другая нет, — и мелкие ровнее делят хвост.
+# How many batches per CPU thread: batches are uneven, one drags half the project's
+# dependencies along and another does not, and small ones share the tail more evenly.
 CHUNKS_PER_THREAD = 2
 
 CHECKER = "res://tools/check_scripts.gd"
 
 
 def check_scripts(godot: str) -> bool:
-    """Разбор всех скриптов пачками; печатает упавшие и итог."""
+    """Parses all scripts in batches; prints the failed ones and the total."""
     scripts = [f"res://{path.relative_to(PROJECT_ROOT).as_posix()}" for path in gd_scripts()]
     count = max(1, min(len(scripts), (os.cpu_count() or 1) * CHUNKS_PER_THREAD))
     piles = [scripts[index::count] for index in range(count)]
@@ -132,7 +132,7 @@ def check_scripts(godot: str) -> bool:
 
 
 def report(step: str, code: int, output: str) -> bool:
-    """Печатает результат шага. Возвращает True, если шаг успешен."""
+    """Prints a step result. Returns True if the step succeeded."""
     errors = find_errors(output)
     if code == 0 and not errors:
         print(f"  OK   {step}")

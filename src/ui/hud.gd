@@ -1,30 +1,30 @@
 class_name Hud
 extends CanvasLayer
 
-## Игровой HUD: только то, без чего не сыграть (ADR-0012, пункт 8).
+## Game HUD: only what you cannot play without (ADR-0012, point 8).
 ##
-## С M22 — неон-нуар (решение пользователя): тёмные полупрозрачные плашки с
-## неоновой кромкой в цвет вывески здания, узкий шрифт Exo 2, значки вместо
-## слов. Слева сверху — очки и документы папками, по центру — имя здания и этаж,
-## где Otto, справа — жизни силуэтами, внизу справа — раунд, под именем здания —
-## мигающая плашка тревоги.
+## Since M22 — neon noir (the user's decision): dark translucent panels with
+## a neon edge in the building sign's colour, the narrow Exo 2 font, icons instead of
+## words. Top left — score and documents as folders, centre — building name and the floor
+## Otto is on, right — lives as silhouettes, bottom right — round, under the building name —
+## a blinking alarm panel.
 ##
-## Бонус здания — плашкой посреди кадра, пока машина с Otto уезжает: подпись и
-## число, которое набегает от нуля (ADR-0038, решение 4). Отдельного экрана
-## итогов нет — как в ROM, строка поверх сцены.
+## The building bonus is a panel in the middle of the frame while the car with Otto drives off: a
+## caption and a number counting up from zero (ADR-0038, decision 4). There is no separate results
+## screen — as in the ROM, a line over the scene.
 ##
-## Строки автомата с рекордом нет: игра ремейк, интерфейс на той же стороне, что
-## картинка и звук. Всё собирается кодом: плашки — данные, а не разметка.
+## There is no arcade-style high score line: the game is a remake, the interface is on the same side
+## as picture and sound. Everything is built in code: panels are data, not markup.
 
-## Как часто мигает тревога, раз в секунду, и насколько тускнеет в нижней точке.
+## How often the alarm blinks, times per second, and how much it dims at the low point.
 const ALARM_BLINKS: float = 1.6
 const ALARM_DIM: float = 0.35
 
-## Сколько папок документов заведено: больше, чем бывает в здании. Красных
-## дверей от 5 до 10, жребием по сиду здания ([method BuildingDocuments.count]),
-## — видно столько папок, сколько документов в этом здании.
+## How many document folders are created: more than a building ever has. Red
+## doors are 5 to 10, by draw from the building seed ([method BuildingDocuments.count]),
+## — as many folders are visible as there are documents in this building.
 const DOCUMENT_ICONS: int = 10
-## Больше стольких жизней значками не рисуется — дальше число.
+## Beyond this many lives icons are not drawn — a number instead.
 const LIFE_ICONS: int = 5
 
 const MARGIN: float = 28.0
@@ -34,21 +34,21 @@ const INK_DIM := NeonStyle.INK_DIM
 const ALARM := Color(1.0, 0.22, 0.2)
 const PLATE := NeonStyle.PLATE
 
-## Кромка, если здание не сказало своего цвета: неон первого здания — отеля.
+## The edge if the building did not give its colour: the neon of the first building, a hotel.
 const DEFAULT_NEON := VerticalSign.NEON_HOTEL
-## Как часто переписывается счётчик кадров, с: каждый кадр цифры мельтешили бы.
+## How often the frame counter is rewritten, s: every frame the digits would flicker.
 const FPS_EVERY: float = 0.25
-## За сколько набегает бонус здания, с: машина уезжает из кадра примерно за
-## столько же.
+## How long the building bonus takes to count up, s: the car leaves the frame in about
+## the same time.
 const BONUS_COUNT_TIME: float = 1.2
-## Запас по бокам числа бонуса сверх отступов плашки, px: цифры в 72 кегля
-## выступают за свою ширину, и «1 000» подходило к кромке вплотную.
+## Margin on the sides of the bonus number on top of the panel padding, px: digits at size 72
+## stick out beyond their width, and "1 000" came right up against the edge.
 const BONUS_PAD: float = 18.0
-## Кегль числа бонуса.
+## Font size of the bonus number.
 const BONUS_SIZE: int = 72
 
-## Показывать ли счётчик кадров. Статическое, как [member Blood.enabled]: его
-## ставят настройки, а HUD читает, не зная, кто их держит.
+## Whether to show the frame counter. Static, like [member Blood.enabled]: the
+## settings set it, and the HUD reads it without knowing who holds them.
 static var show_fps: bool = false
 
 var _neon := DEFAULT_NEON
@@ -58,7 +58,7 @@ var _documents: Array[HudIcon] = []
 var _lives: Array[HudIcon] = []
 var _lives_more: Label = null
 var _building: Label = null
-## Прибавка очков: всплывает над местом и у счёта, счёт набегает.
+## Score gain: pops up above the spot and next to the score, the score counts up.
 var _bursts: ScoreBursts = null
 var _floor: Label = null
 var _round: Label = null
@@ -92,15 +92,15 @@ func _process(_delta: float) -> void:
 	_count_frames()
 	if not _alarm.visible:
 		return
-	# Мигание считается от времени, а не накопителем: HUD живёт и на паузе,
-	# а под паузой delta не приходит вовсе.
+	# Blinking is computed from time, not by an accumulator: the HUD lives on pause too,
+	# and under pause delta does not come at all.
 	var phase := sin(Time.get_ticks_msec() / 1000.0 * ALARM_BLINKS * TAU) * 0.5 + 0.5
 	_alarm.modulate.a = ALARM_DIM + (1.0 - ALARM_DIM) * phase
 
 
-## Язык сменили в меню посреди партии: подписи собраны кодом из перевода в
-## верхнем регистре и сами не переведутся — подпись очков так и осталась бы на
-## прежнем языке до конца игры, а этаж — до следующего этажа (авторевью M22).
+## The language was changed in the menu mid-game: captions are built in code from the translation
+## in upper case and will not re-translate themselves — the score caption would stay in the
+## previous language until the game ends, and the floor — until the next one (code review M22).
 func _notification(what: int) -> void:
 	if what != NOTIFICATION_TRANSLATION_CHANGED or _score_caption == null:
 		return
@@ -110,7 +110,7 @@ func _notification(what: int) -> void:
 	refresh()
 
 
-## Здание, за которым следит HUD: его имя, цвет вывески и этаж Otto.
+## The building the HUD tracks: its name, sign colour and Otto's floor.
 func follow(level: GreyboxLevel) -> void:
 	_level = level
 	_bursts.follow(level)
@@ -123,8 +123,8 @@ func follow(level: GreyboxLevel) -> void:
 	refresh()
 
 
-## Перерисовывает всё разом. Зовётся на входе в здание и при смене состояния:
-## сигналов у партии много, а полей мало, и разбирать их по одному незачем.
+## Redraws everything at once. Called on entering a building and on a state change:
+## the game has many signals and few fields, and sorting them out one by one is pointless.
 func refresh() -> void:
 	var game := GameState.instance()
 	_bursts.show_score(game.score)
@@ -136,22 +136,22 @@ func refresh() -> void:
 		_lives[index].set_state(true, _neon)
 	_lives_more.visible = game.lives > LIFE_ICONS
 	_lives_more.text = "×%d" % game.lives
-	# «Раунд», а не «здание»: так счётчик называется и в аркаде, и в порте
-	# (ADR-0017, решение 5).
+	# "Round", not "building": that is what the counter is called both in the arcade and in the port
+	# (ADR-0017, decision 5).
 	_round.text = "%s %d" % [tr("UI_ROUND").to_upper(), game.building]
 	_alarm_label.text = tr("UI_ALARM")
 	_alarm.visible = game.alarm.raised
 
 
-## Показывает бонус здания: число набегает от нуля до [param amount] за
-## [constant BONUS_COUNT_TIME]. На паузе счёт стоит вместе с игрой.
+## Shows the building bonus: the number counts up from zero to [param amount] over
+## [constant BONUS_COUNT_TIME]. On pause the count stands still along with the game.
 func count_bonus(amount: int) -> void:
 	if _bonus_count != null:
 		_bonus_count.kill()
 	_bonus_plate.visible = true
 	_show_bonus_value(0.0)
-	# Счётчик стрекочет, пока число набегает: запись — длиной в счёт
-	# (ADR-0052, решение 7).
+	# The counter ticks while the number counts up: the recording is as long as the count
+	# (ADR-0052, decision 7).
 	if amount > 0:
 		Sounds.play(Sounds.BONUS_TICK)
 	_bonus_count = create_tween()
@@ -159,14 +159,14 @@ func count_bonus(amount: int) -> void:
 	_bonus_count.tween_method(_show_bonus_value, 0.0, float(amount), BONUS_COUNT_TIME)
 
 
-## Сколько бонусу ещё набегать до полного, с: 0 — досчитан или его нет.
+## How much longer the bonus counts up to full, s: 0 — counted out or there is none.
 func bonus_time_left() -> float:
 	if _bonus_count == null or not _bonus_count.is_valid() or not _bonus_count.is_running():
 		return 0.0
 	return maxf(BONUS_COUNT_TIME - _bonus_count.get_total_elapsed_time(), 0.0)
 
 
-## Убирает плашку бонуса: следующее здание, меню или новая партия.
+## Removes the bonus panel: the next building, the menu or a new game.
 func hide_bonus() -> void:
 	if _bonus_count != null:
 		_bonus_count.kill()
@@ -174,7 +174,7 @@ func hide_bonus() -> void:
 	_bonus_plate.visible = false
 
 
-## Видна ли плашка бонуса и что на ней за число.
+## Whether the bonus panel is visible and what number is on it.
 func bonus_shown() -> bool:
 	return _bonus_plate.visible
 
@@ -187,7 +187,7 @@ func _show_bonus_value(value: float) -> void:
 	_bonus.text = format_score(roundi(value))
 
 
-## Счёт с пробелами по три цифры: 12 400 читается с одного взгляда, 12400 — нет.
+## Score with spaces every three digits: 12 400 reads at a glance, 12400 does not.
 static func format_score(score: int) -> String:
 	var digits := str(absi(score))
 	var grouped := ""
@@ -198,8 +198,8 @@ static func format_score(score: int) -> String:
 	return ("-" if score < 0 else "") + grouped
 
 
-## Этаж, где стоит Otto, так, как его видит игрок: номер таблички, крыша или
-## паркинг — нижний этаж, на табличках «P» ([method FloorSigns.label_of]).
+## The floor Otto stands on, as the player sees it: the sign number, roof or
+## garage — the bottom floor, "P" on the signs ([method FloorSigns.label_of]).
 static func floor_text(rules: BuildingRules, index: int) -> String:
 	if index == BuildingRules.ROOF:
 		return TranslationServer.translate("UI_ROOF").to_upper()
@@ -212,8 +212,8 @@ static func floor_text(rules: BuildingRules, index: int) -> String:
 
 
 func _follow_floor() -> void:
-	# Вне дерева — здание, которое main уже снял и ещё не освободил (выход в
-	# меню): у его Otto нет глобального положения (авторевью M22).
+	# Outside the tree — a building main has already removed and not yet freed (exit to
+	# the menu): its Otto has no global position (code review M22).
 	if _level == null or not is_instance_valid(_level) or not _level.is_inside_tree():
 		return
 	if _level.otto == null:
@@ -232,7 +232,7 @@ func _documents_row_visible(total: int) -> void:
 		_documents[index].visible = index < maxi(total, 0)
 
 
-# --- Сборка ------------------------------------------------------------------
+# --- Assembly ----------------------------------------------------------------
 
 
 func _build() -> void:
@@ -242,7 +242,7 @@ func _build() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
 
-	# Слева сверху: очки и документы.
+	# Top left: score and documents.
 	var left := _plate(root, Control.PRESET_TOP_LEFT)
 	var left_box := VBoxContainer.new()
 	left_box.add_theme_constant_override("separation", 2)
@@ -263,8 +263,8 @@ func _build() -> void:
 		docs.add_child(icon)
 		_documents.append(icon)
 
-	# По центру сверху: раунд, здание и этаж. Раунд — первой строкой: в углу,
-	# мелким и тусклым, его не находили (замечание пользователя, ADR-0037).
+	# Top centre: round, building and floor. Round — on the first line: in the corner,
+	# small and dim, nobody found it (user's remark, ADR-0037).
 	var middle := _plate(root, Control.PRESET_CENTER_TOP)
 	var middle_box := VBoxContainer.new()
 	middle_box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -279,7 +279,7 @@ func _build() -> void:
 	_floor.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	middle_box.add_child(_floor)
 
-	# Тревога — под зданием.
+	# Alarm — under the building.
 	_alarm = PanelContainer.new()
 	_alarm.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	_alarm.position = Vector2(0.0, 150.0)
@@ -292,7 +292,7 @@ func _build() -> void:
 	_alarm_label = _label(34, Color(1.0, 0.85, 0.82), 800)
 	_alarm.add_child(_alarm_label)
 
-	# Справа сверху: жизни.
+	# Top right: lives.
 	var right := _plate(root, Control.PRESET_TOP_RIGHT)
 	var lives := HBoxContainer.new()
 	lives.add_theme_constant_override("separation", 8)
@@ -303,7 +303,7 @@ func _build() -> void:
 		_lives.append(icon)
 	_lives_more = _label(34, INK, 700)
 	lives.add_child(_lives_more)
-	# Посреди кадра: бонус здания на отъезде машины. Спрятан до выхода.
+	# Middle of the frame: the building bonus while the car drives off. Hidden until the exit.
 	_bonus_plate = _plate(root, Control.PRESET_CENTER)
 	_bonus_plate.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_bonus_plate.grow_vertical = Control.GROW_DIRECTION_BOTH
@@ -315,8 +315,8 @@ func _build() -> void:
 	bonus_box.add_child(_bonus_caption)
 	_bonus = _label(BONUS_SIZE, INK, 800)
 	_bonus.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	# Место под самый большой бонус — сразу: плашка не растёт, пока число
-	# набегает, и у любого числа по бокам один и тот же воздух.
+	# Room for the largest bonus right away: the panel does not grow while the number
+	# counts up, and any number has the same air on its sides.
 	var widest := format_score(Arcade.building_bonus(Arcade.BUILDING_BONUS_TOP))
 	var width := (
 		NeonStyle.font(800).get_string_size(widest, HORIZONTAL_ALIGNMENT_LEFT, -1, BONUS_SIZE).x
@@ -324,8 +324,8 @@ func _build() -> void:
 	_bonus.custom_minimum_size.x = ceilf(width + BONUS_PAD * 2.0)
 	bonus_box.add_child(_bonus)
 	_bonus_plate.visible = false
-	# Справа снизу: кадры в секунду, если их просили показывать. Мелко и
-	# приглушённо — это справка, а не часть игры.
+	# Bottom right: frames per second, if asked to show them. Small and
+	# muted — it is a reference, not part of the game.
 	_fps_plate = _plate(root, Control.PRESET_BOTTOM_RIGHT)
 	_fps = _label(22, INK_DIM, 600)
 	_fps_plate.add_child(_fps)
@@ -333,8 +333,8 @@ func _build() -> void:
 	_restyle()
 
 
-## Показывает кадры в секунду раз в [constant FPS_EVERY]. По настенным часам,
-## а не по delta: HUD живёт и на паузе.
+## Shows frames per second once per [constant FPS_EVERY]. By the wall clock,
+## not by delta: the HUD lives on pause too.
 func _count_frames() -> void:
 	_fps_plate.visible = show_fps
 	if not show_fps:
@@ -346,7 +346,7 @@ func _count_frames() -> void:
 	_fps.text = "%d FPS" % roundi(Engine.get_frames_per_second())
 
 
-## Плашка у угла или края [param preset] с отступом [constant MARGIN].
+## A panel at corner or edge [param preset] with margin [constant MARGIN].
 func _plate(root: Control, preset: Control.LayoutPreset) -> PanelContainer:
 	var plate := PanelContainer.new()
 	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -364,7 +364,7 @@ func _plate(root: Control, preset: Control.LayoutPreset) -> PanelContainer:
 	return plate
 
 
-## Кромка и ореол плашек — в цвет вывески здания.
+## Edge and glow of panels — in the building sign's colour.
 func _restyle() -> void:
 	for plate in _plates:
 		plate.add_theme_stylebox_override("panel", NeonStyle.plate(PLATE, _neon))

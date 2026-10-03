@@ -1,22 +1,22 @@
 class_name StreetFront
 extends Node3D
 
-## Вход в здание со стороны улицы выезда по типу (ADR-0058, решения 5 и 6).
+## The building's entrance from the exit street side, by kind (ADR-0058, decisions 5
+## and 6).
 ##
-## Камера смотрит на торец здания ребром, и плоское на его стене не видно:
-## вход читается тем, что выступает над тротуаром. У отеля — козырёк с
-## бегущими лампочками и латунными стойками, ковёр до бордюра и парковщик в
-## ливрее у своей стойки; у офиса — стеклянный тамбур со светом внутри и
-## вращающейся дверью; у жилого дома — крыльцо со ступенями, перилами и
-## мусорными баками у бордюра.
+## The camera looks at the building's end wall edge-on, and anything flat on that wall is
+## not visible: the entrance reads by what sticks out over the sidewalk. The hotel has a
+## canopy with chasing bulbs and brass posts, a carpet to the curb and a valet in livery
+## at his stand; the office — a glass vestibule lit inside with a revolving door; the
+## residential building — a stoop with steps, railings and trash cans at the curb.
 ##
-## Вид, без тел и без новых источников света: машина выезжает под тротуаром, по
-## тоннелю, и вход ей не мешает. Тротуар — от плоскости игры до мостовой
-## ([constant ExitStreet.NEAR_Z]).
+## A look, without bodies and without new light sources: the car leaves under the
+## sidewalk, through a tunnel, and the entrance does not get in its way. The sidewalk
+## runs from the play plane to the roadway ([constant ExitStreet.NEAR_Z]).
 
-## Насколько вход выступает от торца над тротуаром, м.
+## How far the entrance sticks out from the end wall over the sidewalk, m.
 const REACH: float = 3.2
-## Глубина тротуара, занятая входом: от переднего края до мостовой, по z.
+## Sidewalk depth taken by the entrance: from the front edge to the roadway, along z.
 const NEAR: float = 0.8
 const FAR: float = ExitStreet.NEAR_Z + 0.25
 
@@ -37,18 +37,18 @@ const CAN := Color(0.3, 0.32, 0.3)
 const STEPS: int = 4
 const STEP := Vector2(0.32, 0.17)
 
-## Парковщик отеля; null у других типов. Тестам и кадрам.
+## The hotel valet; null for other kinds. For tests and shots.
 var valet: Node3D = null
 
-## Скелет парковщика: дышит, только пока выезд в кадре ([method set_active]).
+## The valet's skeleton: breathes only while the exit is in the frame ([method set_active]).
 var _valet_player: AnimationPlayer = null
 var _left: float = 0.0
 var _floor: float = 0.0
 var _lit: bool = true
 
 
-## Ставит вход здания типа [member BuildingRules.kind] у торца [param left] на
-## тротуаре [param sidewalk] (плоскость правил).
+## Places the entrance of a building of kind [member BuildingRules.kind] at end wall
+## [param left] on sidewalk [param sidewalk] (rules plane).
 func build(
 	rules: BuildingRules, left: float, sidewalk: float, building_seed: int, weather: Weather.Kind
 ) -> void:
@@ -66,8 +66,8 @@ func build(
 			_valet(building_seed, weather, rules.time_of_day)
 
 
-## Отель: козырёк на кронштейнах с лампочками по кромке, латунные стойки у
-## края тротуара и ковёр под ним.
+## Hotel: a canopy on brackets with bulbs along its edge, brass posts at the sidewalk's
+## edge and a carpet under it.
 func _canopy() -> void:
 	var height := 3.0
 	var middle := _left - REACH * 0.5
@@ -98,8 +98,8 @@ func _canopy() -> void:
 	add_child(word)
 
 
-## Парковщик отеля у своей стойки на краю козырька: модель прохожего в
-## бордовой ливрее, стоит и ждёт машину.
+## The hotel valet at his stand at the canopy's edge: a pedestrian model in burgundy
+## livery, standing and waiting for the car.
 func _valet(building_seed: int, weather: Weather.Kind, time: TimeOfDay.Kind) -> void:
 	var stand_x := _left - REACH + 0.55
 	_box(GreyboxLook.surface(BURGUNDY.darkened(0.2)), Vector3(0.45, 1.05, 0.4), stand_x, 0.0, -1.2)
@@ -111,8 +111,8 @@ func _valet(building_seed: int, weather: Weather.Kind, time: TimeOfDay.Kind) -> 
 	for node: Node in person.find_children("*", "MeshInstance3D", true, false):
 		var mesh := node as MeshInstance3D
 		if String(mesh.name).ends_with("Body"):
-			# Поверхностями, как красит [Passerby]: общий material_override на
-			# модели со скелетом ронял рендер на пустом материале.
+			# By surfaces, the way [Passerby] paints: a shared material_override on a
+			# skinned model crashed the renderer on an empty material.
 			for surface: int in mesh.mesh.get_surface_count():
 				mesh.set_surface_override_material(surface, GreyboxLook.surface(LIVERY))
 	person.position = _at(stand_x + 0.6, 0.0, -0.9)
@@ -125,16 +125,16 @@ func _valet(building_seed: int, weather: Weather.Kind, time: TimeOfDay.Kind) -> 
 	valet = person
 
 
-## Скелет парковщика — работа на каждый кадр, а улицу видно только у выезда:
-## он дышит, пока выезд в кадре, как идут прохожие ([method
-## StreetPeople.set_active]). Зовёт пандус каждый кадр.
+## The valet's skeleton is per-frame work, and the street is seen only at the exit: he
+## breathes while the exit is in the frame, as pedestrians walk
+## ([method StreetPeople.set_active]). Called by the ramp every frame.
 func set_active(on: bool) -> void:
 	if _valet_player != null and _valet_player.active != on:
 		_valet_player.active = on
 
 
-## Офис: стеклянный тамбур на всю глубину тротуара, переплёт, свет изнутри и
-## барабан вращающейся двери.
+## Office: a glass vestibule through the full sidewalk depth, mullions, light from
+## inside and the drum of a revolving door.
 func _lobby() -> void:
 	var middle := _left - REACH * 0.5
 	var depth := NEAR - FAR
@@ -148,7 +148,7 @@ func _lobby() -> void:
 	var frame := GreyboxLook.metal(FRAME)
 	_box(frame, Vector3(REACH + 0.1, 0.12, depth + 0.1), middle - 0.05, LOBBY_HEIGHT, z)
 	for step: int in 4:
-		# Стойки — внутри выноса: крайняя не входит в стену торца.
+		# The posts are inside the overhang: the outermost does not go into the end wall.
 		var x := _left - REACH + 0.03 + (REACH - 0.06) * step / 3.0
 		_box(frame, Vector3(0.05, LOBBY_HEIGHT, 0.05), x, 0.0, NEAR + 0.03)
 	var glow := GreyboxLook.light(LOBBY_GLOW) if _lit else GreyboxLook.surface(FRAME)
@@ -158,12 +158,12 @@ func _lobby() -> void:
 	drum.bottom_radius = 0.75
 	drum.height = 2.3
 	drum.radial_segments = 16
-	# Барабан и створка — на волосок выше пола тамбура: низы не в одной плоскости.
+	# Drum and leaf a hair above the vestibule floor: the bottoms are not in one plane.
 	_mesh(drum, glass, middle, 1.157, z)
 	_box(frame, Vector3(0.04, 2.3, 1.4), middle, 0.007, z)
 
 
-## Жилой дом: крыльцо ступенями к двери в торце, перила и баки у бордюра.
+## Residential: a stoop with steps to the door in the end wall, railings and cans at the curb.
 func _stoop() -> void:
 	var stone := GreyboxLook.surface(STOOP)
 	var z := (NEAR + FAR) * 0.5
@@ -181,8 +181,8 @@ func _stoop() -> void:
 	for side: float in [z - 1.05, z + 0.45]:
 		var run := Vector2(STEP.x * STEPS, top).length()
 		var bar := GreyboxLook.box(Vector3(run, 0.04, 0.04), rail)
-		# Крыльцо поднимается к двери в торце, вправо: туда же и перила, и их
-		# нижний конец ложится на стойку у тротуара.
+		# The stoop rises to the door in the end wall, to the right: the railings go the
+		# same way, and their lower end rests on the post at the sidewalk.
 		bar.rotation.z = atan2(top, STEP.x * STEPS)
 		bar.position = _at(_left - STEP.x * STEPS * 0.5 - 0.06, top * 0.5 + 0.9, side)
 		_add(bar)
@@ -215,8 +215,8 @@ func _mesh(mesh: PrimitiveMesh, material: Material, x: float, rise: float, z: fl
 	_add(part)
 
 
-## Точка над тротуаром: всё стоит на 3 мм выше его, чтобы низ не лёг в одну
-## плоскость с плитами тротуара.
+## A point above the sidewalk: everything stands 3 mm above it so the bottom does not lie
+## in one plane with the sidewalk slabs.
 func _at(x: float, rise: float, z: float) -> Vector3:
 	return Garage.scene_point(x, _floor - rise - 0.003, z)
 

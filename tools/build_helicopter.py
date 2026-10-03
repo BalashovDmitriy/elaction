@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""Вертолёт вступления в Blender, экспорт в glTF (ADR-0049).
+"""Intro helicopter in Blender, exported to glTF (ADR-0049).
 
-Лоу-поли kazuma, которым вертолёт летал с M24b, по кадрам M24g читался плоским
-силуэтом: десяток граней, винт одной линией, полозья палками, ни дверей, ни
-хвостового винта. Свободной модели достойнее, с винтом отдельной деталью, на
-poly.pizza не нашлось, и вертолёт собирается здесь.
+The low-poly kazuma the helicopter flew as since M24b read as a flat silhouette in the
+M24g shots: a dozen faces, the rotor as one line, skids as sticks, no doors, no tail
+rotor. No better free model with the rotor as a separate part was found on poly.pizza,
+so the helicopter is built here.
 
-Лёгкий вертолёт с закрытым винтом, лофтом по сечениям: округлый нос с
-остеклением, кабина, сужение в хвостовую балку, киль со стабилизатором, капот
-двигателя с выхлопом и заборником, полозья на поперечинах со ступеньками,
-сдвижная дверь — в проёме свет кабины и кресла. Несущий и хвостовой винты —
-отдельные узлы `MainRotor` и `TailRotor`, начало — на оси, их крутит игра.
-С M24k (ADR-0052, решение 6) и дверь — свой узел `Door`, закрытый: игра
-откатывает её назад по направляющим. В кабине — кресло пилота, его место —
-пустышка `PilotSeat`: пилота сажает игра. Точки огней, прожектора и лебёдки —
-пустышками: игра ставит туда своё, а не угадывает по габариту.
+A light helicopter with an enclosed rotor, lofted through cross-sections: a rounded
+glazed nose, a cabin, a taper into the tail boom, a fin with a stabiliser, an engine
+cowling with exhaust and intake, skids on cross tubes with steps, a sliding door — the
+cabin light and seats in the opening. The main and tail rotors are separate nodes
+`MainRotor` and `TailRotor`, origin on the axis; the game spins them. Since M24k
+(ADR-0052, decision 6) the door is also its own node `Door`, closed: the game rolls it
+back along the rails. In the cabin is the pilot's seat, its place is the empty
+`PilotSeat`: the game seats the pilot. The points for lights, searchlight and winch are
+empties: the game puts its own things there rather than guessing from the bounds.
 
-Метры, нос в +X, ближний к камере борт — −Y Blender (+Z Godot после экспорта),
-нуль — под осью несущего винта на уровне низа полозьев, середина по глубине.
+Metres, nose toward +X, the side near the camera is Blender −Y (Godot +Z after export),
+origin under the main rotor axis at the level of the skid bottoms, middle in depth.
 
     python tools/build_helicopter.py
 """
@@ -42,8 +42,8 @@ except ImportError:
 ROOT = TOOLS.parent
 TARGET = ROOT / "assets" / "models" / "aircraft" / "helicopter.glb"
 
-# Материалы: цвет линейный RGB, металличность, шероховатость. Игра перекрашивает
-# корпус и стекло своими (`Helicopter`); остальное идёт как есть.
+# Materials: linear RGB colour, metallic, roughness. The game repaints the fuselage and
+# glass with its own (`Helicopter`); the rest goes as is.
 MATERIALS = {
     "Hull": ((0.1, 0.12, 0.16), 0.5, 0.35),
     "Stripe": ((0.55, 0.05, 0.04), 0.3, 0.4),
@@ -56,8 +56,8 @@ MATERIALS = {
     "Exhaust": ((0.05, 0.045, 0.04), 0.6, 0.6),
 }
 
-# Сечения фюзеляжа: x, полуширина, полувысота, высота середины над низом
-# полозьев, м. От носа к хвосту: нос, кабина, сужение, балка.
+# Fuselage cross-sections: x, half-width, half-height, height of the middle above the
+# skid bottoms, m. From nose to tail: nose, cabin, taper, boom.
 SECTIONS = [
     (2.95, 0.06, 0.06, 1.1),
     (2.8, 0.42, 0.42, 1.14),
@@ -72,28 +72,28 @@ SECTIONS = [
     (-5.6, 0.08, 0.1, 1.9),
 ]
 RING = 20
-# Остекление: нос и верх кабины впереди этого x, окна по бортам — между этими x
-# и над этой высотой.
+# Glazing: the nose and the cabin top ahead of this x, side windows — between these x
+# and above this height.
 WINDSCREEN_X = 1.55
 SIDE_WINDOWS = (0.25, 1.55, 1.42)
-# Проём сдвижной двери на ближнем борту: x от и до, высота от и до.
+# Sliding door opening on the near side: x from and to, height from and to.
 DOOR = (-1.05, 0.2, 0.72, 1.98)
-# Несущий винт: высота оси, радиус, ширина и толщина лопасти, лопастей.
+# Main rotor: axis height, radius, blade width and thickness, blade count.
 ROTOR_HEIGHT = 3.02
 ROTOR_RADIUS = 4.4
 BLADE = (0.3, 0.045)
 BLADES = 4
-# Хвостовой винт: ось, радиус, лопастей.
+# Tail rotor: axis, radius, blade count.
 TAIL_ROTOR = (-5.42, -0.2, 2.02)
 TAIL_RADIUS = 0.72
 TAIL_BLADES = 2
-# Сиденье пилота: x, y, высота подушки над низом полозьев. Правое кресло — к
-# ближнему борту: пилота видно в боковое окно.
+# Pilot seat: x, y, cushion height above the skid bottoms. The right seat is toward the
+# near side: the pilot is visible through the side window.
 PILOT_SEAT = (1.05, -0.32, 0.98)
 
 
 class Part:
-    """Меш из кусков bmesh с материалом на каждой грани."""
+    """Mesh from bmesh pieces with a material on each face."""
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -160,7 +160,7 @@ def _material(name: str):
 
 
 def _ring(x: float, half_w: float, half_h: float, centre: float) -> list[Vector]:
-    """Сечение-суперэллипс: борта почти прямые, как у кабины, а не у трубы."""
+    """Superellipse cross-section: nearly straight sides, like a cabin, not a tube."""
     points = []
     for step in range(RING):
         angle = math.tau * step / RING
@@ -191,54 +191,55 @@ def build_hull() -> None:
     for face in faces:
         centre = face.calc_center_median()
         _, _, _, mid = min(SECTIONS, key=lambda s: abs(s[0] - centre.x))
-        # Лобовое и верх носа — стекло; окна по бортам кабины — стекло.
+        # Windscreen and nose top are glass; side windows of the cabin are glass.
         if centre.x > WINDSCREEN_X and centre.z > mid + 0.12 and face.normal.z > -0.3:
             hull.paint([face], "Glass")
         elif x0 < centre.x < x1 and centre.z > window_low and abs(face.normal.y) > 0.5:
             hull.paint([face], "Glass")
         elif DOOR[0] < centre.x < DOOR[1] and DOOR[2] < centre.z < DOOR[3] and face.normal.y < -0.5:
-            # Проём двери прорезан: в него видно салон.
+            # The door opening is cut out: the cabin interior is visible through it.
             doorway.append(face)
         elif 0.98 < centre.z < 1.08 and abs(face.normal.y) > 0.5 and centre.x < DOOR[0] - 0.05:
             hull.paint([face], "Stripe")
     bmesh.ops.delete(hull.mesh, geom=doorway, context="FACES")
-    # Салон за проёмом: дальняя стенка, пол и потолок — их и видно в дверь.
+    # Cabin interior behind the opening: back wall, floor and ceiling — what is seen
+    # through the door.
     door_mid = (DOOR[0] + DOOR[1]) * 0.5
     door_len = DOOR[1] - DOOR[0] + 0.3
     hull.box((door_len, 0.04, DOOR[3] - DOOR[2]), Vector((door_mid, 0.55, (DOOR[2] + DOOR[3]) * 0.5)), "Cabin")
     hull.box((door_len, 1.5, 0.04), Vector((door_mid, 0.0, DOOR[2] + 0.02)), "Seat")
     hull.box((door_len, 1.5, 0.04), Vector((door_mid, 0.0, DOOR[3] - 0.02)), "Cabin")
-    # Переплёт окон кабины: стойки по ближнему и дальнему борту и рама по
-    # низу остекления — без них окна читались сплошной заливкой.
+    # Cabin window frames: posts along the near and far sides and a frame along the
+    # bottom of the glazing — without them the windows read as a solid fill.
     for side in (-1.0, 1.0):
         for x in (0.25, 0.95, 1.6):
             hull.box((0.07, 0.05, 0.62), Vector((x, side * 0.86, 1.86)), "Metal")
         hull.box((1.45, 0.05, 0.05), Vector((0.93, side * 0.87, 1.5)), "Metal")
-    # Стойка в середине лобового стекла.
+    # Post in the middle of the windscreen.
     hull.box((0.7, 0.05, 0.06), Vector((2.3, 0.0, 1.62)), "Metal", Matrix.Rotation(0.6, 3, "Y"))
-    # Капот двигателя с заборником и выхлопом, мачта винта.
+    # Engine cowling with intake and exhaust, rotor mast.
     hull.box((2.3, 0.9, 0.34), Vector((-0.35, 0.0, 2.35)), "Hull")
     hull.box((0.9, 0.7, 0.18), Vector((-0.2, 0.0, 2.6)), "Hull")
     for side in (-1.0, 1.0):
         hull.box((0.36, 0.05, 0.16), Vector((0.45, side * 0.46, 2.35)), "Metal")
     hull.tube(Vector((-1.45, -0.2, 2.35)), Vector((-1.95, -0.26, 2.3)), 0.11, "Exhaust")
     hull.tube(Vector((0.0, 0.0, 2.6)), Vector((0.0, 0.0, ROTOR_HEIGHT - 0.05)), 0.09, "Metal")
-    # Кресла в проёме двери и рама проёма.
+    # Seats in the door opening and the opening's frame.
     for x in (-0.75, -0.2):
         hull.box((0.45, 0.5, 0.12), Vector((x, -0.25, 0.95)), "Seat")
         hull.box((0.1, 0.5, 0.6), Vector((x - 0.2, -0.25, 1.28)), "Seat")
     for x in DOOR[:2]:
         hull.box((0.05, 0.06, DOOR[3] - DOOR[2]), Vector((x, -0.9, (DOOR[2] + DOOR[3]) * 0.5)), "Metal")
-    # Направляющие сдвижной двери: сверху и снизу проёма, назад на её длину.
+    # Sliding door rails: above and below the opening, back by its length.
     door_len = DOOR[1] - DOOR[0]
     hull.box((door_len * 2.0, 0.04, 0.04), Vector((DOOR[0], -0.95, DOOR[3] + 0.02)), "Metal")
     hull.box((door_len * 2.0, 0.03, 0.03), Vector((DOOR[0], -0.94, DOOR[2] - 0.03)), "Metal")
-    # Кресло пилота в кабине: спинкой к салону, лицом к носу.
+    # Pilot seat in the cabin: back to the cabin, facing the nose.
     hull.box((0.5, 0.5, 0.12), Vector((PILOT_SEAT[0], PILOT_SEAT[1], PILOT_SEAT[2] - 0.06)), "Seat")
     hull.box((0.12, 0.5, 0.7), Vector((PILOT_SEAT[0] - 0.28, PILOT_SEAT[1], PILOT_SEAT[2] + 0.3)), "Seat")
-    # Приборная доска под лобовым стеклом.
+    # Instrument panel under the windscreen.
     hull.box((0.3, 1.3, 0.3), Vector((2.15, 0.0, 1.3)), "Metal")
-    # Киль, стабилизатор и полозок хвоста.
+    # Fin, stabiliser and tail skid.
     fin = hull.box((0.7, 0.06, 1.0), Vector((-5.35, 0.0, 2.35)), "Hull")
     bmesh.ops.rotate(
         hull.mesh, cent=(-5.35, 0.0, 2.35), matrix=Matrix.Rotation(-0.35, 3, "Y"), verts=fin
@@ -247,17 +248,17 @@ def build_hull() -> None:
     for side in (-1.0, 1.0):
         hull.box((0.4, 0.05, 0.3), Vector((-4.2, side * 0.75, 1.98)), "Hull")
     hull.tube(Vector((-5.4, 0.0, 1.8)), Vector((-5.25, 0.0, 1.45)), 0.03, "Skid")
-    # Прожектор под носом и антенна под брюхом.
+    # Searchlight under the nose and antenna under the belly.
     hull.tube(Vector((2.2, -0.2, 0.62)), Vector((2.35, -0.2, 0.5)), 0.11, "Metal")
     hull.tube(Vector((-0.5, 0.0, 0.6)), Vector((-0.5, 0.0, 0.35)), 0.015, "Metal")
-    # Лебёдка над дверью.
+    # Winch above the door.
     hull.box((0.18, 0.28, 0.14), Vector((0.0, -0.95, 2.05)), "Metal")
     hull.publish(smooth=True)
 
 
 def build_door() -> None:
-    """Сдвижная дверь закрытой: полотно с окном и ручкой. Начало — середина
-    проёма на ближнем борту; игра откатывает её назад по направляющим."""
+    """Sliding door, closed: a panel with a window and a handle. Origin — middle of the
+    opening on the near side; the game rolls it back along the rails."""
     door = Part("Door")
     door_len = DOOR[1] - DOOR[0]
     middle = Vector(((DOOR[0] + DOOR[1]) * 0.5, -0.95, (DOOR[2] + DOOR[3]) * 0.5))
@@ -275,7 +276,7 @@ def build_skids() -> None:
         skids.tube(Vector((1.7, y, 0.06)), Vector((2.05, y, 0.24)), 0.055, "Skid")
         for x in (1.05, -0.95):
             skids.tube(Vector((x, y, 0.06)), Vector((x + 0.05, side * 0.55, 0.62)), 0.045, "Skid")
-        # Ступенька на передней стойке.
+        # Step on the front strut.
         skids.box((0.4, 0.14, 0.03), Vector((1.1, side * 0.82, 0.32)), "Metal")
     for x in (1.05, -0.95):
         skids.tube(Vector((x + 0.05, -0.55, 0.62)), Vector((x + 0.05, 0.55, 0.62)), 0.04, "Skid")
@@ -292,7 +293,7 @@ def build_main_rotor() -> None:
         angle = math.tau * blade / BLADES
         turn = Matrix.Rotation(angle, 3, "Z")
         middle = hub + turn @ Vector((ROTOR_RADIUS * 0.5 + 0.12, 0.0, 0.02))
-        # Лопасть с небольшим углом установки — ловит свет гранью.
+        # Blade with a slight pitch angle — catches the light with a face.
         pitch = Matrix.Rotation(0.08, 3, "X")
         rotor.box((ROTOR_RADIUS - 0.25, width, thickness), middle, "Rotor", turn @ pitch)
     rotor.publish(origin=hub)
@@ -323,8 +324,8 @@ def inside_blender() -> int:
     build_skids()
     build_main_rotor()
     build_tail_rotor()
-    # Огни: зелёный — на правом борту (к камере), красный маячок сверху и
-    # снизу, белая вспышка на киле; прожектор, свет кабины и крюк лебёдки.
+    # Lights: green on the starboard side (toward the camera), red beacon top and
+    # bottom, white strobe on the fin; searchlight, cabin light and winch hook.
     mark("NavGreen", Vector((1.3, -0.92, 1.05)))
     mark("BeaconTop", Vector((-1.0, 0.0, 2.72)))
     mark("BeaconBelly", Vector((0.3, 0.0, 0.52)))

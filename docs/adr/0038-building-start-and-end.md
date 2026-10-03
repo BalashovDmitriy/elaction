@@ -1,122 +1,136 @@
-# ADR-0038 · M24b: вертолёт, красная дверь, паркинг, выход через машину
+# ADR-0038 · M24b: helicopter, red door, garage, exit via the car
 
-- **Статус:** принято
-- **Дата:** 2026-09-25
-- **Дополняет:** [ADR-0005](0005-doors-and-documents.md) — дверь и выход;
-  [ADR-0017](0017-spectrum-palette-and-shafts.md) — спуск по тросу;
-  [ADR-0031](0031-scene-detail.md), решение 4 — гараж на нижнем этаже
-- **Отменяет:** «выйти из красной двери можно раньше» из ADR-0005; время
-  «до пяти секунд» там же
+- **Status:** accepted
+- **Date:** 2026-09-25
+- **Extends:** [ADR-0005](0005-doors-and-documents.md) — the door and the exit;
+  [ADR-0017](0017-spectrum-palette-and-shafts.md) — descent on a rope;
+  [ADR-0031](0031-scene-detail.md), decision 4 — the garage on the bottom floor
+- **Supersedes:** "one may leave a red door early" from ADR-0005; the time
+  "up to five seconds" there as well
 
-## Контекст
+## Context
 
-M24b — вторая из трёх вех по замечаниям после M23 ([ADR-0037](0037-polish-bugs-and-combat.md)):
-непонятно, откуда Otto берётся на крыше; красная дверь не похожа на оригинал;
-нижний этаж — не паркинг; в машину не садятся, Otto исчезает у проёма.
+M24b is the second of three milestones based on the remarks after M23
+([ADR-0037](0037-polish-bugs-and-combat.md)): it is unclear where Otto comes from
+on the roof; the red door does not look like the original; the bottom floor is
+not a garage; nobody gets into the car, Otto vanishes at the opening.
 
-Сверка с дизассемблером аркадного ROM (jotd666/elevator_action, `elevator_z80.asm`,
-адреса — там же; заметки — [`docs/reference/arcade-rom.md`](../reference/arcade-rom.md)):
+Check against the disassembly of the arcade ROM (jotd666/elevator_action,
+`elevator_z80.asm`, addresses from there; notes — [`docs/reference/arcade-rom.md`](../reference/arcade-rom.md)):
 
-- **Прибытие** (`player_arriving_on_roof_anim_4d70`): крюк прилетает из-за левого
-  края кадра, трос идёт наискосок, Otto съезжает, спрыгивает, оглядывается и сам
-  входит в лифт до 30-го этажа — около 11 с без управления. Источника троса нет,
-  вертолёт — только в версии для ZX Spectrum. Сценка идёт раз за партию (@3531,
-  флаг $824A): следующие здания начинаются на 30-м этаже, после гибели Otto
-  встаёт на своём этаже, у красной двери, если она там не собрана (@2FAA).
-- **Красная дверь** (@3BDA, `update_in_room_timer_3c3e`): вход — стоя на коврике
-  лицом к двери; дверь закрывается за Otto; внутри ровно 70 тиков
-  ($82ED = $46, @2A5B) — 4,73 с; выйти раньше можно через 9 тиков, толкнув от
-  двери; документ и 500 очков засчитываются на выходе; от первого шага внутрь до
-  полного выхода Otto неуязвим. Агенты к двери не подходят.
-- **Подвал**: этаж 0, без дверей. Туда спускается ровно одна шахта из пяти нижних,
-  жребием на здание ($802D, @273F); эскалаторы — нет. Машина всегда слева.
-- **Выход** (@09D3, @0BF2): едва Otto оказался в подвале, управление забирают — он
-  идёт к машине, запрыгивает, машина едет вправо, разворачивается и уезжает влево;
-  бонус — строкой поверх, около 6 с. Документы не собраны — звук $38, кадр быстро
-  едет вверх, Otto встаёт у пропущенной двери (@09B5–0A69).
+- **Arrival** (`player_arriving_on_roof_anim_4d70`): a hook flies in from beyond
+  the left edge of the frame, the rope goes diagonally, Otto slides down, jumps
+  off, looks around and walks into the elevator to floor 30 by himself — about
+  11 s without control. There is no source of the rope; a helicopter exists only
+  in the ZX Spectrum version. The scene plays once per game (@3531, flag $824A):
+  the following buildings start on floor 30, after a death Otto stands on his
+  floor, at a red door if it is not collected there (@2FAA).
+- **Red door** (@3BDA, `update_in_room_timer_3c3e`): entry — standing on the mat
+  facing the door; the door closes behind Otto; inside exactly 70 ticks
+  ($82ED = $46, @2A5B) — 4.73 s; one can leave earlier after 9 ticks by pushing
+  away from the door; the document and 500 points are credited on exit; from the
+  first step inside until fully out Otto is invulnerable. Agents do not approach
+  the door.
+- **Basement**: floor 0, no doors. Exactly one shaft of the five lowest goes down
+  there, drawn per building ($802D, @273F); escalators do not. The car is always on
+  the left.
+- **Exit** (@09D3, @0BF2): as soon as Otto is in the basement, control is taken
+  away — he walks to the car, jumps in, the car drives right, turns around and
+  drives off to the left; the bonus is a line on top, about 6 s. If documents are
+  not collected — sound $38, the frame scrolls up quickly, Otto stands at the
+  missed door (@09B5–0A69).
 
-## Решения
+## Decisions
 
-### 1. Вертолёт в каждом здании
+### 1. A helicopter in every building
 
-Решение пользователя — как в версии для ZX Spectrum. Вертолёт влетает слева над
-крышей, зависает, спускает трос; Otto съезжает по нему на крышу и отпускает трос,
-вертолёт уходит вправо и вверх. Управление — с приземления. Сценка идёт в каждом
-здании: здания у нас разные, и прибытие на крышу нового — не повтор. Её можно
-пропустить прыжком, выстрелом или паузой — Otto сразу встаёт на крышу.
+The user's decision — as in the ZX Spectrum version. A helicopter flies in from
+the left above the roof, hovers, lowers a rope; Otto slides down it onto the roof
+and lets go of the rope, the helicopter leaves right and up. Control starts at
+landing. The scene plays in every building: our buildings differ, and arriving on
+the roof of a new one is not a repeat. It can be skipped with a jump, a shot or
+pause — Otto immediately stands on the roof.
 
-После гибели вертолёта нет: Otto возвращается на свой этаж, как сейчас.
+After a death there is no helicopter: Otto returns to his floor, as now.
 
-Модель — Helicopter, kazuma, CC0 (poly.pizza). Несущий винт — отдельная
-поверхность, крутится кодом.
+Model — Helicopter, kazuma, CC0 (poly.pizza). The main rotor is a separate
+surface, spun in code.
 
-### 2. Красная дверь как в оригинале, но без раннего выхода
+### 2. The red door as in the original, but without early exit
 
-- Створка закрывается за Otto, пока он внутри, и открывается, выпуская его.
-- Внутри ровно 70 тиков ROM — 4,73 с. **Раньше не выйти** — решение
-  пользователя; жребий 3–6 с из плана снят: без раннего выхода постоянное время
-  честнее, и оно совпадает с ROM.
-- Документ и 500 очков — на выходе, как в ROM; от шага внутрь до выхода Otto
-  неуязвим, как было.
-- Сквозь дверь глухо: музыка и звуки коридора — шаги, выстрелы, двери — идут
-  через фильтр.
-- Агенты, потерявшие Otto на его этаже, иногда подходят к двери и ждут у неё —
-  решение пользователя из плана, в ROM этого нет. Жребий на агента, не чаще
-  одного у двери; ждёт, пока Otto внутри.
-- Вход остаётся по «вверх» на коврике: в 3D коврик перед дверью, «лицом к двери»
-  на виде сбоку читается хуже.
+- The door leaf closes behind Otto while he is inside and opens to let him out.
+- Inside exactly 70 ROM ticks — 4.73 s. **No leaving earlier** — the user's
+  decision; the 3–6 s draw from the plan is dropped: without early exit a constant
+  time is fairer, and it matches the ROM.
+- The document and 500 points — on exit, as in the ROM; from the step inside until
+  exit Otto is invulnerable, as before.
+- Muffled through the door: music and corridor sounds — footsteps, shots, doors —
+  go through a filter.
+- Agents who lost Otto on his floor sometimes approach the door and wait at it —
+  the user's decision from the plan, the ROM does not have this. A draw per agent,
+  no more than one at a door; he waits while Otto is inside.
+- Entry stays on "up" on the mat: in 3D the mat is in front of the door, and
+  "facing the door" reads worse in the side view.
 
-### 3. Подвал — подземный паркинг, одна шахта вниз
+### 3. Basement — an underground garage, one shaft down
 
-- Нижний этаж обслуживает **одна** шахта — жребием из тех, что доходят до этажа
-  над ним, как в ROM. Остальные кончаются этажом выше. Эскалаторы в подвал не
-  спускаются.
-- Вид: колонны, низкий потолок с балками, трубами и люминесцентными лампами,
-  разметка, чужие машины на местах, ворота в торце, за ними пандус наверх.
-- Машина Otto стоит у ворот, всегда слева, как в ROM: путь от шахты до неё
-  зависит от того, какая шахта выпала.
+- The bottom floor is served by **one** shaft — drawn from those that reach the
+  floor above it, as in the ROM. The others end one floor higher. Escalators do
+  not go down to the basement.
+- Look: columns, a low ceiling with beams, pipes and fluorescent lamps, markings,
+  other cars in their spots, a gate in the end wall, a ramp up behind it.
+- Otto's car stands at the gate, always on the left, as in the ROM: the path from
+  the shaft to it depends on which shaft was drawn.
 
-### 4. Выход: подошёл — сел — уехал
+### 4. Exit: walked up — got in — drove off
 
-Решение пользователя. До машины Otto идёт сам. У водительской двери со всеми
-документами управление забирают: Otto садится, загораются фары, машина уезжает в
-ворота. Бонус считается поверх сцены, затем затемнение и следующее здание.
+The user's decision. Otto walks to the car himself. At the driver's door with all
+documents control is taken away: Otto gets in, the headlights come on, the car
+drives out through the gate. The bonus counts up over the scene, then a fade and
+the next building.
 
-### 5. Без всех документов шахта в подвал закрыта
+### 5. Without all documents the shaft to the basement is closed
 
-Решение пользователя — проще, чем в ROM. Участок шахты между этажом над
-подвалом и подвалом закрыт перекрытием: его видно, и сквозь него не пройти
-никак — ни кабиной, ни пешком, ни прыжком, ни падением. Кабина останавливается
-этажом выше. Собран последний документ — перекрытие само расходится, и кабина
-доезжает до подвала. Возврата за документами из ROM — звука, проезда кадра
-вверх, переноса к двери — нет; прежний мгновенный перенос уходит.
+The user's decision — simpler than in the ROM. The shaft section between the
+floor above the basement and the basement is closed by a slab: it is visible, and
+there is no way through it — not by cab, on foot, by jump or by falling. The cab
+stops one floor higher. When the last document is collected the slab opens by
+itself, and the cab goes down to the basement. The ROM return for documents — a
+sound, the frame scrolling up, transfer to the door — is not there; the old
+instant transfer goes away.
 
-### 6. Уточнения по кадрам вехи
+### 6. Refinements from the milestone frames
 
-Кадры сценок (`tools/m24b_shot.tscn`) показали то, чего не видно в тестах:
+The scene frames (`tools/m24b_shot.tscn`) showed what tests do not:
 
-- **Подвал — «P».** HUD на нижнем этаже пишет «ПАРКИНГ», табло шахт и таблички —
-  «P»; номера остальных этажей прежние.
-- **Выезд в кадре.** На посадке камера раздвигается влево за торец здания: видны
-  ворота, пандус и улица, машина уезжает вверх по пандусу, а не в край кадра.
-- **Бонус до смены раунда.** Бонус досчитывается на плашке, затем затемнение, и
-  только под чёрным бонус идёт в счёт и растёт номер раунда.
-- **Посадка видна.** Otto поворачивается к машине и садится в открытую
-  водительскую дверь; дверь — своя деталь поверх модели пака.
-- **Агент не стреляет в неуязвимого.** Ждущий у двери целится, но стреляет,
-  когда Otto снова можно задеть: иначе пуля проходила сквозь него.
+- **The basement is "P".** The HUD on the bottom floor says "PARKING", shaft
+  indicator boards and plaques say "P"; other floor numbers are as before.
+- **The exit is in the frame.** At boarding the camera widens left past the
+  building's end wall: the gate, the ramp and the street are visible, the car
+  drives up the ramp rather than into the frame edge.
+- **The bonus before the round change.** The bonus finishes counting on the
+  plate, then a fade, and only under black the bonus goes into the score and the
+  round number grows.
+- **Boarding is visible.** Otto turns to the car and gets in through the open
+  driver's door; the door is our own part on top of the pack model.
+- **An agent does not shoot an invulnerable Otto.** One waiting at the door
+  aims, but shoots when Otto can be hit again: otherwise the bullet passed
+  through him.
 
-## Чего в вехе нет
+## Not in the milestone
 
-- Оглядывание на крыше и самостоятельный вход в лифт из сценки ROM: у нас крыша —
-  отдельный уровень с техникой, путь к шахте — уже игра.
-- Правило возвращения после гибели из ROM (этаж не ниже пятого, у несобранной
-  двери) — открытый вопрос 4 остаётся.
-- Плавная анимация и переназначение клавиш — M24c.
+- Looking around on the roof and walking into the elevator by himself from the ROM
+  scene: our roof is a separate level with equipment, the way to the shaft is
+  already gameplay.
+- The ROM rule for returning after death (floor no lower than the fifth, at an
+  uncollected door) — open question 4 remains.
+- Smooth animation and key rebinding — M24c.
 
-## Последствия
+## Consequences
 
-- Бот ищет путь к одной шахте в подвал: проходимость проверяется на любом
-  здании тем же графом.
-- Тесты и маршруты кадров, ждущие приземления, ждут конца сценки вертолёта.
-- Время бота в здании растёт на сценку и на выход; бюджеты шагов — по прогону.
+- The bot finds a path to the one shaft into the basement: reachability is checked
+  on any building with the same graph.
+- Tests and frame routes waiting for landing wait for the end of the helicopter
+  scene.
+- The bot's time in a building grows by the scene and the exit; step budgets — per
+  the run.

@@ -1,71 +1,71 @@
 class_name PropCatalog
 extends RefCounted
 
-## Каталог моделей обстановки (ADR-0033, решение 3).
+## Catalogue of dressing models (ADR-0033, decision 3).
 ##
-## Модели паков лежат в `assets/models/props/` как пришли: у каждой свой рост и
-## свой фасад. Запись каталога приводит модель к игре — рост в метрах, поворот
-## лицом к камере, где она висит и в каком здании уместна. Рост ставится при
-## сборке по габариту модели, а не числом масштаба: переснятый пак с другими
-## единицами не разойдётся с игрой.
+## Pack models sit in `assets/models/props/` as they came: each has its own height and
+## its own front. A catalogue entry brings a model in line with the game — height in metres,
+## rotation to face the camera, where it hangs and in which building it fits. Height is set at
+## assembly from the model's bounds, not by a scale number: a re-exported pack with different
+## units will not diverge from the game.
 ##
-## Авторство — в `assets/models/props/credits.json` и `CREDITS.md`; тест сверяет,
-## что у каждой записи оно есть.
+## Attribution is in `assets/models/props/credits.json` and `CREDITS.md`; a test checks
+## that every entry has it.
 
-## Где предмет: стоит на полу у стены, висит на стене, стоит на крыше, стоит
-## только поверх другого (лампа на комоде — в жребий сама не идёт), стоит в
-## комнате за дверью ([DoorRoom]) — в коридор не идёт; стоит в зале особого
-## этажа ([FloorHall], ADR-0057) — в жребий коридора не идёт.
+## Where an item goes: stands on the floor by the wall, hangs on the wall, stands on the roof, is
+## only on top of another (a lamp on a dresser — does not enter the draw itself), stands in
+## the room behind a door ([DoorRoom]) — does not go into the corridor; stands in a special
+## floor hall ([FloorHall], ADR-0057) — does not enter the corridor draw.
 enum Place { FLOOR, WALL, ROOF, TOP, ROOM, HALL }
 
-## Для какого здания: отель, офис, жилой дом, любое.
+## For which building: hotel, office, residential building, any.
 enum Fit { HOTEL, OFFICE, RESIDENTIAL, ANY }
 
-## Слой рендера обстановки. Предметы видны, как все, но тень от заливки ламп не
-## отбрасывают: заливка — слабый широкий свет, её тень от стула на кадре не
-## видна, а рисовать обстановку лишний раз в её карту теней стоило внизу
-## здания, где ламп втрое больше, трети кадра (ADR-0042, решение 2). Тень под
-## конусом лампы у предметов остаётся.
+## Render layer of dressing. Items are visible like everything else, but cast no shadow from the
+## lamp fill light: the fill is a weak wide light, the shadow of a chair from it is not visible
+## in the frame, and drawing the dressing once more into its shadow map cost a third of the frame
+## at the bottom of the building, where there are three times more lamps (ADR-0042, decision 2).
+## The shadow under a lamp's cone stays for items.
 ##
-## Слой свой вместо первого, а не вдобавок к нему: маска теней берёт предмет, если
-## совпал хоть один слой, и на первом слое маска заливки его бы не отпустила.
+## Its own layer instead of the first one, not in addition to it: the shadow mask takes an item if
+## at least one layer matches, and on the first layer the fill mask would not let it go.
 const RENDER_LAYER: int = 1 << 10
 const DIR := "res://assets/models/props"
 
-## Мебель стоит в стольких метрах от задней стены: перед пилястрами
-## ([constant BuildingRibs.PILASTER_DEPTH]) и панелью, с зазором. Так широкий
-## диван проходит перед пилястрой, а не сквозь неё.
+## Furniture stands this many metres from the back wall: in front of the pilasters
+## ([constant BuildingRibs.PILASTER_DEPTH]) and the panel, with a gap. So a wide
+## sofa passes in front of a pilaster, not through it.
 const FLOOR_OFFSET: float = 0.24
 
-## Глубже этого мебель не бывает, м: от [constant FLOOR_OFFSET] до тела актёра,
-## которое начинается в 0.2 м от плоскости игры. Модель глубже сжимается по
-## глубине, как машина у выхода (ADR-0032): сбоку этого не видно.
+## Furniture is never deeper than this, m: from [constant FLOOR_OFFSET] to the actor's body,
+## which starts 0.2 m from the play plane. A deeper model is squeezed in
+## depth, like the car at the exit (ADR-0032): from the side this is not visible.
 const MAX_DEPTH: float = 0.54
 
-## Предмет на стене не шире этого, м: висит между пилястрами. Шире —
-## уменьшается целиком, а не сплющивается.
+## An item on the wall is no wider than this, m: it hangs between pilasters. A wider one
+## is scaled down as a whole, not flattened.
 const WALL_MAX_WIDTH: float = 0.7
 
-## На какой высоте середина предмета на стене, м, если запись не говорит иного.
+## At what height the middle of an item on the wall is, m, unless the entry says otherwise.
 const WALL_CENTRE: float = 1.65
 
 
-## Запись каталога.
+## Catalogue entry.
 class Entry:
 	extends RefCounted
 
 	var name: String
 	var place: Place = Place.FLOOR
 	var fit: Fit = Fit.ANY
-	## Рост в метрах: модель приводится к нему одним масштабом.
+	## Height in metres: the model is brought to it by a single scale.
 	var height: float = 1.0
-	## Поворот вокруг вертикали, градусы: фасад модели — к камере (+Z).
+	## Rotation around the vertical, degrees: the model's front — toward the camera (+Z).
 	var yaw: float = 0.0
-	## Наклон вокруг X, градусы: картина, пришедшая плашмя, встаёт на стену.
+	## Tilt around X, degrees: a picture that came lying flat stands up on the wall.
 	var pitch: float = 0.0
-	## Что стоит сверху: лампа на столике, на комоде.
+	## What stands on top: a lamp on a side table, on a dresser.
 	var top: String = ""
-	## Середина предмета на стене над полом, м.
+	## Middle of an item on the wall above the floor, m.
 	var centre: float = WALL_CENTRE
 
 	static func of(
@@ -79,36 +79,36 @@ class Entry:
 		entry.yaw = turn
 		return entry
 
-	## Наклон вокруг X. Возвращает себя: записи собираются цепочкой.
+	## Tilt around X. Returns itself: entries are built as a chain.
 	func tilted(degrees: float) -> Entry:
 		pitch = degrees
 		return self
 
-	## Что поставить сверху.
+	## What to put on top.
 	func topped(with_prop: String) -> Entry:
 		top = with_prop
 		return self
 
-	## Висит выше или ниже обычного.
+	## Hangs higher or lower than usual.
 	func raised(middle: float) -> Entry:
 		centre = middle
 		return self
 
 
 static var _entries: Dictionary = _build()
-## Габариты собранных предметов по имени: жребий раскладки спрашивает их на
-## каждом месте, а модель грузится один раз.
+## Bounds of assembled items by name: the layout draw asks for them at
+## every spot, while the model is loaded once.
 static var _footprints: Dictionary = {}
-## Габарит повёрнутой модели до масштаба, по имени.
+## Bounds of the rotated model before scaling, by name.
 static var _boxes: Dictionary = {}
-## Сцены моделей по имени. Кэш загрузчика держит ресурс, только пока на него
-## есть ссылка, а собранный предмет на сцену не ссылается: комната за дверью,
-## собранная на открытии и убранная на закрытии, читала бы .glb с диска заново
-## на каждой створке — посреди шага физики (авторевью M24i).
+## Model scenes by name. The loader cache keeps a resource only while there is a
+## reference to it, and an assembled item does not reference the scene: the room behind a door,
+## assembled on opening and removed on closing, would read the .glb from disk anew
+## on every door leaf — in the middle of a physics step (code review M24i).
 static var _scenes: Dictionary = {}
 
 
-## Все записи каталога.
+## All catalogue entries.
 static func entries() -> Array[Entry]:
 	var all: Array[Entry] = []
 	for entry: Entry in _entries.values():
@@ -116,12 +116,12 @@ static func entries() -> Array[Entry]:
 	return all
 
 
-## Запись по имени или null.
+## Entry by name, or null.
 static func entry(prop_name: String) -> Entry:
 	return _entries.get(prop_name) as Entry
 
 
-## Записи для места и здания.
+## Entries for a place and a building.
 static func pick(where: Place, which: Fit) -> Array[Entry]:
 	var found: Array[Entry] = []
 	for item: Entry in _entries.values():
@@ -131,12 +131,12 @@ static func pick(where: Place, which: Fit) -> Array[Entry]:
 	return found
 
 
-## Собирает предмет: модель, повёрнутая к камере и приведённая к росту, нуль —
-## посередине низа по ширине и у задней грани по глубине. Так предмет ставится
-## к стене одним сдвигом, какой бы глубины ни был. Узел без тел.
+## Assembles an item: the model rotated to the camera and brought to height, the origin —
+## at the middle of the bottom in width and at the back face in depth. So an item is placed
+## against the wall with one shift, whatever its depth. A node without bodies.
 ##
-## [param full_depth] — не сжимать по глубине: для комнаты за дверью, где
-## коридорная мебель стоит в свою настоящую глубину.
+## [param full_depth] — do not squeeze in depth: for the room behind a door, where
+## corridor furniture stands at its real depth.
 static func make(prop_name: String, full_depth: bool = false) -> Node3D:
 	var item := entry(prop_name)
 	var scene := _scenes.get(prop_name) as PackedScene
@@ -148,13 +148,13 @@ static func make(prop_name: String, full_depth: bool = false) -> Node3D:
 		scene = load(path) as PackedScene
 		_scenes[prop_name] = scene
 	var model := scene.instantiate() as Node3D
-	# Поворот — отдельным узлом над моделью: габарит считается уже повёрнутым.
+	# Rotation — a separate node above the model: the bounds are computed already rotated.
 	var turned := Node3D.new()
 	turned.add_child(model)
 	if item != null:
 		turned.rotation = Vector3(deg_to_rad(item.pitch), deg_to_rad(item.yaw), 0.0)
-	# Габарит модели один на все её копии: обход мешей — раз на имя, а не на
-	# каждый предмет здания.
+	# A model's bounds are one for all its copies: the mesh walk happens once per name, not for
+	# every item in the building.
 	if not _boxes.has(prop_name):
 		_boxes[prop_name] = PropCatalog.bounds_of_turned(turned)
 	var box: AABB = _boxes[prop_name]
@@ -164,8 +164,8 @@ static func make(prop_name: String, full_depth: bool = false) -> Node3D:
 		factor = minf(factor, WALL_MAX_WIDTH / maxf(box.size.x, 0.001))
 		height = box.size.y * factor
 	var squeeze := minf(1.0, MAX_DEPTH / maxf(box.size.z * factor, 0.001))
-	# Крыше и комнате за дверью глубины хватает: сжимается только то, что
-	# стоит в коридоре между стеной и актёрами.
+	# The roof and the room behind a door have enough depth: only what
+	# stands in the corridor between the wall and the actors is squeezed.
 	var deep := [Place.ROOF, Place.ROOM, Place.HALL]
 	if full_depth or (item != null and item.place in deep):
 		squeeze = 1.0
@@ -183,8 +183,8 @@ static func make(prop_name: String, full_depth: bool = false) -> Node3D:
 	if item != null and not item.top.is_empty():
 		var on_top := make(item.top, full_depth)
 		if on_top != null:
-			# Сверху, по середине глубины низа: лампа стоит на столешнице, а не
-			# на её заднем крае.
+			# On top, at the middle of the bottom's depth: the lamp stands on the tabletop, not
+			# on its back edge.
 			var depth := box.size.z * factor * squeeze
 			var top_depth := footprint(item.top).z
 			on_top.position = Vector3(0.0, height, (depth - top_depth) * 0.5)
@@ -192,16 +192,16 @@ static func make(prop_name: String, full_depth: bool = false) -> Node3D:
 	return holder
 
 
-## Переводит меши модели с первого слоя на слой обстановки [constant
-## RENDER_LAYER]: заливка ламп обстановку в свою тень не берёт (ADR-0042,
-## решение 2).
+## Moves the model's meshes from the first layer to the dressing layer [constant
+## RENDER_LAYER]: the lamp fill does not take dressing into its shadow (ADR-0042,
+## decision 2).
 static func _mark_as_props(model: Node) -> void:
 	for node: Node in model.find_children("*", "VisualInstance3D", true, false):
 		var visual := node as VisualInstance3D
 		visual.layers = (visual.layers & ~1) | RENDER_LAYER
 
 
-## Габарит собранного предмета, м: ширина, рост, глубина — с лампой сверху.
+## Bounds of an assembled item, m: width, height, depth — with the lamp on top.
 static func footprint(prop_name: String) -> Vector3:
 	if not _footprints.has(prop_name):
 		var built := make(prop_name)
@@ -211,7 +211,7 @@ static func footprint(prop_name: String) -> Vector3:
 	return _footprints[prop_name]
 
 
-## Габарит узла с учётом его собственного поворота — как он стоит у родителя.
+## Bounds of a node including its own rotation — as it stands in its parent.
 static func bounds_of_turned(node: Node3D) -> AABB:
 	var wrapper_box := AABB()
 	var first := true
@@ -225,8 +225,8 @@ static func bounds_of_turned(node: Node3D) -> AABB:
 	return wrapper_box
 
 
-## Габарит всех мешей узла в его собственной системе. Узел может быть ещё не в
-## дереве: преобразования складываются вручную, а не через global_transform.
+## Bounds of all meshes of a node in its own space. The node may not be in the
+## tree yet: transforms are combined by hand, not via global_transform.
 static func bounds_of(node: Node3D) -> AABB:
 	var box := AABB()
 	var first := true
@@ -247,12 +247,12 @@ static func bounds_of(node: Node3D) -> AABB:
 	return box
 
 
-## Каталог. Рост — в метрах, как в жизни рядом с Otto в 1.68; поворот — по
-## кадру `tools/props_shot.tscn -- --raw`: какие модели пришли боком, спиной
-## или плашмя.
+## The catalogue. Height — in metres, as in life next to Otto at 1.68; rotation — by
+## the frame `tools/props_shot.tscn -- --raw`: which models came sideways, backwards
+## or lying flat.
 static func _build() -> Dictionary:
 	var list: Array[Entry] = [
-		# Пол, любое здание.
+		# Floor, any building.
 		Entry.of("houseplant_a", Place.FLOOR, Fit.ANY, 0.9),
 		Entry.of("houseplant_b", Place.FLOOR, Fit.ANY, 1.0),
 		Entry.of("houseplant_c", Place.FLOOR, Fit.ANY, 1.3),
@@ -261,9 +261,9 @@ static func _build() -> Dictionary:
 		Entry.of("trashcan", Place.FLOOR, Fit.ANY, 0.6),
 		Entry.of("vending_machine", Place.FLOOR, Fit.ANY, 1.85),
 		Entry.of("fire_extinguisher", Place.FLOOR, Fit.ANY, 0.6),
-		# Табличка «Мокрый пол» — в любом здании: уборщица прошла (ADR-0048).
+		# A "Wet floor" sign — in any building: the cleaner has passed (ADR-0048).
 		Entry.of("wet_floor_sign", Place.FLOOR, Fit.ANY, 0.62),
-		# Пол, отель: гостиная у лифтов, а не склад.
+		# Floor, hotel: a lounge by the lifts, not a storeroom.
 		Entry.of("couch_medium", Place.FLOOR, Fit.HOTEL, 0.8),
 		Entry.of("armchair", Place.FLOOR, Fit.HOTEL, 0.9),
 		Entry.of("floor_lamp", Place.FLOOR, Fit.HOTEL, 1.6),
@@ -273,25 +273,25 @@ static func _build() -> Dictionary:
 		Entry.of("cabinet", Place.FLOOR, Fit.HOTEL, 0.9),
 		Entry.of("table_lamp", Place.TOP, Fit.HOTEL, 0.5),
 		Entry.of("bench_hotel", Place.FLOOR, Fit.HOTEL, 0.85),
-		# Пол, офис.
+		# Floor, office.
 		Entry.of("water_cooler", Place.FLOOR, Fit.OFFICE, 1.2),
 		Entry.of("file_cabinet", Place.FLOOR, Fit.OFFICE, 1.3, -90.0),
 		Entry.of("copier", Place.FLOOR, Fit.OFFICE, 1.2),
 		Entry.of("cardboard_boxes", Place.FLOOR, Fit.OFFICE, 1.0),
 		Entry.of("bins", Place.FLOOR, Fit.OFFICE, 0.9),
 		Entry.of("bookshelf", Place.FLOOR, Fit.OFFICE, 1.6),
-		# Приёмная у кабинетов: кресло для посетителей и торшер (ADR-0048).
+		# A reception by the offices: an armchair for visitors and a floor lamp (ADR-0048).
 		Entry.of("lounge_chair", Place.FLOOR, Fit.OFFICE, 0.85),
 		Entry.of("light_stand", Place.FLOOR, Fit.OFFICE, 1.6),
-		# Пол, жилой дом (ADR-0055, решение 4): подъезд, а не гостиная —
-		# батарея, велосипед у стены, мешки с мусором до утра.
+		# Floor, residential building (ADR-0055, decision 4): a stairwell entrance, not a lounge —
+		# a radiator, a bicycle by the wall, garbage bags until morning.
 		Entry.of("radiator", Place.FLOOR, Fit.RESIDENTIAL, 0.68),
 		Entry.of("stroller", Place.FLOOR, Fit.RESIDENTIAL, 1.0),
 		Entry.of("bicycle", Place.FLOOR, Fit.RESIDENTIAL, 1.0),
 		Entry.of("trash_bags", Place.FLOOR, Fit.RESIDENTIAL, 0.55),
 		Entry.of("trash_bag", Place.FLOOR, Fit.RESIDENTIAL, 0.6),
-		# Стены: картины — везде, остальное — по зданию. Wall Art пришли
-		# спиной к камере, Painting — плашмя.
+		# Walls: pictures — everywhere, the rest — by building. Wall Art came
+		# with its back to the camera, Painting — lying flat.
 		Entry.of("painting", Place.WALL, Fit.ANY, 0.6).tilted(90.0),
 		Entry.of("wall_art_02", Place.WALL, Fit.ANY, 0.9, 180.0),
 		Entry.of("wall_art_03", Place.WALL, Fit.ANY, 0.9, 180.0),
@@ -306,8 +306,8 @@ static func _build() -> Dictionary:
 		Entry.of("air_vent", Place.WALL, Fit.OFFICE, 0.45, 90.0),
 		Entry.of("fire_exit_sign", Place.WALL, Fit.ANY, 0.3, -90.0).raised(2.35),
 		Entry.of("mailboxes", Place.WALL, Fit.RESIDENTIAL, 0.66).raised(1.35),
-		# Комната за дверью (ADR-0047): в неё видно в открытую створку. Рабочие
-		# места dook пришли боком — столом к +X.
+		# The room behind a door (ADR-0047): it is visible through the open door leaf. dook
+		# workstations came sideways — desk toward +X.
 		Entry.of("bed_hotel", Place.ROOM, Fit.HOTEL, 0.8),
 		Entry.of("bed_double", Place.ROOM, Fit.HOTEL, 1.15),
 		Entry.of("night_stand", Place.ROOM, Fit.HOTEL, 0.58).topped("table_lamp"),
@@ -318,8 +318,8 @@ static func _build() -> Dictionary:
 		Entry.of("office_chair", Place.ROOM, Fit.OFFICE, 1.05),
 		Entry.of("workstation_a", Place.ROOM, Fit.OFFICE, 1.45, 90.0),
 		Entry.of("workstation_b", Place.ROOM, Fit.OFFICE, 1.35, 90.0),
-		# Квартира (ADR-0055, решение 5): кухня, гостиная, спальня — кровать
-		# и тумбы берутся у номера отеля.
+		# Apartment (ADR-0055, decision 5): kitchen, living room, bedroom — the bed
+		# and nightstands are taken from the hotel room.
 		Entry.of("fridge", Place.ROOM, Fit.RESIDENTIAL, 1.7),
 		Entry.of("stove", Place.ROOM, Fit.RESIDENTIAL, 0.92),
 		Entry.of("counter_sink", Place.ROOM, Fit.RESIDENTIAL, 1.06),
@@ -328,8 +328,8 @@ static func _build() -> Dictionary:
 		Entry.of("tv_old", Place.ROOM, Fit.RESIDENTIAL, 0.9, 180.0),
 		Entry.of("sofa", Place.ROOM, Fit.RESIDENTIAL, 0.78),
 		Entry.of("paper_bag", Place.TOP, Fit.RESIDENTIAL, 0.38, 90.0),
-		# Залы особых этажей (ADR-0057, решение 5): Kenney Furniture Kit, цвет —
-		# по типу здания ([HallLook]). Фасадом к камере пришли все.
+		# Special floor halls (ADR-0057, decision 5): Kenney Furniture Kit, colour —
+		# by building kind ([HallLook]). All came facing the camera.
 		Entry.of("washer", Place.HALL, Fit.ANY, 0.85),
 		Entry.of("dryer", Place.HALL, Fit.ANY, 0.85),
 		Entry.of("washer_dryer", Place.HALL, Fit.ANY, 1.8),
@@ -353,7 +353,7 @@ static func _build() -> Dictionary:
 		Entry.of("floor_lamp_round", Place.HALL, Fit.ANY, 1.65),
 		Entry.of("tv_modern", Place.HALL, Fit.ANY, 0.75),
 		Entry.of("speaker", Place.HALL, Fit.ANY, 1.1),
-		# Крыша (ADR-0033, решение 8).
+		# Roof (ADR-0033, decision 8).
 		Entry.of("water_tower", Place.ROOF, Fit.ANY, 4.5),
 		Entry.of("water_tank", Place.ROOF, Fit.ANY, 2.5),
 		Entry.of("air_conditioner", Place.ROOF, Fit.ANY, 0.9),

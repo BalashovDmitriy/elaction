@@ -1,9 +1,9 @@
 extends GutTest
 
-## Наклон ортокамеры (ADR-0023, решение 1): ось камеры проходит через цель в
-## плоскости игры, кадр по вертикали накрывает чуть больше, слушатель остаётся
-## в плоскости. Наклон — свойство камеры, и мир о нём не знает: [CameraBounds]
-## проверяется отдельно и без сцены.
+## Orthographic camera tilt (ADR-0023, decision 1): the camera axis passes through the
+## target in the play plane, the frame covers slightly more vertically, the listener stays
+## in the plane. The tilt is a camera property and the world does not know about it:
+## [CameraBounds] is checked separately and without a scene.
 
 const POINT := Vector2(3.0, 7.0)
 
@@ -21,8 +21,9 @@ func test_the_camera_looks_down_from_above() -> void:
 	assert_eq(camera.projection, Camera3D.PROJECTION_ORTHOGONAL, "и всё ещё орто")
 
 
-## Камера стоит выше цели ровно настолько, чтобы её ось пришла в цель на Z = 0:
-## иначе наклон смотрел бы под ноги, и кадр уехал бы вниз на каждом этаже.
+## The camera stands above the target exactly enough for its axis to hit the target at
+## Z = 0: otherwise the tilt would look at the feet, and the frame would drift down on
+## every floor.
 func test_the_axis_passes_through_the_target_in_the_play_plane() -> void:
 	var camera := _camera()
 	camera.snap_to(POINT)
@@ -35,9 +36,9 @@ func test_the_axis_passes_through_the_target_in_the_play_plane() -> void:
 	assert_gt(camera.global_position.y, POINT.y, "камера выше цели")
 
 
-## Наклонённый кадр режет плоскость игры под углом и накрывает по вертикали
-## больше своего размера — на 1/cos(наклон). Иначе полоса видимых этажей
-## считалась бы по кадру, которого нет, и лампы у края гасли бы в кадре.
+## A tilted frame cuts the play plane at an angle and covers more than its size
+## vertically, by 1/cos(tilt). Otherwise the band of visible floors would be computed
+## from a frame that does not exist, and lamps at the edge would go out in the frame.
 func test_the_frame_covers_a_little_more_height_for_the_tilt() -> void:
 	var camera := _camera()
 	camera.snap_to(Vector2.ZERO)

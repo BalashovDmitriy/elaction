@@ -1,20 +1,20 @@
 extends GutTest
 
-## Паркинг нижнего этажа (ADR-0038, решение 3) на любом здании.
+## The bottom floor garage (ADR-0038, decision 3) on any building.
 ##
-## Раскладка — колонны, места, чужие машины — проверяется без сцены на многих
-## сидах и навыках; сборка — на нескольких сидах: паркинг строится, машины за
-## плоскостью игры, ворота у левого торца, грани разных материалов не в одной
-## плоскости (подход — [code]test_shaft_faces.gd[/code]).
+## The layout — columns, bays, other cars — is checked without a scene on many
+## seeds and skills; the build — on several seeds: the garage is built, cars are behind
+## the play plane, the gate is at the left end wall, faces of different materials are not
+## in one plane (approach — [code]test_shaft_faces.gd[/code]).
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
 const SEEDS: Array[int] = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
 const SKILLS: Array[int] = [0, 5]
-## Сиды сборки: сцена дороже раскладки.
+## Build seeds: a scene costs more than a layout.
 const BUILT_SEEDS: Array[int] = [1, 2, 5]
 
-## Допуск «в одной плоскости», м.
+## "In one plane" tolerance, m.
 const COPLANAR: float = 0.001
 
 
@@ -28,8 +28,8 @@ func _rules(skill: int) -> BuildingRules:
 	return rules
 
 
-## Чужие машины — на местах, мимо машины Otto, выхода, ядер шахт и стен, и
-## внутри стен этажа; место под ними не уже машины.
+## Other cars are in bays, clear of Otto's car, the exit, shaft cores and walls, and
+## inside the floor walls; the bay under them is not narrower than a car.
 func test_parked_cars_keep_clear_on_any_building() -> void:
 	var total := 0
 	for skill: int in SKILLS:
@@ -56,7 +56,7 @@ func test_parked_cars_keep_clear_on_any_building() -> void:
 	assert_gt(total, SEEDS.size(), "машин почти нет — паркинг пуст")
 
 
-## Паркинг один и тот же на одном сиде и разный на разных.
+## The garage is the same on the same seed and different on different ones.
 func test_parked_cars_follow_the_seed() -> void:
 	var rules := _rules(0)
 	var plan := BuildingPlan.generate(rules, 3)
@@ -66,7 +66,7 @@ func test_parked_cars_follow_the_seed() -> void:
 	assert_ne(first, _signature(Garage.parked(rules, other, 4)), "два здания — один паркинг")
 
 
-## Места не налезают друг на друга и на колонны, колонны — на ядра шахт.
+## Bays do not overlap each other or the columns, columns do not overlap shaft cores.
 func test_bays_and_columns_do_not_overlap() -> void:
 	for skill: int in SKILLS:
 		var rules := _rules(skill)
@@ -94,7 +94,7 @@ func test_bays_and_columns_do_not_overlap() -> void:
 					)
 
 
-## Ворота — в левом торце нижнего этажа, в толще стены.
+## The gate is in the left end wall of the bottom floor, inside the wall.
 func test_the_gate_is_at_the_left_end() -> void:
 	for skill: int in SKILLS:
 		var rules := _rules(skill)
@@ -103,8 +103,8 @@ func test_the_gate_is_at_the_left_end() -> void:
 		assert_between(gate, left, left + BuildingShell.WALL_WIDTH, "навык %d" % skill)
 
 
-## Паркинг собирается на каждом сиде: зал, машины за плоскостью игры, ворота у
-## левого торца, вывеска EXIT над ними, светильники в зонах ламп.
+## The garage is built on every seed: the hall, cars behind the play plane, the gate at the
+## left end wall, the EXIT sign above it, fixtures in lamp zones.
 func test_the_garage_builds_on_every_seed() -> void:
 	for building_seed: int in BUILT_SEEDS:
 		var level := _build(building_seed)
@@ -154,8 +154,8 @@ func test_the_garage_builds_on_every_seed() -> void:
 		remove_child(level)
 
 
-## Ворота поднимаются: [method Garage.open_gate] доводит штору до верха шагами
-## физики.
+## The gate rises: [method Garage.open_gate] brings the shutter to the top in physics
+## steps.
 func test_the_gate_opens() -> void:
 	var level := _build(1)
 	var garage := level.garage()
@@ -171,7 +171,7 @@ func test_the_gate_opens() -> void:
 	remove_child(level)
 
 
-## Упавшая лампа гасит светильники своей зоны — и только их.
+## A fallen lamp darkens the fixtures of its zone — and only them.
 func test_a_fallen_lamp_puts_out_its_tubes() -> void:
 	var level := _build(2)
 	var garage := level.garage()
@@ -199,9 +199,9 @@ func test_a_fallen_lamp_puts_out_its_tubes() -> void:
 	remove_child(level)
 
 
-## Новые коробки паркинга не делят грань с коробкой другого материала — ни
-## своей, ни оболочки, ни шахт, ни рёбер. Сиды сборки — на разных типах
-## здания: отделка паркинга у каждого своя (ADR-0058, решение 5).
+## New garage boxes do not share a face with a box of another material — neither
+## their own, nor the shell, nor shafts, nor edges. Build seeds are of different building
+## kinds: each has its own garage finish (ADR-0058, decision 5).
 func test_no_two_materials_share_a_face_in_the_garage() -> void:
 	for index: int in BUILT_SEEDS.size():
 		var building_seed := BUILT_SEEDS[index]
@@ -228,7 +228,7 @@ func test_no_two_materials_share_a_face_in_the_garage() -> void:
 		remove_child(level)
 
 
-## Здание сида [param building_seed] типа [param kind]: первое такое в партии.
+## Building of seed [param building_seed] of kind [param kind]: the first such in a game.
 func _build(
 	building_seed: int, kind: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL
 ) -> GreyboxLevel:
@@ -249,7 +249,7 @@ func _signature(cars: Array[Garage.Parked]) -> String:
 	return ",".join(parts)
 
 
-## Где висят светильники: x трубок.
+## Where the fixtures hang: x of the tubes.
 func _tube_xs(garage: Garage) -> PackedFloat64Array:
 	var found := PackedFloat64Array()
 	var tube_color := Garage.TUBE
@@ -261,7 +261,7 @@ func _tube_xs(garage: Garage) -> PackedFloat64Array:
 	return found
 
 
-## Объём нижнего этажа в сцене: от пола до потолка и чуть за ними.
+## Volume of the bottom floor in the scene: from floor to ceiling and slightly beyond.
 func _bottom_region(rules: BuildingRules) -> AABB:
 	var bottom := rules.floors - 1
 	var top := WorldSpace.height_to_scene(rules.story_top(bottom))
@@ -271,7 +271,7 @@ func _bottom_region(rules: BuildingRules) -> AABB:
 	)
 
 
-## Объём модели по её мешам в координатах сцены.
+## Volume of a model by its meshes in scene coordinates.
 func _bounds_of(model: Node3D) -> AABB:
 	var box := AABB()
 	var first := true
@@ -283,8 +283,8 @@ func _bounds_of(model: Node3D) -> AABB:
 	return box
 
 
-## Коробки без поворота: [AABB, материал]. Пандус за воротами — наклонный и
-## за кадром — не в счёт; штора, пока закрыта, без масштаба.
+## Unrotated boxes: [AABB, material]. The ramp beyond the gate is tilted and
+## off-frame — not counted; the shutter, while closed, has no scale.
 func _boxes(root: Node, garage: Garage) -> Array[Array]:
 	var ramp := garage.gate.get_node_or_null("Ramp")
 	var found: Array[Array] = []
@@ -300,9 +300,9 @@ func _boxes(root: Node, garage: Garage) -> Array[Array]:
 	return found
 
 
-## Пары коробок разных материалов с гранью в одной плоскости и одной нормалью,
-## которые перекрываются по площади. [param same] — [param a] и [param b] один
-## список: пара не проверяется дважды.
+## Pairs of boxes of different materials with a face in one plane and with one normal
+## that overlap in area. [param same] — [param a] and [param b] are one
+## list: a pair is not checked twice.
 func _clashes(a: Array[Array], b: Array[Array], same: bool) -> Array[String]:
 	var clashes: Array[String] = []
 	for i in a.size():

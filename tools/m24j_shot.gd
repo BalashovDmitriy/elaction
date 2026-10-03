@@ -1,12 +1,13 @@
 extends Node3D
 
-## Кадры M24j: каждое сочетание времени суток и погоды — крыша с городом,
-## этаж башни, паркинг у выезда (ADR-0051).
+## M24j shots: every combination of time of day and weather — the roof with the city,
+## a tower floor, the garage at the exit (ADR-0051).
 ##
-## Время суток и погода ставятся руками, а не подбором сида: здание одно и то
-## же, и сочетания сравниваются рядом. Рендер настоящий — нужен экран.
+## Time of day and weather are set by hand, not by picking a seed: the building is the
+## same, and combinations are compared side by side. The render is real — a screen is
+## needed.
 ##
-## Запуск:
+## Launch:
 ##     godot --path . res://tools/m24j_shot.tscn
 ##     godot --path . res://tools/m24j_shot.tscn -- --time=1 --weather=0
 ##     godot --path . res://tools/m24j_shot.tscn -- --only=roof
@@ -25,15 +26,15 @@ var _level: GreyboxLevel = null
 var _folder: String = FOLDER
 var _times: Array[int] = [0, 1, 2, 3]
 var _weathers: Array[int] = [0, 1, 2, 3]
-## Какие кадры снимать: roof, floor, garage, street, room; пусто — все. Улица у
-## выезда (M24k, ADR-0052, решение 3) снимается камерой без Otto: он на неё не
-## выходит.
+## Which shots to take: roof, floor, garage, street, room; empty — all. The exit street
+## (M24k, ADR-0052, decision 3) is shot by a camera without Otto: he does not go out
+## there.
 var _only: String = ""
 var _seed: int = BUILDING_SEED
-## Тип здания ([enum BuildingIdentity.Kind]): `--kind=2` — жилой дом. −1 — как
-## выпадет у первого здания партии, отель.
+## Building kind ([enum BuildingIdentity.Kind]): `--kind=2` — residential. −1 — whatever
+## the first building of the game gets, the hotel.
 var _kind: int = -1
-## Какой этаж снимать кадром floor: `--floor=24` — стилобат внизу.
+## Which floor the floor shot takes: `--floor=24` — the podium below.
 var _floor: int = 2
 
 
@@ -110,12 +111,12 @@ func _shoot_floor(label: String, index: int) -> void:
 	await _shoot(label)
 
 
-## Otto проходит по крыше туда и обратно, и кадр — с цепочкой следов на снегу
-## (M24l, ADR-0054). Только по флагу [code]--only=walk[/code]: в остальные
-## погоды цепочки нет, и общий набор кадров её не ждёт.
+## Otto walks across the roof and back, and the shot shows the trail of footprints in
+## the snow (M24l, ADR-0054). Only with the [code]--only=walk[/code] flag: in other
+## weathers there is no trail, and the common set of shots does not expect it.
 func _shoot_walk(label: String) -> void:
 	await _level.wait_for_the_landing()
-	# Вертолёт улетает: без него виден весь настил.
+	# The helicopter flies away: without it the whole deck is visible.
 	for _frame: int in 360:
 		await get_tree().physics_frame
 	for action: StringName in [&"move_right", &"move_left"]:
@@ -141,7 +142,8 @@ func _place(x: float, index: int) -> void:
 	_level.otto.velocity = Vector3.ZERO
 
 
-## Улица у выезда: камера отпускает Otto и встаёт над мостовой левее торца.
+## The exit street: the camera releases Otto and settles over the roadway left of the
+## end wall.
 func _shoot_street(label: String) -> void:
 	var camera := get_viewport().get_camera_3d() as SideCamera
 	if camera == null:
@@ -159,9 +161,10 @@ func _shoot_street(label: String) -> void:
 	camera.follow(_level.otto)
 
 
-## Прохожие у выезда крупно (M24l, ADR-0054, решение 11): камера наезжает на
-## каждого из первых трёх и ведёт его, пока кадр встаёт, — видно, во что одет и
-## как несёт зонт. Только по флагу [code]--only=people[/code].
+## Pedestrians at the exit in close-up (M24l, ADR-0054, decision 11): the camera closes
+## in on each of the first three and follows him while the frame settles — showing what
+## he wears and how he carries the umbrella. Only with the [code]--only=people[/code]
+## flag.
 func _shoot_people(tag: String) -> void:
 	await _shoot_street("%s_street" % tag)
 	var camera := get_viewport().get_camera_3d() as SideCamera
@@ -185,8 +188,8 @@ func _shoot_people(tag: String) -> void:
 	camera.follow(_level.otto)
 
 
-## Комната за дверью с городом в окне (ADR-0052, решение 5): дверь на этаже
-## Otto открывается, как для агента, и кадр — когда створка распахнута.
+## The room behind the door with the city in the window (ADR-0052, decision 5): the door
+## on Otto's floor opens, as for an agent, and the shot is taken when the leaf is open.
 func _shoot_room(label: String) -> void:
 	var index := 4
 	var surface := _level.rules.floor_surface(index)
@@ -207,7 +210,7 @@ func _shoot_room(label: String) -> void:
 			break
 		await get_tree().physics_frame
 	await _shoot(label)
-	# И крупно: проём с окном и городом за ним.
+	# And in close-up: the opening with the window and the city behind it.
 	var camera := get_viewport().get_camera_3d() as SideCamera
 	if camera != null:
 		var at := WorldSpace.to_scene(door.mat_position())

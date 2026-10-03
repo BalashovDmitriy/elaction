@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""Прогон проверок на чистой копии — так, как их видит CI.
+"""Runs the checks on a clean copy — the way CI sees them.
 
-CI клонирует репозиторий заново, и там нет ничего, чего нет в гите: ни папки
-`.godot` с кэшем импорта, ни сгенерированных `*.translation`, ни локальных
-настроек. Поэтому проверки, зелёные на рабочей машине, на чистом чекауте могут
-упасть — ровно это и случилось в M8b: движок грузил переводы, которых на свежем
-клоне ещё нет, потому что их делает сам импорт.
+CI clones the repository afresh, and there is nothing there that is not in git: no
+`.godot` folder with the import cache, no generated `*.translation`, no local
+settings. So checks that are green on the work machine may fail on a clean checkout —
+this is exactly what happened in M8b: the engine loaded translations that do not yet exist
+on a fresh clone, because the import itself produces them.
 
-Скрипт раскладывает ревизию во временную рабочую копию (`git worktree`) и гоняет
-там `godot_check.py` и `run_tests.py`. Незакоммиченные правки в неё не попадают —
-в этом и смысл: проверяется то, что уедет в CI, а не то, что лежит на диске.
+The script checks out the revision into a temporary working copy (`git worktree`) and runs
+`godot_check.py` and `run_tests.py` there. Uncommitted changes do not get into it —
+that is the point: what is checked is what goes to CI, not what lies on disk.
 
-Прогон долгий: импорт ресурсов с нуля занимает минуты. Поэтому он не в хуках,
-а запускается руками перед PR.
+The run is long: importing resources from scratch takes minutes. So it is not in the hooks,
+but is run by hand before a PR.
 
-Запуск:
+Run:
     python tools/clean_check.py              # HEAD
-    python tools/clean_check.py origin/main  # любая ревизия, понятная git
+    python tools/clean_check.py origin/main  # any revision git understands
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ CHECKS = ("tools/godot_check.py", "tools/run_tests.py")
 
 
 def git(*args: str) -> subprocess.CompletedProcess[str]:
-    """Запускает git в папке проекта."""
+    """Runs git in the project folder."""
     return subprocess.run(
         ["git", "-C", str(PROJECT_ROOT), *args],
         capture_output=True,
@@ -45,7 +45,7 @@ def git(*args: str) -> subprocess.CompletedProcess[str]:
 
 
 def warn_if_dirty() -> None:
-    """Предупреждает, что незакоммиченное в прогон не попадёт."""
+    """Warns that uncommitted changes do not get into the run."""
     changed = git("status", "--porcelain").stdout.strip()
     if changed:
         count = len(changed.splitlines())
@@ -57,7 +57,7 @@ def warn_if_dirty() -> None:
 
 
 def run_checks(worktree: Path) -> bool:
-    """Гоняет проверки в чистой копии. True, если все прошли."""
+    """Runs the checks in a clean copy. True if all passed."""
     ok = True
     for check in CHECKS:
         print(f"\n== {check} на чистой копии ==", flush=True)
@@ -71,7 +71,7 @@ def run_checks(worktree: Path) -> bool:
 
 
 def remove_worktree(worktree: Path) -> None:
-    """Убирает временную копию, не роняя прогон из-за занятого файла."""
+    """Removes the temporary copy without failing the run because of a busy file."""
     if git("worktree", "remove", "--force", str(worktree)).returncode == 0:
         return
     shutil.rmtree(worktree, ignore_errors=True)
@@ -89,7 +89,7 @@ def main(argv: list[str]) -> int:
 
     warn_if_dirty()
     worktree = Path(tempfile.mkdtemp(prefix="elaction-clean-"))
-    # mkdtemp уже создал папку, а git worktree add требует, чтобы её не было.
+    # mkdtemp has already created the folder, and git worktree add requires it not to exist.
     worktree.rmdir()
 
     added = git("worktree", "add", "--detach", str(worktree), revision)

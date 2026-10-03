@@ -1,11 +1,11 @@
 extends SceneTree
 
-## Прохожие крупно, в студии (M24l, ADR-0054, решение 11): ровный пол, свет
-## дня, ортокамера сбоку — видно, во что каждый одет, нет ли открытого тела не
-## по погоде и как он несёт зонт. По кадру на погоду и время суток: одежда
-## зависит от них ([method Passerby.dress_for]).
+## Pedestrians close up, in a studio (M24l, ADR-0054, decision 11): a flat floor, daylight,
+## an ortho camera from the side — one can see what each is wearing, whether there is bare
+## skin unsuited to the weather and how he carries the umbrella. A shot per weather and time
+## of day: clothing depends on them ([method Passerby.dress_for]).
 ##
-## Запуск (нужен экран):
+## Run (a screen is needed):
 ##     godot --path . --script res://tools/people_shot.gd
 ##     godot --path . --script res://tools/people_shot.gd -- --weather=2 --time=1
 
@@ -54,7 +54,7 @@ func _shoot(weather: int, time: int) -> void:
 	stage.add_child(people)
 	people.build(-6.0, 6.0, 0.0, 7, time as TimeOfDay.Kind, weather as Weather.Kind)
 	people.set_process(false)
-	# Строем у камеры: по прохожему на полтора метра, лицом вбок.
+	# Lined up by the camera: one pedestrian per metre and a half, facing sideways.
 	var index := 0
 	var first := 0.6 - (people.get_child_count() - 1) * 0.8
 	for walker in people.get_children():

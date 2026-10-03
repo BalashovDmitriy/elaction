@@ -1,36 +1,38 @@
 class_name Lightning
 extends Node3D
 
-## Молнии в дождь (M22, просьба пользователя: «если дождь — ещё молний, и
-## отсветы в окнах»).
+## Lightning in rain (M22, the user's request: "if it rains — lightning too, and
+## reflections in the windows").
 ##
-## Раз в несколько секунд — серия вспышек: небо города вспыхивает, тёмные
-## стёкла домов загораются отражённым светом, а воздух здания на миг светлеет.
-## Изредка виден сам разряд — ломаная над дальним рядом. Источников света не
-## добавляет: вспышка — яркость неба, стёкол и окружающего света, а не лампа.
+## Every few seconds — a series of flashes: the city sky flares, the dark
+## panes of the houses light up with reflected light, and the building's air brightens for
+## a moment. Occasionally the bolt itself is visible — a zigzag over the far row. It adds no
+## light sources: a flash is the brightness of the sky, the panes and the ambient light, not
+## a lamp.
 ##
-## Гром (M23) идёт за каждой серией с задержкой по дальности: видимый разряд
-## бьёт в дальний ряд города, невидимый — за горизонтом (ADR-0036, решение 5).
+## Thunder (M23) follows each series with a delay by distance: a visible bolt
+## strikes the far row of the city, an invisible one — beyond the horizon (ADR-0036,
+## decision 5).
 
-## Пауза между сериями, с.
+## Pause between series, s.
 const PAUSE := Vector2(5.0, 13.0)
-## Вспышки серии: включения и паузы, с, и яркость каждого включения.
+## Flashes of a series: on-times and pauses, s, and the brightness of each flash.
 const PULSES: Array[Vector3] = [
 	Vector3(0.07, 0.05, 1.0), Vector3(0.05, 0.09, 0.55), Vector3(0.14, 0.0, 0.85)
 ]
-## Как быстро гаснет вспышка после включения, 1/с.
+## How fast a flash fades after switching on, 1/s.
 const FADE: float = 9.0
-## Тусклее этого вспышка уже погасла.
+## Dimmer than this the flash has already gone out.
 const DARK: float = 0.002
-## С каким шансом серию видно разрядом.
+## With what chance a series is seen as a bolt.
 const BOLT_CHANCE: float = 0.55
 const BOLT_COLOUR := Color(0.85, 0.9, 1.0)
-## Где ударил разряд, которого не видно, м: за горизонтом города.
+## Where an invisible bolt struck, m: beyond the city horizon.
 const UNSEEN_DISTANCE := Vector2(1500.0, 3200.0)
-## Глубина дальнего ряда, где встаёт видимый разряд, м.
+## Depth of the far row where a visible bolt appears, m.
 const BOLT_DEPTH: float = 560.0
 
-## Где ударила последняя серия, м. Нужен тестам.
+## Where the last series struck, m. Needed by tests.
 var last_distance: float = 0.0
 
 var _rng := RandomNumberGenerator.new()
@@ -43,8 +45,8 @@ var _span := Vector2(0.0, 40.0)
 var _ground: float = 0.0
 
 
-## Молнии над городом шириной [param span] (x сцены города) с землёй на
-## [param ground]. Сид — чтобы серии здания повторялись.
+## Lightning over a city of width [param span] (x of the city scene) with the ground at
+## [param ground]. The seed is there so the building's series repeat.
 func setup(building_seed: int, span: Vector2, ground: float) -> void:
 	name = "Lightning"
 	_rng.seed = hash([building_seed, "lightning"])
@@ -53,16 +55,16 @@ func setup(building_seed: int, span: Vector2, ground: float) -> void:
 	_wait = _rng.randf_range(1.5, PAUSE.x)
 
 
-## Яркость вспышки прямо сейчас, 0–1.
+## Flash brightness right now, 0–1.
 func level() -> float:
 	return _level
 
 
-## Ведёт серию на [param delta] секунд.
+## Advances the series by [param delta] seconds.
 func advance(delta: float) -> void:
 	_level = maxf(_level - _level * FADE * delta, 0.0)
-	# Экспонента нуля не достигает: без порога небо и стёкла переписывались бы
-	# каждый кадр и между сериями.
+	# The exponential never reaches zero: without a threshold the sky and panes would be
+	# rewritten every frame, between series too.
 	if _level < DARK:
 		_level = 0.0
 	if _pulse < 0:
@@ -96,8 +98,8 @@ func _process(delta: float) -> void:
 	advance(delta)
 
 
-## Разряд: ломаная от неба к крыше дальнего ряда, с отростком. Возвращает,
-## как далеко он от середины города, м.
+## A bolt: a zigzag from the sky to the roof of the far row, with a branch. Returns
+## how far it is from the middle of the city, m.
 func _strike() -> float:
 	if _bolt == null:
 		_bolt = MeshInstance3D.new()
@@ -127,10 +129,10 @@ func _strike() -> float:
 	return sqrt(BOLT_DEPTH * BOLT_DEPTH + aside * aside)
 
 
-## Разряд для прогрева шейдера ([ShaderWarmup]): та же ломаная тем же
-## [ImmediateMesh] и материалом, в том же окне города — иначе прогрелся бы не
-## тот конвейер. Прямой, без жребия: серии здания от прогрева не меняются.
-## Отдаёт узел; убрать его — дело прогрева.
+## A bolt for shader warm-up ([ShaderWarmup]): the same zigzag with the same
+## [ImmediateMesh] and material, in the same city window — otherwise the wrong
+## pipeline would warm up. Straight, without a draw: the building's series do not change
+## from the warm-up. Returns the node; removing it is the warm-up's job.
 func warm_up() -> MeshInstance3D:
 	var bolt := MeshInstance3D.new()
 	bolt.name = "WarmBolt"
@@ -142,22 +144,22 @@ func warm_up() -> MeshInstance3D:
 	mesh.surface_end()
 	bolt.mesh = mesh
 	bolt.position.z = -BOLT_DEPTH
-	# Как у настоящего разряда посреди вспышки: прозрачность сама меняет конвейер.
+	# As for a real bolt in the middle of a flash: transparency itself changes the pipeline.
 	bolt.transparency = 0.5
 	add_child(bolt)
 	return bolt
 
 
-## Материал разряда. Отдельно — его прогревает [ShaderWarmup]: разряд виден
-## редко, и первый собирал бы шейдер посреди грозы.
+## Bolt material. Separate — [ShaderWarmup] warms it up: a bolt is seen
+## rarely, and the first one would compile the shader in the middle of a storm.
 static func bolt_look() -> StandardMaterial3D:
 	var look := StandardMaterial3D.new()
 	look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	look.albedo_color = BOLT_COLOUR
 	look.disable_fog = true
 	look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	# Ломаная идёт сверху вниз, и её треугольники обращены от камеры: с
-	# отсечением задних граней разряд не рисовался вовсе (авторевью M22).
+	# The zigzag goes from top to bottom, and its triangles face away from the camera: with
+	# back-face culling the bolt was not drawn at all (code review M22).
 	look.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return look
 

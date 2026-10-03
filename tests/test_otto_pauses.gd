@@ -1,15 +1,15 @@
 extends GutTest
 
-## Паузы разворота и приземления на живом Otto (ADR-0039, решение 4).
+## Turn and landing pauses on a live Otto (ADR-0039, decision 4).
 ##
-## Правило проверяет test_move_locks.gd; здесь — что Otto его слушается: стоит,
-## пока поворачивается, и не идёт и не прыгает, пока восстанавливается после
-## прыжка. Сцена — одна плита пола.
+## test_move_locks.gd checks the rule; here — that Otto obeys it: stands
+## while turning, and does not walk or jump while recovering after
+## a jump. The scene is one floor slab.
 
 const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
 
-## Паузы меряются временем, а не кадрами: headless-прогон шагает физику
-## по нескольку раз за кадр, и счёт кадрами врёт вдвое.
+## Pauses are measured in time, not frames: a headless run steps physics
+## several times per frame, and counting frames is off by a factor of two.
 
 
 func after_each() -> void:
@@ -45,7 +45,7 @@ func test_a_turn_holds_otto_in_place() -> void:
 
 
 func test_walking_on_ahead_has_no_pause() -> void:
-	# Пауза — только на смену стороны: идущий вперёд трогается сразу.
+	# The pause is only for a side change: one walking forward starts at once.
 	var otto := await _standing_otto()
 	var start := otto.global_position.x
 	Input.action_press(&"move_right")
@@ -79,8 +79,8 @@ func test_a_landing_holds_walk_and_jump() -> void:
 
 
 func test_a_jump_held_through_the_landing_fires_after_it() -> void:
-	# Нажатие во время восстановления не пропадает: держат кнопку — прыжок
-	# случается, как только пауза кончилась.
+	# A press during recovery is not lost: holding the button — the jump
+	# happens as soon as the pause ends.
 	var otto := await _standing_otto()
 	await _jump_and_land(otto)
 	var floor_y := otto.global_position.y

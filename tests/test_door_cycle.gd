@@ -1,10 +1,10 @@
 extends GutTest
 
-## Тесты хода створки.
+## Door leaf travel tests.
 ##
-## Створка — это то, что игрок видит вместо правил: по ней он и понимает, что
-## сейчас из двери кто-то выйдет. Поэтому ход проверяется отдельно от того, кто
-## дверь открыл (ADR-0020, решение 1).
+## The door leaf is what the player sees instead of the rules: it is how he understands that
+## someone is about to come out of the door. So travel is checked separately from whoever
+## opened the door (ADR-0020, decision 1).
 
 const STEP: float = 0.1
 const TRAVEL: float = 0.4
@@ -16,7 +16,7 @@ func _cycle() -> DoorCycle:
 	return cycle
 
 
-## Гонит створку заданное время и отдаёт её же.
+## Runs the leaf for the given time and returns it.
 func _run(cycle: DoorCycle, seconds: float) -> DoorCycle:
 	for _frame: int in int(roundf(seconds / STEP)):
 		cycle.tick(STEP)
@@ -64,7 +64,7 @@ func test_closing_starts_from_where_the_door_stood() -> void:
 	cycle.open()
 	_run(cycle, TRAVEL * 0.5)
 	cycle.close()
-	# Половину хода прошла — столько же и возвращается, а не весь путь заново.
+	# It went half its travel — it returns the same amount, not the whole way anew.
 	assert_true(_run(cycle, TRAVEL * 0.5).is_shut(), "закрывается ровно с того места")
 
 

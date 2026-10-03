@@ -1,28 +1,28 @@
 extends GutTest
 
-## Тесты езды агентов в кабинах (ADR-0025, решение 6).
+## Tests of agents riding in cabs (ADR-0025, decision 6).
 ##
-## В оригинале агенты ездят, но кабиной не распоряжаются: «When Otto is not in
+## In the original agents ride but do not control the cab: "When Otto is not in
 ## an elevator, it will move from floor to floor automatically, even when enemy
-## spies are in it». Отсюда всё устройство: агент идёт к той кабине, что уже
-## стоит вровень с его этажом, и едет пассажиром. Вызова нет ни у кого.
+## spies are in it". Hence the whole design: an agent walks to the cab that already
+## stands level with his floor and rides as a passenger. Nobody has a call.
 ##
-## Тесты со сценой и физикой — самый дорогой уровень проверки
-## ([`testing.md`](../docs/testing.md)), поэтому их здесь ровно два: один про то,
-## что агент доезжает, другой про то, что он не отбирает у Otto управление.
+## Tests with a scene and physics are the most expensive level of checking
+## ([`testing.md`](../docs/testing.md)), so there are exactly two here: one that
+## the agent arrives, the other that he does not take control away from Otto.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 
-## Сколько кадров дать зданию собраться.
+## How many frames to give the building to assemble.
 const SETTLE_FRAMES: int = 10
 
-## Потолок ожидания поездки, шагов физики. Кабина ходит сама и стоит на этаже
-## полторы секунды, так что застать её агент может не сразу.
+## Cap on waiting for a ride, physics steps. The cab runs by itself and stands on a floor
+## for a second and a half, so the agent may not catch it at once.
 const RIDE_FRAMES: int = 1800
 
-## Сид решений агента: паузы и повороты брожения. Любой — поездка от них не
-## зависит; сеется, чтобы прогон повторялся.
+## Seed of the agent's decisions: wandering pauses and turns. Any — the ride does not
+## depend on them; seeded so the run repeats.
 const AGENT_SEED: int = 1
 
 
@@ -31,17 +31,18 @@ func _build() -> GreyboxLevel:
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
 	level.rules = BuildingRules.new()
 	level.building_seed = 1
-	# Свои двери агентов не выпускают: в кадре должен быть один, поставленный
-	# тестом, а не восемь, вышедших по расписанию.
+	# Their own doors do not release agents: the frame must have one, placed
+	# by the test, not eight that came out on schedule.
 	level.spawn_agents = false
 	add_child_autofree(level)
 	return level
 
 
-## Шахта стилобата подлиннее: по ней и ездят.
+## A longer podium shaft: that is the one ridden.
 ##
-## Не самая длинная в здании: та идёт с крыши, а наверху этаж узкий — семь мест,
-## из них шахта, дверь и лампа, — и агенту там негде разойтись с проёмом.
+## Not the longest in the building: that one runs from the roof, and at the top the floor is narrow
+## — seven slots, including a shaft, a door and a lamp — and the agent has no room there to pass the
+## opening.
 func _a_shaft_to_ride(level: GreyboxLevel) -> BuildingPlan.ShaftSpot:
 	var best: BuildingPlan.ShaftSpot = null
 	for shaft in level.plan().shafts:
@@ -52,10 +53,10 @@ func _a_shaft_to_ride(level: GreyboxLevel) -> BuildingPlan.ShaftSpot:
 	return best
 
 
-## Агент, потерявший Otto этажом ниже, приезжает к нему на лифте.
+## An agent who lost Otto one floor down comes to him by elevator.
 ##
-## До M18b он остался бы на своём этаже навсегда: во всём `src/` `ElevatorCar`
-## знал только Otto, и долг тянулся с ADR-0006.
+## Before M18b he would have stayed on his floor forever: in all of `src/` `ElevatorCar`
+## knew only Otto, and the debt dragged on since ADR-0006.
 func test_an_agent_rides_down_to_otto() -> void:
 	var level := _build()
 	await wait_physics_frames(SETTLE_FRAMES)
@@ -71,11 +72,11 @@ func test_an_agent_rides_down_to_otto() -> void:
 		Vector2(level.plan().safe_x(rules, to_index), rules.floor_surface(to_index))
 	)
 
-	# Агент выходит, когда кабина уже стоит вровень с его этажом, и прямо у её
-	# проёма. Раньше он выходил сразу и ловил кабину, бродя по этажу: застанет
-	# ли он её в полторы секунды стоянки, решали его паузы и повороты — жребий,
-	# ещё и несеянный. Раскладка M24b сдвинула соседние шахты, и тест стал
-	# проходить через раз. Проверяется поездка, а не удача в брожении.
+	# The agent comes out when the cab is already standing level with his floor, and right at its
+	# opening. Before, he came out at once and caught the cab while wandering the floor: whether he
+	# catches it in the second and a half of standing was decided by his pauses and turns — a draw,
+	# an unseeded one at that. The M24b layout shifted neighbouring shafts, and the test began
+	# passing every other time. What is checked is the ride, not luck in wandering.
 	var standing := false
 	for _step in RIDE_FRAMES:
 		if _car_standing_at(level, shaft.x, from_index):
@@ -89,8 +90,8 @@ func test_an_agent_rides_down_to_otto() -> void:
 	agent.global_position = WorldSpace.to_scene(
 		Vector2(shaft.x - rules.shaft_width, rules.floor_surface(from_index))
 	)
-	# Сеется, как сеет своих уровень ([method GreyboxLevel._release_agent]):
-	# несеянный генератор давал бы каждому прогону свои паузы брожения.
+	# Seeded the way the level seeds its own ([method GreyboxLevel._release_agent]):
+	# an unseeded generator would give each run its own wandering pauses.
 	agent.seed_decisions(AGENT_SEED)
 	agent.setup(level.otto, 1.0)
 
@@ -102,9 +103,9 @@ func test_an_agent_rides_down_to_otto() -> void:
 		if where >= to_index:
 			break
 
-	# Два этажа вниз — это именно поездка. Пешком агенту вниз не попасть: у края
-	# перекрытия он разворачивается, а эскалатор трогается только с нажатия,
-	# которого у него нет (ADR-0005, пункт 8).
+	# Two floors down is precisely a ride. On foot the agent cannot get down: at the slab
+	# edge he turns around, and an escalator starts only on a press,
+	# which he does not have (ADR-0005, point 8).
 	assert_gte(
 		lowest,
 		from_index + 2,
@@ -113,10 +114,10 @@ func test_an_agent_rides_down_to_otto() -> void:
 	assert_false(agent.is_dead(), "ехал, а не падал в шахту")
 
 
-## Агент в кабине ею не управляет: она ходит своим расписанием, как пустая.
+## An agent in a cab does not control it: it runs on its own schedule, like an empty one.
 ##
-## Это и есть вся разница между «ездит» и «водит». Управление кабиной — привилегия
-## Otto, и в оригинале её нет даже у стоящего на крыше.
+## That is the whole difference between "rides" and "drives". Controlling the cab is Otto's
+## privilege, and in the original even one standing on the roof does not have it.
 func test_an_agent_aboard_does_not_drive() -> void:
 	var level := _build()
 	await wait_physics_frames(SETTLE_FRAMES)
@@ -127,8 +128,8 @@ func test_an_agent_aboard_does_not_drive() -> void:
 	if shaft == null:
 		return
 	var index := shaft.top
-	# Otto далеко: агент в кабине не должен получить власть над ней ни при каких
-	# обстоятельствах, но кадр не должен ещё и превратиться в перестрелку.
+	# Otto is far away: the agent in the cab must not gain power over it under any
+	# circumstances, but the frame must not also turn into a shootout.
 	level.otto.global_position = WorldSpace.to_scene(
 		Vector2(level.plan().safe_x(rules, rules.floors - 1), rules.floor_surface(rules.floors - 1))
 	)
@@ -143,28 +144,28 @@ func test_an_agent_aboard_does_not_drive() -> void:
 	assert_not_null(car, "в шахте %.1f стоит кабина" % shaft.x)
 	if car == null:
 		return
-	# Пустая кабина ходит от этажа к этажу и с паузой на каждом. Агент внутри
-	# ничего в этом не меняет: она не встаёт и не разгоняется.
+	# An empty cab goes from floor to floor with a pause on each. An agent inside
+	# changes nothing in this: it does not stop and does not speed up.
 	#
-	# Заодно проверяется, что агент всё это время действительно был внутри:
-	# без этого «кабина ходит сама» сходилось бы и с пустой шахтой, то есть
-	# не проверяло бы ровно того, ради чего тест написан.
+	# It is also checked that the agent really was inside all this time:
+	# without this "the cab runs by itself" would also hold for an empty shaft, that is,
+	# it would not check exactly what the test was written for.
 	var moved := 0
 	var aboard := 0
 	for _step in 240:
 		await wait_physics_frames(1)
 		if not car.is_aligned():
 			moved += 1
-		# Допуск в целую ширину шахты, а не в половину: внутри кабины агент
-		# переступает от стенки к стенке, и мерка должна отличать «едет»
-		# от «ушёл по этажу», а не ловить его шаги.
+		# A tolerance of the whole shaft width, not half: inside the cab the agent
+		# steps from wall to wall, and the measure must tell "rides"
+		# from "walked off along the floor", not catch his steps.
 		if absf(WorldSpace.to_plane(agent.global_position).x - shaft.x) <= rules.shaft_width:
 			aboard += 1
 	assert_gt(moved, 0, "кабина с агентом внутри продолжает ходить сама")
 	assert_eq(aboard, 240, "агент все эти кадры ехал в кабине, а не ушёл по этажу")
 
 
-## Стоит ли в шахте [param x] кабина вровень с этажом [param index].
+## Whether a cab stands level with floor [param index] in shaft [param x].
 func _car_standing_at(level: GreyboxLevel, x: float, index: int) -> bool:
 	for child in level.get_children():
 		var car := child as ElevatorCar

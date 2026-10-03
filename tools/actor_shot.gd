@@ -1,30 +1,32 @@
 extends Node3D
 
-## Позы актёров рядом: Otto и агент в каждой позе, сбоку и на три четверти.
+## Actor poses side by side: Otto and an agent in every pose, from the side and at three
+## quarters.
 ##
-## Игровым сценарием съёмки все позы не поймать: присед, лёжа, удар и смерть
-## случаются в бою и держатся доли секунды. Здесь каждый актёр стоит в своей
-## позе, доведённой до конца (`FigureRig.snap`), и кадр показывает, что стало с
-## фигурой, — ровно то, о чём спорят с оригиналом (ADR-0032).
+## A gameplay capture scenario cannot catch all the poses: crouching, lying, a hit and
+## death happen in combat and last fractions of a second. Here every actor stands in its
+## pose played to the end (`FigureRig.snap`), and the shot shows what became of the
+## figure, which is exactly what gets argued about against the original (ADR-0032).
 ##
-## Запуск:
+## Run:
 ##     godot --path . res://tools/actor_shot.tscn
 ##     godot --path . res://tools/actor_shot.tscn -- --folder=M21
 ##
-## Кадры ложатся в screens/<папка>/actors_*.png. Папка локальная.
+## Shots go to screens/<folder>/actors_*.png. The folder is local.
 
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 const OTTO_MODEL := preload("res://assets/models/otto.glb")
 
 const DEFAULT_FOLDER := "M21"
 
-## Шаг между фигурами в ряду, м.
+## Step between figures in a row, m.
 const STEP: float = 1.6
 
-## На сколько ряд агентов выше ряда Otto, м: у него свой пол и свои линии пуль.
+## How much higher the agents' row is than Otto's row, m: it has its own floor and its
+## own bullet lines.
 const ROW_RISE: float = 2.6
 
-## Позы в кадре: общие, затем только Otto, затем только агента.
+## Poses in the shot: shared ones, then Otto-only, then agent-only.
 const POSES: PackedStringArray = [
 	"idle",
 	"walk_0",
@@ -47,7 +49,7 @@ const POSES: PackedStringArray = [
 	"pounce_strike",
 ]
 
-## Высоты пуль ROM, м: линии на кадре, чтобы видеть, кто под какой пулей.
+## ROM bullet heights, m: lines in the shot to see who is under which bullet.
 const BULLET_LINES: Array[float] = [1.13, 0.68, 0.23]
 
 var _folder: String = DEFAULT_FOLDER
@@ -86,7 +88,7 @@ func _stage() -> void:
 	sun.light_energy = 1.3
 	add_child(sun)
 
-	# Ряды снизу вверх: Otto, затем агенты по типу здания (ADR-0055, решение 7).
+	# Rows from bottom to top: Otto, then agents by building kind (ADR-0055, decision 7).
 	var models: Array[PackedScene] = [OTTO_MODEL]
 	models.append_array(AgentWardrobe.MODELS)
 	for row in models.size():
@@ -97,7 +99,7 @@ func _stage() -> void:
 		for column in POSES.size():
 			var rig := FigureRig.new()
 			rig.model = model
-			# Ряды друг над другом, а не друг за другом: сбоку задний прятался бы.
+			# Rows above one another, not one behind another: from the side the back one would hide.
 			rig.position = Vector3(column * STEP, row * ROW_RISE, 0.0)
 			add_child(rig)
 			_rigs.append(rig)
@@ -107,7 +109,7 @@ func _stage() -> void:
 	add_child(_camera)
 
 
-## Пол ряда и линии пуль над ним.
+## A row's floor and the bullet lines above it.
 func _row_marks(base: float) -> void:
 	var floor_box := MeshInstance3D.new()
 	var plane := BoxMesh.new()
@@ -137,9 +139,9 @@ func _run() -> void:
 		rig.show_pose(pose)
 		rig.set_walk_phase(0.0 if pose == "walk_0" else 1.2)
 		rig.face(1.0)
-		# Клипы «один раз» снимаются на середине: падение, а не лежащий.
-		# Приземление в игре идёт лишь [constant FigurePoses.LAND_SHOW]: за 0.4 с
-		# вдвое ускоренный клип дошёл бы до конца, и в кадре стояла бы стойка.
+		# "Play once" clips are shot in the middle: falling, not lying.
+		# Landing in the game lasts only [constant FigurePoses.LAND_SHOW]: in 0.4 s a clip
+		# sped up twice would reach its end, and the shot would show the stance.
 		if pose == "land":
 			rig.advance(FigurePoses.LAND_SHOW * 0.5)
 		elif pose == "dead_0" or pose == "shoot" or pose == "jump":
@@ -148,22 +150,22 @@ func _run() -> void:
 		rig.set_process(false)
 
 	var middle := STEP * (POSES.size() - 1) * 0.5
-	# Сбоку, как в игре: фигуры смотрят вправо, ряды агентов над рядом Otto.
+	# From the side, as in the game: figures face right, the agent rows above Otto's row.
 	var rows := _rigs.size() / POSES.size()
 	var centre_y := ROW_RISE * (rows - 1) * 0.5 + 0.9
 	_camera.position = Vector3(middle, centre_y, 12.0)
-	# Ширина кадра — все позы ряда с полем: ортокамера держит высоту, а окно
-	# 1920×1000 шире её в 1.92 раза.
+	# Shot width is all the poses of a row with a margin: the orthographic camera keeps the
+	# height, and the 1920×1000 window is 1.92 times wider than it.
 	_camera.size = maxf(ROW_RISE * rows + 0.6, (STEP * POSES.size() + 1.0) / 1.92)
 	_camera.look_at(Vector3(middle, centre_y, 0.0))
 	await _shoot("actors_side")
 
-	# Спереди на три четверти: видно лицо, шляпу, очки и пистолет.
+	# From the front at three quarters: the face, hat, glasses and pistol are visible.
 	for rig in _rigs:
 		rig.rotation.y = deg_to_rad(35.0)
 	await _shoot("actors_front")
 
-	# Крупно двое в стойке.
+	# Close-up of the two in the stance.
 	_camera.size = 4.4
 	_camera.position = Vector3(0.8, 2.3, 12.0)
 	_camera.look_at(Vector3(0.8, 2.3, 0.0))

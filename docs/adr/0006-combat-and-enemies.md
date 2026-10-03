@@ -1,134 +1,136 @@
-# ADR-0006 · Бой, враги и разделение вехи M4
+# ADR-0006 · Combat, enemies and splitting milestone M4
 
-- **Статус:** принято; пункт 6 изменён — агенты уклоняются ([ADR-0016](0016-combat-balance.md)),
-  ездят в кабинах ([ADR-0025](0025-shafts-escalators-and-riders.md)), ходят и стреляют
-  по правилам ROM ([ADR-0027](0027-rom-combat.md), решения 3 и 3а); пункт 7 — гаснет
-  зона лампы, а не этаж ([ADR-0023](0023-light-and-readability.md), решение 2)
-- **Дата:** 2026-09-12
+- **Status:** accepted; item 6 changed — agents dodge ([ADR-0016](0016-combat-balance.md)),
+  ride in cabs ([ADR-0025](0025-shafts-escalators-and-riders.md)), walk and shoot
+  by ROM rules ([ADR-0027](0027-rom-combat.md), decisions 3 and 3a); item 7 — the lamp's zone
+  goes dark, not the floor ([ADR-0023](0023-light-and-readability.md), decision 2)
+- **Date:** 2026-09-12
 
-## Контекст
+## Context
 
-M4 в эпике собрала в себя стрельбу, удар ногой, врагов, пули, жизни, Game Over и
-отстреливаемые лампы с затемнением. Это вдвое больше M2 и M3, каждая из которых
-занимала веху целиком.
+In the epic, M4 gathered shooting, the kick, enemies, bullets, lives, Game Over and
+shoot-out lamps with darkening. That is twice as much as M2 and M3, each of which took a whole
+milestone.
 
-Как и перед двумя предыдущими вехами, механика сверена с оригиналом до начала работы.
-Источники прежние: Wikipedia, Hardcore Gaming 101, форум Museum of the Game, цитаты
-StrategyWiki из поисковой выдачи (сама она закрыта Cloudflare). Ссылки — в конце.
+As before the two previous milestones, the mechanics were checked against the original before
+work started. The sources are the same: Wikipedia, Hardcore Gaming 101, the Museum of the Game
+forum, StrategyWiki quotes from search results (the site itself is behind Cloudflare). Links
+are at the end.
 
-Сверка подтвердила часть плана, уточнила важное про урон и нашла механику, которой
-в эпике нет вовсе.
+The check confirmed part of the plan, clarified something important about damage and found a
+mechanic that is not in the epic at all.
 
-## Решения
+## Decisions
 
-### 1. Веха разделена на M4a и M4b
+### 1. The milestone is split into M4a and M4b
 
-- **M4a · Бой и враги** — оружие Otto, удар ногой, пули, враги-агенты, жизни и Game Over.
-- **M4b · Лампы и темнота** — отстреливаемые лампы, затемнение, поведение врагов в нём.
+- **M4a · Combat and enemies** — Otto's weapon, the kick, bullets, enemy agents, lives and
+  Game Over.
+- **M4b · Lamps and darkness** — shoot-out lamps, darkening, enemy behaviour in it.
 
-Нумерация остальных вех не сдвигается: `M4a`/`M4b` вместо вставки новой вехи между M4
-и M5. Иначе пришлось бы править номера в уже принятых ADR, а они — запись решения на
-момент принятия, и задним числом их не переписывают.
+The numbering of the other milestones does not shift: `M4a`/`M4b` instead of inserting a new
+milestone between M4 and M5. Otherwise the numbers in already accepted ADRs would have to be
+edited, and they are a record of the decision at the time it was made, not rewritten after the
+fact.
 
-### 2. Не больше трёх пуль Otto на экране
+### 2. No more than three of Otto's bullets on screen
 
 > Agent 17 can vanquish the enemy spies by shooting them with his gun that can only fire
 > up to three bullets at a time.
 
-Это не техническое ограничение, а основа тактики: выстрелив трижды, Otto безоружен,
-пока пули не улетят. Стрельба доступна стоя, приседая и в прыжке.
+This is not a technical limitation but the basis of tactics: having fired three times, Otto is
+unarmed until the bullets fly off. Shooting is available standing, crouching and in a jump.
 
-### 3. Пули медленные и имеют высоту
+### 3. Bullets are slow and have height
 
 > Otto may jump over low enemy fire or duck to evade higher enemy bullets.
 
-Значит, пуля — сущность с собственной высотой полёта, а присед и прыжок работают как
-уклонение. Выстрел приседающего идёт низко, стоящего — высоко.
+So a bullet is an entity with its own flight height, and crouching and jumping work as
+evasion. A crouching shooter's shot goes low, a standing one's goes high.
 
-### 4. Три жизни, и снимает их только выстрел
+### 4. Three lives, and only a shot takes them
 
 > Players are given three "lives." The player loses a life if hit by enemy fire —
 > physical contact with the enemies themselves will not affect him.
 
-**Столкновение с врагом безвредно.** Это меняет дизайн врага: он опасен оружием, а не
-телом, и пробежать сквозь агента — законный приём, а не ошибка.
+**Colliding with an enemy is harmless.** This changes enemy design: he is dangerous with his
+weapon, not his body, and running through an agent is a legitimate technique, not a bug.
 
-К уже реализованным причинам смерти (падение в шахту, сдавливание кабиной, ADR-0004)
-добавляется попадание пули. Респавн после смерти — на этаже гибели; правил оригинала
-найти не удалось, помечено на сверку.
+To the already implemented causes of death (falling into the shaft, cab crush, ADR-0004) a
+bullet hit is added. Respawn after death is on the floor of death; the original's rules could
+not be found, marked for checking.
 
-### 5. Очки
+### 5. Points
 
-Таблица оригинала, найденная при сверке:
+The original's table, found during the check:
 
-| За что | Очки |
+| For what | Points |
 |---|---|
-| Выстрел во врага | 100 |
-| Прыжок ногой | 150 |
-| Лампа на голову | 300 |
-| Документ | 500 |
-| Бонус за здание | 1000 × номер |
+| Shooting an enemy | 100 |
+| Jump kick | 150 |
+| Lamp on the head | 300 |
+| Document | 500 |
+| Building bonus | 1000 × number |
 
-Инструкция к NES-версии называет 100-150 за выстрел и 150-200 за удар — это порт,
-поэтому взяты аркадные значения. За убийства в темноте оригинал даёт надбавку; её
-размер не найден и относится к M4b.
+The NES version manual gives 100-150 for a shot and 150-200 for a kick — that is the port, so
+the arcade values are taken. The original gives a bonus for kills in the dark; its size was
+not found and belongs to M4b.
 
-### 6. Враг в M4a: дверь, ход, выстрел по линии
+### 6. The enemy in M4a: door, walk, shot along the line
 
-Агент выходит из обычной двери, идёт по своему этажу к Otto и стреляет, когда тот
-оказывается на одной с ним линии. Машина состояний — отдельным классом, как у Otto,
-чтобы проверяться без сцены.
+An agent comes out of an ordinary door, walks along his floor toward Otto and shoots when Otto
+is on the same line as him. The state machine is a separate class, like Otto's, so it can be
+tested without a scene.
 
-Уклонения от пуль и езда на лифте в оригинале есть, но в M4a не делаются: агент,
-который ходит и стреляет, уже даёт играбельный бой, а остальное удобнее добавлять,
-когда его поведение видно в игре.
+Dodging bullets and riding the elevator exist in the original but are not done in M4a: an agent
+who walks and shoots already gives playable combat, and the rest is easier to add once his
+behaviour is visible in the game.
 
-### 7. Лампы гасят свой этаж насовсем — отход от оригинала
+### 7. Lamps darken their floor permanently — a departure from the original
 
-**Это первое сознательное расхождение с оригиналом в проекте, и оно противоречит
-пункту 1 цели эпика** («воспроизводит механику без изменений в геймплее»).
+**This is the project's first deliberate divergence from the original, and it contradicts
+item 1 of the epic's goal** ("reproduces the mechanics without changes to gameplay").
 
-В оригинале лампы на одном контуре: сбитая лампа падает, убивает стоящего под ней
-агента — и всё здание чернеет примерно на пять секунд, после чего свет возвращается.
-То есть темнота там — короткое окно возможности, а не состояние этажа.
+In the original the lamps are on one circuit: a shot-down lamp falls, kills an agent standing
+under it — and the whole building goes black for about five seconds, after which the light
+returns. That is, darkness there is a short window of opportunity, not a floor state.
 
-Решение принято владельцем проекта после того, как расхождение было показано: лампа
-гасит свой этаж и не зажигается обратно. Механика реализуется в M4b, и, если после
-сверки в MAME решение будет пересмотрено, менять придётся именно её.
+The decision was made by the project owner after the divergence was shown: a lamp darkens its
+floor and does not come back on. The mechanic is implemented in M4b, and if the decision is
+revised after a check in MAME, that is what will have to change.
 
-### 8. Тревога по таймеру — в M5
+### 8. Timed alarm — in M5
 
-Механики нет ни в одной вехе эпика:
+The mechanic is in none of the epic's milestones:
 
 > If he takes too long to clear a level, an alarm will sound; the enemy agents then
 > become more aggressive, and the elevators will be slower to respond to the player's
 > joystick movements.
 
-Это механика сложности, а не боя: она трогает и врагов, и лифт. В M5 уже запланирована
-«нарастающая сложность» — пункт заведён туда.
+This is a difficulty mechanic, not a combat one: it touches both the enemies and the elevator.
+M5 already plans "increasing difficulty" — the item is filed there.
 
-## Что осталось несверенным
+## What remains unchecked
 
-| Вопрос | Куда относится |
+| Question | Where it belongs |
 |---|---|
-| Правила респавна после смерти | M4a |
-| Длительность затемнения и надбавка за убийства в темноте | M4b |
-| Момент срабатывания тревоги и насколько замедляется лифт | M5 |
-| Сколько агентов выходит из двери и как часто | M4a |
+| Respawn rules after death | M4a |
+| Duration of darkness and bonus for kills in the dark | M4b |
+| When the alarm triggers and how much the elevator slows | M5 |
+| How many agents come out of a door and how often | M4a |
 
-## Последствия
+## Consequences
 
-- **Otto впервые получает оружие и жизни.** `GameState` из ADR-0005 принимает жизни,
-  а `OttoStateMachine` — состояния, связанные с оружием.
-- **Пуля — первая сущность, которую порождают и Otto, и враг.** Ограничение в три
-  штуки касается только Otto.
-- **Безвредное столкновение упрощает врага**: ему не нужна зона урона телом, только
-  оружие.
+- **Otto gets a weapon and lives for the first time.** `GameState` from ADR-0005 takes lives,
+  and `OttoStateMachine` takes weapon-related states.
+- **The bullet is the first entity spawned by both Otto and an enemy.** The three-bullet limit
+  applies only to Otto.
+- **Harmless collision simplifies the enemy**: he needs no body-damage zone, only a weapon.
 
-## Источники
+## Sources
 
 - [Elevator Action — Wikipedia](https://en.wikipedia.org/wiki/Elevator_Action)
 - [Elevator Action — Hardcore Gaming 101](https://hg101.kontek.net/elevatoraction/elevatoraction.htm)
-- [Обсуждение на форуме Museum of the Game](https://forums.arcade-museum.com/threads/elevator-action-question.70396/)
+- [Discussion on the Museum of the Game forum](https://forums.arcade-museum.com/threads/elevator-action-question.70396/)
 - [Elevator Action/Gameplay — StrategyWiki](https://strategywiki.org/wiki/Elevator_Action/Gameplay)
-  (недоступна напрямую, цитаты получены из выдачи поисковика)
+  (not directly reachable, quotes obtained from search results)

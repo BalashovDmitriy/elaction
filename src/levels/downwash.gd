@@ -1,46 +1,46 @@
 class_name Downwash
 extends GPUParticles3D
 
-## Пыль под винтом вертолёта (ADR-0052, решение 6): поток от винта гонит её по
-## крыше веером, пока вертолёт висит низко, и она оседает, когда он уходит.
-## Полоса пыли — на крыше под осью винта, у плоскости игры.
+## Dust under the helicopter rotor (ADR-0052, decision 6): the rotor downwash drives it
+## across the roof in a fan while the helicopter hangs low, and it settles when it leaves.
+## The dust band is on the roof under the rotor axis, at the play plane.
 
-## Сколько частиц, их жизнь, с, полуширина полосы, откуда их поднимает, м,
-## скорость разлёта, м/с, и цвет.
-## Пыль встаёт, пока вертолёт висит не выше [constant DUST_REACH] над крышей.
+## Particle count, their life, s, half-width of the band, where they are lifted from, m,
+## spread speed, m/s, and colour.
+## Dust rises while the helicopter hangs no higher than [constant DUST_REACH] above the roof.
 const DUST_COUNT: int = 70
 const DUST_LIFE: float = 1.4
 const DUST_HALF_WIDTH: float = 2.6
-## Полуглубина полосы пыли, м: в пределах настила крыши, не перед фасадом.
+## Half-depth of the dust band, m: within the roof deck, not in front of the facade.
 const DUST_DEPTH: float = 0.5
-## Направление разлёта — вверх с наклоном к камере на сотую. Ровно вверх
-## Godot кладёт веер [member ParticleProcessMaterial.flatness] в плоскость YZ —
-## к камере и в здание, — а с наклоном по Z веер ложится в плоскость кадра,
-## XY (замер: [method GPUParticles3D.capture_aabb], авторевью M24l).
+## Spread direction — up with a hundredth's tilt towards the camera. Straight up,
+## Godot puts the [member ParticleProcessMaterial.flatness] fan into the YZ plane —
+## towards the camera and into the building — and with a Z tilt the fan lies in the frame
+## plane, XY (measured: [method GPUParticles3D.capture_aabb], code review M24l).
 const DUST_DIRECTION := Vector3(0.0, 1.0, 0.01)
 const DUST_SPEED := Vector2(2.5, 5.0)
 const DUST_SIZE: float = 0.5
 const DUST_COLOR := Color(0.55, 0.52, 0.48, 0.32)
 const DUST_REACH: float = 7.0
 
-## В снег поток поднимает с покрова снежную пыль (ADR-0054): гуще, белее,
-## крупнее облаком и дольше висит.
+## In snow the downwash lifts snow dust off the cover (ADR-0054): thicker, whiter,
+## a larger cloud, and it hangs longer.
 const POWDER_COUNT: int = 120
 const POWDER_LIFE: float = 2.4
 const POWDER_SIZE: float = 0.6
 const POWDER_COLOR := Color(0.9, 0.93, 0.98, 0.26)
 
-## Поток от винта гонит и дождь: шар-отталкиватель частиц под осью винта
-## разносит струи вниз и в стороны, и они ложатся косо, по скорости. Радиус
-## шара, м, его сила, м/с², и какую долю высоты вертолёта над крышей он
-## занимает — середина между винтом и настилом.
+## The rotor downwash drives the rain too: a particle repeller sphere under the rotor axis
+## spreads the streaks down and sideways, and they fall slanted, by velocity. Sphere
+## radius, m, its strength, m/s², and what share of the helicopter's height above the roof
+## it takes — the middle between the rotor and the deck.
 const GUST_RADIUS: float = 4.5
 const GUST_STRENGTH: float = 60.0
 const GUST_RISE: float = 0.5
-## Плита под пылью — по настилу: ширина и глубина с запасом на разлёт, м.
+## Slab under the dust — along the deck: width and depth with a margin for spread, m.
 const DECK_PLATE := Vector3(24.0, 1.0, 8.0)
 
-## Высота крыши под вертолётом, сцена; NAN — крыши под ним нет.
+## Roof height under the helicopter, scene; NAN — there is no roof under it.
 var deck: float = NAN
 
 var _gust := GPUParticlesAttractorSphere3D.new()
@@ -57,9 +57,9 @@ func _init() -> void:
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	visibility_aabb = AABB(Vector3(-8.0, -1.0, -8.0), Vector3(16.0, 4.0, 16.0))
 	var process := ParticleProcessMaterial.new()
-	# Полосой вдоль крыши, а не кольцом: кольцо выносило пыль вперёд за фасад,
-	# и она висела перед тридцатым этажом. Разлёт — веером в плоскости кадра:
-	# в стороны и вверх ([member ParticleProcessMaterial.flatness]).
+	# A band along the roof, not a ring: a ring carried dust forward past the facade,
+	# and it hung in front of the thirtieth floor. The spread is a fan in the frame plane:
+	# sideways and up ([member ParticleProcessMaterial.flatness]).
 	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
 	process.emission_box_extents = Vector3(DUST_HALF_WIDTH, 0.05, DUST_DEPTH)
 	process.direction = DUST_DIRECTION
@@ -83,8 +83,8 @@ func _init() -> void:
 	quad.size = Vector2.ONE * DUST_SIZE
 	var look := StandardMaterial3D.new()
 	look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	# Мягкий клуб, а не квадрат: без картинки частица рисовалась квадратом
-	# цвета, и на снегу это было видно сразу (M24l).
+	# A soft puff, not a square: without a texture a particle was drawn as a square of
+	# colour, and on snow this was visible at once (M24l).
 	look.albedo_texture = _puff()
 	look.vertex_color_use_as_albedo = true
 	look.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
@@ -97,10 +97,10 @@ func _init() -> void:
 	_gust.strength = 0.0
 	_gust.attenuation = 1.0
 	add_child(_gust)
-	# Шар потока толкает от себя и вниз: без столкновений пыль уходила сквозь
-	# настил на восемь метров — перед тридцатым этажом (замер авторевью M24l).
-	# Гаснет она о плиту под собой — на любой крыше, в любую погоду: карта
-	# высот крыши ([RoofCatch]) есть только в дождь и снег.
+	# The downwash sphere pushes away from itself and down: without collisions the dust went
+	# through the deck by eight metres — in front of the thirtieth floor (measured in code review
+	# M24l). It dies on the slab under it — on any roof, in any weather: the roof
+	# height map ([RoofCatch]) exists only in rain and snow.
 	process.collision_mode = ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT
 	collision_base_size = 0.02
 	_deck_plate.name = "DeckPlate"
@@ -109,8 +109,8 @@ func _init() -> void:
 	add_child(_deck_plate)
 
 
-## Ставит полосу пыли под ось винта в [param x] и поднимает пыль, пока вертолёт
-## на высоте [param height] сцены ниже [constant DUST_REACH] над крышей и
+## Puts the dust band under the rotor axis at [param x] and raises dust while the helicopter
+## is at scene height [param height] lower than [constant DUST_REACH] above the roof and
 ## [param hovering].
 func follow(x: float, height: float, hovering: bool) -> void:
 	if is_nan(deck):
@@ -119,14 +119,14 @@ func follow(x: float, height: float, hovering: bool) -> void:
 	var low := hovering and height - deck < DUST_REACH
 	if emitting != low:
 		emitting = low
-	# Поток дождю — тот же, что пыли: пока вертолёт висит низко.
+	# The downwash on rain is the same as on dust: while the helicopter hangs low.
 	_gust.position = Vector3(0.0, maxf(height - deck, 0.0) * GUST_RISE, 0.0)
 	_gust.strength = -GUST_STRENGTH if low else 0.0
 
 
-## Пыль становится снежной: покров на крыше лежит под винтом (ADR-0054).
-## [param brightness] — яркость снега во время суток ([method SnowLook.brightness]):
-## снежная пыль светится, как хлопья, а не берёт слабый свет крыши.
+## The dust becomes snowy: the snow cover on the roof lies under the rotor (ADR-0054).
+## [param brightness] — snow brightness at the time of day ([method SnowLook.brightness]):
+## snow dust glows like the flakes rather than taking the weak roof light.
 func lift_snow(brightness: float) -> void:
 	amount = POWDER_COUNT
 	lifetime = POWDER_LIFE
@@ -139,7 +139,7 @@ func lift_snow(brightness: float) -> void:
 	var ramp := GradientTexture1D.new()
 	ramp.gradient = fade
 	process.color_ramp = ramp
-	# Снег легче пыли: взлетает выше и опадает медленнее.
+	# Snow is lighter than dust: it flies higher and falls slower.
 	process.gravity = Vector3(0.0, 0.6, 0.0)
 	var quad := draw_pass_1 as QuadMesh
 	quad.size = Vector2.ONE * POWDER_SIZE
@@ -148,12 +148,12 @@ func lift_snow(brightness: float) -> void:
 	look.albedo_color = Color(SnowLook.TINT * brightness, 1.0)
 
 
-## Шар, которым поток от винта разносит дождь и снег.
+## The sphere the rotor downwash uses to spread rain and snow.
 func gust() -> GPUParticlesAttractorSphere3D:
 	return _gust
 
 
-## Клуб пыли: круглое пятно, плотное в середине и тающее к краю.
+## A dust puff: a round spot, dense in the middle and fading towards the edge.
 static func _puff() -> GradientTexture2D:
 	var spot := GradientTexture2D.new()
 	spot.fill = GradientTexture2D.FILL_RADIAL

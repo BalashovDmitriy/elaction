@@ -1,14 +1,14 @@
 extends GutTest
 
-## Тесты интерфейса: настройки, переводы, счёт в HUD и жизнь за очки.
+## Interface tests: settings, translations, the score in the HUD and a life for points.
 ##
-## Всё, что здесь проверяется, — правила, а не отрисовка: сохранились ли
-## настройки, есть ли строка на обоих языках, как выглядит число и когда
-## приходит дополнительная жизнь. Кадр для этого поднимать незачем.
+## Everything checked here is rules, not drawing: whether the settings were saved,
+## whether a string exists in both languages, what a number looks like and when an
+## extra life arrives. There is no point bringing up a frame for that.
 
 const TEMP := "user://test_settings.cfg"
 
-## Откуда берутся ключи переводов: та же таблица, из которой их берёт игра.
+## Where translation keys come from: the same table the game takes them from.
 const STRINGS := "res://assets/i18n/ui.csv"
 
 const HUD_SCENE := preload("res://src/ui/hud.tscn")
@@ -19,7 +19,7 @@ func after_each() -> void:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(TEMP))
 
 
-# --- Настройки ---------------------------------------------------------------
+# --- Settings ----------------------------------------------------------------
 
 
 func test_settings_survive_a_restart() -> void:
@@ -41,7 +41,7 @@ func test_settings_survive_a_restart() -> void:
 	assert_eq(loaded.resolution, Vector2i(2560, 1440))
 
 
-## Настройки до M22 хранили флажок «полный экран»: он становится режимом окна.
+## Settings before M22 stored a "full screen" flag: it becomes a window mode.
 func test_the_old_fullscreen_flag_becomes_a_window_mode() -> void:
 	var old := ConfigFile.new()
 	old.set_value(GameSettings.SECTION, "fullscreen", true)
@@ -49,7 +49,7 @@ func test_the_old_fullscreen_flag_becomes_a_window_mode() -> void:
 	assert_eq(GameSettings.load_from(TEMP).window_mode, DisplayModes.Mode.FULLSCREEN)
 
 
-## Размеры окна — только те, что влезают на монитор; 4K — на экране 4K.
+## Window sizes — only those that fit on the monitor; 4K — on a 4K screen.
 func test_window_sizes_fit_the_screen() -> void:
 	var full_hd := DisplayModes.available(Vector2i(1920, 1080))
 	assert_eq(full_hd[-1], Vector2i(1920, 1080), "на FullHD больше FullHD не предлагается")
@@ -62,9 +62,9 @@ func test_window_sizes_fit_the_screen() -> void:
 	)
 
 
-## 4K-монитор с панелью задач: рабочая область ниже 2160, а 4K в списке есть
-## и встаёт во весь экран без рамки. Раньше список строился по рабочей области,
-## и 4K пропадал (замечание пользователя, M24b).
+## A 4K monitor with a taskbar: the work area is below 2160, yet 4K is in the list and
+## goes full screen without a border. The list used to be built from the work area,
+## and 4K disappeared (user's remark, M24b).
 func test_4k_window_on_a_4k_screen_with_a_taskbar() -> void:
 	var screen := Rect2i(0, 0, 3840, 2160)
 	var usable := Rect2i(0, 0, 3840, 2112)
@@ -83,8 +83,8 @@ func test_settings_without_a_file_take_the_system_language() -> void:
 
 
 func test_an_unknown_language_falls_back() -> void:
-	# Файл можно поправить руками, а язык — написать любой. Показывать
-	# интерфейс на несуществующем языке нельзя, поэтому берётся запасной.
+	# The file can be edited by hand, and any language can be written in it. Showing the
+	# interface in a nonexistent language is not allowed, so the fallback is used.
 	var file := ConfigFile.new()
 	file.set_value(GameSettings.SECTION, "locale", "klingon")
 	file.save(TEMP)
@@ -112,7 +112,7 @@ func test_a_bus_level_goes_where_it_belongs() -> void:
 	assert_almost_eq(settings.master, 1.0, 0.001, "соседние шины не тронуты")
 
 
-# --- Переводы ----------------------------------------------------------------
+# --- Translations ------------------------------------------------------------
 
 
 func _keys() -> PackedStringArray:
@@ -122,7 +122,7 @@ func _keys() -> PackedStringArray:
 	if file == null:
 		return keys
 
-	file.get_csv_line()  # заголовок
+	file.get_csv_line()  # header
 	while not file.eof_reached():
 		var row := file.get_csv_line()
 		if row.size() >= 3 and not row[0].is_empty():
@@ -132,8 +132,8 @@ func _keys() -> PackedStringArray:
 
 
 func test_every_string_exists_in_both_languages() -> void:
-	# Непереведённая строка показывается ключом — «UI_PLAY» вместо «Играть»,
-	# и заметить это можно только глазами на нужном языке.
+	# An untranslated string is shown as its key — "UI_PLAY" instead of "Играть",
+	# and it can only be noticed by eye in the right language.
 	var was := TranslationServer.get_locale()
 	for locale: String in GameSettings.LOCALES:
 		TranslationServer.set_locale(locale)
@@ -151,18 +151,18 @@ func test_the_table_is_not_empty() -> void:
 
 
 func test_a_score_is_split_into_threes() -> void:
-	# 12 400 читается с одного взгляда, 12400 — нет.
+	# 12 400 reads at a glance, 12400 does not.
 	assert_eq(Hud.format_score(0), "0")
 	assert_eq(Hud.format_score(999), "999")
 	assert_eq(Hud.format_score(1000), "1 000")
 	assert_eq(Hud.format_score(1234567), "1 234 567")
 
 
-# --- Дополнительная жизнь ----------------------------------------------------
+# --- Extra life --------------------------------------------------------------
 
 
-## Своя партия на тест, а не автолоад: глобальную трогать нельзя — её же смотрят
-## соседние тесты, и оставленные в ней жизни и очки утекли бы к ним.
+## A game of its own per test, not the autoload: the global one must not be touched —
+## neighbouring tests look at it too, and lives and points left in it would leak to them.
 func _game() -> GameState:
 	var game := autofree(GameState.new()) as GameState
 	game.start_game()
@@ -191,7 +191,7 @@ func test_a_new_game_brings_the_extra_life_back() -> void:
 
 
 func test_the_dead_do_not_get_an_extra_life() -> void:
-	# После Game Over очки ещё начисляются — бонус за здание приходит отложенно.
+	# After Game Over points are still awarded — the building bonus arrives with a delay.
 	var game := _game()
 	while game.lives > 0:
 		game.lose_life()
@@ -200,7 +200,7 @@ func test_the_dead_do_not_get_an_extra_life() -> void:
 	assert_eq(game.lives, 0, "мёртвому жизнь не выдают")
 
 
-## Язык сменили посреди партии — подписи HUD, собранные кодом, переводятся.
+## The language changed mid-game — HUD labels assembled by code get translated.
 func test_the_hud_follows_a_language_change() -> void:
 	var was := TranslationServer.get_locale()
 	TranslationServer.set_locale("en")
@@ -217,8 +217,8 @@ func test_the_hud_follows_a_language_change() -> void:
 	assert_does_not_have(captions, english, "подпись очков осталась на прежнем языке")
 
 
-## Папок документов в HUD столько, сколько документов в здании: по ROM их от 5
-## до 10 по навыку, и HUD на пять папок врал бы на высоком навыке.
+## The HUD has as many document folders as the building has documents: per the ROM
+## there are 5 to 10 depending on skill, and a five-folder HUD would lie at high skill.
 func test_the_hud_draws_a_folder_per_document() -> void:
 	assert_gte(Hud.DOCUMENT_ICONS, Arcade.red_doors(99), "папок меньше, чем бывает документов")
 	var hud := HUD_SCENE.instantiate() as Hud
@@ -235,7 +235,8 @@ func test_the_hud_draws_a_folder_per_document() -> void:
 	game.reset()
 
 
-## Раунд — в центре HUD, первой строкой: в углу его не находили (ADR-0037).
+## The round — in the centre of the HUD, on the first line: in the corner nobody found
+## it (ADR-0037).
 func test_the_round_sits_in_the_middle_plate() -> void:
 	var hud := HUD_SCENE.instantiate() as Hud
 	add_child_autofree(hud)
@@ -255,8 +256,9 @@ func test_the_round_sits_in_the_middle_plate() -> void:
 	game.reset()
 
 
-## Нижний этаж — паркинг: HUD пишет «ПАРКИНГ», а не «ЭТАЖ 1», как колонны и
-## табло там пишут «P» (ADR-0038, решение 3). Этаж над ним — по-прежнему второй.
+## The bottom floor is the garage: the HUD writes "ПАРКИНГ" rather than "ЭТАЖ 1", just
+## as the columns and indicator boards there write "P" (ADR-0038, decision 3). The floor
+## above it is still the second.
 func test_the_hud_calls_the_bottom_floor_parking() -> void:
 	var was := TranslationServer.get_locale()
 	var rules := BuildingRules.new()
@@ -270,7 +272,7 @@ func test_the_hud_calls_the_bottom_floor_parking() -> void:
 	TranslationServer.set_locale(was)
 
 
-## Кадры в секунду — по флажку настроек, в углу HUD; флажок переживает перезапуск.
+## Frames per second — by a settings flag, in the HUD corner; the flag survives a restart.
 func test_the_fps_counter_follows_the_setting() -> void:
 	var settings := GameSettings.new()
 	settings.show_fps = true
@@ -289,9 +291,10 @@ func test_the_fps_counter_follows_the_setting() -> void:
 	assert_false(_fps_label_visible(hud), "выключили — пропал")
 
 
-## Ждёт, пока `_process` HUD гарантированно отработает хотя бы раз.
-## `process_frame` дерево шлёт до `_process` узлов того же кадра, и после одного
-## `await` HUD может ещё не обновиться — на CI тест из-за этого падал.
+## Waits until the HUD's `_process` is guaranteed to have run at least once.
+## The tree sends `process_frame` before the nodes' `_process` of the same frame, and
+## after one `await` the HUD may not have updated yet — the test failed on CI because
+## of this.
 func _hud_frame() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame

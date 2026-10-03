@@ -1,31 +1,31 @@
 class_name FigureRig
 extends Node3D
 
-## Скелет актёра: клипы пака и позы кодом (ADR-0032, решение 1).
+## Actor skeleton: pack clips and code poses (ADR-0032, decision 1).
 ##
-## Модель приходит из `.glb`, собранного `tools/build_actors.py` из пака
-## Quaternius: скелет в 62 кости и четыре клипа. Какой позе что играть, решает
-## [FigurePoses]; риг превращает позу любой природы в одно и то же — кадр,
-## набор поворотов и сдвигов костей, — и каждый кадр ведёт скелет к нему
-## сферической интерполяцией по каждой кости. Поэтому переход из клипа в позу
-## кодом такое же движение, как было сглаживание углов с M16.
+## The model comes from a `.glb` built by `tools/build_actors.py` from the
+## Quaternius pack: a 62-bone skeleton and four clips. Which pose plays what is decided by
+## [FigurePoses]; the rig turns a pose of any origin into the same thing — a frame,
+## a set of bone rotations and offsets — and every frame leads the skeleton towards it
+## with per-bone spherical interpolation. So a transition from a clip to a code
+## pose is the same kind of motion as the angle smoothing was since M16.
 ##
-## Клип читается напрямую, `Animation.rotation_track_interpolate` на нужный
-## момент, без [AnimationPlayer] и [AnimationTree]: так `snap()` ставит позу
-## сразу, а габарит по скиннутым вершинам считается от того же кадра.
+## A clip is read directly, `Animation.rotation_track_interpolate` at the needed
+## moment, without [AnimationPlayer] and [AnimationTree]: this way `snap()` sets the pose
+## at once, and the bounds from skinned vertices are computed from the same frame.
 ##
-## Начало узла — в ногах актёра: актёр ставит риг на свой пол, а поворот к
-## камере и наклон тела — дело рига.
+## The node origin is at the actor's feet: the actor puts the rig on its floor, and turning
+## towards the camera and tilting the body are the rig's business.
 ##
-## Обводки с M24f нет (ADR-0042, решение 7): на свету она читалась неестественно.
-## Читаемость в темноте держит свет — меши фигуры лежат на своём слое
-## [constant RENDER_LAYER], и на него светит слабый свет камеры
-## ([method SideCamera.actor_fill]), которому окружение не подчиняется.
+## There is no outline since M24f (ADR-0042, decision 7): in light it read unnaturally.
+## Readability in the dark is kept by light — the figure's meshes are on their own layer
+## [constant RENDER_LAYER], lit by a weak camera light
+## ([method SideCamera.actor_fill]) that the surroundings do not receive.
 
-## Слой рендера фигур: на него и только на него светит свет камеры.
+## Render layer of the figures: the camera light shines on it and only on it.
 const RENDER_LAYER: int = 1 << 11
 
-## Кости пака, которые двигают позы кодом. Те же имена у всех персонажей пака.
+## Pack bones moved by code poses. All pack characters have the same names.
 const HIPS := "Hips"
 const ABDOMEN := "Abdomen"
 const TORSO := "Torso"
@@ -40,13 +40,14 @@ const LEG_L := "UpperLeg.L"
 const LEG_R := "UpperLeg.R"
 const KNEE_L := "LowerLeg.L"
 const KNEE_R := "LowerLeg.R"
-## Стопы пака прицеплены не к голеням, а к корню: скелет собран под IK. В
-## клипах поворот запечён, а в позе кодом стопу ставит на конец голени риг.
+## The pack's feet are attached not to the shins but to the root: the skeleton is rigged
+## for IK. In clips the rotation is baked, and in a code pose the rig puts the foot on the
+## end of the shin.
 const FOOT_L := "Foot.L"
 const FOOT_R := "Foot.R"
-## Кисть с пистолетом: ствол лежит вдоль пальцев (`build_actors.py`, `_gun`).
+## Hand with the pistol: the barrel lies along the fingers (`build_actors.py`, `_gun`).
 const GUN_HAND := "Wrist.R"
-## Вторая кисть, которой держат рукоять снизу, и насколько она ниже первой, м.
+## The second hand that holds the grip from below, and how much lower it is than the first, m.
 const SUPPORT_HAND := "Wrist.L"
 const SUPPORT_DROP: float = 0.04
 const BONES: PackedStringArray = [
@@ -68,12 +69,12 @@ const BONES: PackedStringArray = [
 	FOOT_R,
 ]
 
-## Как наклон корпуса делится между позвонками: гнётся спина, а не шарнир.
+## How the torso tilt is split between vertebrae: the back bends, not a hinge.
 const LEAN_SHARE := {ABDOMEN: 0.45, TORSO: 0.35, CHEST: 0.2}
 const HEAD_SHARE := {NECK: 0.5, HEAD: 0.5}
 
-## Направлений, по которым выбираются крайние вершины каждой кости для
-## заземления: шесть осей и восемь углов куба.
+## Directions along which the extreme vertices of each bone are picked for
+## grounding: six axes and eight cube corners.
 const HULL_DIRECTIONS: Array[Vector3] = [
 	Vector3.RIGHT,
 	Vector3.LEFT,
@@ -90,7 +91,7 @@ const HULL_DIRECTIONS: Array[Vector3] = [
 	Vector3(-1, -1, 1),
 	Vector3(-1, -1, -1),
 ]
-## Ещё двенадцать — середины рёбер куба: для жёстких частей на одной кости
+## Twelve more — midpoints of the cube edges: for rigid parts on a single bone
 ## ([method SkinnedSurface._pick_hull]).
 const HULL_EDGES: Array[Vector3] = [
 	Vector3(1, 1, 0),
@@ -107,31 +108,31 @@ const HULL_EDGES: Array[Vector3] = [
 	Vector3(0, -1, -1),
 ]
 
-## Шейдер порванной фигуры (ADR-0043, решения 8 и 11).
+## Shader of a torn figure (ADR-0043, decisions 8 and 11).
 const CARVE_SHADER := preload("res://src/systems/combat/carve.gdshader")
 
-## Куда смотрит модель, повёрнутая лицом вправо и влево: поворот на четверть
-## оборота кладёт взгляд вдоль этажа, а в покое она смотрит в камеру (+Z).
+## Where the model faces when turned right and left: a quarter turn puts
+## the gaze along the floor, while at rest it faces the camera (+Z).
 const FACE_RIGHT: float = PI * 0.5
 
 
-## Поверхность меша, снятая один раз: вершины, привязка к костям и веса.
+## A mesh surface captured once: vertices, bone binding and weights.
 ##
-## [method Mesh.surface_get_arrays] копирует все массивы поверхности на каждый
-## вызов, а габарит по вершинам нужен на переходах между позами. Снятое при
-## рождении копируется один раз.
+## [method Mesh.surface_get_arrays] copies all surface arrays on every
+## call, and vertex bounds are needed during transitions between poses. What is captured
+## at birth is copied once.
 class SkinnedSurface:
 	extends RefCounted
 
 	var mesh_instance: MeshInstance3D
-	## Номер поверхности в меше.
+	## Surface index in the mesh.
 	var index: int = 0
 	var vertices := PackedVector3Array()
 	var bone_ids := PackedInt32Array()
 	var weights := PackedFloat32Array()
-	## Костей на вершину: 0 у поверхности без привязки — она стоит как есть.
+	## Bones per vertex: 0 for an unbound surface — it stays as is.
 	var per_vertex: int = 0
-	## Крайние вершины каждой кости: по ним риг заземляет позу на ходу.
+	## Extreme vertices of each bone: the rig grounds the pose by them at runtime.
 	var hull := PackedInt32Array()
 
 	static func of(instance: MeshInstance3D, surface: int) -> SkinnedSurface:
@@ -140,21 +141,21 @@ class SkinnedSurface:
 		made.index = surface
 		var arrays := instance.mesh.surface_get_arrays(surface)
 		made.vertices = arrays[Mesh.ARRAY_VERTEX]
-		# У поверхности без скина костей и весов нет вовсе — там null, не пустой
-		# массив, и в типизированное поле его не положить.
+		# A surface without a skin has no bones and weights at all — they are null, not an empty
+		# array, and it cannot go into a typed field.
 		var bones: Variant = arrays[Mesh.ARRAY_BONES]
 		var bone_weights: Variant = arrays[Mesh.ARRAY_WEIGHTS]
 		if instance.skin == null or bones == null or bone_weights == null:
 			made.hull = PackedInt32Array(range(made.vertices.size()))
 			return made
-		# Индексы костей движок отдаёт целыми либо вещественными — как лёг импорт.
+		# The engine returns bone indices as ints or floats — depending on the import.
 		made.bone_ids = bones if bones is PackedInt32Array else PackedInt32Array(Array(bones))
 		made.weights = bone_weights
 		made.per_vertex = made.bone_ids.size() / maxi(made.vertices.size(), 1)
 		made.hull = made._pick_hull()
 		return made
 
-	## Главная привязка вершины — кость с наибольшим весом.
+	## The main binding of a vertex — the bone with the largest weight.
 	func main_bind(index: int) -> int:
 		var best := 0
 		var best_weight := -1.0
@@ -165,10 +166,10 @@ class SkinnedSurface:
 				best = bone_ids[index * per_vertex + slot]
 		return best
 
-	## Вершины, крайние по [constant HULL_DIRECTIONS] среди своей кости.
-	## Кость поворачивается почти жёстко, и крайняя в покое остаётся крайней
-	## в позе: габарит по ним расходится с полным на миллиметры, а вершин
-	## в десять раз меньше.
+	## Vertices that are extreme along [constant HULL_DIRECTIONS] among their bone.
+	## A bone rotates almost rigidly, and a vertex extreme at rest stays extreme
+	## in a pose: the bounds from them differ from the full ones by millimetres, with
+	## ten times fewer vertices.
 	func _pick_hull() -> PackedInt32Array:
 		var best := {}
 		for index in vertices.size():
@@ -187,10 +188,10 @@ class SkinnedSurface:
 		for picks: Array[int] in best.values():
 			for index in picks:
 				chosen[index] = true
-		# Жёсткая часть на одной кости — шляпа, кепка — лёжа касается пола точкой
-		# между осями и углами куба: по ним одним кепка жилого дома уходила в пол
-		# на полтора сантиметра (авторевью M24m). Ей — и рёбра куба: вершин на ней
-		# сотни, а не тысячи, и лишних в крайних — дюжина.
+		# A rigid part on a single bone — a hat, a cap — when lying touches the floor at a point
+		# between the cube axes and corners: by those alone the residential cap sank into the floor
+		# by a centimetre and a half (code review M24m). It gets the cube edges too: it has
+		# hundreds of vertices, not thousands, and the extra extremes are a dozen.
 		if best.size() == 1:
 			for direction: Vector3 in HULL_EDGES:
 				var pick := 0
@@ -201,7 +202,7 @@ class SkinnedSurface:
 		return PackedInt32Array(chosen.keys())
 
 
-## Кадр скелета: поворот и сдвиг каждой кости и то, что идёт всей модели.
+## Skeleton frame: rotation and offset of each bone and what applies to the whole model.
 class Frame:
 	extends RefCounted
 
@@ -211,7 +212,7 @@ class Frame:
 	var lift: float = 0.0
 	var squash: float = 1.0
 
-	## Своя копия: массивы копируются целиком, без интерполяции по костям.
+	## Own copy: arrays are copied whole, without per-bone interpolation.
 	func copy() -> Frame:
 		var twin := Frame.new()
 		twin.rotations = rotations.duplicate()
@@ -221,7 +222,7 @@ class Frame:
 		twin.squash = squash
 		return twin
 
-	## Смесь двух кадров: [param weight] 0 — этот, 1 — [param other].
+	## Blend of two frames: [param weight] 0 — this one, 1 — [param other].
 	func blend(other: Frame, weight: float) -> Frame:
 		var t := clampf(weight, 0.0, 1.0)
 		var mixed := Frame.new()
@@ -236,7 +237,7 @@ class Frame:
 		return mixed
 
 
-## Клип, разобранный на дорожки: какая дорожка какую кость ведёт.
+## A clip split into tracks: which track drives which bone.
 class ClipTracks:
 	extends RefCounted
 
@@ -250,75 +251,76 @@ class ClipTracks:
 		return animation.length
 
 
-## Материалы порванных фигур по исходным: один шейдер на материал пака, а срез у
-## каждой фигуры свой — параметрами экземпляра.
+## Materials of torn figures by source material: one shader per pack material, while the
+## cut is per figure — via instance parameters.
 static var _carve_materials: Dictionary = {}
 
-## Модель актёра. Без неё риг — пустой узел, и это ошибка сцены.
+## The actor model. Without it the rig is an empty node, and that is a scene error.
 @export var model: PackedScene
 
-## Куда наводить дуло, пока актёр стреляет: высота над ступнями и вынос
-## вперёд, м, — точка, откуда вылетает пуля по правилам ROM (ADR-0043,
-## решение 16). NAN — не наводить: рука ходит клипом.
+## Where to aim the muzzle while the actor shoots: height above the feet and reach
+## forward, m — the point where the bullet leaves by the ROM rules (ADR-0043,
+## decision 16). NAN — do not aim: the arm moves by the clip.
 var aim_height: float = NAN
 var aim_reach: float = Proportions.MUZZLE
 
-## Во сколько раз быстрее мира идут часы рига. Сценка добивания замедляет мир,
-## а двое в ней двигаются в своём темпе (ADR-0040).
+## How many times faster than the world the rig's clock runs. The takedown scene slows the
+## world, while the two in it move at their own pace (ADR-0040).
 var speed: float = 1.0
 
-## Наклон вперёд «вокруг пяток» и подъём над полом идут не костям, а самой
-## модели: у скелета нет кости, которой можно уложить тело целиком.
+## The forward tilt "around the heels" and lift above the floor go not to bones but to the
+## model itself: the skeleton has no bone that can lay the whole body down.
 var _instance: Node3D = null
 var _skeleton: Skeleton3D = null
 var _meshes: Array[MeshInstance3D] = []
 var _surfaces: Array[SkinnedSurface] = []
 var _bones: Dictionary = {}
 var _clips: Dictionary = {}
-## Кадр покоя скелета: основа кадров клипа. Снят один раз — клип на ходу
-## собирается каждый кадр, а покой не меняется.
+## Rest frame of the skeleton: the base of clip frames. Captured once — a clip is assembled
+## every frame at runtime, and the rest pose does not change.
 var _rest: Frame = null
-## Первый кадр стойки: основа поз кодом. Его глобальные положения костей
-## посчитаны один раз — от них берутся оси поворотов.
+## First frame of the stance: the base of code poses. Its global bone positions are
+## computed once — the rotation axes are taken from them.
 var _stand: Frame = null
 var _stand_globals: Array[Transform3D] = []
-## Позы кодом неизменны: кадр каждой считается один раз на риг.
+## Code poses are immutable: the frame of each is computed once per rig.
 var _code_frames: Dictionary = {}
-## Рост в покое, м.
+## Height at rest, m.
 var _height: float = 0.0
 
 var _pose_name := "idle"
-## Сколько секунд стоит текущая поза: по ним идут клипы «один раз».
+## How many seconds the current pose has lasted: "once" clips run by it.
 var _pose_time: float = 0.0
-## Часы рига: по ним крутится стойка.
+## The rig's clock: the stance loops by it.
 var _clock: float = 0.0
-## Часы ходьбы, с: копятся из фазы актёра, а не из кадров, — встал актёр,
-## встали и ноги.
+## Walk clock, s: accumulated from the actor's phase, not from frames — when the actor
+## stops, the legs stop too.
 var _walk_clock: float = 0.0
 var _walk_phase: float = 0.0
 var _current: Frame = null
-## Кадр, в котором риг стоял, когда сменилась поза: из него идёт переход.
+## The frame the rig was in when the pose changed: the transition starts from it.
 var _from: Frame = null
-## Сколько длится переход в текущую позу, с ([method FigurePoses.blend_time]).
+## How long the transition into the current pose lasts, s
+## ([method FigurePoses.blend_time]).
 var _blend: float = FigurePoses.BLEND_DEFAULT
-## Разворот (ADR-0039, решение 3): откуда и куда поворачивается тело и сколько
-## секунд он уже идёт. Поворот идёт через «лицом в камеру», а не спиной к ней.
+## Turnaround (ADR-0039, decision 3): from where and to where the body turns and how many
+## seconds it has been going. The turn goes through "facing the camera", not back to it.
 var _yaw_from: float = FACE_RIGHT
 var _yaw_to: float = FACE_RIGHT
 var _turned: float = MoveLocks.TURN_TIME
-## Смотрел ли риг уже куда-нибудь: первый взгляд ставится сразу, без разворота.
+## Whether the rig has already looked anywhere: the first look is set at once, no turn.
 var _faced: bool = false
-## Переход кончился: риг стоит в кадре позы. У неподвижной цели (поза кодом,
-## конец клипа) раскладывать больше нечего — стоящих и лежащих каждый кадр
-## перебирали бы вершины впустую; клип стойки и ходьбы риг дальше просто играет.
+## The transition is over: the rig stands in the pose frame. With a still target (code pose,
+## end of a clip) there is nothing more to apply — those standing and lying would walk
+## vertices every frame for nothing; the stance and walk clips the rig simply keeps playing.
 var _settled: bool = false
-## Что от тела отрезано под днищем кабины: x от, x до, высота днища. Пусто —
-## не резано.
+## What of the body is cut off under the cab floor: x from, x to, floor height. Empty —
+## not cut.
 var _carved := Vector4.ZERO
-## Дуло пистолета в системе кисти [constant GUN_HAND]; NAN — пистолета нет.
+## Pistol muzzle in the space of hand [constant GUN_HAND]; NAN — no pistol.
 var _muzzle := Vector3(NAN, NAN, NAN)
-## Наведена ли рука в последнем разложенном кадре: застывший риг раскладывает
-## кадр ещё раз, когда наведение снимают, — иначе рука так и висела бы вскинутой.
+## Whether the arm was aimed in the last applied frame: a frozen rig applies the
+## frame once more when aiming is removed — otherwise the arm would stay raised.
 var _aim_shown: bool = false
 
 
@@ -328,8 +330,8 @@ func _ready() -> void:
 		return
 	_instance = model.instantiate() as Node3D
 	add_child(_instance)
-	# Проигрыватель импорта не нужен: клипы читает риг. Остановленный, он не
-	# тронет скелет и не потратит кадр.
+	# The import player is not needed: the rig reads the clips. Stopped, it does not
+	# touch the skeleton and does not spend a frame.
 	for player in _instance.find_children("*", "AnimationPlayer", true, false):
 		(player as AnimationPlayer).stop()
 		(player as AnimationPlayer).process_mode = Node.PROCESS_MODE_DISABLED
@@ -368,17 +370,17 @@ func _process(delta: float) -> void:
 	advance(delta * speed)
 
 
-## Шаг перехода: кости идут от кадра, где риг стоял при смене позы, к кадру
-## позы за время перехода, по сглаженной кривой — и приходят ровно в срок.
-## Зовётся из [method Node._process]; тестам отдан наружу, потому что длина
-## кадра в headless-прогоне не 1/60, а «сколько получится».
+## Transition step: the bones go from the frame the rig was in at the pose change to the
+## pose frame over the transition time, along a smoothed curve — and arrive exactly on time.
+## Called from [method Node._process]; exposed to tests because the frame
+## length in a headless run is not 1/60 but "whatever it turns out".
 func advance(delta: float) -> void:
 	if _skeleton == null:
 		return
-	# Неподвижная цель — поза кодом, конец клипа: долетев до неё, риг замирает.
-	# Проверка до шага часов: клип «один раз» успевает встать в последний кадр.
-	# Наводимая рука не замирает: присевший стреляет, не меняя позы (ADR-0043,
-	# решение 16), и опускает её, когда выстрел кончился.
+	# A still target — a code pose, the end of a clip: having reached it, the rig freezes.
+	# Checked before the clock step: a "once" clip manages to reach its last frame.
+	# An aimed arm does not freeze: a crouching actor shoots without changing pose (ADR-0043,
+	# decision 16), and lowers it when the shot is over.
 	var frozen := _settled and _is_still() and not _aims() and not _aim_shown
 	_pose_time += delta
 	_clock += delta
@@ -387,9 +389,9 @@ func advance(delta: float) -> void:
 		return
 	var wanted := _wanted()
 	if not _settled:
-		# Переход — смесь кадра, из которого риг ушёл, с живым кадром цели. Клип
-		# идёт своим ходом и во время перехода: гоняясь за ним сглаживанием, риг
-		# волочился бы за ходьбой с отставанием в 15° и не догонял бы никогда.
+		# A transition is a blend of the frame the rig left with the live frame of the target. The
+		# clip keeps running during the transition: chasing it with smoothing, the rig
+		# would trail the walk with a 15° lag and never catch up.
 		var progress := _pose_time / _blend if _blend > 0.0 else 1.0
 		_settled = _from == null or progress >= 1.0
 		if not _settled:
@@ -398,14 +400,14 @@ func advance(delta: float) -> void:
 	_apply(_current, false)
 
 
-## Какую позу показывать. Имена — из [ActorPose]; ходьба берёт фазу из
-## [method set_walk_phase] и идёт клипом.
+## Which pose to show. Names come from [ActorPose]; walking takes its phase from
+## [method set_walk_phase] and runs as a clip.
 func show_pose(pose_name: String) -> void:
 	if pose_name == _pose_name:
 		return
 	var was_walking := _pose_name.begins_with("walk_")
 	_pose_name = pose_name
-	# Кадры ходьбы — одна поза клипом: смена кадра не перезапускает переход.
+	# Walk frames are one pose as a clip: a frame change does not restart the transition.
 	if was_walking and pose_name.begins_with("walk_"):
 		return
 	_from = _current
@@ -414,8 +416,8 @@ func show_pose(pose_name: String) -> void:
 	_settled = false
 
 
-## Фаза ходьбы, 0..[constant ActorPose.WALK_FRAMES]. Актёр ведёт её сам; риг
-## копит из её приращений свои часы ходьбы.
+## Walk phase, 0..[constant ActorPose.WALK_FRAMES]. The actor drives it itself; the rig
+## accumulates its walk clock from its increments.
 func set_walk_phase(phase: float) -> void:
 	var step := phase - _walk_phase
 	if step < 0.0:
@@ -424,14 +426,15 @@ func set_walk_phase(phase: float) -> void:
 	_walk_clock += step / ActorPose.WALK_FPS
 
 
-## Куда актёр смотрит: -1 влево, +1 вправо. Смена стороны — разворот телом за
-## [constant MoveLocks.TURN_TIME]: столько же актёр стоит на месте. Зовётся
-## каждый кадр; поворот копится по часам рига, а ставится здесь, чтобы актёр
-## мог довернуть тело поверх (Otto у машины поворачивается спиной к камере).
+## Where the actor faces: -1 left, +1 right. Changing sides is a body turnaround over
+## [constant MoveLocks.TURN_TIME]: the actor stands still for as long. Called
+## every frame; the turn accumulates on the rig's clock and is set here so the actor
+## can turn the body further on top (Otto at the car turns his back to the camera).
 ##
-## [param instant] — встать сразу, без разворота: так ложится убитый, которого
-## [Enemy] переворачивает, чтобы тело упало на пол, а не над проёмом. Разворот —
-## движение живого, и труп, крутящийся волчком в падении, был бы ошибкой.
+## [param instant] — face at once, without a turnaround: this is how a killed agent
+## falls when [Enemy] flips him so the body drops onto the floor, not over the opening.
+## A turnaround is the motion of the living, and a corpse spinning like a top as it falls
+## would be a bug.
 func face(direction: float, instant: bool = false) -> void:
 	var wanted := FACE_RIGHT if direction >= 0.0 else -FACE_RIGHT
 	if not _faced or instant:
@@ -446,14 +449,14 @@ func face(direction: float, instant: bool = false) -> void:
 	rotation.y = lerpf(_yaw_from, _yaw_to, smoothstep(0.0, 1.0, progress))
 
 
-## Прозрачность всех мешей: 0 — сплошной, 1 — невидим. Так мигает неуязвимый.
+## Transparency of all meshes: 0 — solid, 1 — invisible. This is how an invulnerable blinks.
 func set_transparency(value: float) -> void:
 	for mesh_instance in _meshes:
 		mesh_instance.transparency = value
 
 
-## Срезает всё, что между [param from_x] и [param to_x] выше [param bottom], в
-## координатах мира: так тело режет днище кабины ([CarCut]).
+## Cuts away everything between [param from_x] and [param to_x] above [param bottom], in
+## world coordinates: this is how the cab floor cuts the body ([CarCut]).
 func carve_under(from_x: float, to_x: float, bottom: float) -> void:
 	_carved = Vector4(from_x, to_x, bottom, 1.0)
 	_cut_materials()
@@ -461,8 +464,8 @@ func carve_under(from_x: float, to_x: float, bottom: float) -> void:
 		mesh_instance.set_instance_shader_parameter(&"carve", _carved)
 
 
-## Прячет кости [param names] и всё, что они тянут: так пропадает часть тела,
-## отрезанная от рэгдолла ([Ragdoll]). Пустой список — всё видно.
+## Hides bones [param names] and everything they pull: this is how a body part cut off
+## from the ragdoll ([Ragdoll]) disappears. An empty list — everything visible.
 func hide_bones(names: PackedStringArray) -> void:
 	if not names.is_empty():
 		_cut_materials()
@@ -483,7 +486,7 @@ func hide_bones(names: PackedStringArray) -> void:
 		mesh_instance.set_instance_shader_parameter(&"hidden_bones", mask)
 
 
-## Где дуло пистолета сейчас, в мире; NAN, если пистолета нет.
+## Where the pistol muzzle is now, in the world; NAN if there is no pistol.
 func muzzle_position() -> Vector3:
 	var hand := _skeleton.find_bone(GUN_HAND) if _skeleton != null else -1
 	if hand < 0 or is_nan(_muzzle.x):
@@ -491,24 +494,24 @@ func muzzle_position() -> Vector3:
 	return _skeleton.global_transform * _skeleton.get_bone_global_pose(hand) * _muzzle
 
 
-## Скелет фигуры: на нём собирается рэгдолл.
+## The figure's skeleton: the ragdoll is built on it.
 func skeleton() -> Skeleton3D:
 	return _skeleton
 
 
-## Возвращает телу всё отрезанное: воскресший Otto целый.
+## Returns everything cut off to the body: a respawned Otto is whole.
 func heal() -> void:
 	_carved = Vector4.ZERO
 	for mesh_instance in _meshes:
-		# Срез — параметр экземпляра, а не материала: снятый материал его не
-		# уносит, и следующий срез тела поднял бы и старый.
+		# The cut is an instance parameter, not a material one: removing the material does not
+		# take it away, and the next body cut would bring back the old one too.
 		mesh_instance.set_instance_shader_parameter(&"carve", _carved)
 		for surface in mesh_instance.mesh.get_surface_count():
 			mesh_instance.set_surface_override_material(surface, null)
 
 
-## Встаёт в позу [param other] кость в кость, с его срезом, и замирает: так
-## оторванный кусок начинается тем, чем был в теле.
+## Takes the pose of [param other] bone for bone, with its cut, and freezes: this way a
+## torn-off piece starts as what it was in the body.
 func copy_pose_of(other: FigureRig) -> void:
 	if _skeleton == null or other._skeleton == null:
 		return
@@ -520,7 +523,7 @@ func copy_pose_of(other: FigureRig) -> void:
 	set_process(false)
 
 
-## Ставит мешам материалы со срезом вместо материалов пака — один раз.
+## Gives the meshes cut-capable materials instead of the pack ones — once.
 func _cut_materials() -> void:
 	for mesh_instance in _meshes:
 		if mesh_instance.get_surface_override_material(0) != null:
@@ -545,8 +548,8 @@ static func _carve_material(source: Material) -> ShaderMaterial:
 	return material
 
 
-## Доводит риг до целевой позы сразу, без сглаживания. Нужно тестам и съёмке:
-## кадр должен показывать позу, а не путь к ней.
+## Brings the rig to the target pose at once, without smoothing. Needed by tests and capture:
+## a frame must show the pose, not the way to it.
 func snap() -> void:
 	if _skeleton == null:
 		return
@@ -558,21 +561,21 @@ func snap() -> void:
 	_apply(_current, true)
 
 
-## Кончился ли переход к текущей позе. Тестам: риг, не долетающий никогда,
-## перебирал бы кости и вершины каждый кадр до конца жизни актёра.
+## Whether the transition to the current pose is over. For tests: a rig that never arrives
+## would walk bones and vertices every frame until the actor's end.
 func settled() -> bool:
 	return _settled
 
 
-## Поворот кости в текущем кадре, как его видит скелет. Тестам: по нему видно,
-## что переход — движение, а не подмена.
+## Bone rotation in the current frame, as the skeleton sees it. For tests: it shows
+## that a transition is motion, not a swap.
 func bone_rotation(bone_name: String) -> Quaternion:
 	if _skeleton == null or _skeleton.find_bone(bone_name) < 0:
 		return Quaternion.IDENTITY
 	return _skeleton.get_bone_pose_rotation(_skeleton.find_bone(bone_name))
 
 
-## Поворот кости в целевом кадре позы — туда, куда риг ведёт скелет.
+## Bone rotation in the target pose frame — where the rig leads the skeleton.
 func target_rotation(bone_name: String) -> Quaternion:
 	var bone := _skeleton.find_bone(bone_name) if _skeleton != null else -1
 	if bone < 0:
@@ -580,19 +583,20 @@ func target_rotation(bone_name: String) -> Quaternion:
 	return _wanted().rotations[bone]
 
 
-## Рост фигуры в покое, м.
+## Figure height at rest, m.
 func height() -> float:
 	return _height
 
 
-## Габарит фигуры в её текущей позе, в координатах узла.
+## Figure bounds in its current pose, in node coordinates.
 ##
-## Считается по самим вершинам, прогнанным через скелет: [method MeshInstance3D.get_aabb]
-## у скиннутого меша отдаёт покой, а не позу, и присевший по нему стоял бы в
-## полный рост. Именно этим тест проверяет, что присед укладывается под пулю.
-## [param hull_only] — только крайние вершины костей: так риг заземляет на ходу.
-## Низ по ним сходится с полным до сантиметра, верх — нет (поля шляпы), и
-## брать у такого габарита можно только низ.
+## Computed from the vertices themselves, run through the skeleton:
+## [method MeshInstance3D.get_aabb] of a skinned mesh returns the rest pose, not the
+## current one, and by it a crouching actor would stand at full height. This is exactly
+## how the test checks that the crouch fits under a bullet.
+## [param hull_only] — only the extreme bone vertices: this is how the rig grounds at runtime.
+## The bottom by them matches the full one to a centimetre, the top does not (hat brim), and
+## only the bottom of such bounds may be used.
 func skinned_aabb(hull_only: bool = false) -> AABB:
 	var box := AABB()
 	var first := true
@@ -617,13 +621,13 @@ func skinned_aabb(hull_only: bool = false) -> AABB:
 	return box
 
 
-## Матрицы скина на этот кадр: поза кости × привязка, по одной на привязку.
-## Считаются раз на поверхность, а не на каждую из сотен её вершин.
+## Skin matrices for this frame: bone pose × binding, one per binding.
+## Computed once per surface, not for each of its hundreds of vertices.
 func _bind_poses(skin: Skin) -> Array[Transform3D]:
 	var poses: Array[Transform3D] = []
 	for bind in skin.get_bind_count():
-		# Импорт glTF привязывает по индексу кости; имя — запасной путь для
-		# скина, собранного руками. Привязка без кости оставляет вершину в покое.
+		# glTF import binds by bone index; the name is a fallback for a
+		# hand-built skin. A binding without a bone leaves the vertex at rest.
 		var bone := skin.get_bind_bone(bind)
 		if bone < 0:
 			bone = _skeleton.find_bone(skin.get_bind_name(bind))
@@ -632,7 +636,7 @@ func _bind_poses(skin: Skin) -> Array[Transform3D]:
 	return poses
 
 
-## Вершина, прогнанная через скелет: сумма по костям веса × (поза × привязка).
+## A vertex run through the skeleton: sum over bones of weight × (pose × binding).
 func _skinned(
 	vertex: Vector3, index: int, surface: SkinnedSurface, binds: Array[Transform3D]
 ) -> Vector3:
@@ -646,8 +650,9 @@ func _skinned(
 	return result
 
 
-## Клипы модели по именам [constant FigurePoses.CLIP_NAMES], разобранные на
-## дорожки костей. Нет клипа — ошибка: поза встанет в стойку, но это надо видеть.
+## Model clips by the names [constant FigurePoses.CLIP_NAMES], split into
+## bone tracks. A missing clip is an error: the pose falls back to the stance, but it must
+## be visible.
 func _read_clips() -> void:
 	var players := _instance.find_children("*", "AnimationPlayer", true, false)
 	var player := players[0] as AnimationPlayer if not players.is_empty() else null
@@ -673,7 +678,7 @@ func _read_clips() -> void:
 		_clips[clip_name] = tracks
 
 
-## Кадр покоя скелета: основа, на которую ложатся дорожки клипа.
+## Rest frame of the skeleton: the base the clip tracks are layered on.
 func _read_rest() -> Frame:
 	var frame := Frame.new()
 	var count := _skeleton.get_bone_count()
@@ -686,7 +691,7 @@ func _read_rest() -> Frame:
 	return frame
 
 
-## Кадр клипа на момент [param time], с.
+## Clip frame at moment [param time], s.
 func _clip_frame(clip_name: String, time: float) -> Frame:
 	var frame := _rest.copy()
 	if not _clips.has(clip_name):
@@ -705,7 +710,7 @@ func _clip_frame(clip_name: String, time: float) -> Frame:
 	return frame
 
 
-## Кадр, к которому риг ведёт скелет сейчас.
+## The frame the rig is leading the skeleton to now.
 func _wanted() -> Frame:
 	var clip := FigurePoses.clip_of(_pose_name)
 	if clip == null or not _clips.has(clip.name):
@@ -724,8 +729,8 @@ func _wanted() -> Frame:
 	return _clip_frame(clip.name, time)
 
 
-## Стоит ли цель на месте: поза кодом, конец клипа, клип «один раз», доигранный
-## до последнего кадра. Стойка и ходьба идут всегда.
+## Whether the target is still: a code pose, the end of a clip, a "once" clip played
+## to its last frame. Stance and walk always run.
 func _is_still() -> bool:
 	var clip := FigurePoses.clip_of(_pose_name)
 	if clip == null or not _clips.has(clip.name):
@@ -738,12 +743,12 @@ func _is_still() -> bool:
 	return false
 
 
-## Стоит ли поза на полу сама: стойка и ходьба — да. С M24c `build_actors.py`
-## ставит на пол каждый кадр каждого клипа по вершинам (ADR-0039), но делает это
-## до того, как агенту надевают федору: стоя она сверху и ничего не меняет, а
-## лежащий на спине агент уходил полями в пол на 9 см (авторевью M24c). Клипы
-## «один раз» и конец клипа заземляются, как поза кодом: на ходу это крайние
-## вершины, а доигранный клип риг больше не раскладывает вовсе.
+## Whether the pose stands on the floor by itself: stance and walk do. Since M24c
+## `build_actors.py` grounds every frame of every clip by vertices (ADR-0039), but does it
+## before the agent gets the fedora: standing, it is on top and changes nothing, but
+## an agent lying on his back sank 9 cm into the floor with the brim (code review M24c).
+## "Once" clips and the end of a clip are grounded like a code pose: at runtime by the
+## extreme vertices, and a finished clip is not applied by the rig at all anymore.
 func _grounded_by_the_clip() -> bool:
 	var clip := FigurePoses.clip_of(_pose_name)
 	if clip == null or not _clips.has(clip.name):
@@ -751,7 +756,7 @@ func _grounded_by_the_clip() -> bool:
 	return clip.mode == FigurePoses.Clip.LOOP or clip.mode == FigurePoses.Clip.WALK
 
 
-## Кадр позы кодом: стойка, на которую легли углы [FigurePoses.Pose].
+## Frame of a code pose: the stance with the angles of [FigurePoses.Pose] applied.
 func _code_frame(pose_name: String) -> Frame:
 	var key := pose_name if FigurePoses.clip_of(pose_name) == null else "stand"
 	if _code_frames.has(key):
@@ -760,10 +765,10 @@ func _code_frame(pose_name: String) -> Frame:
 	var frame := _stand.copy()
 	_swing(frame, LEG_L, pose.legs.x)
 	_swing(frame, LEG_R, pose.legs.y)
-	# Вбок — вокруг оси взгляда модели: левая нога уходит влево, правая вправо.
+	# Sideways — around the model's gaze axis: the left leg goes left, the right one right.
 	_turn(frame, LEG_L, Vector3.BACK, pose.spread)
 	_turn(frame, LEG_R, Vector3.BACK, -pose.spread)
-	# Колено сгибается назад: для кости, растущей вниз, это «вперёд» с минусом.
+	# The knee bends backwards: for a bone growing downwards this is "forward" with a minus.
 	_swing(frame, KNEE_L, -pose.knees.x)
 	_swing(frame, KNEE_R, -pose.knees.y)
 	_swing(frame, ARM_L, pose.arms.x)
@@ -785,15 +790,15 @@ func _code_frame(pose_name: String) -> Frame:
 	return frame
 
 
-## Поворачивает кость на угол вперёд вокруг оси бока фигуры.
+## Rotates a bone by a forward angle around the figure's side axis.
 ##
-## Ось берётся не у кости, а у фигуры — X модели, — и переводится в систему
-## кости по её положению в стойке. Крен и оси костей пака таблице поз не
-## важны, а поворот родителя вокруг той же оси складывается с поворотом
-## ребёнка: колено гнётся от уже вынесенного бедра.
+## The axis is taken not from the bone but from the figure — the model's X — and converted
+## into the bone's space by its position in the stance. The roll and axes of the pack bones
+## do not matter to the pose table, and the parent's rotation around the same axis adds up
+## with the child's: the knee bends from an already swung thigh.
 ##
-## «Вперёд» у кости, растущей вверх (корпус, голова), — поворот вокруг +X, у
-## растущей вниз (ноги, руки) — вокруг −X: тот же поворот уводил бы её назад.
+## "Forward" for a bone growing upwards (torso, head) is a rotation around +X, for one
+## growing downwards (legs, arms) — around −X: the same rotation would take it backwards.
 func _swing(frame: Frame, bone_name: String, degrees: float) -> void:
 	if not _bones.has(bone_name):
 		return
@@ -802,9 +807,9 @@ func _swing(frame: Frame, bone_name: String, degrees: float) -> void:
 	_turn(frame, bone_name, Vector3.RIGHT if upward else Vector3.LEFT, degrees)
 
 
-## Поворачивает кость вокруг оси фигуры [param model_axis] — оси модели,
-## переведённой в систему кости по её положению в стойке. Вперёд — это
-## [method _swing]; вокруг вертикали — поворот головы вбок, свёрнутая шея
+## Rotates a bone around the figure axis [param model_axis] — a model axis
+## converted into the bone's space by its position in the stance. Forward is
+## [method _swing]; around the vertical — the head turned sideways, a broken neck
 ## (ADR-0040).
 func _turn(frame: Frame, bone_name: String, model_axis: Vector3, degrees: float) -> void:
 	if not _bones.has(bone_name) or is_zero_approx(degrees):
@@ -816,7 +821,7 @@ func _turn(frame: Frame, bone_name: String, model_axis: Vector3, degrees: float)
 	)
 
 
-## Ставит стопы на концы голеней: так, как они стояли друг к другу в стойке.
+## Puts the feet on the ends of the shins: as they stood relative to each other in the stance.
 func _follow_feet(frame: Frame) -> void:
 	var globals := _globals(frame)
 	for pair: Array in [[KNEE_L, FOOT_L], [KNEE_R, FOOT_R]]:
@@ -832,8 +837,8 @@ func _follow_feet(frame: Frame) -> void:
 		frame.positions[foot] = local.origin
 
 
-## Дуло пистолета в системе кисти: край ствола в сторону пальцев. Ствол
-## собран вдоль −X покоя (T-поза, пальцы к −X), и дуло — середина его торца.
+## Pistol muzzle in hand space: the end of the barrel towards the fingers. The barrel
+## is built along rest −X (T-pose, fingers to −X), and the muzzle is the middle of its end.
 func _find_muzzle() -> Vector3:
 	var hand := _skeleton.find_bone(GUN_HAND)
 	if hand < 0:
@@ -856,34 +861,34 @@ func _find_muzzle() -> Vector3:
 	return Vector3(NAN, NAN, NAN)
 
 
-## Кадр с рукой, наведённой на точку вылета пули (ADR-0043, решение 16).
+## A frame with the arm aimed at the bullet's exit point (ADR-0043, decision 16).
 ##
-## Плечо и предплечье правой руки поворачиваются так, чтобы дуло встало в
-## точку [member aim_height] над ступнями и [member aim_reach] впереди; левая
-## держит рукоять снизу. Вбок руки остаются, где были: пуля летит в плоскости
-## игры, а вбок кадр её не видит.
+## The right upper arm and forearm turn so that the muzzle lands at the
+## point [member aim_height] above the feet and [member aim_reach] ahead; the left
+## holds the grip from below. Sideways the arms stay where they were: the bullet flies in
+## the play plane, and the frame does not see it sideways.
 func _aimed(frame: Frame) -> Frame:
 	var hand := _skeleton.find_bone(GUN_HAND)
 	var support := _skeleton.find_bone(SUPPORT_HAND)
 	if not _bones.has(ARM_R) or not _bones.has(ELBOW_R) or hand < 0:
 		return frame
 	var aimed := frame.copy()
-	# Точка вылета в системе скелета — через мир: между ригом и скелетом лежат
-	# модель со своим сдвигом над полом и узел арматуры.
+	# The exit point in skeleton space — via the world: between the rig and the skeleton lie
+	# the model with its offset above the floor and the armature node.
 	var to_skeleton := _skeleton.global_transform.affine_inverse() * global_transform
 	var target := to_skeleton * Vector3(0.0, aim_height, aim_reach)
 	_reach(aimed, _bones[ARM_R], _bones[ELBOW_R], hand, _muzzle, target)
-	# Вторая рука держит рукоять снизу: кисть к кисти с пистолетом.
+	# The second hand holds the grip from below: hand to hand with the pistol.
 	if support >= 0 and _bones.has(ARM_L) and _bones.has(ELBOW_L):
 		var grip := _globals(aimed)[hand].origin + Vector3(0.0, -SUPPORT_DROP, 0.0)
 		_reach(aimed, _bones[ARM_L], _bones[ELBOW_L], support, Vector3.ZERO, grip)
 	return aimed
 
 
-## Сводит конец руки — точку [param tip] в системе кости [param end] — в
-## [param target]: плечо и локоть поворачиваются в плоскости взгляда (Y —
-## вверх, Z — вперёд модели), вбок рука остаётся, где была. Локоть уходит вниз
-## от линии плечо — цель.
+## Brings the end of the arm — point [param tip] in the space of bone [param end] — to
+## [param target]: the shoulder and elbow turn in the gaze plane (Y —
+## up, Z — model forward), sideways the arm stays where it was. The elbow goes below
+## the shoulder–target line.
 func _reach(
 	frame: Frame, shoulder_bone: int, elbow_bone: int, end: int, tip: Vector3, target: Vector3
 ) -> void:
@@ -911,13 +916,13 @@ func _reach(
 	_turn_bone(frame, globals, elbow_bone, point - elbow, target - elbow)
 
 
-## Длина отрезка в плоскости взгляда: без бокового сдвига.
+## Length of a segment in the gaze plane: without the sideways offset.
 static func _flat(offset: Vector3) -> float:
 	return Vector2(offset.z, offset.y).length()
 
 
-## Поворачивает кость [param bone] кадра так, чтобы её отрезок [param from]
-## смотрел по [param to]; оба — в системе скелета.
+## Rotates bone [param bone] of the frame so that its segment [param from]
+## points along [param to]; both in skeleton space.
 func _turn_bone(
 	frame: Frame, globals: Array[Transform3D], bone: int, from: Vector3, to: Vector3
 ) -> void:
@@ -930,50 +935,50 @@ func _turn_bone(
 	frame.rotations[bone] = (parent_basis.inverse() * turned).get_rotation_quaternion()
 
 
-## Положения костей в системе скелета для кадра — по цепочке родителей.
+## Bone positions in skeleton space for a frame — along the parent chain.
 func _globals(frame: Frame) -> Array[Transform3D]:
 	var globals: Array[Transform3D] = []
 	globals.resize(frame.rotations.size())
 	for bone in frame.rotations.size():
 		var local := Transform3D(Basis(frame.rotations[bone]), frame.positions[bone])
 		var parent := _skeleton.get_bone_parent(bone)
-		# Родитель в скелете glTF всегда раньше ребёнка: порядок импорта.
+		# In a glTF skeleton the parent always comes before the child: import order.
 		globals[bone] = globals[parent] * local if parent >= 0 else local
 	return globals
 
 
-## Раскладывает кадр по костям и по самой модели.
+## Applies a frame to the bones and to the model itself.
 ##
-## [param exact] — заземлять по всем вершинам, а не по крайним: для снимков и
-## тестов. На ходу хватает крайних, а стойка и ходьба, в которые риг уже пришёл,
-## не заземляются вовсе — их поставил на пол `build_actors.py`. Заземляются поза
-## кодом, клипы «один раз» и конец клипа ([method _grounded_by_the_clip]) и
-## переход: смесь двух кадров на полу сама не стоит.
+## [param exact] — ground by all vertices, not by the extreme ones: for shots and
+## tests. At runtime the extreme ones suffice, and the stance and walk the rig has already
+## reached are not grounded at all — `build_actors.py` put them on the floor. Grounded are
+## a code pose, "once" clips and the end of a clip ([method _grounded_by_the_clip]) and
+## a transition: a blend of two frames on the floor does not stand by itself.
 func _apply(frame: Frame, exact: bool) -> void:
 	_pose_bones(frame)
 
-	# Наклон вперёд вокруг пяток: начало модели — в ногах, и поворот вокруг X
-	# кладёт макушку в +Z, то есть по взгляду. Раздавленный сплющен по высоте
-	# и раздаётся вширь: объём тела никуда не девается.
+	# Forward tilt around the heels: the model origin is at the feet, and a rotation around X
+	# puts the top of the head towards +Z, i.e. along the gaze. A crushed actor is flattened in
+	# height and spreads in width: the body volume does not go anywhere.
 	var widen := 1.0 + (1.0 - frame.squash) * 0.36
 	_instance.rotation.x = deg_to_rad(frame.tilt)
 	_instance.scale = Vector3(widen, frame.squash, widen)
 	_instance.position.y = 0.0
 	if not (_settled and not exact and _grounded_by_the_clip()):
 		_skeleton.force_update_all_bone_transforms()
-		# Заземление: поза встаёт на пол низшей точкой. Лежащий на спине
-		# опирается спиной, залёгший — грудью, присевший — подошвами, и глубина
-		# у всех своя.
+		# Grounding: the pose stands on the floor by its lowest point. Someone lying on his back
+		# rests on the back, someone lying prone on the chest, a crouching one on the soles, and
+		# each has its own depth.
 		var low := skinned_aabb(not exact).position.y
 		_instance.position.y = -low + frame.lift * _height
-	# Руку наводят после заземления: точка вылета — над полом, а модель только
-	# что встала на пол. Низшую точку позы рука не меняет.
+	# The arm is aimed after grounding: the exit point is above the floor, and the model has
+	# just been put on the floor. The arm does not change the pose's lowest point.
 	_aim_shown = _aims()
 	if _aim_shown:
 		_pose_bones(_aimed(frame))
 
 
-## Наводить ли руку: актёр стреляет, и пистолет у фигуры есть.
+## Whether to aim the arm: the actor is shooting, and the figure has a pistol.
 func _aims() -> bool:
 	return not is_nan(aim_height) and not is_nan(_muzzle.x)
 

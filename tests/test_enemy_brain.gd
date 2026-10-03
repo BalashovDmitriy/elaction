@@ -1,13 +1,13 @@
 extends GutTest
 
-## Тесты решений агента по правилам ROM (ADR-0027).
+## Tests of agent decisions by the ROM rules (ADR-0027).
 ##
-## Мозги врага не знают ни про узлы, ни про физику: принимают вектор до Otto
-## и возвращают решение. Числа — из [Arcade]: здесь проверяется, что мозг
-## ими пользуется, а сами числа сверяет [code]test_arcade.gd[/code].
+## The enemy brain knows nothing about nodes or physics: it takes a vector to Otto
+## and returns a decision. The numbers come from [Arcade]: here we check that the brain
+## uses them, and the numbers themselves are checked by [code]test_arcade.gd[/code].
 
 const STEP: float = 1.0 / 60.0
-## Векторы до цели — в метрах, как и всё в правилах с M15.
+## Vectors to the target are in meters, like everything in the rules since M15.
 const FAR_ABOVE := Vector2(0.4, -1.2)
 const IN_FRONT := Vector2(2.0, 0.0)
 const BEHIND := Vector2(-2.0, 0.0)
@@ -27,7 +27,7 @@ func _run(brain: EnemyBrain, seconds: float, to_target: Vector2, sees: bool = tr
 		brain.update(STEP, to_target, sees)
 
 
-## Сколько кадров до первого выстрела, -1 — не выстрелил за [param limit] с.
+## How many frames until the first shot, -1 means no shot within [param limit] s.
 func _frames_to_shot(brain: EnemyBrain, to_target: Vector2, limit: float = 8.0) -> int:
 	for frame: int in int(limit / STEP):
 		brain.update(STEP, to_target, true)
@@ -48,7 +48,7 @@ func test_agent_walks_once_it_is_out() -> void:
 	assert_eq(brain.state, EnemyBrain.State.WALK)
 
 
-## Спокойный агент целится 10 тиков (@1BDF) — выстрел уходит не в тот же кадр.
+## A calm agent aims for 10 ticks (@1BDF): the shot does not go out in the same frame.
 func test_a_calm_agent_takes_aim() -> void:
 	var brain := _brain(0)
 	_run(brain, 0.4, FAR_ABOVE)
@@ -57,8 +57,9 @@ func test_a_calm_agent_takes_aim() -> void:
 	assert_gte(float(frames) * STEP, Arcade.wind_up(0) - STEP, "не раньше замаха")
 
 
-## Замах виден: пока пуля не ушла, агент замахивается, и уровень зажигает луч
-## прицела (ADR-0037, решение 5). Вылетела пуля — замаха больше нет.
+## The windup is visible: until the bullet has gone out, the agent winds up, and the
+## level lights the aiming beam (ADR-0037, decision 5). Once the bullet is out, there is
+## no windup.
 func test_the_wind_up_is_visible_until_the_shot() -> void:
 	var brain := _brain(0)
 	_run(brain, 0.4, FAR_ABOVE)
@@ -71,8 +72,8 @@ func test_the_wind_up_is_visible_until_the_shot() -> void:
 	assert_eq(brain.wind_up_left(), 0.0)
 
 
-## Злой — с самым коротким замахом: в ROM при злости 10 и выше пуля уходит
-## сразу, у нас — через [constant EnemyBrain.MIN_TELL], чтобы луч успели увидеть.
+## An angry agent has the shortest windup: in the ROM at anger 10 and above the bullet
+## goes out at once, for us after [constant EnemyBrain.MIN_TELL], so the beam can be seen.
 func test_a_mean_agent_fires_after_the_shortest_tell() -> void:
 	var brain := _brain(12)
 	_run(brain, 0.4, FAR_ABOVE)
@@ -82,7 +83,7 @@ func test_a_mean_agent_fires_after_the_shortest_tell() -> void:
 	assert_lte(frames, tell + 1, "и не позже")
 
 
-## Пауза после выстрела — max(0, 80 − 8·злость) тиков (@0055).
+## The pause after a shot is max(0, 80 − 8·anger) ticks (@0055).
 func test_agent_holds_fire_between_shots() -> void:
 	var brain := _brain(0)
 	_run(brain, 0.4, FAR_ABOVE)
@@ -91,7 +92,7 @@ func test_agent_holds_fire_between_shots() -> void:
 	assert_gte(float(again) * STEP, Arcade.cooldown(0) - Arcade.action_time(0), "пауза по ROM")
 
 
-## Пуля у агента одна: пока летит прошлая, новой нет (@1BAE).
+## An agent has one bullet: while the previous one flies, there is no new one (@1BAE).
 func test_one_bullet_in_flight() -> void:
 	var brain := _brain(12)
 	_run(brain, 0.4, FAR_ABOVE)
@@ -100,7 +101,7 @@ func test_one_bullet_in_flight() -> void:
 		assert_false(brain.fired(), "прошлая пуля в полёте — не стреляет")
 
 
-## Стреляет, глядя на Otto; спиной к нему — нет, если нет тревоги (@0568).
+## Shoots when facing Otto; with his back to him, no, unless there is an alarm (@0568).
 func test_agent_shoots_only_what_he_faces() -> void:
 	var brain := _brain(12)
 	_run(brain, 0.4, FAR_ABOVE)
@@ -126,7 +127,7 @@ func test_agent_does_not_shoot_another_floor() -> void:
 	assert_eq(_frames_to_shot(brain, FAR_ABOVE, 1.0), -1)
 
 
-## Дальности в ROM нет — есть «в кадре»: вне кадра агент не стреляет.
+## The ROM has no range, only "in frame": outside the frame an agent does not shoot.
 func test_agent_does_not_shoot_out_of_frame() -> void:
 	var brain := _brain(12)
 	_run(brain, 0.4, FAR_ABOVE)
@@ -159,8 +160,8 @@ func test_turning_around_flips_the_facing() -> void:
 	assert_eq(brain.facing, 1.0)
 
 
-## Луч прицела виден при любой злости: у ROM на десяти и выше замаха нет, а
-## втрое быстрая пуля без него неотвратима (ADR-0037, решение 5).
+## The aiming beam is visible at any anger: the ROM has no windup at ten and above, and
+## a bullet three times faster is unavoidable without it (ADR-0037, decision 5).
 func test_the_tell_never_drops_below_the_minimum() -> void:
 	for level: int in range(0, 20):
 		assert_gte(EnemyBrain.tell_time(level), EnemyBrain.MIN_TELL, "злость %d" % level)
@@ -170,9 +171,9 @@ func test_the_tell_never_drops_below_the_minimum() -> void:
 		)
 
 
-## Неуязвимого не обстреливают: Otto выходит из двери, у которой его ждали,
-## и пуля, пущенная в этот миг, прошла бы сквозь него. Агент целится — луч
-## горит, — но пуля ждёт, сколько бы неуязвимость ни длилась.
+## The invulnerable are not fired upon: Otto comes out of a door where he was waited
+## for, and a bullet fired at that moment would pass through him. The agent aims, the
+## beam is lit, but the bullet waits however long the invulnerability lasts.
 func test_agent_holds_the_shot_while_otto_cannot_be_hit() -> void:
 	var brain := _brain(0)
 	_run(brain, 0.4, FAR_ABOVE)
@@ -184,8 +185,8 @@ func test_agent_holds_the_shot_while_otto_cannot_be_hit() -> void:
 	assert_almost_eq(brain.wind_up_left(), EnemyBrain.MIN_TELL, STEP, "замах стоит на минимуме")
 
 
-## Стал уязвим — пуля уходит через [constant EnemyBrain.MIN_TELL]: четверть
-## секунды на реакцию, как у самого злого агента, и ни кадром позже.
+## Once he becomes vulnerable, the bullet goes out after [constant EnemyBrain.MIN_TELL]:
+## a quarter second to react, as with the angriest agent, and not a frame later.
 func test_agent_fires_once_otto_can_be_hit_again() -> void:
 	var brain := _brain(0)
 	_run(brain, 0.4, FAR_ABOVE)
@@ -203,8 +204,8 @@ func test_agent_fires_once_otto_can_be_hit_again() -> void:
 	)
 
 
-## Короткая неуязвимость посреди длинного замаха его не удлиняет сверх нужного:
-## пока замах больше минимума, он идёт как шёл.
+## A short invulnerability in the middle of a long windup does not extend it beyond what
+## is needed: while the windup is above the minimum, it goes on as it was.
 func test_a_long_tell_runs_down_while_otto_cannot_be_hit() -> void:
 	var brain := _brain(0)
 	_run(brain, 0.4, FAR_ABOVE)

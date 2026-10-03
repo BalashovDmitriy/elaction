@@ -1,20 +1,20 @@
 class_name Shelter
 extends RefCounted
 
-## Тело под осадками (ADR-0054, решение 5): капля и хлопок гаснут о голову,
-## плечи, кузов и фюзеляж, а не пролетают сквозь Otto, агента, машину или
-## вертолёт. Крыша ловит их картой высот ([RoofCatch]), но карта неподвижна:
-## тот, кто ходит и ездит, в ней не числится, — и до M24l дождь шёл сквозь
-## людей.
+## A body under precipitation (ADR-0054, decision 5): a drop and a flake die against the head,
+## shoulders, car body and fuselage, rather than flying through Otto, an agent, the car or
+## the helicopter. The roof catches them with a height map ([RoofCatch]), but the map is static:
+## whoever walks and drives is not in it — and before M24l rain went through
+## people.
 ##
-## Ловец — коробка столкновений частиц, дочерняя телу: едет с ним. Невидим и
-## физики не трогает — только частицы.
+## The catcher is a particle collision box, a child of the body: it moves with it. Invisible and
+## does not touch physics — only particles.
 
-## Насколько ловец шире тела: плечи и шляпа выходят за коробку столкновений.
+## How much wider the catcher is than the body: shoulders and hat stick out of the collision box.
 const SPREAD: float = 1.4
 
 
-## Ловец на теле [param body] размером [param size] с низом на его ступнях.
+## A catcher on body [param body] of size [param size] with its bottom at its feet.
 static func over(body: Node3D, size: Vector3) -> GPUParticlesCollisionBox3D:
 	var shield := GPUParticlesCollisionBox3D.new()
 	shield.name = "Shelter"
@@ -24,9 +24,9 @@ static func over(body: Node3D, size: Vector3) -> GPUParticlesCollisionBox3D:
 	return shield
 
 
-## Подгоняет ловец [param shield] под позу: [param size] — габарит тела в ней,
-## низ на ступнях. Присевший, вставший на колено или лёгший укрыт по своему
-## росту: ловец в рост стоящего оставлял над ним сухой столб.
+## Fits the catcher [param shield] to the pose: [param size] — the body extent in it,
+## bottom at the feet. A crouching, kneeling or lying one is covered by their own
+## height: a catcher at standing height left a dry column above them.
 static func fit(shield: GPUParticlesCollisionBox3D, size: Vector3) -> void:
 	var wide := Vector3(size.x * SPREAD, size.y, size.z * SPREAD)
 	if shield.size.is_equal_approx(wide):
@@ -35,18 +35,17 @@ static func fit(shield: GPUParticlesCollisionBox3D, size: Vector3) -> void:
 	shield.position = Vector3(0.0, size.y * 0.5, 0.0)
 
 
-## Ловец по габариту видимого под [param body] — для машины и вертолёта, у
-## которых нет одной коробки тела. Габарит — в осях [param body]; считается
-## по цепочке узлов, а не по мировым осям: машину собирают до дерева. То, что
-## под узлами [param skip], не в счёт: диск винта и трос дали бы сухую коробку
-## во весь винт. Пустые места в [param skip] пропускаются: винта у модели может
-## и не быть.
+## A catcher by the extent of what is visible under [param body] — for the car and the helicopter,
+## which have no single body box. The extent is in [param body]'s axes; computed along the node
+## chain, not world axes: the car is assembled before the tree. What is under the nodes [param skip]
+## does not count: the rotor disc and the rope would give a dry box the size of the whole rotor.
+## Empty entries in [param skip] are skipped: the model may have no rotor.
 static func over_meshes(body: Node3D, skip: Array[Node] = []) -> GPUParticlesCollisionBox3D:
 	var reach := AABB()
 	var first := true
 	var parts := skip.filter(func(part: Node) -> bool: return part != null)
-	# Только геометрия: у источника света габарит — его дальность, и прожектор
-	# вертолёта раздувал ловец до шестнадцати метров.
+	# Geometry only: a light source's extent is its range, and the helicopter's
+	# spotlight inflated the catcher to sixteen metres.
 	for node: Node in body.find_children("*", "GeometryInstance3D", true, false):
 		var shape := node as GeometryInstance3D
 		if shape is GPUParticles3D or shape.get_aabb().size == Vector3.ZERO:
@@ -64,8 +63,8 @@ static func over_meshes(body: Node3D, skip: Array[Node] = []) -> GPUParticlesCol
 	return shield
 
 
-## Положение [param node] в осях его предка [param body] — по цепочке узлов,
-## и до дерева тоже. Им же меряет рост прохожего [Passerby].
+## Position of [param node] in the axes of its ancestor [param body] — along the node chain,
+## and before the tree too. [Passerby] measures a pedestrian's height with it.
 static func relative(body: Node3D, node: Node3D) -> Transform3D:
 	var chain := Transform3D.IDENTITY
 	var at: Node = node

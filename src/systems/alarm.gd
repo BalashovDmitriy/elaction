@@ -1,37 +1,37 @@
 class_name Alarm
 extends RefCounted
 
-## Тревога по таймеру.
+## Timer alarm.
 ##
-## Провозился со зданием — включается сирена: агенты злеют, кабина отвечает
-## с задержкой. Смерть тревогу не снимает, сбрасывает её только смена здания
-## (ADR-0009, пункт 1) — то есть это наказание на всё прохождение, а не на попытку.
+## Dawdled in the building — the siren comes on: agents get angrier, the cab responds
+## with a delay. Death does not clear the alarm, only a building change resets it
+## (ADR-0009, point 1) — that is, it is a penalty for the whole playthrough, not for an attempt.
 ##
-## Срок — из аркадного ROM: 4096 тиков логики, ~277 с (ADR-0027, решение 7).
-## До M18d стояли временные пять минут (ADR-0009, пункт 5): момент
-## срабатывания оригиналом тогда подтверждён не был.
+## The term is from the arcade ROM: 4096 logic ticks, ~277 s (ADR-0027, decision 7).
+## Before M18d a temporary five minutes stood here (ADR-0009, point 5): the moment
+## it triggers in the original had not been confirmed then.
 
-## Сколько времени даётся на здание, с.
+## How much time is given for a building, s.
 var time_limit: float = Arcade.seconds(Arcade.ALARM_TICKS)
 
 var raised: bool = false
 
 var _left: float = 0.0
-## Сколько уже идёт здание, с. Считается и после тревоги: от времени в здании
-## растёт сложность, и сирена её не останавливает, а ускоряет (ADR-0027).
+## How long the building has been going, s. Counted after the alarm too: difficulty grows
+## with time in the building, and the siren does not stop it but speeds it up (ADR-0027).
 var _elapsed: float = 0.0
 
 
-## Новое здание: тревога снимается и отсчёт начинается заново. Единственный
-## способ её снять — смерть игрока этого не делает.
+## A new building: the alarm is cleared and the countdown starts again. The only
+## way to clear it — the player's death does not do this.
 func enter_building() -> void:
 	raised = false
 	_left = time_limit
 	_elapsed = 0.0
 
 
-## Отсчитывает время. Возвращает true в тот единственный кадр, когда тревога
-## включилась, чтобы по ней можно было разово поднять всех на уши.
+## Counts time. Returns true on the single frame the alarm
+## switched on, so that everyone can be roused by it once.
 func tick(delta: float) -> bool:
 	_elapsed += delta
 	if raised:
@@ -45,11 +45,11 @@ func tick(delta: float) -> bool:
 	return true
 
 
-## Сколько осталось до тревоги, с. После срабатывания — ноль.
+## How much is left until the alarm, s. After it triggers — zero.
 func time_left() -> float:
 	return maxf(_left, 0.0)
 
 
-## Сколько уже идёт здание, с.
+## How long the building has been going, s.
 func elapsed() -> float:
 	return _elapsed

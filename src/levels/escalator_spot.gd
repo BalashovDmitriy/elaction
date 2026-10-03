@@ -1,51 +1,51 @@
 class_name EscalatorSpot
 extends RefCounted
 
-## Эскалатор ведёт с [member floor_index] на следующий этаж вниз.
+## The escalator leads from [member floor_index] to the next floor down.
 ##
-## Своим файлом с M24h: [BuildingPlan] упёрся в предел строк, а до того это
-## был его внутренний класс.
+## In its own file since M24h: [BuildingPlan] hit the line limit, and before that this
+## was its inner class.
 
-## Насколько перегиб ломаной отступает внутрь проёма от его ближнего края, м.
+## How far the polyline bend steps back inside the opening from its near edge, m.
 ##
-## Сквозь дыру проходит не линия пути, а пассажир: он шире её на полкорпуса,
-## и отступ обязан быть больше. Запас — 0.15 м, и его стережёт
+## What passes through the hole is not the path line but a passenger: he is half a torso wider,
+## and the offset must be larger. The margin is 0.15 m, and it is guarded by
 ## [code]test_escalator_carries_its_rider_through_the_gap[/code].
 const BEND_CLEARANCE: float = Proportions.BODY_WIDTH * 0.5 + 0.15
-## Запас над головой едущего, пока пролёт уходит под плиту, м.
+## Headroom above the rider while the flight goes under the slab, m.
 const HEAD_CLEARANCE: float = 0.25
 
 var x: float = 0.0
 var floor_index: int = 0
-## Куда спускается полотно: -1 влево, +1 вправо. С M24g — всегда к краю
-## этажа (ADR-0043, решение 15).
+## Where the belt goes down: -1 left, +1 right. Since M24g — always toward the edge
+## of the floor (ADR-0043, decision 15).
 var towards: float = -1.0
-## Край этажа, к которому эскалатор спускается: там кончается проём.
+## The floor edge the escalator goes down toward: the opening ends there.
 var edge: float = 0.0
 
 
-## Проём в перекрытии под полотном: пара «левый край, правый край».
+## The opening in the slab under the belt: a pair "left edge, right edge".
 ##
-## Дыра не под площадкой, а сбоку от неё, по ходу спуска, и тянется до края
-## этажа: пролёт под 45° уходит под плиту на два с лишним метра, и остаток
-## пола за ним был бы островом, куда не дойти. Считается здесь, чтобы
-## уровень и [method BuildingPlan.safe_x] видели один и тот же проём.
+## The hole is not under the landing but beside it, in the direction of descent, and runs to the
+## floor edge: a 45° flight goes under the slab for more than two metres, and the rest
+## of the floor beyond it would be an island one cannot reach. Computed here so that
+## the level and [method BuildingPlan.safe_x] see the same opening.
 func gap(rules: BuildingRules) -> Vector2:
 	var near := x + towards * rules.escalator_gap_offset
 	return Vector2(minf(near, edge), maxf(near, edge))
 
 
-## Дыра в перекрытии, сквозь которую проходит пролёт: пара «левый край,
-## правый край», в задней полосе коридора (ADR-0044, решение 10).
+## The hole in the slab the flight passes through: a pair "left edge,
+## right edge", in the back strip of the corridor (ADR-0044, decision 10).
 ##
-## Короче [method gap]: тот — место, которое раскладка держит под
-## эскалатором, от площадки до края этажа, и по нему по-прежнему стоят
-## двери, лампы и мебель. Пол с M24h цельный, и дыра нужна лишь там, где
-## пролёт проходит сквозь плиту: пока голова едущего не ушла под неё.
+## Shorter than [method gap]: that one is the space the layout keeps under the
+## escalator, from the landing to the floor edge, and doors, lamps and furniture still
+## stand by it. Since M24h the floor is solid, and the hole is needed only where
+## the flight passes through the slab: until the rider's head has gone under it.
 ##
-## Голове надо уйти вниз на рост, плиту и запас; по горизонтали — это, делённое
-## на уклон правил ([member BuildingRules.escalator_angle]), а не 45° молча
-## (авторевью M24h). Пролёт от перегиба круче уклона правил — запас выходит сам.
+## The head has to go down by height, slab and margin; horizontally — that divided
+## by the rules slope ([member BuildingRules.escalator_angle]), not 45° silently
+## (code review M24h). The flight from the bend is steeper than the rules slope — margin comes free.
 func hole(rules: BuildingRules) -> Vector2:
 	var near := x + towards * rules.escalator_gap_offset
 	var drop := Proportions.BODY + rules.slab_height + HEAD_CLEARANCE
@@ -54,21 +54,21 @@ func hole(rules: BuildingRules) -> Vector2:
 	return Vector2(minf(near, far), maxf(near, far))
 
 
-## Нижняя площадка — на этаже ниже, у края.
+## The lower landing — on the floor below, at the edge.
 func landing(rules: BuildingRules) -> float:
 	return x + towards * rules.escalator_run
 
 
-## Перегиб ломаной в своих координатах: где площадка кончается и начинается
-## пролёт.
+## The polyline bend in its own coordinates: where the landing ends and the
+## flight begins.
 ##
-## До M18b перегиб стоял посреди проёма и ниже перекрытия, и ломаная шла
-## двумя пролётами разной крутизны — в кадре это читалось жёлобом, а не
-## эскалатором (ADR-0025, решение 4). Теперь до проёма идёт площадка по
-## этажу, а от его ближнего края — один прямой пролёт вниз.
+## Before M18b the bend stood in the middle of the opening and below the slab, and the polyline went
+## in two flights of different steepness — in the frame it read as a chute, not
+## an escalator (ADR-0025, decision 4). Now up to the opening there is a landing along the
+## floor, and from its near edge — one straight flight down.
 ##
-## Считается здесь, рядом с проёмом, через который проходит: уровень ставит
-## по этому числу конструкцию, тест по нему же проверяет, что пассажир идёт
-## сквозь дыру, а не сквозь плиту.
+## Computed here, next to the opening it passes through: the level places
+## the structure by this number, and the test checks by it that the passenger goes
+## through the hole, not through the slab.
 func bend(rules: BuildingRules) -> Vector2:
 	return Vector2(towards * (rules.escalator_gap_offset + BEND_CLEARANCE), 0.0)

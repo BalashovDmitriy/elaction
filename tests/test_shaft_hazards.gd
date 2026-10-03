@@ -1,11 +1,11 @@
 extends GutTest
 
-## Тесты правил гибели в шахте лифта.
+## Tests of the elevator shaft death rules.
 ##
-## Сами правила — статические функции без состояния, поэтому проверяются
-## напрямую, без сцены и физики.
+## The rules themselves are stateless static functions, so they are checked
+## directly, without a scene and physics.
 
-## Шаг этажа стандартного здания, м.
+## Floor step of the standard building, m.
 const FLOOR: float = Proportions.FLOOR
 
 
@@ -18,8 +18,8 @@ func test_falling_two_floors_is_deadly() -> void:
 
 
 func test_falling_on_a_car_roof_two_floors_down_is_one_floor() -> void:
-	# Крыша кабины ниже пола над ней на толщину плиты: кабина, стоящая двумя
-	# этажами ниже, встречает крышей на этаж и плиту ниже — это ещё этаж.
+	# The cab roof is below the floor above it by the slab thickness: a cab standing two
+	# floors down meets with its roof a floor and a slab lower — that is one more floor.
 	var roof := FLOOR + Proportions.SLAB
 	assert_false(ShaftHazards.is_deadly_fall(roof, FLOOR), "крыша кабины этажом ниже")
 
@@ -34,7 +34,7 @@ func test_standing_still_is_not_a_fall() -> void:
 
 
 func test_the_rule_follows_the_building_floor() -> void:
-	# Этаж задаёт здание: у низкого этажа и падение на два короче.
+	# The building sets the floor height: on a low floor a fall of two is shorter too.
 	var low := FLOOR * 0.5
 	assert_true(ShaftHazards.is_deadly_fall(FLOOR, low), "два низких этажа — смерть")
 

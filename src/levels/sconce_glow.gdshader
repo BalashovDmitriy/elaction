@@ -1,8 +1,9 @@
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_back, shadows_disabled;
 
-// Пятно бра на стене (ADR-0048): вытянутый овал, ярче у абажура и мягко
-// сходящий на нет к краю. Прибавляется к стене — источника света у бра нет.
+// Sconce spot on the wall (ADR-0048): an elongated oval, brighter at the shade and
+// softly fading to nothing toward the edge. Added to the wall — the sconce has no light
+// source.
 
 uniform vec4 tint : source_color = vec4(1.0, 0.72, 0.4, 0.55);
 

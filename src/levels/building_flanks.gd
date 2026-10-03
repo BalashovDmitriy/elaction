@@ -1,24 +1,25 @@
 class_name BuildingFlanks
 extends Node3D
 
-## Торцы башни и уступ стилобата по типу здания (ADR-0058, решение 3).
+## Tower end walls and the podium setback by building kind (ADR-0058, decision 3).
 ##
-## С этажей башни камера видит по бокам больше, чем саму башню: её торцы и
-## крышу широкой части здания — уступ. До M24p там была голая крыша. Теперь у
-## отеля на торцах каменные русты и флаги, на уступе — терраса с зонтиками и
-## гирляндой; у офиса — алюминиевые солнцезащитные ламели и зенитные фонари с
-## техникой; у жилого дома — пожарная лестница, а на уступе рубероид, тарелки,
-## трубы и бельё на верёвках.
+## From the tower floors the camera sees more at the sides than the tower itself: its end
+## walls and the roof of the building's wide part — the setback. Before M24p there was a
+## bare roof there. Now the hotel has stone quoins and flags on the end walls, and on the
+## setback a terrace with umbrellas and a string of lights; the office — aluminium sun
+## louvres and skylights with equipment; the residential building — a fire escape, and
+## on the setback roofing felt, dishes, chimneys and laundry on lines.
 ##
-## Только вид: тел нет, теней нет, свет — эмиссией (у окружения ровно два
-## источника, ADR-0029). Раскладка этажей не меняется — всё снаружи стен.
+## Looks only: no bodies, no shadows, light by emission (the surroundings have exactly two
+## light sources, ADR-0029). The floor layout does not change — everything is outside
+## the walls.
 ##
-## Координаты: x — вдоль здания, y — плоскость правил (вниз), z — сцены.
+## Coordinates: x — along the building, y — the rules plane (down), z — the scene's.
 
-## Глубина здания: от передней грани коридора до дальней стены зала, по z.
+## Building depth: from the corridor's front face to the hall's far wall, along z.
 const FRONT_Z: float = WorldSpace.CORRIDOR_DEPTH * 0.5
 const BACK_Z: float = WorldSpace.BACK_WALL_Z - WorldSpace.ROOM_DEPTH
-## Ближе этого к стене башни на уступе ничего не стоит, м.
+## Nothing on the setback stands closer than this to the tower wall, m.
 const WALL_GAP: float = 0.4
 
 const STONE := Color(0.64, 0.58, 0.48)
@@ -46,20 +47,20 @@ const WASHING: Array[Color] = [
 var _rules: BuildingRules = null
 var _batch := MeshBatch.new()
 var _lit: bool = true
-## Места деталей до сдачи в мультимеши: тестам ([method placements]).
+## Detail placements before handing over to multimeshes: for tests ([method placements]).
 var _placed: Array[Transform3D] = []
-## Марш пожарной лестницы: один меш на все марши — один мультимеш.
+## Fire escape flight: one mesh for all flights — one multimesh.
 var _stair: BoxMesh = null
-## Купола зонтиков террасы — по мешу на цвет [constant CANVAS]: меш на каждый
-## зонтик сдавался бы своим мультимешем на одну копию.
+## Terrace umbrella canopies — a mesh per colour in [constant CANVAS]: a mesh per
+## umbrella would be handed over as its own multimesh with a single instance.
 var _canopies: Array[CylinderMesh] = []
-## Где по высоте у правого торца висит вывеска ([method VerticalSign.span]):
-## флаги и ламели перед ней не встают — закрыли бы буквы.
+## Where in height the sign hangs at the right end wall ([method VerticalSign.span]):
+## flags and louvres are not placed in front of it — they would cover the letters.
 var _sign := Vector2.ZERO
 
 
-## Ставит торцы и уступ здания по типу из [member BuildingRules.kind].
-## [param sign_span] — верх и низ вывески у правого торца в плоскости правил.
+## Places the building's end walls and setback by kind from [member BuildingRules.kind].
+## [param sign_span] — top and bottom of the sign at the right end wall in the rules plane.
 func build(rules: BuildingRules, building_seed: int = 1, sign_span: Vector2 = Vector2.ZERO) -> void:
 	name = "Flanks"
 	_rules = rules
@@ -86,14 +87,14 @@ func build(rules: BuildingRules, building_seed: int = 1, sign_span: Vector2 = Ve
 	_batch.commit(self)
 
 
-## Места всех деталей торцов и уступа в сцене: тестам — под headless-движком
-## мультимеш мест не хранит ([method MeshBatch.places]).
+## Placements of all end wall and setback details in the scene: for tests — under the
+## headless engine a multimesh stores no placements ([method MeshBatch.places]).
 func placements() -> Array[Transform3D]:
 	return _placed
 
 
-## Торец башни у стены [param wall] со стороны [param side] (−1 — слева): от
-## парапета [param top] до уступа [param bottom] (плоскость правил).
+## Tower end wall at wall [param wall] on side [param side] (−1 — left): from parapet
+## [param top] to setback [param bottom] (rules plane).
 func _flank(
 	kind: BuildingIdentity.Kind, wall: float, side: float, top: float, bottom: float
 ) -> void:
@@ -108,7 +109,7 @@ func _flank(
 			_flags(wall, side)
 
 
-## Русты отеля: каменные блоки по углу через один шире и уже.
+## Hotel quoins: stone blocks along the corner, alternately wider and narrower.
 func _quoins(wall: float, side: float, top: float, bottom: float) -> void:
 	var stone := GreyboxLook.surface(STONE)
 	var shade := GreyboxLook.surface(STONE_SHADE)
@@ -124,7 +125,7 @@ func _quoins(wall: float, side: float, top: float, bottom: float) -> void:
 		)
 
 
-## Флаги отеля на кронштейнах через несколько этажей.
+## Hotel flags on brackets every few floors.
 func _flags(wall: float, side: float) -> void:
 	var pole := GreyboxLook.metal(BRASS)
 	var turn := 0
@@ -139,8 +140,8 @@ func _flags(wall: float, side: float) -> void:
 		turn += 1
 
 
-## Ламели офиса: на каждом этаже башни две алюминиевые полки наружу и кромка
-## стеклянной стены по углу.
+## Office louvres: on every tower floor two aluminium shelves sticking out and the edge
+## of the glass wall along the corner.
 func _louvres(wall: float, side: float, top: float, bottom: float) -> void:
 	var metal := GreyboxLook.metal(ALUMINIUM)
 	_batch.box(
@@ -160,14 +161,14 @@ func _louvres(wall: float, side: float, top: float, bottom: float) -> void:
 			)
 
 
-## Встала бы деталь торца [param side] от [param from] до [param to] по
-## высоте (плоскость правил) перед вывеской: та висит у правого торца.
+## Would an end-wall detail on side [param side] from [param from] to [param to] in
+## height (rules plane) stand in front of the sign: it hangs at the right end wall.
 func _before_sign(side: float, from: float, to: float) -> bool:
 	return side > 0.0 and to > _sign.x and from < _sign.y
 
 
-## Пожарная лестница жилого дома: площадка с перилами на каждом этаже башни,
-## марш между площадками и откидная лестница внизу.
+## Residential fire escape: a landing with railings on every tower floor, a flight
+## between landings and a drop ladder at the bottom.
 func _fire_escape(wall: float, side: float) -> void:
 	var iron := GreyboxLook.metal(IRON)
 	var reach := 1.1
@@ -185,7 +186,7 @@ func _fire_escape(wall: float, side: float) -> void:
 			var x := wall + side * (0.2 + bar * 0.2)
 			_batch.box(iron, Vector3(0.02, 0.95, 0.02), Vector3(x, deck - 0.47, z + 0.68))
 		if index + 1 < floors:
-			# Марш вниз к площадке этажа ниже: на кадре — косая полоса.
+			# Flight down to the landing of the floor below: in the frame — a diagonal strip.
 			var drop := _rules.floor_surface(index + 1) - deck
 			var stair := Vector3(0.08, Vector2(reach * 0.7, drop).length(), 0.6)
 			var tilt := Basis(
@@ -198,8 +199,7 @@ func _fire_escape(wall: float, side: float) -> void:
 			_batch.mesh(_stair, Transform3D(tilt * Basis.from_scale(stair), at))
 
 
-## Уступ стилобата на пролёте [param span] (плоскость правил) на высоте
-## [param surface].
+## Podium setback on span [param span] (rules plane) at height [param surface].
 func _ledge(
 	kind: BuildingIdentity.Kind,
 	span: Vector2,
@@ -216,8 +216,8 @@ func _ledge(
 			_terrace(span, surface, side, rng)
 
 
-## Терраса отеля: дощатый настил, живая изгородь у края, зонтики со столиками
-## и гирлянда лампочек — горит ночью и в сумерках.
+## Hotel terrace: plank decking, a hedge at the edge, umbrellas with tables and a string
+## of bulbs — lit at night and at dusk.
 func _terrace(span: Vector2, surface: float, side: float, rng: RandomNumberGenerator) -> void:
 	var middle := (span.x + span.y) * 0.5
 	var length := span.y - span.x
@@ -248,7 +248,7 @@ func _terrace(span: Vector2, surface: float, side: float, rng: RandomNumberGener
 		)
 		_batch.cylinder_on(pole, 0.04, 0.72, surface, Vector3(x, 0.0, z))
 		tops.append(Vector3(x, surface - 2.5, -0.6))
-	# Гирлянда: лампочки по провисающей нити между зонтиками.
+	# String of lights: bulbs along a sagging wire between the umbrellas.
 	var bulb := GreyboxLook.light(BULB) if _lit else GreyboxLook.surface(BULB.darkened(0.5))
 	for index: int in tops.size() - 1:
 		var from := tops[index]
@@ -260,7 +260,7 @@ func _terrace(span: Vector2, surface: float, side: float, rng: RandomNumberGener
 			_batch.sphere(bulb, 0.07, at)
 
 
-## Купол зонтика цвета [param tone] из [constant CANVAS]: один меш на цвет.
+## Umbrella canopy of colour [param tone] from [constant CANVAS]: one mesh per colour.
 func _canopy(tone: int) -> CylinderMesh:
 	while _canopies.size() <= tone:
 		var canopy := CylinderMesh.new()
@@ -273,8 +273,8 @@ func _canopy(tone: int) -> CylinderMesh:
 	return _canopies[tone]
 
 
-## Плаза офиса: плитка, ряды зенитных фонарей — светятся ночью, — и
-## приточная техника с вентиляторами.
+## Office plaza: tiles, rows of skylights — glowing at night — and supply equipment with
+## fans.
 func _plaza(span: Vector2, surface: float, rng: RandomNumberGenerator) -> void:
 	var middle := (span.x + span.y) * 0.5
 	var length := span.y - span.x
@@ -298,8 +298,8 @@ func _plaza(span: Vector2, surface: float, rng: RandomNumberGenerator) -> void:
 		_batch.cylinder_on(fan, 0.4, 0.08, surface, Vector3(x, 1.0, -5.0))
 
 
-## Крыша жилого дома: рубероид, кирпичные трубы, тарелки и бельё на верёвке
-## между столбами.
+## Residential roof: roofing felt, brick chimneys, dishes and laundry on a line between
+## posts.
 func _tar_roof(span: Vector2, surface: float, side: float, rng: RandomNumberGenerator) -> void:
 	var middle := (span.x + span.y) * 0.5
 	var length := span.y - span.x

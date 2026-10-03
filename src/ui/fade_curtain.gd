@@ -1,18 +1,19 @@
 class_name FadeCurtain
 extends CanvasLayer
 
-## Затемнение между зданиями (ADR-0038, решение 4).
+## Fade between buildings (ADR-0038, decision 4).
 ##
-## Машина с Otto уехала, бонус досчитан — кадр уходит в чёрное, под чёрным
-## собирается следующее здание, и кадр выходит из чёрного уже на нём. Раньше
-## здание сменялось встык, одним кадром.
+## The car with Otto has driven off, the bonus is counted: the frame fades to black, the
+## next building is assembled under the black, and the frame comes out of black already
+## on it. Previously the building changed abruptly, in a single frame.
 ##
-## Слой — над HUD и под меню: бонус уходит в чёрное вместе со сценой, а пауза,
-## взятая посреди затемнения, видна поверх него. На паузе затемнение стоит.
+## The layer is above the HUD and below the menu: the bonus fades to black together with
+## the scene, and a pause taken in the middle of the fade shows on top of it. During a
+## pause the fade holds.
 
-## Слой холста: HUD — 3, меню — 5.
+## Canvas layer: HUD is 3, menu is 5.
 const LAYER: int = 4
-## Сколько кадр уходит в чёрное и сколько выходит из него, с.
+## How long the frame takes to fade into black and to come out of it, s.
 const FADE_OUT: float = 0.45
 const FADE_IN: float = 0.45
 
@@ -31,8 +32,8 @@ func _init() -> void:
 	add_child(_veil)
 
 
-## Выждав [param hold], уводит кадр в чёрное, зовёт [param swap] и выводит кадр
-## обратно. Начатое прежде затемнение отменяется.
+## After waiting [param hold], fades the frame to black, calls [param swap] and brings
+## the frame back. A fade started earlier is cancelled.
 func cover(hold: float, swap: Callable) -> void:
 	cancel()
 	_tween = create_tween()
@@ -44,8 +45,8 @@ func cover(hold: float, swap: Callable) -> void:
 	_tween.tween_property(_veil, "color:a", 0.0, FADE_IN)
 
 
-## Начинает с чёрного: держит его [param hold] секунд и выводит кадр. Так
-## открывается первое здание партии, пока под чёрным греются шейдеры
+## Starts from black: holds it for [param hold] seconds and brings the frame in. This is
+## how the first building of a game opens while shaders warm up under the black
 ## ([ShaderWarmup]).
 func reveal(hold: float) -> void:
 	cancel()
@@ -56,8 +57,8 @@ func reveal(hold: float) -> void:
 	_tween.tween_property(_veil, "color:a", 0.0, FADE_IN)
 
 
-## Снимает затемнение сразу: партию бросили в меню или начали заново посреди
-## смены здания — менять здание уже незачем.
+## Removes the fade at once: the game was dropped to the menu or restarted in the middle
+## of a building change, so there is no point in changing the building any more.
 func cancel() -> void:
 	if _tween != null:
 		_tween.kill()
@@ -65,11 +66,11 @@ func cancel() -> void:
 	_veil.color.a = 0.0
 
 
-## Идёт ли затемнение.
+## Whether a fade is in progress.
 func is_running() -> bool:
 	return _tween != null and _tween.is_running()
 
 
-## Насколько кадр сейчас в чёрном: 0 — открыт, 1 — чёрный.
+## How far the frame is in black now: 0 is open, 1 is black.
 func opacity() -> float:
 	return _veil.color.a

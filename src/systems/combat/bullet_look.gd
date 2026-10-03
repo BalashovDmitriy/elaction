@@ -1,31 +1,31 @@
 class_name BulletLook
 extends Node3D
 
-## Вид пули: тонкий длинный трассер (M21, замечание пользователя — «пуля
-## выглядит квадратиком»; M24a — пуля втрое быстрее, ADR-0037, решение 5).
+## Bullet look: a thin long tracer (M21, user's remark — "the bullet
+## looks like a little square"; M24a — the bullet is three times faster, ADR-0037, decision 5).
 ##
-## Модель пули здесь не помогла бы: настоящая пуля на нашем масштабе меньше
-## пикселя. Пулю в кадре видно так же, как в кино, — по трассеру: яркое вытянутое
-## ядро и тающий хвост позади. Всё светится эмиссией — пулю видно и на погашенном
-## этаже, а источников света она не добавляет. Вспышка и дымок выстрела стоят
-## у ствола и живут своим временем — это [ShotFx], а не вид летящей пули.
+## A bullet model would not help here: a real bullet at our scale is smaller than a pixel. A bullet
+## in frame is seen the same way as in films — by a tracer: a bright elongated core and a fading
+## tail behind. Everything glows by emission — the bullet is visible even on a darkened floor, and
+## it adds no light sources. The shot's flash and smoke stand at the muzzle and live on their own
+## time — that is [ShotFx], not the look of the flying bullet.
 ##
-## Только вид: коллизия пули — её `Shape`, и высоты ROM держит она, а не хвост.
+## Look only: the bullet's collision is its `Shape`, and that holds the ROM heights, not the tail.
 ##
-## Хвост растёт с пройденным путём: сразу после выстрела он торчал бы из стрелка
-## назад. Длинный и тонкий: пуля проходит полметра за кадр, и короткий хвост
-## читался бы точкой, прыгающей по кадру, а не росчерком.
+## The tail grows with the distance travelled: right after the shot it would stick out of the
+## shooter backward. Long and thin: the bullet covers half a metre per frame, and a short tail would
+## read as a dot jumping across the frame rather than a streak.
 
-## Ядро: длина и толщина, м.
+## Core: length and thickness, m.
 const CORE_LENGTH: float = 0.36
 const CORE_RADIUS: float = 0.024
-## Хвост: полная длина и толщина у головы, м.
+## Tail: full length and thickness at the head, m.
 const TRAIL_LENGTH: float = 2.6
 const TRAIL_THICKNESS: float = 0.042
 
 const CORE := Color(1.0, 0.96, 0.82)
 const TRAIL := Color(1.0, 0.72, 0.35)
-## Насколько ярко светится ядро: ярче кадра, чтобы грейдинг его не притушил.
+## How brightly the core glows: brighter than the frame, so grading does not dim it.
 const GLOW: float = 6.0
 
 static var _core_material: StandardMaterial3D = null
@@ -35,7 +35,7 @@ var _direction: float = 1.0
 var _trail: MeshInstance3D = null
 
 
-## Собирает вид пули, летящей в сторону [param direction] (−1 влево, +1 вправо).
+## Assembles the look of a bullet flying toward [param direction] (−1 left, +1 right).
 static func make(direction: float) -> BulletLook:
 	var look := BulletLook.new()
 	look.name = "Look"
@@ -44,7 +44,7 @@ static func make(direction: float) -> BulletLook:
 	return look
 
 
-## Обновляет хвост по пройденному пулей пути, м.
+## Updates the tail by the distance the bullet has travelled, m.
 func follow(travelled: float) -> void:
 	var length := minf(travelled, TRAIL_LENGTH)
 	_trail.visible = length > 0.01
@@ -62,7 +62,7 @@ func _build() -> void:
 	capsule.radial_segments = 8
 	capsule.rings = 2
 	core.mesh = capsule
-	# Капсула растёт по Y; ложится вдоль полёта.
+	# The capsule grows along Y; laid along the flight.
 	core.rotation.z = PI * 0.5
 	core.material_override = _core()
 	core.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -71,21 +71,21 @@ func _build() -> void:
 	_trail = MeshInstance3D.new()
 	_trail.name = "Trail"
 	var strip := QuadMesh.new()
-	# Единичная длина: хвост тянется масштабом по X.
+	# Unit length: the tail stretches by X scale.
 	strip.size = Vector2(1.0, TRAIL_THICKNESS)
 	_trail.mesh = strip
 	_trail.material_override = _trail_mat()
 	_trail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	# Градиент хвоста идёт по U квада слева направо: у пули, летящей влево,
-	# голова хвоста — справа, и квад разворачивается.
+	# The tail gradient runs along the quad's U from left to right: for a bullet flying left,
+	# the head of the tail is on the right, and the quad is turned around.
 	if _direction < 0.0:
 		_trail.rotation.y = PI
 	add_child(_trail)
 	follow(0.0)
 
 
-## Ядро: светится эмиссией. Не unshaded — у unshaded Godot 4 эмиссию не берёт,
-## и ядро горело бы альбедо, не ярче единицы, без ореола (авторевью M21).
+## Core: glows by emission. Not unshaded — Godot 4 unshaded does not take emission,
+## and the core would glow by albedo, no brighter than one, without a halo (M21 code review).
 static func _core() -> StandardMaterial3D:
 	if _core_material == null:
 		_core_material = StandardMaterial3D.new()
@@ -96,7 +96,7 @@ static func _core() -> StandardMaterial3D:
 	return _core_material
 
 
-## Хвост: от головы к концу гаснет и остывает — градиент по U.
+## Tail: from the head to the end it fades and cools — a gradient along U.
 static func _trail_mat() -> StandardMaterial3D:
 	if _trail_material == null:
 		var gradient := Gradient.new()

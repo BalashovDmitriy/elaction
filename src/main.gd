@@ -1,51 +1,51 @@
 extends Node
 
-## Точка входа: меню, партия и переходы между ними.
+## Entry point: the menu, the game and the transitions between them.
 ##
-## Держит три вещи и связывает их: [Menu] — экраны вне игры, [Hud] — то, что
-## видно в игре, и само здание. Партия живёт в [GameState], здание — нет:
-## оно собирается заново на каждое и выбрасывается целиком.
+## Holds three things and ties them together: [Menu] — the screens outside play, [Hud] — what
+## is visible in play, and the building itself. The game lives in [GameState], the building
+## does not: it is assembled anew for each one and thrown away whole.
 ##
-## Корень — голый [Node], а не 2D- или 3D-узел: под ним живут и трёхмерное
-## здание, и плоский интерфейс, и ни одному из них родительский трансформ
-## не нужен. Пост-обработка 2D ушла вместе с ADR-0002; её 3D-наследник —
-## дело вехи света (M17).
+## The root is a bare [Node], not a 2D or 3D node: under it live both the three-dimensional
+## building and the flat interface, and neither of them needs a parent
+## transform. 2D post-processing left with ADR-0002; its 3D successor is
+## the business of the light milestone (M17).
 ##
-## Игра начинается с меню, а не со здания (DoD вехи M8b): до неё сюда попадали
-## сразу в партию, потому что меню ещё не было.
+## The game starts with the menu, not the building (M8b milestone DoD): before it, one landed
+## straight in a game, because there was no menu yet.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
-## Скрипт автолоада съёмки: имя автолоада при разборе одного файла не видно,
-## а статический вопрос «идёт ли съёмка» задать надо.
+## The screenshot autoload script: the autoload name is not visible when parsing one file,
+## yet the static question "is a capture running" must be asked.
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
-## Сколько досчитанный бонус висит на кадре, прежде чем кадр уйдёт в чёрное, с:
-## дочитать число.
+## How long the counted-up bonus hangs in frame before the frame fades to black, s:
+## to finish reading the number.
 const BONUS_HOLD: float = 0.8
-## Сколько пункты конца партии не принимают нажатий, с (ADR-0042, решение 5).
+## How long the game-over items do not accept presses, s (ADR-0042, decision 5).
 const GAME_OVER_HOLD: float = 1.5
 
 var _level: GreyboxLevel = null
-## Город за главным меню (ADR-0035). Живёт, пока открыто меню, а не партия.
+## The city behind the main menu (ADR-0035). Lives while the menu is open, not the game.
 var _stage: MenuStage = null
 var _settings: GameSettings = null
 var _records: Records = null
-## Идёт ли партия. На экранах меню — нет, даже пока здание висит в дереве.
+## Whether a game is running. On menu screens — no, even while the building hangs in the tree.
 var _playing: bool = false
-## Что удерживалось в прошлом кадре: по этому считается фронт нажатия.
+## What was held last frame: the press edge is computed from this.
 var _held: Dictionary = {}
-## Страница меню, какой её оставил прошлый кадр. Esc — это и «пауза», и «назад»
-## меню: с настроек над паузой меню возвращает на паузу раньше, чем кадр доходит
-## до [method _process], и по одной текущей странице то же нажатие тут же снимало
-## бы паузу (авторевью M22b).
+## The menu page as the last frame left it. Esc is both "pause" and the menu's "back":
+## from settings over the pause the menu returns to the pause before the frame reaches
+## [method _process], and judged by the current page alone the same press would immediately
+## unpause (M22b code review).
 var _page_before: Menu.Page = Menu.Page.MAIN
-## Затемнение между зданиями (ADR-0038, решение 4).
+## Fade between buildings (ADR-0038, decision 4).
 var _curtain: FadeCurtain = null
-## Идущее демо (ADR-0041) или null. Сколько главное меню простояло без нажатий и
-## с какой точки пойдёт следующее демо.
+## The running demo (ADR-0041) or null. How long the main menu has stood without presses and
+## from which point the next demo will start.
 var _demo: DemoRun = null
 var _idle: float = 0.0
 var _demo_point: int = DemoPlan.Point.ROOF
-## Демо уходит в затемнение: второе нажатие его уже не кончает.
+## The demo is fading out: a second press no longer ends it.
 var _demo_ending: bool = false
 
 @onready var _menu: Menu = $Menu
@@ -53,18 +53,18 @@ var _demo_ending: bool = false
 
 
 func _ready() -> void:
-	# Первое, что игра говорит в лог: версия и платформа. Без них сообщение
-	# «у меня не работает» не с чем соотнести, а сборка без этой строки
-	# считается незапустившейся — tools/smoke.py смотрит именно на неё.
+	# The first thing the game writes to the log: version and platform. Without them an "it does not
+	# work for me" report has nothing to be matched against, and a build without this line
+	# counts as not started — tools/smoke.py looks exactly for it.
 	print(Release.banner())
 
-	# Ввод паузы должен работать на паузе, иначе из неё не выйти. Само здание
-	# при этом обязано замирать — см. _enter_building.
+	# Pause input must work while paused, otherwise there is no way out. The building itself
+	# must freeze meanwhile — see _enter_building.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
 	_settings = GameSettings.load_from()
 	_settings.apply()
-	# Виньетка — под HUD и меню, над сценой (ADR-0030, решение 3).
+	# Vignette — under the HUD and menu, above the scene (ADR-0030, decision 3).
 	add_child(Vignette.new())
 	_curtain = FadeCurtain.new()
 	add_child(_curtain)
@@ -82,8 +82,8 @@ func _ready() -> void:
 	game.game_over.connect(_on_game_over)
 	game.extra_life_awarded.connect(_on_extra_life)
 
-	# Автосъёмка начинает сразу с партии: она водит Otto игровыми действиями,
-	# а кнопки меню нажимать не умеет.
+	# Auto-capture starts right with a game: it drives Otto with game actions,
+	# but cannot press menu buttons.
 	if SCREENSHOTTER.capturing():
 		_start_game()
 	else:
@@ -92,13 +92,13 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_count_idle(delta)
-	# Курсор — только в меню: в партии и в демо он висел поверх кадра, и полный
-	# экран читался растянутым окном (ADR-0042, решение 4).
+	# The cursor is only in the menu: in a game and in the demo it hung over the frame, and full
+	# screen read as a stretched window (ADR-0042, decision 4).
 	var cursor := Input.MOUSE_MODE_VISIBLE if _menu.visible else Input.MOUSE_MODE_HIDDEN
 	if Input.mouse_mode != cursor:
 		Input.mouse_mode = cursor
 	if _just_pressed(&"pause"):
-		# Пауза во вступлении его пропускает, а не открывает меню (ADR-0038).
+		# Pause during the intro skips it rather than opening the menu (ADR-0038).
 		if _playing and _level != null and _level.skip_the_intro():
 			pass
 		elif _playing:
@@ -108,15 +108,15 @@ func _process(delta: float) -> void:
 			and _page_before == Menu.Page.PAUSE
 			and _menu.current_page() == Menu.Page.PAUSE
 		):
-			# Только открытая пауза: закрытое меню помнит последнюю страницу, и
-			# Esc во время последней смерти «продолжал» бы игру после паузы в
-			# этой партии — конец партии так и не показывался (авторевью M24f).
+			# Only an open pause: a closed menu remembers its last page, and
+			# Esc during the last death would "continue" the game after a pause in
+			# this game — the game over was never shown (M24f code review).
 			_resume()
 	_page_before = _menu.current_page()
 
 
-## Любое нажатие: в меню сбрасывает отсчёт до демо, в демо — кончает его
-## (ADR-0041, решение 5). Нажатие, кончившее демо, в игру и меню не проходит.
+## Any press: in the menu resets the countdown to the demo, in the demo ends it
+## (ADR-0041, decision 5). The press that ended the demo does not reach the game or the menu.
 func _input(event: InputEvent) -> void:
 	var pressed := (
 		(event is InputEventKey and event.is_pressed() and not event.is_echo())
@@ -124,13 +124,14 @@ func _input(event: InputEvent) -> void:
 		or (event is InputEventMouseButton and event.is_pressed())
 	)
 	if _demo != null:
-		# Кадр F12 снимается и с демо: main слышит ввод раньше автолоада съёмки, и
-		# нажатие, кончившее демо, до него бы уже не дошло (авторевью M24e).
+		# The F12 shot is taken in the demo too: main hears input before the screenshot autoload,
+		# and the press that ended the demo would no longer reach it (M24e code review).
 		if pressed and not event.is_action(&"screenshot"):
 			get_viewport().set_input_as_handled()
 			_end_demo()
 		return
-	# Стик — тоже ход по меню: стрелками меню ходят и им (авторевью M24e).
+	# The stick also moves through the menu: the menu is navigated by arrows and by it (M24e code
+	# review).
 	var stick := event as InputEventJoypadMotion
 	if (
 		pressed
@@ -140,8 +141,8 @@ func _input(event: InputEvent) -> void:
 		_idle = 0.0
 
 
-## Главное меню без нажатий [constant DemoPlan.IDLE_TIME] секунд — демо. Только
-## главное: на паузе, в настройках и в партии отсчёта нет.
+## Main menu without presses for [constant DemoPlan.IDLE_TIME] seconds — demo. Only
+## the main one: on pause, in settings and in a game there is no countdown.
 func _count_idle(delta: float) -> void:
 	var waiting := (
 		_demo == null
@@ -158,7 +159,8 @@ func _count_idle(delta: float) -> void:
 		_start_demo()
 
 
-## Демо (ADR-0041): здание своей солью, бот за Otto, точка — следующая по кругу.
+## Demo (ADR-0041): a building with its own salt, a bot for Otto, the point is the next one round
+## the circle.
 func _start_demo() -> void:
 	_idle = 0.0
 	_demo_ending = false
@@ -173,16 +175,16 @@ func _start_demo() -> void:
 	_demo_point = DemoPlan.next(_demo_point)
 
 
-## Конец демо: здание замирает, кадр уходит в чёрное, из чёрного — главное меню.
+## End of the demo: the building freezes, the frame fades to black, from black — the main menu.
 func _end_demo() -> void:
 	if _demo == null or _demo_ending:
 		return
 	_demo_ending = true
 	_demo.stop()
 	_level.process_mode = Node.PROCESS_MODE_DISABLED
-	# Сценка добивания держит свой режим PAUSABLE и под выключенным зданием шла бы
-	# дальше: добивала агента со звуком, водила камеру и держала мир замедленным —
-	# с ним и затемнение (авторевью M24e). Уход из дерева возвращает миру ход.
+	# The takedown scene holds its own PAUSABLE mode and under a disabled building would go
+	# on: finishing the agent with sound, driving the camera and keeping the world slowed —
+	# and the fade with it (M24e code review). Leaving the tree gives the world its pace back.
 	var director := _level.otto.takedown
 	if director != null:
 		_level.otto.takedown = null
@@ -191,11 +193,11 @@ func _end_demo() -> void:
 	_curtain.cover(0.0, _open_menu.bind(true))
 
 
-## Нажато ли действие именно в этом кадре.
+## Whether the action was pressed exactly this frame.
 ##
-## Своё отслеживание фронта вместо [method Input.is_action_just_pressed]: тот
-## верен лишь в кадр самого нажатия, а автосценарий съёмки нажимает действия
-## из своего кадра — кадр main успевает пройти раньше, и нажатие теряется.
+## Own edge tracking instead of [method Input.is_action_just_pressed]: that one
+## is true only on the frame of the press itself, and the capture auto-script presses actions
+## from its own frame — main's frame manages to pass earlier, and the press is lost.
 func _just_pressed(action: StringName) -> bool:
 	var pressed := Input.is_action_pressed(action)
 	var was: bool = _held.get(action, false)
@@ -203,9 +205,9 @@ func _just_pressed(action: StringName) -> bool:
 	return pressed and not was
 
 
-## Главное меню: здание выбрасывается, за меню встаёт город, музыка остаётся.
-## [param from_demo] — из затемнения конца демо: оно само выведет кадр из чёрного,
-## и снимать его здесь нельзя.
+## Main menu: the building is thrown away, the city rises behind the menu, the music stays.
+## [param from_demo] — from the end-of-demo fade: it will bring the frame out of black itself,
+## and it must not be cleared here.
 func _open_menu(from_demo: bool = false) -> void:
 	_playing = false
 	_demo = null
@@ -216,10 +218,11 @@ func _open_menu(from_demo: bool = false) -> void:
 		_hud.hide_bonus()
 	else:
 		_drop_the_curtain()
-	# Партия останавливается, а не просто прячется: без этого таймер сирены
-	# продолжал бы идти под главным меню, куда вышли с паузы.
+	# The game stops rather than just hides: without this the siren timer
+	# would keep running under the main menu exited to from the pause.
 	GameState.instance().stop_game()
-	# Здание уходит вместе с Otto за дверью — глухоту двери снимает сама дверь.
+	# The building goes away together with Otto behind a door — the door itself clears the door
+	# muffling.
 	_drop_level()
 	_raise_stage()
 	_hud.visible = false
@@ -237,20 +240,20 @@ func _start_game() -> void:
 	_hud.visible = true
 	GameState.instance().start_game(_new_salt())
 	GameState.instance().building = SCREENSHOTTER.start_building()
-	# HUD перерисовывать не надо: start_game и start_building внутри здания
-	# шлют все сигналы, на которые он подписан.
+	# The HUD need not be redrawn: start_game and start_building inside the building
+	# emit all the signals it is subscribed to.
 	_enter_building()
-	# Первое здание запуска открывается из чёрного: под ним один раз греются
-	# шейдеры редких эффектов, и первый выстрел не дёргает кадр (ADR-0039).
+	# The first building of a launch opens from black: under it the shaders of rare effects
+	# warm up once, and the first shot does not jerk the frame (ADR-0039).
 	if ShaderWarmup.run(_level):
 		_curtain.reveal(ShaderWarmup.HOLD)
 
 
-## Соль новой партии: случайная, не ноль — ноль значит «без соли» (ADR-0028,
-## решение 6). Аргумент `-- --salt=N` задаёт её руками: так партию можно
-## повторить, а кадры снять на известном здании. Автосъёмка вехи идёт без соли:
-## её сценарий рассчитан на здание по номеру, и по чужой раскладке он прошёл
-## бы мимо шахты.
+## Salt of a new game: random, not zero — zero means "no salt" (ADR-0028,
+## decision 6). The `-- --salt=N` argument sets it by hand: that way a game can be
+## repeated and shots taken on a known building. A milestone auto-capture runs without salt:
+## its script is built for a building by number, and on someone else's layout it would walk
+## past the shaft.
 func _new_salt() -> int:
 	if SCREENSHOTTER.capturing():
 		return 0
@@ -276,9 +279,9 @@ func _resume() -> void:
 	_menu.close()
 
 
-## Снимает паузу, а с ней и глухую музыку паузы. Из паузы выходят не только
-## «продолжить»: «заново» и «в меню» оставляли музыку глухой на всю новую
-## партию (авторевью M23).
+## Clears the pause, and with it the muffled pause music. The pause is left not only by
+## "continue": "restart" and "to menu" left the music muffled for the whole new
+## game (M23 code review).
 func _unpause() -> void:
 	get_tree().paused = false
 	Sounds.muffle_music(Sounds.MUFFLE_PAUSE, false)
@@ -289,9 +292,9 @@ func _quit() -> void:
 	get_tree().quit()
 
 
-## Собирает очередное здание. Старое выбрасывается целиком вместе с Otto:
-## партия живёт в [GameState], уровень — нет. [param demo] — здание демо: замер
-## качества оно не заводит (ADR-0041, решение 6).
+## Assembles the next building. The old one is thrown away whole together with Otto:
+## the game lives in [GameState], the level does not. [param demo] — a demo building: it does not
+## start a quality measurement (ADR-0041, decision 6).
 func _enter_building(demo: bool = false) -> void:
 	_drop_level()
 
@@ -299,38 +302,39 @@ func _enter_building(demo: bool = false) -> void:
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	_level.rules = BuildingRules.for_building(game.building, _settings.difficulty)
 	_level.building_seed = game.building_seed()
-	# Время суток — жребием по сиду, на всё здание (ADR-0051, решения 3 и 4).
+	# Time of day — a draw by seed, for the whole building (ADR-0051, decisions 3 and 4).
 	_level.rules.time_of_day = TimeOfDay.of_seed(_level.building_seed)
-	# Полное вступление — в первом здании партии, дальше короткое (ADR-0052).
+	# The full intro is in the game's first building, short ones after (ADR-0052).
 	_level.full_intro = game.building == 1 and not demo
-	# Режим наследуется от родителя, а он тут ALWAYS: без этой строки пауза
-	# не останавливала бы ничего — игра шла бы дальше с надписью «пауза».
+	# The mode is inherited from the parent, and here it is ALWAYS: without this line the pause
+	# would stop nothing — the game would go on with a "pause" caption.
 	_level.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(_level)
 	_level.car_started.connect(_on_car_started)
 	_level.building_cleared.connect(_on_building_cleared)
-	# HUD берёт у здания имя, цвет вывески и этаж Otto (M22).
+	# The HUD takes the name, sign colour and Otto's floor from the building (M22).
 	_hud.follow(_level)
-	# Первый запуск: уровень качества выбирается замером на вступлении здания
-	# (ADR-0034, решение 3). Автосъёмка вехи снимает на уровне из настроек.
-	# Замер — под зданием, а не под main: здание выбросили посреди замера (новая
-	# партия, выход в меню) — замер уходит с ним, не мерит меню и не пишет его
-	# уровень, а следующее здание заводит свой, один (авторевью M22).
+	# First launch: the quality level is chosen by a measurement during the building intro
+	# (ADR-0034, decision 3). A milestone auto-capture shoots at the level from settings. The
+	# measurement is under the building, not under main: if the building is thrown away
+	# mid-measurement (new game, exit to menu), the measurement goes with it, does not measure the
+	# menu and does not write its level, and the next building starts its own, single one (M22 code
+	# review).
 	if QualityProbe.needed(_settings) and not SCREENSHOTTER.capturing() and not demo:
 		var probe := QualityProbe.new()
 		_level.add_child(probe)
 		probe.start(_settings)
-	# Тема заводится на здание, а не на партию: после тревоги её надо вернуть,
-	# а сирена снимается только сменой здания (ADR-0009).
-	# Трек здания и тревоги — жребием по сиду здания (ADR-0036, решение 3), тема
-	# здания — по времени суток (ADR-0052, решение 1).
-	# Тема и тревога — по типу здания (ADR-0057, решение 7); Otto начинает с
-	# крыши, и играет трек верхней половины здания ([method GreyboxLevel.music]).
+	# The theme is started per building, not per game: after an alarm it must be restored,
+	# and the siren is cleared only by a building change (ADR-0009).
+	# Building and alarm tracks — a draw by the building seed (ADR-0036, decision 3), the building
+	# theme — by time of day (ADR-0052, decision 1).
+	# Theme and alarm — by building kind (ADR-0057, decision 7); Otto starts from the
+	# roof, and the upper-half track of the building plays ([method GreyboxLevel.music]).
 	_level.music(game.alarm.raised)
 
 
-## Город за меню. Погода — жребием на каждый выход в меню: ясная ночь, туман
-## или дождь с молниями.
+## The city behind the menu. Weather — a draw on each exit to the menu: a clear night, fog
+## or rain with lightning.
 func _raise_stage() -> void:
 	if _stage != null:
 		return
@@ -353,47 +357,47 @@ func _drop_stage() -> void:
 func _drop_level() -> void:
 	if _level == null:
 		return
-	# Сначала из дерева, потом в утиль: [method Node.queue_free] убирает узел
-	# лишь в конце кадра, и старое здание досматривало бы его рядом с новым —
-	# два Otto, две кабины и вся геометрия дважды в одном физическом мире.
+	# First out of the tree, then to the bin: [method Node.queue_free] removes the node
+	# only at the end of the frame, and the old building would keep simulating next to the new one —
+	# two Ottos, two cabs and all the geometry twice in one physics world.
 	remove_child(_level)
 	_level.queue_free()
 	_level = null
 
 
-## Otto сел в машину, она тронулась: бонус здания набегает поверх сцены.
+## Otto got into the car, it pulled away: the building bonus counts up over the scene.
 func _on_car_started() -> void:
 	Sounds.play(Sounds.BUILDING_BONUS)
 	_hud.count_bonus(Arcade.building_bonus(GameState.instance().building))
 
 
-## Машина ушла из кадра: бонус досчитывается на плашке, висит [constant
-## BONUS_HOLD], кадр уходит в чёрное, и только под чёрным бонус идёт в счёт,
-## раунд — дальше и собирается следующее здание.
+## The car left the frame: the bonus finishes counting on the plate, hangs for [constant
+## BONUS_HOLD], the frame fades to black, and only under black does the bonus go into the score,
+## the round advances and the next building is assembled.
 ##
-## Раньше счёт и раунд менялись в тот же кадр, что уходила машина: старое здание
-## ещё на экране, а HUD уже пишет «РАУНД 2» и счёт с бонусом, пока плашка
-## бонуса только набегает.
+## Before, the score and round changed on the same frame the car left: the old building
+## still on screen, and the HUD already shows "ROUND 2" and the score with bonus, while the bonus
+## plate is only counting up.
 func _on_building_cleared() -> void:
-	# Демо, доехавшее до выхода, кончается, а не собирает следующее здание.
+	# A demo that drove to the exit ends rather than assembling the next building.
 	if _demo != null:
 		_end_demo()
 		return
 	if not _hud.bonus_shown():
 		_on_car_started()
-	# Здание меняется под чёрным, из твина затемнения, — не из шага физики
-	# уходящего здания, в котором пришёл сигнал.
+	# The building changes under black, from the fade tween — not from a physics step
+	# of the departing building in which the signal arrived.
 	_curtain.cover(_hud.bonus_time_left() + BONUS_HOLD, _next_building)
 
 
-## Под чёрным: бонус в счёт, следующий раунд и его здание.
+## Under black: bonus into the score, the next round and its building.
 func _next_building() -> void:
 	_hud.hide_bonus()
 	GameState.instance().finish_building()
 	_enter_building()
 
 
-## Бросает смену здания на полпути: меню, новая партия, конец игры.
+## Abandons the building change halfway: menu, new game, game over.
 func _drop_the_curtain() -> void:
 	_curtain.cancel()
 	_hud.hide_bonus()
@@ -404,14 +408,14 @@ func _on_extra_life() -> void:
 
 
 func _on_game_over() -> void:
-	# Демо рекордов не пишет и конца партии не показывает (ADR-0041, решение 6).
+	# A demo writes no records and shows no game over (ADR-0041, decision 6).
 	if _demo != null:
 		_end_demo()
 		return
 	_playing = false
 	_drop_the_curtain()
-	# Джингл приглушает трек на время звучания, и трек конца партии входит
-	# из-под него (ADR-0036, решение 6).
+	# The jingle ducks the track while it plays, and the game-over track comes in
+	# from under it (ADR-0036, decision 6).
 	Sounds.play(Sounds.GAME_OVER)
 	Sounds.play_music(Sounds.GAME_OVER_THEME)
 
@@ -419,12 +423,12 @@ func _on_game_over() -> void:
 	var place := _records.submit(score)
 	if place >= 0:
 		_records.save_to()
-		# Новый рекорд — свой джингл поверх конца партии (ADR-0052, решение 7).
+		# A new record — its own jingle over the game over (ADR-0052, decision 7).
 		Sounds.play(Sounds.RECORD)
 	_menu.remember(score, place)
-	# Сперва последняя смерть — замедление и наезд (ADR-0042, решение 5). Не в
-	# этом кадре: погибший посреди сценки добивания Otto её обрывает, и сценка,
-	# возвращая темп мира, сняла бы и замедление сцены.
+	# First the last death — slow-down and zoom-in (ADR-0042, decision 5). Not on
+	# this frame: an Otto who died mid takedown scene cuts it short, and the scene,
+	# restoring the world's tempo, would also clear the scene slow-down.
 	_play_the_last_death.call_deferred()
 
 
@@ -436,12 +440,12 @@ func _play_the_last_death() -> void:
 
 
 func _show_game_over() -> void:
-	# Вышли в меню, пока шла сцена, — показывать уже нечего.
+	# Exited to the menu while the scene ran — there is nothing to show anymore.
 	if _level == null or _playing:
 		return
-	# Партия окончена — здание замирает, как на паузе. Иначе агенты продолжают
-	# приходить и стрелять под надписью «игра окончена».
+	# The game is over — the building freezes, as on pause. Otherwise agents keep
+	# arriving and shooting under the "game over" caption.
 	get_tree().paused = true
 	_menu.show_page(Menu.Page.GAME_OVER)
-	# Пункты не сразу: давивший прыжок игрок иначе жал бы «Заново» тем же пробелом.
+	# Items not at once: otherwise a player mashing jump would press "Restart" with the same space.
 	_menu.hold_rows(GAME_OVER_HOLD)

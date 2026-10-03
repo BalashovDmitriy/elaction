@@ -1,9 +1,9 @@
 extends GutTest
 
-## Тесты вставания из приседа.
+## Tests of standing up from a crouch.
 ##
-## Место над головой машина состояний не измеряет — ей его сообщают фактом
-## can_stand, как и опору под ногами. Долг M1, закрыт в M2.
+## The state machine does not measure the room above the head — it is told it as the
+## fact can_stand, like the support underfoot. M1 debt, closed in M2.
 
 
 func _snapshot(move: float = 0.0, crouch: bool = false, jump: bool = false) -> OttoInput:
@@ -37,5 +37,5 @@ func test_cannot_jump_out_of_a_blocked_crouch() -> void:
 
 func test_headroom_does_not_hold_a_standing_otto() -> void:
 	var machine := OttoStateMachine.new()
-	# Низкий потолок мешает только тому, кто сидит.
+	# A low ceiling only hinders someone who is crouching.
 	assert_eq(machine.update(_snapshot(1.0), true, 0.0, false), OttoStateMachine.State.WALK)

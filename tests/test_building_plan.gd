@@ -1,13 +1,13 @@
 extends GutTest
 
-## Тесты раскладки здания.
+## Building layout tests.
 ##
-## Раскладка не знает про узлы: считается по правилам и сиду, поэтому проверяется
-## напрямую. Главное, что здесь стережётся, — проходимость: шахты не сквозные,
-## и если генератор забудет эскалатор на стыке полос, спуститься будет нельзя.
+## The layout knows nothing about nodes: it is computed from the rules and the seed, so it is
+## checked directly. The main thing guarded here is passability: shafts do not go through,
+## and if the generator forgets an escalator at a band junction, there is no way down.
 
-## Сиды, на которых проверяются правила раскладки. Здание случайно, и одна
-## проверка на одном сиде подтверждает только его — а дыры вылезают на редких.
+## Seeds the layout rules are checked on. The building is random, and one
+## check on one seed confirms only that seed — while holes show up on rare ones.
 const SEEDS: Array[int] = [1, 2, 3, 5, 8, 13, 21, 34]
 
 
@@ -15,7 +15,7 @@ func _rules() -> BuildingRules:
 	return BuildingRules.new()
 
 
-## Отпечаток здания: по нему сравниваются два прогона с одним сидом.
+## Building fingerprint: two runs with the same seed are compared by it.
 func _fingerprint(plan: BuildingPlan) -> String:
 	var parts := PackedStringArray()
 	for shaft in plan.shafts:
@@ -60,7 +60,7 @@ func test_documents_are_spread_over_the_height() -> void:
 	var plan := BuildingPlan.generate(rules, 9)
 	var floors := plan.document_floors()
 	var lowest: int = floors[floors.size() - 1]
-	# Иначе всё здание можно было бы не проходить.
+	# Otherwise the whole building could be skipped.
 	assert_gt(lowest, rules.floors / 2, "нижний документ — в нижней половине здания")
 	assert_lt(floors[0], rules.floors / 2, "верхний — в верхней")
 
@@ -74,8 +74,8 @@ func test_nothing_shares_a_place_on_a_floor() -> void:
 		for index in range(shaft.top, shaft.bottom + 1):
 			_claim(busy, index, shaft.x)
 	for escalator in plan.escalators:
-		# Верхняя площадка — на своём этаже, нижняя — у края этажа ниже: пролёт
-		# под 45° уходит на два места (ADR-0043, решение 15).
+		# The upper landing is on its own floor, the lower one at the edge of the floor below: a
+		# 45° span takes two slots (ADR-0043, decision 15).
 		_claim(busy, escalator.floor_index, escalator.x)
 		_claim(busy, escalator.floor_index + 1, escalator.landing(rules))
 	_claim(busy, plan.floors - 1, plan.exit_x)
@@ -85,8 +85,9 @@ func test_nothing_shares_a_place_on_a_floor() -> void:
 		_claim(busy, lamp.floor_index, lamp.x)
 
 
-## На месте возврата нельзя ставить выход: иначе Otto выходил бы из здания,
-## едва воскреснув, — а с последним документом это ещё и сдавало бы здание само.
+## The exit must not be placed on the respawn spot: otherwise Otto would leave the building
+## right after coming back to life — and with the last document this would also finish
+## the building by itself.
 func test_otto_does_not_come_back_to_life_inside_the_exit() -> void:
 	var rules := _rules()
 	for building_seed in range(1, 12):
@@ -94,7 +95,7 @@ func test_otto_does_not_come_back_to_life_inside_the_exit() -> void:
 		assert_ne(plan.safe_x(rules, plan.floors - 1), plan.exit_x, "сид %d" % building_seed)
 
 
-## Место возврата не должно попадать в проём: провалиться сразу после смерти — не то.
+## The respawn spot must not fall into an opening: falling right after death is not it.
 func test_safe_spot_never_hangs_over_a_hole() -> void:
 	var rules := _rules()
 	var plan := BuildingPlan.generate(rules, 12)
@@ -107,15 +108,15 @@ func test_safe_spot_never_hangs_over_a_hole() -> void:
 			assert_false(x >= gap.x and x <= gap.y, "этаж %d стоит над проёмом" % index)
 
 
-## Над крышей небо, вешать лампу там не на что: она висела бы в воздухе.
+## Above the roof is sky, there is nothing to hang a lamp on: it would hang in the air.
 func test_no_lamp_hangs_over_the_roof() -> void:
 	var plan := BuildingPlan.generate(_rules(), 13)
 	for lamp in plan.lamps:
 		assert_gt(lamp.floor_index, BuildingRules.ROOF, "над крышей нет потолка")
 
 
-## Нулевой этаж перестал быть крышей и лампу наконец получает: потолок у него
-## появился, и до этого весь верх здания был единственным этажом без света.
+## Floor zero stopped being the roof and finally gets a lamp: it has a ceiling
+## now, and before that the whole top of the building was the only floor without light.
 func test_the_top_floor_gets_a_lamp_now_that_it_has_a_ceiling() -> void:
 	var plan := BuildingPlan.generate(_rules(), 13)
 	var on_top := 0
@@ -125,9 +126,9 @@ func test_the_top_floor_gets_a_lamp_now_that_it_has_a_ceiling() -> void:
 	assert_gt(on_top, 0, "у верхнего этажа есть потолок, значит есть и лампа")
 
 
-## Ламп на этаже столько, сколько просит ширина, — если хватило мест: лампы
-## уступают дверям, шахтам и эскалаторам. Тёмный этаж карты — ни одной
-## (ADR-0028, решение 4); прочий — хоть одну.
+## A floor has as many lamps as its width asks for — if there were enough slots: lamps
+## give way to doors, shafts and escalators. A dark floor of the map gets none
+## (ADR-0028, decision 4); any other gets at least one.
 func test_floors_get_as_many_lamps_as_their_width_asks() -> void:
 	var rules := _rules()
 	for building_seed: int in SEEDS:
@@ -152,10 +153,10 @@ func test_floors_get_as_many_lamps_as_their_width_asks() -> void:
 		)
 
 
-## Лампы не сбиваются в один край этажа: зона каждой — единица темноты, и
-## этаж с лампами в одном углу тёмен в другом при всех горящих. Лампы встают в
-## ближайшие свободные места к серединам своих зон, поэтому на тесном этаже
-## они могут стоять рядом — но середина между ними остаётся в середине этажа.
+## Lamps do not bunch up at one end of a floor: each one's zone is a unit of darkness, and
+## a floor with lamps in one corner is dark in the other with all of them lit. Lamps take
+## the free slots nearest to the middles of their zones, so on a crowded floor
+## they may stand side by side — but the middle between them stays in the middle of the floor.
 func test_lamps_are_spread_along_the_floor() -> void:
 	var rules := _rules()
 	for building_seed: int in SEEDS:
@@ -183,25 +184,26 @@ func test_lamps_are_spread_along_the_floor() -> void:
 			)
 
 
-## Тесное здание: этажи, на которых шахте, эскалаторам и обязательной двери не
-## оставить лампе свободного места. Такой этаж всё равно обязан получить лампу —
-## иначе он не светел и погасить его нечем, а правило темноты считает его горящим
-## навсегда.
+## A crowded building: floors where the shaft, escalators and the mandatory door leave
+## no free slot for a lamp. Such a floor must still get a lamp —
+## otherwise it is not lit and there is nothing to put out, and the darkness rule considers it
+## lit forever.
 ##
-## Запасная ветка раскладки (лампа делит место с дверью) с M20 на таких правилах
-## не срабатывает: лампы встают раньше лишних дверей, обязательная дверь одна, а
-## этаж выхода, где раньше выход, шахта и дверь съедали все три места, стал
-## гаражом без дверей (ADR-0031, решение 4). Ветка оставлена как страховка для
-## правил, которых ещё нет; тест держит гарантию — лампа на каждом светлом этаже.
+## The layout's fallback branch (a lamp shares a slot with a door) does not fire under these
+## rules since M20: lamps are placed before extra doors, there is one mandatory door, and
+## the exit floor, where the exit, shaft and door used to eat all three slots, became
+## a garage without doors (ADR-0031, decision 4). The branch is kept as insurance for
+## rules that do not exist yet; the test holds the guarantee — a lamp on every lit floor.
 func test_a_crowded_floor_still_gets_a_lamp() -> void:
 	var rules := _rules()
-	# Три места, а не пять: с M18e двери сверх обязательной встают после ламп
-	# (ADR-0028, решение 2), и на пяти местах лампе место находится всегда.
+	# Three slots, not five: since M18e doors beyond the mandatory one are placed after lamps
+	# (ADR-0028, decision 2), and with five slots there is always room for a lamp.
 	rules.slots = 3
 	rules.top_slots = 3
 	rules.width = 16.8
 	rules.floors = 6
-	# Здание одной ширины: порог ниже дна, и узкой части нет вовсе.
+	# A building of one width: the threshold is below the bottom, and there is no narrow part
+	# at all.
 	rules.wide_from = 0
 	rules.documents_cap = 1
 	rules.doors_cap = 3
@@ -227,8 +229,8 @@ func _lamps_on(plan: BuildingPlan, floor_index: int) -> PackedFloat64Array:
 	return xs
 
 
-## Крыша — место, а не этаж: агенты на ней не появляются, потому что нет дверей.
-## Пока она была нулевым этажом, двое стояли в зоне огня от точки старта.
+## The roof is a place, not a floor: agents do not appear on it because there are no doors.
+## While it was floor zero, two stood in the line of fire from the starting point.
 func test_the_roof_carries_no_doors() -> void:
 	for building_seed: int in SEEDS:
 		var plan := BuildingPlan.generate(_rules(), building_seed)
@@ -236,8 +238,8 @@ func test_the_roof_carries_no_doors() -> void:
 			assert_gt(door.floor_index, BuildingRules.ROOF, "сид %d" % building_seed)
 
 
-## Всё, что раскладка ставит, должно стоять внутри силуэта своего уровня:
-## за ним улица, и дверь там висела бы в воздухе.
+## Everything the layout places must stand inside the silhouette of its level:
+## beyond it is the street, and a door there would hang in the air.
 func test_nothing_is_placed_outside_its_own_floor() -> void:
 	var rules := _rules()
 	for building_seed: int in SEEDS:
@@ -262,16 +264,16 @@ func _claim(busy: Dictionary, floor_index: int, x: float) -> void:
 	busy[key] = true
 
 
-## Места не делятся — но и габариты не должны налезать друг на друга.
+## Slots are not shared — but the footprints must not overlap either.
 ##
-## Место — точка сетки, а предмет на нём — полоса: створка двери 1.2 м, проём
-## шахты 1.8, лампа 0.6, стена 0.9. При шаге 1.8 м (ADR-0026, решение 3) место
-## занято почти целиком, и у соседей остаётся 0.6 м зазора. Проверка мест этого
-## не видит: две соседние шахты стояли бы каждая на своём месте и смыкались бы
-## без пола между ними.
+## A slot is a grid point, and the thing on it is a band: a door leaf 1.2 m, a shaft
+## opening 1.8, a lamp 0.6, a wall 0.9. With a 1.8 m step (ADR-0026, decision 3) a slot is
+## almost fully taken, and neighbours are left 0.6 m apart. A slot check does not
+## see this: two neighbouring shafts would each stand in their own slot and close up
+## with no floor between them.
 ##
-## Проём шахты считается на всех её уровнях, дно включая: кабина стоит и там.
-## Проём эскалатора — только на его этаже: этажом ниже там пол.
+## A shaft opening counts on all its levels, the bottom included: the cab stands there too.
+## An escalator opening counts only on its floor: on the floor below there is floor there.
 func test_nothing_on_a_floor_overlaps_its_neighbours() -> void:
 	var rules := _rules()
 	for building_seed: int in SEEDS:
@@ -292,8 +294,8 @@ func test_nothing_on_a_floor_overlaps_its_neighbours() -> void:
 				)
 
 
-## Две шахты в соседних местах сомкнулись бы: между ними не осталось бы пола,
-## и выйти из кабины можно было бы только в соседнюю.
+## Two shafts in neighbouring slots would close up: there would be no floor left between
+## them, and one could step out of a cab only into the neighbouring one.
 func test_shafts_never_stand_side_by_side() -> void:
 	var rules := _rules()
 	var pitch := rules.slot_x(1) - rules.slot_x(0)
@@ -310,7 +312,7 @@ func test_shafts_never_stand_side_by_side() -> void:
 				)
 
 
-## Полосы, которые предметы занимают на этаже: [левый край, правый край, что это].
+## Bands items take on a floor: [left edge, right edge, what it is].
 func _footprints(plan: BuildingPlan, rules: BuildingRules, index: int) -> Array:
 	var bands: Array = []
 	var shaft_half := rules.shaft_width * 0.5
@@ -335,12 +337,12 @@ func _footprints(plan: BuildingPlan, rules: BuildingRules, index: int) -> Array:
 	return bands
 
 
-## Пол между двумя проёмами — либо его нет вовсе, либо на нём помещается тело.
+## Floor between two openings — either there is none at all, or a body fits on it.
 ##
-## Полоса уже тела — ловушка: на ней нельзя встать, а агент, вышедший из
-## кабины, упирается в неё щупом и замирает полкорпусом в шахте. При шаге 1.8 м
-## такую давал эскалатор, спускавшийся к шахте через место: 0.6 м пола против
-## 0.72 тела (авторевью M18c).
+## A strip narrower than a body is a trap: one cannot stand on it, and an agent who came out
+## of a cab bumps into it with his probe and freezes half his body in the shaft. With a
+## 1.8 m step this came from an escalator going down to a shaft one slot away: 0.6 m of
+## floor against a 0.72 body (code review M18c).
 func test_floor_between_openings_fits_a_body() -> void:
 	var rules := _rules()
 	for building_seed: int in range(1, 41):

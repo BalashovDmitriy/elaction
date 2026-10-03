@@ -1,31 +1,31 @@
 class_name ScoreBursts
 extends Control
 
-## Очки на виду (просьба пользователя, M24m): прибавка всплывает над местом
-## события и счёт в HUD не перескакивает молча.
+## Points in view (user's request, M24m): the increment pops up over the place of
+## the event and the score in the HUD does not jump silently.
 ##
-## - Над убитым агентом, раздавленным кабиной или лампой — «+300» неоном:
-##   поднимается и гаснет. Документ — над Otto. Точку сцены переводит в кадр
-##   камера; за кадром прибавка всплывает у его края.
-## - Счёт набегает к новому числу, вспыхивает цветом вывески здания и чуть
-##   вздрагивает; рядом на секунду — та же прибавка.
+## - Over a killed agent, one crushed by a cab or lamp — "+300" in neon:
+##   rises and fades. A document — over Otto. The camera converts the scene point
+##   to the frame; off-frame the increment pops up at its edge.
+## - The score counts up to the new number, flashes the building sign colour and
+##   twitches slightly; next to it for a second — the same increment.
 ##
-## Бонус за здание всплывающей прибавки не получает: у него своя плашка
-## ([Hud]). Слой поверх HUD, мыши не ловит.
+## The building bonus gets no pop-up increment: it has its own plate
+## ([Hud]). A layer over the HUD, does not catch the mouse.
 
-## За сколько набегает счёт и сколько держится вспышка, с.
+## How long the score counts up and how long the flash holds, s.
 const ROLL_TIME: float = 0.45
 const FLASH_TIME: float = 0.6
-## Насколько вздрагивает число счёта.
+## How much the score number twitches.
 const PULSE: float = 1.18
-## Прибавка над местом: кегль, на сколько поднимается, px, и сколько живёт, с.
+## Increment over the place: font size, how far it rises, px, and how long it lives, s.
 const BURST_SIZE: int = 44
 const BURST_RISE: float = 70.0
 const BURST_TIME: float = 1.1
-## Прибавка у счёта: кегль и сколько живёт, с.
+## Increment at the score: font size and how long it lives, s.
 const CHIP_SIZE: int = 30
 const CHIP_TIME: float = 1.0
-## Отступ прибавки от краёв кадра, px.
+## Increment margin from the frame edges, px.
 const EDGE: float = 40.0
 
 var neon := NeonStyle.INK
@@ -38,7 +38,7 @@ var _roll: Tween = null
 var _flash: Tween = null
 
 
-## Число счёта, которым управлять, и здание — по нему Otto для документа.
+## The score number to control, and the building — Otto for a document is found through it.
 func watch(score_label: Label) -> void:
 	_score = score_label
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -50,7 +50,7 @@ func follow(level: GreyboxLevel) -> void:
 	_level = level
 
 
-## Ставит счёт: вниз и при новой партии — сразу, вверх — набегом.
+## Sets the score: down and on a new game — at once, up — by counting up.
 func show_score(score: int) -> void:
 	if _score == null:
 		return
@@ -86,7 +86,7 @@ func _on_scored(points: int, at: Vector3, popup: bool) -> void:
 		_burst(points, at)
 
 
-## Вспышка числа: цвет вывески и вздрагивание, затем обратно.
+## Number flash: sign colour and a twitch, then back.
 func _flash_score() -> void:
 	if _flash != null and _flash.is_valid():
 		_flash.kill()
@@ -100,12 +100,12 @@ func _flash_score() -> void:
 	)
 
 
-## Прибавка у числа счёта: справа от него, гаснет на месте.
+## Increment at the score number: to the right of it, fades in place.
 func _chip(points: int) -> void:
 	var chip := _plus(points, CHIP_SIZE)
 	add_child(chip)
-	# Сразу за последней цифрой окончательного счёта: подпись шире числа, и
-	# край подписи уводил прибавку за плашку.
+	# Right after the last digit of the final score: the label is wider than the number, and
+	# the label edge pushed the increment past the plate.
 	var rect := _score.get_global_rect()
 	var font := _score.get_theme_font("font")
 	var digits := font.get_string_size(
@@ -121,7 +121,7 @@ func _chip(points: int) -> void:
 	fade.tween_callback(chip.queue_free)
 
 
-## Прибавка над местом события: всплывает и гаснет.
+## Increment over the event place: pops up and fades.
 func _burst(points: int, at: Vector3) -> void:
 	var camera := get_viewport().get_camera_3d()
 	if camera == null:

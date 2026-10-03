@@ -1,17 +1,17 @@
 class_name Vignette
 extends CanvasLayer
 
-## Лёгкая виньетка: края кадра чуть темнее, взгляд идёт к середине, где Otto
-## (ADR-0030, решение 3). Зерна нет — на погашенных этажах оно шумело бы там,
-## где игрок и так всматривается.
+## A light vignette: the frame edges are slightly darker, the eye goes to the middle, where Otto is
+## (ADR-0030, decision 3). No grain — on darkened floors it would be noisy exactly where
+## the player is already peering.
 ##
-## Слой между сценой и HUD ([constant LAYER] ниже слоя HUD): интерфейс виньетка
-## не затемняет.
+## A layer between the scene and the HUD ([constant LAYER] below the HUD layer): the vignette
+## does not darken the interface.
 
-## Слой холста: над сценой, под HUD (у него 3) и меню (5).
+## Canvas layer: above the scene, below the HUD (it has 3) and the menu (5).
 const LAYER: int = 2
 
-## Насколько темнеют углы, 0–1, и с какой доли радиуса начинается затемнение.
+## How much the corners darken, 0–1, and from what fraction of the radius darkening starts.
 const STRENGTH: float = 0.38
 const START: float = 0.45
 
@@ -21,8 +21,8 @@ uniform float strength = 0.38;
 uniform float start = 0.45;
 void fragment() {
 	vec2 centre = UV - vec2(0.5);
-	// Кадр широкий: по высоте затемнение сильнее, чем по ширине, иначе верх и
-	// низ почти не темнели бы.
+	// The frame is wide: darkening is stronger along the height than the width, otherwise
+	// the top and bottom would barely darken.
 	centre.x *= 0.8;
 	float edge = smoothstep(start, 0.75, length(centre) * 1.4);
 	COLOR = vec4(0.0, 0.0, 0.0, edge * strength);

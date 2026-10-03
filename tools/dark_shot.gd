@@ -1,30 +1,30 @@
 extends Node3D
 
-## Кадры темноты: широкий этаж с тремя лампами — целиком, с погашенной зоной и
-## погашенный весь.
+## Darkness shots: a wide floor with three lamps — whole, with a darkened zone, and
+## fully darkened.
 ##
-## Съёмка вехи ([code]capture.py[/code]) водит Otto по времени и до нижних этажей
-## не доходит, а лампы стоят по сиду — выдержкой до них не дойти. Здесь кадр
-## ждёт состояния: лампа сбита и долетела до пола.
+## The milestone capture ([code]capture.py[/code]) drives Otto by time and does not reach
+## the lower floors, and lamps are placed by seed — timing will not get there. Here the
+## shot waits for a state: the lamp is shot down and has reached the floor.
 ##
-## Эти три кадра и есть проверка DoD M17: на тёмном этаже игрок обязан видеть,
-## во что стреляет, а соседняя зона обязана остаться светлой (ADR-0023, решение 2).
+## These three shots are the check of the M17 DoD: on a dark floor the player must see
+## what he is shooting at, and the neighbouring zone must stay lit (ADR-0023, decision 2).
 ##
-## Рендер настоящий, не headless — нужен экран.
+## The render is real, not headless — a screen is needed.
 ##
-## Запуск:
+## Launch:
 ##     godot --path . res://tools/dark_shot.tscn
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 
-## Куда складываются кадры.
+## Where the shots are stored.
 const FOLDER := "res://screens/M17"
 
-## Сколько кадров дать зданию, свету и отражениям устояться.
+## How many frames to give the building, light and reflections to settle.
 const SETTLE_FRAMES: int = 45
 
-## Сколько шагов физики ждать падения лампы, прежде чем сдаться.
+## How many physics steps to wait for the lamp to fall before giving up.
 const FALL_STEPS: int = 240
 
 var _level: GreyboxLevel = null
@@ -36,14 +36,14 @@ func _ready() -> void:
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	_level.rules = BuildingRules.new()
 	_level.building_seed = 1
-	# Агентов здесь нет: кадр про свет, а ходящая фигура закрывает собой зону.
+	# No agents here: the shot is about light, and a walking figure covers the zone.
 	_level.spawn_agents = false
 	add_child(_level)
 	_run()
 
 
 func _run() -> void:
-	# Широкий этаж пониже: на нём три лампы, то есть три зоны темноты.
+	# A wide floor lower down: it has three lamps, that is three darkness zones.
 	var index := _level.rules.floors - 3
 	var spots := _level.plan().safe_spots(_level.rules, index)
 	var lamps := _lamps_on(index)
@@ -54,12 +54,13 @@ func _run() -> void:
 		get_tree().quit(1)
 		return
 
-	# Otto встаёт под крайнюю лампу, а не посередине: в кадр должны попасть и его
-	# зона, и соседняя — иначе «погасла одна» не с чем сравнить.
+	# Otto stands under the outermost lamp, not in the middle: both his zone and the
+	# neighbouring one must get into the frame — otherwise "one went out" has nothing to
+	# compare with.
 	var under := _nearest_spot(spots, _lamp_x(lamps[0]))
 	_place(under, index)
-	# Агент у соседней лампы: видно, что в освещённой зоне он читается сам, а в
-	# тёмной его держит только обводка.
+	# An agent at the neighbouring lamp: shows that in a lit zone he reads by himself,
+	# while in a dark one only the outline holds him.
 	_stand_an_agent_at(_nearest_spot(spots, _lamp_x(lamps[1])), index)
 	await _shoot("01_floor_lit", null)
 	await _shoot("02_zone_dark", lamps[0])
@@ -76,7 +77,7 @@ func _run() -> void:
 	get_tree().quit(0)
 
 
-## Сбивает лампу, если дана, ждёт и снимает кадр.
+## Shoots down the lamp if given, waits and takes the shot.
 func _shoot(label: String, lamp: Lamp) -> void:
 	if lamp != null:
 		lamp.shoot_down()
@@ -90,7 +91,7 @@ func _shoot(label: String, lamp: Lamp) -> void:
 	print("  %s" % path)
 
 
-## Ждёт, пока сбитые лампы долетят до пола: по состоянию, а не выдержкой.
+## Waits until the shot-down lamps reach the floor: by state, not by timing.
 func _settle_after_the_fall() -> void:
 	var left := FALL_STEPS
 	while left > 0 and _falling():
@@ -138,9 +139,9 @@ func _place(x: float, index: int) -> void:
 
 func _stand_an_agent_at(x: float, index: int) -> void:
 	var agent := ENEMY_SCENE.instantiate() as Enemy
-	# Стоит на месте и безоружен: кадр про свет, а не про бой. С обычными
-	# правилами он успевал застрелить Otto между вторым и третьим кадром, и на
-	# кадре темноты лежал труп.
+	# Stands still and unarmed: the shot is about light, not combat. Under normal rules he
+	# managed to shoot Otto between the second and third shot, and a corpse lay in the
+	# darkness shot.
 	var peaceful := BuildingRules.new()
 	peaceful.agents_hold_fire = true
 	peaceful.agent_dark_fire_range = 0.0

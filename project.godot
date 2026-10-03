@@ -1,7 +1,7 @@
-; Файл конфигурации движка.
-; Обычно правится через UI редактора Godot, но базовые решения зафиксированы
-; здесь осознанно — см. docs/adr/0019-3d-pivot.md и docs/adr/0021-3d-greybox.md.
-; ADR-0002 (HD пиксель-арт) отменён: сцена стала трёхмерной.
+; Engine configuration file.
+; Usually edited through the Godot editor UI, but the basic decisions are fixed
+; here deliberately — see docs/adr/0019-3d-pivot.md and docs/adr/0021-3d-greybox.md.
+; ADR-0002 (HD pixel art) is superseded: the scene became three-dimensional.
 
 config_version=5
 
@@ -16,10 +16,10 @@ config/icon="res://icon.svg"
 
 [display]
 
-; Базовый вьюпорт 1920x1080 (ADR-0018 в части разрешения остаётся в силе).
-; Мир больше не измеряется в пикселях: с M15 он метрический, 100 прежних
-; пикселей = 1 м (ADR-0019, решение 3). Растяжение canvas_items оставлено —
-; оно теперь обслуживает только HUD и меню, 3D рисуется в разрешении окна.
+; Base viewport 1920x1080 (ADR-0018 stays in force regarding resolution).
+; The world is no longer measured in pixels: since M15 it is metric, 100 former
+; pixels = 1 m (ADR-0019, decision 3). canvas_items stretching is kept —
+; it now serves only the HUD and menu, 3D is drawn at window resolution.
 window/size/viewport_width=1920
 window/size/viewport_height=1080
 window/size/window_width_override=1920
@@ -30,11 +30,11 @@ window/stretch/aspect="keep"
 [autoload]
 
 Screenshotter="*res://src/autoload/screenshotter.gd"
-; Имя автолоада отличается от class_name скрипта (GameState) намеренно: Godot
-; не даёт глобальному классу и автолоаду называться одинаково, а код обращается
-; к состоянию через GameState.instance().
+; The autoload name differs from the script's class_name (GameState) on purpose: Godot
+; does not allow a global class and an autoload to have the same name, and the code accesses
+; the state through GameState.instance().
 Game="*res://src/autoload/game_state.gd"
-; Звук: один автолоад на всю игру, чтобы источники не плодились по сценам.
+; Sound: one autoload for the whole game, so that sources do not multiply across scenes.
 Sound="*res://src/autoload/audio.gd"
 
 [editor_plugins]
@@ -43,10 +43,10 @@ enabled=PackedStringArray("res://addons/gut/plugin.cfg")
 
 [input]
 
-; Клавиатура использует physical_keycode: клавиши остаются на своих физических
-; местах и на кириллической раскладке. Геймпад — раскладка Xbox. С M24c на
-; игровое действие одна клавиша и одна кнопка — игрок переназначает их в меню,
-; схема в user://settings.cfg (KeyBindings, ADR-0039, решение 7).
+; The keyboard uses physical_keycode: keys stay in their physical
+; places on a Cyrillic layout too. Gamepad — Xbox layout. Since M24c each
+; game action has one key and one button — the player rebinds them in the menu,
+; the scheme is in user://settings.cfg (KeyBindings, ADR-0039, decision 7).
 move_left={
 "deadzone": 0.2,
 "events": [Object(InputEventKey,"device":-1,"physical_keycode":4194319), Object(InputEventJoypadButton,"device":-1,"button_index":13), Object(InputEventJoypadMotion,"device":-1,"axis":0,"axis_value":-1.0)]
@@ -82,14 +82,14 @@ screenshot={
 
 [layer_names]
 
-; Слой 1 — геометрия здания и кабины, слой 2 — Otto, слой 3 — враги. Маски в сценах
-; и в коде заданы числами; имена нужны, чтобы в инспекторе было видно, что выбрано.
-; Otto, враги и лампы разведены по слоям, чтобы пуля знала, во что ей можно
-; попасть, а зоны удара не находили посторонних: лампа на слое врагов заставляла
-; и удар ногой, и её собственную зону разбирать чужаков.
-; Слой 5 — трупы (ADR-0043, решение 10): лежат друг на друге, живые их не видят.
-; С M15 те же четыре слоя живут в 3D-физике; 2D-имена оставлены до M20, пока
-; из проекта не вычищены последние 2D-системы (ADR-0021, решение 6).
+; Layer 1 — building and cab geometry, layer 2 — Otto, layer 3 — enemies. Masks in scenes
+; and in code are set by numbers; names are needed so the inspector shows what is selected.
+; Otto, enemies and lamps are split across layers so that a bullet knows what it may
+; hit, and hit zones do not find outsiders: a lamp on the enemy layer made
+; both the kick and its own zone sort through strangers.
+; Layer 5 — corpses (ADR-0043, decision 10): they lie on each other, the living do not see them.
+; Since M15 the same four layers live in 3D physics; 2D names are kept until M20, until
+; the last 2D systems are cleaned out of the project (ADR-0021, decision 6).
 2d_physics/layer_1="geometry"
 2d_physics/layer_2="player"
 2d_physics/layer_3="enemies"
@@ -103,13 +103,13 @@ screenshot={
 [rendering]
 
 renderer/rendering_method="forward_plus"
-; Пиксельная привязка и фильтр ближайшего соседа убраны вместе с ADR-0002:
-; сцена трёхмерная, привязывать к пикселю нечего, а nearest на 3D-текстурах
-; даёт только грязь. Настройки объёмного света, SSR и грейдинга сюда не
-; добавляются — они выбираются на готовой сцене в M17, а не вслепую.
+; Pixel snapping and nearest-neighbour filtering were removed together with ADR-0002:
+; the scene is three-dimensional, there is nothing to snap to a pixel, and nearest on 3D textures
+; only gives dirt. Volumetric light, SSR and grading settings are not added
+; here — they are chosen on the finished scene in M17, not blindly.
 anti_aliasing/quality/msaa_2d=0
-; Дизеринг против полос на градиентах тумана и неба (ADR-0030, решение 4).
-; Сглаживание 3D и атлас теней ставит Graphics по уровню качества (ADR-0034).
+; Dithering against banding in fog and sky gradients (ADR-0030, decision 4).
+; 3D antialiasing and the shadow atlas are set by Graphics per quality level (ADR-0034).
 anti_aliasing/quality/use_debanding=true
 
 [audio]
@@ -118,21 +118,21 @@ buses/default_bus_layout="res://assets/audio/buses.tres"
 
 [internationalization]
 
-; Переводы собираются из assets/i18n/ui.csv: одна таблица, две колонки.
+; Translations are built from assets/i18n/ui.csv: one table, two columns.
 locale/translations=PackedStringArray("res://assets/i18n/ui.en.translation", "res://assets/i18n/ui.ru.translation")
 locale/fallback="en"
 
 [debug]
 
-; Правило 1 CLAUDE.md — типы везде. У gdlint такого правила нет, поэтому
-; нетипизированное объявление — ошибка разбора: его ловит godot_check.py и CI.
-; Вендоренный addons/ не задет — движок по умолчанию пропускает его предупреждения.
+; Rule 1 of CLAUDE.md — types everywhere. gdlint has no such rule, so
+; an untyped declaration is a parse error: godot_check.py and CI catch it.
+; The vendored addons/ is not affected — the engine skips its warnings by default.
 gdscript/warnings/untyped_declaration=2
 
 [physics]
 
-; Jolt, а не встроенный движок: на рэгдолле трупов тот проталкивал части сквозь
-; плиту и не усыплял их (ADR-0043, решение 13). Запас на скругление форм нулевой:
-; с ним персонажи стояли на полу на сантиметр выше.
+; Jolt, not the built-in engine: on corpse ragdolls that one pushed parts through
+; the slab and did not put them to sleep (ADR-0043, decision 13). The shape rounding margin is zero:
+; with it characters stood on the floor a centimetre higher.
 3d/physics_engine="Jolt Physics"
 jolt_physics_3d/collisions/collision_margin_fraction=0.0

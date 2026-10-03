@@ -1,7 +1,7 @@
 extends GutTest
 
-## Когда из кабины можно сойти на этаж — [method ElevatorMotion.can_step_out].
-## Без сцены, как [code]test_elevator_motion.gd[/code].
+## When one can step from the cab onto a floor — [method ElevatorMotion.can_step_out].
+## Without a scene, like [code]test_elevator_motion.gd[/code].
 
 const TOP: float = 0.0
 const MIDDLE: float = 100.0
@@ -14,8 +14,8 @@ func _shaft(start_floor: int = 0) -> ElevatorMotion:
 	return motion
 
 
-## Сойти на ходу можно, пока пол кабины выше пола этажа не больше чем на 18/48
-## этажа, как в ROM (@36F2, ADR-0044, решение 5).
+## One can step out while moving as long as the cab floor is no more than 18/48 of a floor
+## above the storey floor, as in the ROM (@36F2, ADR-0044, decision 5).
 func test_one_can_step_out_level_with_a_floor() -> void:
 	assert_true(_shaft(1).can_step_out(), "вровень — можно")
 

@@ -1,30 +1,31 @@
 class_name Outdoors
 extends RefCounted
 
-## Что стоит снаружи здания и ловит солнце (ADR-0051).
+## What stands outside the building and catches the sun (ADR-0051).
 ##
-## Солнце — направленный свет, а он светит сквозь всё на любой глубине: здание
-## показано в разрезе, и коридоры, на которые он лёг бы, освещаются лампами и
-## общим светом здания. Поэтому солнцу отдан свой слой, и в него попадает только
-## то, что снаружи: крыша и её техника, вывеска, вертолёт, улица у выезда.
+## The sun is a directional light, and it shines through everything at any depth: the
+## building is shown in cutaway, and the corridors it would fall on are lit by lamps and
+## the building's general light. So the sun is given its own layer, and only what is
+## outside goes into it: the roof and its equipment, the sign, the helicopter, the exit
+## street.
 ##
-## Слой ставится и ночью: солнца тогда нет, и лишний бит ничего не меняет, —
-## зато здание не собирается по-разному в разное время суток.
+## The layer is set at night too: there is no sun then, and an extra bit changes
+## nothing — but the building is not assembled differently at different times of day.
 
-## Слой отрисовки, который видит солнце. Рядом — обстановка ([constant
-## PropCatalog.RENDER_LAYER]) и фигуры ([constant FigureRig.RENDER_LAYER]).
+## Render layer the sun sees. Next to it — dressing
+## ([constant PropCatalog.RENDER_LAYER]) and figures ([constant FigureRig.RENDER_LAYER]).
 const LAYER: int = 1 << 12
 
 
-## Отдаёт солнцу всё видимое под [param root].
+## Gives the sun everything visible under [param root].
 static func mark(root: Node) -> void:
 	for node in _visuals(root):
 		node.layers |= LAYER
 
 
-## Отдаёт солнцу всё видимое под [param root], что целиком выше
-## [param bottom] — высоты сцены, м: так из строителей здания берётся крыша, а
-## этажи под ней, собранные теми же строителями, остаются без солнца.
+## Gives the sun everything visible under [param root] that is entirely above
+## [param bottom] — a scene height, m: that way the roof is taken from the building's
+## builders, while the floors under it, built by the same builders, stay without sun.
 static func mark_above(root: Node, bottom: float) -> void:
 	for node in _visuals(root):
 		var box := node.global_transform * node.get_aabb()
@@ -39,9 +40,9 @@ static func _visuals(root: Node) -> Array[VisualInstance3D]:
 		found.append(own)
 	for node in root.find_children("*", "VisualInstance3D", true, false):
 		var visual := node as VisualInstance3D
-		# Свет — тоже VisualInstance3D, но слоя отрисовки у него нет. Кабины и
-		# актёры ходят по зданию: солнце, пойманное на крыше, ехало бы с ними
-		# в коридоры.
+		# A light is also a VisualInstance3D, but it has no render layer. Cabs and actors
+		# move around the building: sun caught on the roof would ride with them into the
+		# corridors.
 		if visual != null and not (visual is Light3D) and not _moves(visual, root):
 			found.append(visual)
 	return found

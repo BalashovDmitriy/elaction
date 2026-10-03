@@ -1,48 +1,50 @@
 class_name Atmosphere
 extends RefCounted
 
-## Воздух здания: общий тон, отражения, туман, свечение и тонмаппинг.
+## The building's atmosphere: ambient tone, reflections, fog, glow and tonemapping.
 ##
-## Числа — из пробы `tools/look3d.gd`, подобранные на нашей же геометрии
-## (ADR-0023, решение 7), и меняются только по замеру `tools/light_bench.gd`.
-## Собирается здесь, а не в уровне: уровню довольно одной строки, а бенчу и
-## пробам нужен тот же воздух без всего здания.
+## The numbers come from the `tools/look3d.gd` probe, tuned on our own geometry
+## (ADR-0023, decision 7), and change only by a `tools/light_bench.gd` measurement.
+## Built here, not in the level: the level is content with one line, while the bench and
+## the probes need the same atmosphere without the whole building.
 
-## Небо за зданием и общий тон. Тон низкий и нужен только затем, чтобы
-## погашенная зона была темна, а не черна: агенты в темноте продолжают
-## стрелять, и игрок обязан видеть, во что стрелять в ответ (ADR-0010, п. 3).
+## The sky behind the building and the ambient tone. The tone is low and is needed only so
+## that a darkened zone is dark rather than black: agents in the dark keep
+## shooting, and the player must see what to shoot back at (ADR-0010, item 3).
 const SKY := Color(0.03, 0.04, 0.07)
 const AMBIENT_ENERGY: float = 0.55
 
-## Отражения в полу: экранные, им нужен наклон камеры (решение 1).
+## Floor reflections: screen-space, they need the camera tilt (decision 1).
 const SSR_STEPS: int = 96
 const SSR_FADE_IN: float = 0.2
 
-## Контактные тени по углам: под актёрами, у плинтуса, в проёмах.
+## Contact shadows in the corners: under the actors, at the skirting, in openings.
 const SSAO_INTENSITY: float = 2.0
 const SSAO_RADIUS: float = 0.6
 
-## Туман — намёк, а не молоко: на 0.015 конусы ламп съедали весь кадр. Множитель
-## плотности и свечение воздуха — по типу здания ([constant BuildingAir.FOG_GAIN]).
+## Fog is a hint, not milk: at 0.015 the lamp cones ate the whole frame. The density
+## multiplier and air glow are by building kind ([constant BuildingAir.FOG_GAIN]).
 const FOG_DENSITY: float = 0.0035
 
-## Свечение только с того, что ярче кадра: иначе блум растит каждую лампу в
-## белый столб и съедает деталь, ради которой всё и затевалось.
+## Glow only from what is brighter than the frame: otherwise bloom grows every lamp into
+## a white pillar and eats the detail that everything was done for.
 const GLOW_INTENSITY: float = 0.6
 const GLOW_THRESHOLD: float = 1.0
 
 const EXPOSURE: float = 1.15
 
-## Тон кадра — ночной нуар по референсу (ADR-0030, решение 1): кривые по каналам
-## от холодных теней к тёплому свету, чуть больше контраста, чуть меньше цвета.
-## Игровые знаки светятся эмиссией поверх тона и яркими остаются.
+## The frame tone is night noir after the reference (ADR-0030, decision 1): per-channel
+## curves from cold shadows to warm light, slightly more contrast, slightly less colour.
+## Game signs glow with emission on top of the tone and stay bright.
 ##
-## Подобран в M22 по кадрам из трёх наборов (`layout_shot --tone=N`): холод в
-## тенях и тепло в свете разведены сильнее, чем в M20, — мрамор и обои больше
-## не выбеливались лампой, а двери и лампы стали теплее на синей стене.
+## Tuned in M22 by shots from three sets (`layout_shot --tone=N`): cold in the
+## shadows and warmth in the light are spread further apart than in M20 — marble and
+## wallpaper were no longer bleached by the lamp, and doors and lamps became warmer on the
+## blue wall.
 ##
-## С M24n контраст и ночной тон кадра задаёт тип здания ([BuildingAir]): нуар
-## здесь — ночной тон суток в [TimeOfDay], и ночью тип перекрывает его целиком.
+## Since M24n the contrast and night tone of the frame are set by the building kind
+## ([BuildingAir]): noir here is the night tone of the day in [TimeOfDay], and at night
+## the kind overrides it entirely.
 const NOIR_SHADOW := Color(0.0, 0.03, 0.08)
 const NOIR_MIDDLE := Color(0.27, 0.33, 0.4)
 const NOIR_LIGHT := Color(1.0, 0.93, 0.8)
@@ -50,10 +52,10 @@ const NOIR_MIDDLE_AT: float = 0.35
 const SATURATION: float = 0.9
 
 
-## Воздух здания с общим тоном [param ambient] — цветом палитры раунда — во
-## время суток [param time] (ADR-0051): днём здание светлее и без ламп, тон
-## кадра — свой на каждое время. С M24n тон, насыщенность и туман — ещё и по
-## типу здания [param kind] ([BuildingAir], ADR-0056).
+## Building atmosphere with ambient tone [param ambient] — the round palette colour — at
+## time of day [param time] (ADR-0051): by day the building is lighter and without lamps,
+## the frame tone is its own for each time. Since M24n the tone, saturation and fog also
+## depend on building kind [param kind] ([BuildingAir], ADR-0056).
 static func environment(
 	ambient: Color,
 	time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT,
@@ -94,10 +96,10 @@ static func environment(
 	return air
 
 
-## Кривые тона: градиент, по которому каждый канал переводится из своего
-## значения в своё. Ночью — нуар: чёрный уходит в холодный синий, белый — в
-## тёплый; в другое время — свой тон ([constant TimeOfDay.GRADE_SHADOW] и
-## соседи), подкрашенный тоном типа здания [param kind] ([BuildingAir]).
+## Tone curves: a gradient by which each channel is mapped from its own
+## value to its own. At night — noir: black goes to cold blue, white to
+## warm; at other times — its own tone ([constant TimeOfDay.GRADE_SHADOW] and
+## neighbours), tinted by the tone of building kind [param kind] ([BuildingAir]).
 static func grade_curve(
 	time: TimeOfDay.Kind, kind: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL
 ) -> GradientTexture1D:

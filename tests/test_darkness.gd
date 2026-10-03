@@ -1,18 +1,18 @@
 extends GutTest
 
-## Темнота по правилам ADR-0023: решает тень Otto, слепой агент патрулирует,
-## за дверью Otto невидим. Со сценой: здание настоящее по правилам, агент
-## ставится руками — в кадре должен быть ровно один, и известно где.
+## Darkness by the ADR-0023 rules: Otto's shadow decides, a blind agent patrols,
+## behind a door Otto is invisible. With a scene: the building is real by the rules, the
+## agent is placed by hand: there must be exactly one in the frame, and where is known.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 
-## Сколько кадров даётся агенту на выстрел. Замах 0.35 с, пауза 1.1 с — двух
-## секунд игрового времени хватает и на выстрел, и на то, чтобы убедиться, что
-## его нет.
+## How many frames an agent gets for a shot. Windup 0.35 s, pause 1.1 s: two
+## seconds of game time are enough both for a shot and for making sure there is
+## none.
 const WATCH_FRAMES: int = 120
 
-## Сколько кадров ждать падения лампы.
+## How many frames to wait for a lamp to fall.
 const FALL_FRAMES: int = 240
 
 
@@ -35,16 +35,16 @@ func _build() -> GreyboxLevel:
 	return level
 
 
-## Этаж дуэли: широкий, в полный размах здания — на нём три лампы и места на
-## любую дальность, — и не нижний, где стоит выход.
+## The duel floor: wide, spanning the full building width (it has three lamps and spots
+## for any range), and not the bottom one, where the exit is.
 ##
-## Не жёстко третий снизу, а первый широкий снизу, где нашлась пара мест
-## ([method _pair_on]): раскладка меняется от вехи к вехе, и на M18c стена
-## легла на тот самый этаж так, что пары на нём не осталось. Тест молча брал
-## тогда одно место дважды и проверял не то.
+## Not strictly the third from the bottom but the first wide one from the bottom where a
+## pair of spots was found ([method _pair_on]): the layout changes from milestone to
+## milestone, and on M18c a wall fell onto that very floor so that no pair was left on
+## it. The test then silently took one spot twice and checked the wrong thing.
 ##
-## Выбирается один раз на здание и запоминается: пара ищется по висящим лампам,
-## и после сбитой лампы поиск вернул бы уже другой этаж.
+## It is chosen once per building and remembered: the pair is searched by hanging lamps,
+## and after a lamp is knocked down the search would return a different floor.
 func _floor(level: GreyboxLevel) -> int:
 	if level.has_meta(&"duel_floor"):
 		return level.get_meta(&"duel_floor") as int
@@ -59,7 +59,7 @@ func _floor(level: GreyboxLevel) -> int:
 	return chosen
 
 
-## Лампа этажа, ближайшая к точке.
+## The floor's lamp nearest to the point.
 func _lamp_near(level: GreyboxLevel, floor_index: int, x: float) -> Lamp:
 	var found: Lamp = null
 	var gap := INF
@@ -74,8 +74,8 @@ func _lamp_near(level: GreyboxLevel, floor_index: int, x: float) -> Lamp:
 	return found
 
 
-## Стоит ли точка почти посередине между двумя лампами — там, где зона
-## не определена однозначно.
+## Whether the point stands almost midway between two lamps, where the zone
+## is not unambiguously defined.
 func _on_a_border(level: GreyboxLevel, floor_index: int, x: float) -> bool:
 	var gaps: Array[float] = []
 	for child in level.get_children():
@@ -86,7 +86,7 @@ func _on_a_border(level: GreyboxLevel, floor_index: int, x: float) -> bool:
 	return gaps.size() > 1 and gaps[1] - gaps[0] < 0.1
 
 
-## Гасит зону лампы и ждёт, пока она долетит.
+## Knocks out a lamp's zone and waits for it to finish falling.
 func _put_out(lamp: Lamp) -> void:
 	lamp.shoot_down()
 	var left := FALL_FRAMES
@@ -96,7 +96,7 @@ func _put_out(lamp: Lamp) -> void:
 	await wait_physics_frames(2)
 
 
-## Ставит Otto на этаж в точку x.
+## Puts Otto on the floor at point x.
 func _place_otto(level: GreyboxLevel, x: float) -> void:
 	level.otto.global_position = WorldSpace.to_scene(
 		Vector2(x, level.rules.floor_surface(_floor(level)))
@@ -104,8 +104,8 @@ func _place_otto(level: GreyboxLevel, x: float) -> void:
 	level.otto.velocity = Vector3.ZERO
 
 
-## Агент на месте, смотрящий в сторону Otto. Стоит: у него нет хода, чтобы
-## дуэль зависела только от того, видит ли он.
+## An agent in place, facing Otto. He stands still: he has no movement, so that the
+## duel depends only on whether he can see.
 func _agent_at(level: GreyboxLevel, x: float, towards: float, walks: bool = false) -> Enemy:
 	var agent := ENEMY_SCENE.instantiate() as Enemy
 	agent.apply_rules(level.rules)
@@ -113,9 +113,9 @@ func _agent_at(level: GreyboxLevel, x: float, towards: float, walks: bool = fals
 		agent.walk_speed = 0.0
 	level.add_child(agent)
 	if not walks:
-		# Стоящий агент бродит на месте и поворачивается куда придётся, а
-		# стреляет по ROM, только глядя на Otto. Тревога снимает это условие:
-		# проверка здесь о том, видит ли он Otto, а не куда он смотрит.
+		# A standing agent wanders in place and turns whichever way, and
+		# by the ROM he shoots only when facing Otto. An alarm lifts this condition:
+		# the check here is about whether he sees Otto, not where he looks.
 		agent.alert_for(1.0e6)
 	agent.global_position = WorldSpace.to_scene(
 		Vector2(x, level.rules.floor_surface(_floor(level)))
@@ -124,7 +124,7 @@ func _agent_at(level: GreyboxLevel, x: float, towards: float, walks: bool = fals
 	return agent
 
 
-## Сколько вражеских пуль появилось за время наблюдения.
+## How many enemy bullets appeared during the observation.
 func _shots_within(level: GreyboxLevel, frames: int) -> int:
 	var seen: Dictionary = {}
 	for _frame in frames:
@@ -136,16 +136,16 @@ func _shots_within(level: GreyboxLevel, frames: int) -> int:
 	return seen.size()
 
 
-## Место под лампой и ещё одно на дальности выстрела, но дальше дальности в темноте.
-## Пара мест этажа: первое гасят, второе остаётся светлым.
+## A spot under a lamp and another within shot range, but beyond the range in darkness.
+## A pair of floor spots: the first gets knocked out, the second stays lit.
 ##
-## Места берутся **из разных зон** и на дальности выстрела друг от друга. Из
-## одной зоны их брать нельзя: погашенная накрывает оба, и «из тени по
-## освещённому» проверяло бы не то. Раньше первое место просто ставилось под
-## лампу, а второе — в двух-пяти метрах от него; на мелкой сетке M18 оба стали
-## попадать в одну зону, и проверка разваливалась. Теперь пара ищется поперёк
-## границы зон: у самой границы соседние зоны сходятся вплотную, и дальность
-## выстрела туда укладывается.
+## The spots are taken **from different zones** and within shot range of each other.
+## They cannot be taken from one zone: the knocked-out one covers both, and "from the
+## shadow at the lit one" would check the wrong thing. Previously the first spot was
+## simply placed under a lamp and the second two to five meters from it; on the fine
+## M18 grid both started falling into one zone, and the check fell apart. Now the pair
+## is searched across a zone border: right at the border neighboring zones meet closely,
+## and the shot range fits there.
 func _spot_pair(level: GreyboxLevel) -> Vector2:
 	return _pair_on(level, _floor(level))
 
@@ -154,8 +154,8 @@ func _pair_on(level: GreyboxLevel, index: int) -> Vector2:
 	var rules := level.rules
 	var spots := level.plan().safe_spots(rules, index)
 	var closest := rules.agent_dark_fire_range * 1.5
-	# Дальности огня нет — есть кадр (ADR-0027, решение 3а): пара обязана
-	# влезать в него вместе с Otto, стоящим на одном из мест.
+	# There is no fire range, only the frame (ADR-0027, decision 3a): the pair must
+	# fit into it together with Otto standing on one of the spots.
 	var furthest := SideCamera.DEFAULT_HALF_HEIGHT * 16.0 / 9.0 * 0.9
 
 	for here: float in spots:
@@ -165,23 +165,23 @@ func _pair_on(level: GreyboxLevel, index: int) -> Vector2:
 				continue
 			if _lamp_near(level, index, here) == _lamp_near(level, index, there):
 				continue
-			# Место ровно на границе зон — ничья, и решает её последний бит дроби:
-			# тест и освещение разрешали её в разные стороны. На M18c граница
-			# легла точно на место сетки (13.2 между лампами 6.0 и 20.4).
+			# A spot exactly on the zone border is a tie, decided by the last bit of the fraction:
+			# the test and the lighting resolved it in different directions. On M18c the border
+			# fell exactly onto a grid spot (13.2 between lamps 6.0 and 20.4).
 			if _on_a_border(level, index, here) or _on_a_border(level, index, there):
 				continue
-			# Стена между местами делает агента слепым — и правильно делает
-			# (ADR-0024, решение 5). Проверка здесь про темноту, а не про стены,
-			# и пара обязана стоять по одну её сторону. Без этого тест падал бы
-			# на тех сидах, где стена легла на дуэльный этаж: «освещённого Otto
-			# обстреливают» превращалось бы в «за стеной не обстреливают».
+			# A wall between the spots makes the agent blind, and rightly so
+			# (ADR-0024, decision 5). The check here is about darkness, not walls,
+			# and the pair must stand on one side of it. Without this the test would fail
+			# on the seeds where a wall fell onto the duel floor: "lit Otto
+			# gets shot at" would turn into "behind a wall he does not get shot at".
 			if level.plan().wall_between(index, here, there):
 				continue
 			return Vector2(here, there)
 	return Vector2(spots[0], spots[0])
 
 
-## Освещённого Otto агент берёт с полной дальности — так было и так остаётся.
+## An agent gets a lit Otto from full range: it was so and stays so.
 func test_a_lit_otto_is_shot_from_afar() -> void:
 	var level := _build()
 	await wait_physics_frames(4)
@@ -193,7 +193,7 @@ func test_a_lit_otto_is_shot_from_afar() -> void:
 	remove_child(level)
 
 
-## Otto в тени агент издалека не видит и не стреляет; подошёл ближе — видит.
+## An agent does not see Otto in the shadow from afar and does not shoot; closer, he sees.
 func test_an_otto_in_the_dark_is_seen_only_up_close() -> void:
 	var level := _build()
 	await wait_physics_frames(4)
@@ -206,12 +206,13 @@ func test_an_otto_in_the_dark_is_seen_only_up_close() -> void:
 	var agent := _agent_at(level, pair.y, signf(pair.x - pair.y))
 	assert_eq(await _shots_within(level, WATCH_FRAMES), 0, "Otto в тени с этой дальности не виден")
 
-	# Теперь агент подходит к Otto на дальность, с которой видно и в темноте.
+	# Now the agent approaches Otto to a range from which he is visible even in darkness.
 	#
-	# Подходит агент, а не Otto: на мелкой сетке M18 шаг к агенту выводил Otto
-	# из тени в освещённую зону агента, и проверялось уже не «в тени вплотную».
-	# А попадание считается по гибели Otto, а не по пулям: с метра пуля
-	# долетает в тот же шаг физики, в котором вылетела, и счёт пуль её не видит.
+	# The agent approaches, not Otto: on the fine M18 grid a step toward the agent took Otto
+	# out of the shadow into the agent's lit zone, and what was checked was no longer
+	# "in the shadow at close range". And a hit is counted by Otto's death, not by bullets:
+	# from a meter the bullet arrives in the same physics step in which it was fired, and
+	# the bullet count does not see it.
 	agent.queue_free()
 	var close := _floor_beside(level, pair.x, level.rules.agent_dark_fire_range * 0.6)
 	assert_false(is_nan(close), "рядом с Otto есть пол, куда встать агенту")
@@ -224,8 +225,8 @@ func test_an_otto_in_the_dark_is_seen_only_up_close() -> void:
 	remove_child(level)
 
 
-## Место на полу в [param reach] от [param x] по этажу дуэли, в любую сторону,
-## где агенту есть на чём стоять. NAN — таких нет.
+## A floor spot at [param reach] from [param x] on the duel floor, in either direction,
+## where the agent has something to stand on. NAN if there is none.
 func _floor_beside(level: GreyboxLevel, x: float, reach: float) -> float:
 	var rules := level.rules
 	var index := _floor(level)
@@ -241,7 +242,7 @@ func _floor_beside(level: GreyboxLevel, x: float, reach: float) -> float:
 	return NAN
 
 
-## Тень агента ничего не решает: из тени освещённого Otto видно.
+## The agent's shadow decides nothing: from the shadow a lit Otto is visible.
 func test_an_agent_in_the_dark_still_sees_a_lit_otto() -> void:
 	var level := _build()
 	await wait_physics_frames(4)
@@ -249,13 +250,14 @@ func test_an_agent_in_the_dark_still_sees_a_lit_otto() -> void:
 	assert_ne(pair.x, pair.y, "пара мест для дуэли нашлась")
 	_place_otto(level, pair.y)
 	await _put_out(_lamp_near(level, _floor(level), pair.x))
-	# Дуэль ставится на том, что Otto остался под горящей лампой: зоны узкие, и
-	# второе место могло попасть в ту же погашенную — тогда проверялось бы не то.
+	# The duel relies on Otto staying under a burning lamp: the zones are narrow, and the
+	# second spot could fall into the same knocked-out one, and then the wrong thing would
+	# be checked.
 	assert_false(level.is_dark_at(_floor(level), pair.y), "Otto стоит в освещённой зоне")
 	var agent := _agent_at(level, pair.x, signf(pair.y - pair.x))
-	# Тень сверяется до дуэли, а не после: попавший агент убивает Otto, а
-	# вернувшийся по ROM Otto уводит с этажа всех живых агентов (ADR-0053,
-	# решение 2), и к концу наблюдения этого агента уже нет.
+	# The shadow is checked before the duel, not after: an agent who hits kills Otto, and
+	# Otto, returning per the ROM, takes all living agents off the floor (ADR-0053,
+	# decision 2), so by the end of the observation this agent is gone.
 	await wait_physics_frames(1)
 	assert_true(agent.is_in_the_dark(), "агент стоит в тени")
 	var shots := await _shots_within(level, WATCH_FRAMES)
@@ -263,7 +265,7 @@ func test_an_agent_in_the_dark_still_sees_a_lit_otto() -> void:
 	remove_child(level)
 
 
-## За дверью Otto нет: агенты теряют его, как в оригинале (долг M14).
+## Otto is not behind the door: agents lose him, as in the original (M14 debt).
 func test_agents_lose_otto_behind_a_door() -> void:
 	var level := _build()
 	await wait_physics_frames(4)
@@ -278,7 +280,7 @@ func test_agents_lose_otto_behind_a_door() -> void:
 	remove_child(level)
 
 
-## Слепой агент не караулит у края этажа, а ходит по нему туда и обратно.
+## A blind agent does not guard the floor edge but walks along it back and forth.
 func test_a_blind_agent_patrols_the_floor() -> void:
 	var level := _build()
 	await wait_physics_frames(4)
@@ -286,7 +288,7 @@ func test_a_blind_agent_patrols_the_floor() -> void:
 	assert_ne(pair.x, pair.y, "пара мест для дуэли нашлась")
 	_place_otto(level, pair.x)
 	await _put_out(_lamp_near(level, _floor(level), pair.x))
-	# Агент идёт прочь от Otto, до края этажа.
+	# The agent walks away from Otto, to the floor edge.
 	var away := signf(pair.y - pair.x)
 	var agent := _agent_at(level, pair.y, away, true)
 	var turned := false

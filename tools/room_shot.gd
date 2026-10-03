@@ -1,29 +1,29 @@
 extends Node3D
 
-## Комнаты за дверью (ADR-0047, ADR-0055): по ряду на тип здания — четыре
-## номера, четыре кабинета и квартиры: кухня, гостиная, спальня и ещё кухня.
+## Rooms behind a door (ADR-0047, ADR-0055): a row per building kind — four
+## hotel rooms, four offices and apartments: kitchen, living room, bedroom and another kitchen.
 ##
-## Каждая стоит за стеной коридора с проёмом двери и открытой створкой, кадр
-## — ортокамерой с наклоном игры ([constant SideCamera.TILT_DEGREES]). Первый
-## кадр — все в проёмах, как в игре; второй — без стены: вся комната
-## целиком, чтобы видеть, что стоит и где.
+## Each stands behind a corridor wall with a door opening and an open leaf, the frame
+## is shot by an orthocamera with the game's tilt ([constant SideCamera.TILT_DEGREES]). The first
+## frame — all in their doorways, as in the game; the second — without the wall: the whole room
+## entirely, to see what stands where.
 ##
-## Запуск:
+## Run:
 ##     godot --path . res://tools/room_shot.tscn
 ##     godot --path . res://tools/room_shot.tscn -- --folder=M24i
 ##     godot --path . res://tools/room_shot.tscn -- --folder=M24k --time=1 --weather=2
 ##
-## `--time` — время суток ([enum TimeOfDay.Kind]) и `--weather` — погода за окном
-## (ADR-0052, решение 5): днём в комнате солнце из окна.
+## `--time` — time of day ([enum TimeOfDay.Kind]) and `--weather` — the weather outside the window
+## (ADR-0052, decision 5): in daytime the room gets sun from the window.
 
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 
-## Шаг комнат вдоль ряда, м, и сколько комнат в ряду.
+## Room pitch along the row, m, and how many rooms are in a row.
 const STEP: float = 5.0
 const PER_ROW: int = 4
 const ROW_STEP: float = Proportions.FLOOR
 const SETTLE_FRAMES: int = 20
-## Ряд квартир: какие комнаты в нём по порядку.
+## The apartment row: which rooms are in it, in order.
 const HOMES: Array[DoorRoom.Home] = [
 	DoorRoom.Home.KITCHEN, DoorRoom.Home.LIVING, DoorRoom.Home.BEDROOM, DoorRoom.Home.KITCHEN
 ]
@@ -32,7 +32,7 @@ var _folder: String = "M24i"
 var _walls: Array[Node3D] = []
 var _time: int = TimeOfDay.Kind.NIGHT
 var _weather: int = Weather.Kind.CLEAR
-## Сколько жребиев квартиры отброшено, пока не выпала нужная комната.
+## How many apartment draws are discarded until the needed room comes up.
 var _tries: int = 0
 
 
@@ -90,7 +90,7 @@ func _stage() -> void:
 	camera.make_current()
 
 
-## Комната типа [param kind] жребием [param draw].
+## A room of kind [param kind] by draw [param draw].
 func _room(kind: BuildingIdentity.Kind, draw: int) -> DoorRoom:
 	return DoorRoom.build(
 		kind,
@@ -103,8 +103,8 @@ func _room(kind: BuildingIdentity.Kind, draw: int) -> DoorRoom:
 	)
 
 
-## Стена коридора с проёмом двери и створкой, распахнутой в комнату, и лампа
-## коридора перед ней.
+## A corridor wall with a door opening and a leaf swung open into the room, and the corridor
+## lamp in front of it.
 func _corridor_wall() -> Node3D:
 	var wall := Node3D.new()
 	var look := GreyboxLook.surface(Color(0.35, 0.33, 0.4))

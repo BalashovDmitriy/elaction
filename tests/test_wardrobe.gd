@@ -1,9 +1,10 @@
 extends GutTest
 
-## Агенты одеты по типу здания (ADR-0055, решение 7): федора в отеле, деловой
-## костюм без шляпы в офисе, кожанка и кепка в жилом доме. Механика одна —
-## меняется только модель тела, и каждая обязана собраться так же, как
-## прежняя: скелет, клипы, шляпа отдельным мешем там, где она есть.
+## Agents are dressed by building kind (ADR-0055, decision 7): a fedora in the hotel, a
+## business suit without a hat in the office, a leather jacket and a cap in the
+## residential building. The mechanic is the same — only the body model changes, and
+## each must assemble the same as the previous: skeleton, clips, the hat as a separate
+## mesh where there is one.
 
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 
@@ -18,8 +19,8 @@ func test_every_kind_of_building_has_its_agent() -> void:
 	assert_eq(paths.size(), AgentWardrobe.MODELS.size(), "модели разные")
 
 
-## Шляпа — своим мешем `hat`: на добивании она слетает (ADR-0050). У офисного
-## агента её нет, и добивание обходится без неё.
+## The hat is its own `hat` mesh: it flies off on a takedown (ADR-0050). The office agent
+## has none, and the takedown does without it.
 func test_hats_are_where_the_wardrobe_says() -> void:
 	var hatted := {
 		BuildingIdentity.Kind.HOTEL: true,
@@ -37,8 +38,8 @@ func test_hats_are_where_the_wardrobe_says() -> void:
 		)
 
 
-## Агент, одетый по типу, собирается целиком: тело из своей модели, клипы на
-## месте — стойка и ходьба играют.
+## An agent dressed by kind assembles entirely: the body from its own model, clips in
+## place — idle and walk play.
 func test_a_dressed_agent_builds_its_body() -> void:
 	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
 		var agent := ENEMY_SCENE.instantiate() as Enemy

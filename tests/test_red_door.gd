@@ -1,35 +1,35 @@
 extends GutTest
 
-## Тесты двери с Otto внутри — узлом, со створкой, вводом и звуком (ADR-0038,
-## решение 2).
+## Tests of the door with Otto inside — with the node, the door leaf, input and sound (ADR-0038,
+## decision 2).
 ##
-## Правила визита без сцены — в [code]test_door_visit.gd[/code]. Здесь то, чего
-## там не проверить: что ввод игрока до двери и правда не доходит ничем, что
-## створку видно закрытой, что документ засчитывается на выходе в настоящем
-## здании и что агенты этажа ждут у двери не больше одного за раз — на
-## нескольких сидах, а не на одном удобном этаже.
+## Visit rules without a scene are in [code]test_door_visit.gd[/code]. Here is what cannot be
+## checked there: that the player's input really does not reach the door in any way, that the leaf
+## is visibly closed, that the document is counted on exit in a real building and that the floor's
+## agents wait at the door no more than one at a time — on several seeds, not on one convenient
+## floor.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
 const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 
-## Ускорение времени: визит — почти пять секунд, и зданий в тесте несколько.
+## Time speed-up: a visit is almost five seconds, and there are several buildings in the test.
 const TIME_SCALE: float = 4.0
 
-## Сколько кадров ждать, пока Otto зайдёт или выйдет, прежде чем сдаться.
+## How many frames to wait for Otto to go in or come out before giving up.
 const PATIENCE: int = 240
 
-## Всё, чем игрок мог бы попроситься наружу: раньше срока не выпускает ничто.
+## Everything the player could use to ask to get out: nothing lets him out early.
 const ACTIONS: Array[StringName] = [
 	&"move_left", &"move_right", &"move_down", &"move_up", &"jump", &"shoot"
 ]
 
-## Сиды зданий для проверок на уровне.
+## Building seeds for level checks.
 const SEEDS: Array[int] = [1, 2, 3]
 
-## Насколько далеко от двери ставить агентов, м: дальше отступа места ожидания и
-## близко настолько, чтобы дойти, пока Otto внутри.
+## How far from the door to place agents, m: farther than the waiting spot offset and close enough
+## to arrive while Otto is inside.
 const AGENT_NEAR: float = 1.9
 const AGENT_FAR: float = 4.2
 
@@ -53,19 +53,19 @@ func _release_all() -> void:
 		Input.action_release(action)
 
 
-## Шаг физики в секундах игры: под ускорением он длиннее.
+## A physics step in game seconds: under speed-up it is longer.
 func _step() -> float:
 	return Engine.time_scale / float(Engine.physics_ticks_per_second)
 
 
-## Ждёт [param seconds] секунд игры шагами физики: под ускорением настенные
-## часы не в счёт.
+## Waits [param seconds] seconds of game time in physics steps: under speed-up the wall clock does
+## not count.
 func _wait_game(seconds: float) -> void:
 	for _frame: int in int(ceilf(seconds / _step())):
 		await get_tree().physics_frame
 
 
-## Одинокая дверь на твёрдом полу, как в [code]test_agent_doors.gd[/code].
+## A lone door on a solid floor, as in [code]test_agent_doors.gd[/code].
 func _bare_door(red: bool) -> Door:
 	var ground := StaticBody3D.new()
 	var shape := CollisionShape3D.new()
@@ -89,7 +89,7 @@ func _guest_at(door: Door) -> Otto:
 	return otto
 
 
-## Жмёт «вверх», пока дверь не возьмёт Otto. Возвращает, взяла ли.
+## Presses "up" until the door takes Otto. Returns whether it took him.
 func _knock(otto: Otto) -> bool:
 	Input.action_press(&"move_up")
 	for _frame: int in PATIENCE:
@@ -99,7 +99,7 @@ func _knock(otto: Otto) -> bool:
 	return false
 
 
-## Ждёт, пока Otto спрячется за створкой.
+## Waits until Otto hides behind the leaf.
 func _wait_hidden(otto: Otto) -> bool:
 	for _frame: int in PATIENCE:
 		if otto.is_hidden():
@@ -108,7 +108,7 @@ func _wait_hidden(otto: Otto) -> bool:
 	return otto.is_hidden()
 
 
-## Ждёт, пока дверь выпустит спрятанного Otto: он снова на виду.
+## Waits until the door releases the hidden Otto: he is in view again.
 func _wait_out(otto: Otto) -> void:
 	var frames := 0
 	while otto.is_hidden() and frames < PATIENCE * 2:
@@ -122,7 +122,7 @@ func test_the_leaf_shuts_behind_otto_and_opens_to_let_him_out() -> void:
 	assert_true(await _knock(otto), "дверь взяла Otto")
 	assert_false(otto.is_hidden(), "пока створка идёт, он ещё в проёме")
 	assert_true(await _wait_hidden(otto), "створка открылась — он внутри")
-	# Секунда: створка успела закрыться за ним, а до выхода ещё далеко.
+	# A second: the leaf has had time to close behind him, and the exit is still far off.
 	await _wait_game(1.0)
 	assert_true(otto.is_hidden(), "он всё ещё внутри")
 	assert_eq(door.openness(), 0.0, "за ним створка закрыта")
@@ -142,7 +142,7 @@ func test_otto_is_out_exactly_after_seventy_ticks_whatever_he_presses() -> void:
 	var frames := 0
 	var hid := false
 	while frames < PATIENCE * 2:
-		# Каждый кадр — другая кнопка, с отпусканием: и зажатая, и свежая.
+		# Every frame a different button, with release: both held and fresh.
 		_release_all()
 		Input.action_press(ACTIONS[frames % ACTIONS.size()])
 		await get_tree().physics_frame
@@ -157,8 +157,8 @@ func test_otto_is_out_exactly_after_seventy_ticks_whatever_he_presses() -> void:
 	assert_almost_eq(inside, rom, _step() * 2.0, "ровно 70 тиков ROM")
 
 
-## Обычная дверь Otto не пускает: как в ROM (@3BDA), внутрь — только в красную
-## (ADR-0044, решение 3). Раньше обычная служила укрытием.
+## An ordinary door does not let Otto in: as in the ROM (@3BDA), only a red one lets him inside
+## (ADR-0044, decision 3). Before, an ordinary door served as cover.
 func test_a_plain_door_does_not_take_otto_in() -> void:
 	var door := _bare_door(false)
 	var otto := _guest_at(door)
@@ -167,7 +167,7 @@ func test_a_plain_door_does_not_take_otto_in() -> void:
 	assert_eq(door.openness(), 0.0, "и не открылась")
 
 
-## Сданная красная становится обычной — и тоже больше не пускает.
+## A cleared red door becomes ordinary — and also no longer lets him in.
 func test_an_emptied_red_door_does_not_take_otto_in_again() -> void:
 	var door := _bare_door(true)
 	var otto := _guest_at(door)
@@ -195,8 +195,8 @@ func test_the_document_is_counted_on_the_way_out() -> void:
 	assert_false(door.is_pending(), "вышел — дверь обычная")
 
 
-## Пока Otto внутри, закрытая красная створка светится сама — красной, — а табло
-## над ней дышит: в тени коридора она не сливается с темнотой (кадр M24b).
+## While Otto is inside, the closed red leaf glows by itself — red — and the board above it
+## breathes: in the corridor shadow it does not merge with the darkness (M24b shot).
 func test_the_occupied_red_door_glows_and_its_sign_breathes() -> void:
 	var door := _bare_door(true)
 	var leaf := door.get_node("Leaf") as MeshInstance3D
@@ -274,7 +274,7 @@ func _drop(level: GreyboxLevel) -> void:
 		level.free()
 
 
-## Документ и 500 очков — на выходе, в любом здании из набора.
+## The document and 500 points — on exit, in any building of the set.
 func test_a_red_door_pays_on_the_way_out_in_any_building() -> void:
 	for building_seed: int in SEEDS:
 		var level := _build(building_seed)
@@ -303,8 +303,8 @@ func test_a_red_door_pays_on_the_way_out_in_any_building() -> void:
 		_drop(level)
 
 
-## Где на этаже двери поставить агентов, чтобы им было дойти: места, где можно
-## стоять, на свободном пути до двери.
+## Where on the door's floor to place agents so they can reach it: places where one can stand, on a
+## free path to the door.
 func _agent_spots(level: GreyboxLevel, door: Door) -> Array[float]:
 	var mat := door.mat_position()
 	var floor_index := level.rules.floor_index_near(mat.y)
@@ -335,8 +335,8 @@ func _spawn_agent(level: GreyboxLevel, x: float, y: float, towards: float, index
 	return agent
 
 
-## Агенты этажа ждут у двери с Otto не больше одного за раз, дошедший стоит у
-## коврика лицом к двери, а вышел Otto — ждать некого.
+## The floor's agents wait at the door with Otto no more than one at a time, the one who arrived
+## stands at the mat facing the door, and once Otto has come out — there is nobody to wait for.
 func test_agents_wait_at_otto_s_door_one_at_most_and_let_go_when_he_is_out() -> void:
 	var watched := 0
 	for building_seed: int in SEEDS:
@@ -345,7 +345,7 @@ func test_agents_wait_at_otto_s_door_one_at_most_and_let_go_when_he_is_out() -> 
 		var door: Door = null
 		var spots: Array[float] = []
 		for candidate in level.doors():
-			# Otto пускает только красная (ADR-0044, решение 3).
+			# Only a red door lets Otto in (ADR-0044, decision 3).
 			if not candidate.has_document:
 				continue
 			spots = _agent_spots(level, candidate)

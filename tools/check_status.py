@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Не даёт закоммитить изменения игры без обновления статуса разработки.
+"""Prevents committing game changes without updating the development status.
 
-`docs/STATUS.md` — точка входа для новой сессии: текущая веха, что работает, что
-дальше. Если он отстаёт от кода, следующая сессия начинается с археологии.
-Поэтому коммит, трогающий `src/`, `tests/` или `project.godot`, обязан обновить
-и статус.
+`docs/STATUS.md` is the entry point for a new session: the current milestone, what
+works, what is next. If it lags behind the code, the next session starts with
+archaeology. So a commit touching `src/`, `tests/` or `project.godot` must update the
+status too.
 
-Правки только в документации, тулинге или CI проверку не требуют.
+Changes only to documentation, tooling or CI do not require the check.
 
-Запуск: хуком pre-commit, либо вручную `python tools/check_status.py`.
+Run: as a pre-commit hook, or manually `python tools/check_status.py`.
 """
 
 from __future__ import annotations
@@ -20,11 +20,11 @@ from godot_bin import PROJECT_ROOT, use_utf8_output
 
 STATUS_FILE = "docs/STATUS.md"
 
-# Пути, изменение которых означает «разработка продвинулась».
+# Paths whose change means "development has progressed".
 WATCHED_PREFIXES = ("src/", "tests/")
 WATCHED_FILES = ("project.godot",)
 
-# Вендоренный код живёт внутри отслеживаемых папок, но нашим прогрессом не является.
+# Vendored code lives inside tracked folders but is not our progress.
 IGNORED_PREFIXES = ("addons/",)
 
 

@@ -1,7 +1,7 @@
 extends GutTest
 
-## Табло кабины и кнопки у порталов (ADR-0033, решение 7) и вертикальная
-## вывеска здания (решение 2): что они показывают, а не как выглядят.
+## The cab indicator board and the buttons at the portals (ADR-0033, decision 7) and the building's
+## vertical sign (decision 2): what they show, not how they look.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
@@ -27,8 +27,8 @@ func _shafts(level: GreyboxLevel) -> BuildingShafts:
 	return null
 
 
-## Кабина едет вниз — кнопка «вниз» горит на этажах под ней, «вверх» — на этажах
-## над ней, если едет вверх. Стоит — не горит ничего. Индексы растут вниз.
+## The cab goes down — the "down" button is lit on floors below it, "up" — on floors above it if it
+## goes up. Standing — nothing is lit. Indices grow downward.
 func test_the_button_lights_where_the_car_is_heading() -> void:
 	var down := Intent.DOWN
 	var up := Intent.UP
@@ -39,9 +39,9 @@ func test_the_button_lights_where_the_car_is_heading() -> void:
 	assert_eq(BuildingShafts.coming(0.0, 5, 9), 0.0, "стоит — не зовёт никого")
 
 
-## Ход табло берётся из настоящей скорости кабины. У неё y растёт вниз, и до
-## авторевью M21b табло читало едущую вниз кабину как едущую вверх: зажигало
-## «▲» на этажах, от которых она уезжала.
+## The board's direction is taken from the cab's real velocity. Its y grows downward, and until the
+## M21b code review the board read a cab going down as going up: it lit "▲" on the floors it was
+## leaving.
 func test_the_heading_follows_the_real_speed_of_the_car() -> void:
 	var motion := ElevatorMotion.new()
 	motion.setup(PackedFloat32Array([10.0, 13.6, 17.2]), 1)
@@ -53,14 +53,13 @@ func test_the_heading_follows_the_real_speed_of_the_car() -> void:
 	assert_eq(BuildingShafts.heading_of(0.0), 0.0, "стоит")
 
 
-## Табло на всех порталах шахты показывают этаж, где её кабина, — номер
-## таблички этажа, а не индекс; на крыше — R. Сначала обновляются все кабины,
-## потом проверяются все табло: в одном столбце бывает несколько шахт (на сиде 1
-## — шахта с крыши и шахта 15..22), и табло не должны показывать чужую кабину.
+## The boards on all portals of a shaft show the floor where its cab is — the floor plate number,
+## not the index; on the roof — R. First all cabs are updated, then all boards are checked: one
+## column can have several shafts (on seed 1 — the shaft from the roof and shaft 15..22), and the
+## boards must not show someone else's cab.
 ##
-## Кабина встаёт на свой этаж только с первым шагом физики: у тела с
-## sync_to_physics позиция до него откатывается к нулю, и все кабины читались
-## бы стоящими на крыше.
+## The cab gets to its floor only with the first physics step: for a body with sync_to_physics the
+## position before it rolls back to zero, and all cabs would read as standing on the roof.
 func test_every_board_of_a_shaft_shows_where_its_car_is() -> void:
 	var level := _level()
 	var shafts := _shafts(level)
@@ -95,15 +94,15 @@ func test_every_board_of_a_shaft_shows_where_its_car_is() -> void:
 	remove_child(level)
 
 
-## Кабина на крыше — на табло R, а не номер на единицу больше верхнего этажа.
+## A cab on the roof shows R on the board, not a number one greater than the top floor.
 func test_the_roof_is_not_a_floor_number() -> void:
 	var rules := BuildingRules.new()
 	assert_eq(BuildingShafts.floor_label(rules, BuildingRules.ROOF), BuildingShafts.ROOF_LABEL)
 	assert_eq(BuildingShafts.floor_label(rules, 0), str(rules.floors))
 
 
-## Нижний этаж — паркинг: табло шахт пишет «P», как табличка этажа и колонны
-## паркинга, а этаж над ним остаётся вторым (ADR-0038, решение 3).
+## The bottom floor is the garage: the shaft boards write "P", like the floor plate and the garage
+## columns, and the floor above it remains the second (ADR-0038, decision 3).
 func test_the_parking_is_p_on_the_boards() -> void:
 	var rules := BuildingRules.new()
 	var bottom := rules.floors - 1
@@ -112,9 +111,9 @@ func test_the_parking_is_p_on_the_boards() -> void:
 	assert_eq(Garage.LEVEL_MARK, "P", "колонны паркинга — P-01, P-02…")
 
 
-## Всё, что табло пишет текстом, есть в шрифте игры: знак, которого в Exo 2 нет,
-## рисует системный запасной шрифт, а на машине без него — пустой квадрат. Так
-## было со стрелками ▲▼ до того, как их сделали геометрией.
+## Everything the board writes as text exists in the game's font: a glyph missing from Exo 2 is
+## drawn by the system fallback font, and on a machine without it — an empty box. That is how it was
+## with the ▲▼ arrows before they were made geometry.
 func test_every_board_label_is_in_the_game_font() -> void:
 	var font := NeonStyle.scene_font(700)
 	var rules := BuildingRules.new()
@@ -127,8 +126,8 @@ func test_every_board_label_is_in_the_game_font() -> void:
 			)
 
 
-## Стрелка хода — треугольник рядом с цифрами: показан, пока кабина едет, остриём
-## туда, куда она едет; цифры при нём сдвигаются, текст табло — только этаж.
+## The direction arrow is a triangle next to the digits: shown while the cab moves, pointing where
+## it goes; the digits shift next to it, the board text is only the floor.
 func test_the_heading_arrow_is_geometry() -> void:
 	var level := _level()
 	var shafts := _shafts(level)
@@ -151,9 +150,9 @@ func test_the_heading_arrow_is_geometry() -> void:
 	remove_child(level)
 
 
-## Панель кнопок не встаёт на наличник двери соседнего места и на её табличку —
-## на любом здании. Проёма выхода в задней стене с M24b нет: выход — ворота
-## паркинга в торце ([GarageGate]).
+## The button panel does not overlap the door casing of the neighbouring place or its plate — in any
+## building. Since M24b there is no exit opening in the back wall: the exit is the garage gate in
+## the end wall ([GarageGate]).
 func test_the_call_panel_keeps_off_doors() -> void:
 	var door_left := Door.LEAF_SIZE.x * 0.5 + Door.FRAME_WIDTH
 	var door_right := Door.LEAF_SIZE.x * 0.5 + BuildingProps.PLATE_GAP + BuildingProps.PLATE.x
@@ -191,7 +190,7 @@ func _column_is_shared(level: GreyboxLevel, shaft: BuildingPlan.ShaftSpot) -> bo
 	return false
 
 
-## Вывеска висит снаружи здания, над верхними этажами, и пишет имя здания.
+## The sign hangs outside the building, above the top floors, and shows the building's name.
 func test_the_sign_spells_the_building_and_hangs_outside() -> void:
 	for building: int in [1, 2, 3, 4]:
 		var level := _level(building)
@@ -208,8 +207,8 @@ func test_the_sign_spells_the_building_and_hangs_outside() -> void:
 		remove_child(level)
 
 
-## Надписи в сцене — с мипмапами, HUD и меню — без них (ADR-0053, решение 9):
-## дальняя табличка не мерцает, а текст интерфейса остаётся резким.
+## Labels in the scene use mipmaps, HUD and menu do not (ADR-0053, decision 9): a distant plate does
+## not flicker, and the interface text stays sharp.
 func test_scene_text_has_mipmaps_and_the_hud_does_not() -> void:
 	var scene := NeonStyle.scene_font(700).base_font as FontFile
 	var hud := NeonStyle.font(700).base_font as FontFile

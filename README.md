@@ -1,361 +1,384 @@
 # elaction
 
-Ремейк аркадной игры **Elevator Action** (Taito, 1983) на Godot 4.
+A remake of the arcade game **Elevator Action** (Taito, 1983) in Godot 4.
 
-Механика — как в оригинале: агент Otto спускается с крыши тридцатиэтажного здания,
-собирает документы за красными дверями, ездит на лифтах, отстреливается от вражеских
-агентов и уходит на машине. Лампы на этаже можно прострелить, и этаж погрузится
-в темноту.
+Mechanics as in the original: agent Otto descends from the roof of a thirty-storey
+building, collects documents behind red doors, rides elevators, shoots back at enemy
+agents and escapes by car. The lamps on a floor can be shot out, and the floor goes
+dark.
 
-**Проект переехал в 3D** ([ADR-0019](docs/adr/0019-3d-pivot.md)): сцена трёхмерная,
-камера ортографическая и смотрит сбоку, движение Otto заперто в плоскости. Переезд
-шёл вехами M15–M22: сначала играбельность в серых коробках, затем актёры, свет,
-раскладка здания по оригиналу, город, модели паков и грейдинг. Последняя 2D-сборка
-осталась в истории git — слияние M14, `d5774df`.
+**The project has moved to 3D** ([ADR-0019](docs/adr/0019-3d-pivot.md)): the scene is
+three-dimensional, the camera is orthographic and looks from the side, Otto's movement is
+locked to a plane. The move ran through milestones M15–M22: first playability in grey
+boxes, then actors, lighting, the building layout from the original, the city, pack models
+and grading. The last 2D build remains in git history — the M14 merge, `d5774df`.
 
 | | |
 |---|---|
-| Движок | Godot 4.7.2 |
-| Язык | GDScript со статической типизацией |
-| Платформы | Windows, Linux |
-| Статус | Идёт M24p — здание снаружи по типу: своя корона над крышей, торцы башни и уступ, паркинг, вход с улицы и машина у выхода. Пройдена M24o — особые этажи залами, кабина и музыка по типу здания. Дальше — M25: онлайн-лидерборд (опционально). |
+| Engine | Godot 4.7.2 |
+| Language | GDScript with static typing |
+| Platforms | Windows, Linux |
+| Status | Milestones up to M24p are complete: the game is assembled in full — three building kinds with their own halls, cabs, music and exterior. Next — M25: online leaderboard (optional). |
 
-## Скачать и играть
+## Download and play
 
-Релизов пока не было: первый тег ещё не ставился, и до него игра собирается из
-исходников — см. «Запуск» ниже. Когда тег появится, готовые сборки будут на
-[странице релизов](https://github.com/BalashovDmitriy/elaction/releases):
-`elaction-vX.Y.Z-windows.zip` и `elaction-vX.Y.Z-linux.zip`. Внутри папка
-`elaction`: исполняемый файл и лицензии. Ресурсы вшиты в сам файл, рядом с ним
-ничего не нужно, доустанавливать тоже нечего.
-Godot нужен только тем, кто собирает игру из исходников.
+There have been no releases yet: the first tag has not been set, and until then the game
+is built from source — see "Running" below. When a tag appears, ready builds will be on
+the [releases page](https://github.com/BalashovDmitriy/elaction/releases):
+`elaction-vX.Y.Z-windows.zip` and `elaction-vX.Y.Z-linux.zip`. Inside is an `elaction`
+folder: the executable and the licenses. Resources are embedded in the file itself,
+nothing else is needed next to it, and there is nothing to install.
+Godot is needed only by those who build the game from source.
 
-Windows при первом запуске покажет предупреждение SmartScreen: сборка не подписана
-(«Подробнее» → «Выполнить в любом случае»). Сертификат стоит денег, а издателя
-у проекта нет — [ADR-0013](docs/adr/0013-release-and-versioning.md).
+On first launch Windows shows a SmartScreen warning: the build is not signed
+("More info" → "Run anyway"). A certificate costs money, and the project has no
+publisher — [ADR-0013](docs/adr/0013-release-and-versioning.md).
 
-Что изменилось между версиями — в [CHANGELOG.md](CHANGELOG.md).
+What changed between versions is in [CHANGELOG.md](CHANGELOG.md).
 
-## Что уже работает
+## What already works
 
-Правила игры живут отдельно от узлов сцены и переехали в 3D без правок; за время
-переезда они выросли — бой и карта здания теперь взяты из аркадного ROM. Мир
-собран из моделей паков и фактур, свет настоящий: конусы ламп с мягкими тенями, отражения в полированном
-полу, туман намёком. Актёры — модели людей на скелете; на погашенном этаже
-двери, кабину и выход держат собственные огоньки, красную дверь — своё бра,
-актёров — слабый свет камеры, который светит только на них.
+The game rules live separately from the scene nodes and moved to 3D without changes;
+during the move they grew — combat and the building map are now taken from the arcade ROM.
+The world is built from pack models and textures, the lighting is real: lamp cones with
+soft shadows, reflections in the polished floor, a hint of fog. Actors are human models on
+a skeleton; on a darkened floor the doors, the cab and the exit keep their own indicator
+lights, the red door its own sconce, and the actors a faint camera light that shines only
+on them.
 
-- Otto ходит, приседает и прыгает; из приседа не встаёт там, где не хватает места.
-- Лифт: кабина слушается изнутри, пустая ездит сама, на крыше катаются без управления.
-  Отпущенная между этажами, кабина доезжает до этажа по ходу, как в аркаде.
-  В кабине можно ходить и на ходу, а сойти на этаж — пока он рядом, как в оригинале.
-  В открытый проём шахты можно упасть насмерть; опускающаяся кабина давит того, кто
-  стоит под ней целиком, а задетого краем выталкивает к краю шахты. Очки за
-  раздавленного агента — только если он попал под кабину, в которой едет Otto.
-- Эскалаторы: посадка с площадки нажатием, во время поездки Otto неуязвим и идёт
-  по ступеням.
-- Двери: войти можно только в красную, пока документ не забран, — как в оригинале.
-  За красными документы по 500 очков — на выходе; Otto поворачивается к
-  двери и уходит вглубь проёма, створка закрывается за ним, внутри он ровно 4,7 с, коридор оттуда слышно глухо, а потерявший его агент
-  иногда ждёт у двери — и стреляет, как только Otto снова можно задеть. Пока документы
-  не собраны, шахта в подвал закрыта стальным люком; последний документ его открывает.
-- Агент не появляется из ниоткуда: дверь открывается целиком и только потом отдаёт
-  его, а он выходит из проёма шагом. Пока он в проёме, пуля идёт сквозь — это не
-  броня, а отсутствие цели, и по створке видно, что сейчас оттуда выйдут. Створка
-  закрывается, как только проём свободен; опустевшая красная дверь становится
-  обычной и тоже начинает выпускать агентов.
-- Бой: пистолет с ограничением в три пули на экране и добивания вплотную, враги-агенты
-  выходят из дверей по ходу спуска и стреляют. Удара ногой, как в 1983 году, нет:
-  вплотную к агенту выстрел становится короткой сценкой — сзади удушение или
-  свёрнутая шея, спереди серия ударов или рукоять пистолета, — а упавший на агента
-  сверху Otto напрыгивает сам. Сценка поставлена: быстрый заход, стоп-кадр на
-  ударе и разгон обратно; на ударе камера толкается и кренится, вспышка лепит
-  лица, музыка проваливается, фон на время сценки темнеет и теряет цвет. Агент
-  успевает потянуть ствол или оглянуться, на ударе с него слетает шляпа, и
-  падает он телом, отброшенный от Otto. Otto уязвим; добивание стоит 200–300 очков против 100 за выстрел. Три жизни, Game Over, а после смерти —
-  возвращение по правилам аркады: у красной двери этажа или в его точке, а
-  агенты уходят и выходят снова; первые полторы секунды Otto неуязвим.
-- **Бой — по правилам аркадного ROM.** Нашёлся аннотированный дизассемблер
-  оригинала, и числа боя взяты из кода, а не из пересказов: скорости, паузы,
-  замах, позы, выпуск. Заметки с адресами — в `docs/reference/arcade-rom.md`.
-- Агентов в здании разом три, поздно — четыре; выходят они из случайной синей
-  двери на этаже Otto, этажом выше или ниже. За Otto не гонятся — бродят и
-  стреляют, глядя на него; выстрелы Otto поднимают их на уши.
-- Агенты стреляют стоя, с колена и лёжа. Высокая пуля проходит над присевшим,
-  пуля с колена — над лежачим, а лёжа агент бьёт и присевшего: от неё спасает
-  только прыжок. Уклоняются они так же: от высокой пули — на колено, от низкой —
-  лёжа.
-- Сложность растёт от здания к зданию и со временем внутри здания; у каждого
-  агента своя злость — от неё замах перед выстрелом, пауза после и шанс
-  увернуться. В настройках — четыре уровня сложности, как переключатель автомата.
-- Кабина давит агентов — 300 очков; тревога включается через 277 с, как в ROM.
-- Лампы: на этаже их одна–три по ширине, висят под самым потолком. Сбить лампу,
-  как в оригинале, можно только из кабины, проезжая между этажами: с пола пуля
-  до неё не достаёт ни стоя, ни в прыжке. Сбитая падает, убивает агента под собой и
-  гасит свою зону насовсем. Otto в тёмной зоне агенты замечают только вплотную, за
-  дверью теряют и ходят по этажу вслепую; убийство агента в темноте на 50 очков дороже.
-- Здание на 30 этажей собирается генерацией, но по правилам карты оригинала: двери
-  на этаже — по таблице аркадного ROM (четыре на башне, до семи в середине, на
-  широком низу вдвое больше), красных дверей от пяти в первом здании до десяти,
-  и лежат они полосами, как в оригинале: в первом здании верх пуст. Этажи 11–15
-  тёмные — ламп там нет, агенты видят Otto только вплотную, а убийство дороже.
-  Каждая партия солит раскладку, и здания от партии к партии разные. Над зданием —
-  крыша, с неё начинается спуск; лифт до неё доходит, дверей и агентов на ней нет.
-- **Чем ниже, тем больше путей**, как в оригинале. Верхнюю треть обслуживает одна
-  шахта, и спуск там безальтернативен; ниже шахты пересекаются — с одной можно
-  пересесть на другую, не ища эскалатор, — и к нижнему этажу их сходится пять.
-- Эскалаторы стоят полосой там, где шахта башни кончается, и на каждом разрыве,
-  который шахты не перекрыли. В оригинале они тоже в верхней трети, а не внизу.
-  Стоят они у края этажа и спускаются к нему под 45°: к верхней площадке доходят
-  пешком, проём уходит от неё к стене. Несколько подряд — зигзагом.
-- Открытая шахта режет этаж: перейти с одной её стороны на другую можно, только пока
-  проём перекрывает собой стоящая кабина. Уехавшая кабина рвёт этаж надвое, и путь
-  приходится искать через соседние этажи.
-- Этаж бывает разделён надвое глухой стеной: сквозь неё не пройти и не выстрелить,
-  а агент за ней Otto не видит. Обойти её можно только через другой этаж.
-- Палитра раунда — правило здания, и набор идёт по кругу, как цвета в оригинале.
-  Тон раунда ложится на материалы — на фактуру стен множителем, на кладку и шахту:
-  рисунок остаётся, цвет даёт раунд. Погашенный этаж тёмен, а не чёрен: в темноте
-  агенты продолжают стрелять, и игрок обязан видеть, во что стрелять в ответ.
-- Шахта видна целиком: направляющие во всю высоту и створки на каждом этаже, который
-  она обслуживает. У полосы есть упоры сверху и снизу, а в кабине — стрелки: они
-  гаснут, когда в эту сторону ходу нет, и предел шахты больше не читается поломкой.
-  В шахте стоит свой холодный свет: он не гаснет от выстрела и не участвует в зонах
-  темноты — погашенное здание должно оставаться проходимым на глаз.
-- Не больше чем в двух шахтах здания ходит **двухэтажная кабина** — жёсткая пара ярусов
-  через этаж, как в оригинале. Войти можно в любой; возит она только между теми
-  этажами, куда попадает любой из двух, и ставится лишь туда, где спуск от этого
-  не запирается.
-- Эскалатор стоит в глубине, у задней стены: пол перед ним цельный, мимо проходят,
-  а на площадку Otto встаёт шагом вглубь. Собран из модели, построенной своим
-  скриптом в Blender: рифлёные ступени с жёлтой кромкой, обшитая ферма, стеклянные
-  балюстрады с поручнем с обеих сторон, тумбы, площадки с гребёнкой. У пролёта свой свет: мест на этаже мало, и
-  эскалатор почти всегда встаёт в стороне от ламп.
-- **Агенты ездят на лифтах.** Кабину они не вызывают — её нет ни у кого, — а входят
-  в ту, что уже стоит вровень с их этажом, и едут пассажирами: ходом кабины
-  распоряжается только Otto. Потерянный этажом выше агент теперь приезжает.
-- **Пропорции — как в 1983 году.** Размеры сверены по пикселям с кадром аркады
-  и заданы одной таблицей в пикселях кадра аркады: Otto и агенты одного роста,
-  чуть больше половины просвета этажа, дверь — 70% просвета, кабина — во весь
-  этаж, шахта — ровно в
-  шаг двери. В кадре, как в оригинале, 3.67 этажа.
-- На каждом этаже у правой стены — светящаяся табличка с номером, как в
-  оригинале: верхний этаж 30, подвал-паркинг — «P». Читается и на погашенном этаже.
-- Раунд начинается с вертолёта — своей модели: прозрачное остекление с пилотом
-  в шлеме, сдвижная дверь, полозья, киль, несущий и хвостовой винты с
-  размытием на вращении. В первом здании партии — сценка целиком: вертолёт
-  подлетает, откатывает дверь, Otto выглядывает в проём и садится на порог,
-  бухта троса падает и качается в потоке от винта, Otto соскальзывает на трос,
-  съезжает на руках, тормозит у крыши и приземляется с приседом; камера
-  наезжает и ведёт его. Потом лебёдка выбирает трос, дверь задвигается, пилот
-  кивает, и вертолёт уходит с креном. В следующих зданиях — короче: вертолёт
-  уже висит с открытой дверью. Сценку можно пропустить прыжком, выстрелом или
-  паузой. Над верхней шахтой — машинное отделение.
-- Силуэт задаётся порогом: до двадцатого этажа узкая башня, которая влезает в кадр
-  целиком, с двадцатого — стилобат вдвое шире экрана, по которому надо ходить.
-- Игровой цикл: собрал документы, вышел — бонус и следующее здание, где агенты злее.
-  Провозился — сирена, и до конца здания её не снять.
-- Свет: зона светла, пока над ней висит лампа — конус вниз с мягкой тенью и слабая
-  заливка вокруг. Сбили — зона падает до общего тона здания навсегда. Камера смотрит
-  чуть сверху, и в полированном полу видны отражения; торцы плит, плинтус и пилястры
-  дают свету рёбра. Выстрел несёт вспышку.
-- Актёры: люди из пака Quaternius (CC0) — Otto в светлом костюме, агенты в тёмных
-  костюмах, федорах и тёмных очках, у всех пистолет в руке. Стойка, ходьба,
-  выстрел, смерть, толчок и приземление — клипы Universal Animation Library
-  (Quaternius, CC0), перенесённые на скелет пака, и удары и отброс для добиваний
-  из её второй части; присед на корточках, лёжа, захват, удушение и свёрнутая шея
-  — позы кодом. Переход между позами короткий
-  и кончается в срок; разворот — поворот тела, и пока тело поворачивается, актёр
-  стоит. После прыжка — короткое восстановление. На погашенном этаже фигуру
-  высвечивает слабый холодный свет камеры — только её, не этаж.
-- Здание заканчивается в подземном паркинге: Otto сам подходит к своей машине у ворот
-  и садится в открытую дверь — у каждой машины кузов прорезан по проёму, в нём
-  салон под свою машину, под крышей горит плафон; загораются фары, поднимаются
-  рольворота, и машина уезжает по плавному пандусу на улицу. Там поток машин в
-  две полосы, и дорожная ситуация своя в каждом здании: на свободной улице машина
-  Otto с правым поворотником съезжает в полосу с ходу, в плотном потоке встаёт у
-  края мостовой и ждёт просвета; кадр идёт за ней, и свет фар ложится на дорогу до затемнения. Бонус досчитывается поверх сцены, дальше затемнение и
-  следующее здание. В первом здании — красное купе, как в 1983 году, дальше модель
-  и цвет по жребию здания (Cars Pack, CC0).
-- Пуля — тонкий трассер, втрое быстрее аркадной; у ствола вспышка и дымок, на
-  стене искры, пыль и след. Перед выстрелом агент вскидывает пистолет, и от
-  ствола идёт красный луч прицела на высоте будущей пули; рука наводит дуло
-  ровно туда, откуда пуля вылетит. Убитые — агенты и Otto — падают телами на
-  суставах от толчка пули, в ту часть тела, куда она попала, и лежат до конца
-  здания: ложатся друг на друга, едут на полу кабины, падают в шахту. Кабина,
-  проходя днищем, срезает то, что под ней, с брызгами и пятном крови, а тело
-  поперёк порога тронувшейся кабины рвётся по её стенке; с выключенной кровью
-  тело просто исчезает. Физика — Jolt.
-- Добивание сверху — приземлиться на агента или вплотную к нему, с прыжка или с
-  этажа выше. Последняя жизнь уходит замедлением: камера наезжает на Otto, и
-  только потом — конец партии, пункты которого первые полторы секунды не
-  нажимаются.
-- Улица у выезда — дома из фасадов Quaternius Downtown с витринами, маркизами
-  и пожарными лестницами: днём под солнцем, неон и фонарь погашены, ночью горят
-  окна, неон и фонарь. Машин днём больше, чем ночью, фары днём горят только в
-  непогоду. По тротуару идут прохожие — мужчины и женщины из паков горожан
-  Quaternius, все разные и одетые по погоде: ясным днём налегке, в прохладу и
-  туман в куртках, в дождь в плащах и с зонтом в руке, в снег в пальто, шапках и
-  шарфах.
-- Снег: хлопья комками со сносом ветра, покров на крыше, отливах, технике,
-  тротуаре, маркизах и машинах, следы Otto и агентов на крыше и колеи на
-  мостовой, город в снегопад. Заснеженная крыша скользкая: на остановке и
-  развороте ноги проскальзывают. Свой звук — метель, хруст шагов, шины по каше.
-- Дождь светом: капли видны там, где на них падает свет лампы, шахты и неона,
-  гаснут о крышу, технику, людей, машины и вертолёт, разбиваются брызгами, по
-  лужам идут круги; над крышей водяная дымка. Поток от винта вертолёта
-  разносит дождь и снег, а в снег поднимает с крыши снежную пыль. Город позади — с этажами, окнами за шторами и
-  вывесками, и едет за камерой ровно.
-- Документов в здании от пяти до десяти, жребием. Разбивается тот, кто упал
-  больше чем на этаж — на пол, крышу кабины или дно шахты.
-- Звук: музыка Kevin MacLeod своя у каждого типа здания — свинг и лаунж у
-  отеля, холодный синти-нуар и лифтовая музыка у офиса, блюз и фанк у жилого
-  дома; свой набор на ночь, утро, день и вечер и своя тревога у типа, трек — по
-  жребию здания, с середины здания вниз тема сменяется;
-  свой трек у меню и конца партии; тревога входит сиреной и наплывом, за красной
-  дверью и на паузе музыка глуше. Эффекты и фон — Kenney и freesound (CC0,
-  CC-BY): шаги Otto и агентов по ковру, камню и металлу, прыжок и приземление,
-  выстрел агента своим звуком на его месте, рикошет пули о стену и металл, тело
-  оземь, давка кабиной, кабина трогается и встаёт, гул кабины и шахты, дверь
-  вертолёта и лебёдка, дверца машины и поворотник, проезжающие машины и гудки,
-  неон вывески с треском, бонус и рекорд, лязг решётки грузового лифта; у
-  залов свой фон — плеск бассейна, гул серверной и котельной, барабаны
-  прачечной, говор ресторана и бара; на крыше и у выхода улица своего
-  времени суток и дождь, на этажах дождь за стеклом, гром за молнией. В
-  замедлении добивания и последней смерти звуки мира идут ниже тоном.
-- Демо-режим, как у автомата: главное меню, простоявшее 45 секунд без нажатий,
-  уступает место игре, которую ведёт бот, — около 30 секунд с крыши с вертолётом,
-  из середины или снизу здания, по очереди. Бот отстреливается, уходит от пуль и
-  добивает агентов вплотную. Любая клавиша, кнопка геймпада или мыши возвращает в
-  меню; рекордов демо не пишет.
-- Интерфейс: главное меню, пауза, настройки (три громкости, язык, сложность,
-  качество графики, режим окна, разрешение, предел кадров,
-  вертикальная синхронизация, кровь, счётчик кадров), таблица
-  рекордов, экран управления с переназначением клавиш и страница авторов. Курсор
-  мыши виден только в меню. Первое здание партии
-  открывается из чёрного: под ним один раз греются шейдеры редких эффектов, и
-  первый выстрел не дёргает кадр. За главным меню — живой ночной город, название
-  игры горит неоновой вывеской; на паузе за меню — замершая игра в расфокусе.
-  Пункты — неоновые плашки, значения листаются влево-вправо, переходы
-  анимированы и озвучены. Два языка — русский и английский, по локали
-  системы. HUD — неоновые плашки в цвет вывески здания: очки, папки документов,
-  жизни силуэтами, имя здания и этаж, где Otto, раунд и тревога. Весь текст —
-  шрифтом Exo 2.
-- Дополнительная жизнь за 10 000 очков — порог из мануала Taito.
-- Время суток — у каждого здания своё: утро, день, вечер или ночь, ночь чаще
-  других. Темнота бывает только ночью: днём сбитая лампа падает, но этаж
-  остаётся светлым, и тёмных этажей нет. У утра, дня и вечера своя музыка и
-  свой фон улицы: утром птицы, днём плотный гул; неоновая вывеска здания
-  утром и днём погашена, в комнате за дверью днём светит солнце из окна.
-- За зданием — город: кирпичные, каменные и стеклянные дома с фасадами из
-  модулей Quaternius Downtown, в несколько рядов по глубине, дальние сдвигаются
-  медленнее ближних. Солнце, а ночью луна кладут на фасады объём, в стёклах
-  отражается небо — фотопанорама Poly Haven под своё время и погоду. Вечером и
-  ночью горят окна — гаснут и загораются, как в живом городе, — неоновые вывески,
-  мигающие огни на крышах и зарево улиц. Погода раунда — ясно, туман с
-  плывущими полосами, дождь или снег; вечером и ночью с грозой: вспышка зажигает
-  стёкла города и на миг высветляет коридор. Обстановка — декор и в бою не
-  участвует.
-  Крыша поднимается к шахте ступенями, как в оригинале.
-- Здание — отель, офисная башня или жилой дом, по жребию: неоновая вывеска
-  столбиком на углу фасада (EMPIRE HOTEL, KRONOS, LENOX APTS…), и коридоры у них
-  разные. У отеля — обои, ковровая дорожка, деревянные двери с филёнками, бра на
-  мраморных пилястрах, «Не беспокоить» на ручках и газеты у порога; у офиса —
-  штукатурка, ковровая плитка, двери с матовым стеклом, таблички отделов, короба
-  ламп дневного света; у жилого дома — плитка шахматкой, облупленная краска и
-  глазурованный кирпич, стальные двери квартир с глазком и ковриком, плафоны-
-  тарелки, граффити и пятна на стенах, мигающие лампы, почтовые ящики, коляски
-  и батареи, а из-за дверей изредка слышно телевизор, собаку или ссору соседей.
-  У стен — мебель из паков (диваны, скамьи, комоды с лампами, часы, кулеры,
-  картотеки, копиры, кресла для посетителей, растения), на стенах — картины,
-  доски, часы. За открытой дверью — номер отеля, кабинет или квартира: кровать с
-  тумбой и шторами, стол с креслом, кухня с плитой и холодильником или гостиная
-  с диваном и телевизором, мерцающим в темноте; окно на город, свой свет.
-- У каждого типа свой мир: отель — тёплый янтарный нуар с люстрами,
-  деревянными панелями, нишами с подсветкой и зеркалами; офис — холодный
-  бело-голубой, стена коридора стеклянная, и за ней виден open space с
-  кубиклами и светящимися мониторами; жилой дом — тусклый натриевый свет,
-  трубы и щитки на стенах, окна на пожарную лестницу, голый кирпич, голые
-  лампочки. Палитра раунда меняется в гамме своего типа, темнота везде
-  одинаково тёмная.
-- Нижние и тёмные этажи здания — особые: за колоннами, стеклом или сеткой
-  вместо стены коридора — зал на всю глубину. У отеля лобби со стойкой
-  регистрации, ресторан, бальный зал с роялем, бассейн, бар, кухня, прачечная и
-  котельная; у офиса лобби с турникетами, столовая, спортзал, переговорные,
-  серверные с мигающими стойками и архив; у жилого дома почтовые ящики,
-  кладовые-клетки, общая комната с пинг-понгом, мастерская и котельная.
-- Снаружи здание тоже своего типа: над крышей корона — ступенчатая ар-деко со
-  шпилем и неоном у отеля, стеклянная вершина со срезом и мачтой у офиса,
-  деревянный бак на опорах у жилого дома. С этажей башни видны её торцы и
-  уступ: у отеля флаги и терраса с зонтиками и гирляндой, у офиса ламели и
-  зенитные фонари, у жилого дома пожарная лестница и бельё на крыше. В
-  паркинге — таблички VALET, места RESERVED со шлагбаумом или граффити и
-  мусорный бак; на улице у выезда — козырёк с ковром и парковщиком, стеклянный
-  тамбур или крыльцо; машина у выхода — по вкусу здания.
-- Лифт своего типа: в отеле латунь, дерево и циферблат со стрелкой над дверью;
-  в офисе нержавейка и цифры; в жилом доме грузовая кабина с решёткой-гармошкой
-  — она закрыта на ходу и складывается, когда из кабины можно выйти.
-- Агенты одеты по зданию: в отеле — в федорах, в офисе — в деловых костюмах с
-  галстуком, в жилом доме — в куртках и кепках. Механика у всех одна.
-- Шахта — стальной столб сквозь здание: лист с болтами, распорки, хромированный
-  портал. Над порталом табло показывает этаж, где сейчас кабина, и стрелку хода,
-  рядом кнопки вызова — горит та, в сторону которой кабина едет к этажу.
-- На крыше — водонапорная башня, тарелка, кондиционеры, солнечная панель, выход
-  на крышу, антенна с мигающим огнём.
-- Лифт как на референсе: кабина со стенками, светильником и пультом, тросы и
-  противовес, который ходит навстречу. Двери с филёнками
-  и ручками, лампы-подвесы, ковровая дорожка вдоль коридора. Нижний этаж — подземный
-  паркинг: колонны, трубы и светильники под потолком, чужие машины на местах. Раунды различаются цветом этажей. Пуля выбивает из лампы искры, а
-  попадание в человека — кровь (её можно выключить в настройках).
-- Графика: четыре уровня качества — от низкого для слабых машин до «Ультра» с
-  отражённым светом и ореолами ламп в воздухе; сглаживание в каждом уровне. На
-  первом запуске уровень выбирается сам, по замеру кадра. Тон кадра — свой у
-  каждого времени суток; ночью — нуар: холодные тени, тёплые лампы.
-- Любое разрешение монитора до 4K: окно, окно без рамки или полный экран в
-  родном разрешении. В полном экране и без рамки выбранное разрешение — это
-  разрешение сцены: меньше родного — рисуется меньше и растягивается FSR, а
-  интерфейс остаётся чётким. Мир метрический:
-  этаж 3.6 м, Otto 1.68.
-  Глубина кадра — комната за задней стеной коридора, видимая в проёмы дверей; всё
-  игровое стоит в одной плоскости, и «дотянулся или нет» решают правила, а не
-  расстановка мешей.
+- Otto walks, crouches and jumps; he does not stand up from a crouch where there is no
+  room.
+- Elevator: the cab obeys from inside, an empty one runs on its own, on the roof they ride
+  without control. Released between floors, the cab carries on to the next floor in its
+  direction, as in the arcade. Otto can walk inside the cab while it moves, and step off
+  onto a floor while it is close, as in the original. One can fall to death into an open
+  shaft opening; a descending cab crushes anyone standing fully under it, and pushes
+  someone caught by its edge to the edge of the shaft. Points for a crushed agent — only
+  if he was caught by the cab Otto rides in.
+- Escalators: boarding from the landing with a press, during the ride Otto is invulnerable
+  and walks along the steps.
+- Doors: only a red door can be entered, while its document has not been taken — as in
+  the original. Documents behind red doors are worth 500 points each — on exit; Otto turns
+  to the door and goes deep into the doorway, the door leaf closes behind him, he stays
+  inside exactly 4.7 s, the corridor is heard muffled from there, and an agent who lost him
+  sometimes waits at the door — and shoots as soon as Otto can be hit again. Until the
+  documents are collected, the shaft to the basement is closed by a steel hatch; the last
+  document opens it.
+- An agent does not appear out of nowhere: the door opens fully and only then releases
+  him, and he steps out of the doorway. While he is in the doorway, a bullet passes
+  through — this is not armour but the absence of a target, and the door leaf shows that
+  someone is about to come out. The leaf closes as soon as the doorway is free; an emptied
+  red door becomes an ordinary one and starts releasing agents too.
+- Combat: a pistol limited to three bullets on screen and point-blank takedowns; enemy
+  agents come out of doors along the way down and shoot. There is no kick as in 1983:
+  point-blank to an agent the shot becomes a short scene — from behind a chokehold or a
+  neck snap, from the front a series of punches or a pistol-grip blow — and Otto, falling
+  onto an agent from above, jumps on him by himself. The scene is staged: a quick approach,
+  a freeze-frame on the hit and a ramp back; on the hit the camera shoves and tilts, a
+  flash sculpts the faces, the music drops away, the background darkens and loses colour
+  for the scene. The agent manages to reach for his gun or glance back, his hat flies off
+  on the hit, and he falls as a body, thrown away from Otto. Otto is vulnerable; a takedown
+  is worth 200–300 points against 100 for a shot. Three lives, Game Over, and after a
+  death — return by the arcade rules: at the floor's red door or at its point, while the
+  agents leave and come out again; for the first second and a half Otto is invulnerable.
+- **Combat follows the rules of the arcade ROM.** An annotated disassembly of the original
+  turned up, and the combat numbers are taken from the code rather than from retellings:
+  speeds, pauses, wind-up, poses, release. Notes with addresses are in
+  `docs/reference/arcade-rom.md`.
+- There are three agents in the building at once, later four; they come out of a random
+  blue door on Otto's floor, a floor above or below. They do not chase Otto — they wander
+  and shoot while looking at him; Otto's shots put them on alert.
+- Agents shoot standing, kneeling and lying down. A high bullet passes over a crouching
+  Otto, a kneeling bullet passes over a lying one, and a lying agent hits a crouching Otto
+  too: only a jump saves from it. They dodge the same way: from a high bullet — onto a knee,
+  from a low one — lying down.
+- Difficulty grows from building to building and over time within a building; each agent
+  has his own anger — it sets the wind-up before a shot, the pause after and the
+  chance to dodge. Settings have four difficulty levels, like the cabinet's switch.
+- The cab crushes agents — 300 points; the alarm turns on after 277 s, as in the ROM.
+- Lamps: one to three per floor across its width, hanging right under the ceiling. As in
+  the original, a lamp can be shot down only from the cab, riding between floors: from the
+  floor a bullet does not reach it, neither standing nor jumping. A downed lamp falls,
+  kills the agent under it and darkens its zone for good. Agents notice Otto in a dark
+  zone only point-blank, lose him behind a door and wander the floor blind; killing an
+  agent in the dark is worth 50 points more.
+- The 30-floor building is generated, but by the rules of the original's map: the doors on
+  a floor follow the arcade ROM table (four on the tower, up to seven in the middle, twice
+  as many on the wide lower part), red doors range from five in the first building to ten,
+  and they lie in bands, as in the original: in the first building the top is empty.
+  Floors 11–15 are dark — there are no lamps, agents see Otto only point-blank, and kills
+  are worth more. Each session salts the layout, and buildings differ from session to
+  session. Above the building is the roof, where the descent starts; the elevator reaches
+  it, there are no doors or agents on it.
+- **The lower, the more paths**, as in the original. The upper third is served by one
+  shaft, and the descent there has no alternative; lower down the shafts overlap — one can
+  change from one to another without looking for an escalator — and five of them converge
+  on the bottom floor.
+- Escalators stand in a band where the tower's shaft ends, and at every gap the shafts did
+  not cover. In the original they are also in the upper third, not at the bottom.
+  They stand at the edge of the floor and descend to it at 45°: the top landing is reached
+  on foot, the opening runs from it toward the wall. Several in a row — in a zigzag.
+- An open shaft cuts a floor: one can cross from one side of it to the other only while
+  a standing cab covers the opening. A cab that has left tears the floor in two, and the
+  way has to be found through neighbouring floors.
+- A floor may be split in two by a solid wall: one cannot walk or shoot through it, and an
+  agent behind it does not see Otto. It can be bypassed only through another floor.
+- The round palette is a building rule, and the set cycles, like the colours in the
+  original. The round's tone lies on the materials — as a multiplier on the wall texture,
+  on the brickwork and the shaft: the pattern stays, the colour comes from the round.
+  A darkened floor is dark, not black: in the dark agents keep shooting, and the player
+  must see what to shoot back at.
+- The shaft is visible in full: guide rails along its whole height and doors on every floor
+  it serves. The band has stops at the top and bottom, and the cab has arrows: they go out
+  when there is no way in that direction, and the shaft's limit no longer reads as a
+  breakdown. The shaft has its own cold light: it does not go out from a shot and does not
+  take part in the darkness zones — a darkened building must stay passable by eye.
+- No more than two shafts in a building carry a **double-deck cab** — a rigid pair of decks
+  one floor apart, as in the original. Either deck can be entered; it carries only between
+  the floors that either of the two reaches, and is placed only where it does not lock the
+  descent.
+- The escalator stands deep inside, at the back wall: the floor in front of it is solid,
+  people walk past, and Otto steps onto the landing by stepping inward. It is built from a
+  model made by its own script in Blender: ribbed steps with a yellow edge, a clad truss,
+  glass balustrades with a handrail on both sides, newels, landings with a comb plate. The
+  span has its own light: there is little room on a floor, and the escalator almost always
+  stands away from the lamps.
+- **Agents ride elevators.** They do not call the cab — nobody has that — but enter one
+  that already stands level with their floor and ride as passengers: only Otto controls the
+  cab's travel. An agent lost a floor above now comes down by cab.
+- **Proportions as in 1983.** Sizes are checked pixel by pixel against an arcade frame and
+  set by one table in arcade frame pixels: Otto and the agents are the same height,
+  slightly more than half the floor's clearance, a door is 70% of the clearance, the cab
+  spans the full floor, the shaft is exactly one door step. As in the original, the frame
+  shows 3.67 floors.
+- On every floor at the right wall there is a glowing sign with the number, as in the
+  original: the top floor is 30, the basement garage is "P". It is readable on a darkened
+  floor too.
+- A round starts with a helicopter — its own model: transparent glazing with a pilot in a
+  helmet, a sliding door, skids, a tail fin, main and tail rotors with motion blur when
+  spinning. In the first building of a session — the full scene: the helicopter flies in,
+  slides the door open, Otto looks out of the doorway and sits on the sill, a coil of rope
+  drops and swings in the rotor downwash, Otto slides onto the rope, goes down hand over
+  hand, brakes at the roof and lands in a crouch; the camera zooms in and follows him.
+  Then the winch reels in the rope, the door slides shut, the pilot nods, and the
+  helicopter leaves banking. In the following buildings — shorter: the helicopter is
+  already hovering with the door open. The scene can be skipped with a jump, a shot or
+  pause. Above the top shaft is the machine room.
+- The silhouette is set by a threshold: up to the twentieth floor a narrow tower that fits
+  in the frame entirely, from the twentieth — a podium twice the screen's width, which has
+  to be walked.
+- Game loop: collect the documents, get out — a bonus and the next building, where agents
+  are angrier. Dawdle — the siren, and it cannot be removed until the end of the building.
+- Lighting: a zone is lit while a lamp hangs over it — a cone downward with a soft shadow
+  and a faint fill around. Shot down — the zone drops to the building's overall tone
+  forever. The camera looks slightly from above, and reflections show in the polished
+  floor; slab ends, the skirting and pilasters give the light edges. A shot carries a
+  flash.
+- Actors: people from the Quaternius pack (CC0) — Otto in a light suit, agents in dark
+  suits, fedoras and dark glasses, everyone with a pistol in hand. Idle, walk, shot, death,
+  hit reaction and landing are clips from the Universal Animation Library (Quaternius,
+  CC0), retargeted to the pack's skeleton, and the punches and knockback for takedowns come
+  from its second part; squatting crouch, lying, grab, chokehold and neck snap are poses in
+  code. The transition between poses is short and ends on time; a turn is a rotation of
+  the body, and while the body turns, the actor stands. After a jump — a short recovery.
+  On a darkened floor the figure is picked out by a faint cold camera light — only the
+  figure, not the floor.
+- The building ends in an underground garage: Otto walks up to his car at the gate by
+  himself and gets in through the open door — every car's body is cut along the opening,
+  inside is an interior made for that car, a dome light glows under the roof; the
+  headlights come on, the roller gate rises, and the car drives up a smooth ramp onto the
+  street. There, traffic runs in two lanes, and the road situation is different in each
+  building: on a free street Otto's car, with the right indicator on, pulls into the lane
+  without stopping; in dense traffic it stops at the kerb and waits for a gap; the frame
+  follows it, and the headlights' light lies on the road until the fade-out. The bonus is
+  counted on top of the scene, then a fade-out and the next building. In the first
+  building — a red coupe, as in 1983; after that the model and colour come from the
+  building's draw (Cars Pack, CC0).
+- A bullet is a thin tracer, three times faster than the arcade one; at the muzzle a flash
+  and a puff of smoke, on the wall sparks, dust and a mark. Before a shot the agent raises
+  his pistol, and a red aiming beam runs from the muzzle at the height of the coming
+  bullet; the arm points the barrel exactly where the bullet will come from. The killed —
+  agents and Otto — fall as jointed bodies from the bullet's impact, at the body part it
+  hit, and lie until the end of the building: they pile on each other, ride on the cab
+  floor, fall into the shaft. A cab passing with its floor slices what is under it, with
+  spray and a blood stain, and a body lying across the sill of a cab that has started
+  moving tears along its wall; with blood turned off the body simply disappears.
+  Physics — Jolt.
+- Takedown from above — land on an agent or right next to him, from a jump or from the
+  floor above. The last life goes out in slow motion: the camera zooms in on Otto, and only
+  then — the end of the session, whose menu items cannot be pressed for the first second
+  and a half.
+- The street at the exit — buildings from Quaternius Downtown facades with shop windows,
+  awnings and fire escapes: by day in the sun, neon and street lamp off, at night windows,
+  neon and street lamp lit. There are more cars by day than at night, by day headlights are
+  on only in bad weather. Pedestrians walk along the sidewalk — men and women from the
+  Quaternius townsfolk packs, all different and dressed for the weather: on a clear day
+  lightly, in cool weather and fog in jackets, in rain in raincoats and with an umbrella in
+  hand, in snow in coats, hats and scarves.
+- Snow: flakes in clumps drifting with the wind, cover on the roof, window sills,
+  equipment, sidewalk, awnings and cars, footprints of Otto and agents on the roof and
+  tyre tracks on the road, the city in a snowfall. A snowy roof is slippery: on stopping
+  and turning the feet slip. Its own sound — blizzard, crunching steps, tyres on slush.
+- Rain by light: drops are visible where the light of a lamp, a shaft or neon falls on
+  them, they end on the roof, equipment, people, cars and the helicopter, break into
+  splashes, rings spread over puddles; a water haze hangs over the roof. The helicopter's
+  rotor downwash scatters rain and snow, and in snow raises snow dust off the roof. The city
+  behind — with floors, curtained windows and signs, and it moves smoothly with the camera.
+- There are five to ten documents in a building, by draw. Anyone who falls more than a
+  floor — onto the floor, a cab roof or the bottom of the shaft — is killed.
+- Sound: Kevin MacLeod's music is different for each building kind — swing and lounge for
+  the hotel, cold synth noir and elevator music for the office, blues and funk for the
+  residential building; its own set for night, morning, day and evening and its own alarm
+  per kind, the track comes from the building's draw, from the middle of the building down
+  the theme changes; the menu and the end of a session have their own tracks; the alarm
+  comes in with a siren and a swell, behind a red door and on pause the music is muffled.
+  Effects and ambience — Kenney and freesound (CC0, CC-BY): Otto's and agents' steps on
+  carpet, stone and metal, jump and landing, an agent's shot with its own sound at his
+  position, bullet ricochet off wall and metal, a body hitting the ground, cab crush, the
+  cab starting and stopping, the hum of the cab and the shaft, the helicopter door and the
+  winch, a car door and the indicator, passing cars and horns, the neon sign crackling,
+  bonus and high score, the clang of the freight elevator's gate; halls have their own
+  ambience — splashing of the pool, hum of the server room and the boiler room, laundry
+  drums, the chatter of the restaurant and the bar; on the roof and at the exit the street
+  of its time of day and the rain, on floors rain behind the glass, thunder after
+  lightning. In the slow motion of a takedown and of the last death, world sounds go lower
+  in pitch.
+- Demo mode, as on the cabinet: the main menu, left for 45 seconds without input, gives
+  way to a game driven by a bot — about 30 seconds from the roof with the helicopter, from
+  the middle or from the bottom of the building, in turn. The bot shoots back, dodges
+  bullets and takes agents down point-blank. Any key, gamepad button or mouse button
+  returns to the menu; the demo does not record high scores.
+- Interface: main menu, pause, settings (three volumes, language, difficulty, graphics
+  quality, window mode, resolution, frame limit, vertical sync, blood, frame counter),
+  high-score table, controls screen with key rebinding and the credits page. The mouse
+  cursor is visible only in menus. The first building of a session opens from black: under
+  it the shaders of rare effects warm up once, and the first shot does not stutter the
+  frame. Behind the main menu is a living night city, the game's title glows as a neon
+  sign; on pause, behind the menu, is the frozen game out of focus. Items are neon plates,
+  values scroll left-right, transitions are animated and have sound. Two languages —
+  Russian and English, by the system locale. HUD — neon plates in the colour of the
+  building's sign: score, document folders, lives as silhouettes, the building's name and
+  the floor where Otto is, the round and the alarm. All text is in the Exo 2 font.
+- An extra life at 10,000 points — the threshold from the Taito manual.
+- Time of day is each building's own: morning, day, evening or night, night more often
+  than the others. Darkness happens only at night: by day a downed lamp falls, but the
+  floor stays lit, and there are no dark floors. Morning, day and evening have their own
+  music and their own street ambience: in the morning birds, by day a dense hum; the
+  building's neon sign is off in the morning and by day, in the room behind a door the sun
+  shines through the window by day.
+- Behind the building is the city: brick, stone and glass buildings with facades from
+  Quaternius Downtown modules, in several rows in depth, the far ones shift slower than the
+  near ones. The sun, and at night the moon, give the facades volume, the glass reflects
+  the sky — a Poly Haven photo panorama matching the time and weather. In the evening and
+  at night windows glow — going out and lighting up as in a living city — neon signs,
+  blinking lights on the roofs and the glow of the streets. Round weather — clear, fog with
+  drifting bands, rain or snow; in the evening and at night with a thunderstorm: a flash
+  lights up the city's glass and brightens the corridor for an instant. The dressing is
+  decor and takes no part in combat.
+  The roof rises to the shaft in steps, as in the original.
+- The building is a hotel, an office tower or a residential building, by draw: a vertical
+  neon sign on the corner of the facade (EMPIRE HOTEL, KRONOS, LENOX APTS…), and their
+  corridors differ. The hotel has wallpaper, a carpet runner, wooden panelled doors,
+  sconces on marble pilasters, "Do not disturb" on the handles and newspapers at the
+  doorstep; the office has plaster, carpet tiles, doors with frosted glass, department
+  signs, fluorescent light boxes; the residential building has checkerboard tiles, peeling
+  paint and glazed brick, steel apartment doors with a peephole and a doormat, saucer
+  ceiling lights, graffiti and stains on the walls, flickering lamps, mailboxes, strollers
+  and radiators, and from behind the doors one occasionally hears a TV, a dog or neighbours
+  arguing. Along the walls is furniture from packs (sofas, benches, dressers with lamps,
+  clocks, water coolers, filing cabinets, copiers, visitor chairs, plants), on the walls —
+  paintings, boards, clocks. Behind an open door is a hotel room, an office or an
+  apartment: a bed with a nightstand and curtains, a desk with a chair, a kitchen with a
+  stove and a fridge, or a living room with a sofa and a TV flickering in the dark; a
+  window onto the city, its own light.
+- Each kind has its own world: the hotel — warm amber noir with chandeliers, wooden panels,
+  lit niches and mirrors; the office — cold white-blue, the corridor wall is glass, and
+  behind it an open space with cubicles and glowing monitors is visible; the residential
+  building — dim sodium light, pipes and panels on the walls, windows onto the fire escape,
+  bare brick, bare bulbs. The round palette varies within its kind's range, darkness is
+  equally dark everywhere.
+- The building's lower and dark floors are special: behind columns, glass or mesh instead
+  of the corridor wall is a hall of full depth. The hotel has a lobby with a reception
+  desk, a restaurant, a ballroom with a grand piano, a pool, a bar, a kitchen, a laundry
+  and a boiler room; the office has a lobby with turnstiles, a canteen, a gym, meeting
+  rooms, server rooms with blinking racks and an archive; the residential building has
+  mailboxes, storage cages, a common room with ping-pong, a workshop and a boiler room.
+- Outside the building is also of its kind: above the roof is a crown — a stepped art deco
+  one with a spire and neon on the hotel, a glass top with a slanted cut and a mast on the
+  office, a wooden water tank on legs on the residential building. From the tower's floors
+  its end walls and setback ledge are visible: the hotel has flags and a terrace with
+  umbrellas and a string of lights, the office has louvres and skylights, the residential
+  building has a fire escape and laundry on the roof. In the garage — VALET signs,
+  RESERVED spots with a barrier or graffiti and a dumpster; on the street at the exit — a
+  canopy with a carpet and a valet, a glass vestibule or a stoop; the car at the exit
+  matches the building's taste.
+- The elevator of its kind: in the hotel brass, wood and a dial with a needle above the
+  door; in the office stainless steel and digits; in the residential building a freight cab
+  with a folding gate — it is closed while moving and folds open when one can step out of
+  the cab.
+- Agents are dressed for the building: in the hotel in fedoras, in the office in business
+  suits with a tie, in the residential building in jackets and caps. The mechanics are the
+  same for all.
+- The shaft is a steel column through the building: bolted sheet, braces, a chrome portal.
+  Above the portal an indicator board shows the floor where the cab is now and the travel
+  arrow, next to it the call buttons — the one in the direction the cab is travelling
+  toward the floor is lit.
+- On the roof — a water tower, a dish, air conditioners, a solar panel, a roof exit, an
+  antenna with a blinking light.
+- The elevator as in the reference: a cab with walls, a light and a control panel, ropes
+  and a counterweight that moves the opposite way. Panelled doors with handles, pendant
+  lamps, a carpet runner along the corridor. The bottom floor is an underground garage:
+  columns, pipes and lights under the ceiling, other people's cars in the spots. Rounds
+  differ in the colour of the floors. A bullet knocks sparks out of a lamp, and a hit on a
+  person draws blood (it can be turned off in the settings).
+- Graphics: four quality levels — from low for weak machines to "Ultra" with bounced light
+  and lamp halos in the air; anti-aliasing at every level. On first launch the level is
+  chosen automatically, by a frame measurement. The frame's tone is specific to each time
+  of day; at night — noir: cold shadows, warm lamps.
+- Any monitor resolution up to 4K: window, borderless window or fullscreen at native
+  resolution. In fullscreen and borderless the chosen resolution is the scene resolution:
+  below native — less is rendered and upscaled by FSR, while the interface stays sharp.
+  The world is metric: a floor is 3.6 m, Otto 1.68.
+  The depth of the frame is the room behind the corridor's back wall, seen through the
+  doorways; everything gameplay-related stands in one plane, and "reached or not" is
+  decided by the rules, not by mesh placement.
 
-## Дорожная карта
+## Roadmap
 
-Весь план работ — в [`docs/EPIC.md`](docs/EPIC.md). Архитектурные решения и их причины —
-в [`docs/adr/`](docs/adr/).
+The whole work plan is in [`docs/EPIC.md`](docs/EPIC.md). Architectural decisions and
+their reasons are in [`docs/adr/`](docs/adr/).
 
-## Запуск
+## Running
 
-### Что нужно поставить
+### What to install
 
-- [Godot 4.7.2](https://godotengine.org/download) — на Windows проще через winget:
+- [Godot 4.7.2](https://godotengine.org/download) — on Windows it is easier via winget:
 
   ```powershell
   winget install --id GodotEngine.GodotEngine
   ```
 
-- Python 3.12 или новее — для линтеров и хуков.
+- Python 3.12 or newer — for linters and hooks.
 
-Играть, проходить проверки и собирать релиз можно только с этими двумя: модели,
-фактуры, звук и иконка лежат в репозитории готовыми ([ADR-0022](docs/adr/0022-actors-rig.md)).
-Ниже — то, что нужно только для их **пересборки**:
+Playing, passing the checks and building a release need only these two: models, textures,
+sound and the icon are in the repository ready-made ([ADR-0022](docs/adr/0022-actors-rig.md)).
+Below is what is needed only to **rebuild** them:
 
-- [Blender 5.2.1](https://www.blender.org/download/) — модели актёров:
+- [Blender 5.2.1](https://www.blender.org/download/) — actor models:
 
   ```powershell
   winget install --id BlenderFoundation.Blender
   ```
 
-- Pillow, numpy и soundfile — сборка звука и генератор иконки; Pillow нужен и
-  сборке фактур `tools/build_textures.py`, и `tools/compare_original.py`,
-  сравнению кадра вехи с оригиналом:
+- Pillow, numpy and soundfile — the sound build and the icon generator; Pillow is also
+  needed by the texture build `tools/build_textures.py` and by
+  `tools/compare_original.py`, which compares a milestone shot with the original:
 
   ```powershell
   .venv/Scripts/pip install -r requirements-assets.txt
   ```
 
-### Настройка окружения
+### Environment setup
 
 ```powershell
 python -m venv .venv
@@ -364,196 +387,196 @@ python -m venv .venv
 .venv/Scripts/pre-commit install --hook-type pre-push
 ```
 
-### Запустить игру
+### Run the game
 
 ```powershell
 godot --path .
 ```
 
-### Открыть в редакторе
+### Open in the editor
 
 ```powershell
 godot -e --path .
 ```
 
-## Управление
+## Controls
 
-| Действие | Клавиатура | Геймпад |
+| Action | Keyboard | Gamepad |
 |---|---|---|
-| Движение | Стрелки | Крестовина, левый стик |
-| Присед | Вниз | Крестовина или стик вниз |
-| Прыжок | Пробел | A |
-| Выстрел, вплотную — добивание | X | X |
-| Пауза | Esc | Start |
-| Снимок экрана | F12 | — |
+| Move | Arrows | D-pad, left stick |
+| Crouch | Down | D-pad or stick down |
+| Jump | Space | A |
+| Shoot, point-blank — takedown | X | X |
+| Pause | Esc | Start |
+| Screenshot | F12 | — |
 
-Движение, прыжок и выстрел переназначаются в меню «Управление»: на действие одна
-клавиша и одна кнопка геймпада, занятая клавиша меняется местами, есть сброс по
-умолчанию. Пауза, снимок экрана и стик закреплены.
+Move, jump and shoot are rebound in the "Controls" menu: one key and one gamepad button per
+action, a key already in use swaps places, there is a reset to defaults. Pause, screenshot
+and the stick are fixed.
 
-В меню пункты выбираются стрелками или крестовиной, **Enter** или **A** —
-выбрать; значения в настройках листаются влево-вправо. **Esc** или **B**
-возвращают со страницы назад.
+In menus items are selected with the arrows or the D-pad, **Enter** or **A** — select;
+values in the settings scroll left-right. **Esc** or **B** go back a page.
 
-На паузе открывается меню: продолжить, начать заново, настройки, выход в главное.
-**Esc** и оттуда возвращает в игру.
+Pause opens a menu: continue, restart, settings, exit to main menu.
+**Esc** from there also returns to the game.
 
-«Вверх» и «вниз» работают по месту: в кабине лифта они ведут её, на площадке эскалатора
-отправляют в поездку, на коврике у двери «вверх» ведёт внутрь. На этаже «вниз» —
-обычный присед.
+"Up" and "down" depend on the place: in an elevator cab they drive it, on an escalator
+landing they start the ride, on the mat at a door "up" leads inside. On a floor "down" is
+an ordinary crouch.
 
-## Проверки
+## Checks
 
-Хуки прогоняются сами: `gdformat` и `gdlint` на коммите, импорт проекта движком и тесты —
-на push. Полный прогон вручную:
+Hooks run by themselves: `gdformat` and `gdlint` on commit, project import by the engine
+and tests on push. A full manual run:
 
 ```powershell
 tools/check.ps1
 ```
 
-Тот же набор проверок выполняет CI на каждый push в `main` и каждый pull request.
+CI runs the same set of checks on every push to `main` and every pull request.
 
-Отдельно:
+Separately:
 
 ```powershell
-python tools/run_tests.py     # тесты GUT
-python tools/godot_check.py   # импорт и разбор скриптов
-python tools/capture.py M22  # скриншоты вехи в screens/M22/
-python tools/compare_original.py M22  # кадр вехи рядом с оригиналом
-python tools/clean_check.py   # импорт и тесты на чистой копии — как на свежем клоне
+python tools/run_tests.py     # GUT tests
+python tools/godot_check.py   # import and script parsing
+python tools/capture.py M22  # milestone screenshots into screens/M22/
+python tools/compare_original.py M22  # milestone shot next to the original
+python tools/clean_check.py   # import and tests on a clean copy — as on a fresh clone
 ```
 
-`clean_check.py` разворачивает HEAD во временную рабочую копию и гоняет там
-`godot_check.py` и `run_tests.py`. Он ловит то, что на рабочей машине не видно:
-файлы, которых нет в гите, но которые лежат на диске с прошлых запусков. Прогон
-долгий, поэтому не в хуках — запускать перед PR.
+`clean_check.py` checks out HEAD into a temporary working copy and runs
+`godot_check.py` and `run_tests.py` there. It catches what is invisible on the working
+machine: files that are not in git but lie on disk from earlier runs. The run is long, so
+it is not in the hooks — run it before a PR.
 
-Один файл тестов гоняется отдельно — так итерация занимает секунды, а не две с лишним
-минуты полного набора:
+A single test file is run separately — that way an iteration takes seconds rather than the
+two-plus minutes of the full suite:
 
 ```powershell
 godot --headless -s addons/gut/gut_cmdln.gd -gselect=test_elevator_motion.gd -gexit
 ```
 
-Звук собирается из свободных библиотек, модели — из паков Quaternius (исходники —
+Sound is built from free libraries, models from Quaternius packs (sources —
 `assets/source/quaternius/`, CC0):
 
 ```powershell
-python tools/build_audio.py        # звуки и музыка из библиотек → assets/audio/
-python tools/build_actors.py       # Otto, агент и машины из паков → assets/models/
-python tools/build_textures.py     # фактуры стен, шахты и крыши → assets/textures/
-python tools/blender_bin.py        # проверить, что Blender найден
-godot --headless --script res://tools/dump_model.gd -- res://assets/models/otto.glb  # что импортировал Godot
+python tools/build_audio.py        # sounds and music from libraries → assets/audio/
+python tools/build_actors.py       # Otto, agent and cars from packs → assets/models/
+python tools/build_textures.py     # wall, shaft and roof textures → assets/textures/
+python tools/blender_bin.py        # check that Blender is found
+godot --headless --script res://tools/dump_model.gd -- res://assets/models/otto.glb  # what Godot imported
 ```
 
-Клипы движения — из Universal Animation Library (Quaternius, CC0): стойка,
-ходьба, выстрел, смерть, толчок, приземление. `build_actors.py` переносит их на
-скелет пака и ставит каждый кадр на пол. В репозитории лежит урезанный исходник
-`assets/source/quaternius/ual_clips.glb`; собрать его заново из скачанного архива —
-`python tools/build_actors.py ual <AnimationLibrary_Godot_Standard.glb>`. Остальные
-позы — таблица в `FigurePoses`, а кости к ним и к кадрам клипов ведёт `FigureRig`
-прямо в игре. Править позу кодом — значит поменять число, а не открыть редактор.
-`godot --path . res://tools/actor_shot.tscn` снимает все позы Otto и агента рядом,
-с линиями пуль ROM, а `godot --path . res://tools/takedown_shot.tscn` — каждую
-сценку добивания листом кадров, настоящим режиссёром с замедлением и наездом камеры.
-`godot --path . res://tools/demo_shot.tscn` снимает демо с каждой из трёх точек.
-`godot --path . res://tools/car_shot.tscn` — все машины жребия сбоку, с открытой
-дверью и крупно, `godot --path . res://tools/room_shot.tscn` — комнаты за дверью,
-а `python tools/build_helicopter.py` собирает вертолёт в Blender.
+Motion clips come from the Universal Animation Library (Quaternius, CC0): idle, walk,
+shot, death, hit reaction, landing. `build_actors.py` retargets them to the pack's skeleton
+and puts every frame on the floor. The repository holds a trimmed source
+`assets/source/quaternius/ual_clips.glb`; to rebuild it from the downloaded archive —
+`python tools/build_actors.py ual <AnimationLibrary_Godot_Standard.glb>`. The other poses
+are a table in `FigurePoses`, and `FigureRig` drives the bones to them and to the clip
+frames right in the game. Editing a pose in code means changing a number, not opening an
+editor. `godot --path . res://tools/actor_shot.tscn` shoots all poses of Otto and the
+agent side by side, with the ROM bullet lines, and
+`godot --path . res://tools/takedown_shot.tscn` shoots each takedown scene as a contact
+sheet, with the real director, slow motion and camera zoom.
+`godot --path . res://tools/demo_shot.tscn` shoots the demo from each of the three points.
+`godot --path . res://tools/car_shot.tscn` — all cars of the draw from the side, with the
+door open and close up, `godot --path . res://tools/room_shot.tscn` — the rooms behind the
+door, and `python tools/build_helicopter.py` builds the helicopter in Blender.
 
-Обстановка — модели паков в `assets/models/props/`, как пришли; рост, поворот к
-камере и где предмет стоит решает каталог `PropCatalog`. Новая модель — строка в
-каталоге, в `assets/models/props/credits.json` и в `CREDITS.md`, иначе тест не
-пропустит.
-`godot --path . res://tools/props_shot.tscn` снимает весь каталог рядом, с
-подписями (`-- --raw` — как модели пришли из паков).
+The dressing is pack models in `assets/models/props/`, as they came; height, turn toward
+the camera and where an item stands are decided by the `PropCatalog` catalogue. A new model
+is a line in the catalogue, in `assets/models/props/credits.json` and in `CREDITS.md`,
+otherwise the test will not let it through.
+`godot --path . res://tools/props_shot.tscn` shoots the whole catalogue side by side, with
+captions (`-- --raw` — as the models came from the packs).
 
-Кадры по состоянию, а не по выдержке — инструменты, которые ждут нужного момента и
-снимают именно то, что обещает подпись:
+Shots by state, not by delay — tools that wait for the right moment and capture exactly
+what the caption promises:
 
 ```powershell
-godot --path . res://tools/ui_shot.tscn -- --folder=M8b --locale=en   # экраны меню
-godot --path . res://tools/combat_shot.tscn           # стойки агента под огнём
-godot --path . res://tools/dark_shot.tscn             # этаж горит, зона погашена, этаж погашен
-godot --path . res://tools/layout_shot.tscn           # башня, стилобат, полоса эскалаторов, стена
-godot --path . res://tools/geometry_shot.tscn         # эскалатор, шахта на погашенном этаже, пара
-godot --path . res://tools/look3d.tscn                # проба 3D-вида, с которой начался пивот
+godot --path . res://tools/ui_shot.tscn -- --folder=M8b --locale=en   # menu screens
+godot --path . res://tools/combat_shot.tscn           # agent stances under fire
+godot --path . res://tools/dark_shot.tscn             # floor lit, zone darkened, floor darkened
+godot --path . res://tools/layout_shot.tscn           # tower, podium, escalator band, wall
+godot --path . res://tools/geometry_shot.tscn         # escalator, shaft on a darkened floor, pair
+godot --path . res://tools/look3d.tscn                # the 3D look test the pivot started with
 ```
 
-Цена кадра меряется отдельно — на настоящем здании с агентами, по времени GPU,
-а не по частоте кадров:
+The frame cost is measured separately — on a real building with agents, by GPU time,
+not by frame rate:
 
 ```powershell
-godot --path . res://tools/light_bench.tscn           # широкий этаж: три лампы и агенты
-godot --path . res://tools/light_bench.tscn -- --whole  # всё здание на каждом уровне качества
-godot --path . res://tools/flicker_shot.tscn          # карта мерцания: что меняется от кадра к кадру
+godot --path . res://tools/light_bench.tscn           # wide floor: three lamps and agents
+godot --path . res://tools/light_bench.tscn -- --whole  # the whole building at every quality level
+godot --path . res://tools/flicker_shot.tscn          # flicker map: what changes from frame to frame
 ```
 
-Здание собирается из сида, поэтому проверяется на трёх уровнях сразу: правила без сцены,
-свойства раскладки на десятках сидов и собранное здание, которое проходит бот — и с
-агентами тоже. Зачем так и почему бот водится по состоянию, а не по секундомеру —
-в [`docs/testing.md`](docs/testing.md).
+The building is assembled from a seed, so it is checked on three levels at once: rules
+without a scene, layout properties over dozens of seeds, and the assembled building that a
+bot plays through — with agents too. Why this way and why the bot is driven by state rather
+than by a stopwatch — in [`docs/testing.md`](docs/testing.md).
 
-Путь бот ищет по графу здания, а не спускается жадно: с пересекающимися шахтами
-«ехать вниз ближайшей» упирается в тупик, и выбираться оттуда надо назад и вверх.
-Маршрут, каким его видит бот, печатает `dump_plan` — по этому следу и ищут, где
-спуск встаёт.
+The bot finds its path through the building graph rather than descending greedily: with
+overlapping shafts "ride the nearest one down" runs into a dead end, and getting out of it
+takes going back and up. The route as the bot sees it is printed by `dump_plan` — that
+trace is what is used to find where the descent gets stuck.
 
-Баланс боя меряется тем же ботом, но вручную и подробно: он печатает, где погиб,
-кто стоял рядом и сколько агентов уложил. С `--trace` он раз в несколько кадров
-печатает, где стоит, что нажал и где ближайшая кабина — так в M15 нашлась кабина,
-которая касалась крыши на один кадр и уезжала.
+Combat balance is measured by the same bot, but manually and in detail: it prints where it
+died, who stood nearby and how many agents it took down. With `--trace` it prints every
+few frames where it stands, what it pressed and where the nearest cab is — this is how M15
+found a cab that touched the roof for one frame and left.
 
 ```powershell
 godot --headless --script res://tools/playthrough.gd -- --seeds=1,2,3 --agents
 godot --headless --script res://tools/playthrough.gd -- --agents --at-once=12
 godot --headless --script res://tools/playthrough.gd -- --seeds=1 --trace --budget=3000
 godot --headless --script res://tools/playthrough.gd -- --seeds=3 --agents --log=logs/run_{seed}.jsonl
-python tools/run_log.py logs/run_3.jsonl             # сводка: смерти, причины, стрелки
+python tools/run_log.py logs/run_3.jsonl             # summary: deaths, causes, shooters
 ```
 
-Журнал прогона (`--log=`) пишет каждое событие строкой JSON — смерти с причиной и
-стрелком, попадания, выпуск агентов, поездки, решения бота; тест прохождения с
-агентами пишет его сам в `logs/playthrough_seed<N>.jsonl`. Разбор без перезапусков —
-`tools/run_log.py` (см. `docs/testing.md`).
+The run log (`--log=`) writes each event as a JSON line — deaths with cause and shooter,
+hits, agent release, rides, bot decisions; the playthrough test with agents writes it by
+itself to `logs/playthrough_seed<N>.jsonl`. Analysis without reruns —
+`tools/run_log.py` (see `docs/testing.md`).
 
-## Сборка релиза
+## Building a release
 
-Релиз собирает CI по тегу `v*`: сверяет тег с версией проекта, собирает Windows
-на windows-runner и Linux на ubuntu, прогоняет распакованный линуксовый архив
-(Windows-сборка консоли не пишет и проверяется руками) и выкладывает архивы
-в Releases с заметками из `CHANGELOG.md`. Решения — в
+CI builds a release on a `v*` tag: it checks the tag against the project version, builds
+Windows on a windows runner and Linux on ubuntu, runs the unpacked Linux archive (the
+Windows build does not write to the console and is checked by hand) and uploads the
+archives to Releases with notes from `CHANGELOG.md`. Decisions are in
 [ADR-0013](docs/adr/0013-release-and-versioning.md).
 
-Версия живёт в одном месте — `config/version` в `project.godot`, — и правится
-только скриптом: он же проставляет её в пресеты экспорта, где пустая версия
-ломает сборку под Windows.
+The version lives in one place — `config/version` in `project.godot` — and is edited only
+by a script: it also writes it into the export presets, where an empty version breaks the
+Windows build.
 
 ```powershell
-python tools/version.py                 # напечатать версию
-python tools/version.py --set 0.9.0     # проставить везде
-python tools/version.py --check v0.9.0  # сверить тег с версией
+python tools/version.py                 # print the version
+python tools/version.py --set 0.9.0     # set it everywhere
+python tools/version.py --check v0.9.0  # check the tag against the version
 ```
 
-То же самое можно собрать руками — например, чтобы проверить сборку до тега.
-Нужны шаблоны экспорта той же версии, что и движок (в редакторе: «Проект» →
-«Управление шаблонами экспорта»).
+The same can be built by hand — for example, to check the build before a tag. It needs
+export templates of the same version as the engine (in the editor: "Project" →
+"Manage Export Templates").
 
 ```powershell
 python tools/export.py windows    # build/windows/elaction.exe
 python tools/package.py windows   # dist/elaction-v0.9.0-windows.zip
-python tools/smoke.py build/linux/elaction.x86_64   # прогон собранного билда
-python tools/render_icon.py       # перерисовать icon.ico
+python tools/smoke.py build/linux/elaction.x86_64   # run of the built build
+python tools/render_icon.py       # redraw icon.ico
 ```
 
-## Структура и стиль
+## Structure and style
 
-Описаны в [`docs/conventions.md`](docs/conventions.md).
+Described in [`docs/conventions.md`](docs/conventions.md).
 
-## Лицензия
+## License
 
-Код проекта — MIT. Elevator Action является товарным знаком Taito Corporation; проект
-не аффилирован с правообладателем, оригинальные ассеты игры не используются.
+The project code is MIT. Elevator Action is a trademark of Taito Corporation; the project
+is not affiliated with the rights holder, the original game's assets are not used.
 
-Модели и фактуры других авторов — CC0 и CC-BY 3.0; кто и что — в
+Models and textures by other authors are CC0 and CC-BY 3.0; who and what is in
 [`CREDITS.md`](CREDITS.md).

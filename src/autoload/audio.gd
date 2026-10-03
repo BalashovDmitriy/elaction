@@ -1,126 +1,126 @@
 class_name AudioDirector
 extends Node
 
-## Звук игры: один автолоад на всё.
+## Game sound: one autoload for everything.
 ##
-## Узлы не заводят себе источников: их пришлось бы держать в каждой сцене, а
-## выстрел, переживший смерть стрелявшего, обрывался бы вместе с ним. Здесь
-## пул источников на шине SFX, пара на музыку и фон на своей шине (ADR-0012,
-## пункт 7; ADR-0036, решения 5 и 6).
+## Nodes do not create their own sources: they would have to be kept in every scene, and
+## a shot that outlived the shooter's death would be cut off together with him. Here there is
+## a pool of sources on the SFX bus, a pair for music and ambience on its own bus (ADR-0012,
+## point 7; ADR-0036, decisions 5 and 6).
 ##
-## Имена звуков — константы [Sounds]; тест следит, чтобы у каждой был файл,
-## а у каждого файла — константа.
+## Sound names are [Sounds] constants; a test makes sure each one has a file,
+## and each file has a constant.
 ##
-## Обращаются к нему через [method Sounds.play] и соседей: имя автолоада
-## отличается от [code]class_name[/code], как и у [GameState], — иначе
-## разбор одного скрипта в отрыве от проекта не находит идентификатор.
+## It is accessed through [method Sounds.play] and its neighbours: the autoload name
+## differs from [code]class_name[/code], as with [GameState] — otherwise
+## parsing a single script apart from the project does not find the identifier.
 
-## Сколько эффектов может звучать разом. Больше дюжины в кадре — это уже каша,
-## как и с источниками света: у оригинала на всё было четыре чипа по три голоса.
+## How many effects can sound at once. More than a dozen in a frame is already mush,
+## as with light sources: the original had four chips of three voices for everything.
 const VOICES: int = 12
 
-## Наплыв одного трека в другой, с: тревога входит, а не обрывает тему.
+## Crossfade of one track into another, s: the alarm comes in rather than cutting the theme.
 const MUSIC_FADE: float = 1.6
-## Как быстро трек уходит в тишину на [method stop_music], с.
+## How fast the track fades to silence on [method stop_music], s.
 const MUSIC_OUT: float = 0.6
-## Тише этого источник уже не слышно; дальше — остановка.
+## Quieter than this a source is no longer heard; past it — stop.
 const SILENT_DB: float = -60.0
 
-## Частота среза «из-за стены», Гц: музыка за красной дверью и на паузе,
-## фон на этажах. Без приглушения фильтр выключен, а не стоит на 20 кГц.
+## "Behind the wall" cutoff frequency, Hz: music behind a red door and on pause,
+## ambience on floors. Without muffling the filter is off, rather than sitting at 20 kHz.
 const MUSIC_MUFFLED_HZ: float = 900.0
 const AMBIENCE_MUFFLED_HZ: float = 1600.0
 const OPEN_HZ: float = 20000.0
-## Коридор из-за красной двери: шаги, выстрелы и двери глухо и тише
-## (ADR-0038, решение 2).
+## The corridor from behind a red door: steps, shots and doors are dull and quieter
+## (ADR-0038, decision 2).
 const SFX_MUFFLED_HZ: float = 700.0
 const SFX_MUFFLED_DB: float = -6.0
-## Как быстро звук уходит за стену и возвращается, с.
+## How fast sound goes behind the wall and comes back, s.
 const MUFFLE_TIME: float = 0.35
-## Фон на этажах тише, чем на крыше, дБ.
+## Ambience on floors is quieter than on the roof, dB.
 const INDOOR_AMBIENCE_DB: float = -3.0
 
-## Насколько джингл приглушает трек, дБ, и как быстро.
+## How much a jingle ducks the track, dB, and how fast.
 const DUCK_DB: float = -12.0
 const DUCK_IN: float = 0.12
 const DUCK_OUT: float = 0.8
 
-## Скорость звука, м/с: гром идёт за вспышкой с задержкой по дальности.
+## Speed of sound, m/s: thunder follows the flash with a delay by distance.
 const SOUND_SPEED: float = 343.0
-## Задержка грома в пределах, с: дальний разряд в пять километров ждали бы
-## пятнадцать секунд, и связи со вспышкой было бы уже не услышать.
+## Thunder delay is clamped, s: a distant strike five kilometres away would be waited for
+## fifteen seconds, and the connection to the flash could no longer be heard.
 const THUNDER_DELAY := Vector2(0.25, 6.0)
-## Ближе этого — раскат, дальше — перекат, м.
+## Closer than this — a clap, farther — a roll, m.
 const THUNDER_NEAR: float = 1200.0
 
-## Эффекты фильтров в [code]buses.tres[/code]: срез первым, громкость вторым.
+## Filter effects in [code]buses.tres[/code]: cutoff first, volume second.
 const MUFFLE_EFFECT: int = 0
 const DUCK_EFFECT: int = 1
-## Третий эффект шины SFX — сдвиг тона: в замедлении мира (добивание, последняя
-## смерть) звуки мира звучат ниже (ADR-0052, решение 7). Включён только на
-## время замедления — сдвиг тона дорог.
+## The third effect of the SFX bus is pitch shift: when the world slows down (takedown, last
+## death) world sounds play lower (ADR-0052, decision 7). It is enabled only for
+## the slowdown — pitch shift is expensive.
 const SLOW_EFFECT: int = 2
-## Тон звуков мира в самом глубоком замедлении и с какого темпа мира он
-## начинает опускаться.
+## Pitch of world sounds at the deepest slowdown and from which world tempo it
+## starts to drop.
 const SLOWEST_PITCH: float = 0.62
 const SLOW_FROM: float = 0.98
 
 static var _instance: AudioDirector = null
 
-## Громкости шин, 0..1. Их меняют настройки.
+## Bus volumes, 0..1. Settings change them.
 var _levels: Dictionary = {}
 
 var _sfx: Array[AudioStreamPlayer] = []
 var _next: int = 0
 
-## Два источника музыки: пока один уходит, второй входит.
+## Two music sources: while one fades out, the other fades in.
 var _music: Array[AudioStreamPlayer] = []
 var _current: int = 0
 var _playing_music: String = ""
 var _music_fades: Array[Tween] = [null, null]
 
-## Петли фона по имени и разовые звуки фона — гром.
+## Ambience loops by name and one-shot ambience sounds — thunder.
 var _ambience: Dictionary = {}
-## Петли, которые сейчас уходят в тишину. Отдельно от звучащих: позванная
-## снова, уходящая петля возвращается сама, а не заводится второй поверх неё —
-## та, первая, осталась бы звучать вполсилы навсегда (авторевью M23).
+## Loops currently fading to silence. Separate from the playing ones: when called
+## again, a fading loop comes back itself rather than a second one starting over it —
+## the first one would stay playing at half strength forever (code review M23).
 var _leaving: Dictionary = {}
 var _ambience_shot: AudioStreamPlayer = null
 var _ambience_fades: Dictionary = {}
 
-## Почему музыка сейчас из-за стены: пауза, красная дверь. Пока есть хоть
-## одна причина — глухо; пауза посреди визита не возвращает звук на выходе из неё.
+## Why music is behind the wall now: pause, red door. While there is at least
+## one reason — dull; a pause in the middle of a visit does not bring the sound back on exiting it.
 var _muffled_by: Dictionary = {}
 var _world_muffled: bool = false
 var _outdoors: bool = true
 var _weather: Weather.Kind = Weather.Kind.CLEAR
 var _time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT
 var _building: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL
-## Фон зала особого этажа, у которого Otto ([method set_hall]); пусто — нет.
+## Ambience of the special floor hall Otto is near ([method set_hall]); empty — none.
 var _hall: String = ""
-## Какой по счёту город звучит. Гром назначается городу, и к следующему — в
-## меню, в другое здание — он уже не приходит (авторевью M23).
+## Which city in sequence is sounding. Thunder is assigned to a city, and to the next one — in
+## the menu, in another building — it no longer comes (code review M23).
 var _city: int = 0
 var _tweens: Dictionary = {}
-## Когда кончится джингл, который сейчас приглушает трек, по часам движка, с.
+## When the jingle now ducking the track ends, by the engine clock, s.
 var _duck_until: float = 0.0
 
 
-## Звук партии. До входа автолоада в дерево — null.
+## The game's sound. Before the autoload enters the tree — null.
 static func instance() -> AudioDirector:
 	return _instance
 
 
-## Источники заводятся здесь, а не в [method Node._ready], вместе с публикацией
-## экземпляра: между входом в дерево и готовностью [method instance] отдавал бы
-## директора с пустым пулом, и первый же [method play] уронил бы кадр обращением
-## за нулевым голосом.
+## Sources are created here, not in [method Node._ready], together with publishing
+## the instance: between entering the tree and ready [method instance] would hand out
+## a director with an empty pool, and the very first [method play] would crash the frame by
+## accessing a null voice.
 func _enter_tree() -> void:
 	if _instance != null:
 		return
 	_instance = self
 
-	# Автолоад живёт и на паузе: иначе музыка обрывалась бы на каждом Esc.
+	# The autoload lives on pause too: otherwise music would cut off on every Esc.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
 	for index: int in VOICES:
@@ -137,15 +137,15 @@ func _enter_tree() -> void:
 
 	_ambience_shot = AudioStreamPlayer.new()
 	_ambience_shot.bus = Sounds.AMBIENCE_BUS
-	# Раскат длится секунд девять, а серии идут чаще: второй гром не обрывает
-	# первый.
+	# A clap lasts about nine seconds, and series come more often: the second thunder does not cut
+	# the first.
 	_ambience_shot.max_polyphony = 2
 	add_child(_ambience_shot)
 
 
-## Тон звуков мира идёт за темпом мира: замедление — ниже. Темп ставят сценки
-## добивания и последней смерти ([member Engine.time_scale]); ускорение тестов
-## тон не трогает.
+## World sound pitch follows the world tempo: slowdown — lower. The tempo is set by the takedown
+## and last-death scenes ([member Engine.time_scale]); test speed-up
+## does not touch the pitch.
 func _process(_delta: float) -> void:
 	var index := AudioServer.get_bus_index(Sounds.SFX_BUS)
 	if index < 0 or AudioServer.get_bus_effect_count(index) <= SLOW_EFFECT:
@@ -160,21 +160,21 @@ func _process(_delta: float) -> void:
 			shift.pitch_scale = lerpf(SLOWEST_PITCH, 1.0, clampf(tempo, 0.0, 1.0))
 
 
-## Как у [GameState]: без этого статическая ссылка переживала бы сам узел, и
-## [method Sounds.play] звал бы освобождённый объект.
+## As with [GameState]: without this the static reference would outlive the node itself, and
+## [method Sounds.play] would call a freed object.
 func _exit_tree() -> void:
 	if _instance == self:
 		_instance = null
 
 
-## Проигрывает эффект. Голоса разбираются по кругу: самый старый затирается,
-## и одновременная пальба не съедает звук шагов насовсем. Джингл на время
-## звучания приглушает трек (ADR-0036, решение 6).
+## Plays an effect. Voices are taken in a round: the oldest is overwritten,
+## and simultaneous shooting does not eat the sound of steps for good. A jingle ducks the track
+## while it plays (ADR-0036, decision 6).
 ##
-## [param pitch] и [param db] — тон и громкость этого раза: удар добивания
-## звучит поверх себя же на тон ниже, гулко (ADR-0050). Голоса общие, и каждый
-## раз тон и громкость ставятся заново — иначе пониженный удар передавал бы
-## свой тон следующему шагу.
+## [param pitch] and [param db] — pitch and volume for this time: the takedown hit
+## sounds over itself a tone lower, booming (ADR-0050). Voices are shared, and every
+## time pitch and volume are set anew — otherwise a lowered hit would pass
+## its pitch to the next step.
 func play(name: String, pitch: float = 1.0, db: float = 0.0) -> void:
 	var stream := Sounds.stream(name)
 	if stream == null:
@@ -182,7 +182,7 @@ func play(name: String, pitch: float = 1.0, db: float = 0.0) -> void:
 
 	var player := _sfx[_next]
 	_next = (_next + 1) % _sfx.size()
-	# Голоса общие, а шина у звука своя: меню и джинглы мимо глушения коридора.
+	# Voices are shared, but a sound has its own bus: menu and jingles bypass the corridor muffling.
 	player.bus = Sounds.bus_of(name)
 	player.stream = stream
 	player.pitch_scale = pitch
@@ -192,7 +192,7 @@ func play(name: String, pitch: float = 1.0, db: float = 0.0) -> void:
 		_duck(stream.get_length())
 
 
-## Сколько общих голосов звучит эффектом [param name] прямо сейчас. Нужно тестам.
+## How many shared voices are playing effect [param name] right now. Needed by tests.
 func voices_playing(name: String) -> int:
 	var stream := Sounds.stream(name)
 	var count := 0
@@ -202,10 +202,10 @@ func voices_playing(name: String) -> int:
 	return count
 
 
-## Включает музыку наплывом. Тот же трек не перезапускается: иначе тема
-## начиналась бы заново на каждой смерти. [param pick] — вариант трека, его
-## выбирает здание по сиду (ADR-0036). Первый трек — сразу в полную силу:
-## наплыв из тишины на старте игры звучал бы как задержка.
+## Turns music on with a crossfade. The same track is not restarted: otherwise the theme
+## would start over on every death. [param pick] — the track variant, the
+## building chooses it by seed (ADR-0036). The first track — at full strength right away:
+## a fade-in from silence at game start would sound like a delay.
 func play_music(name: String, pick: int = 0) -> void:
 	var stream := Sounds.variant(name, pick)
 	if stream == null:
@@ -228,7 +228,7 @@ func play_music(name: String, pick: int = 0) -> void:
 		_fade_music(_current, 0.0, MUSIC_FADE, false)
 
 
-## Уводит музыку в тишину.
+## Fades music to silence.
 func stop_music() -> void:
 	_playing_music = ""
 	for index: int in _music.size():
@@ -236,18 +236,18 @@ func stop_music() -> void:
 			_fade_music(index, SILENT_DB, MUSIC_OUT, true)
 
 
-## Что играет прямо сейчас. Нужно тестам и отладке.
+## What is playing right now. Needed by tests and debugging.
 func music_name() -> String:
 	return _playing_music if _music[_current].playing else ""
 
 
-## Файл трека, который сейчас входит или звучит. Нужно тестам.
+## The file of the track now fading in or playing. Needed by tests.
 func music_stream() -> AudioStream:
 	return _music[_current].stream if _music[_current].playing else null
 
 
-## Музыка из-за стены по причине [param reason]: за красной дверью и на паузе
-## (ADR-0036, решение 6).
+## Music from behind the wall for reason [param reason]: behind a red door and on pause
+## (ADR-0036, decision 6).
 func muffle_music(reason: String, on: bool) -> void:
 	var was := music_muffled()
 	if on:
@@ -262,8 +262,8 @@ func music_muffled() -> bool:
 	return not _muffled_by.is_empty()
 
 
-## Звуки мира из-за стены — Otto за красной дверью. Глушится шина эффектов с
-## фоном; меню и джинглы идут мимо неё ([constant Sounds.INTERFACE_BUS]).
+## World sounds from behind the wall — Otto behind a red door. The effects bus with
+## ambience is muffled; menu and jingles bypass it ([constant Sounds.INTERFACE_BUS]).
 func muffle_world(on: bool) -> void:
 	if _world_muffled == on:
 		return
@@ -276,9 +276,9 @@ func world_muffled() -> bool:
 	return _world_muffled
 
 
-## Петли фона: улица, дождь, ветер. Лишние уходят, новые входят наплывом,
-## те, что уже звучат, не перезапускаются — иначе дождь прерывался бы на
-## каждом здании.
+## Ambience loops: street, rain, wind. Extra ones fade out, new ones fade in,
+## those already playing are not restarted — otherwise rain would be interrupted on
+## every building.
 func set_ambience(names: PackedStringArray) -> void:
 	for name: String in _ambience.keys():
 		if not names.has(name):
@@ -298,8 +298,8 @@ func set_ambience(names: PackedStringArray) -> void:
 		_fade_ambience(name, player, 0.0, false)
 
 
-## Погода вокруг: снаружи и внутри звучат свои петли. Зовёт её город, когда
-## строится, — и гром прежнего города с этим отменяется.
+## Weather around: outside and inside have their own loops. The city calls it when
+## it is built — and the previous city's thunder is cancelled with that.
 func set_weather(weather: Weather.Kind, time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT) -> void:
 	_weather = weather
 	_time = time
@@ -307,9 +307,9 @@ func set_weather(weather: Weather.Kind, time: TimeOfDay.Kind = TimeOfDay.Kind.NI
 	set_ambience(Sounds.weather_loops(_weather, _outdoors, _time, _building, _hall))
 
 
-## Тип здания: по нему тишина коридора (ADR-0055, решение 8). [param hall] —
-## фон зала особого этажа, у которого Otto (ADR-0057, решение 4): входит
-## наплывом поверх тишины коридора и уходит, когда Otto ушёл с этажа.
+## Building kind: it sets the corridor silence (ADR-0055, decision 8). [param hall] —
+## the ambience of the special floor hall Otto is near (ADR-0057, decision 4): it fades
+## in over the corridor silence and fades out when Otto has left the floor.
 func set_building(building: BuildingIdentity.Kind, hall: String = "") -> void:
 	if _building == building and _hall == hall:
 		return
@@ -318,39 +318,39 @@ func set_building(building: BuildingIdentity.Kind, hall: String = "") -> void:
 	set_ambience(Sounds.weather_loops(_weather, _outdoors, _time, _building, _hall))
 
 
-## Какие петли фона звучат. Нужно тестам.
+## Which ambience loops are playing. Needed by tests.
 func ambience() -> PackedStringArray:
 	return PackedStringArray(_ambience.keys())
 
 
-## Под открытым небом фон в полную силу, на этажах — глухо, как из-за стекла
-## (ADR-0036, решение 5).
+## Under the open sky ambience is at full strength, on floors — dull, as if through glass
+## (ADR-0036, decision 5).
 func set_outdoors(on: bool) -> void:
 	if _outdoors == on:
 		return
 	_outdoors = on
 	set_ambience(Sounds.weather_loops(_weather, _outdoors, _time, _building, _hall))
-	# Гром на этажах глухой: петли внутри и так записаны из-за стекла, а
-	# фильтр шины приглушает то, что приходит снаружи.
+	# Thunder on floors is dull: the inside loops are recorded through glass anyway, and
+	# the bus filter muffles what comes from outside.
 	_sweep(Sounds.AMBIENCE_BUS, OPEN_HZ if on else AMBIENCE_MUFFLED_HZ)
 	_gain(Sounds.AMBIENCE_BUS, 0.0 if on else INDOOR_AMBIENCE_DB, MUFFLE_TIME)
 
 
-## Гром от разряда в [param distance] метрах: с задержкой, как от настоящего.
-## Таймер встаёт на паузе игры — гром не приходит к замершей вспышке.
+## Thunder from a strike [param distance] metres away: with a delay, like a real one.
+## The timer stops on game pause — thunder does not arrive to a frozen flash.
 func thunder(distance: float) -> void:
 	var name := Sounds.THUNDER_NEAR if distance < THUNDER_NEAR else Sounds.THUNDER_FAR
 	var timer := get_tree().create_timer(thunder_delay(distance), false)
 	timer.timeout.connect(_rumble.bind(name, _city))
 
 
-## Задержка грома для разряда в [param distance] метрах, с.
+## Thunder delay for a strike [param distance] metres away, s.
 static func thunder_delay(distance: float) -> float:
 	return clampf(distance / SOUND_SPEED, THUNDER_DELAY.x, THUNDER_DELAY.y)
 
 
-## Раскат грома, назначенный городу номер [param city]. Город с тех пор
-## сменился — молнии, от которой он шёл, уже нет.
+## A thunderclap assigned to city number [param city]. If the city has
+## changed since — the lightning it came from is gone.
 func _rumble(name: String, city: int) -> void:
 	if city != _city:
 		return
@@ -361,27 +361,27 @@ func _rumble(name: String, city: int) -> void:
 	_ambience_shot.play()
 
 
-## Громкость шины, 0..1. Ноль — тишина, единица — как записано.
+## Bus volume, 0..1. Zero — silence, one — as recorded.
 func set_level(bus: String, level: float) -> void:
 	var index := AudioServer.get_bus_index(bus)
 	if index < 0:
 		return
-	# Уровень запоминается только применённый: иначе [method level_of] отдавал бы
-	# настройкам громкость шины, которой нет.
+	# Only an applied level is remembered: otherwise [method level_of] would give
+	# the settings a bus volume that does not exist.
 	var value := clampf(level, 0.0, 1.0)
 	_levels[bus] = value
 	_apply_level(index, value)
-	# Интерфейс и джинглы — мимо шины эффектов, но под её ползунком: в
-	# настройках их громкость всегда была громкостью эффектов, и своей шиной
-	# они обзавелись ради глушения за дверью, а не ради ещё одного ползунка.
+	# Interface and jingles bypass the effects bus, but are under its slider: in
+	# the settings their volume has always been the effects volume, and they got their own bus
+	# for muffling behind the door, not for one more slider.
 	if bus == Sounds.SFX_BUS:
 		var interface := AudioServer.get_bus_index(Sounds.INTERFACE_BUS)
 		if interface >= 0:
 			_apply_level(interface, value)
 
 
-## Тишина — это не «минус восемьдесят децибел», а выключенная шина: на малых
-## громкостях логарифм уходит в минус бесконечность и трещит по дороге.
+## Silence is not "minus eighty decibels" but a disabled bus: at low
+## volumes the logarithm goes to minus infinity and crackles along the way.
 static func _apply_level(index: int, value: float) -> void:
 	AudioServer.set_bus_mute(index, is_zero_approx(value))
 	AudioServer.set_bus_volume_db(index, linear_to_db(maxf(value, 0.0001)))
@@ -391,8 +391,8 @@ func level_of(bus: String) -> float:
 	return float(_levels.get(bus, 1.0))
 
 
-## Сбрасывает приглушения, фон и назначенный гром. Нужен тестам: автолоад один
-## на все файлы.
+## Resets ducking, ambience and assigned thunder. Needed by tests: the autoload is one
+## for all files.
 func reset() -> void:
 	for player: AudioStreamPlayer in _ambience.values() + _leaving.values():
 		player.queue_free()
@@ -431,7 +431,7 @@ func _fade_music(index: int, target_db: float, seconds: float, stop_after: bool)
 	_music_fades[index] = fade
 
 
-## Заводит петлю фона [param name] из тишины; null — файла нет.
+## Starts ambience loop [param name] from silence; null — no file.
 func _loop(name: String) -> AudioStreamPlayer:
 	var stream := Sounds.stream(name)
 	if stream == null:
@@ -458,22 +458,22 @@ func _fade_ambience(
 	_ambience_fades[name] = fade
 
 
-## Петля ушла в тишину — источник больше не нужен.
+## The loop has faded to silence — the source is no longer needed.
 func _drop_loop(name: String, player: AudioStreamPlayer) -> void:
 	if _leaving.get(name) == player:
 		_leaving.erase(name)
 	player.queue_free()
 
 
-## Ведёт срез фильтра шины к [param hz]. На открытом звуке фильтр выключается:
-## на 20 кГц он не слышен, но стоит времени микшера.
+## Moves the bus filter cutoff toward [param hz]. With open sound the filter turns off:
+## at 20 kHz it is inaudible, but it costs mixer time.
 func _sweep(bus: String, hz: float) -> void:
 	var index := AudioServer.get_bus_index(bus)
 	var muffle := _muffle_of(bus)
 	AudioServer.set_bus_effect_enabled(index, MUFFLE_EFFECT, true)
 	var sweep := _restart(bus + "/muffle")
-	# Срез слышится по октавам, а не по герцам: линейный ход от 20 кГц до
-	# 900 Гц просидел бы почти всё время там, где разницы не слышно.
+	# Cutoff is heard by octaves, not by hertz: a linear sweep from 20 kHz to
+	# 900 Hz would spend almost all its time where no difference is heard.
 	sweep.tween_method(
 		func(octave: float) -> void: muffle.cutoff_hz = pow(2.0, octave),
 		log(muffle.cutoff_hz) / log(2.0),
@@ -488,14 +488,14 @@ func _gain(bus: String, target_db: float, seconds: float) -> void:
 	_restart(bus + "/gain").tween_property(_gain_of(bus), "volume_db", target_db, seconds)
 
 
-## Приглушает трек на [param seconds] секунд снаружи: музыка проваливается на
-## ударе добивания (ADR-0050).
+## Ducks the track for [param seconds] seconds from outside: music drops on
+## the takedown hit (ADR-0050).
 func duck(seconds: float) -> void:
 	_duck(seconds)
 
 
-## Приглушает трек на [param seconds] секунд. Джингл поверх джингла продлевает
-## приглушение, а не возвращает трек посреди второго.
+## Ducks the track for [param seconds] seconds. A jingle over a jingle extends
+## the ducking rather than bringing the track back in the middle of the second.
 func _duck(seconds: float) -> void:
 	var now := Time.get_ticks_msec() / 1000.0
 	_duck_until = maxf(_duck_until, now + seconds)
@@ -515,13 +515,13 @@ func _restart(key: String) -> Tween:
 	return tween
 
 
-## Фильтр «из-за стены» шины [param bus] — первый эффект в [code]buses.tres[/code].
+## The "behind the wall" filter of bus [param bus] — the first effect in [code]buses.tres[/code].
 static func _muffle_of(bus: String) -> AudioEffectLowPassFilter:
 	var index := AudioServer.get_bus_index(bus)
 	return AudioServer.get_bus_effect(index, MUFFLE_EFFECT) as AudioEffectLowPassFilter
 
 
-## Ручка громкости шины [param bus] — второй эффект: приглушение и фон на этажах.
+## Volume knob of bus [param bus] — the second effect: ducking and ambience on floors.
 static func _gain_of(bus: String) -> AudioEffectAmplify:
 	var index := AudioServer.get_bus_index(bus)
 	return AudioServer.get_bus_effect(index, DUCK_EFFECT) as AudioEffectAmplify

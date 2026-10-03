@@ -1,7 +1,7 @@
 extends GutTest
 
-## Тесты микса (ADR-0036): шины, наплыв треков, приглушение, фон по погоде и
-## месту, гром за молнией, шаг по полу.
+## Mix tests (ADR-0036): buses, track crossfade, ducking, ambience by weather and
+## place, thunder after lightning, steps on the floor.
 
 
 func before_each() -> void:
@@ -19,8 +19,8 @@ func after_all() -> void:
 
 
 func test_the_mixer_has_its_buses() -> void:
-	# Отдельная шина у музыки — чтобы её можно было приглушить, не выключая
-	# выстрелы; фон — дочерняя шина эффектов, его ведёт тот же ползунок.
+	# Music has a separate bus so that it can be ducked without muting
+	# shots; ambience is a child bus of effects, driven by the same slider.
 	for bus: String in [Sounds.MASTER_BUS, Sounds.MUSIC_BUS, Sounds.SFX_BUS, Sounds.AMBIENCE_BUS]:
 		assert_gt(AudioServer.get_bus_index(bus), -1, "шина %s есть" % bus)
 	var ambience := AudioServer.get_bus_index(Sounds.AMBIENCE_BUS)
@@ -82,8 +82,8 @@ func test_the_same_building_does_not_restart_its_track() -> void:
 
 
 func test_music_stays_behind_the_wall_while_any_reason_holds() -> void:
-	# Пауза посреди визита в красную дверь: снятие паузы не возвращает звук,
-	# пока Otto за дверью.
+	# A pause in the middle of a visit to a red door: unpausing does not bring the sound back
+	# while Otto is behind the door.
 	var director := AudioDirector.instance()
 	if director == null:
 		return
@@ -114,8 +114,8 @@ func test_the_weather_sounds_outside_and_behind_the_glass() -> void:
 	assert_eq(_sorted(director.ambience()), _sorted([Sounds.CITY, Sounds.WIND]), "а на крыше ветер")
 
 
-## Любая погода, время суток, тип здания и зал особого этажа: петля фона
-## зациклена. Утро, день и вечер улицы и залы M24o звучали раз и молкли.
+## Any weather, time of day, building kind and special floor hall: the ambience loop
+## is looped. The street's morning, day and evening and the M24o halls played once and went silent.
 func test_every_weather_sounds_with_existing_loops() -> void:
 	var halls: Array[String] = [""]
 	for tone: String in Sounds.HALL_TONES.values():
@@ -178,9 +178,9 @@ func test_silence_mutes_the_bus_instead_of_going_to_minus_infinity() -> void:
 
 
 func test_a_loop_called_back_while_leaving_is_not_doubled() -> void:
-	# Otto съехал с крыши и тут же вернулся: улица ещё уходила, а новая петля
-	# заводилась поверх неё — старая, с убитым наплывом, звучала вполсилы до
-	# конца игры, и на каждом таком возвращении их становилось больше.
+	# Otto rode off the roof and came right back: the street was still fading out, and a new loop
+	# started over it — the old one, with its fade killed, played at half strength until the
+	# end of the game, and with every such return there were more of them.
 	var director := AudioDirector.instance()
 	if director == null:
 		return
@@ -194,7 +194,7 @@ func test_a_loop_called_back_while_leaving_is_not_doubled() -> void:
 
 
 func test_the_street_is_heard_on_the_roof_and_at_the_exit() -> void:
-	# ADR-0036, решение 5: на крыше, у выхода и в меню — улица в полную силу.
+	# ADR-0036, decision 5: on the roof, at the exit and in the menu — the street at full strength.
 	var rules := BuildingRules.new()
 	var bottom := rules.floors - 1
 	var exit_x := 20.0
@@ -207,8 +207,8 @@ func test_the_street_is_heard_on_the_roof_and_at_the_exit() -> void:
 
 
 func test_the_thunder_of_a_gone_city_does_not_arrive() -> void:
-	# Гром ждёт своей задержки на таймере дерева, а не у молнии: из меню или
-	# прежнего здания он приходил в следующее, хоть там и ясная ночь.
+	# Thunder waits for its delay on a tree timer, not at the lightning: from the menu or
+	# a previous building it came into the next one, even though it is a clear night there.
 	var director := AudioDirector.instance()
 	if director == null:
 		return
@@ -224,7 +224,7 @@ func test_the_thunder_of_a_gone_city_does_not_arrive() -> void:
 
 
 func test_the_shaft_hum_rides_the_shaft_with_otto() -> void:
-	# Источник стоит вровень с Otto, но не выходит за этажи своей шахты.
+	# The source stays level with Otto, but does not go beyond the floors of its shaft.
 	var hums: ShaftHums = add_child_autofree(ShaftHums.new()) as ShaftHums
 	var shaft := BuildingPlan.ShaftSpot.new()
 	shaft.x = 4.0
@@ -243,7 +243,7 @@ func _sorted(names: Variant) -> PackedStringArray:
 	return list
 
 
-## Сколько живых источников директора играют петлю [param name].
+## How many live director sources are playing loop [param name].
 func _players_of(director: AudioDirector, name: String) -> int:
 	var stream := Sounds.stream(name)
 	var count := 0
@@ -254,7 +254,7 @@ func _players_of(director: AudioDirector, name: String) -> int:
 	return count
 
 
-## Звучит ли сейчас ближний раскат.
+## Whether a near clap is playing now.
 func _rumbling(director: AudioDirector) -> bool:
 	var near := Sounds.stream(Sounds.THUNDER_NEAR)
 	for child: Node in director.get_children():
@@ -264,8 +264,8 @@ func _rumbling(director: AudioDirector) -> bool:
 	return false
 
 
-## Шина, в которую звучит эффект [param name]: голос, которому он достался
-## последним. Голоса разбираются по кругу, так что ищется с конца круга.
+## The bus effect [param name] plays into: the voice that got it
+## last. Voices are taken in a round, so the search goes from the end of the round.
 func _bus_of_voice(director: AudioDirector, name: String) -> String:
 	var stream := Sounds.stream(name)
 	for child: Node in director.get_children():
@@ -275,8 +275,8 @@ func _bus_of_voice(director: AudioDirector, name: String) -> String:
 	return ""
 
 
-## Слышно ли шину [param bus] из-за стены: включён ли фильтр «из-за стены» на
-## ней или на любой шине, куда она уходит, вплоть до общей.
+## Whether bus [param bus] is heard from behind the wall: whether the "behind the wall" filter is on
+## it or on any bus it feeds into, up to the master.
 func _behind_the_wall(bus: String) -> bool:
 	var index := AudioServer.get_bus_index(bus)
 	while index > 0:
@@ -288,9 +288,9 @@ func _behind_the_wall(bus: String) -> bool:
 	return false
 
 
-## Otto за красной дверью: коридор глухо, а меню и джингл документа — нет.
-## Щелчок меню на паузе и джингл, который звучит на самом выходе, — звуки не
-## коридора, и глушить их вместе с ним значило бы глушить сам интерфейс.
+## Otto behind a red door: the corridor is dull, but the menu and the document jingle are not.
+## A menu click on pause and a jingle that plays right at the exit are not
+## corridor sounds, and muffling them along with it would mean muffling the interface itself.
 func test_the_red_door_muffles_the_corridor_but_not_the_interface() -> void:
 	var director := AudioDirector.instance()
 	if director == null:
@@ -313,8 +313,8 @@ func test_the_red_door_muffles_the_corridor_but_not_the_interface() -> void:
 	assert_false(_behind_the_wall(shot), "вышел — коридор слышно")
 
 
-## Своей шиной интерфейс обзавёлся ради двери, а не ради ползунка: громкость
-## ему по-прежнему ставит ползунок эффектов, и в общую он идёт мимо эффектов.
+## The interface got its own bus for the door, not for a slider: its volume
+## is still set by the effects slider, and it goes into the master bypassing effects.
 func test_the_interface_follows_the_effects_volume() -> void:
 	var director := AudioDirector.instance()
 	if director == null:

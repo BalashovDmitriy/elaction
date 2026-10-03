@@ -1,21 +1,22 @@
 class_name RespawnSpot
 extends RefCounted
 
-## Куда Otto возвращается после гибели — по правилу ROM (@7633, @2FAA;
-## ADR-0053, решение 2): не ниже пятого этажа ROM, у красной двери этажа, если
-## документ за ней ещё не взят, а без неё — в постоянной точке этажа. Где Otto
-## погиб и где стоят агенты, не важно: агенты с этажей уходят, а выпускают их
-## снова с задержкой. Вынесено из [GreyboxLevel] — правило без узлов.
+## Where Otto returns after dying — by the ROM rule (@7633, @2FAA;
+## ADR-0053, decision 2): no lower than the fifth ROM floor, at the floor's red door if
+## the document behind it has not been taken yet, and without one — at the floor's fixed
+## point. Where Otto died and where the agents stand does not matter: the agents leave the
+## floors, and they are released again with a delay. Moved out of [GreyboxLevel] — a rule
+## without nodes.
 
-## Кусок этажа уже этого, м, — тупик: между стеной и шахтой бывает карман в
-## полтора метра, и вернувшийся туда Otto уходил бы из него только кабиной
-## (M24g, сид 3). Точка возвращения ищется вне таких карманов.
+## A floor piece narrower than this, m, is a dead end: between a wall and a shaft there can be
+## a pocket a metre and a half wide, and Otto returned there would get out of it only by cab
+## (M24g, seed 3). The return point is searched for outside such pockets.
 const POCKET: float = 3.0
 
 
-## Этаж возвращения для погибшего на [param index]: тот же, но не ниже пятого
-## этажа ROM. Ниже здание у аркады — первые этажи с дверью по краям, и
-## вернувшийся там у самого выхода прошёл бы их даром.
+## The return floor for one who died on [param index]: the same, but no lower than the fifth
+## ROM floor. Below that the arcade building has the first floors with doors at the edges,
+## and one who returned there right by the exit would pass them for free.
 static func floor_for(rules: BuildingRules, index: int) -> int:
 	var at := index
 	while (
@@ -25,11 +26,11 @@ static func floor_for(rules: BuildingRules, index: int) -> int:
 	return at
 
 
-## Место на этаже [param index]: у красной двери [param red_x], если она есть
-## (NAN — нет), а без неё — точка ROM на доле этажа
-## [constant Arcade.RESPAWN_SHARE]. Встаёт Otto на ближайшее к ней место, где
-## можно стоять. Карманы обходит только точка ROM, пока на этаже есть что-то
-## кроме них: красная дверь в кармане — всё равно цель, и Otto встаёт у неё.
+## The spot on floor [param index]: at red door [param red_x] if there is one
+## (NAN — none), and without it — the ROM point at floor fraction
+## [constant Arcade.RESPAWN_SHARE]. Otto stands at the nearest spot to it where
+## one can stand. Only the ROM point avoids pockets, while the floor has something
+## besides them: a red door in a pocket is still the goal, and Otto stands by it.
 static func choose(plan: BuildingPlan, rules: BuildingRules, index: int, red_x: float) -> float:
 	var spots := plan.safe_spots(rules, index)
 	if spots.is_empty():
@@ -49,8 +50,8 @@ static func choose(plan: BuildingPlan, rules: BuildingRules, index: int, red_x: 
 	return best
 
 
-## Где на этаже [param index] красная дверь с документом из [param doors], или
-## NAN: документ за ней взят или красной двери на этаже нет.
+## Where on floor [param index] the red door with a document from [param doors] is, or
+## NAN: the document behind it was taken or there is no red door on the floor.
 static func red_door_x(doors: Array[Door], rules: BuildingRules, index: int) -> float:
 	for door in doors:
 		if door.is_pending() and rules.floor_index_near(door.mat_position().y) == index:
@@ -58,7 +59,7 @@ static func red_door_x(doors: Array[Door], rules: BuildingRules, index: int) -> 
 	return NAN
 
 
-## Места из [param spots], что стоят на кусках этажа шире [constant POCKET].
+## Spots from [param spots] that stand on floor pieces wider than [constant POCKET].
 static func _off_pockets(
 	plan: BuildingPlan, rules: BuildingRules, index: int, spots: PackedFloat64Array
 ) -> PackedFloat64Array:

@@ -1,40 +1,39 @@
 class_name BuildingRoof
 extends Node3D
 
-## Скаты крыши ступенями по бокам шахты (ADR-0029, решение 4).
+## Roof slopes in steps on both sides of the shaft (ADR-0029, decision 4).
 ##
-## В оригинале над тридцатым этажом крыша поднимается ступенями к шахте с обеих
-## сторон, и кадр читается верхом дома. У нас это силуэт за плоскостью игры:
-## ступени стоят позади коридора, без тел, а Otto ходит по плоскому настилу —
-## путь, бот и проверки проходимости не меняются.
+## In the original the roof above the thirtieth floor rises in steps toward the shaft on both sides,
+## and the frame reads as the top of a building. Here it is a silhouette behind the play plane: the
+## steps stand behind the corridor, without bodies, and Otto walks on the flat deck — the path, the
+## bot and the traversability checks do not change.
 
-## Сколько ступеней в скате.
+## How many steps in a slope.
 const STEPS: int = 4
 
-## Высота ступени, м. Верхняя ступень ниже машинного отделения
-## ([constant BuildingShafts.MACHINE_ROOM_SIZE]): шахта выходит над скатами,
-## как в оригинале.
+## Step height, m. The top step is lower than the machine room ([constant
+## BuildingShafts.MACHINE_ROOM_SIZE]): the shaft rises above the slopes, as in the original.
 const STEP_RISE: float = 0.3
 
-## Рёбра кровельных листов на ступенях: шаг и сечение, м.
+## Ribs of the roofing sheets on the steps: pitch and section, m.
 const RIB_STEP: float = 0.45
 const RIB := Vector2(0.05, 0.05)
 
-## Сколько скат не доходит до машинного отделения, м.
+## How far the slope stops short of the machine room, m.
 const MACHINE_ROOM_GAP: float = 0.15
 
-## Доля кладки палитры раунда в тоне скатов. Меньше, чем у стен
-## ([constant BuildingShell.PALETTE_SHARE]), и от тона дальней стены, а не от
-## стены коридора: скаты стоят позади игры и должны уходить в фон, а не
-## спорить с парапетами (кадры M19).
+## Share of the round palette's masonry in the slope tone. Smaller than for the walls ([constant
+## BuildingShell.PALETTE_SHARE]), and from the tone of the far wall, not the corridor wall: the
+## slopes stand behind the play and should recede into the background, not compete with the parapets
+## (M19 shots).
 const PALETTE_SHARE: float = 0.08
 
 
-## Ступени скатов прямоугольниками правил: x вдоль крыши, y — от верха ступени
-## до настила. Левый скат поднимается слева направо, правый — справа налево.
+## Slope steps as rules rectangles: x along the roof, y — from the top of the step to the deck. The
+## left slope rises left to right, the right one right to left.
 ##
-## Статический: геометрию проверяют без сцены — ступени внутри крыши и не
-## заходят на машинное отделение.
+## Static: the geometry is checked without a scene — the steps are inside the roof and do not go
+## into the machine room.
 static func steps(rules: BuildingRules, plan: BuildingPlan) -> Array[Rect2]:
 	var rects: Array[Rect2] = []
 	var shaft := plan.roof_shaft()
@@ -54,8 +53,8 @@ static func steps(rules: BuildingRules, plan: BuildingPlan) -> Array[Rect2]:
 			continue
 		var run := length / float(STEPS)
 		for step in STEPS:
-			# Ступень лежит от своего края до машинного отделения: нижние шире,
-			# верхние уже, и вместе они складываются в скат.
+			# A step lies from its edge to the machine room: the lower ones are wider, the upper ones
+			# narrower, and together they add up to a slope.
 			var rise := STEP_RISE * float(step + 1)
 			var from := span.x + run * float(step) if side == 0 else span.x
 			var to := span.y if side == 0 else span.y - run * float(step)
@@ -63,11 +62,11 @@ static func steps(rules: BuildingRules, plan: BuildingPlan) -> Array[Rect2]:
 	return rects
 
 
-## Ставит скаты по правилам и плану. Цвет — кладка палитры раунда, приглушённая
-## к серому: крыша — фон, а не вывеска (ADR-0029, решение 5).
+## Places the slopes by rules and plan. Colour — the round palette's masonry, muted toward grey: the
+## roof is background, not a sign (ADR-0029, decision 5).
 func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 	var tone := GreyboxLook.SKY_WALL.lerp(rules.palette.masonry, PALETTE_SHARE)
-	# Кровля — гравий (ADR-0033, решение 8), тон раунда множителем.
+	# The roofing is gravel (ADR-0033, decision 8), the round tone as a multiplier.
 	var material := BuildingFinish.roof_gravel(tone)
 	var depth := WorldSpace.ROOM_DEPTH
 	var rib := GreyboxLook.metal(GreyboxLook.SKY_WALL.lerp(GreyboxLook.TRIM, 0.35))
@@ -76,8 +75,8 @@ func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 		box.position = WorldSpace.to_scene(rect.get_center())
 		box.position.z = WorldSpace.BACK_WALL_Z - depth * 0.5
 		add_child(box)
-		# Рёбра кровельных листов по верху ступени (ADR-0031, решение 2): глухая
-		# коробка читалась стеной, а не кровлей.
+		# Ribs of the roofing sheets along the top of the step (ADR-0031, decision 2): a blank box read as
+		# a wall, not a roof.
 		var count := int(rect.size.x / RIB_STEP)
 		for index in count:
 			var x := rect.position.x + RIB_STEP * (float(index) + 0.5)

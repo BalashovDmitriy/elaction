@@ -1,27 +1,27 @@
 class_name DoorLife
 extends RefCounted
 
-## Жизнь за дверью квартиры (ADR-0055, решение 8): изредка из-за закрытой
-## двери глухо слышно телевизор, собаку или ссору соседей.
+## Life behind an apartment door (ADR-0055, decision 8): now and then a TV, a dog or
+## neighbours arguing are heard muffled from behind a closed door.
 ##
-## Только звук, механики нет: агенты за этими дверьми не прячутся, и звук не
-## предвещает выхода агента — у того свой телеграф створки (ADR-0020). Поэтому
-## звучит лишь закрытая дверь без документа и на этаже в кадре, редко и тихо.
-## Без узлов: дверь спрашивает каждый кадр, что прозвучало.
+## Sound only, no mechanic: agents do not hide behind these doors, and the sound does
+## not foretell an agent's exit — that has its own leaf telegraph (ADR-0020). So only a
+## closed door without a document on a floor in the frame sounds, rarely and quietly.
+## No nodes: the door asks every frame what has sounded.
 
-## Что слышно из-за двери.
+## What is heard from behind the door.
 const SOUNDS: PackedStringArray = [Sounds.DOOR_TV, Sounds.DOOR_DOG, Sounds.DOOR_ARGUE]
-## Пауза между звуками одной двери, с: дверей в кадре до десятка, и на всех
-## вместе выходит звук раз в десяток секунд.
+## Pause between sounds of one door, s: there are up to a dozen doors in the frame, and
+## all together they produce a sound every ten or so seconds.
 const PAUSE := Vector2(60.0, 150.0)
-## Первая пауза короче: войдя на этаж, жизнь слышно не через минуту.
+## The first pause is shorter: entering a floor, life is heard sooner than in a minute.
 const FIRST_PAUSE := Vector2(4.0, 90.0)
 
 var _rng := RandomNumberGenerator.new()
 var _wait: float = 0.0
 
 
-## Жизнь двери с жребием [param seed]: одна дверь звучит одинаково от раза к разу.
+## Door life with draw [param seed]: one door sounds the same from time to time.
 static func of(seed: int) -> DoorLife:
 	var life := DoorLife.new()
 	life._rng.seed = seed
@@ -29,9 +29,10 @@ static func of(seed: int) -> DoorLife:
 	return life
 
 
-## Прошло [param delta] секунд; [param audible] — дверь закрыта, без документа
-## и на этаже в кадре. Возвращает имя звука, если он прозвучал сейчас, иначе
-## пустую строку. Пока дверь не слышно, часы стоят: звук не копится.
+## [param delta] seconds have passed; [param audible] — the door is closed, without a
+## document and on a floor in the frame. Returns the sound's name if it sounded now,
+## otherwise an empty string. While the door cannot be heard, the clock stands: sound
+## does not accumulate.
 func advance(delta: float, audible: bool) -> String:
 	if not audible:
 		return ""

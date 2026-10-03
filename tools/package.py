@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Архив релиза: собранный билд плюс лицензии.
+"""Release archive: the built binary plus licences.
 
-Что кладём — [ADR-0013](../docs/adr/0013-release-and-versioning.md), пункт 7:
-исполняемый файл (ресурсы вшиты внутрь, `.pck` рядом нет), своя лицензия,
-лицензии шрифтов — OFL требует прикладывать её к продукту — и `CREDITS.md`:
-модели под CC-BY 3.0 требуют назвать авторов там, где их распространяют.
-Что каждый шрифт `assets/fonts/` едет со своей лицензией, стережёт `test_release`.
+What goes in — [ADR-0013](../docs/adr/0013-release-and-versioning.md), point 7:
+the executable (resources are embedded inside, no `.pck` next to it), our own licence,
+font licences — OFL requires shipping it with the product — and `CREDITS.md`:
+models under CC-BY 3.0 require naming the authors where they are distributed.
+That every font in `assets/fonts/` ships with its licence is guarded by `test_release`.
 
-Архив собирается кодом, а не командой `zip` в workflow: `zip` есть на ubuntu
-и нет на windows, а разбираться с этим в YAML — плодить платформенные ветки
-там, где их можно не заводить.
+The archive is built by code, not by the `zip` command in the workflow: `zip` exists on ubuntu
+and not on windows, and dealing with that in YAML means breeding platform branches
+where they can be avoided.
 
     python tools/package.py windows   # dist/elaction-v0.9.0-windows.zip
     python tools/package.py linux
@@ -27,51 +27,51 @@ from version import read as project_version
 
 DIST_DIR = PROJECT_ROOT / "dist"
 
-# Что едет вместе с игрой. Ключ — путь в репозитории, значение — имя в архиве.
+# What ships with the game. Key — path in the repository, value — name in the archive.
 EXTRAS: dict[str, str] = {
     "LICENSE": "LICENSE.txt",
     "CREDITS.md": "CREDITS.md",
     "assets/fonts/Exo2.LICENSE.txt": "Exo2.LICENSE.txt",
 }
 
-# Права на исполняемый файл внутри zip. Без них распакованная под Linux игра
-# не запускается, пока игрок сам не сделает chmod +x, — а он не обязан знать.
+# Permissions of the executable inside the zip. Without them a game unpacked under Linux
+# does not start until the player runs chmod +x himself — and he is not obliged to know that.
 EXECUTABLE_MODE: int = 0o755
 
 
-# Папка внутри архива. Без неё `unzip` в Linux рассыпал бы файлы по текущему
-# каталогу, а называть её как сам архив нельзя: проводник Windows на «Извлечь
-# всё» и так заводит папку по имени архива, и путь выходил бы с удвоением —
-# elaction-v0.9.0-windows\elaction-v0.9.0-windows\elaction.exe. Версия и
-# платформа остаются в имени архива, внутри — просто игра.
+# A folder inside the archive. Without it `unzip` on Linux would scatter files into the current
+# directory, and it cannot be named like the archive itself: Windows Explorer on "Extract
+# All" already creates a folder named after the archive, and the path would come out doubled —
+# elaction-v0.9.0-windows\elaction-v0.9.0-windows\elaction.exe. Version and
+# platform stay in the archive name, inside — just the game.
 INNER_DIR: str = "elaction"
 
 
 def archive_name(preset: Preset) -> str:
-    """Имя файла архива: `elaction-v0.9.0-windows`."""
+    """Archive file name: `elaction-v0.9.0-windows`."""
     return f"elaction-v{project_version()}-{preset.alias}"
 
 
 def add(archive: zipfile.ZipFile, source: Path, name: str, executable: bool = False) -> None:
-    """Кладёт файл в архив, при надобности пометив его исполняемым."""
+    """Puts a file into the archive, marking it executable if needed."""
     info = zipfile.ZipInfo(name)
     info.compress_type = zipfile.ZIP_DEFLATED
-    # На Windows ZipInfo ставит create_system=0 (FAT), и распаковщик тогда права
-    # из external_attr не смотрит вовсе: собранный на Windows Linux-архив уехал
-    # бы без права на запуск. Говорим «Unix» явно, от системы сборки не завися.
+    # On Windows ZipInfo sets create_system=0 (FAT), and then the unpacker does not look at
+    # permissions from external_attr at all: a Linux archive built on Windows would ship
+    # without the execute permission. We say "Unix" explicitly, independent of the build system.
     info.create_system = 3
     info.external_attr = (EXECUTABLE_MODE if executable else 0o644) << 16
     archive.writestr(info, source.read_bytes())
 
 
 def package(preset: Preset) -> int:
-    """Собирает архив для пресета. Возвращает код возврата для процесса."""
+    """Builds the archive for a preset. Returns the exit code for the process."""
     if not preset.path.exists():
         print(f"Нет собранного билда {preset.path} — сначала python tools/export.py {preset.alias}")
         return 1
 
-    # Проверяем до того, как открыли архив: иначе на полпути в dist/ остаётся
-    # обрезанный zip, который со стороны не отличить от готового.
+    # Checked before the archive is opened: otherwise a truncated zip is left halfway in dist/,
+    # which from the outside cannot be told apart from a finished one.
     missing = [source for source in EXTRAS if not (PROJECT_ROOT / source).exists()]
     if missing:
         print(f"Не нашёл {', '.join(missing)} — архив без них не собираю.")

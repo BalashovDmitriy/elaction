@@ -1,70 +1,73 @@
 class_name GarageRamp
 extends Node3D
 
-## Выезд из паркинга за воротами: тоннель, пандус наверх и улица (ADR-0038,
-## решение 3).
+## Exit from the garage beyond the gate: tunnel, ramp up and the street (ADR-0038,
+## decision 3).
 ##
-## С посадки кадр раздвигается влево за торец ([method ExitBoarding.exit_frame])
-## и едет за машиной вверх по пандусу до улицы. Первый вариант — голая
-## подпорная стена на полкадра, три лампы и плоские дома — был на кадрах ниже
-## всей игры. Теперь выезд собран, как само здание, разрезом:
+## From boarding the frame widens to the left past the end wall
+## ([method ExitBoarding.exit_frame]) and follows the car up the ramp to the street. The
+## first version — a bare retaining wall half a frame wide, three lamps and flat houses —
+## looked worse in shots than the rest of the game. Now the exit is built like the building
+## itself, as a cross-section:
 ##
-## - за воротами — **тоннель**: низкий потолок с люминесцентными светильниками,
-##   пятна их света на пандусе и на стене, кабельный лоток, спринклерная труба,
-##   отбойник в жёлто-чёрную полосу и стрелка EXIT краской на стене;
-## - дальше пандус выходит в **открытую рампу**: подпорная стена литого бетона
-##   (щиты, стяжки, потёки — [code]street_concrete.gdshader[/code]), поверху
-##   ограждение, светильники-«бочонки» и водосток;
-## - наверху — **улица** ([ExitStreet]): мостовая, фонарь над въездом и ряд
-##   домов через дорогу; тротуар идёт над тоннелем;
-## - под всем — грунт разрезом, с пластами.
+## - beyond the gate — a **tunnel**: a low ceiling with fluorescent fixtures,
+##   their light pools on the ramp and the wall, a cable tray, a sprinkler pipe,
+##   a crash barrier in yellow-black stripes and an EXIT arrow painted on the wall;
+## - further on the ramp comes out into an **open ramp**: a cast concrete retaining wall
+##   (form panels, ties, streaks — [code]street_concrete.gdshader[/code]), a railing
+##   on top, "barrel" fixtures and a downpipe;
+## - at the top — the **street** ([ExitStreet]): paving, a street light over the entrance and
+##   a row of houses across the road; the sidewalk runs above the tunnel;
+## - under it all — soil in cross-section, with strata.
 ##
-## Свет: фонарь над въездом — один источник без тени, и горит он, только пока
-## выезд в кадре ([method show_light]); остальное — эмиссия и пятна.
+## Light: the street light over the entrance is one shadowless source, and it is lit only
+## while the exit is in frame ([method show_light]); the rest is emission and light pools.
 ##
-## Вид, без тел: Otto сюда не выходит, машина — вид без тела — проезжает.
+## Looks only, no bodies: Otto does not come out here; the car — looks without a body —
+## drives through.
 
-## Грунт под полом подвала, м, — до низа любого кадра.
+## Soil under the basement floor, m — down to the bottom of any frame.
 const SOIL_DEPTH: float = 6.0
-## Зазор клина грунта от плиты и стен, м.
+## Gap of the soil wedge from the slab and walls, m.
 const SOIL_GAP: float = 0.01
-## Насколько клин уходит в пласт грунта под полом, м.
+## How far the wedge goes into the soil stratum under the floor, m.
 const SOIL_SINK: float = 0.05
-## На сколько отрезков разбит подъём по кривой: граней на ней не видно.
+## Into how many segments the curved rise is split: no facets are visible on it.
 const SLOPE_PIECES: int = 24
-## Тоннель: сколько пандуса от ворот накрыто потолком, м. Дальше потолок
-## задевал бы крышу машины: пол пандуса поднимается, а потолок — нет.
+## Tunnel: how much of the ramp from the gate is covered by the ceiling, m. Further on the
+## ceiling would touch the car roof: the ramp floor rises, but the ceiling does not.
 const TUNNEL: float = 5.0
-## Подпорная стена: толщина, м.
+## Retaining wall: thickness, m.
 const WALL_THICKNESS: float = 0.24
-## Ширина проезда по глубине — площадки у ворот, пандуса и тоннеля, м: коридор
-## с запасом, середина — в плоскости игры. По ней же шлагбаум офиса тянет
-## стрелу до стены тоннеля ([GarageDressing]).
+## Driveway width in depth — of the landing by the gate, the ramp and the tunnel, m: a
+## corridor with a margin, the middle in the play plane. The office barrier also extends
+## its arm by it to the tunnel wall ([GarageDressing]).
 const WIDTH: float = WorldSpace.CORRIDOR_DEPTH + 0.4
-## Тротуар над тоннелем и вдоль рампы: насколько выше мостовой, м.
+## Sidewalk above the tunnel and along the ramp: how much higher than the paving, m.
 const KERB: float = 0.15
-## Ограждение рампы: высота над тротуаром, шаг стоек, м.
+## Ramp railing: height above the sidewalk, post pitch, m.
 const RAIL_HEIGHT: float = 1.0
 const RAIL_STEP: float = 1.25
-## Фонарь над въездом: высота столба над тротуаром, вынос консоли, м, и свет —
-## натриевый, как свет за шторой ворот ([constant GarageGate.OUTSIDE]).
+## Street light over the entrance: pole height above the sidewalk, arm reach, m, and the
+## light — sodium, like the light behind the gate shutter ([constant GarageGate.OUTSIDE]).
 const LAMP_HEIGHT: float = 4.6
 const LAMP_ARM: float = 1.0
 const LAMP_RANGE: float = 11.0
 const LAMP_ENERGY: float = 9.0
-## Где стоит фонарь — левее торца, м: в кадре и на въезде, и на улице.
+## Where the street light stands — left of the end wall, m: in frame both at the entrance
+## and on the street.
 const LAMP_FROM_WALL: float = 7.0
-## Светильники тоннеля: шаг от ворот, длина трубки, м, и пятна их света.
+## Tunnel fixtures: pitch from the gate, tube length, m, and their light pools.
 const TUBE_STEP: float = 1.6
 const TUBE := Vector3(1.1, 0.04, 0.1)
 const WASH := Vector2(2.0, 2.2)
 const WASH_ENERGY: float = 0.18
 const POOL_ENERGY: float = 0.24
-## Светильники-«бочонки» на стене рампы: размер, высота над проездом и шаг, м.
+## "Barrel" fixtures on the ramp wall: size, height above the driveway and pitch, m.
 const BULKHEAD := Vector3(0.34, 0.16, 0.08)
 const BULKHEAD_RISE: float = 1.5
 const BULKHEAD_STEP: float = 3.0
-## Отбойник у стены: высота и глубина, м.
+## Crash barrier by the wall: height and depth, m.
 const BUMPER := Vector2(0.14, 0.14)
 
 const SOIL := Color(0.12, 0.105, 0.095)
@@ -79,11 +82,11 @@ const BULKHEAD_GLOW := Color(1.0, 0.8, 0.55)
 const POLE := Color(0.16, 0.17, 0.19)
 const WALL_PAINT := Color(0.78, 0.78, 0.74)
 
-## Вход в здание с улицы по типу ([StreetFront]).
+## Street entrance to the building by kind ([StreetFront]).
 var front: StreetFront = null
 
 var _rules: BuildingRules = null
-## Пол подвала и улица, в плоскости правил; торец здания; ширина проезда.
+## Basement floor and street, in the rules plane; the building's end wall; driveway width.
 var _surface: float = 0.0
 var _street: float = 0.0
 var _left: float = 0.0
@@ -93,7 +96,7 @@ var _light: OmniLight3D = null
 var _street_node: ExitStreet = null
 
 
-## Собирает выезд у левого торца нижнего этажа.
+## Builds the exit at the left end wall of the bottom floor.
 func build(rules: BuildingRules, building_seed: int = 1) -> void:
 	name = "Ramp"
 	_rules = rules
@@ -105,12 +108,12 @@ func build(rules: BuildingRules, building_seed: int = 1) -> void:
 	_street_node = ExitStreet.new()
 	add_child(_street_node)
 	_street_node.build(_left, _street, building_seed, _weather, rules.time_of_day)
-	# Вход в здание с улицы по типу (ADR-0058, решение 5): на тротуаре над
-	# тоннелем у торца — его высоту кладёт [method _build_street_edge].
+	# Street entrance to the building by kind (ADR-0058, decision 5): on the sidewalk above
+	# the tunnel by the end wall — its height is set by [method _build_street_edge].
 	front = StreetFront.new()
 	_street_node.add_child(front)
 	front.build(rules, _left, _street - KERB, building_seed, _weather)
-	# Улица — снаружи: днём на ней солнце здания (ADR-0052, решение 3).
+	# The street is outside: by day the building's sun is on it (ADR-0052, decision 3).
 	Outdoors.mark(_street_node)
 	_build_slabs()
 	_build_soil()
@@ -120,23 +123,23 @@ func build(rules: BuildingRules, building_seed: int = 1) -> void:
 	_build_lamp()
 
 
-## Зажигает или гасит свет выезда: горит, пока выезд в кадре.
+## Turns the exit light on or off: it is lit while the exit is in frame.
 func show_light(on: bool) -> void:
 	if _light != null:
 		_light.visible = on
 	if _street_node != null:
 		_street_node.show_light(on)
-	# Парковщик отеля стоит, как идут прохожие: только пока выезд в кадре.
+	# The hotel valet stands the way pedestrians walk: only while the exit is in frame.
 	if front != null:
 		front.set_active(on)
 
 
-## Поток машин улицы у выезда.
+## Street traffic by the exit.
 func traffic() -> StreetTraffic:
 	return _street_node.traffic() if _street_node != null else null
 
 
-## Настоящие источники выезда — для тестов бюджета.
+## Real light sources of the exit — for budget tests.
 func lights() -> Array[Light3D]:
 	var found: Array[Light3D] = []
 	if _light != null:
@@ -146,51 +149,51 @@ func lights() -> Array[Light3D]:
 	return found
 
 
-## Левый конец подъёма — верх пандуса, в плоскости правил.
+## Left end of the rise — the top of the ramp, in the rules plane.
 func top_x() -> float:
 	return _left - GarageGate.RAMP_APRON - GarageGate.RAMP_RUN
 
 
-## Высота проезда над полом подвала в [param x], м: площадка у ворот, подъём,
-## улица. Подъём — плавной кривой (ADR-0043, решение 17): пологий вход, круче к
-## середине, пологий выход на улицу. Прямой пандус ломался на концах углами, и
-## машина на них переламывалась.
+## Driveway height above the basement floor at [param x], m: the landing by the gate, the
+## rise, the street. The rise is a smooth curve (ADR-0043, decision 17): a gentle entry,
+## steeper towards the middle, a gentle exit to the street. A straight ramp broke into
+## corners at its ends, and the car snapped over them.
 static func climb_at(rules: BuildingRules, x: float) -> float:
 	return rules.floor_height * rise_share(_along(rules, x))
 
 
-## Наклон проезда в [param x], рад: касательная к той же кривой.
+## Driveway slope at [param x], rad: the tangent to the same curve.
 static func slope_at(rules: BuildingRules, x: float) -> float:
 	var t := _along(rules, x)
 	return atan(rules.floor_height / GarageGate.RAMP_RUN * rise_slope(t))
 
 
-## Доля подъёма на доле пути [param t]: сглаженная ступень — касательная на
-## обоих концах горизонтальна.
+## Share of the rise at path fraction [param t]: a smoothstep — the tangent is horizontal
+## at both ends.
 static func rise_share(t: float) -> float:
 	var at := clampf(t, 0.0, 1.0)
 	return at * at * (3.0 - 2.0 * at)
 
 
-## Производная [method rise_share] по доле пути.
+## Derivative of [method rise_share] with respect to path fraction.
 static func rise_slope(t: float) -> float:
 	var at := clampf(t, 0.0, 1.0)
 	return 6.0 * at * (1.0 - at)
 
 
-## Доля пути по подъёму в [param x]: 0 — у площадки, 1 — наверху.
+## Path fraction along the rise at [param x]: 0 — at the landing, 1 — at the top.
 static func _along(rules: BuildingRules, x: float) -> float:
 	var start := rules.floor_span(rules.floors - 1).x - GarageGate.RAMP_APRON
 	return clampf((start - x) / GarageGate.RAMP_RUN, 0.0, 1.0)
 
 
-## Где кончается потолок тоннеля, в плоскости правил.
+## Where the tunnel ceiling ends, in the rules plane.
 func mouth_x() -> float:
 	return _left - TUNNEL
 
 
-## Площадка у проёма и подъём влево на этаж. По подъёму уезжает машина
-## ([method ExitCar._climb]).
+## The landing by the opening and the rise to the left onto the floor. The car leaves
+## along the rise ([method ExitCar._climb]).
 func _build_slabs() -> void:
 	var concrete := BuildingFinish.shaft_concrete(Garage.CONCRETE)
 	var thickness := _rules.slab_height
@@ -203,7 +206,7 @@ func _build_slabs() -> void:
 	)
 	var incline := _slope(Vector3(0.0, thickness, _width), concrete, 0.0, thickness * 0.5)
 	incline.name = "Incline"
-	# Отбойник у стены: жёлтый, с чёрными торцами на площадке.
+	# Crash barrier by the wall: yellow, with black ends on the landing.
 	var yellow := GreyboxLook.surface(Garage.PAINT_YELLOW)
 	var black := GreyboxLook.surface(Garage.PAINT_BLACK)
 	var bumper_z := -_width * 0.5 + BUMPER.y * 0.5
@@ -221,10 +224,10 @@ func _build_slabs() -> void:
 	_slope(Vector3(0.0, BUMPER.x, BUMPER.y), yellow, bumper_z, -BUMPER.x * 0.5)
 
 
-## Лента вдоль подъёма из коротких коробок по кривой: во всю его длину,
-## [param size] — толщина и глубина (x не в счёт), [param z] — середина по
-## глубине, [param lift] — насколько середина ниже (+) или выше (−) поверхности
-## пандуса. Отрезков столько, что на кривой не видно граней.
+## A strip along the rise made of short boxes on the curve: along its whole length,
+## [param size] — thickness and depth (x does not count), [param z] — middle in
+## depth, [param lift] — how much the middle is below (+) or above (−) the ramp
+## surface. There are enough segments that no facets are visible on the curve.
 func _slope(size: Vector3, material: Material, z: float, lift: float) -> Node3D:
 	var strip := Node3D.new()
 	add_child(strip)
@@ -237,14 +240,14 @@ func _slope(size: Vector3, material: Material, z: float, lift: float) -> Node3D:
 		var from := Vector2(start - run * t0, _surface - rise * rise_share(t0))
 		var to := Vector2(start - run * t1, _surface - rise * rise_share(t1))
 		var chord := to - from
-		# Внахлёст на толщину: у коротких отрезков под разными углами между
-		# гранями иначе светились бы щели.
+		# Overlapped by the thickness: with short segments at different angles, gaps would
+		# otherwise shine between the faces.
 		var part := _box(
 			Vector3(chord.length() + size.y, size.y, size.z), material, Vector3.ZERO, false
 		)
 		var angle := atan2(-chord.y, -chord.x)
 		part.rotation.z = -angle
-		# Сдвиг от поверхности — по нормали к подъёму, а не по вертикали.
+		# The offset from the surface is along the normal to the rise, not along the vertical.
 		var normal := Vector2(sin(angle), cos(angle))
 		var centre := (from + to) * 0.5 + normal * lift * Vector2(-1.0, 1.0)
 		part.position = _at(centre.x, centre.y, z)
@@ -252,27 +255,27 @@ func _slope(size: Vector3, material: Material, z: float, lift: float) -> Node3D:
 	return strip
 
 
-## Грунт разрезом: клин под подъёмом и пласт под всем выездом. Лицо разреза —
-## вровень с проездом, как у плит здания; кромка разреза светлее.
+## Soil in cross-section: a wedge under the rise and a stratum under the whole exit. The
+## cut face is flush with the driveway, as with the building slabs; the cut edge is lighter.
 func _build_soil() -> void:
 	var soil := _soil()
 	var run := GarageGate.RAMP_RUN
 	var rise := _rules.floor_height
 	var depth := _width + 1.0
 	var z := _width * 0.5 - depth * 0.5
-	# Клин: высокая сторона слева, у верха пандуса. Чуть ниже плиты, чтобы грани
-	# не легли в одну плоскость.
-	# Клин под кривой подъёма — столбиками: каждый от пласта грунта до низа
-	# плиты над ним.
+	# The wedge: the high side on the left, at the top of the ramp. Slightly below the slab so
+	# the faces do not lie in one plane.
+	# The wedge under the curved rise is made of columns: each from the soil stratum to the
+	# bottom of the slab above it.
 	var start := _left - GarageGate.RAMP_APRON
 	var step := run / float(SLOPE_PIECES)
 	for index in SLOPE_PIECES:
 		var t := (float(index) + 0.5) / float(SLOPE_PIECES)
-		# Чуть ниже плиты и чуть уже разреза: грани клина не ложатся в одну
-		# плоскость ни с плитой, ни со стенами.
+		# Slightly below the slab and slightly narrower than the cut: the wedge faces do not lie
+		# in one plane with either the slab or the walls.
 		var top := _surface - rise * rise_share(t) + _rules.slab_height + SOIL_GAP
-		# Низ — в пласт грунта под полом: вровень с его верхом грани совпали бы
-		# с тоннелем.
+		# The bottom goes into the soil stratum under the floor: flush with its top the faces
+		# would coincide with the tunnel.
 		var bottom := _surface + _rules.slab_height + SOIL_SINK
 		if bottom - top <= SOIL_SINK + 0.02:
 			continue
@@ -290,7 +293,7 @@ func _build_soil() -> void:
 		soil,
 		_at(_left - span * 0.5, _surface + _rules.slab_height + SOIL_DEPTH * 0.5, z)
 	)
-	# Под улицей левее пандуса — грунт до асфальта.
+	# Under the street left of the ramp — soil up to the asphalt.
 	var street_span := span - GarageGate.RAMP_APRON - run
 	var fill := _surface + _rules.slab_height - _street - ExitStreet.ASPHALT
 	_box(
@@ -298,7 +301,7 @@ func _build_soil() -> void:
 		soil,
 		_at(top_x() - street_span * 0.5, _street + ExitStreet.ASPHALT + fill * 0.5, z)
 	)
-	# Кромка разреза под полом подвала: светлая полоса, как торец плиты.
+	# Cut edge under the basement floor: a light strip, like a slab end.
 	_box(
 		Vector3(span, 0.05, 0.01),
 		GreyboxLook.surface(SOIL_CUT),
@@ -307,8 +310,8 @@ func _build_soil() -> void:
 	)
 
 
-## Край улицы у выезда: асфальт левее верха пандуса — на него машина выезжает,
-## — и тротуар над тоннелем и вдоль рампы.
+## The street edge by the exit: asphalt left of the top of the ramp — the car drives out
+## onto it — and the sidewalk above the tunnel and along the ramp.
 func _build_street_edge() -> void:
 	var from := _left - ExitStreet.FROM
 	var right := top_x()
@@ -319,7 +322,7 @@ func _build_street_edge() -> void:
 		_street_node.road(),
 		_at((from + right) * 0.5, _street + ExitStreet.ASPHALT * 0.5, near - depth * 0.5)
 	)
-	# Кромка разреза по асфальту — светлая черта, как торец плиты здания.
+	# The cut edge along the asphalt — a light line, like the end of a building slab.
 	_box(
 		Vector3(right - from, 0.03, 0.01),
 		GreyboxLook.surface(KERB_TONE),
@@ -327,20 +330,20 @@ func _build_street_edge() -> void:
 	)
 	var walk := GreyboxLook.surface(PAVEMENT)
 	var back := -_width * 0.5 - WALL_THICKNESS
-	# Вдоль рампы тротуар — за стеной, от ограждения до мостовой.
+	# Along the ramp the sidewalk is behind the wall, from the railing to the paving.
 	var strip := back - ExitStreet.NEAR_Z
 	_box(
 		Vector3(_left - right, KERB, strip),
 		walk,
 		_at((right + _left) * 0.5, _street - KERB * 0.5, back - strip * 0.5)
 	)
-	# Над тоннелем — во всю глубину проезда.
+	# Above the tunnel — the full depth of the driveway.
 	_box(
 		Vector3(TUNNEL, KERB, near - back),
 		walk,
 		_at(_left - TUNNEL * 0.5, _street - KERB * 0.5, (near + back) * 0.5)
 	)
-	# Бордюр у мостовой, на сантиметр выше тротуара.
+	# Curb by the paving, a centimetre above the sidewalk.
 	_box(
 		Vector3(_left - right, KERB + 0.01, 0.16),
 		GreyboxLook.surface(KERB_TONE),
@@ -348,7 +351,7 @@ func _build_street_edge() -> void:
 	)
 
 
-## Тоннель: стена за проездом, потолок, светильники и то, что на стене.
+## Tunnel: the wall behind the driveway, the ceiling, fixtures and what is on the wall.
 func _build_tunnel() -> void:
 	var back := -_width * 0.5 - WALL_THICKNESS
 	var ceiling := _street + _rules.slab_height
@@ -366,7 +369,7 @@ func _build_tunnel() -> void:
 		concrete,
 		_at(_left - TUNNEL * 0.5, _street + _rules.slab_height * 0.5, (near + back) * 0.5)
 	)
-	# Полосы габарита на торце потолка у выхода из тоннеля.
+	# Clearance stripes on the ceiling end at the tunnel exit.
 	var yellow := GreyboxLook.surface(Garage.PAINT_YELLOW)
 	var black := GreyboxLook.surface(Garage.PAINT_BLACK)
 	for index in 6:
@@ -378,7 +381,7 @@ func _build_tunnel() -> void:
 		)
 	var face := -_width * 0.5
 	var steel := GreyboxLook.metal(TRAY)
-	# Кабельный лоток и кабели в нём, под потолком.
+	# Cable tray with cables in it, under the ceiling.
 	_box(
 		Vector3(TUNNEL - 0.4, 0.08, 0.24),
 		steel,
@@ -391,11 +394,11 @@ func _build_tunnel() -> void:
 		_at(_left - TUNNEL * 0.5 - 0.1, ceiling + 0.335, face + 0.12),
 		false
 	)
-	# Спринклерная труба — красная, вдоль потолка.
+	# Sprinkler pipe — red, along the ceiling.
 	var pipe := _pipe(TUNNEL - 0.2, 0.035, GreyboxLook.metal(Garage.PIPE_RED))
 	pipe.rotation.z = PI * 0.5
 	pipe.position = _at(_left - TUNNEL * 0.5, ceiling + 0.14, face + 0.42)
-	# Светильники: трубки у стены под потолком, пятна на стене и на пандусе.
+	# Fixtures: tubes by the wall under the ceiling, light pools on the wall and the ramp.
 	var x := _left - TUBE_STEP * 0.5
 	while x > mouth + TUBE.x * 0.5:
 		_box(
@@ -415,7 +418,7 @@ func _build_tunnel() -> void:
 			pool.rotation.z = -slope_at(_rules, x)
 		add_child(pool)
 		x -= TUBE_STEP
-	# Стрелка EXIT краской на стене — по ней выезжают.
+	# EXIT arrow painted on the wall — cars leave by it.
 	var words := Garage.label("◀ EXIT", 800, 0.42, WALL_PAINT)
 	words.position = _at(_left - 1.9, _surface - 1.45, face + 0.004)
 	add_child(words)
@@ -423,8 +426,8 @@ func _build_tunnel() -> void:
 	_box(Vector3(2.1, 0.06, 0.004), bar, _at(_left - 1.9, _surface - 1.1, face + 0.002), false)
 
 
-## Открытая рампа за тоннелем: подпорная стена, водосток, «бочонки» и
-## ограждение поверху.
+## Open ramp behind the tunnel: retaining wall, downpipe, "barrels" and
+## the railing on top.
 func _build_open_ramp() -> void:
 	var back := -_width * 0.5 - WALL_THICKNESS
 	var right := mouth_x()
@@ -436,7 +439,7 @@ func _build_open_ramp() -> void:
 		_wall(top, _surface, 0.7 if Weather.is_raining(_weather) else 0.0),
 		_at((left + right) * 0.5, top + height * 0.5, back + WALL_THICKNESS * 0.5)
 	)
-	# Отлив парапета — светлая полоса по верху.
+	# Parapet coping — a light strip along the top.
 	_box(
 		Vector3(right - left, 0.05, WALL_THICKNESS + 0.06),
 		GreyboxLook.surface(KERB_TONE),
@@ -444,13 +447,13 @@ func _build_open_ramp() -> void:
 		false
 	)
 	var face := -_width * 0.5
-	# Водосток — от отлива вниз к проезду, у выхода из тоннеля.
+	# Downpipe — from the coping down to the driveway, at the tunnel exit.
 	var drain_x := right - 0.35
 	var drain_ground := _surface - climb_at(_rules, drain_x)
 	var drain := _pipe(drain_ground - top, 0.05, GreyboxLook.metal(Garage.PIPE_GREY))
 	drain.position = _at(drain_x, (drain_ground + top) * 0.5, face + 0.07)
-	# Светильники над проездом идут вдоль подъёма: каждый на своей высоте над
-	# ним, пока помещается под отливом.
+	# The fixtures above the driveway go along the rise: each at its own height above
+	# it, while it fits under the coping.
 	var x := right - 1.2
 	while x > left + 0.5:
 		var ground := _surface - climb_at(_rules, x)
@@ -464,7 +467,7 @@ func _build_open_ramp() -> void:
 			false
 		)
 		x -= BULKHEAD_STEP
-	# Ограждение: стойки на отливе и два прута поверху.
+	# Railing: posts on the coping and two bars on top.
 	var metal := GreyboxLook.metal(RAIL)
 	var rail_z := back + WALL_THICKNESS * 0.5
 	var coping := top - 0.05
@@ -486,7 +489,8 @@ func _build_open_ramp() -> void:
 		)
 
 
-## Фонарь над въездом: столб на тротуаре за ограждением, консоль над рампой.
+## Street light over the entrance: a pole on the sidewalk behind the railing, an arm over
+## the ramp.
 func _build_lamp() -> void:
 	var pole_x := _left - LAMP_FROM_WALL
 	var pole_z := ExitStreet.NEAR_Z + 0.35
@@ -528,8 +532,8 @@ func _build_lamp() -> void:
 		)
 
 
-## Материал стены: литой бетон с высотой верха и низа, от которых потёки и
-## сырость.
+## Wall material: cast concrete with top and bottom heights, from which the streaks and
+## dampness go.
 func _wall(top: float, bottom: float, wetness: float = 0.0) -> ShaderMaterial:
 	var grain := BuildingFinish.shaft_concrete(WALL_TONE)
 	var look := ShaderMaterial.new()
@@ -543,7 +547,7 @@ func _wall(top: float, bottom: float, wetness: float = 0.0) -> ShaderMaterial:
 	return look
 
 
-## Материал грунта: пласты от уровня улицы.
+## Soil material: strata from the street level.
 func _soil() -> ShaderMaterial:
 	var look := ShaderMaterial.new()
 	look.shader = preload("res://src/levels/street_soil.gdshader")
@@ -552,7 +556,7 @@ func _soil() -> ShaderMaterial:
 	return look
 
 
-## Труба длиной [param length] и радиусом [param radius], стоя по Y.
+## A pipe of length [param length] and radius [param radius], standing along Y.
 func _pipe(length: float, radius: float, material: Material) -> MeshInstance3D:
 	var mesh := CylinderMesh.new()
 	mesh.top_radius = radius
@@ -567,9 +571,9 @@ func _pipe(length: float, radius: float, material: Material) -> MeshInstance3D:
 	return part
 
 
-## Пятно света — плоскость с градиентом, складывается с тем, на чём лежит.
-## [param upright] — на стене, светлее сверху, у светильника; иначе — на полу,
-## круглое.
+## Light pool — a plane with a gradient, added to whatever it lies on.
+## [param upright] — on a wall, lighter at the top, by the fixture; otherwise — on the
+## floor, round.
 static func _glow(size: Vector2, tone: Color, energy: float, upright: bool) -> MeshInstance3D:
 	var gradient := Gradient.new()
 	gradient.set_color(0, Color(tone, energy))
@@ -606,7 +610,7 @@ func _at(x: float, y: float, z: float) -> Vector3:
 	return Garage.scene_point(x, y, z)
 
 
-## Коробка выезда. Теней выезд не кладёт: его источники — без теней.
+## A box of the exit. The exit casts no shadows: its sources are shadowless.
 func _box(
 	size: Vector3, material: Material, centre: Vector3, shadow: bool = false
 ) -> MeshInstance3D:

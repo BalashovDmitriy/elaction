@@ -1,25 +1,25 @@
 extends GutTest
 
-## Бот умеет драться: встретив агента на своей линии, он его убивает.
+## The bot can fight: meeting an agent on its line, it kills him.
 ##
-## Тест про сам инструмент замера, а не про игру, — и всё же самый важный из
-## новых. Одиночные действия, выстрел и прыжок, движок отдаёт по фронту
-## нажатия: отпустить и нажать их в одном кадре мало, фронта не выйдет. Бот
-## делал именно так, и всю веху M11 замеры показывали игру, в которой Otto ни
-## разу не выстрелил и ни разу не прыгнул. Цифры в ADR-0016 собраны тем ботом,
-## и переписаны они только после этой проверки.
+## The test is about the measuring tool itself, not the game — and yet the most important of
+## the new ones. Single actions, shot and jump, the engine reports by the press
+## edge: releasing and pressing them in one frame is not enough, there will be no edge. The bot
+## did exactly that, and for the whole M11 milestone the measurements showed a game in which Otto
+## never once fired and never once jumped. The figures in ADR-0016 were collected by that bot,
+## and they were rewritten only after this check.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 
-## Сколько кадров даётся на дуэль. Пуля летит 6.6 м/с, агент стоит в паре
-## метров — это доля секунды; остальное запас на замах и на промах.
+## How many frames are given to the duel. The bullet flies 6.6 m/s, the agent stands a couple of
+## metres away — that is a fraction of a second; the rest is margin for wind-up and a miss.
 const DUEL_FRAMES: int = 300
 
-## Сколько кадров даётся зданию, чтобы встать на места.
+## How many frames the building is given to settle into place.
 const SETTLE_FRAMES: int = 4
 
-## Этаж посередине здания: и не крыша, и не выход.
+## A floor in the middle of the building: neither the roof nor the exit.
 const FLOOR: int = 5
 
 
@@ -32,8 +32,8 @@ func after_all() -> void:
 	GameState.instance().reset()
 
 
-## Здание настоящее, но своих агентов оно не выпускает: в дуэли должен быть
-## ровно один противник, иначе непонятно, кого бот достал.
+## The building is real, but it does not release its own agents: the duel must have
+## exactly one opponent, otherwise it is unclear whom the bot got.
 func _build() -> GreyboxLevel:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
@@ -52,9 +52,10 @@ func test_the_bot_shoots_the_agent_in_its_way() -> void:
 	var spots := level.plan().safe_spots(rules, FLOOR)
 	assert_gt(spots.size(), 1, "на этаже есть где стоять обоим")
 
-	# Не первые два места, а два ближайших друг к другу: между соседними местами
-	# бывает и занятое — шахта, проём эскалатора, — и первая пара расходилась бы
-	# на полэтажа. С того края агент боту уже не цель, и дуэли не вышло бы вовсе.
+	# Not the first two slots but the two nearest each other: between neighbouring slots there can
+	# be an occupied one — a shaft, an escalator opening — and the first pair would be half a floor
+	# apart. From that edge the agent is no longer a target for the bot, and there would be no duel
+	# at all.
 	var pair := _closest_pair(spots)
 	var gap := pair.y - pair.x
 	assert_lt(gap, OttoBot.ENGAGE, "агент стоит в поле зрения бота")
@@ -70,9 +71,9 @@ func test_the_bot_shoots_the_agent_in_its_way() -> void:
 
 	var bot := OttoBot.new(level)
 	var frames := 0
-	# Два кадра на решение, как во всех прогонах ботом: это правило M13, а не
-	# недосмотр. Подробно — `tests/test_building_playthrough.gd`, метод `_tick`,
-	# и `docs/testing.md`, пункт 4.
+	# Two frames per decision, as in all bot runs: this is an M13 rule, not
+	# an oversight. Details — `tests/test_building_playthrough.gd`, method `_tick`,
+	# and `docs/testing.md`, point 4.
 	while not agent.is_dead() and frames < DUEL_FRAMES:
 		bot.step()
 		await wait_physics_frames(1)
@@ -84,12 +85,12 @@ func test_the_bot_shoots_the_agent_in_its_way() -> void:
 	remove_child(level)
 
 
-## Бот уходит от выстрела по лучу прицела, а не по пуле (ADR-0037, решение 5):
-## под высоким приседает сразу, через низкий прыгает, только когда пуля вот-вот
-## придёт, — прыгнув раньше, он приземлился бы прямо на неё.
+## The bot dodges a shot by the aim laser, not by the bullet (ADR-0037, decision 5):
+## under a high one it crouches at once, over a low one it jumps only when the bullet is about
+## to arrive — jumping earlier, it would land right on it.
 ##
-## Луч зажигается руками, а агент заморожен: проверяется, как бот читает луч, а
-## не жребий позы выстрела.
+## The laser is lit by hand and the agent is frozen: what is checked is how the bot reads the laser,
+## not the draw of the shooting pose.
 func test_the_bot_answers_the_aiming_laser() -> void:
 	var level := _build()
 	await wait_physics_frames(SETTLE_FRAMES)
@@ -97,8 +98,8 @@ func test_the_bot_answers_the_aiming_laser() -> void:
 	var pair := _closest_pair(level.plan().safe_spots(rules, FLOOR))
 	var surface := rules.floor_surface(FLOOR)
 	level.otto.global_position = WorldSpace.to_scene(Vector2(pair.x, surface))
-	# Агент стоит и не стреляет, пока тест не заморозит его: иначе он подошёл бы
-	# вплотную или выстрелил бы сам.
+	# The agent stands and does not shoot until the test freezes him: otherwise he would walk up
+	# point-blank or shoot himself.
 	rules.agents_hold_fire = true
 	var agent := ENEMY_SCENE.instantiate() as Enemy
 	agent.walk_speed = 0.0
@@ -107,7 +108,7 @@ func test_the_bot_answers_the_aiming_laser() -> void:
 	agent.apply_rules(rules)
 	agent.setup(level.otto, -1.0)
 	await wait_physics_frames(SETTLE_FRAMES * 4)
-	# Замёрзший агент луч не гасит: его зажигает тест.
+	# A frozen agent does not put out the laser: the test lights it.
 	agent.process_mode = Node.PROCESS_MODE_DISABLED
 	var bot := OttoBot.new(level)
 
@@ -131,8 +132,8 @@ func test_the_bot_answers_the_aiming_laser() -> void:
 	remove_child(level)
 
 
-## Зажигает луч агента на высоте [param height] над полом: пуля уйдёт через
-## [param shot_in] секунд.
+## Lights the agent's laser at height [param height] above the floor: the bullet leaves in
+## [param shot_in] seconds.
 func _aim(agent: Enemy, height: float, shot_in: float) -> void:
 	agent.laser.position = Vector3(-Proportions.MUZZLE, height, 0.0)
 	agent.laser.shot_in = shot_in
@@ -140,8 +141,8 @@ func _aim(agent: Enemy, height: float, shot_in: float) -> void:
 	agent.laser.aim(-1.0)
 
 
-## Агента спиной к себе бот не расстреливает, а подкрадывается и добивает сзади
-## (ADR-0040): так дороже, и так он показывает добивания в демо (ADR-0041).
+## The bot does not shoot an agent with his back to it, but sneaks up and takes him down from behind
+## (ADR-0040): that is worth more, and that is how it shows takedowns in the demo (ADR-0041).
 func test_the_bot_takes_down_an_agent_from_behind() -> void:
 	var level := _build()
 	await wait_physics_frames(SETTLE_FRAMES)
@@ -157,7 +158,7 @@ func test_the_bot_takes_down_an_agent_from_behind() -> void:
 		Vector2(minf(pair.y, pair.x + OttoBot.TAKEDOWN_SNEAK * 0.6), surface)
 	)
 	agent.apply_rules(rules)
-	# Спиной к Otto: смотрит от него, вправо.
+	# Back to Otto: faces away from him, to the right.
 	agent.setup(level.otto, 1.0)
 	await wait_physics_frames(SETTLE_FRAMES * 4)
 	var before := GameState.instance().score
@@ -180,7 +181,7 @@ func test_the_bot_takes_down_an_agent_from_behind() -> void:
 	remove_child(level)
 
 
-## Два ближайших друг к другу места этажа: слева и справа.
+## The two floor slots nearest each other: left and right.
 func _closest_pair(spots: PackedFloat64Array) -> Vector2:
 	var best := Vector2(spots[0], spots[1])
 	for index in range(1, spots.size() - 1):

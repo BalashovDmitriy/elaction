@@ -1,17 +1,17 @@
 extends GutTest
 
-## Кабина, в которую вошли на ходу (ADR-0037, решение 1).
+## A cab entered while moving (ADR-0037, decision 1).
 ##
-## Otto садится в кабину вровень с этажом или шагнув на её пол, пока она
-## подъезжает. Между этажами кабина не встаёт ни так, ни так (ADR-0053,
-## решение 1): невровень с этажом из неё не выйти, и оба застыли бы навсегда.
-## Работает без сцены, как и [code]test_elevator_motion.gd[/code].
+## Otto gets into the cab level with the floor or by stepping onto its floor while it
+## approaches. Between floors the cab stops in neither case (ADR-0053, decision 1): out
+## of level with the floor you cannot step out of it, and both would freeze forever.
+## Works without a scene, like [code]test_elevator_motion.gd[/code].
 
 const TOP: float = 0.0
 const MIDDLE: float = 100.0
 const BOTTOM: float = 200.0
 
-## Кадр теста. При скорости 100 px/с кабина проходит за него ровно 10 px.
+## Test frame. At a speed of 100 px/s the cab covers exactly 10 px in it.
 const STEP: float = 0.1
 
 
@@ -39,18 +39,20 @@ func test_car_boarded_on_the_way_carries_on_to_its_floor() -> void:
 
 
 func test_car_boarded_on_the_way_obeys_and_then_runs_on_to_a_floor() -> void:
-	# Повёл и отпустил — кабина доезжает до этажа по ходу, а не встаёт.
+	# Drove and released: the cab carries on to the floor in the direction of travel
+	# instead of stopping.
 	var motion := _shaft(2)
 	_run(motion, 1.2, 0.0, false)
 	_run(motion, 0.3, ElevatorMotion.UP, true)
-	# Отпущена между дном и серединой на ходу вверх: доезжает до середины, а не
-	# возвращается на дно, с которого ушла.
+	# Released between the bottom and the middle while moving up: it carries on to the
+	# middle instead of going back to the bottom it left.
 	assert_almost_eq(_run(motion, 2.0, 0.0, true), MIDDLE, 0.01, "доехала не до этажа по ходу")
 	assert_true(motion.is_aligned(), "отпущенная пассажиром — на этаже")
 
 
 func test_the_next_passenger_rides_on_to_a_floor() -> void:
-	# Пассажир повёл и вышел; следующий входит на ходу — кабина доезжает.
+	# The passenger drove and stepped out; the next one enters while moving and the cab
+	# carries on.
 	var motion := _shaft(2)
 	_run(motion, 0.6, ElevatorMotion.UP, true)
 	_run(motion, 0.8, 0.0, true)

@@ -1,63 +1,64 @@
 class_name GameState
 extends Node
 
-## Состояние партии: счёт, жизни и прогресс по документам.
+## Game state: score, lives and document progress.
 ##
-## Первый синглтон игрового состояния в проекте. Двери, HUD и выход не знают друг
-## о друге и связываются через него сигналами — как предписывают соглашения.
-## Здесь же живёт партия целиком: номер здания и тревога.
+## The project's first game state singleton. Doors, HUD and the exit do not know about each
+## other and talk through it with signals — as the conventions prescribe.
+## The whole game lives here too: building number and alarm.
 ##
-## В дерево его ставит автолоад `Game`, а код обращается через [method instance].
-## Имя автолоада само по себе идентификатором не является: `--check-only` разбирает
-## каждый скрипт по отдельности и таких имён не знает, а имя класса знает. Побочная
-## выгода — тесты создают свой экземпляр и глобального не трогают.
+## The `Game` autoload puts it into the tree, and code accesses it via [method instance].
+## The autoload name by itself is not an identifier: `--check-only` parses
+## each script separately and does not know such names, but it knows the class name. A side
+## benefit — tests create their own instance and do not touch the global one.
 
 signal score_changed(value: int)
-## Очки начислены: сколько и где — точка сцены, над которой HUD покажет
-## прибавку; [constant AT_OTTO] — над Otto (документ). [param popup] = false —
-## без прибавки над местом: у бонуса за здание своя панель.
+## Points awarded: how many and where — the scene point above which the HUD shows
+## the increment; [constant AT_OTTO] — above Otto (a document). [param popup] = false —
+## no increment above the place: the building bonus has its own panel.
 signal scored(points: int, at: Vector3, popup: bool)
 signal documents_changed(collected: int, total: int)
 signal lives_changed(value: int)
 
-## Выдана дополнительная жизнь за очки. Отдельно от [signal lives_changed]:
-## тот говорит, сколько жизней стало, а этот — что одну только что подарили,
-## и по нему играет свой звук.
+## An extra life for points was awarded. Separate from [signal lives_changed]:
+## that one says how many lives there are now, and this one says one was just given,
+## and it plays its own sound.
 signal extra_life_awarded
-## Жизни кончились. Партия окончена.
+## Lives are over. The game is over.
 signal game_over
 
-## Otto вошёл в новое здание.
+## Otto has entered a new building.
 signal building_changed(number: int)
 
-## Провозились: агенты злеют, кабина отвечает с задержкой (ADR-0009).
+## Took too long: agents get angrier, the cab responds with a delay (ADR-0009).
 signal alarm_raised
 
-## Таблица очков оригинала (ADR-0005, пункт 1 и ADR-0006, пункт 5).
-## Где показать прибавку очков, если события в сцене нет: над Otto ([signal scored]).
+## The original's score table (ADR-0005, item 1 and ADR-0006, item 5).
+## Where to show the score increment if there is no event in the scene: above Otto
+## ([signal scored]).
 const AT_OTTO := Vector3.INF
-## Прибавка всплывает над головой убитого, а не у ног.
+## The increment pops up above the killed agent's head, not at his feet.
 const OVER_HEAD := Vector3(0.0, 1.9, 0.0)
 const DOCUMENT_SCORE: int = 500
 const ENEMY_SHOT_SCORE: int = 100
 const LAMP_SCORE: int = 300
-## Агент, раздавленный кабиной, — 300, как в ROM (таблица очков @577B).
+## An agent crushed by a cab is 300, as in the ROM (score table @577B).
 const CRUSH_SCORE: int = 300
 
-## Надбавка за убийство на погашенном этаже. Плоская, а не множитель: сверка
-## перед M6 нашла таблицу — выстрел 100, выстрел в темноте 150, ногой 150,
-## ногой в темноте 200 (ADR-0010, пункт 6). До сверки здесь стояло удвоение.
+## Bonus for a kill on a dark floor. Flat, not a multiplier: the check against the original
+## before M6 found the table — shot 100, shot in the dark 150, kick 150,
+## kick in the dark 200 (ADR-0010, item 6). Before the check there was a doubling here.
 const DARK_KILL_BONUS: int = 50
 
-## Жизней на партию — три, как в оригинале (ADR-0006, пункт 4).
+## Lives per game — three, as in the original (ADR-0006, item 4).
 const STARTING_LIVES: int = 3
 
-## Дополнительная жизнь за очки. Порог — минимальный из четырёх, которые
-## мануал Taito отдаёт DIP-переключателями (ADR-0012, пункт 5): 10 000.
+## Extra life for points. The threshold is the lowest of the four the
+## Taito manual offers via DIP switches (ADR-0012, item 5): 10 000.
 ##
-## Выдаётся один раз за партию. Повтор каждые десять тысяч мануалом не
-## подтверждён, а на тёмном этаже с респавном агентов он превратился бы
-## в бесконечные жизни — эту ферму мы себе уже предсказывали в ADR-0010.
+## Awarded once per game. A repeat every ten thousand is not confirmed by the
+## manual, and on a dark floor with agent respawn it would turn into
+## infinite lives — we already predicted this farm for ourselves in ADR-0010.
 const EXTRA_LIFE_SCORE: int = 10000
 
 static var _instance: GameState = null
@@ -67,48 +68,48 @@ var lives: int = STARTING_LIVES
 var documents_collected: int = 0
 var documents_total: int = 0
 
-## Номер здания. Сид его раскладки — [method building_seed].
+## Building number. Its layout seed is [method building_seed].
 var building: int = 1
 
-## Соль партии: смешивается с номером здания в сид, чтобы здания отличались от
-## партии к партии и не заучивались (ADR-0028, решение 6). Ноль — сид равен
-## номеру здания, как до M18e: так играют тесты и бот, иначе шкала смертей
-## шумела бы.
+## Game salt: mixed with the building number into the seed so buildings differ from
+## game to game and are not memorised (ADR-0028, decision 6). Zero — the seed equals
+## the building number, as before M18e: tests and the bot play this way, otherwise the death
+## scale would be noisy.
 var salt: int = 0
 var alarm := Alarm.new()
 
-## Идёт ли партия. На паузе и после Game Over время не тикает.
+## Whether a game is running. On pause and after Game Over time does not tick.
 var _running: bool = false
 
-## Выдана ли уже дополнительная жизнь в этой партии.
+## Whether the extra life has already been awarded in this game.
 var _extra_life_given: bool = false
 
 
-## Состояние партии. До входа автолоада в дерево — null.
+## Game state. Null until the autoload enters the tree.
 static func instance() -> GameState:
 	return _instance
 
 
-## Очки за убитого агента с учётом того, темно ли там, где его достали.
+## Points for a killed agent, taking into account whether it is dark where he was hit.
 static func kill_score(base: int, in_the_dark: bool) -> int:
 	return base + DARK_KILL_BONUS if in_the_dark else base
 
 
 func _enter_tree() -> void:
-	# Экземпляр из автолоада входит в дерево первым и становится общим.
+	# The autoload instance enters the tree first and becomes the shared one.
 	if _instance == null:
 		_instance = self
-		# Журнал прогона игры — по флагу `--log=путь` или `ELACTION_LOG`.
+		# Game run log — by the `--log=path` flag or `ELACTION_LOG`.
 		RunLog.open()
 
 
-## Сирена отсчитывается шагами физики, а не кадрами.
+## The siren is counted in physics steps, not frames.
 ##
-## От неё зависит злость агентов и задержка кабин, то есть исход партии, — а
-## кадр идёт по настенным часам. Пока счёт был кадровый, один и тот же сид давал
-## то три смерти, то четыре при одном и том же числе шагов бота: сирена успевала
-## включиться раньше или позже. Правило вехи M18b — всё, что решает исход, живёт
-## в физике ([`testing.md`](../../docs/testing.md)).
+## Agent anger and cab delay depend on it, i.e. the outcome of the game — while
+## frames go by the wall clock. While the count was per frame, the same seed gave
+## now three deaths, now four with the same number of bot steps: the siren managed
+## to switch on earlier or later. The M18b milestone rule — everything that decides the
+## outcome lives in physics ([`testing.md`](../../docs/testing.md)).
 func _physics_process(delta: float) -> void:
 	if not _running:
 		return
@@ -121,8 +122,8 @@ func _exit_tree() -> void:
 		_instance = null
 
 
-## Начинает партию заново: счёт, жизни, первое здание. [param new_salt] —
-## соль партии; ноль, если её не передали.
+## Starts the game anew: score, lives, first building. [param new_salt] —
+## game salt; zero if it was not passed.
 func start_game(new_salt: int = 0) -> void:
 	reset()
 	salt = new_salt
@@ -130,15 +131,16 @@ func start_game(new_salt: int = 0) -> void:
 	building_changed.emit(building)
 
 
-## Останавливает партию, не трогая её итог. Нужно выходу в меню: здание там
-## выброшено, а таймер сирены без этого продолжал бы идти под главным меню.
+## Stops the game without touching its result. Needed for exiting to the menu: the building
+## is thrown away there, and without this the siren timer would keep running under the main
+## menu.
 func stop_game() -> void:
 	_running = false
 
 
-## Здание сдано: бонус за него и переход к следующему. Тревога снимается
-## только здесь — смерть её не снимала и не снимет. Бонус — по ROM: 1000 × номер
-## здания, но не больше чем за десятое (`Arcade.building_bonus`).
+## The building is finished: its bonus and moving on to the next. The alarm is cleared
+## only here — death did not and will not clear it. The bonus is by the ROM: 1000 × building
+## number, but no more than for the tenth (`Arcade.building_bonus`).
 func finish_building() -> void:
 	add_score(Arcade.building_bonus(building), AT_OTTO, false)
 	building += 1
@@ -146,14 +148,14 @@ func finish_building() -> void:
 	building_changed.emit(building)
 
 
-## Начинает партию в здании с известным числом красных дверей.
+## Starts a game in a building with a known number of red doors.
 func start_building(total_documents: int) -> void:
 	documents_total = maxi(total_documents, 0)
 	documents_collected = 0
 	documents_changed.emit(documents_collected, documents_total)
 
 
-## Обнуляет всё: счёт, жизни, документы, номер здания, соль и тревогу.
+## Resets everything: score, lives, documents, building number, salt and alarm.
 func reset() -> void:
 	score = 0
 	lives = STARTING_LIVES
@@ -168,16 +170,16 @@ func reset() -> void:
 	documents_changed.emit(documents_collected, documents_total)
 
 
-## Сид раскладки текущего здания: его номер, смешанный с солью партии. Одна
-## и та же соль на раскладку и на бой (ADR-0027, решение 2): уровень сеет
-## сидом и то и другое.
+## Layout seed of the current building: its number mixed with the game salt. One
+## and the same salt for the layout and for combat (ADR-0027, decision 2): the level seeds
+## both with it.
 func building_seed() -> int:
 	return building if salt == 0 else hash([building, salt])
 
 
-## Засчитывает поднятый документ вместе с очками за него. [param scored] =
-## false — без очков: так демо снизу засчитывает документы этажей выше, которых
-## бот не поднимал (ADR-0041).
+## Counts a picked-up document together with its points. [param scored] =
+## false — without points: this is how the demo from below counts documents of floors above
+## that the bot did not pick up (ADR-0041).
 func collect_document(scored: bool = true) -> void:
 	documents_collected += 1
 	documents_changed.emit(documents_collected, documents_total)
@@ -185,10 +187,10 @@ func collect_document(scored: bool = true) -> void:
 		add_score(DOCUMENT_SCORE)
 
 
-## Снимает жизнь. Возвращает true, если Otto ещё может вернуться в игру.
+## Takes a life. Returns true if Otto can still return to play.
 ##
-## После конца партии ничего не делает: [signal game_over] сообщает о переходе,
-## а не о состоянии, и повторно он не приходит.
+## After the game is over it does nothing: [signal game_over] reports the transition,
+## not the state, and it does not come twice.
 func lose_life() -> bool:
 	if lives <= 0:
 		return false
@@ -201,7 +203,7 @@ func lose_life() -> bool:
 	return false
 
 
-## Начисляет [param points] очков за событие в точке сцены [param at].
+## Awards [param points] points for an event at scene point [param at].
 func add_score(points: int, at: Vector3 = AT_OTTO, popup: bool = true) -> void:
 	score += points
 	score_changed.emit(score)
@@ -209,10 +211,10 @@ func add_score(points: int, at: Vector3 = AT_OTTO, popup: bool = true) -> void:
 	_check_extra_life()
 
 
-## Дополнительная жизнь за очки — один раз за партию и только пока она идёт.
+## Extra life for points — once per game and only while it is running.
 ##
-## После Game Over очки ещё начисляются (бонус за здание приходит отложенно),
-## и без этой проверки мёртвому выдавали бы жизнь, с которой он не оживёт.
+## After Game Over points are still awarded (the building bonus arrives with a delay),
+## and without this check a dead player would get a life he cannot come back with.
 func _check_extra_life() -> void:
 	if _extra_life_given or score < EXTRA_LIFE_SCORE or lives <= 0:
 		return
@@ -222,6 +224,7 @@ func _check_extra_life() -> void:
 	extra_life_awarded.emit()
 
 
-## Собраны ли все документы здания. Здание без красных дверей считается собранным.
+## Whether all documents of the building are collected. A building without red doors counts
+## as collected.
 func all_documents_collected() -> bool:
 	return documents_collected >= documents_total

@@ -1,190 +1,189 @@
-# ADR-0012 · Звук и интерфейс
+# ADR-0012 · Sound and interface
 
-- **Статус:** принято; пункт 3 («чужой файл один») снят — модели и фактуры паков
-  ([ADR-0032](0032-actor-models.md), [ADR-0033](0033-dressing-from-packs.md)), HUD
-  с M22 набран шрифтом Exo 2 (OFL), меню и сцена — с M22b
-  ([ADR-0035](0035-menu.md)), Pixellari удалён. Настройка сложности, которой в
-  вехе нет, появилась в [ADR-0027](0027-rom-combat.md), решение 8. Пункты 1 и 2 —
-  звук синтезом и свой мотив — отменены [ADR-0036](0036-sound-from-libraries.md)
-- **Дата:** 2026-09-13 (пункты 1 и 2 переписаны в тот же день, после прослушивания)
+- **Status:** accepted; item 3 ("one third-party file") is lifted — pack models and textures
+  ([ADR-0032](0032-actor-models.md), [ADR-0033](0033-dressing-from-packs.md)), the HUD
+  is set in the Exo 2 font (OFL) since M22, the menu and the scene since M22b
+  ([ADR-0035](0035-menu.md)), Pixellari removed. The difficulty setting, which is not in
+  the milestone, appeared in [ADR-0027](0027-rom-combat.md), decision 8. Items 1 and 2 —
+  synthesized sound and our own theme — are superseded by [ADR-0036](0036-sound-from-libraries.md)
+- **Date:** 2026-09-13 (items 1 and 2 rewritten the same day, after listening)
 
-## Контекст
+## Context
 
-M8 — последняя веха до релиза: звук, HUD, меню, рекорды. Всё это в проекте есть
-ровно настолько, насколько было нужно для отладки: HUD — отладочный оверлей
-системным шрифтом, меню нет вовсе, звука нет ни одного.
+M8 is the last milestone before release: sound, HUD, menu, high scores. All of this exists in
+the project exactly as much as was needed for debugging: the HUD is a debug overlay in the
+system font, there is no menu at all, and not a single sound.
 
-### Что нашла сверка с оригиналом
+### What the check against the original found
 
-- **Звук оригинала — чистый PSG.** Четыре чипа AY-3-8910 и отдельный Z80 под звук:
-  три голоса на чип, квадратная волна, шум и огибающие. Сэмплов нет, и взяться им
-  в 1983 году неоткуда.
-- **Тему написал Yoshio Imamura** — тревожная, простая, с «дрожащими» нотами,
-  которые хорошо ложатся на осторожное продвижение по зданию.
-- **Из эффектов источники называют выстрелы и «динь» лифта.** Полного списка нет.
-- **Нашёлся мануал Taito** (Internet Archive) — тот самый, что отдавал 403 с M2.
-  Он про обслуживание автомата, и таблицы очков, числа красных дверей и правил
-  тревоги в нём нет. Зато есть DIP-переключатели:
+- **The original's sound is pure PSG.** Four AY-3-8910 chips and a separate Z80 for sound:
+  three voices per chip, square wave, noise and envelopes. No samples, and in 1983 there was
+  nowhere for them to come from.
+- **The theme was written by Yoshio Imamura** — tense, simple, with "trembling" notes that fit
+  cautious progress through the building well.
+- **Of the effects, the sources name shots and the elevator "ding".** There is no full list.
+- **Taito's manual turned up** (Internet Archive) — the very one that returned 403 since M2.
+  It is about servicing the cabinet, and it has no score table, no number of red doors and no
+  alarm rules. But it has the DIP switches:
 
-  | Настройка | Значения |
+  | Setting | Values |
   |---|---|
-  | Дополнительная жизнь | 10 000 / 15 000 / 20 000 / 25 000 очков |
-  | Жизней на партию | 3–6 |
-  | Сложность | VERY EASY / EASY / DIFFICULT / EXPERT |
+  | Extra life | 10,000 / 15,000 / 20,000 / 25,000 points |
+  | Lives per game | 3–6 |
+  | Difficulty | VERY EASY / EASY / DIFFICULT / EXPERT |
 
-  Три жизни, выбранные нами в M4a, оказались минимумом из этого списка — то есть
-  угаданы верно. А вот дополнительной жизни за очки у нас нет вовсе.
+  The three lives we chose in M4a turned out to be the minimum from this list — that is,
+  guessed correctly. But we have no extra life for points at all.
 
-## Решения
+## Decisions
 
-### 1. Звук синтезируется кодом, как и графика
+### 1. Sound is synthesized by code, like the graphics
 
-`tools/render_audio.py` пишет WAV в `assets/audio/`; файлы коммитятся, как PNG
-([ADR-0011](0011-asset-pipeline.md), пункт 2). Причины те же:
+`tools/render_audio.py` writes WAV into `assets/audio/`; the files are committed, like PNGs
+([ADR-0011](0011-asset-pipeline.md), item 2). The reasons are the same:
 
-- **Детерминированность.** Тот же скрипт — тот же файл, и правка «сделать выстрел
-  суше» — это правка числа в коде, а не поиск нового сэмпла.
-- **Ни одного чужого файла.** Сэмплы из библиотек тянут за собой лицензии и
-  разнобой: звуки из разных мест не дружат между собой, и микс приходится
-  вытягивать эквалайзером.
-- **Это ровно то, что умел оригинал.** Квадрат, шум и огибающая — весь словарь
-  AY-3-8910, и он же весь словарь генератора.
+- **Determinism.** Same script — same file, and the change "make the shot drier" is a change of
+  a number in code, not a search for a new sample.
+- **Not a single third-party file.** Library samples bring licences and inconsistency with them:
+  sounds from different places do not get along, and the mix has to be pulled together with an
+  equalizer.
+- **This is exactly what the original could do.** Square, noise and envelope — the whole
+  vocabulary of the AY-3-8910, and also the whole vocabulary of the generator.
 
-Синтез в рантайме через `AudioStreamGenerator` отклонён: звук стал бы кодом на
-горячем пути, а отлаживать его тяжелее, чем файл, который можно просто послушать.
+Runtime synthesis via `AudioStreamGenerator` is rejected: sound would become code on the hot
+path, and debugging it is harder than a file you can just listen to.
 
-### 2. Мотив свой, в идиоме PSG
+### 2. Our own theme, in the PSG idiom
 
-Тема оригинала принадлежит Taito, и копировать её нельзя. Пишем свою: три голоса —
-мелодия, бас и шум-перкуссия, — короткая петля, тревожная и простая, как у
-оригинала. Отдельный мотив на тревогу: сирена у нас работает с M5b
-([ADR-0009](0009-game-loop-and-alarm.md)), а звучать ей до сих пор нечем.
+The original's theme belongs to Taito and cannot be copied. We write our own: three voices —
+melody, bass and noise percussion — a short loop, tense and simple, like the original's. A
+separate motif for the alarm: our siren has worked since M5b
+([ADR-0009](0009-game-loop-and-alarm.md)), and it has had nothing to sound with so far.
 
-### Правка пунктов 1 и 2 · 2026-09-13, после прослушивания
+### Amendment of items 1 and 2 · 2026-09-13, after listening
 
-Первая версия была сделана буквально по этим двум пунктам: квадрат, шум,
-шестнадцать уровней громкости, 22 кГц моно. Звучала она соответственно —
-как чип 1983 года, и на слух оказалась негодной.
+The first version was made literally by these two items: square, noise, sixteen volume levels,
+22 kHz mono. It sounded accordingly — like a 1983 chip, and by ear it turned out unusable.
 
-**Ошибка была в рассуждении, а не в исполнении.** Формула проекта —
-«механика 1983 года, картинка 2026 года» ([`EPIC.md`](../EPIC.md)), и звук
-относится к той же стороне, что картинка: в M6 и M7 мы не воспроизводили
-плоские цвета аркады, а делали свет и нормал-мапы. Со звуком надо было
-поступить так же с самого начала, а подражание чипу было данью оригиналу
-там, где её никто не просил.
+**The mistake was in the reasoning, not the execution.** The project formula is
+"1983 mechanics, 2026 picture" ([`EPIC.md`](../EPIC.md)), and sound belongs to the same side as
+the picture: in M6 and M7 we did not reproduce the arcade's flat colours but made lighting and
+normal maps. Sound should have been treated the same way from the start, and imitating the chip
+was a tribute to the original where nobody asked for one.
 
-**Что меняется:**
+**What changes:**
 
-| Было | Стало |
+| Was | Now |
 |---|---|
-| 22 050 Гц, моно | 44 100 Гц, стерео |
-| Квадрат, шум, огибающая по 16 уровням | Осцилляторы без алиасинга, фильтры с резонансом, свёрточный реверб, компрессия, лимитер |
-| Эффект — один-два голоса | Эффект — атака, тело и хвост комнаты, как их строят в современных играх |
-| Мелодия на трёх голосах PSG | Тёмный synthwave: бас, арпеджио с движущимся срезом, пад, барабаны |
-| Всё в WAV | Короткое и частое в WAV, длинное и музыка в OGG |
+| 22,050 Hz, mono | 44,100 Hz, stereo |
+| Square, noise, 16-level envelope | Alias-free oscillators, resonant filters, convolution reverb, compression, limiter |
+| An effect is one or two voices | An effect is attack, body and room tail, as modern games build them |
+| Melody on three PSG voices | Dark synthwave: bass, arpeggio with a moving cutoff, pad, drums |
+| Everything in WAV | Short and frequent in WAV, long and music in OGG |
 
-**Что не меняется:** синтез, а не сэмплы (пункт 1 в этой части в силе), своя
-тема вместо темы Taito, три шины и разделение вехи. Инструменты синтеза уехали
-в отдельный модуль `tools/audio_dsp.py`, сами звуки остались в `render_audio.py`.
+**What does not change:** synthesis, not samples (item 1 stays in force in this part), our own
+theme instead of Taito's, three buses and the milestone split. The synthesis tools moved into a
+separate module `tools/audio_dsp.py`; the sounds themselves stayed in `render_audio.py`.
 
-### 3. Шрифт вендорится, потому что кириллица
+### 3. The font is vendored, because of Cyrillic
 
-Интерфейс двуязычный (сквозное требование эпика), а это латиница плюс кириллица —
-около ста тридцати глифов. Рисовать их генератором, как остальные ассеты, — это
-полвехи на одни буквы.
+The interface is bilingual (a cross-cutting requirement of the epic), and that means Latin plus
+Cyrillic — about a hundred and thirty glyphs. Drawing them with a generator, like the other
+assets, is half a milestone on letters alone.
 
-Берём открытый пиксельный шрифт с кириллицей и чёткой лицензией (CC0 или OFL),
-кладём в `assets/fonts/` вместе с текстом лицензии. Конкретный выбирается в M8b —
-требования: кириллица, целочисленный кегль, вид без сглаживания.
+We take an open pixel font with Cyrillic and a clear licence (CC0 or OFL) and put it in
+`assets/fonts/` together with the licence text. The specific one is chosen in M8b — the
+requirements: Cyrillic, integer point size, no anti-aliasing.
 
-Это первый чужой файл в репозитории, и поэтому он один: всё остальное по-прежнему
-рисуется и синтезируется своим кодом.
+This is the first third-party file in the repository, and therefore it is the only one:
+everything else is still drawn and synthesized by our own code.
 
-### 4. Язык по локали, с переключателем
+### 4. Language by locale, with a switch
 
-`ru` и `en`. Язык берётся из локали системы, меняется в настройках и запоминается.
-Строки живут в одном месте, а не в узлах: иначе перевод превращается в обход сцен.
+`ru` and `en`. The language is taken from the system locale, changed in the settings and
+remembered. Strings live in one place, not in nodes: otherwise translation turns into walking
+the scenes.
 
-### 5. Дополнительная жизнь за 10 000 очков
+### 5. An extra life at 10,000 points
 
-Берём минимальный порог из мануала. До сих пор очки в игре ни на что не влияли —
-их некуда было тратить, и счёт оставался украшением. Теперь у него есть цена.
+We take the minimum threshold from the manual. Until now points did not affect anything in the
+game — there was nothing to spend them on, and the score remained decoration. Now it has a value.
 
-Дальше пороги не повторяются: одна жизнь за первые 10 000. Повтор каждые 10 000
-мануалом не подтверждён, а бесконечные жизни на фарме агентов в темноте мы уже
-однажды сами себе предсказывали ([ADR-0010](0010-lighting-and-atmosphere.md), п. 6).
+The threshold does not repeat: one life for the first 10,000. Repeating every 10,000 is not
+confirmed by the manual, and we already predicted infinite lives from farming agents in the dark
+for ourselves once ([ADR-0010](0010-lighting-and-atmosphere.md), item 6).
 
-### 6. Веха делится: M8a — звук, M8b — интерфейс
+### 6. The milestone splits: M8a — sound, M8b — interface
 
-Как делились M4, M5 и M7.
+As M4, M5 and M7 were split.
 
-- **M8a — звук.** Генератор, эффекты на все события игры, тема и мотив тревоги,
-  шины и микс.
-- **M8b — интерфейс.** Шрифт, два языка, HUD вместо отладочного оверлея, главное
-  меню, настройки, таблица рекордов, дополнительная жизнь за очки.
+- **M8a — sound.** The generator, effects for all game events, the theme and the alarm motif,
+  buses and mix.
+- **M8b — interface.** The font, two languages, a HUD instead of the debug overlay, the main
+  menu, settings, the high-score table, the extra life for points.
 
-Порядок такой, потому что звук ни от чего не зависит, а меню зависит от шрифта,
-языка и настроек громкости, которые заводит звук.
+The order is this way because sound depends on nothing, while the menu depends on the font, the
+language and the volume settings that sound introduces.
 
-### 7. Три шины: Master, Music, SFX
+### 7. Three buses: Master, Music, SFX
 
-Громкости — в настройках, и они же единственное, что игра пишет на диск помимо
-рекордов. Отдельная шина у музыки нужна ровно затем, чтобы её можно было
-приглушить, не выключая выстрелы.
+Volumes are in the settings, and they are the only thing the game writes to disk besides high
+scores. Music has a separate bus precisely so that it can be turned down without turning off
+the shots.
 
-## Дополнено перед M8b · 2026-09-13
+## Added before M8b · 2026-09-13
 
-Вопросы по интерфейсу закрыты, и три ответа меняют работу.
+The interface questions are closed, and three answers change the work.
 
-### 8. HUD современный, а не аркадный
+### 8. A modern HUD, not an arcade one
 
-Строка сверху с очками, рекордом и жизнями-иконками — это язык автомата.
-Игра ремейк: механика 1983 года, картинка 2026-го, и интерфейс на той же
-стороне, что картинка, — как и звук (правка пунктов 1 и 2 выше).
+A top line with points, high score and life icons is the language of the cabinet. The game is a
+remake: 1983 mechanics, a 2026 picture, and the interface is on the same side as the picture —
+as is sound (the amendment of items 1 and 2 above).
 
-Значит: только необходимое, по углам, полупрозрачно. Очки, жизни, документы,
-этаж и тревога. Отладочный оверлей с состоянием, скоростью и FPS уходит из
-игры — ему место за клавишей, а не в кадре.
+So: only what is necessary, in the corners, semi-transparent. Points, lives, documents, floor
+and alarm. The debug overlay with state, speed and FPS leaves the game — its place is behind a
+key, not in the frame.
 
-### 9. Рекорды без инициалов
+### 9. High scores without initials
 
-Десять строк со счётом и датой. Ввод трёх букв стрелками — ритуал зала, где
-за автоматом стоит очередь; дома он превращается в лишний экран между смертью
-и следующей партией.
+Ten lines with score and date. Entering three letters with the arrows is a ritual of the arcade
+hall, where a queue stands behind the cabinet; at home it turns into an extra screen between
+death and the next game.
 
-### 10. Переназначение клавиш откладывается
+### 10. Key remapping is postponed
 
-В настройках будет **экран управления**, но только показывающий: какое действие
-на какой клавише и какой кнопке геймпада, прочитанное из `InputMap`. Настоящее
-переназначение — это ещё и геймпад, и разбор конфликтов, и сохранение схемы;
-работы там на половину вехи, а до релиза она нужнее в M9. Заведено долгом.
+The settings will have a **controls screen**, but only a display one: which action is on which
+key and which gamepad button, read from `InputMap`. Real remapping also means the gamepad,
+conflict resolution and saving the scheme; that is half a milestone of work, and before release
+it is more needed in M9. Filed as debt.
 
-### 11. Шрифт: Pixellari, OFL
+### 11. Font: Pixellari, OFL
 
-Выбран по единственному жёсткому требованию — кириллица (ADR-0012, пункт 3).
-Проверено: все 66 букв русского алфавита на месте, латиница и цифры тоже;
-из нужного не хватает только длинного тире, поэтому в интерфейсе его не
-используем. Файл и текст лицензии лежат рядом в `assets/fonts/`.
+Chosen by the only hard requirement — Cyrillic (ADR-0012, item 3). Verified: all 66 letters of
+the Russian alphabet are present, Latin and digits too; of what is needed only the em dash is
+missing, so it is not used in the interface. The file and the licence text lie side by side in
+`assets/fonts/`.
 
-## Чего в вехе нет
+## What is not in the milestone
 
-- **Демо-режима** (attract mode), который в автомате крутится между партиями.
-  Он требует бота, который играет сам, — у нас такой есть только в тестах.
-  Заведено долгом.
-- **Озвучки и речи.** В оригинале их нет, и у PSG для них нет голоса.
-- **Настройки сложности.** DIP-переключатели автомата — это про оператора зала,
-  а не про игрока; наша сложность растёт от здания к зданию (ADR-0009).
+- **Demo mode** (attract mode), which the cabinet runs between games. It requires a bot that
+  plays by itself — we have one only in tests. Filed as debt.
+- **Voice-over and speech.** The original has none, and the PSG has no voice for them.
+- **Difficulty settings.** The cabinet's DIP switches are for the hall operator, not the player;
+  our difficulty grows from building to building (ADR-0009).
 
-## Последствия
+## Consequences
 
-- В `assets/audio/` появляются WAV, в `assets/fonts/` — первый чужой файл.
-- `requirements-assets.txt` обрастает зависимостями генератора звука (numpy уже там).
-- Появляется первое, что игра пишет на диск: настройки и таблица рекордов.
-- Счёт впервые влияет на игру — через дополнительную жизнь.
+- WAVs appear in `assets/audio/`, and the first third-party file in `assets/fonts/`.
+- `requirements-assets.txt` gains the dependencies of the sound generator (numpy is already
+  there).
+- The first thing the game writes to disk appears: settings and the high-score table.
+- The score affects the game for the first time — through the extra life.
 
-## Источники
+## Sources
 
 - [Arcade Game Manual: Elevator Action — Internet Archive](https://archive.org/details/ArcadeGameManualElevatoraction)
 - [AY-3-8910 — Video Game Music Preservation Foundation](https://www.vgmpf.com/Wiki/index.php/AY-3-8910)
 - [Elevator Action — Wikipedia](https://en.wikipedia.org/wiki/Elevator_Action)
-- [Elevator Action «Theme» — Video Game Music Daily](https://vgmdaily.wordpress.com/2010/08/09/elevator-action-theme-yoshino-imamura/)
+- [Elevator Action "Theme" — Video Game Music Daily](https://vgmdaily.wordpress.com/2010/08/09/elevator-action-theme-yoshino-imamura/)

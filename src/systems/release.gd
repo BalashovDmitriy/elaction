@@ -1,40 +1,40 @@
 class_name Release
 extends RefCounted
 
-## Версия игры и строка запуска.
+## Game version and the startup line.
 ##
-## Версия живёт в одном месте — `config/version` в `project.godot`
-## ([ADR-0013](../../docs/adr/0013-release-and-versioning.md), пункт 3). Отсюда её
-## берут все, кому она нужна: угол главного меню, строка в логе и — через
-## `tools/version.py` — пресеты экспорта и тег релиза.
+## The version lives in one place, `config/version` in `project.godot`
+## ([ADR-0013](../../docs/adr/0013-release-and-versioning.md), item 3). Everyone who
+## needs it takes it from here: the main menu corner, the log line and, through
+## `tools/version.py`, the export presets and the release tag.
 ##
-## Класс без узлов и состояния: спрашивают его и из меню, и из точки входа,
-## и из теста, а заводить ради двух строк автолоад незачем.
+## A class without nodes or state: it is queried from the menu, from the entry point
+## and from a test, and there is no point in creating an autoload for two lines.
 
-## Ключ настройки проекта, где лежит версия.
+## Project setting key that holds the version.
 const SETTING := "application/config/version"
 
-## На случай, если настройки нет вовсе: пусть лучше будет заведомо неигровая
-## версия в углу экрана, чем пустое место, о котором никто не спросит.
+## In case the setting is missing altogether: better an obviously non-game version in
+## the screen corner than an empty spot nobody will ask about.
 const UNKNOWN := "0.0.0"
 
 
-## Версия игры, например `0.9.0`.
+## Game version, for example `0.9.0`.
 static func version() -> String:
 	var found: Variant = ProjectSettings.get_setting(SETTING, UNKNOWN)
 	var text := str(found)
 	return text if not text.is_empty() else UNKNOWN
 
 
-## То же с буквой `v` — как в теге и в имени архива.
+## The same with the letter `v`, as in the tag and the archive name.
 static func tag() -> String:
 	return "v" + version()
 
 
-## Строка, которую игра печатает в лог при запуске.
+## The line the game prints to the log at startup.
 ##
-## Она же маркер для `tools/smoke.py`: собранный билд, который не напечатал её,
-## не считается запустившимся, даже если процесс вышел с нулём (ADR-0013,
-## пункт 6). Поэтому формат менять нельзя, не поправив smoke.
+## It is also the marker for `tools/smoke.py`: a built binary that did not print it does
+## not count as started, even if the process exited with zero (ADR-0013, item 6). So the
+## format must not change without fixing smoke.
 static func banner() -> String:
 	return "elaction %s · %s" % [version(), OS.get_name()]

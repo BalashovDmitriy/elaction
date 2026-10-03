@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""Звук игры из свободных библиотек (ADR-0036).
+"""Game sound from free libraries (ADR-0036).
 
-Музыка — Kevin MacLeod (incompetech.com, CC-BY 4.0), джинглы и звуки меню —
-паки Kenney (CC0), эффекты и фон — freesound.org (CC0 и CC-BY). Каждый файл
-выбран пользователем на слух; здесь — откуда он взят и как приведён к игре:
-обрезка, петля со сшивкой, громкость, моно для звуков на месте.
+Music — Kevin MacLeod (incompetech.com, CC-BY 4.0), jingles and menu sounds —
+Kenney packs (CC0), effects and ambience — freesound.org (CC0 and CC-BY). Each file
+was chosen by the user by ear; here is where it was taken from and how it is fitted to the game:
+trimming, a loop with a crossfade, loudness, mono for positional sounds.
 
-    python tools/build_audio.py              # скачать и собрать всё
-    python tools/build_audio.py shot theme   # только эти имена
+    python tools/build_audio.py              # download and build everything
+    python tools/build_audio.py shot theme   # only these names
     python tools/build_audio.py --list
 
-Пишет в `assets/audio/`: короткие эффекты — WAV, длинное — OGG. Несколько
-вариантов одного имени — `имя.ogg`, `имя.2.ogg`, …: музыку и фон игра берёт
-жребием по зданию, эффекты — на каждый звук (`Sounds`). Авторы — в
-`assets/audio/credits.json`; таблица для `CREDITS.md` печатается `--credits`.
+Writes to `assets/audio/`: short effects as WAV, long ones as OGG. Several
+variants of one name are `name.ogg`, `name.2.ogg`, …: the game picks music and ambience
+by a draw per building, effects per sound (`Sounds`). Authors are in
+`assets/audio/credits.json`; the table for `CREDITS.md` is printed by `--credits`.
 
-Скачанное кладётся в `.cache/audio/` рядом с проектом: freesound отвечает 429,
-если спрашивать часто.
+Downloads go to `.cache/audio/` next to the project: freesound answers 429
+if asked often.
 """
 
 from __future__ import annotations
@@ -57,9 +57,9 @@ KENNEY_PAGES = {
     "jingles": "https://kenney.nl/assets/music-jingles",
 }
 
-# Громкость. Музыка и фон — по среднеквадратичной громкости звучащей части,
-# эффекты — по пику, а потом поправкой на баланс: шаг не должен спорить с
-# выстрелом.
+# Loudness. Music and ambience — by the RMS loudness of the sounding part,
+# effects — by peak, and then a balance correction: a step must not compete with
+# a shot.
 MUSIC_RMS = -18.0
 JINGLE_RMS = -17.0
 LOOP_RMS = -24.0
@@ -69,33 +69,33 @@ PEAK = -1.0
 
 @dataclass
 class Source:
-    """Откуда взят звук и как его привести."""
+    """Where the sound was taken from and how to fit it."""
 
     title: str
     author: str
     licence: str
     page: str
     url: str = ""
-    # Файл внутри архива Kenney.
+    # File inside the Kenney archive.
     member: str = ""
-    # Отрезок, с. Отрицательное — от конца; `end` None — до конца.
+    # Segment, s. Negative — from the end; `end` None — to the end.
     start: float = 0.0
     end: float | None = None
-    # Петля со сшивкой в столько секунд; 0 — звучит один раз.
+    # Loop with a crossfade of this many seconds; 0 — plays once.
     loop: float = 0.0
     fade_in: float = 0.0
     fade_out: float = 0.0
     mono: bool = False
-    # Как выравнивать: "music", "jingle", "loop", "ambience", "peak".
+    # How to level: "music", "jingle", "loop", "ambience", "peak".
     level: str = "peak"
     gain: float = 0.0
-    # Срезать тишину в начале: у записей freesound до звука бывает полсекунды.
+    # Trim silence at the start: freesound recordings can have half a second before the sound.
     trim: bool = True
     excerpt: bool = False
-    # Сколько оставить после срезки тишины, с; 0 — всё. Так из записи с серией
-    # щелчков берётся один щелчок.
+    # How much to keep after trimming silence, s; 0 — all. That way one click is taken
+    # from a recording with a series of clicks.
     length: float = 0.0
-    # Срез верхов выше стольких герц: звук из-за двери или стены; 0 — без среза.
+    # Cut highs above this many hertz: sound from behind a door or wall; 0 — no cut.
     muffle: float = 0.0
 
 
@@ -119,18 +119,18 @@ def kenney(pack: str, member: str, title: str, **kw) -> Source:
 
 
 def _track(title: str) -> Source:
-    # Треки целиком: петлю им задаёт игра, а у трека и так есть начало и конец.
+    # Whole tracks: the game gives them the loop, and a track has a start and an end anyway.
     return macleod(title, level="music", trim=False)
 
 
 SOUNDS: dict[str, list[Source]] = {
-    # --- Музыка: свой трек на экран, трек здания и тревоги — жребием по зданию.
-    # Тема — по типу здания и времени суток (ADR-0057, решение 7; ADR-0052,
-    # решение 1): ночь — "theme", утро, день и вечер — с суффиксом. Отель —
-    # свинг, лаунж и саксофон; офис — холодный синти-нуар, днём лифтовая
-    # музыка; жилой дом — блюз и фанк. С середины здания играет следующий трек
-    # набора, если он есть. Тревога — своя у типа. Треки выбраны пользователем
-    # на слух со страницы прослушивания (2026-10-03).
+    # --- Music: a track per screen, building and alarm tracks — a draw per building.
+    # Theme — by building kind and time of day (ADR-0057, decision 7; ADR-0052,
+    # decision 1): night — "theme", morning, day and evening — with a suffix. Hotel —
+    # swing, lounge and saxophone; office — cold synth noir, elevator music
+    # by day; residential building — blues and funk. From the middle of the building the next
+    # track of the set plays, if there is one. Alarm — its own per kind. Tracks chosen by the user
+    # by ear from the listening page (2026-10-03).
     "theme": [_track("Covert Affair"), _track("Dances and Dames"), _track("Spy Glass"), _track("Hard Boiled")],
     "theme_morning": [_track("Shades of Spring"), _track("Walking Along")],
     "theme_day": [_track("Lobby Time"), _track("George Street Shuffle"), _track("Fig Leaf Rag")],
@@ -148,7 +148,7 @@ SOUNDS: dict[str, list[Source]] = {
     "alarm_residential": [_track("Private Eye"), _track("Faster Does It")],
     "menu_theme": [_track("Cool Vibes")],
     "game_over_theme": [_track("Just As Soon")],
-    # --- Джинглы.
+    # --- Jingles.
     "document": [kenney("jingles", "Audio/Sax jingles/jingles_SAX16.ogg", "Music Jingles: SAX16",
                         level="jingle")],
     "extra_life": [freesound(578401, 10522382, "nomiqbomi", "Inquisitive Vibraphone 09", CC0,
@@ -159,7 +159,7 @@ SOUNDS: dict[str, list[Source]] = {
                                end=3.4, fade_out=0.4, level="jingle", gain=-3.0)],
     "game_over": [macleod("Hard Boiled", start=-8.5, fade_in=0.03, fade_out=0.35,
                           level="jingle", trim=False, excerpt=True)],
-    # --- Эффекты.
+    # --- Effects.
     "step_carpet": [freesound(38872, 15613, "swuing", "footstep-carpet.wav", BY4, mono=True,
                               gain=-9.0)],
     "step_concrete": [kenney("impact", f"Audio/footstep_concrete_00{i}.ogg",
@@ -185,7 +185,7 @@ SOUNDS: dict[str, list[Source]] = {
                              gain=-4.0)],
     "car_away": [freesound(128190, 1160789, "soundmary", "car drive away", BY4, mono=True,
                            end=8.0, fade_out=2.0, level="loop", gain=4.0)],
-    # --- M24b: вертолёт, трос, машина, ворота, шахта в подвал (ADR-0038).
+    # --- M24b: helicopter, rope, car, gate, basement shaft (ADR-0038).
     "helicopter": [freesound(541482, 11157357, "Lydmakeren", "Helicopter_Hover", CC0,
                              mono=True, start=150.0, end=170.0, loop=2.0, level="loop",
                              trim=False)],
@@ -203,7 +203,7 @@ SOUNDS: dict[str, list[Source]] = {
                               end=11.8, fade_out=0.5)],
     "basement_open": [freesound(567317, 97550, "TRP", "Door buzz alarm elevator HALIFAX 93",
                                 CC0, mono=True, end=1.5)],
-    # --- M24k: пробелы, найденные аудитом звука (ADR-0052, решение 7).
+    # --- M24k: gaps found by the sound audit (ADR-0052, decision 7).
     "heli_door": [freesound(269520, 2843367, "MrAuralization", "Van sliding door open", BY4,
                             mono=True, fade_out=0.3, gain=-2.0)],
     "winch": [freesound(683808, 4257513, "mpuffenbarger", "SFX Electric Actuator Jack 1", CC0,
@@ -258,7 +258,7 @@ SOUNDS: dict[str, list[Source]] = {
                          "Interface Sounds: confirmation_001", mono=True, gain=-8.0)],
     "ui_back": [kenney("ui", "Audio/mouserelease1.ogg", "UI Audio: mouserelease1", mono=True,
                        gain=-8.0)],
-    # --- Фон. Петли снаружи — по минуте: дольше в игре не стоят на месте.
+    # --- Ambience. Outdoor loops are a minute each: in the game one does not stand still longer.
     "city": [freesound(361088, 1648170, "klankbeeld", "city night hum", BY4, start=10.0,
                        end=72.0, loop=2.0, level="ambience", trim=False)],
     "city_morning": [freesound(261307, 3452716, "VlatkoBlazek", "Morning on my street", BY4,
@@ -274,8 +274,8 @@ SOUNDS: dict[str, list[Source]] = {
                               loop=2.0, level="ambience", trim=False)],
     "wind": [freesound(454072, 612689, "kyles", "rushing air, distant skyline", CC0, start=5.0,
                        end=67.0, loop=2.0, level="ambience", trim=False)],
-    # Снег (M24l, ADR-0054): ветер, шаги по снегу и шины по каше — выбраны
-    # пользователем на слух со страницы прослушивания.
+    # Snow (M24l, ADR-0054): wind, steps on snow and tyres on slush — chosen
+    # by the user by ear from the listening page.
     "wind_snow": [freesound(454213, 612689, "kyles", "swirling winter wind gusty grains sand",
                             CC0, start=5.0, end=67.0, loop=2.0, level="ambience", trim=False)],
     "step_snow": [freesound(615658, 10150854, "Lumamorph", "Crispy_snow_footsteps-01", CC0,
@@ -284,9 +284,9 @@ SOUNDS: dict[str, list[Source]] = {
     "car_pass_slush": [freesound(190997, 2580450, "Zabuhailo", "Cars_driving_slush_road", BY4,
                                  mono=True, start=20.0, end=32.0, loop=1.0, fade_in=0.3,
                                  gain=-2.0, trim=False)],
-    # Жилой дом и офис (M24m, ADR-0055, решение 8): фон коридора, жизнь за
-    # дверью квартиры и шаг по линолеуму — выбраны пользователем на слух со
-    # страницы прослушивания. Записанное вблизи приглушено срезом верхов.
+    # Residential building and office (M24m, ADR-0055, decision 8): corridor ambience, life behind
+    # a flat door and a step on linoleum — chosen by the user by ear from
+    # the listening page. Close-up recordings are muffled by a high cut.
     "room_tone_office": [freesound(708021, 14714083, "Soup_UnderScore",
                                    "Empty Office Space Room Tone with Aircon SFX", CC0,
                                    start=10.0, end=70.0, loop=2.0, level="ambience", gain=-4.0,
@@ -309,8 +309,8 @@ SOUNDS: dict[str, list[Source]] = {
     "step_lino": [freesound(475080, 6858456, "roman_gens", "Footsteps Boots_Linoleum", BY4,
                             mono=True, start=at, length=0.42, fade_out=0.08, trim=False,
                             gain=-9.0) for at in (16.88, 18.04, 19.29, 22.39)],
-    # Залы особых этажей и решётка грузовой кабины (M24o, ADR-0057, решения 4 и
-    # 6) — выбраны пользователем на слух со страницы прослушивания.
+    # Special-floor halls and the freight cab gate (M24o, ADR-0057, decisions 4 and
+    # 6) — chosen by the user by ear from the listening page.
     "hall_pool": [freesound(495399, 10725617, "tosha73", "Public Swimming Pool Atmosphere.wav",
                             CC0, start=5.0, end=65.0, loop=2.0, level="ambience", trim=False)],
     "hall_server": [freesound(465613, 9250976, "Nox_Sound", "Object_Fan_Server_Room.wav", CC0,
@@ -345,7 +345,7 @@ SOUNDS: dict[str, list[Source]] = {
                             loop=0.5, level="loop", gain=-6.0, trim=False)],
 }
 
-# Что звучит петлёй: сшивка нужна им, а форматом — OGG.
+# What plays as a loop: they need the crossfade, and OGG as the format.
 LONG = {"winch", "car_pass", "car_pass_slush", "wind_snow", "alarm", "city_morning", "city_day", "city_evening", "theme", "theme_morning", "theme_day", "theme_evening", "alarm_theme",
         "theme_office", "theme_office_morning", "theme_office_day", "theme_office_evening",
         "alarm_office", "theme_residential", "theme_residential_morning",
@@ -384,7 +384,7 @@ def _seconds(value: float, length: int, rate: int) -> int:
 
 
 def _rms_db(signal: np.ndarray) -> float:
-    # Громкость звучащей части: тишина в хвосте занизила бы среднее.
+    # Loudness of the sounding part: silence in the tail would lower the average.
     mono = signal.mean(axis=1)
     envelope = np.abs(mono)
     loud = mono[envelope > envelope.max() * 0.05] if envelope.max() > 0 else mono
@@ -392,7 +392,7 @@ def _rms_db(signal: np.ndarray) -> float:
 
 
 def _muffle(signal: np.ndarray, rate: int, cutoff: float) -> np.ndarray:
-    """Глухо, как из-за двери: плавный срез верхов выше [cutoff] герц (4-й порядок)."""
+    """Muffled, as from behind a door: a smooth high cut above [cutoff] hertz (4th order)."""
     spectrum = np.fft.rfft(signal, axis=0)
     freqs = np.fft.rfftfreq(len(signal), 1.0 / rate)
     gain = 1.0 / (1.0 + (freqs / cutoff) ** 4)
@@ -404,7 +404,7 @@ def _shape(source: Source, signal: np.ndarray, rate: int) -> np.ndarray:
     start = _seconds(source.start, length, rate)
     end = length if source.end is None else _seconds(source.end, length, rate)
     tail = int(source.loop * rate)
-    # Петле нужен запас после конца: он сшивается с началом.
+    # A loop needs headroom after the end: it is crossfaded with the start.
     signal = signal[start : min(length, end + tail)].copy()
     if source.mono:
         signal = signal.mean(axis=1, keepdims=True)
@@ -422,7 +422,7 @@ def _shape(source: Source, signal: np.ndarray, rate: int) -> np.ndarray:
     if tail > 0:
         body = len(signal) - tail
         head = np.linspace(0.0, 1.0, tail)[:, None]
-        # Равная мощность: линейная сшивка проседает посередине на три децибела.
+        # Equal power: a linear crossfade dips by three decibels in the middle.
         signal[:tail] = signal[:tail] * np.sqrt(head) + signal[body:] * np.sqrt(1.0 - head)
         signal = signal[:body]
 
@@ -440,7 +440,7 @@ def _shape(source: Source, signal: np.ndarray, rate: int) -> np.ndarray:
                "ambience": AMBIENCE_RMS}[source.level]
         target = rms - _rms_db(signal)
     signal *= 10.0 ** ((target + source.gain) / 20.0)
-    # Пик после выравнивания по громкости может уйти выше нуля — прижимаем.
+    # The peak after loudness levelling can go above zero — clamp it.
     peak = np.abs(signal).max()
     ceiling = 10.0 ** (PEAK / 20.0)
     if peak > ceiling:
@@ -449,8 +449,8 @@ def _shape(source: Source, signal: np.ndarray, rate: int) -> np.ndarray:
 
 
 def _write_ogg(target: Path, signal: np.ndarray, rate: int) -> None:
-    # Кусками: libsndfile 1.2 на Windows падает переполнением стека, если
-    # отдать ему трек в три минуты одним вызовом.
+    # In chunks: libsndfile 1.2 on Windows crashes with a stack overflow if
+    # given a three-minute track in one call.
     block = 16384
     with sf.SoundFile(target, "w", rate, signal.shape[1], format="OGG", subtype="VORBIS",
                       compression_level=0.55) as out:
@@ -468,7 +468,7 @@ def build(names: list[str]) -> None:
     credits_path = OUT / "credits.json"
     credits = json.loads(credits_path.read_text(encoding="utf-8")) if credits_path.exists() else {}
     for name in names:
-        # Прежние варианты этого имени уходят: число вариантов могло сократиться.
+        # Previous variants of this name go away: the number of variants may have shrunk.
         removed = []
         for old in list(OUT.glob(f"{name}.*")):
             if old.suffix in (".wav", ".ogg") and old.stem.split(".")[0] == name:
@@ -485,15 +485,15 @@ def build(names: list[str]) -> None:
             else:
                 sf.write(target, shaped, rate, subtype="PCM_16")
             credits[target.stem] = {
-                "title": source.title + (" (фрагмент)" if source.excerpt else ""),
+                "title": source.title + (" (excerpt)" if source.excerpt else ""),
                 "author": source.author,
                 "licence": source.licence,
                 "url": source.page,
             }
             print(f"{target.name:28s} {len(shaped) / rate:6.1f} с  {source.author}")
-        # Настройки импорта файла, которого больше нет (вариантов стало меньше,
-        # WAV сменился на OGG), остались бы в репозитории сиротой. У переписанного
-        # файла они свои и остаются — вместе с его uid.
+        # Import settings of a file that no longer exists (fewer variants,
+        # WAV changed to OGG) would remain in the repository as orphans. A rewritten
+        # file keeps its own — together with its uid.
         for old in removed:
             if not old.exists():
                 old.with_name(old.name + ".import").unlink(missing_ok=True)
@@ -502,12 +502,12 @@ def build(names: list[str]) -> None:
 
 
 def credits_table() -> str:
-    rows = ["| Имя | Звук | Автор | Лицензия | Источник |", "|---|---|---|---|---|"]
+    rows = ["| Name | Sound | Author | Licence | Source |", "|---|---|---|---|---|"]
     for name, sources in SOUNDS.items():
         for index, source in enumerate(sources):
             stem = _file_name(name, index, name in LONG).rsplit(".", 1)[0]
             host = urllib.parse.urlparse(source.page).netloc.removeprefix("www.")
-            title = source.title + (" (фрагмент)" if source.excerpt else "")
+            title = source.title + (" (excerpt)" if source.excerpt else "")
             rows.append(f"| `{stem}` | {title} | {source.author} | {source.licence} "
                         f"| [{host}]({source.page}) |")
     return "\n".join(rows)

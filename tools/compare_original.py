@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""Кадр вехи рядом с кадром оригинала: одна высота, слева аркада, справа мы.
+"""A milestone frame next to the original's frame: one height, arcade on the left, us on the right.
 
-Так расхождения видно глазом, а не по таблице: на M18c сравнение сразу показало
-то, чего не было ни в одном замере, — пустоватый этаж, отсутствие номеров
-этажей, крышу, которая не читается верхом дома.
+This way discrepancies are seen by eye, not in a table: on M18c the comparison immediately showed
+what was in no measurement — a sparse floor, missing floor
+numbers, a roof that does not read as the top of a building.
 
-Кадры оригинала — нативные снимки MAME, 256×224. Они скачиваются по требованию
-в `screens/_original/` и в репозиторий не идут: это снимки чужой игры, как и
-вся папка `screens/`. Из кадра оригинала берётся поле здания — без HUD сверху и
-кирпичной полосы снизу, 176 px, — потому что именно его показывает наша камера.
+The original's frames are native MAME snapshots, 256×224. They are downloaded on demand
+into `screens/_original/` and do not go into the repository: they are shots of someone else's
+game, like the whole `screens/` folder. The building field is taken from the original's frame —
+without the HUD above and the brick strip below, 176 px — because that is what our camera shows.
 
-Запуск:
-    python tools/compare_original.py M18C                 # последний кадр вехи
-    python tools/compare_original.py M18C --shot stopped  # кадр по метке шага
+Run:
+    python tools/compare_original.py M18C                 # last frame of the milestone
+    python tools/compare_original.py M18C --shot stopped  # frame by step label
     python tools/compare_original.py M18C --original elevator
 
-Пишет `screens/<веха>/compare_original.jpg`.
+Writes `screens/<milestone>/compare_original.jpg`.
 """
 
 from __future__ import annotations
@@ -33,20 +33,20 @@ from godot_bin import PROJECT_ROOT, use_utf8_output
 SCREENS = PROJECT_ROOT / "screens"
 ORIGINALS = SCREENS / "_original"
 
-# Снимки MAME: этажи 30–27 с крышей и этажи 19–16 с эскалаторами.
+# MAME snapshots: floors 30–27 with the roof and floors 19–16 with escalators.
 SOURCES = {
     "elevatorb": "https://adb.arcadeitalia.net/media/mame.current/ingames/elevatorb.png",
     "elevator": "https://adb.arcadeitalia.net/media/mame.current/ingames/elevator.png",
 }
 
-# Поле здания в кадре оригинала: ниже HUD и выше кирпичной полосы.
+# The building field in the original's frame: below the HUD and above the brick strip.
 FIELD = (0, 16, 256, 192)
 HEIGHT = 1080
 GAP = 20
 
 
 def original(name: str) -> Path:
-    """Путь к кадру оригинала, скачанному при первом обращении."""
+    """Path to the original's frame, downloaded on first access."""
     ORIGINALS.mkdir(parents=True, exist_ok=True)
     path = ORIGINALS / f"{name}.png"
     if not path.exists():
@@ -57,12 +57,12 @@ def original(name: str) -> Path:
 
 
 def our_shot(milestone: str, label: str | None) -> Path:
-    """Последний кадр вехи, а с меткой — последний кадр этого шага.
+    """The last frame of the milestone, and with a label — the last frame of that step.
 
-    «Последний» — по времени записи, а не по имени: время в имени кадра с
-    точностью до секунды, и снятые в одну секунду шаги сортировались бы по
-    алфавиту меток. Имя, занятое в ту же секунду, Screenshotter продолжает
-    суффиксом `-N`, и метка ищется с ним тоже.
+    "Last" — by write time, not by name: the time in a frame name has
+    one-second precision, and steps shot in the same second would be sorted by
+    label alphabetically. A name taken in the same second is continued by Screenshotter
+    with a `-N` suffix, and the label is searched with it too.
     """
     folder = SCREENS / milestone
     shots = [p for p in folder.glob("*.jpg") if not p.name.startswith("compare")]

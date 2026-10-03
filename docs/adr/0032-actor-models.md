@@ -1,122 +1,128 @@
-# ADR-0032 · M21: модели Otto и агентов из пака Quaternius
+# ADR-0032 · M21: Otto and agent models from the Quaternius pack
 
-- **Статус:** принято
-- **Дата:** 2026-09-24
+- **Status:** accepted
+- **Date:** 2026-09-24
 
-## Контекст
+## Context
 
-С M16 (ADR-0022) Otto и агенты — фигуры из коробок на семи костях: бёдра,
-корпус, голова, руки и ноги одной костью каждая. Колен и локтей нет, поэтому
-присед — это наклон корпуса на 76°, и читается он как «согнулся», а не «сел»
-(долг M18c). Голова — треть роста, как у спрайтового чиби.
+Since M16 (ADR-0022) Otto and agents are figures made of boxes on seven bones:
+hips, torso, head, arms and legs with one bone each. There are no knees or
+elbows, so the crouch is a 76° torso tilt, and it reads as "bent over" rather
+than "crouched" (M18c debt). The head is a third of the height, like a sprite
+chibi.
 
-Решение пользователя (ADR-0031): модели берём из **Quaternius Ultimate Modular
-Men Pack**, лицензия CC0, персонаж Business Man для Otto и для агентов.
+The user's decision (ADR-0031): models come from the **Quaternius Ultimate Modular
+Men Pack**, CC0 license, the Business Man character for Otto and for agents.
 
-### Что показала сверка
+### What the check showed
 
-- **Модель.** Business Man — 4162 треугольника, четыре меша (ноги, корпус,
-  ступни, голова) и восемь материалов цветом, без текстур. Рост 1.86 м, голова
-  около пятой части роста.
-- **Скелет.** 62 кости: Root, Body, Hips, Abdomen, Torso, Chest, Neck, Head,
-  плечо, плечо руки, предплечье и кисть с пальцами, бедро, голень и стопа.
-  **Колени и локти есть.** Покой — T-поза, руки горизонтально.
-- **Клипы.** 24 штуки: Idle, Idle_Gun, Idle_Gun_Shoot, Gun_Shoot, Walk, Run,
-  Death, Kick_Left/Right, Roll, HitRecieve и другие. **Приседа, лёжки и
-  прыжка нет** — а именно их высоты держит ROM: пуля стоя на 1.13 м, присев на
-  0.68, лёжа на 0.23 (ADR-0027), и под них подогнаны позы.
-- **Шляпы у Business Man нет.** Шляпа с полями есть у Farmer, но с красной
-  лентой и широкими полями — силуэт ковбойский.
-- **Пистолета в паке нет** ни у кого из персонажей: клипы «с оружием» держат
-  пустую руку.
+- **Model.** Business Man — 4162 triangles, four meshes (legs, torso, feet,
+  head) and eight color materials, no textures. Height 1.86 m, the head is about
+  a fifth of the height.
+- **Skeleton.** 62 bones: Root, Body, Hips, Abdomen, Torso, Chest, Neck, Head,
+  shoulder, upper arm, forearm and hand with fingers, thigh, shin and foot.
+  **Knees and elbows exist.** Rest is a T-pose, arms horizontal.
+- **Clips.** 24 of them: Idle, Idle_Gun, Idle_Gun_Shoot, Gun_Shoot, Walk, Run,
+  Death, Kick_Left/Right, Roll, HitRecieve and others. **There is no crouch,
+  prone or jump** — and those are exactly the heights the ROM fixes: a bullet at
+  1.13 m standing, 0.68 crouched, 0.23 prone (ADR-0027), and the poses are fitted
+  to them.
+- **Business Man has no hat.** Farmer has a brimmed hat, but with a red band and
+  a wide brim — a cowboy silhouette.
+- **There is no pistol in the pack** for any character: the "with gun" clips hold
+  an empty hand.
 
-## Решения
+## Decisions
 
-### 1. Анимация смешанная: клипы пака и позы кодом
+### 1. Mixed animation: pack clips and poses in code
 
-Решение пользователя. Там, где ROM не диктует высот, двигаются клипы пака; там,
-где диктует, — наши позы кодом, теперь с коленями и локтями:
+The user's decision. Where the ROM does not dictate heights, pack clips move;
+where it does, our poses in code, now with knees and elbows:
 
-| Поза | Чем |
+| Pose | By |
 |---|---|
-| idle | клип Idle_Gun |
-| walk | клип Walk, по фазе ходьбы |
-| shoot | клип Idle_Gun_Shoot |
-| dead_0, dead_1 | клип Death: середина и последний кадр |
-| crouch, prone, jump, kick, crushed | позы кодом из `FigurePoses` |
+| idle | clip Idle_Gun |
+| walk | clip Walk, by walk phase |
+| shoot | clip Idle_Gun_Shoot |
+| dead_0, dead_1 | clip Death: middle and last frame |
+| crouch, prone, jump, kick, crushed | code poses from `FigurePoses` |
 
-Позы кодом строятся **не от покоя**, а от первого кадра стойки: у T-позы руки
-горизонтальны, и «рука на −4° вперёд» от неё ничего не значит. Кость
-поворачивается вокруг оси бока фигуры, взятой в её собственной системе, —
-поэтому таблице поз не важны ни крен костей пака, ни их оси.
+Code poses are built **not from rest** but from the first frame of the stance:
+in a T-pose the arms are horizontal, and "arm at −4° forward" from it means
+nothing. A bone rotates around the figure's side axis taken in the bone's own
+space — so the pose table does not care about the roll of the pack's bones or
+their axes.
 
-**Своё сэмплирование вместо AnimationTree.** Клип читается риггом напрямую —
-`Animation.rotation_track_interpolate` на нужный момент, — и поза любой из
-двух природ становится одним и тем же: набором поворотов костей. Переход
-между позами — сферическая интерполяция по каждой кости, как было сглаживание
-углов с M16. Так проще, чем стыковать `AnimationTree` с позами кодом, и
-остаются в силе две вещи, на которых стоят тесты: `snap()` ставит позу сразу,
-а габарит считается по скиннутым вершинам.
+**Own sampling instead of AnimationTree.** The rig reads a clip directly —
+`Animation.rotation_track_interpolate` at the needed moment — and a pose of
+either nature becomes the same thing: a set of bone rotations. A transition
+between poses is spherical interpolation per bone, as the angle smoothing has
+been since M16. This is simpler than joining `AnimationTree` with code poses,
+and two things the tests rely on stay valid: `snap()` sets a pose immediately,
+and the bounds are computed from skinned vertices.
 
-### 2. Шляпа агента — своя федора
+### 2. The agent's hat — our own fedora
 
-Решение пользователя. Строится в `build_actors.py` и привязана к кости
-головы: тулья с заломом и узкие поля в цвет шляпы агента. Силуэт гангстера,
-как у агентов в оригинале. Остальные головы пака не берём.
+The user's decision. Built in `build_actors.py` and attached to the head bone: a
+crown with a pinch and a narrow brim in the agent's hat color. A gangster
+silhouette, like the agents in the original. Other heads from the pack are not
+used.
 
-### 3. Otto — в прежней палитре, без шляпы
+### 3. Otto — in the previous palette, without a hat
 
-Решение пользователя. Модель общая, отличие — цветом и головой: у Otto
-кремовый костюм и тёмные волосы, у агента тёмно-синий костюм, федора и очки.
-На погашенном этаже силуэт со шляпой отличает агента и без цвета.
+The user's decision. The model is shared; the difference is color and head: Otto
+has a cream suit and dark hair, an agent has a dark-blue suit, a fedora and
+glasses. On a dark floor the hat silhouette tells an agent apart even without
+color.
 
-### 4. Агентам — тёмные очки
+### 4. Agents get dark glasses
 
-Решение пользователя. Тонкая пластина с двумя стёклами на кости головы, поверх
-глаз пака.
+The user's decision. A thin plate with two lenses on the head bone, over the
+pack's eyes.
 
-### 5. Пистолет строится сами
+### 5. We build the pistol ourselves
 
-Пистолета в паке нет, поэтому `build_actors.py` строит его из примитивов и
-привязывает к кисти правой руки — как было у фигуры M16.
+There is no pistol in the pack, so `build_actors.py` builds it from primitives and
+attaches it to the right hand — as it was with the M16 figure.
 
-### 6. Пайплайн: исходник пака в репозитории, сборка через Blender
+### 6. Pipeline: the pack source in the repository, build via Blender
 
-- Исходник `business_man.glb` (1.5 МБ, CC0) лежит в `assets/source/quaternius/`
-  с лицензией. В `assets/source/` — `.gdignore`: Godot исходник не импортирует, в игре
-  только собранные модели.
-- `tools/build_actors.py` открывает исходник в Blender, приводит рост к
-  `Proportions.BODY` (1.68 м), перекрашивает материалы палитрой актёра,
-  добавляет федору, очки и пистолет, оставляет четыре нужных клипа и пишет
-  `otto.glb` и `agent.glb`.
-- Имена костей — пака. Риг ищет их по именам и падает с ошибкой, если
-  кости нет, — как с M16.
-- Отложенное из M20: `car.glb` без читателя и его сборка уходят вместе со
-  старой фигурой.
+- The source `business_man.glb` (1.5 MB, CC0) lies in `assets/source/quaternius/`
+  with the license. `assets/source/` has a `.gdignore`: Godot does not import the
+  source; the game has only the built models.
+- `tools/build_actors.py` opens the source in Blender, scales the height to
+  `Proportions.BODY` (1.68 m), recolors materials with the actor palette,
+  adds the fedora, glasses and pistol, keeps the four needed clips and writes
+  `otto.glb` and `agent.glb`.
+- Bone names are the pack's. The rig looks them up by name and fails with an
+  error if a bone is missing — as since M16.
+- Deferred from M20: `car.glb` with no reader and its build go away together with
+  the old figure.
 
-### 7. Машина у выхода — из Cars Pack, в каждом здании своя
+### 7. The car at the exit — from the Cars Pack, a different one in each building
 
-Решение пользователя, принято по ходу вехи. У Quaternius есть Cars Pack (CC0):
-такси, полицейская, SUV, две спортивные и две обычные. В жребий идут пять —
-**кроме такси и полицейской**: шпион, уезжающий на патрульной машине, странен.
-Какая машина и какого цвета — жребий по соли здания, но **первое здание —
-красная спортивная**, как в 1983 году. Длина любой приводится к
-`Proportions.CAR_LENGTH`, чтобы выход и проём гаража не сдвигались.
-`CarModel` из примитивов уходит.
+The user's decision, made during the milestone. Quaternius has a Cars Pack (CC0):
+taxi, police car, SUV, two sports cars and two regular ones. Five go into the draw
+— **except the taxi and the police car**: a spy driving away in a patrol car is
+odd. Which car and what color is a draw by the building salt, but **the first
+building gets the red sports car**, as in 1983. The length of any car is scaled to
+`Proportions.CAR_LENGTH` so that the exit and the garage opening do not shift.
+`CarModel` from primitives goes away.
 
-### 8. Пропорции — пака
+### 8. Proportions — the pack's
 
-Голова около пятой части роста вместо трети. Рост тот же, 1.68 м, и равен
-коллизии (ADR-0026, решение 8).
+The head is about a fifth of the height instead of a third. The height is the
+same, 1.68 m, and equals the collision (ADR-0026, decision 8).
 
-## Последствия
+## Consequences
 
-- Присед наконец читается «на корточках»: бёдра опускаются, колени сгибаются,
-  а не корпус ложится на колени.
-- Живая ходьба и смерть клипами — без ручной работы.
-- Модель в двести раз тяжелее прежней коробочной (около 3000 вершин против
-  сотни), а заземление считается по скиннутым вершинам. Поэтому для
-  заземления риг берёт прореженный набор вершин и считает его только тогда,
-  когда поза кодом или идёт переход; клипы заземлены самим паком.
-- Тесты поз по вершинам остаются: присед под пулей стоя, агент на колене под
-  выстрелом стоя, залёгший под выстрелом из приседа.
+- The crouch finally reads as "squatting": the hips go down, the knees bend,
+  rather than the torso lying on the knees.
+- Lively walking and death via clips — without manual work.
+- The model is two hundred times heavier than the old box one (about 3000
+  vertices versus a hundred), and grounding is computed from skinned vertices.
+  So for grounding the rig takes a thinned set of vertices and computes it only
+  when a code pose or a transition is running; clips are grounded by the pack
+  itself.
+- Vertex-based pose tests stay: crouch under a standing bullet, an agent on one
+  knee under a standing shot, a prone agent under a crouched shot.

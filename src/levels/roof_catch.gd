@@ -1,28 +1,25 @@
 class_name RoofCatch
 extends RefCounted
 
-## Чем крыша ловит то, что падает с неба: дождь ([RoofRain]) и снег
-## ([RoofSnow]). Частицы гаснут не по таймеру, а о саму крышу — по карте
-## высот, снятой сверху с настила, ступеней, парапетов, машинного отделения и
-## техники (ADR-0037, решение 3). Одно место на обе погоды: разведи их — и
-## снег падал бы в шахту там, где дождь уже гаснет о крышку.
+## How the roof catches what falls from the sky: rain ([RoofRain]) and snow ([RoofSnow]). Particles
+## die not by a timer but on the roof itself — by a height map taken from above from the deck,
+## steps, parapets, machine room and equipment (ADR-0037, decision 3). One place for both weathers:
+## separate them — and snow would fall into the shaft where rain already dies on the lid.
 ##
-## Карта снимается один раз и только со слоя [constant LAYER]: на него
-## [method mark] переводит неподвижное на крыше. Otto и агенты в ней не
-## числятся — снятые на месте, где стояли при сборке, они оставили бы в
-## осадках дыру в форме человека.
+## The map is taken once and only from layer [constant LAYER]: [method mark] moves stationary things
+## on the roof onto it. Otto and agents are not in it — captured where they stood at assembly, they
+## would leave a human-shaped hole in the precipitation.
 
-## Слой, с которого снимается карта высот и на который ложатся мокрый настил и
-## снежный покров. Двадцатый: остальные слои в проекте не заняты, и камеры и
-## свет видят все двадцать.
+## The layer from which the height map is taken and on which the wet deck and the snow cover lie.
+## The twentieth: other layers in the project are not taken, and cameras and lights see all twenty.
 const LAYER: int = 1 << 19
 
-## Толщина крышки над проёмом крыши, м: частица за шаг проходит до 15 см.
+## Thickness of the lid over the roof opening, m: a particle travels up to 15 cm per step.
 const LID_DEPTH: float = 0.4
 
 
-## Коробка над крышей, где идут осадки: по ширине крыши с отливами, по глубине
-## от [param back_z] до [param front_z], высотой [param height] над настилом.
+## The box over the roof where precipitation falls: across the roof width with the drips, in depth
+## from [param back_z] to [param front_z], [param height] high above the deck.
 static func box(rules: BuildingRules, back_z: float, front_z: float, height: float) -> AABB:
 	var bounds := rules.floor_span(BuildingRules.ROOF)
 	var deck := WorldSpace.height_to_scene(rules.floor_surface(BuildingRules.ROOF))
@@ -33,7 +30,7 @@ static func box(rules: BuildingRules, back_z: float, front_z: float, height: flo
 	)
 
 
-## Карта высот, снимаемая с коробки [param over] со слоя [param mask].
+## Height map taken from box [param over] from layer [param mask].
 static func catcher(
 	over: AABB, name: String, mask: int = LAYER
 ) -> GPUParticlesCollisionHeightField3D:
@@ -47,13 +44,13 @@ static func catcher(
 	return caught
 
 
-## Невидимые крышки над проёмами в плите крыши — над верхней шахтой.
+## Invisible lids over the openings in the roof slab — over the top shaft.
 ##
-## Машинное отделение накрывает шахту только у задней стены, а проём идёт
-## сквозь плиту на всю глубину. Капли и снежинки перед домиком падали бы в
-## шахту и дальше вниз — перед порталом тридцатого этажа, то есть осадками в
-## здании. Крышка — на уровне настила: верх чуть выше него, на шаг частиц
-## [param step], и частица гаснет вровень с настилом, а не под ним.
+## The machine room covers the shaft only at the back wall, while the opening goes through the slab
+## over its whole depth. Drops and snowflakes in front of the little house would fall into the shaft
+## and further down — in front of the thirtieth floor's portal, that is precipitation inside the
+## building. The lid is at deck level: its top is slightly above the deck, by the particle step
+## [param step], and a particle dies level with the deck, not under it.
 static func lids(
 	rules: BuildingRules, plan: BuildingPlan, over: AABB, step: float
 ) -> Array[GPUParticlesCollisionBox3D]:
@@ -69,8 +66,8 @@ static func lids(
 	return made
 
 
-## Переводит на слой [constant LAYER] неподвижное на крыше под [param roots],
-## что задевает коробку [param over].
+## Moves stationary things on the roof under [param roots] that touch box [param over] onto layer
+## [constant LAYER].
 static func mark(roots: Array[Node], over: AABB) -> void:
 	for root in roots:
 		for node: Node in root.find_children("*", "GeometryInstance3D", true, false):

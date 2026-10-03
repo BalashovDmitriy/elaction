@@ -1,26 +1,26 @@
-# Гейт качества перед каждым коммитом.
+# Quality gate before every commit.
 #
-# Установка (один раз после клона):
+# Installation (once after cloning):
 #   .venv/Scripts/pre-commit install
 #   .venv/Scripts/pre-commit install --hook-type pre-push
 #
-# Прогнать всё вручную:
+# Run everything by hand:
 #   .venv/Scripts/pre-commit run --all-files
 
-# Часть хуков зовётся через `python -m <модуль>`, а не своим именем. Причина
-# внешняя: pre-commit кладёт в окружение сгенерированные .exe-обёртки, и
-# управление приложениями в Windows блокирует их как файлы без репутации —
+# Some hooks are called via `python -m <module>`, not by their own name. The reason
+# is external: pre-commit puts generated .exe wrappers into the environment, and
+# Windows application control blocks them as files without reputation —
 # `[WinError 4551] Политика управления приложениями заблокировала этот файл`.
-# Сам python.exe в тех же окружениях не блокируется, поэтому вызов модулем
-# проходит. Проверка от этого не меняется, а запись переносима: в CI на Linux
-# она работает ровно так же. Если упрётся ещё один хук — лечится тем же приёмом.
+# python.exe itself in the same environments is not blocked, so calling as a module
+# passes. The check does not change because of this, and the entry is portable: in CI on Linux
+# it works exactly the same. If one more hook hits this — the same trick fixes it.
 default_install_hook_types: [pre-commit, pre-push]
 exclude: '^(\.godot/|addons/|build/|export/)'
 
 repos:
-  # mixed-line-ending намеренно не подключён: gdformat на Windows пишет CRLF,
-  # а .gitattributes (* text=auto eol=lf) всё равно нормализует переводы строк
-  # при коммите. Хук только добавлял бы лишний цикл "упало и исправило".
+  # mixed-line-ending is deliberately not enabled: gdformat on Windows writes CRLF,
+  # and .gitattributes (* text=auto eol=lf) normalizes line endings anyway
+  # on commit. The hook would only add an extra "failed and fixed" cycle.
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -30,9 +30,9 @@ repos:
       - id: end-of-file-fixer
         entry: python -m pre_commit_hooks.end_of_file_fixer
         exclude: '\.(tscn|tres|import|godot)$'
-      # Через python -m, как end-of-file-fixer выше: exe-лаунчер хука,
-      # который pip кладёт в окружение pre-commit, неподписан, и политика
-      # управления приложениями Windows запрещает его запуск (WinError 4551).
+      # Via python -m, like end-of-file-fixer above: the hook's exe launcher,
+      # which pip puts into the pre-commit environment, is unsigned, and the Windows
+      # application control policy forbids running it (WinError 4551).
       - id: check-yaml
         entry: python -m pre_commit_hooks.check_yaml
       - id: check-merge-conflict
@@ -43,7 +43,7 @@ repos:
         entry: python -m pre_commit_hooks.check_added_large_files
         args: [--maxkb=5120]
 
-  # Линтер и форматтер GDScript (gdtoolkit)
+  # GDScript linter and formatter (gdtoolkit)
   - repo: https://github.com/Scony/godot-gdscript-toolkit
     rev: 4.5.0
     hooks:
@@ -54,7 +54,7 @@ repos:
 
   - repo: local
     hooks:
-      # Непрерывность между сессиями: код не уезжает вперёд статуса разработки.
+      # Continuity between sessions: code does not get ahead of the development status.
       - id: status-updated
         name: docs/STATUS.md обновлён вместе с кодом
         entry: python tools/check_status.py
@@ -63,9 +63,9 @@ repos:
         always_run: true
         stages: [pre-commit]
 
-      # Тяжёлые проверки движком — только на push, чтобы не тормозить коммиты.
-      # Если check.ps1 уже прошёл на этом же дереве, повтор пропускается:
-      # tools/check_stamp.py сверяет отпечаток рабочей копии.
+      # Heavy engine checks — only on push, so as not to slow down commits.
+      # If check.ps1 has already passed on this same tree, the repeat is skipped:
+      # tools/check_stamp.py compares the working copy fingerprint.
       - id: godot-check
         name: godot --headless --import (импорт ресурсов и парсинг скриптов)
         entry: python tools/check_stamp.py --run python tools/godot_check.py

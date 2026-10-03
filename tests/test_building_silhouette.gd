@@ -1,20 +1,20 @@
 extends GutTest
 
-## Тесты силуэта здания: сколько мест на уровне и где его стены.
+## Building silhouette tests: how many slots a level has and where its walls are.
 ##
-## Здание расширяется книзу ступенями, и на этом держится всё остальное: шахта
-## проходит сквозь этажи разной ширины и должна стоять на месте, которое есть на
-## каждом из них. Считается всё по правилам, без сцены (ADR-0014, пункт 3).
+## The building widens toward the bottom in steps, and everything else rests on this: a shaft
+## passes through floors of different widths and must stand on a slot that exists on
+## each of them. Everything is computed by the rules, without a scene (ADR-0014, point 3).
 
 
 func _rules() -> BuildingRules:
 	var rules := BuildingRules.new()
 	rules.floors = 30
-	# Здание теста — свой маленький мир в целых числах, и задаётся он целиком:
-	# все длины, от которых зависят проверки ниже. Пока часть бралась из
-	# умолчаний, тест держался на том, что 480 и 3840 точны в любом float; с
-	# M15 умолчания метрические — 4.8 и 38.4, — и точные равенства поплыли на
-	# последнем бите дроби ([Vector2] к тому же хранит float32).
+	# The test building is its own small world in integers, and it is set in full:
+	# all lengths the checks below depend on. While part was taken from
+	# defaults, the test relied on 480 and 3840 being exact in any float; since
+	# M15 the defaults are metric — 4.8 and 38.4 — and exact equalities drifted on
+	# the last bit of the fraction ([Vector2] also stores float32).
 	rules.floor_height = 120.0
 	rules.slab_height = 20.0
 	rules.sky_height = 160.0
@@ -31,8 +31,8 @@ func test_levels_start_at_the_roof_and_end_at_the_bottom() -> void:
 	assert_eq(all[-1], rules.floors - 1)
 
 
-## Силуэт: наверху узко, внизу вся ширина. Ступени идут только вниз — на этом
-## держится шахта, которая проходит сквозь этажи разной ширины (ADR-0014).
+## Silhouette: narrow at the top, full width at the bottom. Steps go only down — the shaft
+## that passes through floors of different widths rests on this (ADR-0014).
 func test_the_building_only_widens_going_down() -> void:
 	var rules := _rules()
 	var previous := -1.0
@@ -48,11 +48,11 @@ func test_the_narrowest_level_is_the_roof_and_the_widest_is_the_bottom() -> void
 	assert_lt(rules.floor_width(BuildingRules.ROOF), rules.width, "наверху уже")
 
 
-## Верхние этажи влезают в кадр целиком, нижние — шире экрана (ADR-0024,
-## решение 2). Башню видно всю, а по стилобату надо ходить.
+## Upper floors fit in the frame entirely, lower ones are wider than the screen (ADR-0024,
+## decision 2). The tower is seen whole, while the podium has to be walked.
 ##
-## Правила берутся умолчаниями, а не миром теста: ширина кадра метрическая, и
-## сверять её надо с тем зданием, которое собирается в игре.
+## Rules are taken as defaults, not from the test world: the frame width is metric, and
+## it must be checked against the building assembled in the game.
 func test_narrow_levels_fit_the_frame_and_wide_ones_do_not() -> void:
 	var rules := BuildingRules.new()
 	var frame := _frame_width()
@@ -70,9 +70,9 @@ func test_narrow_levels_fit_the_frame_and_wide_ones_do_not() -> void:
 	assert_gt(wide, 0, "широкая тоже")
 
 
-## Ширина кадра ортокамеры, м. Половину высоты задаёт камера, ширину — из неё
-## и соотношения сторон вьюпорта проекта: считать по окну в headless нельзя,
-## его там нет.
+## Orthocamera frame width, m. Half the height is set by the camera, the width — from it
+## and the project viewport aspect ratio: one cannot compute from the window in headless,
+## there is none there.
 func _frame_width() -> float:
 	var wide := float(ProjectSettings.get_setting("display/window/size/viewport_width"))
 	var high := float(ProjectSettings.get_setting("display/window/size/viewport_height"))
@@ -87,8 +87,8 @@ func test_narrow_levels_offer_fewer_slots() -> void:
 	assert_eq(bottom.y - bottom.x + 1, rules.slots)
 
 
-## Места симметричны относительно середины: несимметричный этаж уводил бы
-## шахту, проходящую сквозь него, в сторону от собственного столбца.
+## Slots are symmetric around the middle: an asymmetric floor would pull
+## a shaft passing through it away from its own column.
 func test_slots_stay_centred_on_every_level() -> void:
 	var rules := _rules()
 	var middle := rules.slots - 1
@@ -97,13 +97,13 @@ func test_slots_stay_centred_on_every_level() -> void:
 		assert_eq(span.x + span.y, middle, "этаж %d сдвинут вбок" % index)
 
 
-## На самом узком этаже должно помещаться обязательное: шахта, одна дверь и его
-## лампы. Двери сверх одной обязательными не считаются — занимают, что осталось
-## (ADR-0028, решение 2).
+## The narrowest floor must fit the mandatory: a shaft, one door and its
+## lamps. Doors beyond one are not mandatory — they take what is left
+## (ADR-0028, decision 2).
 ##
-## Самый узкий этаж — нулевой, и мерится именно его ширина. Крыша уже, но на
-## ней нет ни дверей, ни ламп: мерить её шириной занятость этажа значило бы
-## сравнивать два разных уровня и проходить по случайному совпадению их ступени.
+## The narrowest floor is floor zero, and its width is what gets measured. The roof is narrower, but
+## it has neither doors nor lamps: measuring floor occupancy by its width would mean
+## comparing two different levels and passing by a chance match of their step.
 func test_the_narrowest_level_fits_everything_it_must_hold() -> void:
 	var rules := _rules()
 	var needed := 1 + mini(rules.doors_on(0), 1) + rules.lamps_on(0)
@@ -118,9 +118,9 @@ func test_slots_outside_the_silhouette_are_not_available() -> void:
 	assert_true(rules.slot_available(0, rules.floors - 1), "внизу то же место — этаж")
 
 
-## Перекрытие — и пол своего уровня, и потолок нижнего. На ступени силуэта
-## нижний этаж шире, и без этого над его наружной полосой было бы открытое небо,
-## а лампа на крайнем месте висела бы не на чем.
+## The slab is both the floor of its level and the ceiling of the one below. At a silhouette step
+## the lower floor is wider, and without this there would be open sky above its outer strip,
+## and a lamp in the outermost slot would hang on nothing.
 func test_a_slab_covers_the_floor_below_it_whole() -> void:
 	var rules := _rules()
 	for index: int in rules.levels():
@@ -134,7 +134,7 @@ func test_a_slab_covers_the_floor_below_it_whole() -> void:
 		)
 
 
-## Ниже собственных стен перекрытие не сужается: оно остаётся полом своего уровня.
+## The slab does not get narrower than its own walls: it stays the floor of its level.
 func test_a_slab_is_never_narrower_than_its_own_level() -> void:
 	var rules := _rules()
 	for index: int in rules.levels():
@@ -143,8 +143,8 @@ func test_a_slab_is_never_narrower_than_its_own_level() -> void:
 		assert_true(slab.x <= own.x and slab.y >= own.y, "этаж %d потерял свой пол" % index)
 
 
-## Каждое место уровня имеет над собой потолок: лампа вешается на перекрытие,
-## а его кладёт уровень выше.
+## Every slot of a level has a ceiling above it: a lamp is hung on the slab,
+## and the level above lays it.
 func test_every_slot_of_a_floor_has_a_ceiling_over_it() -> void:
 	var rules := _rules()
 	for index: int in rules.floors:
@@ -158,8 +158,8 @@ func test_every_slot_of_a_floor_has_a_ceiling_over_it() -> void:
 			)
 
 
-## Границы выводятся из крайних мест: место должно отстоять от своей стены
-## ровно на margin, как и на этаже во всю ширину.
+## Bounds are derived from the outermost slots: a slot must be exactly margin away from its
+## wall, as on a full-width floor.
 func test_floor_span_keeps_the_margin_from_its_own_walls() -> void:
 	var rules := _rules()
 	for index: int in [BuildingRules.ROOF, 0, 15, rules.floors - 1]:
@@ -169,17 +169,17 @@ func test_floor_span_keeps_the_margin_from_its_own_walls() -> void:
 		assert_eq(span.y - rules.slot_x(slots.y), rules.margin, "справа, этаж %d" % index)
 
 
-## Симметрия мест держится на нечётном их числе: у чётного набора середины нет,
-## крайний столбец пропадает на всех уровнях разом, а нижний этаж перестаёт быть
-## во всю ширину здания. Правило записано у самого поля, а стережётся здесь.
+## Slot symmetry rests on their odd count: an even set has no middle,
+## the outermost column disappears on all levels at once, and the bottom floor stops being
+## the full width of the building. The rule is written next to the field itself, and guarded here.
 func test_slot_count_is_odd() -> void:
 	var rules := _rules()
 	assert_eq(rules.slots % 2, 1, "чётное число мест ломает симметрию силуэта")
 	assert_eq(rules.top_slots % 2, 1, "и наверху тоже")
 
 
-## То же правило, но с обратной стороны: на нечётном наборе нижний этаж обязан
-## выходить на полную ширину здания, иначе силуэт не доходит до края.
+## The same rule, from the other side: with an odd set the bottom floor must
+## reach the full width of the building, otherwise the silhouette does not reach the edge.
 func test_the_bottom_floor_reaches_both_walls() -> void:
 	var rules := _rules()
 	var span := rules.floor_span(rules.floors - 1)

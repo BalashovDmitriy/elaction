@@ -1,41 +1,41 @@
 class_name RoofKit
 extends Node3D
 
-## Техника крыши: бак, кондиционеры, тарелка, солнечные панели, выход на
-## крышу, лестница и антенна с мигающим огнём (ADR-0031, решение 2; с M21b —
-## модели паков, ADR-0033, решение 8). Высокое над крышей с M24p — корона
-## здания ([BuildingCrown]).
+## Roof equipment: a tank, air conditioners, a dish, solar panels, the roof
+## exit, a ladder and an antenna with a blinking light (ADR-0031, decision 2; since M21b —
+## pack models, ADR-0033, decision 8). The tall thing above the roof since M24p is the building's
+## crown ([BuildingCrown]).
 ##
-## Всё без тел и без источников света: огонь антенны — эмиссия. Стоит у задней
-## стены крыши и за ней, на своих ступенях кровли, и не встаёт перед шахтой:
-## над ней машинное отделение, с которого начинается спуск. Неоновая вывеска
-## с M21b живёт на углу фасада ([VerticalSign]): на крыше её закрывала техника.
+## All without bodies or light sources: the antenna light is emission. Stands at the back
+## wall of the roof and behind it, on its roof steps, and does not stand in front of the shaft:
+## above it is the machine room, where the descent begins. The neon sign
+## since M21b lives on the facade corner ([VerticalSign]): on the roof the equipment covered it.
 
-## Техника стоит за задней стеной крыши, на ступенях кровли, м.
+## The equipment stands behind the roof's back wall, on the roof steps, m.
 const DEPTH_Z: float = WorldSpace.BACK_WALL_Z - 1.8
-## Ближе этого к камере техника не выступает: передняя грань машинного
-## отделения, за спиной Otto.
+## The equipment does not protrude closer than this to the camera: the front face of the machine
+## room, behind Otto.
 const FRONT_Z: float = WorldSpace.BACK_WALL_Z + BuildingShafts.MACHINE_ROOM_DEPTH
-## Ближе к краю кровли техника не встаёт, и между предметами зазор, м.
+## The equipment does not stand closer to the roof edge, and the gap between items, m.
 const EDGE_GAP: float = 0.3
 const GAP: float = 0.35
 
-## Лестница на машинное отделение.
+## Ladder to the machine room.
 const STEEL := Color(0.3, 0.31, 0.33)
 const STEEL_LIGHT := Color(0.52, 0.53, 0.55)
 
-## Огонь на макушке антенны: размер, период и доля, когда горит.
+## The light on top of the antenna: size, period and the fraction when it is on.
 const BEACON: float = 0.16
 const BEACON_PERIOD: float = 1.4
 const BEACON_ON: float = 0.35
 const BEACON_RED := Color(1.0, 0.12, 0.08)
 
-## Что ставится вдоль длинной стороны кровли — по порядку от края, пока
-## влезает, — и насколько каждый предмет выдвинут от [constant DEPTH_Z]:
-## высокое — дальше, низкое — ближе, иначе башня закрыла бы кондиционеры.
+## What is placed along the long side of the roof — in order from the edge, while
+## it fits — and how far each item is pushed out from [constant DEPTH_Z]:
+## tall ones further, low ones closer, otherwise the tower would cover the air conditioners.
 ##
-## Водонапорная башня ушла с M24p: высокое над крышей — корона здания
-## ([BuildingCrown]), у жилого дома свой бак на опорах. Бак — у края.
+## The water tower is gone since M24p: the tall thing above the roof is the building's crown
+## ([BuildingCrown]), the residential building has its own tank on legs. The tank is at the edge.
 const LONG_SIDE: Array[String] = [
 	"water_tank", "satellite_dish", "air_conditioner", "air_conditioner", "solar_panel"
 ]
@@ -53,8 +53,8 @@ var _beacon: MeshInstance3D = null
 var _clock: float = 0.0
 
 
-## Ставит технику по правилам и плану. [param building_seed] решает, что у
-## края — бак или кондиционер: крыши зданий не повторяют друг друга.
+## Places the equipment by rules and plan. [param building_seed] decides what is at the
+## edge — a tank or an air conditioner: building roofs do not repeat each other.
 func build(rules: BuildingRules, plan: BuildingPlan, building_seed: int = 1) -> void:
 	var shaft := plan.roof_shaft()
 	if shaft == null:
@@ -70,10 +70,10 @@ func build(rules: BuildingRules, plan: BuildingPlan, building_seed: int = 1) -> 
 	var short := right if on_the_left else left
 
 	var line := LONG_SIDE.duplicate()
-	# Жребий по сиду: бак или кондиционер у края — крыши не повторяют друг друга.
+	# A draw by seed: a tank or an air conditioner at the edge — roofs do not repeat each other.
 	if building_seed % 2 == 0:
 		line[0] = "air_conditioner"
-	# От парапета внутрь: у края — самое высокое, к отделению — низкое.
+	# From the parapet inward: at the edge the tallest, toward the machine room the low ones.
 	var cursor := long.x + EDGE_GAP if on_the_left else long.y - EDGE_GAP
 	var inward := 1.0 if on_the_left else -1.0
 	var limit := long.y - GAP if on_the_left else long.x + GAP
@@ -94,7 +94,7 @@ func build(rules: BuildingRules, plan: BuildingPlan, building_seed: int = 1) -> 
 	_antenna(shaft.x, surface - BuildingShafts.MACHINE_ROOM_SIZE.y)
 
 
-## Мигает огнём антенны. Картинка, а не правило: по настенным часам.
+## Blinks the antenna light. A picture, not a rule: by wall-clock time.
 func _process(delta: float) -> void:
 	if _beacon == null:
 		return
@@ -102,7 +102,7 @@ func _process(delta: float) -> void:
 	_beacon.visible = _clock < BEACON_PERIOD * BEACON_ON
 
 
-## Верх кровли в точке [param x]: верх самой высокой ступени над ней или настил.
+## Roof top at point [param x]: the top of the highest step over it, or the deck.
 static func _top_at(steps: Array[Rect2], surface: float, x: float) -> float:
 	var top := surface
 	for rect in steps:
@@ -111,11 +111,11 @@ static func _top_at(steps: Array[Rect2], surface: float, x: float) -> float:
 	return top
 
 
-## Модель каталога на кровле: низом на ступень под серединой.
+## A catalogue model on the roof: bottom on the step under its middle.
 ##
-## Передом не ближе машинного отделения: модели крыши по глубине не сжимаются, и
-## выход на крышу в 2.7 м глубиной от [constant DEPTH_Z] вставал поперёк
-## плоскости игры — Otto шёл сквозь него, а тот закрывал Otto (авторевью M21b).
+## Its front no closer than the machine room: roof models are not squashed in depth, and
+## the 2.7 m deep roof exit from [constant DEPTH_Z] stood across the
+## play plane — Otto walked through it, and it covered Otto (M21b code review).
 func _place(prop_name: String, x: float, steps: Array[Rect2], surface: float) -> void:
 	var item := PropCatalog.make(prop_name)
 	if item == null:
@@ -134,7 +134,7 @@ func _box(size: Vector3, at: Vector2, z: float, material: StandardMaterial3D) ->
 	return part
 
 
-## Лестница на машинное отделение: две тетивы и перекладины.
+## Ladder to the machine room: two stringers and rungs.
 func _ladder(x: float, surface: float) -> void:
 	var steel := GreyboxLook.metal(STEEL_LIGHT)
 	var height := BuildingShafts.MACHINE_ROOM_SIZE.y + 0.4
@@ -146,7 +146,7 @@ func _ladder(x: float, surface: float) -> void:
 		_box(Vector3(0.36, 0.03, 0.03), Vector2(x, surface - 0.25 - float(rung) * 0.3), z, steel)
 
 
-## Антенна на машинном отделении с мигающим огнём на макушке.
+## The antenna on the machine room with a blinking light on top.
 func _antenna(x: float, base: float) -> void:
 	var z := WorldSpace.BACK_WALL_Z - 0.2
 	var mast := PropCatalog.make("roof_antenna")

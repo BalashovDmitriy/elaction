@@ -1,41 +1,41 @@
-# ADR-0003 · Docker в проекте не используется
+# ADR-0003 · Docker is not used in the project
 
-- **Статус:** принято
-- **Дата:** 2026-09-11
+- **Status:** accepted
+- **Date:** 2026-09-11
 
-## Контекст
+## Context
 
-Вопрос: нужен ли проекту Docker и, в частности, многоконтейнерная конфигурация.
+Question: does the project need Docker and, in particular, a multi-container configuration.
 
-## Решение
+## Decision
 
-**Локально Docker не используется. Многоконтейнерной конфигурации нет.**
+**Docker is not used locally. There is no multi-container configuration.**
 
-Причины:
+Reasons:
 
-1. **Godot — десктопное GPU-приложение.** Редактор нуждается в дисплее и видеокарте.
-   На Windows проброс GPU в контейнер отсутствует, а запуск редактора через контейнер
-   означает возню с X-сервером ради нулевой выгоды.
-2. **Нечего разделять на контейнеры.** В проекте нет базы данных, брокера, бэкенда и
-   сетевого слоя. Docker compose решает задачу оркестрации нескольких сервисов, а сервис
-   здесь ровно один — сама игра.
-3. **Воспроизводимость решается дешевле.** Версия движка зафиксирована в `project.godot`
-   и в переменной `GODOT_VERSION` в CI, версии тулинга — в `requirements-dev.txt`.
-   Этого достаточно, чтобы окружение совпадало у разработчика и в CI.
+1. **Godot is a desktop GPU application.** The editor needs a display and a graphics card.
+   On Windows there is no GPU passthrough into a container, and running the editor through a
+   container means fiddling with an X server for zero benefit.
+2. **There is nothing to split into containers.** The project has no database, broker, backend
+   or network layer. Docker compose solves the problem of orchestrating several services, and
+   there is exactly one service here — the game itself.
+3. **Reproducibility is solved more cheaply.** The engine version is pinned in `project.godot`
+   and in the `GODOT_VERSION` variable in CI, tooling versions in `requirements-dev.txt`.
+   This is enough for the environment to match between the developer and CI.
 
-## Где контейнеры всё же уместны
+## Where containers are still appropriate
 
-- **CI.** GitHub Actions сам по себе изолирован, поэтому отдельный образ не нужен:
-  workflow скачивает Linux-сборку Godot нужной версии и запускает её headless.
-  Если в будущем сборка станет тяжёлой, вариант — свой образ с движком и шаблонами
-  экспорта, чтобы не качать их на каждый прогон.
-- **M10, онлайн-лидерборд.** Если он появится, у проекта возникнет настоящий бэкенд
-  с базой данных. Вот там docker compose уместен — и тогда он будет описывать сервисы
-  лидерборда, а не игру.
+- **CI.** GitHub Actions is isolated by itself, so a separate image is not needed:
+  the workflow downloads the Linux build of Godot of the required version and runs it headless.
+  If the build becomes heavy in the future, an option is our own image with the engine and
+  export templates, so as not to download them on every run.
+- **M10, online leaderboard.** If it appears, the project will get a real backend
+  with a database. That is where docker compose fits — and then it will describe the
+  leaderboard services, not the game.
 
-## Последствия
+## Consequences
 
-- Разработчику нужны локально установленные Godot и Python. Порог входа минимальный,
-  установка описана в README.
-- Если в команде появится второй человек с другой ОС, окружение придётся описать точнее.
-  Пересмотреть решение имеет смысл именно в этот момент, а не раньше.
+- The developer needs Godot and Python installed locally. The entry threshold is minimal;
+  installation is described in the README.
+- If a second person with a different OS joins the team, the environment will have to be
+  described more precisely. That is exactly the moment to revisit the decision, not earlier.

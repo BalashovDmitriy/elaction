@@ -1,26 +1,26 @@
 class_name OpenSpace
 extends Node3D
 
-## Open space офиса за стеклянной стеной коридора (ADR-0056, решение 4).
+## The office open space behind the corridor's glass wall (ADR-0056, decision 4).
 ##
-## У офиса вместо задней стены — стеклянные перегородки, и за ними виден зал на
-## всю глубину плиты: ряды кубиклов с перегородками в рост сидящего, столы,
-## мониторы со светящимися экранами, кресла, шкафы-картотеки, а у дальней стены
-## — ленточные окна на город: ночью тёмные, днём светятся небом. Отдельной
-## комнаты за дверью у офиса нет: дверь открывается в этот зал.
+## Instead of a back wall the office has glass partitions, and behind them a hall through
+## the full depth of the slab is visible: rows of cubicles with partitions at seated
+## height, desks, monitors with glowing screens, chairs, filing cabinets, and at the far
+## wall — ribbon windows onto the city: dark at night, glowing with the sky by day. The
+## office has no separate room behind the door: the door opens into this hall.
 ##
-## Только вид: тел нет, теней нет — набор на всё здание мультимешами по одному
-## на деталь, и в проходе теней ламп он не участвует (бюджет кадра внизу
-## здания, ADR-0042, решение 2). Экраны светятся эмиссией только на светлых
-## этажах: на тёмном по ROM офис погашен целиком.
+## Looks only: no bodies, no shadows — the set for the whole building is multimeshes,
+## one per detail, and it does not take part in the lamp shadow pass (frame budget at
+## the bottom of the building, ADR-0042, decision 2). Screens glow by emission only on
+## lit floors: on a dark one, per the ROM, the office is dark entirely.
 ##
-## Зал не заходит туда, где плиты нет — в шахты, — и за глухие внутренние
-## стены; столы стоят дальше, чем ходит створка двери.
+## The hall does not go where there is no slab — into shafts — or past solid inner
+## walls; desks stand farther than the door leaf swings.
 
-## Ряды кубиклов: глубина середины ряда от задней стены коридора, м. Первый —
-## за створкой двери ([constant Door.LEAF_SIZE] в глубину), второй — у окон.
+## Cubicle rows: depth of the row's middle from the corridor's back wall, m. The first is
+## behind the door leaf ([constant Door.LEAF_SIZE] in depth), the second at the windows.
 const ROWS: Array[float] = [2.3, 4.7]
-## Шаг кубиклов вдоль ряда и их габарит, м.
+## Cubicle step along the row and their bounds, m.
 const CUBICLE_STEP: float = 2.0
 const DESK := Vector3(1.5, 0.05, 0.75)
 const DESK_HEIGHT: float = 0.74
@@ -28,14 +28,14 @@ const PARTITION := Vector3(1.9, 1.2, 0.05)
 const MONITOR := Vector3(0.5, 0.36, 0.06)
 const CHAIR := Vector3(0.5, 0.9, 0.5)
 const CABINET := Vector3(0.5, 1.3, 0.6)
-## Окна у дальней стены: высота ленты, её низ над полом, шаг переплёта, м.
+## Windows at the far wall: ribbon height, its bottom above the floor, mullion step, m.
 const WINDOW_BAND := Vector2(1.5, 0.9)
 const MULLION_STEP: float = 1.2
-## Ближе этого к краю пролёта кубикл не ставится, м.
+## A cubicle is not placed closer than this to the span's edge, m.
 const EDGE: float = 0.6
 
-## Цвета: стол, перегородки кубиклов (ткань), корпус монитора, экран, кресло,
-## шкаф, окна ночью и переплёт.
+## Colours: desk, cubicle partitions (fabric), monitor body, screen, chair, cabinet,
+## windows at night and mullions.
 const DESK_COLOUR := Color(0.52, 0.47, 0.4)
 const FABRIC := Color(0.36, 0.4, 0.46)
 const CASE := Color(0.12, 0.12, 0.13)
@@ -57,8 +57,8 @@ var _frame := GreyboxLook.metal(FRAME)
 var _night: StandardMaterial3D = null
 
 
-## Собирает зал на всех этажах офиса, кроме крыши, паркинга и особых этажей —
-## там свой зал ([FloorHall], ADR-0057, решение 3).
+## Builds the hall on all office floors except the roof, the garage and special floors —
+## those have their own hall ([FloorHall], ADR-0057, decision 3).
 func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 	name = "OpenSpace"
 	_night = TimeOfDay.window_look(rules.time_of_day, NIGHT_GLASS)
@@ -80,8 +80,8 @@ func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 	_batch.commit(self)
 
 
-## Ряд кубиклов на глубине [param z]: перегородка сзади, стол, монитор лицом к
-## коридору, кресло за столом; через один — шкаф-картотека в торце.
+## A cubicle row at depth [param z]: a partition at the back, a desk, a monitor facing
+## the corridor, a chair at the desk; every other one has a filing cabinet at the end.
 func _row(span: Vector2, surface: float, z: float, lit: bool) -> void:
 	var length := span.y - span.x - EDGE * 2.0
 	var count := int(length / CUBICLE_STEP)
@@ -109,14 +109,14 @@ func _row(span: Vector2, surface: float, z: float, lit: bool) -> void:
 			)
 
 
-## Ленточные окна у дальней стены зала: стекло по времени суток
-## ([method TimeOfDay.window_look]) и переплёт.
+## Ribbon windows at the hall's far wall: glass by time of day
+## ([method TimeOfDay.window_look]) and mullions.
 func _windows(span: Vector2, surface: float, far: float) -> void:
 	OpenSpace.ribbon_windows(_batch, _night, _frame, span, surface, far)
 
 
-## Лента окон у дальней стены зала на пролёте [param span]: её же ставят залы
-## особых этажей ([FloorHall]).
+## Ribbon of windows at the hall's far wall on span [param span]: special-floor halls
+## place it too ([FloorHall]).
 static func ribbon_windows(
 	batch: MeshBatch, glass: Material, frame: Material, span: Vector2, surface: float, far: float
 ) -> void:

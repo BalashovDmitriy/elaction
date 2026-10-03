@@ -1,19 +1,20 @@
 class_name CorpsePiece
 extends Node3D
 
-## Кусок тела, оторванный стенкой кабины (ADR-0043, решения 11 и 12).
+## A piece of a body torn off by a cab wall (ADR-0043, decisions 11 and 12).
 ##
-## Копия фигуры в той же позе кость в кость, у которой физические только части
-## этого куска, а остальное тело спрятано. Части встают туда, где были в теле,
-## с его скоростями, и дальше это обычное упавшее тело ([Corpse]): едет на полу
-## кабины, падает в шахту, ложится на трупы, попадает под днище. Лежит до конца
-## здания, как и трупы (ADR-0037, решение 6).
+## A copy of the figure in the same pose bone for bone, in which only the parts of
+## this piece are physical and the rest of the body is hidden. The parts take the places
+## they had in the body, with its velocities, and from then on it is an ordinary fallen
+## body ([Corpse]): it rides on the cab floor, falls into the shaft, lands on corpses,
+## gets under the cab bottom. It stays until the end of the building, like corpses
+## (ADR-0037, decision 6).
 
 var corpse: Corpse = null
 
 
-## Отрывает от тела [param from] с фигурой [param figure] части [param names] и
-## кладёт их в [param host] отдельным куском на том же месте.
+## Tears the parts [param names] off the body [param from] with the figure
+## [param figure] and puts them into [param host] as a separate piece in the same place.
 static func tear_off(
 	from: Corpse, figure: FigureRig, host: Node, names: PackedStringArray
 ) -> CorpsePiece:

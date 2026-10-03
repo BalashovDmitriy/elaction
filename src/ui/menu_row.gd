@@ -1,28 +1,28 @@
 class_name MenuRow
 extends Button
 
-## Пункт меню — плашка в стиле HUD (ADR-0035, решение 4).
+## A menu item — a panel in the HUD style (ADR-0035, decision 4).
 ##
-## Один класс на все виды пунктов: кнопка, переключатель «‹ значение ›», уровень
-## громкости, флажок и назначение клавиши. Выпадающие списки заменены переключателем: влево-вправо
-## листают, и с геймпада это одно нажатие, а не открытый поверх страницы список.
+## One class for all item kinds: a button, a "‹ value ›" switch, a volume
+## level, a flag and a key binding. Drop-down lists are replaced by a switch: left-right
+## pages through values, and on a gamepad it is one press, not a list opened over the page.
 ##
-## Выбранный пункт загорается плавно: кромка шире, ореол ярче, текст чуть
-## сдвигается вправо. Фокус идёт за мышью, поэтому состояние у пункта одно —
-## выбран или нет, — и «наведён, но не выбран» не бывает.
+## The selected item lights up smoothly: the edge widens, the glow brightens, the text shifts
+## slightly to the right. Focus follows the mouse, so an item has one state —
+## selected or not — and "hovered but not selected" does not happen.
 
-## Значение сменилось: индекс варианта, уровень 0..1 или флажок.
+## The value changed: variant index, level 0..1 or flag.
 signal changed(value: Variant)
 
 enum Kind { ACTION, CHOICE, LEVEL, TOGGLE, BINDING }
 
-## Сколько длится вспышка выбора, с.
+## How long the selection flash lasts, s.
 const GLOW_TIME: float = 0.14
-## Насколько выбранный пункт сдвигает текст вправо, px.
+## How far the selected item shifts the text to the right, px.
 const INDENT: float = 14.0
-## Шаг уровня громкости: двадцать делений на всю шкалу.
+## Volume level step: twenty divisions over the whole scale.
 const LEVEL_STEP: float = 0.05
-## Ширина полосы уровня, px.
+## Width of the level bar, px.
 const BAR_WIDTH: float = 220.0
 
 const FILL_IDLE := Color(0.03, 0.035, 0.06, 0.38)
@@ -33,16 +33,16 @@ var options: Array[String] = []
 var index: int = 0
 var level: float = 0.0
 var on: bool = false
-## Что написано справа у назначения: клавиша и кнопка или «нажмите клавишу».
+## What is written on the right of a binding: key and button, or "press a key".
 var shown: String = ""
-## Цвет кромки и ореола. Меню задаёт его уже собранному пункту, поэтому стиль
-## пересобирается сразу, а не с первой вспышкой фокуса.
+## Edge and glow colour. The menu sets it on an already built item, so the style
+## is rebuilt immediately, not with the first focus flash.
 var neon: Color = VerticalSign.NEON_HOTEL:
 	set(value):
 		neon = value
 		_restyle()
 
-## 0 — не выбран, 1 — выбран; между ними — вспышка.
+## 0 — not selected, 1 — selected; in between — the flash.
 var glow: float = 0.0:
 	set(value):
 		glow = value
@@ -54,7 +54,7 @@ var _value: Label = null
 var _tween: Tween = null
 
 
-## Кнопка: подпись и действие по нажатию.
+## Button: caption and action on press.
 static func action(caption: String, font_size: int = 40) -> MenuRow:
 	var row := MenuRow.new()
 	row.kind = Kind.ACTION
@@ -62,7 +62,7 @@ static func action(caption: String, font_size: int = 40) -> MenuRow:
 	return row
 
 
-## Переключатель: подпись слева, «‹ вариант ›» справа.
+## Switch: caption on the left, "‹ variant ›" on the right.
 static func choice(caption: String, variants: Array[String], selected: int) -> MenuRow:
 	var row := MenuRow.new()
 	row.kind = Kind.CHOICE
@@ -72,7 +72,7 @@ static func choice(caption: String, variants: Array[String], selected: int) -> M
 	return row
 
 
-## Уровень 0..1 полосой и процентами — громкость.
+## Level 0..1 as a bar and percent — volume.
 static func slider(caption: String, value: float) -> MenuRow:
 	var row := MenuRow.new()
 	row.kind = Kind.LEVEL
@@ -81,7 +81,7 @@ static func slider(caption: String, value: float) -> MenuRow:
 	return row
 
 
-## Флажок: «вкл» и «выкл».
+## Flag: "on" and "off".
 static func toggle(caption: String, value: bool) -> MenuRow:
 	var row := MenuRow.new()
 	row.kind = Kind.TOGGLE
@@ -90,8 +90,8 @@ static func toggle(caption: String, value: bool) -> MenuRow:
 	return row
 
 
-## Назначение: подпись действия слева, его клавиша и кнопка справа. Нажатие
-## не листает, а отдаётся меню — оно слушает следующую клавишу (ADR-0039).
+## Binding: the action caption on the left, its key and button on the right. A press
+## does not page through values but goes to the menu — it listens for the next key (ADR-0039).
 static func binding(caption: String, value: String) -> MenuRow:
 	var row := MenuRow.new()
 	row.kind = Kind.BINDING
@@ -100,18 +100,18 @@ static func binding(caption: String, value: String) -> MenuRow:
 	return row
 
 
-## Меняет то, что написано справа у назначения.
+## Changes what is written on the right of a binding.
 func show_text(value: String) -> void:
 	shown = value
 	_show_value()
 
 
-## Что написано справа: вариант, проценты или «вкл/выкл». Нужно тестам.
+## What is written on the right: variant, percent or "on/off". Needed by tests.
 func value_text() -> String:
 	return _value.text if _value != null else ""
 
 
-## Листает значение на [param step]: −1 — влево, +1 — вправо.
+## Pages the value by [param step]: −1 — left, +1 — right.
 func step_value(step: int) -> void:
 	match kind:
 		Kind.CHOICE:
@@ -121,7 +121,7 @@ func step_value(step: int) -> void:
 			changed.emit(index)
 		Kind.LEVEL:
 			var next := clampf(snappedf(level + step * LEVEL_STEP, LEVEL_STEP), 0.0, 1.0)
-			# Упёрлись в край — ничего не сменилось: ни щелчка, ни записи в шину.
+			# Hit the edge — nothing changed: no click, no write to the bus.
 			if is_equal_approx(next, level):
 				return
 			level = next
@@ -163,7 +163,7 @@ func _build(caption: String, font_size: int) -> void:
 		_value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		if kind == Kind.LEVEL:
-			# Место под полосу слева от процентов: её рисует [method _draw].
+			# Room for the bar to the left of the percent: [method _draw] draws it.
 			_value.custom_minimum_size = Vector2(BAR_WIDTH + 110.0, 0.0)
 		line.add_child(_value)
 		_show_value()
@@ -178,9 +178,9 @@ func _build(caption: String, font_size: int) -> void:
 func _gui_input(event: InputEvent) -> void:
 	if kind == Kind.ACTION or kind == Kind.BINDING:
 		return
-	# Громкость листается с повтором, как фокус вверх-вниз: двадцать делений
-	# по одному нажатию — это двадцать нажатий. Варианты — без повтора: смена
-	# языка пересобирает страницу на каждый шаг.
+	# Volume pages with repeat, like focus up-down: twenty divisions
+	# one press at a time is twenty presses. Variants — without repeat: changing
+	# the language rebuilds the page on every step.
 	var repeat := kind == Kind.LEVEL
 	if event.is_action_pressed(&"ui_left", repeat):
 		step_value(-1)
@@ -191,7 +191,7 @@ func _gui_input(event: InputEvent) -> void:
 
 
 func _on_pressed() -> void:
-	# Нажатие листает вперёд: мышью по переключателю, как по кнопке.
+	# A press pages forward: with the mouse on a switch, as on a button.
 	if kind != Kind.ACTION and kind != Kind.BINDING:
 		step_value(1)
 
@@ -200,7 +200,7 @@ func _on_focus_changed(focused: bool) -> void:
 	if _tween != null:
 		_tween.kill()
 	_tween = create_tween()
-	# Меню живёт и на паузе, и вспышка обязана идти вместе с ним.
+	# The menu lives on pause too, and the flash must run together with it.
 	_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	_tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_tween.tween_property(self, "glow", 1.0 if focused else 0.0, GLOW_TIME)
@@ -232,7 +232,7 @@ func _restyle() -> void:
 	_box.content_margin_right = 24.0
 	if _caption != null:
 		_caption.add_theme_color_override("font_color", NeonStyle.INK_DIM.lerp(NeonStyle.INK, glow))
-		# Подпись сдвигается вместе с полем: оно у HBox, а не у стиля.
+		# The caption shifts together with the margin: it belongs to the HBox, not the style.
 		_caption.get_parent().set("offset_left", _box.content_margin_left)
 		_caption.get_parent().set("offset_right", -_box.content_margin_right)
 	queue_redraw()
@@ -241,7 +241,7 @@ func _restyle() -> void:
 func _draw() -> void:
 	if kind != Kind.LEVEL or _value == null:
 		return
-	# Полоса уровня — перед процентами: тусклая дорожка и неоновая заливка.
+	# The level bar — before the percent: a dim track and a neon fill.
 	var right := size.x - _box.content_margin_right - 96.0
 	var track := Rect2(right - BAR_WIDTH, size.y * 0.5 - 3.0, BAR_WIDTH, 6.0)
 	draw_rect(track, Color(NeonStyle.INK_DIM, 0.25))

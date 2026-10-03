@@ -1,7 +1,7 @@
 extends GutTest
 
-## Кадрирование камеры. Без сцены: [CameraBounds] — арифметика, и проверять её
-## запуском здания незачем.
+## Camera framing. No scene: [CameraBounds] is arithmetic, and there is no point in
+## launching a building to check it.
 
 var _bounds: CameraBounds = null
 
@@ -31,7 +31,7 @@ func test_the_frame_does_not_leave_the_top_and_bottom() -> void:
 
 
 func test_a_band_narrower_than_the_frame_is_centred() -> void:
-	# Упереться в оба края разом нельзя, и дёргаться между ними — худшее.
+	# You cannot rest against both edges at once, and jerking between them is the worst.
 	_bounds.limits = Rect2(0.0, 0.0, 8.0, 50.0)
 	assert_eq(_bounds.clamp_centre(Vector2(0.0, 25.0)).x, 4.0)
 	assert_eq(_bounds.clamp_centre(Vector2(8.0, 25.0)).x, 4.0)
@@ -55,21 +55,22 @@ func test_smoothing_moves_towards_the_target_without_passing_it() -> void:
 
 
 func test_smoothing_off_snaps_to_the_target() -> void:
-	# Нужно съёмке и тестам: кадр должен показывать то, что уже случилось.
+	# Needed by shots and tests: the frame must show what has already happened.
 	assert_eq(CameraBounds.smoothed(Vector2.ZERO, Vector2(10.0, 3.0), 0.0, 1.0), Vector2(10.0, 3.0))
 
 
 func test_smoothing_does_not_depend_on_the_frame_rate() -> void:
-	# Один шаг в 1/30 обязан дать то же, что два шага в 1/60: иначе на просадке
-	# камера обгоняет цель.
+	# One step of 1/30 must give the same as two steps of 1/60: otherwise on a frame drop
+	# the camera overtakes the target.
 	var one := CameraBounds.smoothed(Vector2.ZERO, Vector2(10.0, 0.0), 8.0, 1.0 / 30.0)
 	var first := CameraBounds.smoothed(Vector2.ZERO, Vector2(10.0, 0.0), 8.0, 1.0 / 60.0)
 	var two := CameraBounds.smoothed(first, Vector2(10.0, 0.0), 8.0, 1.0 / 60.0)
 	assert_almost_eq(one.x, two.x, 0.0001)
 
 
-## Камера встаёт в стоящую цель ровно, а не ползёт к ней вечно на доли пикселя:
-## ползущая камера давала мерцание кромок дверей и перекрытий (M22).
+## The camera settles on a standing target exactly instead of creeping toward it forever
+## by fractions of a pixel: a creeping camera made the edges of doors and slabs flicker
+## (M22).
 func test_the_camera_comes_to_rest() -> void:
 	var at := Vector2.ZERO
 	var target := Vector2(3.0, -2.0)

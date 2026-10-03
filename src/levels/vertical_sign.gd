@@ -1,75 +1,77 @@
 class_name VerticalSign
 extends Node3D
 
-## Неоновая вывеска здания на углу фасада, буквами столбиком (ADR-0033,
-## решение 2).
+## The building's neon sign on the facade corner, letters in a column (ADR-0033,
+## decision 2).
 ##
-## До M21b неон HOTEL стоял на крыше, за техникой, и при спуске уходил за верх
-## кадра и под HUD. Вывеска на углу висит вдоль верхних этажей снаружи здания
-## лицом к камере: её не закрывает техника, и её видно всю дорогу вниз по
-## башне. У отеля — имя и HOTEL, у офиса — имя корпорации.
+## Before M21b the HOTEL neon stood on the roof, behind the equipment, and on the way
+## down it went out over the top of the frame and under the HUD. The corner sign hangs
+## along the upper floors outside the building facing the camera: the equipment does not
+## cover it, and it is visible all the way down the tower. The hotel has its name and
+## HOTEL, the office has the corporation's name.
 ##
-## Свет — эмиссия букв и один источник отсвета, тот же, что был у неона на
-## крыше: бюджет источников окружения не растёт. Одна буква изредка мигает —
-## как у настоящего неона, у которого вот-вот сдохнет трубка.
+## Light is the letters' emission and one glow source, the same one the neon on the roof
+## had: the budget of environment light sources does not grow. One letter occasionally
+## flickers, like real neon whose tube is about to die.
 
-## Шаг букв по высоте и их кегль, м; щит шире буквы на поля.
+## Letter step in height and their size, m; the board is wider than a letter by margins.
 const LETTER_STEP: float = 0.82
 const LETTER_SIZE: float = 0.7
 const MARGIN: float = 0.3
-## Докуда слышно гудение неона, м.
+## How far the neon hum can be heard, m.
 const BUZZ_REACH: float = 9.0
 const PANEL_WIDTH: float = 1.1
 const PANEL_DEPTH: float = 0.18
-## Пробел между строками (имя и HOTEL), в шагах буквы.
+## Gap between lines (the name and HOTEL), in letter steps.
 const LINE_GAP: float = 0.6
 
-## Насколько вывеска отстоит от боковой стены здания и где по глубине, м.
+## How far the sign stands off the building's side wall and where in depth, m.
 const STANDOFF: float = 0.75
 const Z: float = -0.25
-## Верх вывески над настилом крыши, м.
+## Top of the sign above the roof deck, m.
 const RISE: float = 0.4
 
-## Неон: отель — розовый, офис — холодный голубой, жилой дом — фиолетовый
-## (ADR-0055, решение 3). Не цвета огоньков игры (ADR-0023, решение 6).
+## Neon: hotel is pink, office is cold blue, residential building is purple
+## (ADR-0055, decision 3). Not the colors of the game's indicator lights (ADR-0023,
+## decision 6).
 const NEON_HOTEL := Color(1.0, 0.25, 0.55)
 const NEON_OFFICE := Color(0.3, 0.85, 1.0)
 const NEON_RESIDENTIAL := Color(0.45, 0.42, 1.0)
 const PANEL := Color(0.07, 0.07, 0.09)
 
-## Отсвет: яркость и радиус, м.
+## Glow: brightness and radius, m.
 const GLOW_ENERGY: float = 1.6
 const GLOW_RANGE: float = 9.0
 
-## Ореол неона в дожде: насколько шире щита и выше его, м, яркость и
-## насколько позади щита — за задней стеной здания, чтобы ореол не лёг в
-## коридоры.
+## Neon halo in the rain: how much wider and taller than the board, m, brightness, and
+## how far behind the board, beyond the building's back wall, so that the halo does not
+## fall into the corridors.
 const HALO_MARGIN := Vector2(2.4, 2.0)
 const HALO_STRENGTH: float = 0.25
 const HALO_BEHIND: float = 1.6
 
-## Погашенный неон днём (ADR-0052, решение 4): стеклянные трубки цвета
-## неона, но тёмные и в свету солнца, — вывеску видно, а не горит она.
+## Unlit neon by day (ADR-0052, decision 4): glass tubes of the neon color, but dark and
+## in sunlight: the sign is visible, but it does not glow.
 const UNLIT_DARKEN: float = 0.55
 const UNLIT_GREY: float = 0.35
 
-## Мигание: раз в сколько секунд буква гаснет и на сколько.
+## Flicker: how often in seconds a letter goes out and for how long.
 const FLICKER_EVERY: float = 3.7
 const FLICKER_FOR: float = 0.18
 
 var _letters: Array[Label3D] = []
 var _glow: OmniLight3D = null
 var _halo: MeshInstance3D = null
-## Высота щита, м: по ней ореол в дожде.
+## Board height, m: the rain halo follows it.
 var _height: float = 0.0
-## Верх щита в плоскости правил.
+## Top of the board in the rules plane.
 var _top: float = 0.0
 var _flicker: Label3D = null
 var _clock: float = 0.0
 var _lit: bool = true
 
 
-## Цвет неона здания [param identity]: вывеска и кромка HUD.
+## Neon color of building [param identity]: the sign and the HUD edge.
 static func neon_of(identity: BuildingIdentity) -> Color:
 	match identity.kind:
 		BuildingIdentity.Kind.OFFICE:
@@ -79,7 +81,7 @@ static func neon_of(identity: BuildingIdentity) -> Color:
 	return NEON_HOTEL
 
 
-## Вешает вывеску здания [param identity] у правой стены верхнего этажа.
+## Hangs the sign of building [param identity] at the right wall of the top floor.
 func hang(rules: BuildingRules, identity: BuildingIdentity) -> void:
 	name = "VerticalSign"
 	var lines := identity.sign_lines()
@@ -100,11 +102,11 @@ func hang(rules: BuildingRules, identity: BuildingIdentity) -> void:
 	panel.position = WorldSpace.to_scene(Vector2(x, top + height * 0.5))
 	panel.position.z = Z
 	add_child(panel)
-	# Неон гудит там, где висит (ADR-0036): слышно на крыше и верхних этажах.
-	# Погашенный молчит.
+	# The neon hums where it hangs (ADR-0036): audible on the roof and the upper floors.
+	# Unlit neon is silent.
 	if _lit:
 		Sounds.source(panel, Sounds.NEON_BUZZ, BUZZ_REACH, true)
-	# Кронштейны к стене: сверху и снизу.
+	# Brackets to the wall: top and bottom.
 	for share: float in [0.12, 0.88]:
 		var arm := GreyboxLook.box(
 			Vector3(STANDOFF, 0.08, 0.08), GreyboxLook.metal(PANEL.lightened(0.2))
@@ -129,7 +131,7 @@ func hang(rules: BuildingRules, identity: BuildingIdentity) -> void:
 				label.modulate = tube
 				label.outline_modulate = tube.darkened(0.3)
 			label.outline_size = 8
-			# Горящий неон светит сам; погашенный — в свету дня, как стекло.
+			# Lit neon glows by itself; unlit neon is in daylight, like glass.
 			label.shaded = not _lit
 			label.position = WorldSpace.to_scene(Vector2(x, y))
 			label.position.z = Z + PANEL_DEPTH * 0.5 + 0.01
@@ -139,9 +141,9 @@ func hang(rules: BuildingRules, identity: BuildingIdentity) -> void:
 		y += LETTER_STEP * LINE_GAP
 	add_to_group(Graphics.GROUP)
 	if not _lit:
-		# Погашенной вывеске нечем мигать и нечем светить.
+		# An unlit sign has nothing to flicker and nothing to light with.
 		return
-	# Мигает одна буква, по имени здания — всегда та же у этого здания.
+	# One letter flickers, chosen by building name: always the same one for this building.
 	_flicker = (
 		_letters[posmod(hash(identity.name), _letters.size())] if not _letters.is_empty() else null
 	)
@@ -159,15 +161,15 @@ func hang(rules: BuildingRules, identity: BuildingIdentity) -> void:
 	apply_graphics()
 
 
-## Где по высоте висит щит: верх и низ в плоскости правил. Перед ним на
-## правом торце башни не встают флаги и ламели ([BuildingFlanks]) — закрыли бы
-## буквы.
+## Where the board hangs in height: top and bottom in the rules plane. In front of it, on
+## the right end wall of the tower, no flags or louvers ([BuildingFlanks]) are placed: they
+## would cover the letters.
 func span() -> Vector2:
 	return Vector2(_top, _top + _height)
 
 
-## Ореол неона в дожде (ADR-0037, решение 3, дополнение): дождь у вывески
-## светится её цветом. Только в дождь — в ясную ночь воздух прозрачный.
+## Neon halo in the rain (ADR-0037, decision 3, addendum): the rain near the sign glows
+## in its color. Only in the rain: on a clear night the air is transparent.
 func glow_in_rain() -> void:
 	if _glow == null or _halo != null:
 		return
@@ -180,42 +182,42 @@ func glow_in_rain() -> void:
 	add_child(_halo)
 
 
-## Ореол неона в дожде — для теста; вне дождя его нет.
+## The neon halo in the rain, for a test; outside the rain it does not exist.
 func halo() -> MeshInstance3D:
 	return _halo
 
 
-## Отсвет неона в объёмном тумане — по уровню качества (ADR-0034, решение 1):
-## на «Ультра» вокруг вывески светится воздух.
+## Neon glow in volumetric fog, by quality level (ADR-0034, decision 1):
+## on "Ultra" the air around the sign glows.
 func apply_graphics() -> void:
 	if _glow != null:
 		_glow.light_volumetric_fog_energy = Graphics.light_in_fog()
 
 
-## Мигает буквой. Картинка, а не правило: по настенным часам.
+## Flickers a letter. A picture, not a rule: by the wall clock.
 func _process(delta: float) -> void:
 	if _flicker == null:
 		return
 	_clock = fmod(_clock + delta, FLICKER_EVERY)
 	var shown := _clock > FLICKER_FOR
-	# Гаснущая трубка трещит там, где висит (ADR-0052, решение 7).
+	# A dying tube crackles where it hangs (ADR-0052, decision 7).
 	if _flicker.visible and not shown:
 		Sounds.play_at(self, Sounds.NEON_FLICKER, _flicker.global_position, BUZZ_REACH)
 	_flicker.visible = shown
 
 
-## Горит ли неон: вечером и ночью — да, утром и днём — нет.
+## Whether the neon is lit: in the evening and at night yes, in the morning and by day no.
 func is_lit() -> bool:
 	return _lit
 
 
-## Погашенная неоновая трубка днём: цвет неона, но тёмный и в свету. Одна на
-## вывеску здания и вывески лавок у выезда ([ExitStreet]).
+## An unlit neon tube by day: the neon color, but dark and in the light. One for the
+## building sign and the shop signs by the exit ([ExitStreet]).
 static func unlit_tube(neon: Color) -> Color:
 	return neon.lerp(Color(0.5, 0.5, 0.5), UNLIT_GREY).darkened(UNLIT_DARKEN)
 
 
-## Текст вывески сверху вниз, буквами без пробелов: для тестов.
+## The sign text from top to bottom, letters without spaces: for tests.
 func text() -> String:
 	var joined := ""
 	for label in _letters:

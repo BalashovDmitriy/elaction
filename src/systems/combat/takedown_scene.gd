@@ -1,71 +1,73 @@
 class_name TakedownScene
 extends Node
 
-## Режиссёр сценки добивания (ADR-0040, с M24i — ADR-0050).
+## Director of the takedown scene (ADR-0040, since M24i ADR-0050).
 ##
-## Ставит агента вплотную к Otto, выключает обоим управление — ввод Otto и мозг
-## агента — и ведёт двоих по таблице поз [Takedown.Scene]. Мир вокруг на время
-## сценки замедлен, а сценка идёт в своём темпе: режиссёр считает время
-## поделённым на замедление и так же ускоряет оба рига. На ключевом кадре агент
-## погибает, Otto получает очки.
+## Places the agent right next to Otto, turns off control for both (Otto's input and
+## the agent's brain) and leads the two through the pose table [Takedown.Scene]. The
+## world around is slowed down for the duration of the scene, while the scene runs at its
+## own pace: the director counts time divided by the slowdown and speeds up both rigs by
+## the same amount. On the key frame the agent dies and Otto gets points.
 ##
-## С M24i сценка поставлена, а не проиграна ровно. Замедление неровное: быстрый
-## заход, к удару мир почти встаёт, на самом ударе — стоп-кадр на доли секунды,
-## потом разгон обратно. На ударе камера толкается и кренится, вспышка у лиц,
-## музыка проваливается, удар звучит гулко, у агента слетает шляпа, и падает он
-## рэгдоллом, отброшенный от Otto, а не готовой позой. Всю сценку фон темнее и
-## бесцветнее, а музыка глуше. Ракурс не меняется: вид остаётся боковым.
+## Since M24i the scene is staged rather than played evenly. The slowdown is uneven: a
+## fast approach, toward the blow the world nearly stops, on the blow itself a freeze
+## frame for a fraction of a second, then speeding back up. On the blow the camera jolts
+## and tilts, a flash at the faces, the music drops out, the blow sounds hollow, the
+## agent's hat flies off, and he falls as a ragdoll thrown away from Otto, not into a
+## ready pose. Throughout the scene the background is darker and more colorless, and the
+## music more muffled. The angle does not change: the view stays from the side.
 ##
-## Otto в сценке уязвим (решение пользователя): пуля другого агента, долетевшая
-## в замедлении, убивает его, и сценка обрывается. Агент, до ключевого кадра не
-## доживший до смерти, тогда возвращается в бой.
+## Otto is vulnerable in the scene (the user's decision): another agent's bullet arriving
+## during the slowdown kills him, and the scene is cut short. An agent who did not die
+## before the key frame then returns to combat.
 
-## Во сколько раз замедляется мир к удару.
+## How many times the world slows down toward the blow.
 const SLOW: float = 0.3
-## Замедление на заходе — мягче, чем к удару: сценка начинается быстро.
+## The slowdown on the approach is softer than toward the blow: the scene starts fast.
 const APPROACH: float = 0.6
-## Стоп-кадр на ударе: сколько длится, с настоящего времени, и во сколько раз
-## замедлен мир — почти стоит, но пули и огни не замирают намертво.
+## The freeze frame on the blow: how long it lasts, s of real time, and how many times
+## the world is slowed down: almost standing, but bullets and lights do not freeze dead.
 const FREEZE_TIME: float = 0.14
 const FREEZE_SCALE: float = 0.03
-## Крупный план: за сколько камера наезжает, с (времени сценки), и сколько
-## держит крупно после ключевого кадра — до отъезда к концу сценки.
+## Close-up: how long the camera takes to push in, s (of scene time), and how long it
+## holds close after the key frame, before pulling back toward the end of the scene.
 const CLOSE_IN: float = 0.25
 const CLOSE_HOLD: float = 0.12
-## На какой высоте над полом середина крупного плана, м: грудь стоящих.
+## At what height above the floor the close-up's middle is, m: the chest of those
+## standing.
 const CLOSE_HEIGHT: float = 1.0
-## На сколько фигура Otto отходит от камеры в сценке сзади, м: тела стоят
-## вплотную в одной плоскости, и агент должен быть спереди, а руки Otto — за ним.
+## How far Otto's figure moves away from the camera in a scene from behind, m: the bodies
+## stand close in one plane, and the agent must be in front, Otto's arms behind him.
 const BEHIND_DEPTH: float = 0.14
-## На какой высоте щуп ищет стену перед местом агента, м: на уровне колена — ниже
-## любого проёма и выше порога.
+## At what height the probe looks for a wall in front of the agent's spot, m: at knee
+## level, below any opening and above the threshold.
 const WALL_PROBE: float = 0.4
-## За сколько агент встаёт на своё место перед Otto, с (своего времени сценки).
+## How long the agent takes to get to his spot in front of Otto, s (of his scene time).
 const ALIGN_TIME: float = 0.12
-## Вспышка на ударе: лепит лица двоих. Цвет, яркость, дальность, м, насколько
-## ближе к камере, м, и за сколько гаснет, с настоящего времени.
+## The flash on the blow: it sculpts the two faces. Color, brightness, range, m, how much
+## closer to the camera, m, and how long it takes to fade, s of real time.
 const FLASH_COLOR := Color(1.0, 0.9, 0.75)
 const FLASH_ENERGY: float = 6.0
 const FLASH_RANGE: float = 2.4
 const FLASH_OUT: float = 0.45
 const FLASH_TIME: float = 0.32
-## Фон на время сценки: насыщенность и яркость кадра, и за сколько он к ним
-## приходит, с настоящего времени. Уходит сразу, на любом выходе из сценки
-## ([method _restore_grade]).
+## The background during the scene: saturation and brightness of the frame, and how long
+## it takes to reach them, s of real time. It goes away at once, on any exit from the
+## scene ([method _restore_grade]).
 const GRADE_SATURATION: float = 0.35
 const GRADE_BRIGHTNESS: float = 0.8
 const GRADE_TIME: float = 0.2
-## Удар — поверх себя же на тон ниже и громче: гулко.
+## The blow layered over itself a tone lower and louder: hollow.
 const BOOM_PITCH: float = 0.55
 const BOOM_DB: float = 3.0
-## Музыка проваливается на ударе, с.
+## The music drops out on the blow, s.
 const DUCK_TIME: float = 0.7
-## Причина глушения музыки на время сценки ([method Sounds.muffle_music]).
+## Reason for muffling the music during the scene ([method Sounds.muffle_music]).
 const MUFFLE := "takedown"
-## Отброс трупа от Otto: сила вдоль взгляда Otto — доли толчка пули
-## ([constant Corpse.HIT_META]).
+## Throwing the corpse away from Otto: the force along Otto's gaze, as fractions of a
+## bullet's push ([constant Corpse.HIT_META]).
 const HIT_PUSH: float = 1.4
-## Шляпа: масса, кг, толчок, м/с, — от Otto и вверх, — и закрутка, рад/с.
+## The hat: mass, kg, push, m/s (away from Otto and up), and spin, rad/s.
 const HAT_MASS: float = 0.15
 const HAT_PUSH := Vector2(1.6, 2.4)
 const HAT_SPIN: float = 9.0
@@ -76,34 +78,35 @@ var _scene: Takedown.Scene = null
 var _facing: float = 1.0
 var _time: float = 0.0
 var _killed: bool = false
-## Масштаб времени до сценки: тесты гоняют мир ускоренным, и сценка его
-## не сбрасывает, а замедляет относительно него.
+## The time scale before the scene: tests run the world sped up, and the scene does
+## not reset it but slows down relative to it.
 var _time_scale_before: float = 1.0
 var _slowed: bool = false
-## Во сколько раз замедлен мир прямо сейчас: по кривой сценки.
+## How many times the world is slowed down right now: by the scene's curve.
 var _world: float = APPROACH
-## Во сколько раз был замедлен мир в начале этого кадра, и какого. Масштаб
-## времени движок читает раз на кадр: шаг физики, идущий в кадре после того,
-## как сценка сменила замедление, приходит ещё со старым. Поделённый на новое,
-## второй шаг кадра удара шёл бы вдесятеро длиннее и проскакивал стоп-кадр
-## целиком, а исход сценки зависел бы от числа шагов в кадре (авторевью M24i).
+## How many times the world was slowed down at the start of this frame, and which frame.
+## The engine reads the time scale once per frame: a physics step running in the frame
+## after the scene changed the slowdown still arrives with the old one. Divided by the
+## new one, the second step of the blow frame would run ten times longer and skip the
+## freeze frame entirely, and the scene's outcome would depend on the number of steps in
+## a frame (M24i code review).
 var _frame_world: float = 1.0
 var _frame_number: int = -1
-## Сколько ещё идёт стоп-кадр, с настоящего времени.
+## How much longer the freeze frame lasts, s of real time.
 var _freeze_left: float = 0.0
 var _from_x: float = 0.0
 var _to_x: float = 0.0
 var _flash: OmniLight3D = null
 var _flash_age: float = 0.0
-## Кадр сцены и его прежние насыщенность и яркость: сценка их возвращает.
+## The scene's frame and its former saturation and brightness: the scene restores them.
 var _environment: Environment = null
 var _saturation_before: float = 1.0
 var _brightness_before: float = 1.0
 var _grade_age: float = 0.0
 
 
-## Начинает сценку [param scene] над агентом [param agent]. Узел встаёт в дерево
-## рядом с Otto и уходит из него сам, когда сценка кончилась или оборвалась.
+## Starts scene [param scene] over agent [param agent]. The node enters the tree
+## next to Otto and leaves it by itself when the scene has ended or been cut short.
 static func play(otto: Otto, agent: Enemy, scene: Takedown.Scene) -> TakedownScene:
 	var director := TakedownScene.new()
 	director.name = "Takedown"
@@ -115,17 +118,17 @@ static func play(otto: Otto, agent: Enemy, scene: Takedown.Scene) -> TakedownSce
 	return director
 
 
-## Какая сценка идёт. Тестам.
+## Which scene is running. For tests.
 func scene() -> Takedown.Scene:
 	return _scene
 
 
-## Погиб ли уже агент.
+## Whether the agent has already died.
 func killed() -> bool:
 	return _killed
 
 
-## Идёт ли стоп-кадр удара. Тестам.
+## Whether the blow's freeze frame is on. For tests.
 func is_frozen() -> bool:
 	return _freeze_left > 0.0
 
@@ -140,27 +143,28 @@ func _ready() -> void:
 	_otto.died.connect(_abort)
 	if _scene.side == Takedown.Side.BACK:
 		_otto.figure.position.z = -BEHIND_DEPTH
-	# Рука, наведённая до сценки — агент замахивался, Otto только что стрелял, —
-	# висела бы вскинутой поверх её клипов: вид в сценке ни тот ни другой не
-	# обновляет (ADR-0043, решение 16).
+	# An arm aimed before the scene (the agent was winding up, Otto had just fired)
+	# would hang raised over its clips: the view in the scene updates neither one
+	# (ADR-0043, decision 16).
 	_otto.figure.aim_height = NAN
 	_agent.figure.aim_height = NAN
 	_grade_in()
 	Sounds.muffle_music(MUFFLE, true)
-	# Сценка начинается посреди шага физики Otto: до конца кадра мир идёт ещё
-	# без замедления.
+	# The scene starts in the middle of Otto's physics step: until the end of the frame the
+	# world still runs without the slowdown.
 	_frame_number = Engine.get_process_frames()
 	_frame_world = 1.0
 	_slow_down()
 	_show(0.0)
 
 
-## Ведёт сценку на [param delta] секунд мира. Отдан наружу тестам.
+## Runs the scene for [param delta] seconds of world time. Exposed for tests.
 func advance(delta: float) -> void:
 	if _scene == null:
 		return
-	# Агента или Otto выбросили посреди сценки — ушёл за дверь, здание сменилось,
-	# тест разобрал сцену: сценка снимается, а не обращается к освобождённому.
+	# The agent or Otto was thrown out in the middle of the scene (went behind a door, the
+	# building changed, a test took the scene apart): the scene is removed instead of
+	# touching the freed one.
 	if not is_instance_valid(_agent) or not is_instance_valid(_otto):
 		_abort()
 		return
@@ -193,17 +197,17 @@ func advance(delta: float) -> void:
 	_apply_world()
 
 
-## Шагами физики, а не кадрами: смерть агента, очки и конец сценки решают исход
-## партии, и по настенным часам прогон бота переставал бы повторяться
-## (`docs/testing.md`, правило из M18b).
+## In physics steps, not frames: the agent's death, the points and the end of the scene
+## decide the game's outcome, and by the wall clock the bot run would stop repeating
+## (`docs/testing.md`, a rule from M18b).
 func _physics_process(delta: float) -> void:
 	advance(delta)
 
 
 func _notification(what: int) -> void:
-	# Замедление — это время мира, а меню паузы живёт на том же движке: на паузе
-	# оно шло бы втрое медленнее. Пауза снимает замедление, продолжение
-	# возвращает.
+	# The slowdown is world time, and the pause menu lives on the same engine: on pause
+	# it would run three times slower. The pause lifts the slowdown, continuing
+	# restores it.
 	match what:
 		NOTIFICATION_PAUSED:
 			_speed_up()
@@ -211,23 +215,24 @@ func _notification(what: int) -> void:
 			if _scene != null:
 				_slow_down()
 		NOTIFICATION_EXIT_TREE:
-			# Здание выбросили посреди сценки: мир не должен остаться медленным, а
-			# кадр — бесцветным.
+			# The building was thrown away in the middle of the scene: the world must not stay slow,
+			# nor the frame colorless.
 			_speed_up()
 			_restore_grade()
 			Sounds.muffle_music(MUFFLE, false)
 
 
-## Позы по времени. Погибший агент — уже рэгдолл: его ведёт физика, не таблица.
+## Poses by time. A killed agent is already a ragdoll: physics drives him, not the table.
 func _show(time: float) -> void:
 	_otto.figure.show_pose(Takedown.Scene.pose_at(_scene.otto, time))
 	if not _killed:
 		_agent.figure.show_pose(Takedown.Scene.pose_at(_scene.agent, time))
 
 
-## Где агенту встать перед Otto: на [param wanted], если до него нет стены, или
-## у самой стены. Режиссёр ставит агента руками, мимо физики, и без проверки
-## прижатый к стене агент уходил бы в неё на четверть метра (авторевью M24d).
+## Where the agent should stand in front of Otto: at [param wanted] if there is no wall
+## before it, or right at the wall. The director places the agent by hand, bypassing
+## physics, and without the check an agent pressed against a wall would go a quarter
+## meter into it (M24d code review).
 func _free_spot(wanted: float) -> float:
 	var space := _otto.get_world_3d().direct_space_state
 	var height := Vector3(0.0, WALL_PROBE, 0.0)
@@ -243,7 +248,8 @@ func _free_spot(wanted: float) -> float:
 	return wall.x - signf(wanted - from.x) * Proportions.BODY_WIDTH * 0.5
 
 
-## Крупный план по ходу сценки: наезд, крупно до ключевого кадра, отъезд.
+## The close-up over the course of the scene: push in, close until the key frame, pull
+## back.
 func _frame(time: float) -> void:
 	var camera := _camera()
 	if camera == null:
@@ -259,8 +265,9 @@ func _camera() -> SideCamera:
 	return viewport.get_camera_3d() as SideCamera if viewport != null else null
 
 
-## Удар: агент погибает и падает рэгдоллом от Otto, мир встаёт стоп-кадром,
-## камера толкается, вспышка, провал музыки, гулкий удар, слетает шляпа.
+## The blow: the agent dies and falls as a ragdoll away from Otto, the world stops in a
+## freeze frame, the camera jolts, a flash, the music drops out, a hollow blow, the hat
+## flies off.
 func _kill() -> void:
 	_killed = true
 	_freeze_left = FREEZE_TIME
@@ -269,16 +276,17 @@ func _kill() -> void:
 		camera.kick(1.0)
 	_flash_at_the_faces()
 	Sounds.duck_music(DUCK_TIME)
-	# Агента уже убило посреди сценки — лампой, кабиной: очки за него взяты там.
-	# Тело и его падает на ударе: поз ему сценка больше не ставит, а держать —
-	# значит оставить его стоять замершим до конца сценки.
+	# The agent was already killed in the middle of the scene, by a lamp or a cab: the
+	# points for him were taken there. His body also falls on the blow: the scene no longer
+	# sets poses for him, and holding it would mean leaving him standing frozen until the
+	# end of the scene.
 	if _agent.is_dead():
 		_agent.held = false
 		return
 	var score := Takedown.score(_scene.side, _agent.is_in_the_dark())
 	_knock_the_hat()
-	# Отброс — от Otto, туда, куда он смотрит, и в голову: тело валится, а не
-	# оседает на месте.
+	# The throw goes away from Otto, in the direction he is looking, and into the head: the
+	# body topples instead of slumping in place.
 	_agent.set_meta(Corpse.HIT_META, _facing * HIT_PUSH)
 	_agent.set_meta(Corpse.HIT_POINT, _head_of(_agent))
 	_agent.kill(false, _scene.corpse)
@@ -289,7 +297,8 @@ func _kill() -> void:
 	_apply_world()
 
 
-## Где голова актёра, координаты сцены: у кости головы, а без неё — на росте.
+## Where the actor's head is, scene coordinates: at the head bone, and without it, at
+## the actor's height.
 static func _head_of(actor: Node3D) -> Vector3:
 	var figure := actor.get(&"figure") as FigureRig
 	var skeleton := figure.skeleton() if figure != null else null
@@ -300,8 +309,8 @@ static func _head_of(actor: Node3D) -> Vector3:
 	return actor.global_position + Vector3(0.0, Proportions.BODY * 0.9, 0.0)
 
 
-## Вспышка у лиц двоих: тёплая, ближе к камере, гаснет за [constant
-## FLASH_TIME] настоящего времени.
+## A flash at the two faces: warm, closer to the camera, fading over [constant
+## FLASH_TIME] of real time.
 func _flash_at_the_faces() -> void:
 	if _flash == null:
 		_flash = OmniLight3D.new()
@@ -316,8 +325,8 @@ func _flash_at_the_faces() -> void:
 	_flash_age = 0.0
 
 
-## Шляпа слетает с агента: прячется на нём, а её копия улетает телом — от Otto,
-## вверх и с закруткой — и остаётся лежать, как труп.
+## The hat flies off the agent: it is hidden on him, and its copy flies off as a body
+## (away from Otto, up and spinning) and stays lying, like a corpse.
 func _knock_the_hat() -> void:
 	var figure := _agent.figure
 	var hat := figure.find_child("hat", true, false) as MeshInstance3D
@@ -328,8 +337,8 @@ func _knock_the_hat() -> void:
 	if bone < 0:
 		return
 	hat.visible = false
-	# Меш шляпы — в позе покоя скелета: на голову его ставит поза головы
-	# относительно её покоя.
+	# The hat mesh is in the skeleton's rest pose: it is put onto the head by the head pose
+	# relative to its rest.
 	var placed := (
 		skeleton.global_transform
 		* skeleton.get_bone_global_pose(bone)
@@ -361,16 +370,17 @@ func _knock_the_hat() -> void:
 	body.angular_velocity = Vector3(0.0, 0.0, -_facing * HAT_SPIN)
 
 
-## Вспышка и цвет кадра гаснут по настоящему времени: мир на ударе почти стоит.
-## Настоящее — шагами сценки без замедления мира, а не по часам: под прогоном
-## тестов с `--fixed-fps` часы и кадры расходятся (run_tests.py).
+## The flash and the frame color fade by real time: on the blow the world nearly stops.
+## Real time is counted in scene steps without the world slowdown, not by the clock:
+## under a test run with `--fixed-fps` the clock and the frames diverge (run_tests.py).
 func _fade_effects() -> void:
 	if _flash != null:
 		_flash.light_energy = FLASH_ENERGY * maxf(1.0 - _flash_age / FLASH_TIME, 0.0)
 	_grade_step()
 
 
-## Фон темнеет и теряет цвет: насыщенность и яркость кадра — к сценке.
+## The background darkens and loses color: the frame's saturation and brightness move
+## toward the scene's.
 func _grade_in() -> void:
 	var viewport := get_viewport()
 	var world := viewport.find_world_3d() if viewport != null else null
@@ -392,7 +402,7 @@ func _grade_step() -> void:
 	_environment.adjustment_brightness = lerpf(_brightness_before, GRADE_BRIGHTNESS, share)
 
 
-## Кадр — как до сценки: и на конце, и на обрыве.
+## The frame as before the scene: both at the end and on being cut short.
 func _restore_grade() -> void:
 	if _environment == null:
 		return
@@ -411,7 +421,7 @@ func _finish() -> void:
 	queue_free()
 
 
-## Otto погиб посреди сценки: агент, ещё живой, возвращается в бой.
+## Otto died in the middle of the scene: the agent, still alive, returns to combat.
 func _abort() -> void:
 	var agent := _agent
 	var otto := _otto
@@ -441,8 +451,8 @@ func _release() -> void:
 	_scene = null
 
 
-## Замедление по кривой сценки: быстрый заход — [constant APPROACH], к удару —
-## [constant SLOW], на ударе — стоп-кадр, после — разгон к обычному ходу.
+## Slowdown by the scene's curve: a fast approach at [constant APPROACH], toward the
+## blow [constant SLOW], on the blow a freeze frame, after it speeding up to normal.
 func _world_now() -> float:
 	if _freeze_left > 0.0:
 		return FREEZE_SCALE
@@ -453,7 +463,8 @@ func _world_now() -> float:
 	return lerpf(SLOW, 1.0, smoothstep(_scene.kill_at, _scene.duration, _time))
 
 
-## Ставит миру и ригам скорость по кривой. Риги в стоп-кадре стоят.
+## Sets the world and the rigs to the speed from the curve. In a freeze frame the rigs
+## stand still.
 func _apply_world() -> void:
 	if not _slowed:
 		return

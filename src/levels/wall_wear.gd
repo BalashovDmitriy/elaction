@@ -1,18 +1,17 @@
 class_name WallWear
 extends Node3D
 
-## Следы жизни на стенах жилого дома (ADR-0055, решение 4): тэги граффити
-## понизу, ржавые пятна и трещины в штукатурке — коридор восьмидесятых, а не
-## гостиничный.
+## Signs of life on the walls of a residential building (ADR-0055, decision 4): graffiti tags low
+## down, rust stains and cracks in the plaster — an eighties corridor, not a hotel one.
 ##
-## Только вид: картинки — плоскости с прозрачностью прямо на штукатурке, без
-## тел. Раскладка — без сцены, по плану и сиду ([method lay]), как обстановка
-## ([BuildingDressing]): след не ложится на проём двери, портал шахты и
-## глухую стену и не налезает на то, что висит на стене. Картинки рисует
-## `tools/build_wear.py` в `assets/textures/wear/`.
+## Look only: the pictures are planes with transparency right on the plaster, without bodies. The
+## layout is without a scene, by plan and seed ([method lay]), like the dressing
+## ([BuildingDressing]): a mark does not go on a door opening, a shaft portal or a blank wall and
+## does not overlap what hangs on the wall. The pictures are drawn by `tools/build_wear.py` into
+## `assets/textures/wear/`.
 
 
-## След на стене: картинка, этаж, середина по x и по высоте над полом, ширина.
+## A mark on the wall: picture, floor, middle by x and by height above the floor, width.
 class Mark:
 	extends RefCounted
 	var image: String = ""
@@ -26,22 +25,22 @@ const DIR := "res://assets/textures/wear"
 const TAGS: PackedStringArray = ["tag_0", "tag_1", "tag_2", "tag_3"]
 const STAINS: PackedStringArray = ["stain_0", "stain_1"]
 const CRACKS: PackedStringArray = ["crack_0", "crack_1"]
-## Голый кирпич, где осыпалась штукатурка (ADR-0056, решение 4).
+## Bare brick where the plaster has crumbled (ADR-0056, decision 4).
 const BRICKS: PackedStringArray = ["brick_0", "brick_1"]
 const BRICK_RISE := Vector2(1.55, 2.05)
 const BRICK_WIDTH: float = 1.0
 
-## Сколько следов на этаже: с каким шансом свободное место его получает.
+## How many marks per floor: the chance that a free place gets one.
 const CHANCE: float = 0.45
-## Тэг — на уровне руки, пятно — под потолком, где течёт сверху, трещина — где
-## придётся. Ширина, м, и середина над полом, м.
+## A tag at hand level, a stain under the ceiling where it leaks from above, a crack wherever.
+## Width, m, and middle above the floor, m.
 const TAG_WIDTH: float = 1.05
-## Низ рисунка тэга — росчерк под строкой — на такую долю ширины ниже середины
-## картинки (`tools/build_wear.py`).
+## The bottom of the tag drawing — the flourish under the line — is this share of the width below
+## the middle of the picture (`tools/build_wear.py`).
 const TAG_INK: float = 0.3
-## Тэг — над панелью стены с поручнем: картинка лежит на штукатурке, а панель
-## ([constant BuildingRibs.SKIRTING_HEIGHT]) выступает перед ней и срезала
-## низ букв (кадры авторевью M24m).
+## The tag is above the wall panel with a handrail: the picture lies on the plaster, and the panel
+## ([constant BuildingRibs.SKIRTING_HEIGHT]) sticks out in front of it and cut off the bottom of the
+## letters (M24m code review shots).
 const TAG_RISE := Vector2(
 	BuildingRibs.SKIRTING_HEIGHT + BuildingRibs.RAIL_HEIGHT + TAG_WIDTH * TAG_INK + 0.04, 1.55
 )
@@ -49,21 +48,21 @@ const STAIN_RISE := Vector2(1.9, 2.25)
 const STAIN_WIDTH: float = 0.7
 const CRACK_RISE := Vector2(1.2, 2.0)
 const CRACK_WIDTH: float = 0.9
-## Ближе этого к середине предмета на стене след не ложится, м.
+## A mark is not placed closer than this to the middle of an object on the wall, m.
 const DECOR_CLEAR: float = 0.6
-## Зазор следа от занятого на стене: наличник двери и полоса за ним, м.
+## Gap of a mark from what is occupied on the wall: the door casing and the strip beyond it, m.
 const ZONE_CLEAR: float = 0.12
-## Плоскость — на волосок перед штукатуркой: иначе мерцала бы с ней.
+## The plane is a hair in front of the plaster: otherwise it would flicker with it.
 const STANDOFF: float = 0.006
-## Свой жребий: следы не ходят в ногу с обстановкой.
+## Its own draw: marks do not move in step with the dressing.
 const SALT: int = 0x57A1_7E
 
 var marks: Array[Mark] = []
 
 
-## Следы здания: только у жилого дома, у остальных — пусто. [param features] —
-## устройство стены ([WallFeatures]): окна, щитки и двери стоят на тех же
-## местах, и тэг под окном или кирпич под дверью лестницы торчали бы из-за них.
+## The building's marks: only for a residential building, for the others — empty. [param features] —
+## the wall layout ([WallFeatures]): windows, panels and doors stand in the same places, and a tag
+## under a window or brick under a stairwell door would stick out from behind them.
 static func lay(
 	rules: BuildingRules,
 	plan: BuildingPlan,
@@ -77,14 +76,14 @@ static func lay(
 		return found
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([building_seed, SALT])
-	# Что висит на стене, по этажам: иначе каждое место обходило бы всё здание.
+	# What hangs on the wall, by floor: otherwise each place would go over the whole building.
 	var hung := {}
 	if dressing != null:
 		for spot: BuildingDressing.PropSpot in dressing.decor:
 			if not hung.has(spot.floor_index):
 				hung[spot.floor_index] = PackedFloat64Array()
 			(hung[spot.floor_index] as PackedFloat64Array).append(spot.x)
-	# Устройство стены — занятые отрезки по этажам, как двери и шахты.
+	# Wall layout — occupied segments by floor, like doors and shafts.
 	var built := {}
 	for feature: WallFeatures.Feature in features:
 		if not built.has(feature.floor_index):
@@ -93,9 +92,9 @@ static func lay(
 		(built[feature.floor_index] as Array[Vector2]).append(
 			Vector2(feature.x - half, feature.x + half)
 		)
-	# Этаж выхода — гараж: там своя отделка (ADR-0038).
+	# The exit floor is the garage: it has its own finish (ADR-0038).
 	for index: int in rules.floors - 1:
-		# На особом этаже стены нет — следам лечь не на что (ADR-0057).
+		# On a special floor there is no wall — the marks have nothing to lie on (ADR-0057).
 		if FloorRole.hall_at(rules, index):
 			continue
 		var zones := BuildingDressing.blocked_zones(rules, plan, index)
@@ -110,9 +109,9 @@ static func lay(
 	return found
 
 
-## Задевает ли след [param mark] занятое на стене: проём двери с наличником,
-## портал шахты, глухую стену, пролёт эскалатора. Тэг в проёме висел бы в
-## воздухе открытой двери.
+## Whether mark [param mark] touches what is occupied on the wall: a door opening with its casing, a
+## shaft portal, a blank wall, an escalator span. A tag in an opening would hang in the air of an
+## open door.
 static func clashes(zones: Array[Vector2], mark: Mark) -> bool:
 	var half := mark.width * 0.5 + ZONE_CLEAR
 	for zone: Vector2 in zones:
@@ -121,7 +120,7 @@ static func clashes(zones: Array[Vector2], mark: Mark) -> bool:
 	return false
 
 
-## Ставит плоскости по [param list]: по одному мультимешу на картинку.
+## Places planes by [param list]: one multimesh per picture.
 func build(rules: BuildingRules, list: Array[Mark]) -> void:
 	name = "WallWear"
 	marks = list
@@ -163,8 +162,8 @@ static func _draw(rng: RandomNumberGenerator, index: int, x: float) -> Mark:
 	return mark
 
 
-## Висит ли что-то из [param decor] этажа (середины по x) ближе
-## [constant DECOR_CLEAR] к месту [param x].
+## Whether something from the floor's [param decor] (middles by x) hangs closer than [constant
+## DECOR_CLEAR] to place [param x].
 static func _near_decor(decor: PackedFloat64Array, x: float) -> bool:
 	for hung_x: float in decor:
 		if absf(hung_x - x) < DECOR_CLEAR:
@@ -172,8 +171,8 @@ static func _near_decor(decor: PackedFloat64Array, x: float) -> bool:
 	return false
 
 
-## Материал следа [param image]: картинка с прозрачностью на шершавом. Им же
-## рисует граффити паркинга жилого дома ([GarageDressing]).
+## Material of mark [param image]: a picture with transparency on a rough surface. The residential
+## building's garage graffiti is drawn with it too ([GarageDressing]).
 static func tag_look(image: String) -> StandardMaterial3D:
 	var look := StandardMaterial3D.new()
 	look.albedo_texture = load("%s/%s.png" % [DIR, image]) as Texture2D

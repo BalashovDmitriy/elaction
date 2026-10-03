@@ -1,39 +1,39 @@
 class_name CityDetails
 extends RefCounted
 
-## Детали ночного города за зданием (M22, замечание пользователя — «больше
-## детализации заднему фону»): верхи домов, мигающие огни, неон, зарево улиц,
-## полосы тумана; звёзды и луна с M24j — на панораме неба.
+## Details of the night city behind the building (M22, user's remark — "more
+## detail for the background"): house tops, blinking lights, neon, street glow,
+## fog bands; stars and moon since M24j are on the sky panorama.
 ##
-## Город размыт глубиной резкости своей камеры, поэтому детали такие, что
-## читаются и в размытии: силуэт, огонёк, пятно цвета. Всё мультимешами и без
-## источников света — огни и неон светятся сами, как окна (ADR-0029).
+## The city is blurred by its camera's depth of field, so the details are ones that
+## read even blurred: a silhouette, a light, a patch of colour. All by multimeshes and without
+## light sources — lights and neon glow by themselves, like windows (ADR-0029).
 ##
-## Строит узлы; раскладку по сиду держит [CityPlan].
+## Builds the nodes; [CityPlan] holds the layout by seed.
 
-## Верх: уступ — доля ширины и высоты дома, шпиль, бак и антенна, м.
+## Top: setback — a fraction of house width and height, spire, tank and antenna, m.
 const SETBACK := Vector2(0.62, 0.12)
 const SPIRE := Vector2(0.6, 14.0)
 const TANK := Vector2(2.2, 3.4)
 const TANK_LEGS: float = 2.0
 const ANTENNA := Vector2(0.35, 9.0)
 
-## Огонь на верху дома: размер, цвет, период мигания, с.
+## Light on a house top: size, colour, blink period, s.
 const BEACON: float = 1.6
 const BEACON_COLOUR := Color(1.0, 0.12, 0.08)
 const BEACON_PERIOD: float = 1.8
 
-## Зарево улиц: высота полосы над землёй и её цвет у земли.
+## Street glow: height of the band above the ground and its colour at the ground.
 const GLOW_HEIGHT: float = 26.0
 const GLOW_COLOUR := Color(1.0, 0.55, 0.25, 0.55)
 
-## Полосы тумана: сколько, какой высоты и насколько плотные.
+## Fog bands: how many, how tall and how dense.
 const FOG_BANKS: int = 7
 const FOG_BANK_HEIGHT: float = 22.0
 const FOG_BANK_COLOUR := Color(0.55, 0.58, 0.66, 0.16)
 const FOG_DRIFT: float = 1.4
 
-## Мигающие огни — шейдером: у каждого своя фаза, и узлов на огонь не нужно.
+## Blinking lights by shader: each has its own phase, and no node per light is needed.
 const BEACON_SHADER := """
 shader_type spatial;
 render_mode unshaded, cull_disabled, fog_disabled;
@@ -41,8 +41,8 @@ uniform vec4 colour : source_color = vec4(1.0, 0.12, 0.08, 1.0);
 uniform float period = 1.8;
 varying float phase;
 void vertex() {
-	// Фаза мигания — своя у каждого огня; в фрагментный шейдер она не доходит
-	// сама, только через varying.
+	// The blink phase is each light's own; it does not reach the fragment shader
+	// by itself, only through a varying.
 	phase = INSTANCE_CUSTOM.x;
 }
 void fragment() {
@@ -55,7 +55,7 @@ void fragment() {
 """
 
 
-## Верхи домов: уступы, шпили, баки на опорах, антенны.
+## House tops: setbacks, spires, tanks on legs, antennas.
 static func crowns(blocks: Array[CityPlan.Block], ground: float, facade: Material) -> Node3D:
 	var host := Node3D.new()
 	host.name = "Crowns"
@@ -102,7 +102,7 @@ static func crowns(blocks: Array[CityPlan.Block], ground: float, facade: Materia
 	return host
 
 
-## Где у дома верх — для огня: над шпилем и антенной, над плоской крышей.
+## Where a house's top is — for the light: above the spire and antenna, above a flat roof.
 static func crown_top(block: CityPlan.Block, ground: float) -> Vector3:
 	var top := ground + block.height
 	match block.crown:
@@ -117,7 +117,7 @@ static func crown_top(block: CityPlan.Block, ground: float) -> Vector3:
 	return Vector3(block.x, top, block.z)
 
 
-## Красные огни на верхах домов, каждый со своей фазой мигания.
+## Red lights on house tops, each with its own blink phase.
 static func beacons(blocks: Array[CityPlan.Block], ground: float) -> MultiMeshInstance3D:
 	var places: Array[Transform3D] = []
 	var phases: Array[float] = []
@@ -151,8 +151,8 @@ static func beacons(blocks: Array[CityPlan.Block], ground: float) -> MultiMeshIn
 	return node
 
 
-## Неоновые вывески на фасадах: полосы своего цвета, мимо дымки — неон режет
-## туман.
+## Neon signs on facades: bands of their own colour, bypassing the haze — neon cuts through
+## fog.
 static func signs(blocks: Array[CityPlan.Block], ground: float) -> MultiMeshInstance3D:
 	var places: Array[Transform3D] = []
 	var colours: Array[Color] = []
@@ -168,8 +168,8 @@ static func signs(blocks: Array[CityPlan.Block], ground: float) -> MultiMeshInst
 		colours.append(block.sign_colour * (0.9 * fade))
 		customs.append(CityLook.sign_custom(block))
 	var quad := QuadMesh.new()
-	# Подложка, трубка и буквы — шейдером (M24a): до того вывеска была ровным
-	# прямоугольником цвета.
+	# Backing, tube and letters by shader (M24a): before that the sign was a flat
+	# rectangle of colour.
 	quad.material = CityLook.signs()
 	var many := MultiMesh.new()
 	many.transform_format = MultiMesh.TRANSFORM_3D
@@ -187,8 +187,8 @@ static func signs(blocks: Array[CityPlan.Block], ground: float) -> MultiMeshInst
 	return node
 
 
-## Зарево улиц: тёплая полоса у земли за первым рядом, гаснущая кверху. Город
-## ночью подсвечен снизу, и без зарева дома стояли в темноте, как на пустыре.
+## Street glow: a warm band at the ground behind the first row, fading upward. The city
+## at night is lit from below, and without the glow the houses stood in darkness, as on a wasteland.
 static func street_glow(ground: float, from_x: float, to_x: float) -> MeshInstance3D:
 	var gradient := Gradient.new()
 	gradient.set_color(0, Color(GLOW_COLOUR, 0.0))
@@ -212,7 +212,7 @@ static func street_glow(ground: float, from_x: float, to_x: float) -> MeshInstan
 	return glow
 
 
-## Полосы тумана между рядами домов; плывут вбок в [method drift].
+## Fog bands between rows of houses; they drift sideways in [method drift].
 static func fog_banks(building_seed: int, from_x: float, to_x: float, ground: float) -> Node3D:
 	var host := Node3D.new()
 	host.name = "FogBanks"
@@ -251,12 +251,12 @@ static func fog_banks(building_seed: int, from_x: float, to_x: float, ground: fl
 	return host
 
 
-## Сдвигает полосы тумана на [param delta] секунд: медленно, в разные стороны.
+## Shifts the fog bands by [param delta] seconds: slowly, in different directions.
 static func drift(banks: Node3D, delta: float, from_x: float, to_x: float) -> void:
 	for child in banks.get_children():
 		var bank := child as Node3D
 		bank.position.x += float(bank.get_meta(&"drift", 0.0)) * delta
-		# Ушла за край — возвращается с другого: туман не кончается.
+		# Gone past the edge — comes back from the other: the fog never ends.
 		if bank.position.x > to_x + 300.0:
 			bank.position.x = from_x - 300.0
 		elif bank.position.x < from_x - 300.0:

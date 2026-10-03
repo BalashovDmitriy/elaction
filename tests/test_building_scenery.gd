@@ -1,10 +1,10 @@
 extends GutTest
 
-## Окружение здания (ADR-0029): погода и город по сиду, обстановка не мешает
-## читаемости, скаты крыши — силуэт, а не пол.
+## Building surroundings (ADR-0029): weather and city by seed, dressing does not hurt
+## readability, roof slopes are a silhouette, not a floor.
 ##
-## Раскладка обстановки и города — без сцены, на любом сиде. Сцена собирается
-## один раз: у декора нет тел, и источников света он не добавляет.
+## Dressing and city layout — without a scene, on any seed. The scene is assembled
+## once: the decor has no bodies and adds no light sources.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
@@ -22,7 +22,7 @@ func _rules(skill: int) -> BuildingRules:
 	return rules
 
 
-## Погода повторяется по сиду, и на тридцати зданиях выпадают все три.
+## Weather repeats by seed, and over thirty buildings all three come up.
 func test_weather_follows_the_seed_and_varies() -> void:
 	var seen: Dictionary = {}
 	for building_seed: int in range(1, 31):
@@ -34,7 +34,7 @@ func test_weather_follows_the_seed_and_varies() -> void:
 	assert_eq(seen.size(), Weather.Kind.size(), "на тридцати зданиях выпала не всякая погода")
 
 
-## Город повторяется по сиду и различается между сидами.
+## The city repeats by seed and differs between seeds.
 func test_the_city_follows_the_seed() -> void:
 	var first := CityPlan.generate(1, 0.0, 40.0)
 	var again := CityPlan.generate(1, 0.0, 40.0)
@@ -43,8 +43,8 @@ func test_the_city_follows_the_seed() -> void:
 	assert_ne(_fingerprint(first), _fingerprint(other), "другой сид — другой город")
 
 
-## Каждый ряд закрывает здание по ширине целиком: иначе в просвет между домами
-## видна пустота, ради которой город и затевался.
+## Each row covers the full width of the building: otherwise the gap between houses
+## shows the void that the city was set up to hide.
 func test_every_row_covers_the_building() -> void:
 	var width := BuildingRules.new().width
 	var blocks := CityPlan.generate(3, 0.0, width)
@@ -60,7 +60,7 @@ func test_every_row_covers_the_building() -> void:
 		assert_gt(to, width, "ряд %d не доходит до правого края" % row)
 
 
-## Горящие окна лежат на фасаде своего дома.
+## Lit windows lie on their own house's facade.
 func test_lit_windows_stay_on_their_facade() -> void:
 	for block in CityPlan.generate(5, 0.0, 30.0):
 		var grid := CityPlan.window_grid(block)
@@ -69,8 +69,8 @@ func test_lit_windows_stay_on_their_facade() -> void:
 			assert_between(window.y, 0, grid.y - 1, "окно за краем фасада по высоте")
 
 
-## Обстановка не встаёт на место двери, лампы, шахты, эскалатора и выхода и
-## не жмётся к глухой стене — на любом сиде и навыке.
+## Dressing does not take the place of a door, lamp, shaft, escalator or exit and
+## does not press against a solid wall — on any seed and skill.
 func test_props_keep_off_doors_lamps_shafts_and_walls() -> void:
 	var total := 0
 	for skill: int in SKILLS:
@@ -96,7 +96,7 @@ func test_props_keep_off_doors_lamps_shafts_and_walls() -> void:
 				for lamp in plan.lamps:
 					if lamp.floor_index == prop.floor_index:
 						assert_gte(absf(lamp.x - prop.x), step * 0.5, where + ": под лампой")
-				# Нижнюю площадку эскалатора safe_spots не держит: на ней стоят.
+				# safe_spots does not reserve the escalator's lower landing: people stand on it.
 				for escalator in plan.escalators:
 					if escalator.floor_index + 1 == prop.floor_index:
 						var landing := escalator.x + escalator.towards * rules.escalator_run
@@ -113,9 +113,9 @@ func test_props_keep_off_doors_lamps_shafts_and_walls() -> void:
 	assert_gt(total, 0, "ни одного предмета — проверять было нечего")
 
 
-## Труба видна: висит ниже полосы, которую закрывает кромка перекрытия, и не
-## проходит сквозь шахту, полотно эскалатора и табличку этажа. Трубы на виду —
-## только в жилом доме (ADR-0056, решение 5): там их и проверяем.
+## The pipe is visible: it hangs below the band covered by the slab edge, and does not
+## pass through a shaft, an escalator belt or a floor sign. Pipes in plain sight are
+## only in a residential building (ADR-0056, decision 5): so that is where we check them.
 func test_pipes_show_below_the_slab_edge_and_skip_what_they_would_cover() -> void:
 	var laid := 0
 	var front := BuildingProps.pipe_z() + BuildingProps.PIPE_THICKNESS * 0.5
@@ -144,9 +144,9 @@ func test_pipes_show_below_the_slab_edge_and_skip_what_they_would_cover() -> voi
 	assert_gt(laid, 0, "ни одной трубы — проверять было нечего")
 
 
-## Неон вывески, цифры табло шахт и огонёк кнопок вызова не носят цвета
-## огоньков игры: табло двери, двери с документом и выхода (ADR-0023,
-## решение 6).
+## Sign neon, shaft indicator digits and the call button light do not carry the colours
+## of the game's indicator lights: door indicator, document door and exit (ADR-0023,
+## decision 6).
 func test_neon_signs_do_not_wear_the_colours_of_game_signs() -> void:
 	var reserved: Array[Color] = [
 		GreyboxLook.SIGN_WARM, GreyboxLook.SIGN_RED, GreyboxLook.SIGN_GREEN
@@ -166,7 +166,7 @@ func test_neon_signs_do_not_wear_the_colours_of_game_signs() -> void:
 			assert_gt(gap.length(), 0.3, "вывеска %s похожа на огонёк %s" % [neon, sign_colour])
 
 
-## Скаты крыши внутри её стен, не заходят на машинное отделение и ниже его.
+## Roof slopes are inside its walls, do not go onto the machine room and are below it.
 func test_roof_steps_frame_the_machine_room() -> void:
 	var rules := _rules(0)
 	for building_seed: int in SEEDS:
@@ -199,11 +199,11 @@ func test_roof_steps_frame_the_machine_room() -> void:
 			)
 
 
-## У декора нет тел, а источников в окружении два — лампа над крышей и отсвет
-## неоновой вывески на углу (ADR-0033, решение 2): окна города, табло, буквы
-## вывески и огонь антенны светятся эмиссией и бюджет ламп кадра не трогают.
-## Солнце или луна города (ADR-0051) — в своём мире города, за [SubViewport], и
-## тоже не в счёт.
+## The decor has no bodies, and there are two sources in the surroundings — a lamp above the roof
+## and the glow of the neon sign on the corner (ADR-0033, decision 2): city windows, indicators,
+## sign letters and the antenna light glow by emission and do not touch the frame's lamp budget. The
+## city's sun or moon (ADR-0051) is in the city's own world, behind a [SubViewport], and does not
+## count either.
 func test_scenery_adds_no_bodies_and_no_lights() -> void:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
@@ -226,9 +226,9 @@ func test_scenery_adds_no_bodies_and_no_lights() -> void:
 	remove_child(level)
 
 
-## Что труба на этаже обязана обходить, парами «левый край, правый край».
-## Считается заново, а не берётся у [BuildingProps]: иначе тест проверял бы
-## разрывы трубы ими же самими.
+## What a pipe on a floor must go around, as "left edge, right edge" pairs.
+## Computed anew rather than taken from [BuildingProps]: otherwise the test would check
+## the pipe breaks by the same breaks.
 func _pipe_blockers(rules: BuildingRules, plan: BuildingPlan, index: int) -> Array[Vector2]:
 	var blockers: Array[Vector2] = []
 	var half := rules.shaft_width * 0.5
@@ -251,12 +251,12 @@ func _fingerprint(blocks: Array[CityPlan.Block]) -> String:
 	return "|".join(parts)
 
 
-## Машина у выхода встаёт так, что по всей длине не задевает ни портал шахты
-## (замечание пользователя на кадре гаража M20), ни внутреннюю стену, ни пролёт
-## эскалатора, спускающегося в гараж, и стоит в стенах здания (авторевью M20).
+## The car at the exit stands so that along its whole length it touches neither a shaft portal
+## (the user's remark on the M20 garage shot), nor the inner wall, nor the run of an
+## escalator descending into the garage, and stands within the building walls (M20 code review).
 ##
-## С M24b выход — сама машина у ворот (ADR-0038, решение 3): место Otto у
-## водительской двери приходится на неё, а не рядом.
+## Since M24b the exit is the car itself at the gate (ADR-0038, decision 3): Otto's spot at the
+## driver's door falls on it, not next to it.
 func test_the_car_parks_clear_of_shafts_and_the_exit() -> void:
 	for skill: int in SKILLS:
 		var rules := _rules(skill)
@@ -294,14 +294,14 @@ func test_the_car_parks_clear_of_shafts_and_the_exit() -> void:
 				_assert_apart(car, run, "%s: машина на эскалаторе x=%.1f" % [label, escalator.x])
 
 
-## Отрезки [param a] и [param b] не перекрываются (касаться можно).
+## Segments [param a] and [param b] do not overlap (touching is allowed).
 func _assert_apart(a: Vector2, b: Vector2, message: String) -> void:
 	assert_true(a.y <= b.x + 0.001 or a.x >= b.y - 0.001, message)
 
 
-## Стенки кабины стоят на её полу и доходят до крыши. Пол — в нуле кабины, плита
-## под ним: стенки, отсчитанные от верха плиты, висели на 18 см выше пола
-## (авторевью M20).
+## The cab walls stand on its floor and reach the roof. The floor is at the cab's zero, the slab
+## under it: walls measured from the slab top hung 18 cm above the floor
+## (M20 code review).
 func test_the_cabin_walls_stand_on_its_floor() -> void:
 	var scene := load("res://src/systems/elevators/elevator_car.tscn") as PackedScene
 	var car := scene.instantiate() as ElevatorCar
@@ -322,8 +322,8 @@ func test_the_cabin_walls_stand_on_its_floor() -> void:
 	remove_child(car)
 
 
-## Уровень качества доходит до здания, которое уже стоит, а не со следующего
-## (ADR-0030, решение 5): отражения, контактные тени и туман воздуха здания.
+## The quality level reaches the building already standing, not from the next one
+## (ADR-0030, decision 5): reflections, contact shadows and the building's air fog.
 func test_quality_reaches_the_building_already_standing() -> void:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
@@ -339,8 +339,8 @@ func test_quality_reaches_the_building_already_standing() -> void:
 	remove_child(level)
 
 
-## Этаж выхода — гараж: дверей на нём нет ни на одном сиде и навыке, как в
-## подвале оригинала (ADR-0031, решение 4).
+## The exit floor is a garage: it has no doors on any seed and skill, as in
+## the original's basement (ADR-0031, decision 4).
 func test_the_exit_floor_is_a_garage_without_doors() -> void:
 	for skill: int in SKILLS:
 		var rules := _rules(skill)
@@ -355,9 +355,9 @@ func test_the_exit_floor_is_a_garage_without_doors() -> void:
 				)
 
 
-## Техника крыши стоит внутри её стен и за спиной Otto: передом не ближе
-## машинного отделения. На сиде 2 выход на крышу глубиной 2.7 м вставал поперёк
-## плоскости игры (авторевью M21b).
+## Roof equipment stands inside its walls and behind Otto: its front no closer than
+## the machine room. On seed 2 the 2.7 m deep roof exit stood across the
+## play plane (M21b code review).
 func test_roof_kit_stays_on_the_roof() -> void:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
@@ -388,7 +388,7 @@ func test_roof_kit_stays_on_the_roof() -> void:
 	remove_child(level)
 
 
-## Противовес ходит навстречу кабине: кабина внизу — он наверху.
+## The counterweight moves opposite the cab: cab at the bottom — it at the top.
 func test_the_counterweight_goes_against_the_car() -> void:
 	var detail: CarDetail = autofree(CarDetail.new())
 	add_child(detail)
@@ -398,8 +398,8 @@ func test_the_counterweight_goes_against_the_car() -> void:
 	var weight := detail._weight.global_position.y
 	detail.follow(20.0, 5.0)
 	assert_gt(weight, detail._weight.global_position.y, "кабина поднялась — противовес опустился")
-	# Выше верха шахты противовес не идёт: у шахты на крышу верх — в машинном
-	# отделении, а не над потолком верхней остановки (авторевью M20).
+	# The counterweight does not go above the shaft top: for a shaft to the roof the top is in the
+	# machine room, not above the ceiling of the top stop (M20 code review).
 	detail.set_top(21.0)
 	detail.follow(0.0, 5.0)
 	var weight_top := detail._weight.global_position.y + CarDetail.WEIGHT.y * 0.5
@@ -407,7 +407,7 @@ func test_the_counterweight_goes_against_the_car() -> void:
 	remove_child(detail)
 
 
-## Кровь, выключенная в настройках, не брызгает вовсе.
+## Blood switched off in settings does not splash at all.
 func test_blood_respects_the_setting() -> void:
 	var host: Node3D = autofree(Node3D.new())
 	add_child(host)
@@ -420,8 +420,8 @@ func test_blood_respects_the_setting() -> void:
 	remove_child(host)
 
 
-## Сбитая лампа выбрасывает искры в точке попадания, и они остаются там, пока
-## лампа падает (ADR-0031, решение 3а).
+## A shot lamp throws sparks at the point of impact, and they stay there while
+## the lamp falls (ADR-0031, decision 3a).
 func test_a_shot_lamp_throws_sparks() -> void:
 	var host: Node3D = autofree(Node3D.new())
 	add_child(host)

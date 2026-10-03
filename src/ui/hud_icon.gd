@@ -1,14 +1,14 @@
 class_name HudIcon
 extends Control
 
-## Значок HUD, нарисованный кодом: жизнь — силуэт головы и плеч, документ —
-## папка. Картинок нет: значок растёт с разрешением без лесенки, а цвет берёт
-## из кромки HUD — розовый у отеля, голубой у офиса.
+## A HUD icon drawn in code: a life is a silhouette of head and shoulders, a document is a folder.
+## There are no pictures: the icon scales with resolution without jaggies, and takes its colour from
+## the HUD trim — pink for the hotel, light blue for the office.
 
 enum Kind { LIFE, DOCUMENT }
 
 var kind: Kind = Kind.LIFE
-## Горит ли значок: жизнь есть, документ собран. Погасший — контур.
+## Whether the icon is lit: the life exists, the document is collected. A dim one is an outline.
 var lit: bool = true
 var colour := Color.WHITE
 
@@ -39,7 +39,7 @@ func _draw() -> void:
 			_draw_document(fill, edge)
 
 
-## Голова и плечи: круг над трапецией.
+## Head and shoulders: a circle above a trapezoid.
 func _draw_life(fill: Color, edge: Color) -> void:
 	var s := size
 	var head := Vector2(s.x * 0.5, s.y * 0.3)
@@ -61,7 +61,7 @@ func _draw_life(fill: Color, edge: Color) -> void:
 	draw_polyline(outline, edge, 2.0, true)
 
 
-## Папка с язычком; у собранной — галочка.
+## A folder with a tab; a collected one has a check mark.
 func _draw_document(fill: Color, edge: Color) -> void:
 	var s := size
 	var folder := PackedVector2Array(

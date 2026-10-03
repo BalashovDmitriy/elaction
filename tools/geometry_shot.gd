@@ -1,38 +1,38 @@
 extends Node3D
 
-## Кадры M18b вблизи: эскалатор, столб света в шахте, двухэтажная пара.
+## M18b close-up shots: the escalator, the light column in the shaft, the two-deck pair.
 ##
-## Съёмка вехи ([code]capture.py[/code]) и кадры раскладки ([code]layout_shot.gd[/code])
-## снимают этаж целиком — в такой кадр эскалатор влезает полоской в четверть
-## высоты, и по нему не видно ни ступеней, ни балюстрады. Здесь камера своя и
-## близкая: кадр про конструкцию, а не про этаж.
+## Milestone capture ([code]capture.py[/code]) and layout shots ([code]layout_shot.gd[/code])
+## shoot a whole floor: in such a shot the escalator fits as a strip a quarter of the
+## height, and neither steps nor balustrade can be seen on it. Here the camera is its own
+## and close: the shot is about the construction, not about the floor.
 ##
-## Это и есть проверка DoD M18b ([ADR-0025](res://docs/adr/0025-shafts-escalators-and-riders.md)):
-## эскалатор выглядит эскалатором, шахта читается на погашенном этаже, а пара
-## ярусов ходит вместе.
+## This is the M18b DoD check ([ADR-0025](res://docs/adr/0025-shafts-escalators-and-riders.md)):
+## the escalator looks like an escalator, the shaft reads on an unlit floor, and the pair
+## of decks moves together.
 ##
-## Рендер настоящий, не headless — нужен экран.
+## The render is real, not headless: a screen is needed.
 ##
-## Запуск:
+## Run:
 ##     godot --path . res://tools/geometry_shot.tscn
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
-## Куда складываются кадры.
+## Where the shots go.
 const FOLDER := "res://screens/M18b"
 
-## Сколько кадров дать зданию, свету и отражениям устояться.
+## How many frames to give the building, light and reflections to settle.
 const SETTLE_FRAMES: int = 45
 
-## Потолок ожидания, пока сбитые лампы долетят до пола, шагов физики.
+## Wait cap, in physics steps, for knocked-down lamps to reach the floor.
 const FALL_STEPS: int = 240
 
-## Сид тот же, что у остальных инструментов вехи: раскладка по нему разобрана
-## в статусе, и кадры сравниваются с ней, а не с новым зданием.
+## The seed is the same as for the milestone's other tools: the layout for it is analyzed
+## in the status, and the shots are compared with it, not with a new building.
 const BUILDING_SEED: int = 1
 
-## Как далеко камера стоит от плоскости игры и на сколько наклонена. Числа
-## [SideCamera]: кадр обязан быть тем же, что видит игрок, только ближе.
+## How far the camera stands from the play plane and how much it is tilted. The numbers
+## of [SideCamera]: the shot must be the same as what the player sees, only closer.
 const DISTANCE: float = 20.0
 const TILT_DEGREES: float = 10.0
 
@@ -46,7 +46,7 @@ func _ready() -> void:
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	_level.rules = BuildingRules.new()
 	_level.building_seed = BUILDING_SEED
-	# Кадр про конструкцию: ходящая фигура закрывает собой то, ради чего он снят.
+	# The shot is about the construction: a walking figure covers what it is taken for.
 	_level.spawn_agents = false
 	add_child(_level)
 
@@ -67,7 +67,7 @@ func _run() -> void:
 		return
 
 	var rules := _level.rules
-	# Кадр охватывает оба пролёта и оба этажа, которые эскалатор связывает.
+	# The shot covers both spans and both floors the escalator connects.
 	var middle := Vector2(
 		spot.x + spot.towards * rules.escalator_run * 0.5,
 		rules.floor_surface(spot.floor_index) + rules.floor_height * 0.5
@@ -76,9 +76,9 @@ func _run() -> void:
 	await _shoot("01_escalator", middle, 7.2)
 
 	await _shoot_the_dark_shaft("02_shaft_dark")
-	# Неснятый кадр — это провал прогона, и выходить надо с ошибкой. Второй
-	# [method SceneTree.quit] в том же кадре забивает код первого, поэтому
-	# отказ поднимается сюда, а не выходит на месте.
+	# A shot not taken is a failure of the run, and we must exit with an error. A second
+	# [method SceneTree.quit] in the same frame overrides the first one's code, so
+	# the refusal is raised up here instead of exiting on the spot.
 	var shot := await _shoot_the_pair("03_double_deck")
 	if not shot:
 		get_tree().quit(1)
@@ -88,10 +88,10 @@ func _run() -> void:
 	get_tree().quit(0)
 
 
-## Кадр двухэтажной пары: оба яруса и тяги между ними.
+## Shot of the two-deck pair: both decks and the rods between them.
 ##
-## Кадр берёт два этажа разом — иначе видно один ярус, и пара ничем не
-## отличается от обычной кабины.
+## The shot takes two floors at once: otherwise one deck is visible, and the pair is no
+## different from an ordinary cab.
 func _shoot_the_pair(label: String) -> bool:
 	var rules := _level.rules
 	var shaft := _double_deck_shaft()
@@ -105,8 +105,8 @@ func _shoot_the_pair(label: String) -> bool:
 		Vector2(shaft.x + rules.shaft_width, rules.floor_surface(index))
 	)
 	_level.otto.velocity = Vector3.ZERO
-	# Середина между этажом верхнего яруса и этажом нижнего: пара стоит через
-	# этаж, и в кадр должны попасть оба.
+	# The middle between the upper deck's floor and the lower deck's floor: the pair stands
+	# a floor apart, and both must get into the shot.
 	var middle := rules.floor_surface(index) + rules.floor_height * 0.5
 	await _shoot(label, Vector2(shaft.x, middle), 4.2)
 	return true
@@ -119,13 +119,13 @@ func _double_deck_shaft() -> BuildingPlan.ShaftSpot:
 	return null
 
 
-## Кадр шахты на погашенном этаже: лампы сбиты, светит только столб.
+## Shot of a shaft on an unlit floor: the lamps are knocked down, only the column shines.
 ##
-## Это и есть проверка решения 3: шахта обязана читаться всегда, иначе
-## погашенное здание перестаёт быть проходимым на глаз.
+## This is the check of decision 3: the shaft must always read, otherwise
+## an unlit building stops being passable by eye.
 func _shoot_the_dark_shaft(label: String) -> void:
 	var rules := _level.rules
-	# Широкий этаж пониже: там шахт на этаже больше всего, и ламп тоже три.
+	# A wide floor lower down: it has the most shafts per floor, and three lamps too.
 	var index := rules.floors - 3
 	var shaft_x := _shaft_x_on(index)
 	for lamp in _lamps_on(index):
@@ -139,7 +139,7 @@ func _shoot_the_dark_shaft(label: String) -> void:
 	await _shoot(label, Vector2(shaft_x, rules.floor_surface(index) - rules.floor_height), 5.4)
 
 
-## Столбец первой шахты, обслуживающей этаж.
+## Column of the first shaft serving the floor.
 func _shaft_x_on(index: int) -> float:
 	for shaft in _level.plan().shafts:
 		if index >= shaft.top and index <= shaft.bottom:
@@ -156,12 +156,12 @@ func _lamps_on(index: int) -> Array[Lamp]:
 	return found
 
 
-## Ждёт, пока сбитые лампы долетят до пола: по состоянию, а не выдержкой.
+## Waits until knocked-down lamps reach the floor: by state, not by delay.
 ##
-## Состояние — «лампа ещё на этаже»: долетев, она сама себя убирает
-## ([method Lamp._land]), и пустой этаж и значит, что все упали. По признаку
-## «уже удаляется» ждать нельзя — он истинен ровно один кадр, тот самый
-## последний, и ожидание кончалось бы, не начавшись.
+## The state is "the lamp is still on the floor": having landed, it removes itself
+## ([method Lamp._land]), and an empty floor means all of them have fallen. Waiting on
+## the "already being deleted" sign is not possible: it is true for exactly one frame,
+## the very last one, and the wait would end before it began.
 func _settle_after_the_fall(index: int) -> void:
 	var left := FALL_STEPS
 	while left > 0 and not _lamps_on(index).is_empty():
@@ -172,11 +172,12 @@ func _settle_after_the_fall(index: int) -> void:
 	await get_tree().physics_frame
 
 
-## Эскалатор, к которому ближе всего лампа его этажа.
+## The escalator closest to its floor's lamp.
 ##
-## Кадр о конструкции: ступени, балюстрада и поручень видны только под светом.
-## Эскалаторов на здание пяток, и половина из них стоит в неосвещённой части
-## этажа — снятый там, кадр показывал бы зоны ламп M17, а не геометрию M18b.
+## The shot is about the construction: steps, balustrade and handrail are visible only
+## under light. There are about five escalators per building, and half of them stand in
+## the unlit part of the floor: shot there, the frame would show M17 lamp zones, not
+## M18b geometry.
 func _escalator_under_a_lamp() -> EscalatorSpot:
 	var plan := _level.plan()
 	if plan.escalators.is_empty():
@@ -194,8 +195,8 @@ func _escalator_under_a_lamp() -> EscalatorSpot:
 	return best
 
 
-## Ставит Otto на верхнюю площадку: кадр должен показывать и то, что борт со
-## стороны камеры его не закрывает (ADR-0025, решение 5).
+## Puts Otto on the upper landing: the shot must also show that the side on the camera
+## side does not cover him (ADR-0025, decision 5).
 func _stand_otto_on_the_top_pad(spot: EscalatorSpot) -> void:
 	var rules := _level.rules
 	_level.otto.global_position = WorldSpace.to_scene(
@@ -204,7 +205,7 @@ func _stand_otto_on_the_top_pad(spot: EscalatorSpot) -> void:
 	_level.otto.velocity = Vector3.ZERO
 
 
-## Снимает кадр, наведённый на точку правил, с заданной половиной высоты кадра.
+## Takes a shot aimed at a rules point, with the given half height of the frame.
 func _shoot(label: String, centre: Vector2, half_height: float) -> void:
 	var at := WorldSpace.to_scene(centre)
 	_camera.size = half_height * 2.0

@@ -1,10 +1,11 @@
 extends GutTest
 
-## Свет лампы на запасном этаже (ADR-0042, решение 2).
+## Lamp light on a spare floor (ADR-0042, decision 2).
 ##
-## Этажи за кромкой кадра горят заранее, чтобы въезжающий этаж не вспыхивал на
-## глазах. Их тени никто не видит, а внизу здания они давали треть проходов
-## теней: там лампа горит конусом без тени и не дальше своего пола.
+## Floors beyond the frame edge are lit in advance so a floor coming in does not flare up
+## before the eyes. Nobody sees their shadows, and at the bottom of the building they gave a
+## third of the shadow passes: there the lamp is lit as a cone without shadow and no further
+## than its floor.
 
 const LAMP_SCENE := preload("res://src/systems/lighting/lamp.tscn")
 const HANG: float = 2.6
@@ -50,9 +51,9 @@ func test_a_margin_lamp_lights_its_own_floor_only() -> void:
 		assert_lt(spot.spot_range, HANG + Proportions.SLAB, "и не глубже плиты под своим полом")
 
 
-## Обстановка в тень заливки не попадает: маска теней берёт предмет по любому
-## общему слою, и предмет, оставшийся и на первом, заливка не отпустила бы
-## (авторевью M24f).
+## Dressing does not get into the fill shadow: the shadow mask takes an item by any
+## shared layer, and an item that also stayed on the first one would not be released by the
+## fill (code review M24f).
 func test_props_cast_no_fill_shadow() -> void:
 	var lamp := _lamp()
 	var fill: OmniLight3D = null
@@ -63,7 +64,7 @@ func test_props_cast_no_fill_shadow() -> void:
 	if fill == null:
 		return
 	var checked := 0
-	# Несколько предметов, а не весь каталог: слой ставит одна функция сборки.
+	# A few items, not the whole catalogue: the layer is set by one build function.
 	for entry: PropCatalog.Entry in PropCatalog.entries().slice(0, 4):
 		var prop := PropCatalog.make(entry.name)
 		if prop == null:
@@ -86,9 +87,9 @@ func test_back_in_frame_the_lamp_is_whole_again() -> void:
 		assert_true(light.visible and light.shadow_enabled, "%s снова с тенью" % light.get_class())
 
 
-## Мигающая лампа жилого дома, сбитая пулей, не зажигает погашенный
-## рассеиватель снова: мигание отпускает свет во всю силу, а вид сбитой лампы
-## остаётся за [method Lamp.shoot_down] (авторевью M24m: светилась на лету).
+## A blinking residential lamp shot down by a bullet does not light the darkened
+## diffuser again: the blinking releases the light at full strength, while the look of a
+## shot-down lamp stays with [method Lamp.shoot_down] (code review M24m: it glowed in flight).
 func test_a_shot_flickering_lamp_stays_dark() -> void:
 	var lamp := LAMP_SCENE.instantiate() as Lamp
 	lamp.flicker = true

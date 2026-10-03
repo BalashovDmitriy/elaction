@@ -1,33 +1,32 @@
 class_name RunLog
 extends RefCounted
 
-## Журнал прогона: что происходило в игре, строкой JSON на событие.
+## Run log: what happened in the game, one JSON line per event.
 ##
-## Прогоны ботом и тесты прохождения длинные, и разбирать их перезапусками с
-## новыми отладочными печатями — по десять минут на вопрос (M24g, сид 3).
-## Журнал пишет всё нужное для разбора сразу: смерти Otto с причиной и тем, кто
-## стрелял, попадания, выпуск и гибель агентов, возвращения в игру, решения бота,
-## поездки. Читает его `tools/run_log.py`: сводка, фильтры по этажу, виду и
-## времени.
+## Bot runs and playthrough tests are long, and analysing them by rerunning with new
+## debug prints takes ten minutes per question (M24g, seed 3). The log records
+## everything needed for analysis at once: Otto's deaths with the cause and who shot,
+## hits, agent release and deaths, returns to play, bot decisions, rides. It is read by
+## `tools/run_log.py`: a summary, filters by floor, kind and time.
 ##
-## Включается путём файла: [method open], флаг `--log=путь` у инструментов и
-## переменная окружения `ELACTION_LOG`. Выключен — [method write] не стоит
-## ничего, кроме одной проверки.
+## Enabled by a file path: [method open], the `--log=path` flag of the tools and the
+## `ELACTION_LOG` environment variable. When disabled, [method write] costs nothing but
+## a single check.
 ##
-## Строка: [code]{"frame": кадр физики, "t": игровое время, с, "kind": вид, …}[/code].
-## Координаты — в плоскости правил, x и y, м.
+## Line: [code]{"frame": physics frame, "t": game time, s, "kind": kind, …}[/code].
+## Coordinates are in the rules plane, x and y, m.
 
 const ENV := "ELACTION_LOG"
 const FLAG := "--log="
-## Место номера сида в пути журнала у инструментов прогона.
+## Placeholder for the seed number in the log path of the run tools.
 const SEED_MARK := "{seed}"
 
 static var _file: FileAccess = null
 static var _clock: float = 0.0
 
 
-## Открывает журнал в [param path]; пустой путь — по флагу или переменной
-## окружения, если заданы. Прежний журнал закрывается.
+## Opens the log at [param path]; an empty path — by the flag or the environment
+## variable, if set. The previous log is closed.
 static func open(path: String = "") -> bool:
 	close()
 	var target := path
@@ -37,9 +36,9 @@ static func open(path: String = "") -> bool:
 				target = argument.trim_prefix(FLAG)
 	if target.is_empty():
 		target = OS.get_environment(ENV)
-	# Путь с {seed} — шаблон `tools/playthrough.gd`: журнал на каждый сид
-	# открывает он сам. Открытый здесь, при запуске игры, шаблон лёг бы лишним
-	# файлом с «{seed}» в имени.
+	# A path with {seed} is a `tools/playthrough.gd` template: it opens the log for each
+	# seed itself. Opened here, at game start, the template would leave an extra file with
+	# "{seed}" in its name.
 	if target.is_empty() or target.contains(SEED_MARK):
 		return false
 	DirAccess.make_dir_recursive_absolute(target.get_base_dir())
@@ -54,18 +53,18 @@ static func close() -> void:
 	_file = null
 
 
-## Пишется ли журнал.
+## Whether the log is being written.
 static func is_on() -> bool:
 	return _file != null
 
 
-## Двигает игровые часы журнала: зовёт тот, кто ведёт прогон, раз в шаг.
+## Advances the log's game clock: called by whoever drives the run, once per step.
 static func tick(delta: float) -> void:
 	_clock += delta
 
 
-## Пишет событие [param kind] с подробностями [param details]. Векторы
-## превращаются в пары чисел, узлы — в имена.
+## Writes event [param kind] with details [param details]. Vectors become pairs of
+## numbers, nodes become names.
 static func write(kind: String, details: Dictionary = {}) -> void:
 	if _file == null:
 		return
@@ -76,7 +75,7 @@ static func write(kind: String, details: Dictionary = {}) -> void:
 	_file.flush()
 
 
-## Точка сцены — в плоскости правил, с округлением до сантиметра.
+## A scene point — in the rules plane, rounded to a centimetre.
 static func at(node: Node3D) -> Array:
 	if node == null or not is_instance_valid(node):
 		return []

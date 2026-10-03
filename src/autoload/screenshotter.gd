@@ -1,51 +1,51 @@
 extends Node
 
-## Снимки экрана для последующего анализа и оптимизации.
+## Screenshots for later analysis and optimization.
 ##
-## Ручной режим: F12 сохраняет текущий кадр в `screens/manual/`.
-## Автоматический: запуск игры с аргументом `-- --capture=M2` прогоняет короткий
-## сценарий вехи, сохраняет по кадру на каждый шаг и закрывает игру. Так снимки
-## снимаются после каждой играбельной вехи — см. tools/capture.py.
+## Manual mode: F12 saves the current frame to `screens/manual/`.
+## Automatic: running the game with the `-- --capture=M2` argument plays a short
+## milestone script, saves a frame for each step and closes the game. This way shots
+## are taken after every playable milestone — see tools/capture.py.
 ##
-## Снимки пишутся в JPEG рядом с проектом: `screens/<веха>/<время>_<шаг>.jpg`.
+## Shots are written as JPEG next to the project: `screens/<milestone>/<time>_<step>.jpg`.
 
 const OUTPUT_ROOT := "res://screens"
 const JPEG_QUALITY: float = 0.9
 const CAPTURE_ARG_PREFIX := "--capture="
 const MANUAL_FOLDER := "manual"
 
-## Шаги автоматического прогона по вехам: что удерживать и сколько секунд.
+## Steps of the automatic run per milestone: what to hold and for how many seconds.
 ##
-## План выбирается аргументом --capture=<веха>, регистр имени не важен; для
-## незнакомой вехи берётся план M1 и в лог идёт предупреждение.
+## The plan is chosen by the --capture=<milestone> argument, name case does not matter; for
+## an unknown milestone the M1 plan is used and a warning goes to the log.
 ##
-## Выдержки M1 завязаны на время полёта Otto (2 · jump_speed / gravity ≈ 0.85 с):
-## «jump» снимается около вершины, а «crouch» — уже после приземления.
+## M1 delays are tied to Otto's flight time (2 · jump_speed / gravity ≈ 0.85 s):
+## "jump" is shot near the apex, and "crouch" — already after landing.
 ##
-## Выдержки M2 намеренно не требуют точности: «ride_down» держит спуск дольше,
-## чем нужно на три этажа, и кабина упирается в низ шахты. Так кадр не зависит
-## от того, за сколько именно она едет.
+## M2 delays deliberately do not require precision: "ride_down" holds the descent longer
+## than three floors need, and the cab hits the bottom of the shaft. So the frame does not depend
+## on exactly how long the ride takes.
 ##
-## Выдержка «at_red_door» в M3 — это путь до коврика красной двери и ничего
-## больше: 320 px от места появления Otto при walk_speed 90 px/с. «Вверх» в этом
-## шаге не держится намеренно, иначе Otto успел бы зайти внутрь и кадр, обещающий
-## его перед дверью, показал бы пустой проём.
+## The "at_red_door" delay in M3 is the way to the red door's mat and nothing
+## more: 320 px from Otto's spawn point at walk_speed 90 px/s. "Up" in this
+## step is deliberately not held, otherwise Otto would manage to go inside and the frame promising
+## him in front of the door would show an empty doorway.
 ##
-## Свет M6 этим сценарием не проверяется, и пытаться не стоит: тёмный этаж
-## получается только сбитой лампой, а попасть по ней выдержкой — ровно тот
-## случай, который здесь ломался четырежды. Темноту снимает tools/dark_shot.tscn:
-## он ждёт не секунды, а состояние. Отсюда нужен только вид настоящей игры —
-## с HUD, виньеткой и свечением, которых в том инструменте нет.
+## M6 light is not checked by this script, and it is not worth trying: a dark floor
+## comes only from a shot-down lamp, and hitting it with a delay is exactly the
+## case that broke here four times. Darkness is shot by tools/dark_shot.tscn:
+## it waits not for seconds but for a state. From here only the look of the real game is needed —
+## with HUD, vignette and glow, which that tool does not have.
 ##
-## Бой M11 не снимается здесь по той же причине: агент уходит на колено не по
-## расписанию, а когда в него летит высокая пуля. Его снимает
-## tools/combat_shot.tscn — тоже по состоянию.
+## M11 combat is not shot here for the same reason: an agent kneels not on a
+## schedule, but when a high bullet flies at him. It is shot by
+## tools/combat_shot.tscn — also by state.
 ##
-## Гибели в сценарии нет намеренно. Разбиться в шахте можно только с высоты и
-## только пока кабина не под ногами: где она окажется к этому моменту, зависит от
-## её расписания, а оно сдвигается от любой правки пауз. Такой шаг молча снимал бы
-## не то, что обещает подпись. Падение и сдавливание проверяются отдельным
-## прогоном вручную — как это делается, описано в docs/STATUS.md.
+## There is deliberately no death in the script. One can crash in a shaft only from a height and
+## only while the cab is not underfoot: where it will be at that moment depends on
+## its schedule, and that shifts with any pause edit. Such a step would silently shoot
+## something other than what the caption promises. Falling and crushing are checked by a separate
+## manual run — how it is done is described in docs/STATUS.md.
 const AUTO_PLANS: Dictionary = {
 	"M1":
 	[
@@ -105,8 +105,8 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "walking", "actions": ["move_right"], "hold": 1.4},
 		{"label": "settled", "actions": [], "hold": 1.0},
 	],
-	# Ни один шаг не обещает места: двери и лампы стоят по сиду, а выдержкой
-	# до них не дойти — этим занимается tools/dark_shot.tscn, он ждёт состояние.
+	# No step promises a place: doors and lamps stand by seed, and a delay
+	# will not reach them — tools/dark_shot.tscn handles that, it waits for a state.
 	"M7A":
 	[
 		{"label": "roof", "actions": [], "hold": 0.8},
@@ -122,8 +122,8 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "otto_jumps", "actions": ["move_right", "jump"], "hold": 0.35},
 		{"label": "otto_crouches", "actions": ["move_down"], "hold": 0.8},
 	],
-	# Свет M17: крыша и два этажа под ней с лампами, рёбрами и огоньками. Тёмную
-	# зону здесь не снять — лампа стоит по сиду; её снимает F12 по ходу игры.
+	# M17 light: the roof and two floors under it with lamps, ribs and indicator lights. The dark
+	# zone cannot be shot here — the lamp stands by seed; F12 during play shoots it.
 	"M17":
 	[
 		{"label": "roof", "actions": [], "hold": 1.0},
@@ -131,9 +131,9 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "muzzle_flash", "actions": ["shoot"], "hold": 0.08},
 		{"label": "settled", "actions": [], "hold": 1.0},
 	],
-	# M18b: спуск с крыши шахтой, на которой веха и держится. Эскалатор, шахту
-	# на погашенном этаже и двухэтажную пару выдержкой не снять — они стоят
-	# по сиду; их снимает tools/geometry_shot.tscn в ту же папку.
+	# M18b: descent from the roof by the shaft the milestone rests on. The escalator, a shaft
+	# on a darkened floor and the two-storey pair cannot be shot by delay — they stand
+	# by seed; tools/geometry_shot.tscn shoots them into the same folder.
 	"M18B":
 	[
 		{"label": "roof", "actions": [], "hold": 1.0},
@@ -141,8 +141,8 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "riding_down", "actions": ["move_down"], "hold": 2.5},
 		{"label": "settled", "actions": [], "hold": 1.0},
 	],
-	# M18c: пропорции. Рост рядом с дверью и лампой, кабина во весь этаж, 3.67
-	# этажа в кадре — и присед с прыжком: у прыжка голова упирается в потолок.
+	# M18c: proportions. Height next to a door and a lamp, a cab the full floor tall, 3.67
+	# floors in the frame — and crouch with jump: in a jump the head hits the ceiling.
 	"M18C":
 	[
 		{"label": "roof", "actions": [], "hold": 1.0},
@@ -154,8 +154,8 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "jumping", "actions": ["jump"], "hold": 0.25},
 		{"label": "settled", "actions": [], "hold": 1.0},
 	],
-	# M18d: бой по ROM. Спуск кабиной, выход на этаж и перестрелка: агенты
-	# выходят рядом, стреляют стоя, с колена и лёжа, Otto отвечает из приседа.
+	# M18d: ROM combat. Descent by cab, stepping out onto a floor and a shootout: agents
+	# come out nearby, shoot standing, kneeling and lying, Otto answers from a crouch.
 	"M18D":
 	[
 		{"label": "roof", "actions": [], "hold": 1.0},
@@ -169,10 +169,10 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "jump_shot", "actions": ["jump", "shoot"], "hold": 0.3},
 		{"label": "firefight", "actions": [], "hold": 2.5},
 	],
-	# M18e: здание по карте. Башня с четырьмя дверями на этаж, спуск кабиной
-	# и выход на этаж, где агенты выходят из дверей, стоящих через место.
-	# Тёмные этажи (ROM 11–15) и широкий низ по сиду не выдержкой снимает
-	# tools/layout_shot.tscn в ту же папку.
+	# M18e: building by the map. A tower with four doors per floor, descent by cab
+	# and stepping out onto a floor where agents come out of doors standing every other slot.
+	# Dark floors (ROM 11–15) and the wide base by seed are shot not by delay but by
+	# tools/layout_shot.tscn into the same folder.
 	"M18E":
 	[
 		{"label": "roof", "actions": [], "hold": 1.0},
@@ -183,12 +183,12 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "waiting", "actions": [], "hold": 3.0},
 		{"label": "doors", "actions": [], "hold": 1.0},
 	],
-	# M19: город, погода, крыша и обстановка. Крыша со скатами и городом за
-	# ней, спуск кабиной мимо кварталов, этаж с предметами у задней стены.
-	# Широкий низ, тёмный этаж и стену по сиду снимает tools/layout_shot.tscn.
-	# M20: детализация — крыша с техникой и неоном, спуск кабиной (стенки, пульт,
-	# тросы, противовес), этаж с дверями, лампами и дорожкой. Гараж, эффекты,
-	# раунды и погоду снимает tools/layout_shot.tscn -- --folder=M20.
+	# M19: city, weather, roof and dressing. A roof with slopes and the city behind
+	# it, descent by cab past the blocks, a floor with items at the back wall.
+	# The wide base, a dark floor and the wall by seed are shot by tools/layout_shot.tscn.
+	# M20: detail — roof with equipment and neon, descent by cab (walls, panel,
+	# ropes, counterweight), a floor with doors, lamps and a runner. Garage, effects,
+	# rounds and weather are shot by tools/layout_shot.tscn -- --folder=M20.
 	"M20":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},
@@ -200,10 +200,10 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "shooting", "actions": ["shoot"], "hold": 0.3},
 		{"label": "floor", "actions": [], "hold": 1.5},
 	],
-	# M21: люди в костюмах. Otto идёт по крыше клипом ходьбы, едет вниз, выходит
-	# на этаж к агентам в федорах, стреляет, садится на корточки и прыгает.
-	# Все позы рядом, с линиями пуль ROM, снимает tools/actor_shot.tscn, машины
-	# у выхода — tools/layout_shot.tscn -- --folder=M21.
+	# M21: people in suits. Otto walks on the roof with the walk clip, rides down, steps out
+	# onto the floor to agents in fedoras, shoots, squats and jumps.
+	# All poses side by side, with ROM bullet lines, are shot by tools/actor_shot.tscn, cars
+	# at the exit — tools/layout_shot.tscn -- --folder=M21.
 	"M21":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},
@@ -218,11 +218,11 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "jumping", "actions": ["jump"], "hold": 0.3},
 		{"label": "firefight", "actions": [], "hold": 2.0},
 	],
-	# M21b: мир моделями паков. Крыша с техникой и вывеска на углу, спуск кабиной
-	# мимо табло этажей, этаж отеля с обстановкой и стальная шахта. Офис и гаражи
-	# по зданиям снимает tools/layout_shot.tscn -- --folder=M21b --building=N.
-	# M22: грейдинг и HUD — тот же спуск, что M21b: крыша, кабина, этаж отеля.
-	# Уровни качества и тон рядом снимает tools/layout_shot.tscn --floor-only.
+	# M21b: world from pack models. Roof with equipment and a sign on the corner, descent by cab
+	# past floor indicator boards, a hotel floor with dressing and a steel shaft. Office and garages
+	# per building are shot by tools/layout_shot.tscn -- --folder=M21b --building=N.
+	# M22: grading and HUD — the same descent as M21b: roof, cab, hotel floor.
+	# Quality levels and tone side by side are shot by tools/layout_shot.tscn --floor-only.
 	"M22":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},
@@ -244,10 +244,10 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "floor", "actions": [], "hold": 1.5},
 		{"label": "walking_on", "actions": ["move_left"], "hold": 1.6},
 	],
-	# M24b: вертолёт привозит Otto (сценку снимает tools/intro_shot.tscn), дальше
-	# тот же спуск: крыша, кабина, этаж. Паркинг — tools/garage_shot.tscn; до
-	# двери, подвала и выхода сценарий по времени не доходит, своего инструмента
-	# съёмки у них пока нет.
+	# M24b: the helicopter brings Otto (tools/intro_shot.tscn shoots the scene), then
+	# the same descent: roof, cab, floor. Garage — tools/garage_shot.tscn; the timed script
+	# does not reach the door, the basement and the exit, they have no shooting
+	# tool of their own yet.
 	"M24B":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},
@@ -258,9 +258,9 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
 		{"label": "floor", "actions": [], "hold": 1.5},
 	],
-	# M24c: движение клипами UAL. Тот же спуск, а на этаже — толчок, полёт,
-	# приземление, разворот посередине и шаг. Все позы рядом, с линиями
-	# пуль ROM, снимает tools/actor_shot.tscn -- --folder=M24C.
+	# M24c: movement with UAL clips. The same descent, and on the floor — push-off, flight,
+	# landing, turning in the middle and a step. All poses side by side, with ROM
+	# bullet lines, are shot by tools/actor_shot.tscn -- --folder=M24C.
 	"M24C":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},
@@ -276,9 +276,9 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "turning", "actions": ["move_right"], "hold": 0.05},
 		{"label": "walking_on", "actions": ["move_right"], "hold": 1.0},
 	],
-	# M24d: добивания. Тот же маршрут, что M24c: прыжок теперь без ноги, полёт
-	# клипом. Сценки добивания снимает tools/takedown_shot.tscn -- --folder=M24D:
-	# маршрут по времени агента вплотную не подведёт.
+	# M24d: takedowns. The same route as M24c: the jump is now without the leg, flight
+	# with a clip. Takedown scenes are shot by tools/takedown_shot.tscn -- --folder=M24D:
+	# a timed route will not bring an agent up close.
 	"M24D":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},
@@ -294,8 +294,8 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "turning", "actions": ["move_right"], "hold": 0.05},
 		{"label": "walking_on", "actions": ["move_right"], "hold": 1.0},
 	],
-	# M24e: демо-режим. Маршрут партии тот же, что M24d; само демо снимает
-	# tools/demo_shot.tscn -- --folder=M24E: оно из меню, а съёмка начинает с партии.
+	# M24e: demo mode. The game route is the same as M24d; the demo itself is shot by
+	# tools/demo_shot.tscn -- --folder=M24E: it is from the menu, while capture starts with a game.
 	"M24E":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},
@@ -311,8 +311,8 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "turning", "actions": ["move_right"], "hold": 0.05},
 		{"label": "walking_on", "actions": ["move_right"], "hold": 1.0},
 	],
-	# M24f: баги и настройки. Маршрут партии тот же, что M24e; кадры света и
-	# темноты — tools/light_bench.tscn -- --shot=, меню с «Авторами» —
+	# M24f: bugs and settings. The game route is the same as M24e; light and
+	# darkness frames — tools/light_bench.tscn -- --shot=, the menu with "Credits" —
 	# tools/ui_shot.tscn -- --folder=M24F.
 	"M24F":
 	[
@@ -329,9 +329,9 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "turning", "actions": ["move_right"], "hold": 0.05},
 		{"label": "walking_on", "actions": ["move_right"], "hold": 1.0},
 	],
-	# M24g: анимация и вид. Маршрут партии тот же, что M24f, плюс спуск по тросу
-	# в начале; трупы, кабина, эскалатор, дверь — tools/m24g_shot.tscn, выезд
-	# покадрово — tools/m24b_shot.tscn -- --sequence, позы — tools/actor_shot.tscn.
+	# M24g: animation and looks. The game route is the same as M24f, plus the rope descent
+	# at the start; corpses, cab, escalator, door — tools/m24g_shot.tscn, the exit
+	# frame by frame — tools/m24b_shot.tscn -- --sequence, poses — tools/actor_shot.tscn.
 	"M24G":
 	[
 		{"label": "rope", "actions": [], "hold": 0.4},
@@ -348,9 +348,9 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "turning", "actions": ["move_right"], "hold": 0.05},
 		{"label": "walking_on", "actions": ["move_right"], "hold": 1.0},
 	],
-	# M24h: улица и кабина. Маршрут M24g плюс шаг в едущей кабине; эскалатор в
-	# глубине — tools/m24g_shot.tscn, поток и выезд — tools/m24b_shot.tscn --
-	# --sequence, кадр по этажам — tools/light_bench.tscn -- --floors.
+	# M24h: street and cab. The M24g route plus a step in a moving cab; the escalator in
+	# depth — tools/m24g_shot.tscn, traffic and exit — tools/m24b_shot.tscn --
+	# --sequence, a frame per floor — tools/light_bench.tscn -- --floors.
 	"M24H":
 	[
 		{"label": "rope", "actions": [], "hold": 0.4},
@@ -367,11 +367,11 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "landing", "actions": [], "hold": 0.4},
 		{"label": "walking_on", "actions": ["move_right"], "hold": 1.0},
 	],
-	# M24i: вид. Маршрут M24h: вертолёт и трос, крыша, кабина, коридор с
-	# отделкой по типу здания. Машины с салоном — tools/car_shot.tscn, посадка
-	# и выезд на всех моделях — tools/m24b_shot.tscn -- --building=N
-	# --only=exit, комнаты за дверью — tools/room_shot.tscn, добивания —
-	# tools/takedown_shot.tscn, этажи отеля и офиса — tools/layout_shot.tscn --
+	# M24i: looks. The M24h route: helicopter and rope, roof, cab, a corridor with
+	# finish by building kind. Cars with interiors — tools/car_shot.tscn, boarding
+	# and exit on all models — tools/m24b_shot.tscn -- --building=N
+	# --only=exit, rooms behind a door — tools/room_shot.tscn, takedowns —
+	# tools/takedown_shot.tscn, hotel and office floors — tools/layout_shot.tscn --
 	# --floor-only --building=N.
 	"M24I":
 	[
@@ -385,9 +385,9 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "floor", "actions": [], "hold": 0.6},
 		{"label": "walking_on", "actions": ["move_right"], "hold": 1.6},
 	],
-	# M24j: время суток и новый город. Маршрут M24i — первое здание партии во
-	# время суток своего сида. Все двенадцать сочетаний времени и погоды —
-	# tools/m24j_shot.tscn, город вблизи без расфокуса — tools/city_shot.tscn.
+	# M24j: time of day and the new city. The M24i route — the first building of a game at
+	# its seed's time of day. All twelve combinations of time and weather —
+	# tools/m24j_shot.tscn, the city up close without defocus — tools/city_shot.tscn.
 	"M24J":
 	[
 		{"label": "rope", "actions": [], "hold": 0.4},
@@ -400,9 +400,9 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "floor", "actions": [], "hold": 0.6},
 		{"label": "walking_on", "actions": ["move_right"], "hold": 1.6},
 	],
-	# M24l: снег. Маршрут M24j — первое здание партии в погоду своего сида;
-	# снег во все времена суток, улица с прохожими и следы — tools/m24j_shot.tscn
-	# с --weather=3 (--only=walk — цепочка следов).
+	# M24l: snow. The M24j route — the first building of a game in its seed's weather;
+	# snow at all times of day, the street with pedestrians and footprints — tools/m24j_shot.tscn
+	# with --weather=3 (--only=walk — a chain of footprints).
 	"M24L":
 	[
 		{"label": "rope", "actions": [], "hold": 0.4},
@@ -415,8 +415,8 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "floor", "actions": [], "hold": 0.6},
 		{"label": "walking_on", "actions": ["move_right"], "hold": 1.6},
 	],
-	# Жилой дом (ADR-0055): съёмка идёт в первом жилом здании партии без соли
-	# ([constant CAPTURE_KINDS]) — тот же маршрут крыша — шахта — этаж.
+	# Residential building (ADR-0055): capture runs in the first residential building of an unsalted
+	# game ([constant CAPTURE_KINDS]) — the same route roof — shaft — floor.
 	"M24M":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},
@@ -429,9 +429,9 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "walking_on", "actions": ["move_right"], "hold": 1.6},
 		{"label": "walking_back", "actions": ["move_left"], "hold": 2.4},
 	],
-	# Характер типа (ADR-0056): тот же маршрут в первом офисе партии — у него
-	# стена изменилась сильнее всех, стекло и зал за ним. Отель и жилой дом
-	# рядом снимает `tools/kinds_sheet.py`.
+	# Kind character (ADR-0056): the same route in the first office of a game — its
+	# wall changed the most, glass and the hall behind it. Hotel and residential building
+	# side by side are shot by `tools/kinds_sheet.py`.
 	"M24N":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},
@@ -444,9 +444,9 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "walking_on", "actions": ["move_right"], "hold": 1.6},
 		{"label": "walking_back", "actions": ["move_left"], "hold": 2.4},
 	],
-	# Кабина по типу (ADR-0057, решение 6): тот же маршрут в первом жилом доме
-	# партии — решётка грузовой кабины закрыта на ходу и сложена на этаже. Залы
-	# особых этажей трёх типов снимает `tools/kinds_sheet.py --floors`.
+	# Cab by kind (ADR-0057, decision 6): the same route in the first residential building
+	# of a game — the freight cab grille is closed while moving and folded at the floor. Halls
+	# of special floors of three kinds are shot by `tools/kinds_sheet.py --floors`.
 	"M24O":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},
@@ -457,9 +457,9 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
 		{"label": "floor", "actions": [], "hold": 0.6},
 	],
-	# Здание снаружи по типу (ADR-0058): маршрут в первом офисе партии — корона
-	# над крышей, торцы башни и уступ с этажей. Отель и жилой дом рядом снимают
-	# `tools/kinds_sheet.py`, вступление — `tools/intro_shot.tscn --building=N`.
+	# Building exterior by kind (ADR-0058): the route in the first office of a game — the crown
+	# above the roof, the tower end walls and the setback ledge from floors. Hotel and residential
+	# side by side — `tools/kinds_sheet.py`, the intro — `tools/intro_shot.tscn --building=N`.
 	"M24P":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},
@@ -482,8 +482,8 @@ const AUTO_PLANS: Dictionary = {
 	],
 }
 const DEFAULT_PLAN := "M1"
-## В каком типе здания идёт съёмка вехи: партия начинается с первого здания
-## этого типа. Остальные вехи — с первого здания, отеля.
+## Which building kind a milestone's capture runs in: the game starts from the first building
+## of this kind. Other milestones — from the first building, a hotel.
 const CAPTURE_KINDS: Dictionary = {
 	"M24M": BuildingIdentity.Kind.RESIDENTIAL,
 	"M24N": BuildingIdentity.Kind.OFFICE,
@@ -495,13 +495,13 @@ var _milestone: String = MANUAL_FOLDER
 
 
 func _ready() -> void:
-	# Это инструмент разработки. В экспортированной сборке res:// недоступен на
-	# запись, а глобальный перехват ввода и занятая F12 игре не нужны.
+	# This is a development tool. In an exported build res:// is not
+	# writable, and a global input hook and a busy F12 are not needed by the game.
 	if not OS.is_debug_build():
 		set_process_input(false)
 		return
 
-	# Снимок должен сниматься и на паузе, иначе F12 перестанет работать в M8.
+	# A shot must work on pause too, otherwise F12 stops working in M8.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
 	var milestone := _milestone_from_cmdline()
@@ -511,12 +511,12 @@ func _ready() -> void:
 	_run_auto_plan.call_deferred()
 
 
-## Идёт ли автосъёмка. По этому [Main] понимает, что меню надо пропустить:
-## сценарий съёмки жмёт игровые действия, а до игры из меню он не доберётся —
-## кнопки меню он нажимать не умеет и уметь не должен.
+## Whether auto capture is running. [Main] uses this to know the menu must be skipped:
+## the capture script presses game actions, and it will not get from the menu to the game —
+## it cannot press menu buttons and must not be able to.
 ##
-## Статическая: имя автолоада не видно при разборе одного скрипта в отрыве от
-## проекта, поэтому зовут её через preload самого файла — как и соседнюю
+## Static: the autoload name is not visible when a single script is parsed apart from the
+## project, so it is called via preload of the file itself — like the neighbouring
 ## [method mark_ignored_by_engine].
 static func capturing() -> bool:
 	return not _milestone_from_cmdline().is_empty()
@@ -524,14 +524,14 @@ static func capturing() -> bool:
 
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("screenshot"):
-		# Ручной кадр всегда в manual/, даже посреди автоматического прогона:
-		# иначе он попал бы в папку вехи и сошёл бы за кадр сценария.
+		# A manual frame always goes to manual/, even in the middle of an automatic run:
+		# otherwise it would land in the milestone folder and pass for a script frame.
 		capture(MANUAL_FOLDER, MANUAL_FOLDER)
 
 
-## Сохраняет текущий кадр. Вызывать через await, иначе снимок уедет на кадр вперёд.
+## Saves the current frame. Call with await, otherwise the shot slips a frame ahead.
 ##
-## [param folder] переопределяет папку вехи; пустая строка — папка текущего прогона.
+## [param folder] overrides the milestone folder; an empty string — the folder of the current run.
 func capture(label: String, folder: String = "") -> void:
 	await RenderingServer.frame_post_draw
 
@@ -556,7 +556,7 @@ func capture(label: String, folder: String = "") -> void:
 
 func _run_auto_plan() -> void:
 	var tree := get_tree()
-	# Даём сцене собраться и уровню построить геометрию.
+	# Let the scene assemble and the level build its geometry.
 	await tree.process_frame
 	await _wait_for_the_player()
 
@@ -574,13 +574,13 @@ func _run_auto_plan() -> void:
 	tree.quit()
 
 
-## Ждёт, пока здание отдаст Otto игроку.
+## Waits until the building hands Otto to the player.
 ##
-## Раунд начинается спуском по тросу, и первые полсекунды ввод не действует
-## (ADR-0017, решение 4). Шаги сценария отмеряются выдержкой от места появления
-## Otto, и начатые на тросе они теряют эти полсекунды ходьбы: кадр, обещающий
-## дверь, показал бы пустую стену. Ждём по состоянию, а не выдержкой — длина
-## вступления ещё поменяется, а «стоит на полу» не поменяется никогда.
+## A round starts with the rope descent, and for the first half second input does nothing
+## (ADR-0017, decision 4). Script steps are measured by delay from Otto's spawn
+## point, and started on the rope they lose that half second of walking: the frame promising
+## a door would show a blank wall. Wait by state, not by delay — the intro length
+## will still change, while "stands on the floor" never will.
 func _wait_for_the_player() -> void:
 	var level := _level_in_play()
 	if level == null:
@@ -590,8 +590,8 @@ func _wait_for_the_player() -> void:
 		push_warning("Otto не встал на крышу, сценарий идёт как есть")
 
 
-## Здание, в которое идёт съёмка. Лежит прямо в текущей сцене: его кладёт туда
-## [Main], и на съёмке оно там одно.
+## The building being captured. It sits directly in the current scene: [Main] puts it
+## there, and during capture it is the only one.
 func _level_in_play() -> GreyboxLevel:
 	var scene := get_tree().current_scene
 	if scene == null:
@@ -603,11 +603,11 @@ func _level_in_play() -> GreyboxLevel:
 	return null
 
 
-## Сценарий вехи. Регистр не важен: в документах веха зовётся `M4a`, а ключ
-## здесь один на оба написания.
+## The milestone script. Case does not matter: in documents the milestone is called `M4a`, and
+## the key here is one for both spellings.
 ##
-## У незнакомой вехи плана нет, и молча снимать вместо неё M1 нельзя: кадры
-## легли бы в папку с её именем и сошли бы за её сценарий. Поэтому — предупреждение.
+## An unknown milestone has no plan, and silently shooting M1 instead is not allowed: the frames
+## would land in a folder with its name and pass for its script. Hence the warning.
 func _plan_for(milestone: String) -> Array:
 	var key := milestone.to_upper()
 	if AUTO_PLANS.has(key):
@@ -616,8 +616,8 @@ func _plan_for(milestone: String) -> Array:
 	return AUTO_PLANS[DEFAULT_PLAN]
 
 
-## С какого здания начинать партию на съёмке вехи ([constant CAPTURE_KINDS]):
-## без соли сид здания — его номер. Без съёмки — с первого.
+## Which building to start a game from when capturing a milestone ([constant CAPTURE_KINDS]):
+## without salt a building's seed is its number. Without capture — from the first.
 static func start_building() -> int:
 	var key := _milestone_from_cmdline().to_upper()
 	if not CAPTURE_KINDS.has(key):
@@ -632,8 +632,8 @@ static func _milestone_from_cmdline() -> String:
 	return ""
 
 
-## Свободный путь для кадра. Метка времени идёт до секунд, поэтому два снимка
-## в одну секунду с одной меткой различаются суффиксом, а не затирают друг друга.
+## A free path for a frame. The timestamp goes down to seconds, so two shots
+## in the same second with the same label differ by a suffix instead of overwriting each other.
 func _free_path(folder: String, label: String) -> String:
 	var base := folder.path_join("%s_%s" % [_timestamp(), label])
 	var candidate := "%s.jpg" % base
@@ -644,13 +644,13 @@ func _free_path(folder: String, label: String) -> String:
 	return candidate
 
 
-## Кладёт .gdignore рядом со снимками: без него Godot импортирует каждый JPEG
-## как ресурс проекта и засевает папку .import-файлами.
+## Puts .gdignore next to the shots: without it Godot imports every JPEG
+## as a project resource and litters the folder with .import files.
 ##
-## Публичный и статический: в ту же папку пишут инструменты tools/*_shot.gd, и своя
-## копия этой пометки у каждого разошлась бы с этой при первой же правке. Статический,
-## потому что звать его приходится по скрипту, а не по автолоаду: имя автолоада
-## видно только запущенной игре, а `godot_check.py` разбирает скрипты поодиночке.
+## Public and static: tools/*_shot.gd write into the same folder, and each one's own
+## copy of this marker would diverge from this one at the first edit. Static,
+## because it has to be called by script, not by autoload: the autoload name is
+## visible only to the running game, and `godot_check.py` parses scripts one at a time.
 static func mark_ignored_by_engine(root_folder: String) -> void:
 	var marker := root_folder.path_join(".gdignore")
 	if FileAccess.file_exists(marker):

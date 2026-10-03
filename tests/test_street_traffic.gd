@@ -1,15 +1,15 @@
 extends GutTest
 
-## Поток машин по улице у выезда (ADR-0044, решения 1 и 2).
+## Traffic on the street at the exit (ADR-0044, decisions 1 and 2).
 ##
-## Правила потока — без сцены здания: улица из одной мостовой, поток на ней и
-## шаги, которые тест делает сам ([method StreetTraffic.step]). Сиды разные:
-## жребий просветов и скоростей свой у каждого здания, и проверяется любой.
+## Traffic rules — without the building scene: a street of one roadway, traffic on it and
+## steps the test makes itself ([method StreetTraffic.step]). Seeds differ:
+## each building has its own draw of gaps and speeds, and any one is checked.
 
 const SEEDS: Array[int] = [1, 2, 3, 5, 8]
 const LEFT: float = 0.0
 const STREET: float = 0.0
-## Шаг потока в тесте, с, и сколько шагов гнать.
+## Traffic step in the test, s, and how many steps to run.
 const STEP: float = 1.0 / 30.0
 const STEPS: int = 1800
 
@@ -21,7 +21,7 @@ func _traffic(building_seed: int) -> StreetTraffic:
 	return traffic
 
 
-## Бампер к бамперу по ходу: сколько между машиной и передней, м.
+## Bumper to bumper along the way: how much between a car and the one in front, m.
 func _gaps(traffic: StreetTraffic, near: bool) -> Array[float]:
 	var gaps: Array[float] = []
 	var cars := traffic.cars(near)
@@ -70,7 +70,7 @@ func test_the_street_keeps_moving() -> void:
 	assert_gt(traffic.cars(true).size(), 0, "уехавших сменяют новые")
 
 
-## Машина за влившейся машиной Otto держит дистанцию: не проходит насквозь.
+## A car behind Otto's merged car keeps its distance: it does not pass through.
 func test_cars_behind_otto_s_car_keep_their_distance() -> void:
 	for building_seed: int in SEEDS:
 		var traffic := _traffic(building_seed)
@@ -86,7 +86,7 @@ func test_cars_behind_otto_s_car_keep_their_distance() -> void:
 		traffic.hold_back(false)
 		assert_true(traffic.is_clear_for(x), "сид %d: просвет наступил" % building_seed)
 		traffic.join(guest)
-		# Otto трогается медленнее потока: подъезжающим сзади — тормозить.
+		# Otto starts slower than the traffic: those coming up from behind must brake.
 		var worst := INF
 		for _step: int in STEPS / 3:
 			guest.position.x -= 3.0 * STEP
@@ -103,8 +103,8 @@ func test_a_car_close_behind_closes_the_gap() -> void:
 	assert_false(traffic.is_clear_for(car.x - CarModel.LENGTH - 3.0), "машина в трёх метрах сзади")
 
 
-## Дорожная ситуация — жребий здания (ADR-0046, решение 3): на разных сидах
-## выпадают все три, и в плотной просветы уже, а ждать дольше, чем в свободной.
+## The traffic situation is a building draw (ADR-0046, decision 3): on different seeds
+## all three come up, and in dense traffic the gaps are narrower, and the wait longer than in light.
 func test_the_road_situation_is_a_draw_of_the_building() -> void:
 	var seen: Dictionary = {}
 	for building_seed: int in 60:
@@ -123,7 +123,7 @@ func test_the_road_situation_is_a_draw_of_the_building() -> void:
 	)
 
 
-## Машины потока — разные: жребий модели и краски у каждой.
+## Traffic cars differ: each has a draw of model and paint.
 func test_traffic_cars_are_a_mix_of_models() -> void:
 	var models: Dictionary = {}
 	for building_seed: int in SEEDS:

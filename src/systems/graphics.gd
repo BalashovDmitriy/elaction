@@ -1,97 +1,97 @@
 class_name Graphics
 extends RefCounted
 
-## Уровень качества графики и то, что он включает (ADR-0030, решение 5;
-## «Ультра», сглаживание и выбор по замеру — ADR-0034).
+## Graphics quality level and what it enables (ADR-0030, decision 5;
+## "Ultra", anti-aliasing and choosing by measurement — ADR-0034).
 ##
-## Одна таблица на весь проект: воздух, лампы, окно и город спрашивают здесь,
-## что им можно, а не держат каждый свой порог. Правил игры уровень не касается —
-## темнота живёт в [FloorLighting], а не в картинке, и агент в темноте видит
-## Otto одинаково на любом уровне.
+## One table for the whole project: the atmosphere, lamps, window and city ask here
+## what they may do, rather than each keeping its own threshold. The level does not touch
+## the game rules — darkness lives in [FloorLighting], not in the picture, and an agent in
+## the dark sees Otto the same way on any level.
 ##
-## Уровень меняется настройками прямо посреди партии: узлы, которым он важен,
-## стоят в группе [constant GROUP] и перестраиваются по [method broadcast].
+## The level changes via settings right in the middle of a game: nodes it matters to
+## are in group [constant GROUP] and rebuild on [method broadcast].
 
 enum Quality { LOW, MEDIUM, HIGH, ULTRA }
 
-## Группа узлов, которые перестраиваются при смене уровня. Каждый из них
-## обязан уметь [code]apply_graphics()[/code].
+## Group of nodes that rebuild when the level changes. Each of them
+## must be able to [code]apply_graphics()[/code].
 const GROUP := &"graphics"
 
-## Доля разрешения окна, в которой рисуется город, по уровню. Он в дымке и
-## размыт по замыслу, и на низких уровнях второй кадр в полном разрешении
-## стоил бы вдвое. С M24a у ближнего ряда рамы, переплёты и жизнь за стеклом
-## (ADR-0037, решение 4): на высоком город рисуется в три четверти окна, на
-## «Ультра» — в полное. Сам город дёшев — коробки и квады без света, — и
-## замер кадра разницу почти не видит.
+## Fraction of the window resolution the city is drawn at, by level. It is hazy and
+## blurred by design, and on low levels a second frame at full resolution
+## would cost double. Since M24a the near row has frames, mullions and life behind the glass
+## (ADR-0037, decision 4): on high the city is drawn at three quarters of the window, on
+## "Ultra" at full. The city itself is cheap — boxes and quads without lights — and
+## the frame measurement barely sees the difference.
 const CITY_SHARE: Array[float] = [0.34, 0.5, 0.75, 1.0]
 
-## Доля капель дождя по уровню.
+## Share of raindrops by level.
 const RAIN_SHARE: Array[float] = [0.25, 0.5, 1.0, 1.0]
 
-## Сглаживание по уровню (ADR-0034, решение 2): MSAA на окне, FXAA — только
-## низкому. TAA нет ни на одном: он размывал огоньки и обводку актёров — та
-## держала читаемость на погашенном этаже до M24f.
+## Anti-aliasing by level (ADR-0034, decision 2): MSAA on the window, FXAA only for
+## low. No level has TAA: it blurred the indicator lights and the actors' outline — which
+## kept readability on a dark floor until M24f.
 const MSAA: Array[Viewport.MSAA] = [
 	Viewport.MSAA_DISABLED, Viewport.MSAA_2X, Viewport.MSAA_2X, Viewport.MSAA_4X
 ]
 
-## Атлас теней ламп, пикселей по стороне: на «Ультра» вдвое крупнее, и тень
-## мебели и людей чётче.
+## Lamp shadow atlas, pixels per side: on "Ultra" twice as large, and the shadows of
+## furniture and people are sharper.
 const SHADOW_ATLAS: Array[int] = [2048, 4096, 4096, 8192]
 
-## Сколько света ламп уходит в объёмный туман: на «Ультра» у ламп ореол в
-## воздухе коридора (ADR-0034, решение 1), ниже — туман лишь чуть светлеет у
-## ламп, как было с M17. Больше — и дымка ложится поверх актёров.
+## How much lamp light goes into the volumetric fog: on "Ultra" lamps have a halo in
+## the corridor air (ADR-0034, decision 1), below — the fog only brightens slightly at
+## the lamps, as it did since M17. More — and the haze lies over the actors.
 const LIGHT_IN_FOG: Array[float] = [0.0, 1.0, 1.0, 3.0]
 
-## Сетка объёмного тумана по уровню: ширина и глубина. Мельче сетка — и конус
-## лампы в воздухе ступенчатый.
+## Volumetric fog grid by level: width and depth. A coarser grid — and the lamp cone
+## in the air is stepped.
 const FOG_GRID: Array[Vector2i] = [
 	Vector2i(64, 64), Vector2i(64, 64), Vector2i(64, 64), Vector2i(128, 128)
 ]
 
-## Текущий уровень. Статический: его читают узлы, которые заводятся и
-## пересоздаются с каждым зданием, а настройки живут дольше любого из них.
+## Current level. Static: it is read by nodes that are created and
+## recreated with each building, while the settings outlive any of them.
 static var quality: Quality = Quality.HIGH
 
 
-## Отражения в полу — экранные, самые дорогие из высокого.
+## Floor reflections — screen-space, the most expensive of high.
 static func reflections() -> bool:
 	return quality >= Quality.HIGH
 
 
-## Контактные тени по углам.
+## Contact shadows in the corners.
 static func contact_shadows() -> bool:
 	return quality >= Quality.MEDIUM
 
 
-## Объёмный туман.
+## Volumetric fog.
 static func volumetric_fog() -> bool:
 	return quality >= Quality.MEDIUM
 
 
-## Отражённый свет: лампа отскакивает от пола и стен.
+## Bounced light: a lamp bounces off the floor and walls.
 static func indirect_light() -> bool:
 	return quality == Quality.ULTRA
 
 
-## Тень от конуса лампы.
+## Shadow from the lamp cone.
 static func spot_shadows() -> bool:
 	return quality >= Quality.MEDIUM
 
 
-## Тень от заливки лампы — вторая тень на каждую лампу.
+## Shadow from the lamp fill — a second shadow per lamp.
 static func fill_shadows() -> bool:
 	return quality >= Quality.HIGH
 
 
-## Тень солнца на крыше и улице (ADR-0051).
+## Sun shadow on the roof and the street (ADR-0051).
 static func sun_shadows() -> bool:
 	return quality >= Quality.MEDIUM
 
 
-## Сколько света источника уходит в объёмный туман.
+## How much of a source's light goes into the volumetric fog.
 static func light_in_fog() -> float:
 	return LIGHT_IN_FOG[quality]
 
@@ -104,7 +104,7 @@ static func rain_share() -> float:
 	return RAIN_SHARE[quality]
 
 
-## Включает и выключает в воздухе то, что зависит от уровня.
+## Turns on and off what depends on the level in the atmosphere.
 static func apply_to(environment: Environment) -> void:
 	environment.ssr_enabled = reflections()
 	environment.ssao_enabled = contact_shadows()
@@ -112,7 +112,8 @@ static func apply_to(environment: Environment) -> void:
 	environment.ssil_enabled = indirect_light()
 
 
-## Сглаживание и тени — свойства окна, а не воздуха: ставятся на корневое окно.
+## Anti-aliasing and shadows are window properties, not atmosphere ones: set on the root
+## window.
 static func apply_to_viewport(viewport: Viewport) -> void:
 	smooth(viewport)
 	viewport.positional_shadow_atlas_size = SHADOW_ATLAS[quality]
@@ -127,9 +128,9 @@ static func apply_to_viewport(viewport: Viewport) -> void:
 	RenderingServer.environment_set_volumetric_fog_volume_size(grid.x, grid.y)
 
 
-## Сглаживание окна по уровню: и корневого, и вида города (ADR-0037,
-## решение 4). Вид города без него рисовался ступеньками, а растянутый на экран
-## вдвое — ступеньками вдвое крупнее.
+## Window anti-aliasing by level: both the root one and the city view (ADR-0037,
+## decision 4). Without it the city view was drawn in steps, and stretched to the screen
+## twofold — in steps twice as large.
 static func smooth(viewport: Viewport) -> void:
 	viewport.msaa_3d = MSAA[quality]
 	viewport.screen_space_aa = (
@@ -140,7 +141,7 @@ static func smooth(viewport: Viewport) -> void:
 	viewport.use_taa = false
 
 
-## Ставит уровень и перестраивает всех, кому он важен.
+## Sets the level and rebuilds everyone it matters to.
 static func broadcast(level: Quality) -> void:
 	quality = level
 	var tree := Engine.get_main_loop() as SceneTree

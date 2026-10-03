@@ -1,7 +1,7 @@
 extends GutTest
 
-## Жизнь за дверью квартиры (ADR-0055, решение 8): звук редкий, только у
-## закрытой двери на этаже в кадре, и жребий двери повторяется.
+## Life behind an apartment door (ADR-0055, decision 8): the sound is rare, only at
+## a closed door on a floor in the frame, and the door draw repeats.
 
 
 func test_a_door_sounds_now_and_then() -> void:
@@ -11,7 +11,7 @@ func test_a_door_sounds_now_and_then() -> void:
 		var sound := life.advance(1.0 / 60.0, true)
 		if sound != "":
 			heard.append(sound)
-	# За десять минут — от четырёх до десяти раз: пауза от минуты до двух с половиной.
+	# In ten minutes — from four to ten times: a pause of one to two and a half minutes.
 	assert_between(heard.size(), 4, 11, "звук редкий")
 	for sound: String in heard:
 		assert_has(DoorLife.SOUNDS, sound, "звук из своего набора")

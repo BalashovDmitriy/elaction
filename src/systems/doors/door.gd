@@ -1,58 +1,62 @@
 class_name Door
 extends Node3D
 
-## Дверь этажа.
+## A floor door.
 ##
-## Красная прячет документ, обычная — засаду. Створку ведёт [DoorCycle], правила
-## визита Otto — [DoorVisit]; узел отвечает за коврик, вид и выдачу документа.
+## A red one hides a document, an ordinary one an ambush. The leaf is driven by
+## [DoorCycle], the rules of Otto's visit by [DoorVisit]; the node is responsible for the
+## mat, the look and handing out the document.
 ##
-## Дверью пользуются двое, и по-разному. Otto стучится сам, створка закрывается
-## за ним и открывается, выпуская, ровно через 70 тиков ROM (ADR-0038, решение 2).
-## Агента дверь выпускает по просьбе уровня, и открывается перед ним заметно
-## дольше: створка — это предупреждение (ADR-0020, решение 2).
+## Two parties use a door, and differently. Otto knocks by himself, the leaf closes
+## behind him and opens, letting him out, exactly after 70 ROM ticks (ADR-0038, decision
+## 2). The door lets an agent out at the level's request, and opens before him noticeably
+## longer: the leaf is a warning (ADR-0020, decision 2).
 ##
-## Створка висит в задней стене коридора, порог — в плоскости игры (ADR-0021,
-## решение 1). Проём в стене за створкой режет сам уровень.
+## The leaf hangs in the corridor back wall, the threshold in the play plane (ADR-0021,
+## decision 1). The level itself cuts the opening in the wall behind the leaf.
 ##
-## Над створкой табло: красное у красной двери, тёплое у обычной. Это и есть
-## читаемость двери на погашенном этаже — сама створка больше не светится
-## (ADR-0023, решение 6).
+## Above the leaf is an indicator board: red at a red door, warm at an ordinary one. This
+## is what makes a door readable on an unlit floor: the leaf itself no longer glows
+## (ADR-0023, decision 6).
 
-## Документ взят, дверь перестала быть красной. Как в ROM — на выходе Otto,
-## а не на входе (ADR-0038, решение 2).
+## The document is taken, the door is no longer red. As in the ROM, on Otto's exit,
+## not on entry (ADR-0038, decision 2).
 signal document_taken
 
-## Otto ушёл внутрь и створка пошла за ним. По этому уровень ведёт агентов к
-## двери ([DoorWatch]).
+## Otto went inside and the leaf followed him. By this the level leads agents to the
+## door ([DoorWatch]).
 signal otto_hid
 
-## Otto вышел наружу.
+## Otto came outside.
 signal otto_came_out
 
-## Габарит створки, м: 40% × 70% просвета, как в оригинале ([Proportions]).
-## Уровень режет по нему проём в задней стене, а коробка створки собирается
-## из него же в [method Node._ready], а не лежит в сцене вторым числом.
+## Leaf size, m: 40% × 70% of the clearance, as in the original ([Proportions]).
+## The level cuts the opening in the back wall by it, and the leaf box is built
+## from it as well in [method Node._ready] instead of sitting in the scene as a second
+## number.
 const LEAF_SIZE := Proportions.DOOR
 
-## Ход створки перед агентом по умолчанию, с — [member agent_open_time].
+## Default leaf travel before an agent, s: [member agent_open_time].
 const AGENT_OPEN_TIME: float = 0.7
 
-## Толщина створки, м.
+## Leaf thickness, m.
 const LEAF_THICKNESS: float = 0.08
 
-## На сколько створка отстоит от стены. Чуть больше нуля: лежащая в одной
-## плоскости со стеной, она мерцала бы с ней на каждом кадре.
+## How far the leaf stands off the wall. Slightly more than zero: lying in the same
+## plane as the wall, it would flicker with it every frame.
 const LEAF_STANDOFF: float = 0.05
 
-## Докуда слышно створку, м. Дверей в здании полсотни, и хлопок каждой на всё
-## здание превратился бы в стук без остановки: слышно только ближние.
+## How far the leaf can be heard, m. There are fifty doors in a building, and a slam of
+## each across the whole building would turn into nonstop banging: only near ones are
+## heard.
 const DOOR_REACH: float = 14.4
 
-## Табло над створкой: габарит и на сколько его середина выше верха створки, м.
+## The indicator board above the leaf: size and how far its middle is above the top of
+## the leaf, m.
 const SIGN_SIZE := Vector3(0.4, 0.13, 0.04)
 
-## Детали двери (ADR-0031, решение 3): филёнки на створке, ручка, отбойная
-## пластина и наличник вокруг проёма, м.
+## Door details (ADR-0031, decision 3): panels on the leaf, a handle, a kick
+## plate and a casing around the opening, m.
 const PANEL_SIZE := Vector2(0.84, 0.78)
 const PANEL_RELIEF: float = 0.02
 const HANDLE := Vector3(0.15, 0.025, 0.04)
@@ -62,115 +66,120 @@ const KICK_PLATE := Vector2(1.08, 0.2)
 const FRAME_WIDTH: float = 0.08
 const FRAME_DEPTH: float = 0.05
 const SIGN_RISE: float = 0.2
-## Пока Otto за красной дверью, закрытая створка в тени коридора сливалась с
-## темнотой (кадр `door_02_inside_closed`). Теперь створка чуть светится сама —
-## красным, как была, — а табло над ней медленно дышит: раз в столько секунд,
-## от своей обычной яркости до этой доли сверху. Источников света не прибавляет.
+## While Otto is behind a red door, the closed leaf in the corridor shadow merged with
+## the darkness (shot `door_02_inside_closed`). Now the leaf glows slightly by itself,
+## red as it was, and the board above it slowly breathes: once every this many seconds,
+## from its usual brightness up to this fraction on top. It adds no light sources.
 const OCCUPIED_PULSE: float = 1.6
 const OCCUPIED_GLOW: float = 1.8
-## Насколько занятая створка светится сама: доля её цвета. Маркер
-## ([method GreyboxLook.marker]) горел плоским розовым пятном ярче всех дверей.
+## How much an occupied leaf glows by itself: a fraction of its color. The marker
+## ([method GreyboxLook.marker]) burned as a flat pink spot brighter than all doors.
 const OCCUPIED_LEAF_GLOW: float = 0.14
 
-## Бра красной двери (ADR-0042, решение 8): красная дверь в тени коридора
-## терялась, и её легко было пройти. Конус без тени, перед створкой у её верха,
-## смотрит вниз и к стене — пятно ложится на створку и пол перед ней. Горит и при
-## сбитой лампе, гаснет с документом. Дальше своего пола не светит: от высоты
-## бра до пола — меньше дальности, до плиты под полом — больше.
+## The red door's sconce (ADR-0042, decision 8): a red door in the corridor shadow got
+## lost, and it was easy to walk past. A shadowless cone, in front of the leaf at its
+## top, looks down and toward the wall: the spot falls onto the leaf and the floor in
+## front of it. It stays on with a knocked-down lamp and goes out with the document. It
+## does not light beyond its own floor: from the sconce height to the floor is less than
+## its range, to the slab under the floor more.
 const RED_LIGHT_COLOR := Color(1.0, 0.32, 0.26)
 const RED_LIGHT_ENERGY: float = 1.3
 const RED_LIGHT_RANGE: float = 3.0
 const RED_LIGHT_ANGLE: float = 42.0
-## Насколько бра перед стеной, м, и на сколько оно наклонено к ней от отвеса.
+## How far the sconce is in front of the wall, m, and how much it tilts toward it from
+## plumb.
 const RED_LIGHT_OUT: float = 0.7
 const RED_LIGHT_TILT: float = 0.35
 
-## Стекло офисной створки: размер, м, и тон — светлое матовое.
+## Glass of the office leaf: size, m, and tone: light frosted.
 const VISION := Vector2(0.62, 0.5)
 const FROSTED := Color(0.78, 0.84, 0.88)
-## Табличка «Не беспокоить» на ручке: размер, м, и цвет.
+## The "Do not disturb" sign on the handle: size, m, and color.
 const HANGER := Vector3(0.09, 0.22, 0.008)
 const HANGER_COLOR := Color(0.72, 0.1, 0.12)
-## Соль жребия мелочей у двери: свой, чтобы не ходить в ногу с комнатой.
+## Salt of the draw for small items at the door: its own, so as not to move in step with
+## the room.
 const LITTLE_SALT: int = 0x7A_B1E5
-## Жизнь за дверью квартиры (ADR-0055, решение 8): соль жребия, откуда звук,
-## докуда слышно, м, и насколько тише прочих звуков, дБ, — он глухой, из-за
-## двери.
+## Life behind an apartment door (ADR-0055, decision 8): draw salt, where the sound comes
+## from, how far it can be heard, m, and how much quieter than other sounds, dB: it is
+## muffled, from behind the door.
 const LIFE_SALT: int = 0x11FE
 const LIFE_AT := Vector3(0.0, 1.2, -0.3)
 const LIFE_REACH: float = 7.0
 const LIFE_DB: float = -6.0
-## Глазок квартиры: размер и высота над низом створки, м.
+## The apartment peephole: size and height above the bottom of the leaf, m.
 const PEEPHOLE := Vector3(0.035, 0.035, 0.02)
 const PEEPHOLE_RISE: float = 1.55
-## Коврик у порога квартиры, м, и его цвета.
+## The mat at the apartment threshold, m, and its colors.
 const DOORMAT := Vector3(0.9, 0.015, 0.5)
 const DOORMAT_RIM := Color(0.12, 0.11, 0.1)
 const DOORMAT_TONES: Array[Color] = [
 	Color(0.36, 0.26, 0.16), Color(0.2, 0.26, 0.2), Color(0.34, 0.14, 0.12), Color(0.28, 0.28, 0.3)
 ]
-## Пакет с покупками, м, и его начинка.
+## A grocery bag, m, and its contents.
 const BAG := Vector3(0.3, 0.38, 0.2)
 const BAG_COLOR := Color(0.62, 0.48, 0.3)
 const LOAF_COLOR := Color(0.78, 0.6, 0.34)
 const GREENS_COLOR := Color(0.24, 0.46, 0.18)
 
-## Краски занятой створки по тону: их две на все двери (створка и филёнки).
+## Occupied leaf paints by tone: there are two for all doors (leaf and panels).
 static var _occupied_paints: Dictionary = {}
 
-## Сколько Otto сидит внутри, с: 70 тиков ROM, считая от стука.
+## How long Otto stays inside, s: 70 ROM ticks, counting from the knock.
 @export var hide_time: float = Arcade.seconds(Arcade.ROOM_TICKS)
 
-## Сколько открывается створка перед гостем, с: 7 тиков ROM — столько Otto
-## идёт в дверь, прежде чем пропасть (@3BDA–3C25, ADR-0043, решение 4).
+## How long the leaf takes to open before a guest, s: 7 ROM ticks, as long as Otto
+## walks into the door before vanishing (@3BDA–3C25, ADR-0043, decision 4).
 @export var open_time: float = Arcade.seconds(7)
 
-## Сколько открывается створка перед агентом, с.
+## How long the leaf takes to open before an agent, s.
 ##
-## Дольше, чем перед Otto, и нарочно: игрок обязан успеть увидеть створку и уйти.
-## Сверкой не подтверждено — ADR-0020, решение 2. Число — в [constant
-## AGENT_OPEN_TIME]: по нему уровень заранее знает, когда звать дверь, чтобы
-## агент вышел к концу смены (ADR-0028, решение 7).
+## Longer than before Otto, on purpose: the player must manage to see the leaf and leave.
+## Not confirmed by the check: ADR-0020, decision 2. The number is in [constant
+## AGENT_OPEN_TIME]: by it the level knows in advance when to call the door so that
+## the agent comes out by the end of the shift (ADR-0028, decision 7).
 @export var agent_open_time: float = AGENT_OPEN_TIME
 
-## Красная дверь: за ней документ.
+## A red door: a document is behind it.
 @export var has_document: bool = false
 
-## Дверь особого этажа (ADR-0057, решение 3): за ней зал, а не комната — створка
-## открывается в зал, как у офиса, и комната в нём не появляется. Ставит уровень.
+## A special-floor door (ADR-0057, decision 3): behind it is a hall, not a room: the leaf
+## opens into the hall, as at the office, and no room appears in it. Set by the level.
 var opens_into_hall: bool = false
 
 var _visit := DoorVisit.new()
 var _cycle := DoorCycle.new()
 var _guest: Otto = null
-## Otto, который уже снаружи, но ещё выходит: створка закрывается за ним.
+## Otto, already outside but still coming out: the leaf closes behind him.
 var _stepping_out: Otto = null
-## Дверь открыта под агента: занята, пока он не выйдет.
+## The door is open for an agent: occupied until he comes out.
 var _expecting_agent: bool = false
 var _voice: AudioStreamPlayer3D = null
-## Что уже показано: ход створки и красная ли дверь. Дверей в здании полсотни,
-## и почти всё время все они стоят закрытыми — двигать их каждый кадр значит
-## трогать трансформ полсотни раз на ровном месте.
+## What is already shown: the leaf travel and whether the door is red. There are fifty
+## doors in a building, and almost all the time they all stand closed: moving them every
+## frame means touching the transform fifty times for nothing.
 var _shown: float = -1.0
 var _shown_red: bool = false
 var _shown_occupied: bool = false
 var _sign: MeshInstance3D = null
-## Бра красной двери; горит, пока за ней документ и этаж в кадре.
+## The red door's sconce; on while the document is behind it and the floor is in frame.
 var _red_light: SpotLight3D = null
-## Этаж двери в полосе горящих: за кадром бра не горит, как и лампы
-## ([method set_light_in_view]). Дверь вне уровня — в тестах — считается в кадре.
+## The door's floor is in the lit band: off-frame the sconce is off, like the lamps
+## ([method set_light_in_view]). A door outside a level (in tests) counts as in frame.
 var _in_view: bool = true
-## Жизнь за дверью квартиры; у остальных дверей — нет.
+## Life behind an apartment door; other doors do not have it.
 var _life: DoorLife = null
-## Своё табло на время, пока Otto внутри: общий материал огонька дышал бы у всех
-## красных дверей здания разом. И часы дыхания — по физике: на паузе оно стоит.
+## Its own board while Otto is inside: the shared indicator light material would breathe
+## at all red doors of the building at once. And the breathing clock follows physics: on
+## pause it stands still.
 var _pulse: StandardMaterial3D = null
 var _pulse_clock: float = 0.0
-## Филёнки створки: их тон идёт за створкой — красной или обычной.
+## Leaf panels: their tone follows the leaf, red or ordinary.
 var _panels: Array[MeshInstance3D] = []
-## Комната за дверью ([DoorRoom], ADR-0047): собирается, когда створка
-## трогается, и убирается, когда закрылась. Здание и жребий двери даёт уровень
-## ([method furnish]); без них — в тестах — за дверью по-прежнему темно.
+## The room behind the door ([DoorRoom], ADR-0047): it is built when the leaf
+## starts moving and removed when it has closed. The building and the door's draw come
+## from the level ([method furnish]); without them (in tests) it is still dark behind
+## the door.
 var _room: DoorRoom = null
 var _room_identity: BuildingIdentity = null
 var _room_seed: int = 0
@@ -179,8 +188,8 @@ var _furnished: bool = false
 var _room_unlit: bool = false
 var _room_time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT
 var _room_weather: Weather.Kind = Weather.Kind.CLEAR
-## Вид двери по типу здания (ADR-0048): филёнки и дерево у отеля, стекло и
-## алюминий у офиса. Без здания — отель, как до M24i.
+## Door look by building kind (ADR-0048): panels and wood at the hotel, glass and
+## aluminum at the office. Without a building, the hotel, as before M24i.
 var _style := BuildingStyle.new()
 
 @onready var _mat: Area3D = $Mat
@@ -188,7 +197,7 @@ var _style := BuildingStyle.new()
 @onready var _mat_visual: MeshInstance3D = $MatVisual
 
 
-## Коврик по [Proportions] — сразу после сборки сцены, как формы актёров.
+## A mat by [Proportions], right after the scene is assembled, like the actors' shapes.
 func _notification(what: int) -> void:
 	if what != NOTIFICATION_SCENE_INSTANTIATED:
 		return
@@ -227,7 +236,7 @@ func _physics_process(delta: float) -> void:
 	_listen(delta)
 
 	if _stepping_out != null:
-		# Выходит на камеру, пока створка закрывается.
+		# Comes out toward the camera while the leaf closes.
 		_stepping_out.ride_progress = _cycle.openness()
 		_see_out()
 		return
@@ -236,7 +245,7 @@ func _physics_process(delta: float) -> void:
 		_look_for_visitor()
 		return
 	if _guest.ride_look == Otto.LOOK_DOOR_IN:
-		# Уходит вглубь проёма, пока створка открывается.
+		# Goes into the depth of the opening while the leaf opens.
 		_guest.ride_progress = _cycle.openness()
 
 	match _visit.tick(delta, _cycle.is_open()):
@@ -249,31 +258,31 @@ func _physics_process(delta: float) -> void:
 			_release()
 
 
-## Осталась ли за дверью добыча: красная ли она ещё. Документ достаётся на
-## выходе (ADR-0038, решение 2), и до выхода дверь остаётся красной.
+## Whether loot is left behind the door: whether it is still red. The document is
+## obtained on exit (ADR-0038, decision 2), and until the exit the door stays red.
 func is_pending() -> bool:
 	return has_document
 
 
-## Точка, где Otto стоит перед дверью, в координатах правил: сюда он входит
-## и отсюда выходит.
+## The point where Otto stands in front of the door, in rules coordinates: he enters
+## here and comes out from here.
 func mat_position() -> Vector2:
 	return WorldSpace.to_plane(_mat.global_position)
 
 
-## Свободна ли дверь под агента: внутри никого, и створка стоит закрытой.
+## Whether the door is free for an agent: nobody inside, and the leaf stands closed.
 ##
-## Спрашивают до выбора двери, а не после: уровень выпускает одного за кадр и
-## берёт ближайшую дверь. Ближайшая, ещё закрывающаяся за прошлым агентом,
-## забирала бы этот кадр себе — и не выпускала никого, пока не дойдёт створка.
+## Asked before choosing a door, not after: the level releases one per frame and
+## takes the nearest door. The nearest one, still closing behind the previous agent,
+## would take this frame for itself and release nobody until the leaf finishes.
 func can_summon() -> bool:
 	return _guest == null and not _expecting_agent and _cycle.is_shut()
 
 
-## Просит дверь открыться, чтобы выпустить агента.
+## Asks the door to open to let an agent out.
 ##
-## Возвращает false, если дверь занята: внутри гость или створка ещё ходит после
-## прошлого. Уровень в этом случае просто попробует в следующий раз.
+## Returns false if the door is occupied: a guest is inside or the leaf is still moving
+## after the previous one. In this case the level will simply try next time.
 func summon_agent() -> bool:
 	if not can_summon():
 		return false
@@ -284,21 +293,21 @@ func summon_agent() -> bool:
 	return true
 
 
-## Ход створки, 0..1. По нему видно снаружи, открыта дверь или нет.
+## Leaf travel, 0..1. From outside it shows whether the door is open or not.
 func openness() -> float:
 	return _cycle.openness()
 
 
-## Открылась ли створка настолько, что агент может показаться в проёме.
+## Whether the leaf has opened enough for an agent to appear in the opening.
 func agent_may_step_out() -> bool:
 	return _expecting_agent and _cycle.is_open()
 
 
-## Агент вышел или дверь передумала: створка идёт обратно.
+## The agent came out or the door changed its mind: the leaf goes back.
 ##
-## Otto, вставший перед открывающейся дверью, её не останавливает — дверь не
-## передумывает (ADR-0020, решение 5). Зовут отсюда только уровень: либо агент
-## освободил проём, либо этаж ушёл из полосы выпуска.
+## Otto standing in front of an opening door does not stop it: the door does not
+## change its mind (ADR-0020, decision 5). Only the level calls this: either the agent
+## cleared the opening, or the floor left the release band.
 func dismiss_agent() -> void:
 	if not _expecting_agent:
 		return
@@ -309,15 +318,15 @@ func dismiss_agent() -> void:
 
 func _look_for_visitor() -> void:
 	if _expecting_agent:
-		# Дверь занята выходом агента, и Otto в неё не пускают. Дело не в
-		# вежливости: створку за агентом закрывает уровень ([method
-		# dismiss_agent]), а визит гостя идёт по створке — прячется он и выходит
-		# только в открытую, — и пущенный сюда Otto застрял бы в проёме.
+		# The door is occupied by an agent coming out, and Otto is not let in. It is not about
+		# politeness: the leaf behind the agent is closed by the level ([method
+		# dismiss_agent]), and the guest's visit follows the leaf (he hides and comes out
+		# only through an open one), so Otto let in here would get stuck in the opening.
 		return
 	if not has_document:
-		# Как в ROM (@3BDA): игрока пускает только красная дверь, пока документ
-		# не забран. Обычная — дверь агентов, и укрытием она не служит
-		# (ADR-0044, решение 3).
+		# As in the ROM (@3BDA): only a red door lets the player in while the document
+		# has not been taken. An ordinary one is an agent door, and it does not serve as cover
+		# (ADR-0044, decision 3).
 		return
 	for body: Node3D in _mat.get_overlapping_bodies():
 		var visitor := body as Otto
@@ -329,11 +338,11 @@ func _look_for_visitor() -> void:
 		return
 
 
-## Впускает Otto: створка открывается, и пока она идёт, он шагает в проём.
+## Lets Otto in: the leaf opens, and while it moves he steps into the opening.
 ##
-## Шаг в проём — поездка, как на эскалаторе: ввод снят и достать его нельзя уже
-## сейчас — в ROM он неуязвим от первого шага внутрь, — но он ещё на виду.
-## Прячется он, когда створка откроется ([method _hide_the_guest]).
+## The step into the opening is a ride, like on an escalator: input is off and he cannot
+## be hit already now (in the ROM he is invulnerable from the first step inside), but he
+## is still in view. He hides when the leaf opens ([method _hide_the_guest]).
 func _admit(visitor: Otto) -> void:
 	_guest = visitor
 	visitor.global_position = _mat.global_position
@@ -345,8 +354,8 @@ func _admit(visitor: Otto) -> void:
 	Sounds.play(Sounds.DOOR_OPEN)
 
 
-## Створка открылась: Otto внутри, и она закрывается за ним. Коридор отсюда
-## слышно глухо — и музыку, и шаги с выстрелами (ADR-0038, решение 2).
+## The leaf has opened: Otto is inside, and it closes behind him. From here the corridor
+## is heard muffled: both the music and the steps with shots (ADR-0038, decision 2).
 func _hide_the_guest() -> void:
 	_guest.ride(false)
 	_guest.stay_indoors(true)
@@ -356,12 +365,13 @@ func _hide_the_guest() -> void:
 	otto_hid.emit()
 
 
-## Выпускает Otto в открытую створку и закрывает её за ним. Документ достаётся
-## здесь, на выходе, как в ROM: пока Otto внутри, дверь ещё красная.
+## Lets Otto out through the open leaf and closes it behind him. The document is
+## obtained here, on exit, as in the ROM: while Otto is inside, the door is still red.
 ##
-## Выход кончается, когда створка закрылась: до тех пор Otto на виду, но ввод
-## снят и достать его нельзя — в ROM он неуязвим «до полного выхода». Без этого
-## агент, дождавшийся у двери, стрелял бы в того, кто ещё стоит в проёме.
+## The exit ends when the leaf has closed: until then Otto is in view, but input is
+## off and he cannot be hit: in the ROM he is invulnerable "until fully out". Without
+## this an agent who waited at the door would shoot at someone still standing in the
+## opening.
 func _release() -> void:
 	_guest.global_position = _mat.global_position
 	_guest.stay_indoors(false)
@@ -383,7 +393,7 @@ func _release() -> void:
 	document_taken.emit()
 
 
-## Створка закрылась за вышедшим: управление снова у игрока.
+## The leaf has closed behind the one who came out: control is back with the player.
 func _see_out() -> void:
 	if not _cycle.is_shut():
 		return
@@ -392,30 +402,30 @@ func _see_out() -> void:
 	_stepping_out = null
 
 
-## Глушит коридор за дверью или возвращает его: музыку и звуки мира разом.
+## Muffles the corridor behind the door or restores it: music and world sounds at once.
 func _muffle(on: bool) -> void:
 	Sounds.muffle_music(Sounds.MUFFLE_DOOR, on)
 	Sounds.muffle_world(on)
 
 
-## Здание выбросили, пока Otto за дверью, — новая партия с паузы, выход в меню.
-## Глухой звук снимает сама дверь: иначе это пришлось бы помнить каждому, кто
-## выбрасывает здание.
+## The building was thrown away while Otto is behind the door: a new game from the
+## pause, exit to the menu. The door itself removes the muffled sound: otherwise everyone
+## who throws a building away would have to remember it.
 func _exit_tree() -> void:
 	if _guest != null and _visit.is_hiding():
 		_muffle(false)
 
 
-## Ведёт створку по ходу [DoorCycle].
+## Drives the leaf by the [DoorCycle] travel.
 ##
-## Створка поворачивается на петлях у левого края внутрь комнаты — на четверть
-## оборота при полном ходе. До M18c она съезжала вбок по стене на всю свою
-## ширину, но при шаге места 1.8 м и створке 1.2 открытая дверь налезала бы на
-## соседнее место — на шахту или другую дверь. Повёрнутая, она не выходит за
-## свой проём: комната за стеной глубиной 7 м (ADR-0026, решение 3).
+## The leaf swings on hinges at its left edge into the room, a quarter turn at full
+## travel. Before M18c it slid sideways along the wall by its full width, but with a
+## 1.8 m spot step and a 1.2 m leaf an open door would overlap the neighboring spot, a
+## shaft or another door. Swung, it does not go beyond its opening: the room behind the
+## wall is 7 m deep (ADR-0026, decision 3).
 ##
-## Стоящая створка не трогается: зовут отсюда каждый кадр и из каждой двери
-## здания, а меняется положение только пока дверь ходит.
+## A standing leaf is not touched: this is called every frame and from every door of
+## the building, and the position changes only while the door moves.
 func _refresh_look() -> void:
 	var along := _cycle.openness()
 	var occupied := _occupied()
@@ -431,13 +441,13 @@ func _refresh_look() -> void:
 	_open_the_room(along)
 	var angle := along * PI * 0.5
 	var half := LEAF_SIZE.x * 0.5
-	# Поворот вокруг Y на +угол уводит правый край створки в −Z, то есть
-	# в комнату; середина ходит по дуге вокруг петли.
+	# Rotation around Y by +angle takes the leaf's right edge to −Z, that is,
+	# into the room; the middle moves along an arc around the hinge.
 	_leaf.rotation.y = angle
 	_leaf.position.x = -half + cos(angle) * half
 	_leaf.position.z = WorldSpace.BACK_WALL_Z + LEAF_STANDOFF - sin(angle) * half
 	var tone := GreyboxLook.DOOR_RED if has_document else _style.leaf_tone
-	# Занятая створка светится сама, неярко: маркер, а не краска.
+	# An occupied leaf glows by itself, dimly: a marker, not paint.
 	_leaf.material_override = _paint(tone, occupied)
 	var relief := _paint(tone.darkened(0.14), occupied)
 	for panel in _panels:
@@ -448,12 +458,13 @@ func _refresh_look() -> void:
 	_pulse_clock = 0.0
 
 
-## Какая комната за дверью: здание [param identity] и жребий двери
-## [param seed]. [param span] — этаж от наружной стены до наружной по X от
-## середины двери: комната не выходит за него ([method DoorRoom.build]).
+## Which room is behind the door: building [param identity] and the door's draw
+## [param seed]. [param span] is the floor from outer wall to outer wall along X from
+## the door's middle: the room does not go beyond it ([method DoorRoom.build]).
 ##
-## [param unlit] — этаж двери тёмный: комната за ней без своего света.
-## [param time] и [param weather] — что за окном комнаты (ADR-0052, решение 5).
+## [param unlit]: the door's floor is dark, and the room behind it has no light of its
+## own. [param time] and [param weather] are what is outside the room window (ADR-0052,
+## decision 5).
 func furnish(
 	identity: BuildingIdentity,
 	seed: int,
@@ -473,7 +484,7 @@ func furnish(
 		_life = DoorLife.of(hash([seed, LIFE_SALT]))
 
 
-## Жизнь за закрытой дверью квартиры: изредка глухой звук ([DoorLife]).
+## Life behind a closed apartment door: an occasional muffled sound ([DoorLife]).
 func _listen(delta: float) -> void:
 	if _life == null:
 		return
@@ -483,17 +494,17 @@ func _listen(delta: float) -> void:
 		Sounds.play_at(self, heard, global_position + LIFE_AT, LIFE_REACH, LIFE_DB)
 
 
-## Комната за дверью, пока створка открыта; иначе null.
+## The room behind the door while the leaf is open; otherwise null.
 func room() -> DoorRoom:
 	return _room
 
 
-## Собирает комнату, когда створка тронулась, и убирает, когда закрылась.
+## Builds the room when the leaf starts moving and removes it when it has closed.
 func _open_the_room(along: float) -> void:
 	if not _furnished:
 		return
-	# Дверь офиса открывается в зал за стеклом ([OpenSpace], ADR-0056):
-	# отдельной комнаты у неё нет.
+	# An office door opens into the hall behind the glass ([OpenSpace], ADR-0056):
+	# it has no separate room.
 	if along > 0.0 and _room == null and not _style.glass_wall and not opens_into_hall:
 		var kind := BuildingIdentity.Kind.HOTEL if _room_identity == null else _room_identity.kind
 		_room = DoorRoom.build(
@@ -505,15 +516,15 @@ func _open_the_room(along: float) -> void:
 		_room = null
 
 
-## Этаж двери попал в полосу горящих или ушёл из неё. Зовёт уровень, отбирая
-## видимые этажи, как у ламп (ADR-0010, пункт 8).
+## The door's floor has entered or left the lit band. Called by the level as it selects
+## the visible floors, as for lamps (ADR-0010, item 8).
 func set_light_in_view(on: bool) -> void:
 	_in_view = on
 	if _red_light != null:
 		_red_light.visible = has_document and on
 
 
-## Горит ли бра красной двери. Тестам.
+## Whether the red door's sconce is on. For tests.
 func is_red_light_on() -> bool:
 	return _red_light != null and _red_light.visible
 
@@ -528,13 +539,13 @@ func _make_red_light() -> SpotLight3D:
 	light.shadow_enabled = false
 	light.light_volumetric_fog_energy = 0.5
 	light.position = Vector3(0.0, LEAF_SIZE.y + SIGN_RISE, WorldSpace.BACK_WALL_Z + RED_LIGHT_OUT)
-	# Свет у Godot идёт вдоль −Z узла: отвес вниз и наклон к стене.
+	# In Godot a light points along the node's −Z: plumb down and tilted toward the wall.
 	light.rotation.x = -PI * 0.5 + RED_LIGHT_TILT
 	light.visible = false
 	return light
 
 
-## Краска створки: занятая светится сама, неярко, — красной остаётся и в тени.
+## Leaf paint: an occupied one glows by itself, dimly, staying red even in the shadow.
 static func _paint(tone: Color, occupied: bool) -> StandardMaterial3D:
 	var plain := GreyboxLook.surface(tone)
 	if not occupied:
@@ -550,12 +561,12 @@ static func _paint(tone: Color, occupied: bool) -> StandardMaterial3D:
 	return glowing
 
 
-## Otto за этой дверью: вошёл и ещё не вышел.
+## Otto is behind this door: he went in and has not come out yet.
 func _occupied() -> bool:
 	return _guest != null and _visit.is_hiding()
 
 
-## Табло над занятой дверью медленно дышит, пока Otto внутри.
+## The board above an occupied door slowly breathes while Otto is inside.
 func _breathe(delta: float) -> void:
 	if not _shown_occupied:
 		return
@@ -567,10 +578,10 @@ func _breathe(delta: float) -> void:
 	_sign.material_override = _pulse
 
 
-## Детали створки: у отеля — две филёнки, у офиса — матовое стекло в верхней
-## трети; ручка с розеткой у свободного края и отбойная пластина внизу. Дети
-## створки — поворачиваются вместе с ней. У части номеров отеля — табличка «Не
-## беспокоить» на ручке и газета или поднос у порога (ADR-0048).
+## Leaf details: the hotel has two panels, the office frosted glass in the upper
+## third; a handle with a rose at the free edge and a kick plate at the bottom. They are
+## children of the leaf and swing together with it. Some hotel rooms have a "Do not
+## disturb" sign on the handle and a newspaper or a tray at the threshold (ADR-0048).
 func _dress_leaf() -> void:
 	var front := LEAF_THICKNESS * 0.5
 	var bottom := -LEAF_SIZE.y * 0.5
@@ -607,8 +618,8 @@ func _dress_leaf() -> void:
 	_little_things(lever)
 
 
-## Матовое стекло в створке офиса: светлая полоса в верхней трети, чуть
-## светится — за ней кабинет.
+## Frosted glass in the office leaf: a light band in the upper third, slightly
+## glowing: an office room is behind it.
 func _vision_glass(front: float, bottom: float) -> MeshInstance3D:
 	var frosted := StandardMaterial3D.new()
 	frosted.albedo_color = FROSTED
@@ -622,9 +633,9 @@ func _vision_glass(front: float, bottom: float) -> MeshInstance3D:
 	return glass
 
 
-## Мелочи у двери жребием двери: у номера отеля — табличка на ручке и газета
-## или поднос у порога, у квартиры — коврик и пакет с покупками (ADR-0055).
-## У красной двери и в офисе их нет.
+## Small items at the door by the door's draw: a hotel room gets a sign on the handle and
+## a newspaper or a tray at the threshold, an apartment a mat and a grocery bag
+## (ADR-0055). A red door and the office have none.
 func _little_things(lever: MeshInstance3D) -> void:
 	if not _furnished or has_document:
 		return
@@ -649,7 +660,7 @@ func _little_things(lever: MeshInstance3D) -> void:
 		add_child(bag)
 
 
-## Поднос с посудой после ужина в номере.
+## A tray with dishes after dinner in the room.
 func _tray() -> Node3D:
 	var tray := Node3D.new()
 	tray.name = "Tray"
@@ -669,7 +680,7 @@ func _tray() -> Node3D:
 	return tray
 
 
-## Газета у порога.
+## A newspaper at the threshold.
 func _newspaper() -> Node3D:
 	var paper := GreyboxLook.box(
 		Vector3(0.36, 0.025, 0.26), GreyboxLook.surface(Color(0.82, 0.8, 0.74))
@@ -682,8 +693,8 @@ func _newspaper() -> Node3D:
 	return holder
 
 
-## Коврик у порога квартиры: тёмная кайма, середина своего цвета жребием.
-## Лежит перед проёмом, а не в нём: створка ходит над ним.
+## A mat at the apartment threshold: a dark border, the middle in a color by draw.
+## It lies in front of the opening, not in it: the leaf moves above it.
 func _doormat(rng: RandomNumberGenerator) -> Node3D:
 	var mat := Node3D.new()
 	mat.name = "Doormat"
@@ -700,7 +711,7 @@ func _doormat(rng: RandomNumberGenerator) -> Node3D:
 	return mat
 
 
-## Бумажный пакет с покупками у двери: сверху торчат батон и зелень.
+## A paper grocery bag at the door: a loaf and greens stick out of the top.
 func _grocery_bag() -> Node3D:
 	var bag := Node3D.new()
 	bag.name = "GroceryBag"
@@ -717,7 +728,7 @@ func _grocery_bag() -> Node3D:
 	return bag
 
 
-## Наличник вокруг проёма на задней стене: стойки и перемычка.
+## A casing around the opening on the back wall: jambs and a lintel.
 func _frame_the_opening() -> void:
 	var trim := GreyboxLook.metal(GreyboxLook.TRIM.darkened(0.35))
 	if _furnished:
@@ -739,11 +750,11 @@ func _frame_the_opening() -> void:
 	add_child(head)
 
 
-## Подаёт голос двери. Источник позиционный и один на дверь: поток подменяется,
-## потому что открыться и закрыться разом она всё равно не может.
+## Gives the door a voice. The source is positional and one per door: the stream is
+## swapped, because the door cannot open and close at once anyway.
 ##
-## Звук зовётся [param effect], а не `name`: у [Node] поле с таким именем своё,
-## и параметр его заслонял бы.
+## The sound is called [param effect], not `name`: [Node] has its own field with that
+## name, and the parameter would shadow it.
 func _say(effect: String) -> void:
 	if _voice == null:
 		_voice = Sounds.source(self, effect, DOOR_REACH)

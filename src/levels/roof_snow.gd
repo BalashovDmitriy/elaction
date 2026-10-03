@@ -1,38 +1,38 @@
 class_name RoofSnow
 extends Node3D
 
-## Снег над крышей (ADR-0054, решения 2 и 5): хлопья идут со сносом ветра и
-## гаснут о крышу — по той же карте высот, что и дождь ([RoofCatch]), — а
-## покров уже лежит на всём, что смотрит вверх: настиле, ступенях, отливах
-## парапетов, машинном отделении и технике. Покров не растёт: снег лёг до
-## того, как Otto спустился, и за здание его не прибавится.
+## Snow over the roof (ADR-0054, decisions 2 and 5): flakes fall with wind drift and die
+## on the roof — by the same heightmap as rain ([RoofCatch]) — and the snow cover
+## already lies on everything facing up: the deck, steps, parapet flashing, machine
+## room and equipment. The cover does not grow: the snow fell before Otto came down, and
+## no more is added during the building.
 ##
-## Перед этажами снега нет, как и дождя ([RoofRain]): здание в разрезе, и
-## хлопья перед этажом читались бы снегом в комнате.
+## There is no snow in front of the floors, just like rain ([RoofRain]): the building is
+## in cutaway, and flakes in front of a floor would read as snow in a room.
 ##
-## Покров — наклейка сверху на слой крыши [constant RoofCatch.LAYER]: она
-## ложится только на грани, которые смотрят вверх, и только на неподвижное —
-## Otto, агенты и вертолёт на слое не числятся и остаются без снега.
+## The cover is a decal from above on the roof layer [constant RoofCatch.LAYER]: it lies
+## only on faces that look up, and only on static things — Otto, agents and the
+## helicopter are not on the layer and stay without snow.
 
-## Хлопьев на «высоком» ([method Graphics.rain_share]) — на жизнь по одной
-## скорости падения [code]FALL.x[/code], — высота неба над настилом, скорость
-## падения, м/с, ветер вбок, м/с, размер хлопка.
+## Flakes on "High" ([method Graphics.rain_share]) — for a lifetime at a single fall
+## speed [code]FALL.x[/code] — sky height above the deck, fall speed, m/s, sideways wind,
+## m/s, flake size.
 const FLAKES: int = 1400
 const HEIGHT: float = 8.0
 const FALL := Vector2(1.1, 1.9)
 const WIND: float = 0.7
 const FLAKE: float = 0.11
 
-## Где по глубине идёт снег — там же, где дождь.
+## Where in depth the snow falls — the same place as the rain.
 const BACK_Z: float = RoofRain.BACK_Z
 const FRONT_Z: float = RoofRain.FRONT_Z
 
-## Шаг частиц: хлопок медленный, хватает шестидесяти в секунду.
+## Particle step: a flake is slow, sixty per second is enough.
 const TICKS: int = 60
 
-## Покров: на сколько он поднимается над настилом, м, — выше машинного
-## отделения и техники; цвет снега и плотных мест, проплешин; с какого наклона
-## грань уже без снега (доля [member Decal.normal_fade]).
+## Cover: how far it rises above the deck, m — higher than the machine room and
+## equipment; colour of the snow and of dense spots, bald patches; from what slope a face
+## is already without snow (share of [member Decal.normal_fade]).
 const COVER_HEIGHT: float = 7.5
 const COVER := Color(0.88, 0.9, 0.95, 1.0)
 const COVER_THIN := Color(0.8, 0.83, 0.88, 0.55)
@@ -45,7 +45,7 @@ var _tracks: SnowTracks = null
 var _box := AABB()
 
 
-## Собирает снег над крышей здания по правилам и плану во время суток
+## Builds the snow over the building's roof by the rules and plan at time of day
 ## [param time].
 func build(rules: BuildingRules, plan: BuildingPlan, time: TimeOfDay.Kind) -> void:
 	var deck := WorldSpace.height_to_scene(rules.floor_surface(BuildingRules.ROOF))
@@ -59,58 +59,58 @@ func build(rules: BuildingRules, plan: BuildingPlan, time: TimeOfDay.Kind) -> vo
 	_tracks = SnowTracks.new()
 	add_child(_tracks)
 	var bounds := rules.floor_span(BuildingRules.ROOF)
-	# Над проёмами шахт под ногами кабина — металл, а не снег.
+	# Over shaft openings the cab is underfoot — metal, not snow.
 	_tracks.watch(deck, bounds.x, bounds.y, plan.gaps_on(rules, BuildingRules.ROOF))
 	add_to_group(Graphics.GROUP)
 	apply_graphics()
 
 
-## Переводит на слой крыши неподвижное на крыше под [param roots]: по нему
-## снимается карта высот, на него ложится покров.
+## Moves the static things on the roof under [param roots] to the roof layer: the
+## heightmap is captured from it, the cover lies on it.
 func catch_on(roots: Array[Node]) -> void:
 	RoofCatch.mark(roots, _box)
 
 
-## Сколько хлопьев по уровню качества — та же доля, что у капель.
+## How many flakes by quality level — the same share as for drops.
 func apply_graphics() -> void:
 	RainLook.scale_amount(_flakes, Graphics.rain_share())
 
 
-## Хлопья, которые гаснут о крышу, — для теста.
+## Flakes that die on the roof — for the test.
 func flakes() -> GPUParticles3D:
 	return _flakes
 
 
-## Карта высот снега — для теста.
+## The snow heightmap — for the test.
 func catcher() -> GPUParticlesCollisionHeightField3D:
 	return _catcher
 
 
-## Покров — для теста.
+## The cover — for the test.
 func cover() -> Decal:
 	return _cover
 
 
-## Следы на настиле — для теста.
+## Footprints on the deck — for the test.
 func tracks() -> SnowTracks:
 	return _tracks
 
 
-## Хлопья сыплются над настилом со сдвигом против ветра: снесённые, они ложатся
-## на крышу, а не уходят за парапет вниз по фасаду. Сдвиг — на меньший снос с
-## левого края и на больший с правого ([method SnowLook.slant]): иначе у левого
-## парапета до настила не долетал ни один хлопок, а у правого часть уходила
-## за отлив (авторевью M24l).
+## Flakes fall over the deck shifted against the wind: drifted, they land on the roof
+## rather than going past the parapet down the facade. The shift is by a smaller drift
+## from the left edge and a larger one from the right ([method SnowLook.slant]):
+## otherwise at the left parapet not a single flake reached the deck, and at the right
+## one some went past the flashing (code review M24l).
 func _snow(rules: BuildingRules, deck: float, time: TimeOfDay.Kind) -> void:
 	var bounds := rules.floor_span(BuildingRules.ROOF)
 	var fall := HEIGHT + 0.3
 	var slant := SnowLook.slant(FALL, WIND)
-	# Вынос карниза — своего здания (ADR-0058), как у дождя ([RoofRain]).
+	# Cornice overhang of its own building (ADR-0058), as for rain ([RoofRain]).
 	var overhang := BuildingShell.coping_overhang(rules.kind)
 	var from := bounds.x - overhang - fall * slant.x
 	var to := bounds.y + overhang - fall * slant.y
-	# Жизнь — до настила и самому косому хлопку; хлопьев — на тот же поток, что
-	# при жизни по одной скорости падения: дольше живущий дольше лежит погасшим.
+	# Lifetime — down to the deck even for the most slanted flake; the flake count is for
+	# the same flow as with a lifetime at one fall speed: one living longer lies dead longer.
 	var slowest := SnowLook.slowest_fall(FALL, WIND)
 	_flakes = SnowLook.flakes(
 		roundi(FLAKES * FALL.x / slowest),
@@ -134,8 +134,8 @@ func _snow(rules: BuildingRules, deck: float, time: TimeOfDay.Kind) -> void:
 	add_child(_flakes)
 
 
-## Покров: наклейка сверху на всю крышу с отливами и техникой. Плотнее в
-## середине, с проплешинами по шуму — ровный белый лист читался бы краской.
+## Cover: a decal from above over the whole roof with flashing and equipment. Denser in
+## the middle, with bald patches by noise — an even white sheet would read as paint.
 func _lay(rules: BuildingRules, deck: float) -> void:
 	var bounds := rules.floor_span(BuildingRules.ROOF)
 	var edge := BuildingShell.COPING_OVERHANG + 0.1

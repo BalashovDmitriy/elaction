@@ -1,61 +1,63 @@
 class_name FloorHall
 extends Node3D
 
-## Залы особых этажей за плоскостью игры (ADR-0057, решения 2–5).
+## Halls of special floors behind the play plane (ADR-0057, decisions 2–5).
 ##
-## На особом этаже вместо задней стены коридора — колонны, стекло или сетка, и
-## за ними зал на всю глубину плиты: лобби, ресторан, бассейн, котельная,
-## серверная. Роль этажа — по устройству ROM ([FloorRole]); здесь только вид.
-## Тел нет, теней нет: примитивы и мебель паков собраны мультимешами
-## ([MeshBatch]) — деталей сотни на этаж, вызовов отрисовки десятки на здание.
+## On a special floor, instead of the corridor's back wall there are columns, glass or
+## mesh, and behind them a hall through the full depth of the slab: lobby, restaurant,
+## pool, boiler room, server room. The floor's role follows the ROM's structure
+## ([FloorRole]); here only the look. No bodies, no shadows: primitives and pack
+## furniture are assembled into multimeshes ([MeshBatch]) — hundreds of details per
+## floor, tens of draw calls per building.
 ##
-## Дверь особого этажа открывается в сам зал ([member Door.opens_into_hall]):
-## комнаты за ней нет, и перед дверью свободна только полоса створки.
+## A special floor's door opens into the hall itself ([member Door.opens_into_hall]):
+## there is no room behind it, and in front of the door only the leaf's strip is free.
 ##
-## Ночью на тёмных этажах ROM всё, что светится само, погашено: экраны,
-## индикаторы, бутылки бара, окно топки. Пар над котлом живёт и в темноте.
+## At night on the ROM's dark floors everything that glows by itself is off: screens,
+## indicators, bar bottles, the furnace window. The steam over the boiler lives on in
+## the dark too.
 ##
-## Координаты: x — вдоль этажа, высота — над полом, глубина d — от задней стены
-## коридора в зал (0 … [constant WorldSpace.ROOM_DEPTH]).
+## Coordinates: x — along the floor, height — above the floor, depth d — from the
+## corridor's back wall into the hall (0 … [constant WorldSpace.ROOM_DEPTH]).
 
-## Стойки сетки-рабицы и их шаг, м: сетку ставит [BuildingShell].
+## Chain-link mesh posts and their step, m: the mesh is placed by [BuildingShell].
 const MESH_POST := Color(0.34, 0.35, 0.36)
 const MESH_POST_STEP: float = 1.5
 
-## Глубина зала, м: до дальней стены, с зазором.
+## Hall depth, m: up to the far wall, with a gap.
 const DEPTH: float = WorldSpace.ROOM_DEPTH - 0.15
-## Ближе этого к краю пролёта зал ничего не ставит, м.
+## The hall places nothing closer than this to the span's edge, m.
 const EDGE: float = 0.5
-## Короче этого стойку регистрации и бара зал не ставит, м: на коротком
-## пролёте между шахтами она не помещается.
+## The hall places no reception or bar counter shorter than this, m: it does not fit on
+## a short span between shafts.
 const MIN_COUNTER: float = 1.0
-## Полоса створки офисной двери, м: глубже стоять можно.
+## Leaf strip of an office door, m: one may stand deeper.
 const LEAF_CLEAR: float = DoorRoom.LEAF_CLEAR
 
-## Свет зала: точечные источники без теней через [constant LIGHT_STEP] м на
-## середине глубины. Лампы коридора светят вниз, конусом, и в глубину зала не
-## достают; без своего света зал читался бы чёрной дырой. Горят, как лампы,
-## только на этажах в кадре ([method light_span]).
+## Hall light: shadowless point lights every [constant LIGHT_STEP] m at mid-depth.
+## Corridor lamps shine down, as a cone, and do not reach deep into the hall; without
+## its own light the hall would read as a black hole. Like the lamps, they burn only
+## on floors in the frame ([method light_span]).
 const LIGHT_STEP: float = 5.0
 const LIGHT_HEIGHT: float = 2.4
 const LIGHT_RANGE: float = 5.5
 const LIGHT_ENERGY: float = 1.3
-## Чаша бассейна: середина по глубине и ширина, м. Ближний край — за комнатой
-## двери, дальний — перед лентой окон.
+## Pool basin: middle depth-wise and width, m. The near edge is behind the door room,
+## the far one — in front of the window strip.
 const POOL_DEPTH: float = 5.15
 const POOL_WIDTH: float = 2.6
-## Труба котла начинается над ним, м; пар идёт с его верха и тает под
-## потолком.
+## The boiler's flue starts above it, m; steam rises from its top and melts under the
+## ceiling.
 const CHIMNEY_FROM: float = 2.0
 const STEAM_FROM: float = 2.15
 
-## Свой оттенок у зала, где свет особый: вода, серверы, топка, неон бара.
+## Its own tint for a hall where the light is special: water, servers, furnace, bar neon.
 const POOL_LIGHT := Color(0.55, 0.85, 1.0)
 const SERVER_LIGHT := Color(0.6, 0.75, 1.0)
 const BOILER_LIGHT := Color(1.0, 0.6, 0.35)
 const BAR_LIGHT := Color(1.0, 0.55, 0.6)
 
-## Пол зала по роли: мрамор, паркет, плитка, резина, бетон.
+## Hall floor by role: marble, parquet, tile, rubber, concrete.
 const MARBLE := Color(0.78, 0.74, 0.66)
 const DARK_STONE := Color(0.16, 0.17, 0.19)
 const TERRAZZO := Color(0.55, 0.53, 0.48)
@@ -69,7 +71,7 @@ const CARPET_HALL := Color(0.3, 0.12, 0.14)
 const OFFICE_CARPET := Color(0.22, 0.25, 0.3)
 const DINER_TILE := Color(0.62, 0.6, 0.55)
 
-## Цвета деталей залов.
+## Colours of hall details.
 const WOOD := Color(0.3, 0.17, 0.1)
 const BRASS := Color(0.74, 0.56, 0.28)
 const STEEL := Color(0.6, 0.62, 0.64)
@@ -94,19 +96,19 @@ const BOTTLES: Array[Color] = [
 var _rules: BuildingRules = null
 var _plan: BuildingPlan = null
 var _batch := MeshBatch.new()
-## Этаж, который сейчас собирается.
+## The floor being built now.
 var _index: int = 0
 var _surface: float = 0.0
 var _lit: bool = true
 var _doors: Array[float] = []
 var _steam: Array[Vector3] = []
-## Свет залов по этажу: [method light_span] гасит невидимые.
+## Hall lights by floor: [method light_span] puts out the invisible ones.
 var _lights: Dictionary = {}
-## Места всех деталей залов ([method placements]).
+## Placements of all hall details ([method placements]).
 var _placed: Array[Transform3D] = []
 
 
-## Собирает залы всех особых этажей здания.
+## Builds the halls of all of the building's special floors.
 func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 	name = "FloorHall"
 	_rules = rules
@@ -121,8 +123,8 @@ func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 		add_child(HallLook.steam_plume(at))
 
 
-## Зажигает свет залов на видимых этажах и гасит остальные — тем же
-## правилом, что лампы и столбы шахт (ADR-0010, пункт 8).
+## Turns on hall lights on visible floors and puts out the rest — by the same rule as
+## lamps and shaft pillars (ADR-0010, point 8).
 func light_span(span: Vector2i, strip: Vector2 = Vector2(-INF, INF)) -> void:
 	for index: int in _lights:
 		var lit := VisibleFloors.covers(span, index)
@@ -130,7 +132,7 @@ func light_span(span: Vector2i, strip: Vector2 = Vector2(-INF, INF)) -> void:
 			light.visible = lit and VisibleFloors.in_band(strip, light.global_position.x)
 
 
-## Источники света залов: тестам.
+## Hall light sources: for tests.
 func lights() -> Array[OmniLight3D]:
 	var all: Array[OmniLight3D] = []
 	for index: int in _lights:
@@ -138,13 +140,13 @@ func lights() -> Array[OmniLight3D]:
 	return all
 
 
-## Места всех деталей залов в сцене: тестам. Мультимеш под headless-движком
-## мест не хранит ([method MeshBatch.places]).
+## Placements of all hall details in the scene: for tests. A multimesh under the
+## headless engine stores no placements ([method MeshBatch.places]).
 func placements() -> Array[Transform3D]:
 	return _placed
 
 
-## Сколько деталей в залах: тестам.
+## How many details there are in the halls: for tests.
 func parts() -> int:
 	var total := 0
 	for child: Node in get_children():
@@ -172,7 +174,7 @@ func _floor(index: int, role: FloorRole.Role) -> void:
 			_light(index, role, span)
 
 
-## Свет зала на пролёте [param span]: оттенок ламп типа или свой у зала.
+## Hall light on span [param span]: the kind's lamp tint or the hall's own.
 func _light(index: int, role: FloorRole.Role, span: Vector2) -> void:
 	var colour: Color = BuildingAir.LAMP_LIGHT[_rules.kind]
 	match role:
@@ -241,12 +243,12 @@ func _lay(role: FloorRole.Role, span: Vector2) -> void:
 			_workshop(span)
 
 
-# --- Общественные залы ------------------------------------------------------
+# --- Public halls -----------------------------------------------------------
 
 
-## Лобби: у отеля — мрамор, стойка регистрации с ключами за ней и диваны; у
-## офиса — тёмный камень, пост охраны с мониторами и турникеты; у жилого дома —
-## терраццо, почтовые ящики, стол швейцара и скамья.
+## Lobby: for a hotel — marble, a reception counter with keys behind it, and sofas; for
+## an office — dark stone, a security desk with monitors, and turnstiles; for a
+## residential building — terrazzo, mailboxes, a doorman's desk and a bench.
 func _lobby(span: Vector2) -> void:
 	match _rules.kind:
 		BuildingIdentity.Kind.OFFICE:
@@ -279,8 +281,8 @@ func _lobby(span: Vector2) -> void:
 			_floor_cover(span, GreyboxLook.polished(MARBLE))
 			_far_wall(span, GreyboxLook.surface(Color(0.36, 0.22, 0.14)))
 			var middle := (span.x + span.y) * 0.5
-			# Стойка — на пролёт с запасом в метр по краям: на коротком пролёте
-			# ширина выходила отрицательной, и коробка выворачивалась наизнанку.
+			# The counter spans the span with a metre's margin at the edges: on a short span
+			# the width came out negative, and the box turned inside out.
 			var counter := minf(span.y - span.x - 2.0, 6.0)
 			if counter >= MIN_COUNTER:
 				_on(GreyboxLook.surface(WOOD), Vector3(counter, 1.1, 0.7), middle, 0.0, 4.6)
@@ -296,8 +298,8 @@ func _lobby(span: Vector2) -> void:
 				_prop("houseplant_c", x, 5.5)
 
 
-## Ресторан отеля — столы со скатертями и свечами, окна на город; столовая
-## офиса — длинные столы, линия раздачи у дальней стены.
+## Hotel restaurant — tables with tablecloths and candles, windows onto the city; office
+## canteen — long tables, a serving line at the far wall.
 func _dining(span: Vector2) -> void:
 	if _rules.kind == BuildingIdentity.Kind.OFFICE:
 		_floor_cover(span, GreyboxLook.polished(DINER_TILE))
@@ -325,8 +327,8 @@ func _dining(span: Vector2) -> void:
 			_glow(CANDLE, 0.05, Vector3(x, 0.82, row))
 
 
-## Бальный зал: паркет, сцена с роялем и колонками у дальней стены, круглые
-## столы по краям танцпола и зеркальный шар.
+## Ballroom: parquet, a stage with a grand piano and speakers at the far wall, round
+## tables around the dance floor and a mirror ball.
 func _ballroom(span: Vector2) -> void:
 	_floor_cover(span, GreyboxLook.polished(PARQUET))
 	_far_wall(span, GreyboxLook.surface(Color(0.32, 0.08, 0.1)))
@@ -347,15 +349,15 @@ func _ballroom(span: Vector2) -> void:
 				_prop("dining_chair", x + 0.7, row, -90.0)
 
 
-## Бассейн: светлая плитка, чаша с водой в ряби, бортик, лесенки, шезлонги у
-## края и окна на город.
+## Pool: light tile, a basin of rippling water, a coping, ladders, loungers at the edge
+## and windows onto the city.
 func _pool(span: Vector2) -> void:
 	_floor_cover(span, GreyboxLook.polished(POOL_TILE))
 	_windows(span)
 	var length := span.y - span.x - 1.0
 	var middle := _mid(span)
-	# Чаша — за комнатами дверей ([constant DoorRoom.DEPTH]): во весь пролёт
-	# она проходила бы сквозь пол открытой комнаты.
+	# The basin is behind the door rooms ([constant DoorRoom.DEPTH]): across the whole
+	# span it would pass through the floor of an open room.
 	var near := POOL_DEPTH - POOL_WIDTH * 0.5
 	var water := HallLook.water()
 	_batch.box(
@@ -386,8 +388,8 @@ func _pool(span: Vector2) -> void:
 	_glow(Color(1.0, 0.4, 0.2), 0.3, Vector3(span.x + 0.4, 1.4, 6.6))
 
 
-## Бар скай-лобби: стойка с табуретами, за ней полки светящихся бутылок, неон
-## и диваны у колонн.
+## Sky lobby bar: a counter with stools, shelves of glowing bottles behind it, neon and
+## sofas by the columns.
 func _bar(span: Vector2) -> void:
 	_floor_cover(span, GreyboxLook.polished(Color(0.14, 0.08, 0.05)))
 	_far_wall(span, GreyboxLook.surface(Color(0.12, 0.08, 0.07)))
@@ -396,8 +398,8 @@ func _bar(span: Vector2) -> void:
 		if _free(x, 1.0, 1.6):
 			_prop("lounge_armchair", x, 1.6)
 	var unit_width := _width_of("bar_counter", 0.0)
-	# Не меньше трёх секций, но не шире пролёта: на коротком пролёте три
-	# секции вылезали за край — за шахту, в соседний зал.
+	# At least three sections, but not wider than the span: on a short span three
+	# sections stuck out past the edge — past the shaft, into the neighbouring hall.
 	var units := mini(
 		clampi(int((span.y - span.x - 2.0) / unit_width), 3, 10),
 		int((span.y - span.x) / unit_width)
@@ -419,7 +421,7 @@ func _bar(span: Vector2) -> void:
 		)
 
 
-## Конференц-зал: ряды кресел спинкой к камере, трибуна и экран у дальней стены.
+## Conference hall: rows of chairs with backs to the camera, a podium and a screen at the far wall.
 func _conference(span: Vector2) -> void:
 	var office := _rules.kind == BuildingIdentity.Kind.OFFICE
 	_floor_cover(span, GreyboxLook.surface(OFFICE_CARPET if office else CARPET_HALL))
@@ -435,8 +437,7 @@ func _conference(span: Vector2) -> void:
 				_prop("dining_chair" if not office else "desk_chair", x, row, 180.0)
 
 
-## Переговорные офиса: стеклянные коробки с длинным столом, креслами и
-## телевизором на стене.
+## Office meeting rooms: glass boxes with a long table, chairs and a TV on the wall.
 func _meeting(span: Vector2) -> void:
 	_floor_cover(span, GreyboxLook.surface(OFFICE_CARPET))
 	_windows(span)
@@ -456,8 +457,8 @@ func _meeting(span: Vector2) -> void:
 		_prop("tv_modern", x, 6.2)
 
 
-## Спортзал: резиновый пол, беговые дорожки, скамьи для жима со штангой,
-## стойка гантелей и зеркало во всю дальнюю стену.
+## Gym: rubber floor, treadmills, bench presses with barbells, a dumbbell rack and a
+## mirror across the whole far wall.
 func _gym(span: Vector2) -> void:
 	_floor_cover(span, GreyboxLook.surface(RUBBER))
 	_far_wall(span, GreyboxLook.metal(Color(0.24, 0.27, 0.29)))
@@ -482,8 +483,7 @@ func _gym(span: Vector2) -> void:
 	_on(steel, Vector3(span.y - span.x - 1.0, 0.05, 0.4), _mid(span), 0.8, DEPTH - 0.3)
 
 
-## Общая комната жилого дома: раскладные столы со стульями, пинг-понг,
-## телевизор и диван.
+## Residential common room: folding tables with chairs, ping-pong, a TV and a sofa.
 func _community(span: Vector2) -> void:
 	_floor_cover(span, GreyboxLook.surface(LINOLEUM))
 	_far_wall(span, GreyboxLook.surface(Color(0.55, 0.5, 0.38)))
@@ -504,8 +504,8 @@ func _community(span: Vector2) -> void:
 	_prop("couch_medium", span.x + 1.0, 5.2, 180.0)
 
 
-## Кладовые-клетки: ряды отсеков из сетки на стойках, в каждом коробки,
-## велосипед или старое кресло.
+## Storage cages: rows of mesh compartments on posts, each with boxes, a bicycle or an
+## old armchair.
 func _lockers(span: Vector2) -> void:
 	_floor_cover(span, GreyboxLook.surface(CONCRETE))
 	var net := HallLook.chain_link()
@@ -531,8 +531,7 @@ func _lockers(span: Vector2) -> void:
 				_prop("box_closed", x + 0.3, row + 0.2)
 
 
-## Прачечная: ряд стиральных и сушильных машин у дальней стены, стол для
-## белья и тележки.
+## Laundry: a row of washers and dryers at the far wall, a folding table and carts.
 func _laundry(span: Vector2) -> void:
 	_floor_cover(span, GreyboxLook.polished(DINER_TILE.darkened(0.2)))
 	_far_wall(span, GreyboxLook.surface(Color(0.62, 0.64, 0.6)))
@@ -551,11 +550,11 @@ func _laundry(span: Vector2) -> void:
 		_on(GreyboxLook.surface(LINEN), Vector3(0.7, 0.15, 0.45), x + 1.3, 0.75, 2.3)
 
 
-# --- Технические этажи ------------------------------------------------------
+# --- Technical floors -------------------------------------------------------
 
 
-## Котельная: котлы-бочки на опорах с окошком топки, стояки и трубы под
-## потолком, манометры; над котлом пар.
+## Boiler room: barrel boilers on supports with a furnace window, risers and pipes under
+## the ceiling, pressure gauges; steam above the boiler.
 func _boiler(span: Vector2) -> void:
 	_floor_cover(span, GreyboxLook.surface(CONCRETE.darkened(0.2)))
 	_far_wall(span, GreyboxLook.surface(Color(0.3, 0.3, 0.28)))
@@ -572,8 +571,9 @@ func _boiler(span: Vector2) -> void:
 			_on(GreyboxLook.surface(DARK_STEEL), Vector3(0.2, 0.45, 1.4), x + side, 0.0, 4.5)
 		var door := GreyboxLook.light(FIRE) if _lit else GreyboxLook.surface(RACK)
 		_batch.box_on(door, Vector3(0.35, 0.25, 0.02), _surface, Vector3(x - 1.62, 1.1, _z(4.5)))
-		# Труба — от котла до потолка: в два метра она уходила сквозь плиту в
-		# зал этажа выше, а пар из-под потолка поднимался туда же.
+		# The flue runs from the boiler to the ceiling: at two metres it went through the
+		# slab into the hall of the floor above, and steam from under the ceiling rose
+		# there too.
 		var ceiling := _surface - _rules.story_top(_index)
 		_batch.cylinder_on(
 			pipe, 0.12, ceiling - CHIMNEY_FROM, _surface, Vector3(x + 0.8, CHIMNEY_FROM, _z(4.5))
@@ -585,8 +585,8 @@ func _boiler(span: Vector2) -> void:
 	_overhead(span, pipe, lagging)
 
 
-## Вентиляция и насосы: короба приточных установок с решётками, вентиляторы,
-## насосы на рамах и воздуховоды.
+## Ventilation and pumps: air handling unit casings with grilles, fans, pumps on frames
+## and ducts.
 func _mechanical(span: Vector2) -> void:
 	_floor_cover(span, GreyboxLook.surface(CONCRETE))
 	_far_wall(span, GreyboxLook.surface(Color(0.34, 0.35, 0.34)))
@@ -606,8 +606,8 @@ func _mechanical(span: Vector2) -> void:
 	_overhead(span, pipe, GreyboxLook.metal(Color(0.7, 0.72, 0.72)))
 
 
-## Серверная офиса: фальшпол, два ряда стоек с мигающими индикаторами,
-## холодный свет и короб кабельного лотка.
+## Office server room: raised floor, two rows of racks with blinking indicators, cold
+## light and a cable tray duct.
 func _server(span: Vector2) -> void:
 	_floor_cover(span, GreyboxLook.polished(RAISED_FLOOR))
 	_far_wall(span, GreyboxLook.surface(Color(0.25, 0.27, 0.3)))
@@ -625,7 +625,7 @@ func _server(span: Vector2) -> void:
 	_on(tray, Vector3(span.y - span.x, 0.08, 0.4), _mid(span), 2.3, 5.2)
 
 
-## Архив: ряды стеллажей с коробами дел и шкафы-картотеки.
+## Archive: rows of shelving with file boxes and filing cabinets.
 func _archive(span: Vector2) -> void:
 	_floor_cover(span, GreyboxLook.surface(LINOLEUM.darkened(0.2)))
 	_far_wall(span, GreyboxLook.surface(Color(0.5, 0.5, 0.47)))
@@ -638,8 +638,8 @@ func _archive(span: Vector2) -> void:
 			_prop("file_cabinet", x, 1.0)
 
 
-## Кухня отеля: линия плит под вытяжками, мойки, холодильники и разделочные
-## столы из нержавейки.
+## Hotel kitchen: a line of stoves under hoods, sinks, refrigerators and stainless steel
+## prep tables.
 func _kitchen(span: Vector2) -> void:
 	_floor_cover(span, GreyboxLook.polished(Color(0.5, 0.42, 0.36)))
 	_far_wall(span, GreyboxLook.polished(Color(0.82, 0.82, 0.78)))
@@ -662,7 +662,7 @@ func _kitchen(span: Vector2) -> void:
 			_prop("kitchen_fridge", x + 1.6, 2.0)
 
 
-## Склад: стеллажи с коробками; у отеля бельевая — стопки белого белья.
+## Storeroom: shelving with boxes; for a hotel, linen storage — stacks of white linen.
 func _storage(span: Vector2) -> void:
 	_floor_cover(span, GreyboxLook.surface(CONCRETE))
 	_far_wall(span, GreyboxLook.surface(Color(0.4, 0.4, 0.38)))
@@ -676,8 +676,7 @@ func _storage(span: Vector2) -> void:
 			_prop("cardboard_boxes", x, 6.4)
 
 
-## Мастерская жилого дома: верстак, щит с инструментом на стене, шкафы и
-## стремянка.
+## Residential workshop: a workbench, a tool board on the wall, cabinets and a stepladder.
 func _workshop(span: Vector2) -> void:
 	_floor_cover(span, GreyboxLook.surface(CONCRETE.darkened(0.1)))
 	_far_wall(span, GreyboxLook.surface(Color(0.42, 0.38, 0.3)))
@@ -707,10 +706,10 @@ func _workshop(span: Vector2) -> void:
 		_on(ladder, Vector3(0.5, 0.03, 0.04), span.x + 0.6, 0.3 + rung * 0.3, 2.5)
 
 
-# --- Детали -----------------------------------------------------------------
+# --- Details ----------------------------------------------------------------
 
 
-## Пол зала поверх плиты: на всю глубину зала по пролёту.
+## Hall floor over the slab: the full depth of the hall along the span.
 func _floor_cover(span: Vector2, material: Material) -> void:
 	_batch.box(
 		material,
@@ -719,7 +718,7 @@ func _floor_cover(span: Vector2, material: Material) -> void:
 	)
 
 
-## Дальняя стена зала своим цветом: поверх общей стены [BuildingShell].
+## The hall's far wall in its own colour: over the common wall of [BuildingShell].
 func _far_wall(span: Vector2, material: Material) -> void:
 	var height := _surface - _rules.story_top(_index)
 	_batch.box(
@@ -729,7 +728,7 @@ func _far_wall(span: Vector2, material: Material) -> void:
 	)
 
 
-## Окна на город у дальней стены — общественным залам.
+## Windows onto the city at the far wall — for public halls.
 func _windows(span: Vector2) -> void:
 	OpenSpace.ribbon_windows(
 		_batch,
@@ -741,7 +740,7 @@ func _windows(span: Vector2) -> void:
 	)
 
 
-## Трубы под потолком технического этажа: две магистрали вдоль и отводы вниз.
+## Pipes under the ceiling of a technical floor: two mains along and drops down.
 func _overhead(span: Vector2, pipe: Material, lagging: Material) -> void:
 	var length := span.y - span.x + EDGE * 2.0
 	var middle := _mid(span)
@@ -751,7 +750,7 @@ func _overhead(span: Vector2, pipe: Material, lagging: Material) -> void:
 		_batch.cylinder_on(pipe, 0.06, 2.6, _surface, Vector3(x, 0.0, _z(6.6)))
 
 
-## Стол во всю длину: стойка поста охраны или швейцара, с мониторами.
+## A full-length desk: a security or doorman's counter, with monitors.
 func _desk_row(x: float, length: float, d: float, colour: Color, screens: bool) -> void:
 	_on(GreyboxLook.metal(colour), Vector3(length, 1.05, 0.7), x, 0.0, d)
 	if not screens:
@@ -763,7 +762,7 @@ func _desk_row(x: float, length: float, d: float, colour: Color, screens: bool) 
 		_on(face, Vector3(0.39, 0.26, 0.01), x + side, 1.13, d + 0.12)
 
 
-## Турникет: тумба со стеклянной створкой.
+## Turnstile: a pedestal with a glass leaf.
 func _turnstile(x: float, d: float) -> void:
 	_on(GreyboxLook.metal(STEEL), Vector3(0.18, 1.0, 1.0), x, 0.0, d)
 	_batch.box_on(
@@ -773,7 +772,7 @@ func _turnstile(x: float, d: float) -> void:
 	_on(lamp, Vector3(0.1, 0.02, 0.1), x, 1.0, d - 0.3)
 
 
-## Доска с ключами за стойкой регистрации: ячейки с латунными бирками.
+## Key board behind the reception counter: cells with brass tags.
 func _key_rack(x: float, width: float) -> void:
 	var board := GreyboxLook.surface(WOOD.darkened(0.3))
 	_batch.box_on(board, Vector3(width, 1.2, 0.05), _surface, Vector3(x, 1.0, _z(DEPTH - 0.05)))
@@ -791,7 +790,7 @@ func _key_rack(x: float, width: float) -> void:
 			)
 
 
-## Рояль: корпус, поднятая крышка и ножки.
+## Grand piano: body, raised lid and legs.
 func _piano(x: float, d: float) -> void:
 	var black := GreyboxLook.polished(Color(0.02, 0.02, 0.025))
 	_on(black, Vector3(1.6, 0.3, 1.2), x, 1.15, d)
@@ -801,7 +800,7 @@ func _piano(x: float, d: float) -> void:
 	_on(GreyboxLook.surface(CHALK), Vector3(1.2, 0.03, 0.15), x, 1.2, d - 0.55)
 
 
-## Полки бара у дальней стены: три яруса бутылок, светятся при свете.
+## Bar shelves at the far wall: three tiers of bottles, glowing when lit.
 func _shelves(x: float, width: float) -> void:
 	var wood := GreyboxLook.surface(WOOD.darkened(0.2))
 	_batch.box_on(wood, Vector3(width, 1.6, 0.3), _surface, Vector3(x, 0.9, _z(DEPTH - 0.15)))
@@ -822,7 +821,7 @@ func _shelves(x: float, width: float) -> void:
 			)
 
 
-## Стеллаж: стойки, четыре полки и груз на них.
+## Shelving: posts, four shelves and the load on them.
 func _shelf_unit(x: float, d: float, goods: Color) -> void:
 	var steel := GreyboxLook.metal(Color(0.42, 0.44, 0.46))
 	var load := GreyboxLook.surface(goods)
@@ -836,20 +835,20 @@ func _shelf_unit(x: float, d: float, goods: Color) -> void:
 			_on(load, Vector3(0.38, 0.3, 0.45), x - 0.45 + box * 0.45, 0.18 + tier * 0.55, d)
 
 
-## Светящаяся точка: свеча, зеркальный шар, табло. Погашена — на тёмном этаже.
+## A glowing point: candle, mirror ball, display. Off on a dark floor.
 func _glow(colour: Color, size: float, at: Vector3) -> void:
 	if not _lit:
 		return
 	_batch.sphere(GreyboxLook.light(colour), size, Vector3(at.x, _surface - at.y, _z(at.z)))
 
 
-## Коробка на полу: [param h] — высота низа, [param d] — глубина середины.
+## A box on the floor: [param h] — height of the bottom, [param d] — depth of the middle.
 func _on(material: Material, size: Vector3, x: float, h: float, d: float) -> void:
 	_batch.box_on(material, size, _surface, Vector3(x, h, _z(d)))
 
 
-## Предмет пака серединой на (x, d), низом на [param h] над полом, повёрнутый
-## на [param turn] градусов вокруг вертикали.
+## A pack item centred on (x, d), bottom at [param h] above the floor, rotated by
+## [param turn] degrees around the vertical.
 func _prop(prop_name: String, x: float, d: float, turn: float = 0.0, h: float = 0.0) -> void:
 	var parts := HallLook.template(prop_name, _rules.kind)
 	if parts.is_empty():
@@ -861,8 +860,8 @@ func _prop(prop_name: String, x: float, d: float, turn: float = 0.0, h: float = 
 		_batch.mesh(part[0] as Mesh, place * (part[1] as Transform3D))
 
 
-## Свободно ли место предмета полушириной [param half] на глубине [param d]:
-## перед дверью свободна полоса створки — она открывается в зал.
+## Whether the spot of an item with half-width [param half] at depth [param d] is free:
+## in front of a door the leaf's strip is free — it opens into the hall.
 func _free(x: float, half: float, d: float) -> bool:
 	if d - 0.5 > LEAF_CLEAR:
 		return true
@@ -872,7 +871,7 @@ func _free(x: float, half: float, d: float) -> bool:
 	return true
 
 
-## Места вдоль пролёта с шагом [param step] от края со сдвигом [param offset].
+## Spots along the span with step [param step] from the edge, shifted by [param offset].
 func _along(span: Vector2, step: float, offset: float) -> Array[float]:
 	var places: Array[float] = []
 	var length := span.y - span.x
@@ -885,8 +884,8 @@ func _along(span: Vector2, step: float, offset: float) -> Array[float]:
 	return places
 
 
-## Ширина предмета пака в его росте по каталогу и зазор [param gap]: шаг
-## ряда машин, шкафов, стоек бара.
+## Width of a pack item at its catalogue height plus gap [param gap]: the step of a row
+## of machines, cabinets, bar counters.
 func _width_of(prop_name: String, gap: float) -> float:
 	return PropCatalog.footprint(prop_name).x + gap
 
@@ -895,6 +894,6 @@ func _mid(span: Vector2) -> float:
 	return (span.x + span.y) * 0.5
 
 
-## Z сцены по глубине зала.
+## Scene Z by hall depth.
 func _z(d: float) -> float:
 	return WorldSpace.BACK_WALL_Z - d

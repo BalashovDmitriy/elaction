@@ -1,25 +1,25 @@
 class_name MenuStage
 extends Node3D
 
-## Ночной город за главным меню (ADR-0035, решение 1).
+## The night city behind the main menu (ADR-0035, decision 1).
 ##
-## Здания здесь нет — только [CityBackdrop] со своей камерой. Город умеет жить
-## сам: погода, молнии, мигающие огни, — а камеру ведёт по текущей камере
-## корневого мира. Поэтому достаточно поставить ортокамеру так, как её ставит
-## [SideCamera] над крышей, и медленно вести вдоль улицы: параллакс кварталов
-## город даёт сам.
+## There is no building here — only [CityBackdrop] with its own camera. The city can live
+## by itself: weather, lightning, blinking lights — and it drives its camera by the current camera
+## of the root world. So it is enough to place the ortho camera the way
+## [SideCamera] places it above the roof, and move it slowly along the street: the city provides
+## the parallax of the blocks itself.
 ##
-## Здание не строится нарочно: [GreyboxLevel] тянет за собой Otto, партию и
-## замер качества, а меню нужен вид, а не игра.
+## The building is deliberately not built: [GreyboxLevel] drags Otto, the game and
+## the quality measurement along with it, while the menu needs a view, not a game.
 
-## Скорость проезда камеры вдоль улицы, м/с. Медленно: фон, а не аттракцион.
+## Camera pan speed along the street, m/s. Slow: a background, not a ride.
 const DRIFT_SPEED: float = 0.35
-## Насколько выше крыши середина кадра, в долях кадра: небо и верхи домов
-## занимают больше половины, улицы внизу тают в дымке.
+## How far above the roof the middle of the frame is, in frame fractions: the sky and house tops
+## take more than half, the streets below fade in the haze.
 const LIFT: float = 0.18
-## Во сколько раз кадр меню шире игрового. В игре город виден полосой за
-## зданием; за меню здания нет, и при игровом кадре окна вставали во весь экран
-## — силуэта города не было, одни размытые квадраты.
+## How many times wider the menu frame is than the game one. In the game the city is seen as a band
+## behind the building; behind the menu there is no building, and with the game frame the windows
+## filled the whole screen — there was no city silhouette, only blurred squares.
 const WIDEN: float = 3.0
 
 var weather: Weather.Kind = Weather.Kind.RAIN
@@ -30,16 +30,18 @@ var _city: CityBackdrop = null
 var _time: float = 0.0
 
 
-## Собирает сцену. Погода — по [param stage_seed]: тот же жребий, что у здания.
+## Assembles the scene. Weather — by [param stage_seed]: the same draw as a building's.
 func build(stage_seed: int) -> void:
 	_rules = BuildingRules.new()
 	weather = Weather.of_seed(stage_seed)
-	# Меню стоит на улице: фон в полную силу, как на крыше (ADR-0036, решение 5).
+	# The menu stands on the street: ambience at full strength, as on the roof (ADR-0036, decision
+	# 5).
 	Sounds.set_outdoors(true)
 
 	var air := WorldEnvironment.new()
 	air.environment = Environment.new()
-	# В корневом мире ничего нет, и он рисует фоном холст — город на слое −1.
+	# The root world has nothing in it, and it draws the canvas as background — the city on layer
+	# −1.
 	CityBackdrop.show_behind(air.environment)
 	add_child(air)
 
@@ -60,7 +62,7 @@ func build(stage_seed: int) -> void:
 	_city.build(_rules, stage_seed, weather)
 
 
-## Камера сцены — чтобы тест мог проверить, что она ведёт город.
+## The scene camera — so a test can check that it drives the city.
 func camera() -> Camera3D:
 	return _camera
 
@@ -70,8 +72,8 @@ func _process(delta: float) -> void:
 	_place_camera()
 
 
-## Камера качается вдоль улицы туда и обратно по синусу: у края она плавно
-## разворачивается, а не упирается.
+## The camera sways along the street back and forth by a sine: at the edge it turns around
+## smoothly rather than hitting a stop.
 func _place_camera() -> void:
 	if _camera == null:
 		return

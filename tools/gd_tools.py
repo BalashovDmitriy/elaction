@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""gdformat --check и gdlint по всему коду, параллельно (M24j).
+"""gdformat --check and gdlint over all the code, in parallel (M24j).
 
-gdtoolkit разбирает файлы по одному в одном процессе: на двух с половиной
-сотнях скриптов форматтер и линтер шли по пять-шесть секунд каждый, подряд —
-одиннадцать, на одном потоке. Здесь файлы режутся на куски, и куски обоих
-инструментов идут разом процессами по числу потоков процессора.
+gdtoolkit parses files one by one in a single process: on two hundred and fifty scripts
+the formatter and the linter took five to six seconds each, in sequence — eleven, on
+one thread. Here the files are split into chunks, and the chunks of both tools run at
+once as processes, as many as the processor has threads.
 
-Вывод — тот же, что у самих инструментов: ошибки и итог по каждому куску,
-код возврата 1, если хоть один кусок не прошёл.
+The output is the same as the tools' own: errors and a summary for each chunk, exit
+code 1 if at least one chunk failed.
 
-    python tools/gd_tools.py              # формат и линт src, tests, tools
-    python tools/gd_tools.py --format     # только формат
-    python tools/gd_tools.py --lint       # только линт
+    python tools/gd_tools.py              # format and lint src, tests, tools
+    python tools/gd_tools.py --format     # format only
+    python tools/gd_tools.py --lint       # lint only
 """
 
 from __future__ import annotations
@@ -26,8 +26,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DIRS = ("src", "tests", "tools")
 
-# Модулями, а не gdformat.exe и gdlint.exe: неподписанные обёртки pip блокирует
-# управление приложениями Windows (WinError 4551), см. .pre-commit-config.yaml.
+# As modules, not gdformat.exe and gdlint.exe: unsigned pip wrappers are blocked by
+# Windows application control (WinError 4551), see .pre-commit-config.yaml.
 TOOLS = {
     "gdformat": ["-m", "gdtoolkit.formatter", "--check"],
     "gdlint": ["-m", "gdtoolkit.linter"],
@@ -71,7 +71,7 @@ def main() -> int:
 
     files = scripts()
     threads = os.cpu_count() or 1
-    # Потоки делятся между инструментами поровну.
+    # Threads are split between the tools equally.
     per_tool = max(1, threads // len(wanted))
     jobs = [(tool, piece) for tool in wanted for piece in chunks(files, per_tool)]
     failed: set[str] = set()
@@ -80,8 +80,8 @@ def main() -> int:
         for tool, code, output in pool.map(lambda job: run_chunk(*job), jobs):
             if code != 0:
                 failed.add(tool)
-                # Итоговые строки кусков («Success…», «N files would be left
-                # unchanged») не повторяем — печатаем только сами замечания.
+                # Chunk summary lines ("Success…", "N files would be left unchanged")
+                # are not repeated — only the remarks themselves are printed.
                 lines = [
                     line
                     for line in output.splitlines()

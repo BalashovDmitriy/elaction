@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Отпечаток дерева, на котором `check.ps1` прошёл целиком.
+"""Fingerprint of the tree on which `check.ps1` passed in full.
 
-Хук на push гонял тот же набор, что `check.ps1`, — разбор движком и все тесты
-GUT, три минуты, — даже когда `check.ps1` только что прошёл на том же самом
-коде. Здесь это повторение отсекается, а не проверка:
+The push hook ran the same set as `check.ps1` — engine parsing and all the GUT
+tests, three minutes — even when `check.ps1` had just passed on the very same
+code. What is cut here is the repetition, not the check:
 
-- `check.ps1` после зелёного прогона записывает отпечаток (`--write`);
-- хук на push запускает проверку через `--run`, и если дерево с тех пор не
-  менялось ни в одном файле, пропускает её с сообщением, иначе гоняет как раньше.
+- after a green run `check.ps1` writes the fingerprint (`--write`);
+- the push hook runs the check via `--run`, and if the tree has not changed
+  in any file since then, skips it with a message, otherwise runs it as before.
 
-Отпечаток — хеш дерева рабочей копии целиком: закоммиченное, изменённое и новое,
-без того, что игнорирует `.gitignore`. Он не зависит от коммитов: проверка,
-прошедшая до коммита, годится и после него, пока содержимое файлов то же.
-Лежит в `.git/`, поэтому в репозиторий не попадает никогда.
+The fingerprint is a hash of the whole working copy tree: committed, modified and new,
+without what `.gitignore` ignores. It does not depend on commits: a check
+that passed before a commit is still valid after it, as long as the file contents are the
+same. It lives in `.git/`, so it never gets into the repository.
 
-Запуск:
+Run:
     python tools/check_stamp.py --write
     python tools/check_stamp.py --run python tools/run_tests.py
 """
@@ -43,10 +43,10 @@ def stamp_path() -> Path:
 
 
 def fingerprint() -> str:
-    """Хеш дерева рабочей копии, как если бы всё в ней закоммитили.
+    """Hash of the working copy tree, as if everything in it were committed.
 
-    Собирается во временном индексе, чтобы не трогать настоящий: `git add -A`
-    в него и `git write-tree`. Одинаковое содержимое даёт один и тот же хеш.
+    Built in a temporary index so as not to touch the real one: `git add -A`
+    into it and `git write-tree`. The same content gives the same hash.
     """
     with tempfile.TemporaryDirectory() as folder:
         env = dict(os.environ)

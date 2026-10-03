@@ -1,30 +1,30 @@
 class_name ShotFx
 extends Node3D
 
-## Выстрел и удар пули: вспышка и дымок у ствола, искры, пыль и след на стене
-## (ADR-0037, решение 5).
+## A shot and a bullet hit: muzzle flash and smoke, sparks, dust and a mark on the wall
+## (ADR-0037, decision 5).
 ##
-## Пуля с M24a втрое быстрее ROM и пересекает кадр меньше чем за секунду: сам
-## трассер виден пару кадров, и выстрел читается по тому, что остаётся на месте, —
-## вспышке у ствола, дымку и следу там, куда пуля пришла.
+## Since M24a the bullet is three times faster than in the ROM and crosses the frame in under a
+## second: the tracer itself is visible for a couple of frames, and the shot reads by what stays in
+## place — the muzzle flash, smoke and the mark where the bullet landed.
 ##
-## Картинка, а не правило: на бой не влияет. Узел живёт до конца своих частиц и
-## убирает себя сам. След — не узел эффекта: он остаётся на стене до конца
-## здания, но их число ограничено ([constant HOLES_KEPT]).
+## Picture, not a rule: it does not affect combat. The node lives until its particles end and
+## removes itself. The mark is not an effect node: it stays on the wall until the end of the
+## building, but their number is limited ([constant HOLES_KEPT]).
 
-## Докуда слышно удар пули, м.
+## How far a bullet hit is heard, m.
 const IMPACT_REACH: float = 22.0
 
-## Вспышка у ствола: свет, сила, радиус и сколько она живёт, с. Короткий
-## импульс — на три-четыре кадра, а не весь полёт пули: свет стоит у ствола.
+## Muzzle flash: light, energy, radius and how long it lives, s. A short
+## pulse — for three or four frames, not the whole bullet flight: the light stays at the muzzle.
 const FLASH_COLOR := Color(1.0, 0.84, 0.52)
 const FLASH_ENERGY: float = 4.0
 const FLASH_RANGE: float = 2.4
 const FLASH_TIME: float = 0.06
-## Пятно вспышки у ствола, м.
+## Muzzle flash spot, m.
 const FLASH_SIZE: float = 0.42
 
-## Дымок у ствола и пыль от удара: сколько клубков, живут, с, и размер, м.
+## Muzzle smoke and hit dust: how many puffs, lifetime, s, and size, m.
 const SMOKE_COUNT: int = 7
 const SMOKE_LIFETIME: float = 0.7
 const SMOKE_SIZE: float = 0.16
@@ -32,23 +32,23 @@ const DUST_COUNT: int = 10
 const DUST_LIFETIME: float = 0.55
 const DUST_SIZE: float = 0.12
 
-## След пули на стене: размер, м, и сколько следов держит здание разом. Старые
-## уходят первыми — в долгой перестрелке стены иначе обрастали бы сотнями
-## декалей, а каждая — это работа кластера света на каждом кадре.
+## Bullet mark on the wall: size, m, and how many marks a building keeps at once. Old ones
+## go first — in a long shootout walls would otherwise grow hundreds of
+## decals, and each one is light cluster work on every frame.
 const HOLE_SIZE: float = 0.18
 const HOLES_KEPT: int = 40
-## Насколько вглубь стены от точки удара ложится след, м: на переднюю грань у
-## самого края, которую видно камере, а не на торец, который к ней ребром.
+## How deep into the wall from the hit point the mark lands, m: on the front face at its
+## very edge, which the camera sees, not on the end face, which is edge-on to it.
 const HOLE_INSET: float = 0.07
 
-## Слой геометрии: по нему ищется передняя грань того, во что попала пуля.
+## Geometry layer: used to find the front face of whatever the bullet hit.
 const GEOMETRY: int = 1
 
 static var _holes: Array[Decal] = []
 static var _hole_texture: Texture2D = null
 static var _flash_material: StandardMaterial3D = null
-## Клубки дыма и пыли ([method _puff]): ход — по стороне и цвету, квад — по
-## размеру, материал пятна — один.
+## Smoke and dust puffs ([method _puff]): the motion — by side and colour, the quad — by
+## size, the spot material — one.
 static var _puff_processes: Dictionary = {}
 static var _puff_meshes: Dictionary = {}
 static var _puff_look: StandardMaterial3D = null
@@ -59,8 +59,8 @@ var _age: float = 0.0
 var _lifetime: float = 0.0
 
 
-## Выстрел в точке [param at] под узлом [param host], в сторону [param towards]
-## (−1 влево, +1 вправо): вспышка со светом и дымок.
+## A shot at point [param at] under node [param host], toward [param towards]
+## (−1 left, +1 right): a flash with light and smoke.
 static func muzzle(host: Node, at: Vector3, towards: float) -> ShotFx:
 	var fx := ShotFx.new()
 	fx.name = "Muzzle"
@@ -71,7 +71,7 @@ static func muzzle(host: Node, at: Vector3, towards: float) -> ShotFx:
 	fx._light.light_color = FLASH_COLOR
 	fx._light.light_energy = FLASH_ENERGY
 	fx._light.omni_range = FLASH_RANGE
-	# Тень от импульса в три кадра не нужна и дорога.
+	# A shadow from a three-frame pulse is unnecessary and expensive.
 	fx._light.shadow_enabled = false
 	fx.add_child(fx._light)
 	fx._flash = MeshInstance3D.new()
@@ -93,10 +93,10 @@ static func muzzle(host: Node, at: Vector3, towards: float) -> ShotFx:
 	return fx
 
 
-## Удар пули в стену, дверь или кабину в точке [param at]: искры, пыль и след.
-## [param towards] — ход пули; [param surface] — во что она попала: след
-## вешается на него, чтобы ехать с кабиной. [param audible] — false у прогрева
-## шейдеров ([ShaderWarmup]): там удар только рисуется.
+## A bullet hit on a wall, door or cab at point [param at]: sparks, dust and a mark.
+## [param towards] — bullet direction; [param surface] — what it hit: the mark
+## hangs on it so it rides with the cab. [param audible] — false during shader
+## warm-up ([ShaderWarmup]): there the hit is only drawn.
 static func impact(
 	host: Node, at: Vector3, towards: float, surface: Node3D, audible: bool = true
 ) -> ShotFx:
@@ -106,8 +106,8 @@ static func impact(
 	host.add_child(fx)
 	fx.global_position = at
 	Sparks.ricochet(host, at, towards)
-	# Удар пули слышно там, куда она попала: о металл кабины — звонко, о
-	# стену и пол — глухо (ADR-0052, решение 7).
+	# A bullet hit is heard where it landed: on cab metal — ringing, on
+	# a wall and floor — dull (ADR-0052, decision 7).
 	if audible:
 		var metal := surface is AnimatableBody3D
 		var sound := Sounds.BULLET_METAL if metal else Sounds.BULLET_WALL
@@ -126,7 +126,7 @@ static func impact(
 	return fx
 
 
-## Сколько следов пуль сейчас на стенах. Тестам: потолок держится.
+## How many bullet marks are on walls now. For tests: the cap holds.
 static func holes() -> int:
 	_forget_freed_holes()
 	return _holes.size()
@@ -148,11 +148,11 @@ func _process(delta: float) -> void:
 		queue_free()
 
 
-## След на передней грани того, во что попала пуля.
+## A mark on the front face of whatever the bullet hit.
 ##
-## Пуля летит в плоскости игры и бьёт в торец стены, а торец камере виден
-## ребром. След поэтому ложится на переднюю грань у самого края — там, где торец
-## с ней сходится: её глубину находит луч от камеры в стену.
+## The bullet flies in the play plane and hits the wall's end face, and the end face is edge-on
+## to the camera. So the mark lands on the front face at its very edge — where the end face
+## meets it: its depth is found by a ray from the camera into the wall.
 static func _leave_a_hole(fx: ShotFx, at: Vector3, towards: float, surface: Node3D) -> void:
 	var space := fx.get_world_3d().direct_space_state
 	var x := at.x + signf(towards) * HOLE_INSET
@@ -166,8 +166,8 @@ static func _leave_a_hole(fx: ShotFx, at: Vector3, towards: float, surface: Node
 	decal.name = "BulletHole"
 	decal.size = Vector3(HOLE_SIZE, 0.3, HOLE_SIZE)
 	decal.texture_albedo = _hole()
-	# Декаль бьёт вдоль своей −Y; поворот на четверть оборота по X направляет
-	# её в стену, от камеры. Боковые грани — торец — её не берут.
+	# A decal projects along its −Y; a quarter turn around X points
+	# it into the wall, away from the camera. Side faces — the end face — do not take it.
 	decal.rotation = Vector3(PI * 0.5, 0.0, 0.0)
 	decal.normal_fade = 0.5
 	decal.upper_fade = 0.0
@@ -181,7 +181,7 @@ static func _leave_a_hole(fx: ShotFx, at: Vector3, towards: float, surface: Node
 		oldest.queue_free()
 
 
-## Выбрасывает из учёта следы, ушедшие вместе со зданием.
+## Drops from tracking the marks that went away with the building.
 static func _forget_freed_holes() -> void:
 	var kept: Array[Decal] = []
 	for hole in _holes:
@@ -190,12 +190,12 @@ static func _forget_freed_holes() -> void:
 	_holes = kept
 
 
-## Клубок частиц: дым у ствола или пыль у стены. Медленные мягкие пятна,
-## всплывают и тают.
+## A particle puff: smoke at the muzzle or dust at the wall. Slow soft spots
+## that float up and melt.
 ##
-## Материалы и сетка — одни на все выстрелы: их вариантов четыре (дым и пыль,
-## влево и вправо), а собирать их заново значило бы растрировать фактуры на
-## каждую пулю перестрелки.
+## Materials and mesh are shared by all shots: they have four variants (smoke and dust,
+## left and right), and building them anew would mean rasterizing textures for
+## every bullet of a shootout.
 static func _puff(
 	count: int, lifetime: float, size: float, heading: Vector3, colour: Color
 ) -> GPUParticles3D:
@@ -213,7 +213,7 @@ static func _puff(
 	return particles
 
 
-## Ход клубка: разлёт по [param heading], рост и таяние цвета [param colour].
+## Puff motion: spread along [param heading], growth and fading of colour [param colour].
 static func _puff_process(heading: Vector3, colour: Color) -> ParticleProcessMaterial:
 	var key := "%s|%s" % [heading, colour]
 	if _puff_processes.has(key):
@@ -247,7 +247,7 @@ static func _puff_process(heading: Vector3, colour: Color) -> ParticleProcessMat
 	return process
 
 
-## Квад клубка размером [param size]: мягкое пятно цвета частицы лицом к камере.
+## Puff quad of size [param size]: a soft spot of the particle colour facing the camera.
 static func _puff_mesh(size: float) -> QuadMesh:
 	if _puff_meshes.has(size):
 		return _puff_meshes[size] as QuadMesh
@@ -265,7 +265,7 @@ static func _puff_mesh(size: float) -> QuadMesh:
 	return quad
 
 
-## Мягкое круглое пятно: белое в середине, прозрачное к краю.
+## A soft round spot: white in the middle, transparent toward the edge.
 static func _soft_dot() -> Texture2D:
 	var gradient := Gradient.new()
 	gradient.set_color(0, Color(1.0, 1.0, 1.0, 1.0))
@@ -280,7 +280,7 @@ static func _soft_dot() -> Texture2D:
 	return texture
 
 
-## След пули: тёмная середина, обожжённый край, прозрачно снаружи.
+## Bullet mark: dark middle, scorched edge, transparent outside.
 static func _hole() -> Texture2D:
 	if _hole_texture == null:
 		var gradient := Gradient.new()
@@ -299,7 +299,7 @@ static func _hole() -> Texture2D:
 	return _hole_texture
 
 
-## Пятно вспышки: мягкое к краю, всегда лицом к камере.
+## Flash spot: soft toward the edge, always facing the camera.
 static func _flash_mat() -> StandardMaterial3D:
 	if _flash_material == null:
 		var gradient := Gradient.new()

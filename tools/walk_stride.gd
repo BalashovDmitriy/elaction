@@ -1,13 +1,13 @@
 extends SceneTree
 
-## Замер шага клипа ходьбы: с какой скоростью опорная стопа едет назад.
+## Walk clip stride measurement: how fast the support foot moves backward.
 ##
-## Клип пака шагает на месте, и стопа, стоящая на полу, едет под телом назад
-## ровно со скоростью, с которой тело шло бы вперёд. Поделив на неё скорость
-## актёра (`Arcade.WALK_PX`), получаем [constant FigurePoses.WALK_CLIP_RATE]:
-## на нём подошвы не скользят по полу.
+## The pack's clip walks in place, and the foot standing on the floor moves back under the body
+## at exactly the speed the body would walk forward. Dividing the actor's speed
+## (`Arcade.WALK_PX`) by it, we get [constant FigurePoses.WALK_CLIP_RATE]:
+## at it the soles do not slide on the floor.
 ##
-## Запуск:
+## Run:
 ##     godot --headless --script res://tools/walk_stride.gd
 
 
@@ -32,7 +32,7 @@ func _run() -> void:
 	var lowest := INF
 	for sample in samples:
 		lowest = minf(lowest, sample.y)
-	# Опора — кадры, где стопа у самого пола; скорость — средняя по ним.
+	# Support — frames where the foot is right at the floor; speed — the average over them.
 	var speed_sum := 0.0
 	var count := 0
 	for step in steps:

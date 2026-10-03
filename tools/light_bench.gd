@@ -1,19 +1,19 @@
 extends Node3D
 
-## Замер кадра под светом M17: настоящее здание, агенты, три лампы в кадре.
+## Frame measurement under M17 lighting: a real building, agents, three lamps in the frame.
 ##
-## Отвечает на один вопрос ADR-0023 (решение 7): укладывается ли воздух —
-## отражения, туман, свечение — и конусы ламп в бюджет кадра. Меряется время
-## GPU на кадр, а не дельта процесса: дельта считает и ожидание вертикальной
-## синхронизации, и физику, и к свету отношения не имеет.
+## Answers one question of ADR-0023 (decision 7): whether the air — reflections, fog,
+## glow — and the lamp cones fit in the frame budget. GPU time per frame is measured,
+## not the process delta: the delta also counts waiting for vertical sync and physics,
+## and has nothing to do with lighting.
 ##
-## Рендер настоящий, не headless — нужен экран. Число пишется в STATUS.
+## The render is real, not headless — a screen is needed. The number goes into STATUS.
 ##
-## С M22 — и по всему зданию (ADR-0030, решение 6): `--whole` ставит Otto на
-## каждый этаж от крыши до гаража на каждом уровне качества и пишет средний и
-## худший кадр уровня, с этажом, где худший случился.
+## Since M22 — across the whole building too (ADR-0030, decision 6): `--whole` puts Otto
+## on every floor from the roof to the garage at every quality level and writes the
+## level's average and worst frame, with the floor where the worst one happened.
 ##
-## Запуск:
+## Launch:
 ##     godot --path . res://tools/light_bench.tscn
 ##     godot --path . res://tools/light_bench.tscn -- --whole
 ##     godot --path . res://tools/light_bench.tscn -- --whole --seed=2
@@ -26,40 +26,40 @@ extends Node3D
 ##     godot --path . res://tools/light_bench.tscn -- --probe --floor=6 --corpses=40
 ##     godot --path . res://tools/light_bench.tscn -- --probe --floor=6 --timeline
 ##
-## `--floors` (M24f) — таблица по этажам на одном уровне (`--quality=`, по
-## умолчанию «Ультра»): GPU и CPU рендера, полный кадр, источники с тенью и
-## вызовы отрисовки — видно, что растёт к низу здания. `--native` — окно без
-## рамки во весь экран, в родном разрешении, как у игрока в полном экране.
+## `--floors` (M24f) — a per-floor table at one level (`--quality=`, "Ultra" by
+## default): render GPU and CPU, the full frame, shadowed sources and draw calls —
+## shows what grows toward the bottom of the building. `--native` — a borderless
+## full-screen window at native resolution, as for a player in full screen.
 ##
-## Сид по умолчанию — 1, туман. Дождь (M24a) меряется на сиде 2.
+## The default seed is 1, fog. Rain (M24a) is measured on seed 2.
 ##
-## `--garage` (M24b) меряет нижний этаж — паркинг со светильниками и чужими
-## машинами; `--x=` ставит Otto в нужную точку этажа, иначе — на безопасное
-## место, как на широком этаже.
+## `--garage` (M24b) measures the bottom floor — the garage with fixtures and other
+## people's cars; `--x=` puts Otto at the needed point of the floor, otherwise at a
+## safe spot, as on a wide floor.
 ##
-## `--exit=` (M24b) ставит кадр выезда: середина кадра — на столько метров правее
-## левого торца здания, как у [method ExitBoarding.exit_frame]; `--lift=` —
-## насколько низ кадра поднят над низом здания, м, как у кадра, едущего за
-## машиной по пандусу. С ними Otto ставится в паркинг сам:
+## `--exit=` (M24b) sets the exit frame: the frame's middle is this many metres right of
+## the building's left end wall, as in [method ExitBoarding.exit_frame]; `--lift=` — how
+## far the frame's bottom is raised above the building's bottom, m, as for a frame
+## following the car up the ramp. With them Otto is placed in the garage automatically:
 ##     godot --path . res://tools/light_bench.tscn -- --exit=3.5
 ##     godot --path . res://tools/light_bench.tscn -- --exit=-9.45 --lift=3.6
 
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
-## Сколько шагов физики дать зданию собраться, агентам выйти и свету
-## устояться. Шаги физики, а не кадры: без вертикальной синхронизации кадр
-## идёт миллисекунду, и двери за сто кадров не успели бы открыться.
+## How many physics steps to give the building to assemble, agents to come out and the
+## light to settle. Physics steps, not frames: without vertical sync a frame takes a
+## millisecond, and doors would not manage to open in a hundred frames.
 const SETTLE_STEPS: int = 240
-## Сколько кадров мерить.
+## How many frames to measure.
 const MEASURE_FRAMES: int = 240
-## Бюджет кадра, мс: 60 кадров в секунду.
+## Frame budget, ms: 60 frames per second.
 const BUDGET_MS: float = 16.6
-## По всему зданию: сколько кадров дать этажу устояться и сколько мерить.
+## Whole building: how many frames to let a floor settle and how many to measure.
 const FLOOR_SETTLE: int = 20
 const FLOOR_FRAMES: int = 30
 
-## Кадр выезда (`--exit=`), в плоскости правил; пустой — кадр по Otto.
+## Exit frame (`--exit=`), in the rules plane; empty — the frame follows Otto.
 var _exit_bounds := Rect2()
 
 
@@ -77,21 +77,21 @@ func _ready() -> void:
 		if argument.begins_with("--seed="):
 			level.building_seed = argument.trim_prefix("--seed=").to_int()
 		elif argument.begins_with("--kind="):
-			# Тип здания (M24o): у залов особых этажей свой свет и свои мультимеши.
+			# Building kind (M24o): special-floor halls have their own light and multimeshes.
 			kind = argument.trim_prefix("--kind=").to_int()
 		elif argument.begins_with("--time="):
-			# Время суток (M24j): днём город другой — солнце и стекло с небом.
+			# Time of day (M24j): in the daytime the city is different — sun and glass with sky.
 			level.rules.time_of_day = argument.trim_prefix("--time=").to_int() as TimeOfDay.Kind
-	# Здание типа — по окончательному сиду: `--kind` до `--seed` искал его по
-	# прежнему, и тип выходил другой.
+	# The kind's building is found by the final seed: `--kind` before `--seed` looked it
+	# up by the previous one, and the kind came out different.
 	if kind >= 0:
 		GameState.instance().building = BuildingIdentity.first_of(
 			kind as BuildingIdentity.Kind, level.building_seed
 		)
 	add_child(level)
 
-	# Не крыша, а широкий этаж: три лампы, двери с табло и агенты у них —
-	# самый дорогой кадр здания.
+	# Not the roof but a wide floor: three lamps, doors with indicator boards and agents
+	# by them — the building's most expensive frame.
 	if OS.get_cmdline_user_args().has("--whole"):
 		_run_whole(level)
 		return
@@ -127,12 +127,12 @@ func _ready() -> void:
 	_run(level)
 
 
-## Всё здание на каждом уровне качества: худший кадр — этаж, где он случился.
+## The whole building at every quality level: the worst frame — the floor where it happened.
 func _run_whole(level: GreyboxLevel) -> void:
 	var viewport := get_viewport().get_viewport_rid()
 	RenderingServer.viewport_set_measure_render_time(viewport, true)
-	# Город рисуется своим видом (ADR-0029): его кадр меряется отдельно и
-	# прибавляется — в замере корневого окна его нет (M24a).
+	# The city is drawn by its own viewport (ADR-0029): its frame is measured separately
+	# and added — it is not in the root window's measurement (M24a).
 	var city := level.get_node_or_null("Scenery/City/CityView") as SubViewport
 	var city_rid := city.get_viewport_rid() if city != null else RID()
 	if city_rid.is_valid():
@@ -144,15 +144,15 @@ func _run_whole(level: GreyboxLevel) -> void:
 	var failed := false
 	for quality: int in Graphics.Quality.size():
 		Graphics.broadcast(quality as Graphics.Quality)
-		# Шейдеры уровня компилируются на первых кадрах: их не меряем.
+		# The level's shaders compile in the first frames: those are not measured.
 		for _frame in 60:
 			await get_tree().process_frame
 		var total := 0.0
 		var samples := 0
 		var worst := 0.0
 		var worst_floor := 0
-		# Крыша — отдельной строкой: на ней город, погода и дождь (M24a), и в
-		# среднем по тридцати этажам она тонет.
+		# The roof gets its own row: it has the city, weather and rain (M24a), and in the
+		# average over thirty floors it drowns.
 		var roof := 0.0
 		for index in range(BuildingRules.ROOF, rules.floors):
 			level.otto.global_position = WorldSpace.to_scene(
@@ -196,7 +196,7 @@ func _run_whole(level: GreyboxLevel) -> void:
 	get_tree().quit(1 if failed else 0)
 
 
-## По этажам на одном уровне качества: строка на этаж.
+## Per floor at one quality level: a row per floor.
 func _run_floors(level: GreyboxLevel) -> void:
 	var quality := Graphics.Quality.ULTRA
 	for argument: String in OS.get_cmdline_user_args():
@@ -259,15 +259,15 @@ func _run_floors(level: GreyboxLevel) -> void:
 	get_tree().quit(0)
 
 
-## Разбор кадра одного этажа (`--probe --floor=N`, M24h): кадр целиком, а
-## затем без одного слагаемого за раз — видно, что сколько стоит. Слагаемые
-## выключаются и включаются обратно, по одному; этаж — по номеру на табло.
+## Breakdown of one floor's frame (`--probe --floor=N`, M24h): the whole frame, then
+## without one term at a time — shows what costs how much. Terms are turned off and
+## back on, one by one; the floor — by the number on the indicator board.
 ##
-## `--corpses=N` кладёт на этаж N трупов; `--timeline` — развёртка физики и
-## GPU по полсекунды с числом едущих кабин; `--scripts` — шаг физики по
-## скриптам, каждый выключен на цикл кабин; `--cars` и `--nodes` — кабины и
-## узлы уровня по очереди. Окно строки меньше цикла кабин (они ходят в ногу),
-## поэтому физику меряют развёрткой, а не одной строкой.
+## `--corpses=N` puts N corpses on the floor; `--timeline` — a physics and GPU timeline
+## in half-second steps with the number of moving cabs; `--scripts` — the physics step
+## by script, each turned off for a cab cycle; `--cars` and `--nodes` — cabs and level
+## nodes in turn. A row's window is shorter than a cab cycle (they move in step), so
+## physics is measured by a timeline rather than a single row.
 func _run_probe(level: GreyboxLevel) -> void:
 	var number := 6
 	var corpses := 0
@@ -289,7 +289,7 @@ func _run_probe(level: GreyboxLevel) -> void:
 	level.otto.global_position = WorldSpace.to_scene(
 		Vector2(level.plan().safe_x(rules, index), rules.floor_surface(index))
 	)
-	# Трупы на этаже: столько убитых агентов вокруг Otto, улёгшихся телом.
+	# Corpses on the floor: this many killed agents around Otto, settled as bodies.
 	var at := WorldSpace.to_plane(level.otto.global_position)
 	for body: int in corpses:
 		var agent := ENEMY_SCENE.instantiate() as Enemy
@@ -470,8 +470,8 @@ func _run_probe(level: GreyboxLevel) -> void:
 	get_tree().quit(0)
 
 
-## Останавливает шаг физики узлов класса [param kind]; [param limiters] —
-## только ограничителей рэгдолла.
+## Stops the physics step of nodes of class [param kind]; [param limiters] — only the
+## ragdoll's limiters.
 func _pause(level: GreyboxLevel, kind: String, on: bool, limiters: bool = false) -> void:
 	for node: Node in level.find_children("*", kind, true, false):
 		if limiters and not node is Ragdoll.SpeedLimit:
@@ -479,7 +479,7 @@ func _pause(level: GreyboxLevel, kind: String, on: bool, limiters: bool = false)
 		node.set_physics_process(on)
 
 
-## Делает все кости трупов статичными и возвращает как было.
+## Makes all corpse bones static and restores them as they were.
 func _still_bones(on: bool) -> void:
 	for node: Node in get_tree().get_nodes_in_group(Corpse.GROUP):
 		var corpse := Corpse.of(node)
@@ -492,7 +492,7 @@ func _still_bones(on: bool) -> void:
 			)
 
 
-## Среднее время физики за [param frames] кадров, мс.
+## Average physics time over [param frames] frames, ms.
 func _physics_over(frames: int) -> float:
 	var total := 0.0
 	for _frame in frames:
@@ -501,7 +501,7 @@ func _physics_over(frames: int) -> float:
 	return total / float(frames)
 
 
-## Сколько тел застыло ([method Ragdoll.freeze]).
+## How many bodies have frozen ([method Ragdoll.freeze]).
 func _frozen_bodies() -> int:
 	var count := 0
 	for node: Node in get_tree().get_nodes_in_group(Corpse.GROUP):
@@ -511,7 +511,7 @@ func _frozen_bodies() -> int:
 	return count
 
 
-## Строка разбора: слагаемое выключено [param toggle] и после замера включено.
+## Breakdown row: term [param toggle] is turned off and turned back on after measuring.
 func _probe_line(viewport: RID, label: String, toggle: Callable) -> void:
 	var before := {}
 	toggle.call(false)
@@ -560,7 +560,7 @@ func _other_lights(level: GreyboxLevel, on: bool) -> void:
 			_hold_light(node as Light3D, on)
 
 
-## Гасит источник на время строки и возвращает ему прежнюю видимость.
+## Hides a source for the row and restores its previous visibility.
 func _hold_light(light: Light3D, on: bool) -> void:
 	if on:
 		light.visible = bool(light.get_meta(&"probe_visible", light.visible))
@@ -572,7 +572,8 @@ func _hold_light(light: Light3D, on: bool) -> void:
 func _run(level: GreyboxLevel) -> void:
 	var viewport := get_viewport().get_viewport_rid()
 	RenderingServer.viewport_set_measure_render_time(viewport, true)
-	# Город — своим видом, как в замере по зданию: с кадра выезда он виден.
+	# The city by its own viewport, as in the building measurement: it is visible from
+	# the exit frame.
 	var city := level.get_node_or_null("Scenery/City/CityView") as SubViewport
 	var city_rid := city.get_viewport_rid() if city != null else RID()
 	if city_rid.is_valid():
@@ -581,8 +582,8 @@ func _run(level: GreyboxLevel) -> void:
 	Engine.max_fps = 0
 
 	for _step: int in SETTLE_STEPS:
-		# Вступление, отпустив камеру, возвращает ей границы здания: кадр выезда
-		# ставится заново, пока здание устаивается.
+		# The intro, releasing the camera, gives it back the building's bounds: the exit
+		# frame is set again while the building settles.
 		if _exit_bounds.has_area():
 			level.otto.apply_camera_bounds(_exit_bounds)
 		await get_tree().physics_frame

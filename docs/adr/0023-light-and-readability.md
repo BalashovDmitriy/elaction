@@ -1,187 +1,183 @@
-# ADR-0023 · Свет: наклон камеры, зоны ламп, рёбра и огоньки
+# ADR-0023 · Light: camera tilt, lamp zones, edges and indicator lights
 
-- **Статус:** принято; число ламп из решения 2 считается по ширине этажа, а не
-  по местам ([ADR-0024](0024-building-geometry.md), решение 2); тень заливки из
-  решения 3 — только на высоком уровне качества и выше, ниже заливка короче
-  ([ADR-0030](0030-grading-and-quality.md), решение 5); лампа висит под
-  потолком, а не на 1.8 м ([ADR-0026](0026-proportions.md), решение 5)
-- **Дата:** 2026-09-20
+- **Status:** accepted; the number of lamps from decision 2 is computed by floor width, not by slots
+  ([ADR-0024](0024-building-geometry.md), decision 2); the fill shadow from decision 3 is only at the
+  high quality level and above, below it the fill is shorter
+  ([ADR-0030](0030-grading-and-quality.md), decision 5); the lamp hangs under the ceiling, not at
+  1.8 m ([ADR-0026](0026-proportions.md), decision 5)
+- **Date:** 2026-09-20
 
-## Контекст
+## Context
 
-M17 — веха света, ради которой затевался пивот ([ADR-0019](0019-3d-pivot.md)).
-Референс — боковой разрез здания ночью: полированный тёмный пол с отражениями,
-ряд потолочных светильников конусами вниз, тёплый свет внутри против холодного
-снаружи, красные индикаторы у лифта, неон вывески. И пол на нём **виден** —
-камера смотрит чуть сверху.
+M17 is the lighting milestone for which the pivot was undertaken ([ADR-0019](0019-3d-pivot.md)).
+The reference is a side cross-section of a building at night: a polished dark floor with
+reflections, a row of ceiling fixtures casting cones downward, warm light inside against cold
+outside, red indicators by the elevator, a neon sign. And the floor in it **is visible** — the
+camera looks slightly from above.
 
-Что уже было решено и остаётся: игровой объект не зависит от освещения сцены
-([ADR-0019](0019-3d-pivot.md), решение 5); пуля летит в плоскости XY независимо
-от камеры (там же, решение 6); в темноте агент видит ближе, но стрелять не
-перестаёт ([ADR-0007](0007-lamps-and-darkness.md)); актёров в темноте держит
-обводка ([ADR-0022](0022-actors-rig.md), решение 4).
+What was already decided and stays: a game object does not depend on scene lighting
+([ADR-0019](0019-3d-pivot.md), decision 5); a bullet flies in the XY plane regardless of the camera
+(same, decision 6); in the dark an agent sees a shorter distance but does not stop shooting
+([ADR-0007](0007-lamps-and-darkness.md)); actors in the dark are held by the outline
+([ADR-0022](0022-actors-rig.md), decision 4).
 
-Проба `tools/look3d.gd` дала числа для тумана, свечения, SSAO и тонмаппинга и
-две находки: строго боковая камера пола не видит, а гладкая коробка под светом
-читается пятном — кадр вытянули рёбра.
+The trial `tools/look3d.gd` gave numbers for fog, glow, SSAO and tone mapping, and two findings: a
+strictly side camera does not see the floor, and a smooth box under light reads as a blob — the
+frame was pulled out by edges.
 
-## Решения
+## Decisions
 
-### 1. Ортокамера наклоняется на десять градусов сверху
+### 1. The ortho camera tilts ten degrees from above
 
-Строго сбоку верхняя плоскость перекрытия — полоска нулевой толщины, и
-отражений в полу — приёма, ради которого пивот и затевался, — не будет никогда.
-Наклон в десять градусов открывает пол полосой в треть метра: в неё ложатся
-отражения и свет ламп, а этажи остаются параллельными полосами кадра.
+Strictly from the side, the top face of the slab is a zero-thickness strip, and floor reflections —
+the technique the pivot was undertaken for — will never happen. A ten-degree tilt opens the floor
+as a strip a third of a metre wide: reflections and lamp light fall into it, and floors stay
+parallel bands of the frame.
 
-Ограничение решения 6 [ADR-0019](0019-3d-pivot.md) в силе: наклон — свойство
-камеры, а не мира. Плоскость игры, попадания и полоса видимых этажей считаются
-как считались; камера лишь стоит выше цели на `расстояние × tg(наклон)`, чтобы
-её ось пересекала плоскость игры в нужной точке, и видит по вертикали чуть
-больше — на `1/cos(наклон)`.
+The constraint of decision 6 of [ADR-0019](0019-3d-pivot.md) is in force: tilt is a property of the
+camera, not of the world. The play plane, hits and the band of visible floors are computed as they
+were; the camera merely stands above the target by `distance × tan(tilt)` so that its axis crosses
+the play plane at the right point, and sees slightly more vertically — by `1/cos(tilt)`.
 
-Перспектива отвергнута: этажи перестают быть равными полосами, верх и низ кадра
-в разном масштабе, и правило «этаж — полоса кадра» с отбором видимых этажей
-пришлось бы пересчитывать.
+Perspective is rejected: floors stop being equal bands, the top and bottom of the frame are at
+different scales, and the rule "a floor is a band of the frame" with the selection of visible floors
+would have to be recomputed.
 
-### 2. Ламп на этаже несколько, и темнота ходит зонами
+### 2. There are several lamps on a floor, and darkness comes in zones
 
-Как на референсе: ряд светильников по потолку, по одному на каждые три места
-этажа — одна лампа на узком верху, две в середине, три внизу
-(`BuildingRules.lamps_on`). Раскладка ставит их не в случайные свободные
-места, а в середины равных зон этажа: **зона лампы — это и есть единица
-темноты.**
+As in the reference: a row of fixtures along the ceiling, one for every three slots of the floor —
+one lamp at the narrow top, two in the middle, three at the bottom (`BuildingRules.lamps_on`). The
+layout puts them not in random free slots but in the middles of equal zones of the floor: **the
+lamp's zone is the unit of darkness.**
 
-Сбитая лампа гасит **свою зону**, а не этаж: агент в этой зоне видит ближе и
-стоит дороже, агент под соседней лампой — нет. Зона — ближайшая лампа по
-горизонтали; границы лежат посередине между соседними. Правило живёт в
-[`FloorLighting`](../../src/systems/lighting/floor_lighting.gd), как и прежде без
-сцены, и проверяется тем же приёмом.
+A shot-down lamp darkens **its zone**, not the floor: an agent in that zone sees a shorter distance
+and is worth more, an agent under a neighbouring lamp is not. The zone is the nearest lamp
+horizontally; the boundaries lie midway between neighbours. The rule lives in
+[`FloorLighting`](../../src/systems/lighting/floor_lighting.gd), still without a scene, and is
+checked by the same technique.
 
-Это второй шаг от оригинала, и он записан как выбор. В 1983 сбитая лампа гасила
-всё здание на несколько секунд; [ADR-0007](0007-lamps-and-darkness.md) сделал
-темноту поэтажной и навсегда — ради тактики «погасить этаж и пройти». Зоны
-делают ту же тактику точнее: гасить надо там, где стоишь, а не где угодно на
-этаже, — и они единственное, что согласуется с несколькими лампами на этаж.
-Одна лампа на тридцатиметровый этаж референсом не читается вовсе.
+This is the second step away from the original, and it is recorded as a choice. In 1983 a
+shot-down lamp darkened the whole building for a few seconds; [ADR-0007](0007-lamps-and-darkness.md)
+made darkness per floor and permanent — for the tactic "darken the floor and get through". Zones
+make the same tactic more precise: you have to darken where you stand, not anywhere on the floor —
+and they are the only thing consistent with several lamps per floor. One lamp on a thirty-metre
+floor does not read against the reference at all.
 
-Отвергнут вариант «несколько ламп, гаснут все разом»: он делает первый же
-выстрел по любой лампе выключателем этажа и обесценивает остальные.
+The option "several lamps that go out all at once" is rejected: it makes the very first shot at any
+lamp a floor switch and devalues the rest.
 
-### 3. У лампы два источника, и оба уходят с ней
+### 3. A lamp has two sources, and both go with it
 
-Конус вниз — `SpotLight3D` с мягкой тенью, тёплый, — даёт пятно на полу и
-рёбра теней, как на референсе. Один конус оставляет между лампами черноту даже
-при горящих лампах, поэтому рядом с ним слабая широкая заливка — `OmniLight3D`.
-Оба — дети лампы: сбита — погасли оба, и «зона горит» значит ровно «лампа
-висит». Горят только лампы видимых этажей, как и раньше.
+A downward cone — a warm `SpotLight3D` with a soft shadow — gives a spot on the floor and shadow
+edges, as in the reference. One cone leaves blackness between lamps even when the lamps are lit, so
+next to it there is a weak wide fill — `OmniLight3D`. Both are children of the lamp: shot down —
+both go out, and "the zone is lit" means exactly "the lamp is hanging". Only lamps of visible floors
+are lit, as before.
 
-**Тень нужна обоим.** Заливка задумывалась без тени — она слабая, и тень на
-второй источник каждой лампы стоит денег. Но её радиус (7 м) больше высоты
-этажа (3 м), и бестеневой свет прошёл сквозь перекрытия: на кадре погашенного
-этажа его пол подсвечивали лампы этажа снизу, и темнота переставала быть
-темнотой. Резать радиус нельзя — он и нужен, чтобы дотянуться до краёв зоны.
-Тень на заливке стоила 0.8 мс на кадр (1.2 → 2.0 при бюджете 16.6), и это
-дешевле, чем темнота, сквозь которую видно.
+**Both need a shadow.** The fill was intended without a shadow — it is weak, and a shadow on the
+second source of each lamp costs money. But its radius (7 m) is greater than the floor height
+(3 m), and shadowless light went through the slabs: in the frame of a darkened floor, its floor was
+lit by the lamps of the floor below, and darkness stopped being darkness. The radius cannot be cut —
+it is needed to reach the edges of the zone. The shadow on the fill cost 0.8 ms per frame
+(1.2 → 2.0 with a 16.6 budget), and that is cheaper than darkness one can see through.
 
-Отдельной холодной заливки от окон нет: окна и город придут в M19, и тогда
-холодный свет снаружи будет иметь источник. Сейчас температуру разводят тёплые
-лампы против холодного общего тона палитры раунда.
+There is no separate cold fill from windows: windows and the city come in M19, and then the cold
+light from outside will have a source. For now the temperature is split by warm lamps against the
+cold overall tone of the round palette.
 
-### 4. Рёбра — минимум, чтобы свету было за что цепляться
+### 4. Edges — the minimum for light to catch on
 
-Проба показала: полкадра вытянули пилястры и торцы плит, а не источники.
-В веху входят три ребра, и только они: **торец плиты** — светлая полоса по
-переднему краю перекрытия; **плинтус** — по низу задней стены; **пилястры** —
-между проёмами дверей и у стен. Всё это коробки без тел, как стены комнаты.
-Силуэт, шахты и обстановка остаются M18 и M19.
+The trial showed: half the frame was pulled out by pilasters and slab edges, not by sources.
+The milestone includes three edges, and only those: the **slab edge** — a light strip along the
+front edge of the slab; the **skirting** — along the bottom of the back wall; **pilasters** —
+between door openings and at the walls. All of this is boxes without bodies, like the room walls.
+The silhouette, shafts and dressing remain M18 and M19.
 
-### 5. Материалы: пол полированный, остальное шершавое
+### 5. Materials: the floor polished, the rest rough
 
-Пол — тёмный и гладкий, ради отражений: низкая шероховатость, каплю металла.
-Стены и плиты — шершавый бетон. Шахта — металл. Это PBR-параметры на тех же
-коробках; текстур нет — они дело обстановки M19.
+The floor is dark and smooth, for reflections: low roughness, a drop of metal. Walls and slabs are
+rough concrete. The shaft is metal. These are PBR parameters on the same boxes; there are no
+textures — they are the business of the M19 dressing.
 
-### 6. Читаемость — диегетическими огоньками, а не свечением коробок
+### 6. Readability through diegetic indicator lights, not glowing boxes
 
-Игровой объект перестаёт светиться целиком: под красивым светом светящаяся
-дверь-коробка выглядит инородно, и греев-бокс остаётся виден. Вместо этого у
-каждого — маленький **собственный свет**, как индикаторы на референсе:
+A game object stops glowing as a whole: under beautiful light a glowing box-door looks alien, and
+the greybox stays visible. Instead each one gets a small **light of its own**, like the indicators
+in the reference:
 
-| Объект | Огонёк |
+| Object | Indicator light |
 |---|---|
-| Дверь | табло над створкой: красное у красной, тёплое у обычной |
-| Кабина | два красных индикатора на крыше кабины; стрелки как были |
-| Выход | зелёная вывеска над проёмом |
-| Лампа | сам светильник — он и есть источник |
-| Пуля | как была, она и так свет |
-| Актёры | обводка ([ADR-0022](0022-actors-rig.md), решение 4) |
+| Door | an indicator board above the leaf: red for a red door, warm for an ordinary one |
+| Cab | two red indicators on the cab roof; arrows as before |
+| Exit | a green sign above the opening |
+| Lamp | the fixture itself — it is the source |
+| Bullet | as before, it is light anyway |
+| Actors | outline ([ADR-0022](0022-actors-rig.md), decision 4) |
 
-Огоньки — эмиссия, свету сцены не подчиняются: требование решения 5
-[ADR-0019](0019-3d-pivot.md) выполняется ими на любом этаже, погашенном тоже.
+Indicator lights are emission and do not obey scene light: the requirement of decision 5 of
+[ADR-0019](0019-3d-pivot.md) is met by them on any floor, darkened ones included.
 
-### 7. Атмосфера — числами пробы, под бюджетом
+### 7. Atmosphere — with the trial's numbers, under budget
 
-SSR, SSAO, объёмный туман плотностью намёка, свечение и ACES берутся из
-`look3d.gd` как есть: они уже подобраны на нашей же геометрии. Меняются только
-по замеру: `tools/light_bench.gd` строит настоящее здание с агентами и меряет
-кадр на GPU. Бюджет 16.6 мс — граница, число пишется в STATUS.
+SSR, SSAO, volumetric fog at a hint of density, glow and ACES are taken from `look3d.gd` as is: they
+are already tuned on our own geometry. They change only by measurement: `tools/light_bench.gd`
+builds the real building with agents and measures the frame on the GPU. The 16.6 ms budget is the
+limit, the number is written into STATUS.
 
-**Яркость источников — исключение, и это стоит сказать прямо.** Числа пробы
-относились к её же свету: шесть спотов по 9 единиц, наклонённых на заднюю
-стену. У нас конус висит на 1.8 м и светит вниз, и с числами пробы первый
-кадр вышел почти чёрным. Конус 9.0 на 6 м и 60°, заливка 1.5 на 7 м и общий
-тон 0.55 подобраны по кадру — единственные числа вехи, у которых источник
-«так видно», а не замер. Кадры, на которых они выбраны, снимает
-`tools/dark_shot.gd`: этаж горит, зона погашена, этаж погашен целиком.
+**Light source brightness is an exception, and that is worth saying plainly.** The trial's numbers
+belonged to its own light: six spots of 9 units each, tilted at the back wall. Ours is a cone
+hanging at 1.8 m and shining down, and with the trial's numbers the first frame came out almost
+black. Cone 9.0 at 6 m and 60°, fill 1.5 at 7 m and overall tone 0.55 were chosen by the frame —
+the only numbers of the milestone whose source is "it looks right", not a measurement. The frames
+they were chosen on are shot by `tools/dark_shot.gd`: the floor lit, a zone darkened, the floor
+darkened entirely.
 
-### 8. Видит ли агент Otto, решает тень Otto; слепой агент патрулирует
+### 8. Whether an agent sees Otto is decided by Otto's shadow; a blind agent patrols
 
-До сих пор темнота резала дальность агенту, который сам в ней стоял
-([ADR-0007](0007-lamps-and-darkness.md), решение 4). С зонами это перевёрнуто:
-**из тени освещённого видно, освещённый в тень не видит.** Otto в тёмной зоне
-агент замечает только ближе `agent_dark_fire_range` — 1.8 м, треть полной
-дальности, число M11, на котором бот проходит здание; освещённого Otto видит
-с полной дальности, где бы ни стоял сам. Собственная тень агента влияет теперь
-только на цену его смерти (ADR-0010, пункт 6).
+Until now darkness cut the range of an agent who himself stood in it
+([ADR-0007](0007-lamps-and-darkness.md), decision 4). With zones this is reversed:
+**from the shadow the lit one is visible; the lit one cannot see into the shadow.** An agent
+notices Otto in a dark zone only closer than `agent_dark_fire_range` — 1.8 m, a third of the full
+range, the M11 number on which the bot completes the building; a lit Otto he sees from full range,
+wherever he himself stands. The agent's own shadow now affects only the price of his death
+(ADR-0010, item 6).
 
-Не видит — не цель. Мозг получает «жив и виден» одним словом и невидимого не
-преследует: идёт, куда шёл, у края этажа разворачивается и идёт обратно. Так
-тактика «погасить и стоять в тени» работает буквально, а не только «не стреляет
-издалека». Тем же словом закрывается долг M14: Otto за дверью невидим, и агенты
-теряют его — в оригинале войти в дверь значило сбить их со следа.
+Not seen — not a target. The brain gets "alive and visible" as one word and does not pursue an
+invisible target: it goes where it was going, turns around at the edge of the floor and walks back.
+This way the tactic "darken and stand in the shadow" works literally, not only as "does not shoot
+from afar". The same word closes the M14 debt: Otto behind a door is invisible, and agents lose
+him — in the original, entering a door meant throwing them off the trail.
 
-Отвергнуто «обе тени — худшая дальность»: проще объяснить, но менее честно, а
-проверяется ровно так же. Число 1.8 подлежит замеру ботом, как всё в балансе.
+Rejected: "both shadows — the worse range": simpler to explain but less honest, and checked in
+exactly the same way. The number 1.8 is subject to bot measurement, like everything in the balance.
 
-## Чего в вехе нет
+## What is not in the milestone
 
-- **Окон, города и холодного света снаружи** — M19.
-- **Текстур** — M19. Здесь материалы задают только шероховатость, металл и цвет.
-- **Качания лампы после выстрела.** Сбитая лампа падает сразу (ADR-0007), и
-  качаться ей некогда; подвес — шнур и патрон — есть, качание не заводится.
-- **Затухания темноты в поздних зданиях** — открытый долг ADR-0010, пункт 7.
+- **Windows, the city and cold light from outside** — M19.
+- **Textures** — M19. Here materials set only roughness, metal and colour.
+- **Lamp swinging after a shot.** A shot-down lamp falls immediately (ADR-0007), and it has no time
+  to swing; the suspension — cord and socket — exists, swinging is not introduced.
+- **Darkness fading in later buildings** — an open debt of ADR-0010, item 7.
 
-## Как проверяем
+## How we check
 
-**DoD вехи:** свет выглядит мягким и объёмным, и при этом на тёмном этаже
-игрок видит, во что стреляет.
+**Milestone DoD:** the light looks soft and volumetric, and at the same time on a dark floor the
+player sees what he is shooting at.
 
-- `test_side_camera.gd` — ось наклонённой камеры проходит через цель в плоскости
-  игры, кадр по вертикали больше на 1/cos, слушатель звука остался в плоскости.
-- `test_floor_lighting.gd` — зоны без сцены: гаснет своя зона, соседняя горит,
-  этаж без ламп не гаснет никогда, этаж тёмен, когда погашены все его зоны.
-- `test_building_rules.gd`, `test_building_plan.gd` — ламп по ширине этажа,
-  разнесены по этажу, места не делят; у крыши их нет вовсе. На вырожденно
-  тесном здании лампа достаётся каждому этажу, даже когда делить место больше
-  не с чем: этаж без лампы не светел и погасить его нечем.
-- `test_building_assembly.gd` — сбитая лампа гасит зону, не этаж; источников
-  становится меньше на два.
-- `test_darkness.gd` — со сценой: освещённого Otto бьют с полной дальности;
-  Otto в тени издалека не виден, вплотную виден; агент в тени видит освещённого;
-  за дверью Otto теряют; слепой агент доходит до края и разворачивается.
-- `test_enemy_brain.gd` — невидимая цель не преследуется и не обстреливается.
-- `test_readability.gd` — у каждой двери, кабины, выхода и лампы есть светящийся
-  элемент, у актёров — обводка. Структурная проверка того, что кадр с погашенными
-  лампами обязан показывать.
-- Бюджет кадра — `tools/light_bench.gd`, вручную, число в STATUS.
+- `test_side_camera.gd` — the axis of the tilted camera passes through the target in the play plane,
+  the frame is taller by 1/cos vertically, the sound listener stays in the plane.
+- `test_floor_lighting.gd` — zones without a scene: its own zone goes out, the neighbouring one stays
+  lit, a floor without lamps never goes dark, a floor is dark when all its zones are out.
+- `test_building_rules.gd`, `test_building_plan.gd` — lamps by floor width, spread along the floor,
+  not sharing slots; the roof has none at all. In a degenerately cramped building every floor gets a
+  lamp even when there is nothing left to share a slot with: a floor without a lamp is not lit and
+  there is nothing to darken it with.
+- `test_building_assembly.gd` — a shot-down lamp darkens a zone, not a floor; there are two fewer
+  sources.
+- `test_darkness.gd` — with a scene: a lit Otto is hit from full range; Otto in the shadow is not
+  seen from afar, seen up close; an agent in the shadow sees a lit one; behind a door Otto is lost;
+  a blind agent walks to the edge and turns around.
+- `test_enemy_brain.gd` — an invisible target is not pursued or fired at.
+- `test_readability.gd` — every door, cab, exit and lamp has an emissive element, actors have an
+  outline. A structural check of what the frame with the lamps out must show.
+- Frame budget — `tools/light_bench.gd`, manually, number in STATUS.

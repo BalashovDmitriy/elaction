@@ -1,43 +1,43 @@
 class_name Sounds
 extends RefCounted
 
-## Звуки игры: имена событий и загрузка файлов.
+## Game sounds: event names and file loading.
 ##
-## Устроено как у прежних спрайтов: имя — это имя файла, список один
-## на проект, и тест ходит по нему в обе стороны — у каждого имени есть файл,
-## у каждого файла есть имя. Иначе ненужный звук копится в репозитории, а
-## забытое событие молчит. Файлы — из свободных библиотек, авторы в
-## `assets/audio/credits.json` (ADR-0036, решение 1).
+## Organized like the former sprites: the name is the file name, there is one list
+## for the project, and a test walks it both ways: every name has a file,
+## every file has a name. Otherwise unused sound piles up in the repository, and a
+## forgotten event stays silent. Files come from free libraries, authors are in
+## `assets/audio/credits.json` (ADR-0036, decision 1).
 
 const DIR := "res://assets/audio/"
 
-## Расширения, в которых может лежать звук. Короткое и частое — в WAV,
-## длинное — в OGG; какое у какого, решает сборка ассетов, а игра берёт то,
-## что нашла. Второй список тех же имён разъехался бы с первым молча.
+## Extensions a sound can be stored in. Short and frequent ones are WAV,
+## long ones OGG; which is which is decided by the asset build, and the game takes what
+## it finds. A second list of the same names would silently drift from the first.
 const EXTENSIONS: PackedStringArray = [".wav", ".ogg"]
 
 const MUSIC_BUS := "Music"
 const SFX_BUS := "SFX"
 const MASTER_BUS := "Master"
-## Фон — дочерняя шина эффектов: громкость эффектов в настройках ведёт и его
-## (ADR-0036, решение 5).
+## Ambience is a child bus of effects: the effects volume in the settings drives it too
+## (ADR-0036, decision 5).
 const AMBIENCE_BUS := "Ambience"
-## Интерфейс и джинглы — мимо шины эффектов, прямо в общую: глушение коридора
-## за красной дверью их не трогает — щелчок меню и джингл документа звучат не
-## в коридоре. Громкость ведёт тот же ползунок эффектов ([method
-## AudioDirector.set_level]).
+## The interface and jingles bypass the effects bus and go straight into the master one:
+## the corridor muffling behind a red door does not touch them, since a menu click and
+## the document jingle do not sound in the corridor. Volume is driven by the same effects
+## slider ([method AudioDirector.set_level]).
 const INTERFACE_BUS := "Interface"
 
-## Причины, по которым музыка звучит из-за стены.
+## Reasons for which the music sounds as if from behind a wall.
 const MUFFLE_PAUSE := "pause"
 const MUFFLE_DOOR := "door"
 
-## События игры. Константы, а не строки по месту: опечатка в строке — это
-## тишина, которую не видно ни в логе, ни в кадре. Шаг — свой у каждого пола.
+## Game events. Constants, not strings in place: a typo in a string is
+## silence that shows neither in the log nor in the frame. Each floor has its own step.
 const STEP_CARPET := "step_carpet"
 const STEP_CONCRETE := "step_concrete"
 const SHOT := "shot"
-## Удар в сценке добивания (ADR-0040). Файл — прежний удар ногой.
+## The blow in the takedown scene (ADR-0040). The file is the former kick.
 const BLOW := "kick"
 const LAMP_BREAK := "lamp_break"
 const LAMP_CRASH := "lamp_crash"
@@ -52,12 +52,12 @@ const CAR_AWAY := "car_away"
 const BUILDING_BONUS := "building_bonus"
 const EXTRA_LIFE := "extra_life"
 const GAME_OVER := "game_over"
-## M24b (ADR-0038): вертолёт висит над крышей и пролетает, Otto съезжает по
-## тросу; дверца и мотор машины, ворота паркинга; шахта в подвал открылась.
+## M24b (ADR-0038): the helicopter hovers above the roof and flies past, Otto slides down
+## the rope; the car door and engine, the garage gate; the shaft to the basement opened.
 const HELICOPTER := "helicopter"
 const HELICOPTER_PASS := "helicopter_pass"
 const ROPE_SLIDE := "rope_slide"
-## M24k: сдвижная дверь вертолёта, лебёдка и сброс бухты троса (ADR-0052).
+## M24k: the helicopter's sliding door, the winch and the rope coil drop (ADR-0052).
 const HELI_DOOR := "heli_door"
 const WINCH := "winch"
 const ROPE_DROP := "rope_drop"
@@ -65,14 +65,14 @@ const CAR_DOOR := "car_door"
 const CAR_START := "car_start"
 const GARAGE_GATE := "garage_gate"
 const BASEMENT_OPEN := "basement_open"
-## Джингл смерти Otto: звучит поверх самой смерти.
+## Otto's death jingle: it sounds over the death itself.
 const DEATH_JINGLE := "death_jingle"
 
-## M24k — пробелы, найденные аудитом звука (ADR-0052, решение 7): пуля в
-## стену и в металл, выстрел агента, тело о пол, давка, вход в замедление;
-## прыжок, приземление, присед, шаг по металлу, возвращение Otto; кабина
-## трогается и встаёт; дверца машины, поворотник, проезжающая машина, гудок;
-## сирена тревоги, треск неона; тиканье бонуса и новый рекорд.
+## M24k: gaps found by the sound audit (ADR-0052, decision 7): a bullet into a
+## wall and into metal, an agent's shot, a body hitting the floor, a crush, entering the
+## slowdown; jump, landing, crouch, a step on metal, Otto's return; the cab
+## starts and stops; the car door, a turn signal, a passing car, a horn;
+## the alarm siren, neon crackle; the bonus ticking and a new high score.
 const BULLET_WALL := "bullet_wall"
 const BULLET_METAL := "bullet_metal"
 const ENEMY_SHOT := "enemy_shot"
@@ -95,30 +95,32 @@ const NEON_FLICKER := "neon_flicker"
 const BONUS_TICK := "bonus_tick"
 const RECORD := "record"
 
-## Меню (ADR-0035, решение 5): переход по пунктам, выбор и возврат.
+## Menu (ADR-0035, decision 5): moving between items, selection and going back.
 const UI_MOVE := "ui_move"
 const UI_SELECT := "ui_select"
 const UI_BACK := "ui_back"
 
-## Музыка: свой трек на экран (ADR-0036, решение 3). Трек тревоги звучит вместо
-## темы здания, пока сирена не снята.
+## Music: its own track per screen (ADR-0036, decision 3). The alarm track plays instead
+## of the building theme until the siren is lifted.
 const THEME := "theme"
-## Тема здания утром, днём и вечером; ночью — [constant THEME] (ADR-0052,
-## решение 1). Тревога — одна на любое время суток.
+## The building theme in the morning, by day and in the evening; at night [constant THEME]
+## (ADR-0052, decision 1). The alarm is one for any time of day.
 const THEME_MORNING := "theme_morning"
 const THEME_DAY := "theme_day"
 const THEME_EVENING := "theme_evening"
 const ALARM_THEME := "alarm_theme"
-## Темы офиса и жилого дома (ADR-0057, решение 7): у отеля — прежние имена,
-## у других типов — с именем типа; время суток — суффиксом, как у отеля.
+## Office and residential building themes (ADR-0057, decision 7): the hotel keeps the
+## former names, the other kinds have the kind's name; the time of day is a suffix, as
+## for the hotel.
 const THEME_OFFICE := "theme_office"
 const THEME_RESIDENTIAL := "theme_residential"
 const ALARM_OFFICE := "alarm_office"
 const ALARM_RESIDENTIAL := "alarm_residential"
-## Лязг решётки грузовой кабины (ADR-0057, решение 6).
+## The clang of the freight cab's gate (ADR-0057, decision 6).
 const CAB_GATE := "cab_gate"
-## Фон залов особых этажей (ADR-0057, решение 4): звучит поверх тишины
-## коридора, пока Otto на этаже зала. У залов без своего звука — только тишина.
+## Ambience of special-floor halls (ADR-0057, decision 4): it sounds over the corridor
+## silence while Otto is on the hall's floor. Halls without their own sound get only
+## silence.
 const HALL_POOL := "hall_pool"
 const HALL_SERVER := "hall_server"
 const HALL_BOILER := "hall_boiler"
@@ -142,26 +144,29 @@ const HALL_TONES := {
 const MENU_THEME := "menu_theme"
 const GAME_OVER_THEME := "game_over_theme"
 
-## Фон: улица, дождь и ветер снаружи; на этажах — дождь за стеклом и тишина
-## коридора; гром к молниям; гул шахты и неон вывески — на своём месте.
+## Ambience: the street, rain and wind outside; on the floors, rain behind the glass and
+## the corridor silence; thunder for lightning; the shaft hum and the sign neon in their
+## own places.
 const CITY := "city"
-## Улица утром, днём и вечером (ADR-0052, решение 8); ночь — [constant CITY].
+## The street in the morning, by day and in the evening (ADR-0052, decision 8); night is
+## [constant CITY].
 const CITY_MORNING := "city_morning"
 const CITY_DAY := "city_day"
 const CITY_EVENING := "city_evening"
 const RAIN := "rain"
 const WIND := "wind"
-## Снег (ADR-0054): ветер снаружи, шаг по снегу, шины по каше.
+## Snow (ADR-0054): wind outside, a step in snow, tires in slush.
 const WIND_SNOW := "wind_snow"
 const STEP_SNOW := "step_snow"
 const CAR_PASS_SLUSH := "car_pass_slush"
 const RAIN_WINDOW := "rain_window"
 const ROOM_TONE := "room_tone"
-## Свой фон коридора у офиса и жилого дома (ADR-0055, решение 8); у отеля —
-## прежний [constant ROOM_TONE].
+## Own corridor ambience for the office and the residential building (ADR-0055, decision
+## 8); the hotel keeps the former [constant ROOM_TONE].
 const ROOM_TONE_OFFICE := "room_tone_office"
 const ROOM_TONE_RESIDENTIAL := "room_tone_residential"
-## Жизнь за дверью квартиры ([DoorLife]) и шаг по линолеуму жилого дома.
+## Life behind an apartment door ([DoorLife]) and a step on residential building
+## linoleum.
 const DOOR_TV := "door_tv"
 const DOOR_DOG := "door_dog"
 const DOOR_ARGUE := "door_argue"
@@ -278,16 +283,16 @@ const AMBIENCE: PackedStringArray = [
 	HALL_MECHANICAL,
 ]
 
-## Джинглы: на время звучания приглушают трек (ADR-0036, решение 6).
+## Jingles: they duck the track while they play (ADR-0036, decision 6).
 const JINGLES: PackedStringArray = [
 	DOCUMENT, EXTRA_LIFE, BUILDING_BONUS, GAME_OVER, DEATH_JINGLE, RECORD
 ]
 
-## Звуки меню: как и джинглы, идут в [constant INTERFACE_BUS].
+## Menu sounds: like jingles, they go to [constant INTERFACE_BUS].
 const INTERFACE: PackedStringArray = [UI_MOVE, UI_SELECT, UI_BACK, BONUS_TICK]
 
-## Звуки, которые звучат петлёй, пока длится то, что их вызвало. Трек конца
-## партии не зациклен: он доигрывает под экраном рекорда и молкнет.
+## Sounds that play as a loop while whatever triggered them lasts. The game-over track
+## is not looped: it plays out under the high-score screen and falls silent.
 const LOOPED: PackedStringArray = [
 	ELEVATOR_HUM,
 	HELICOPTER,
@@ -298,8 +303,9 @@ const LOOPED: PackedStringArray = [
 	THEME_DAY,
 	THEME_EVENING,
 	ALARM_THEME,
-	# Темы и тревоги офиса и жилого дома (ADR-0057, решение 7): без петли трек
-	# здания доигрывал раз и молчал до конца здания (авторевью M24o).
+	# Office and residential building themes and alarms (ADR-0057, decision 7): without a
+	# loop the building track played once and was silent until the end of the building
+	# (M24o code review).
 	THEME_OFFICE,
 	THEME_OFFICE + "_morning",
 	THEME_OFFICE + "_day",
@@ -312,7 +318,8 @@ const LOOPED: PackedStringArray = [
 	ALARM_RESIDENTIAL,
 	MENU_THEME,
 	CITY,
-	# Улица утром, днём и вечером — петлёй, как ночная (ADR-0052, решение 8).
+	# The street in the morning, by day and in the evening loops, like the night one
+	# (ADR-0052, decision 8).
 	CITY_MORNING,
 	CITY_DAY,
 	CITY_EVENING,
@@ -325,7 +332,7 @@ const LOOPED: PackedStringArray = [
 	ROOM_TONE_RESIDENTIAL,
 	SHAFT_HUM,
 	NEON_BUZZ,
-	# Фон залов особых этажей (ADR-0057, решение 4) звучит, пока Otto на этаже.
+	# Special-floor hall ambience (ADR-0057, decision 4) plays while Otto is on the floor.
 	HALL_POOL,
 	HALL_SERVER,
 	HALL_BOILER,
@@ -337,19 +344,19 @@ const LOOPED: PackedStringArray = [
 	HALL_MECHANICAL,
 ]
 
-## Больше стольких вариантов одного имени не бывает: дальше тест не ищет.
+## There are never more variants of one name than this: the test does not look further.
 const MAX_VARIANTS: int = 9
 
 static var _cache: Dictionary = {}
 
 
-## Шина, в которую идёт эффект [param name]: меню и джинглы — в
-## [constant INTERFACE_BUS], всё остальное, звуки мира, — в [constant SFX_BUS].
+## The bus effect [param name] goes to: menu and jingles to
+## [constant INTERFACE_BUS], everything else, world sounds, to [constant SFX_BUS].
 static func bus_of(name: String) -> String:
 	return INTERFACE_BUS if INTERFACE.has(name) or JINGLES.has(name) else SFX_BUS
 
 
-## Все имена разом: по ним ходит тест.
+## All names at once: the test walks them.
 static func names() -> PackedStringArray:
 	var all := PackedStringArray(EFFECTS)
 	all.append_array(MUSIC)
@@ -357,8 +364,8 @@ static func names() -> PackedStringArray:
 	return all
 
 
-## Файлы вариантов звука по порядку: `имя`, `имя.2`, `имя.3`… Счёт идёт до
-## первого пропуска — вариант за пропуском игра бы не нашла.
+## Sound variant files in order: `name`, `name.2`, `name.3`... Counting goes up to
+## the first gap: the game would not find a variant beyond a gap.
 static func variant_paths(name: String) -> PackedStringArray:
 	var paths := PackedStringArray()
 	for index: int in MAX_VARIANTS:
@@ -369,13 +376,13 @@ static func variant_paths(name: String) -> PackedStringArray:
 	return paths
 
 
-## Имя файла варианта без расширения.
+## Variant file name without the extension.
 static func variant_stem(name: String, index: int) -> String:
 	return name if index == 0 else "%s.%d" % [name, index + 1]
 
 
-## Все места, где мог бы лежать файл с именем [param stem]. Нужны тесту: он
-## следит, чтобы вариант лежал ровно в одном файле, а не в WAV и OGG разом.
+## All places where a file named [param stem] could be. The test needs them: it
+## makes sure a variant is in exactly one file, not in WAV and OGG at once.
 static func candidates(stem: String) -> PackedStringArray:
 	var paths := PackedStringArray()
 	for extension: String in EXTENSIONS:
@@ -390,9 +397,9 @@ static func _existing(stem: String) -> String:
 	return ""
 
 
-## Поток звука или null, если файла нет. Кэш общий: один и тот же выстрел
-## звучит в партии тысячи раз. Вариантов несколько — поток сам тянет жребий на
-## каждое звучание: шаги подряд не звучат одним файлом.
+## The sound stream, or null if there is no file. The cache is shared: the same shot
+## sounds thousands of times per game. If there are several variants, the stream itself
+## draws one for every playback: consecutive steps do not sound with the same file.
 static func stream(name: String) -> AudioStream:
 	if _cache.has(name):
 		return _cache[name] as AudioStream
@@ -416,8 +423,8 @@ static func stream(name: String) -> AudioStream:
 	return loaded
 
 
-## Вариант номер [param pick] по кругу — для музыки и фона, которые выбираются
-## жребием по зданию, а не на каждое звучание (ADR-0036).
+## Variant number [param pick] wrapping around, for music and ambience, which are chosen
+## by a draw per building, not per playback (ADR-0036).
 static func variant(name: String, pick: int) -> AudioStream:
 	var streams := variants(name)
 	if streams.is_empty():
@@ -425,7 +432,7 @@ static func variant(name: String, pick: int) -> AudioStream:
 	return streams[posmod(pick, streams.size())]
 
 
-## Все варианты звука, загруженные и с петлёй по [constant LOOPED].
+## All sound variants, loaded and looped according to [constant LOOPED].
 static func variants(name: String) -> Array[AudioStream]:
 	var key := name + "#variants"
 	if _cache.has(key):
@@ -440,19 +447,19 @@ static func variants(name: String) -> Array[AudioStream]:
 	return streams
 
 
-## Зацикливание задаётся здесь, а не в настройках импорта.
+## Looping is set here, not in the import settings.
 ##
-## Настройки импорта — вторая копия того же списка, и разъезжаются они молча:
-## тема, у которой в `.import` сброшен цикл, играет двадцать секунд и замолкает
-## до конца партии. Список [constant LOOPED] один, и он же проверяется тестом.
+## The import settings are a second copy of the same list, and they drift silently:
+## a theme whose loop is reset in `.import` plays for twenty seconds and goes silent
+## until the end of the game. The [constant LOOPED] list is single, and the test checks it.
 static func _set_looping(stream: AudioStream, looping: bool) -> void:
 	var wav := stream as AudioStreamWAV
 	if wav != null:
 		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD if looping else AudioStreamWAV.LOOP_DISABLED
 		if looping:
 			wav.loop_begin = 0
-			# Конец петли — последний кадр, а он считается из длины и частоты:
-			# делить размер данных на байты кадра нельзя, формат бывает сжатым.
+			# The loop end is the last frame, and it is computed from length and rate:
+			# dividing data size by frame bytes is not possible, the format can be compressed.
 			wav.loop_end = int(round(wav.get_length() * float(wav.mix_rate)))
 		return
 
@@ -462,31 +469,31 @@ static func _set_looping(stream: AudioStream, looping: bool) -> void:
 		vorbis.loop_offset = 0.0
 
 
-## Проигрывает эффект. Тихо ничего не делает, если автолоада ещё нет:
-## тесты поднимают классы и без дерева сцены.
+## Plays an effect. Silently does nothing if the autoload does not exist yet:
+## tests bring up classes even without a scene tree.
 static func play(name: String) -> void:
 	var director := AudioDirector.instance()
 	if director != null:
 		director.play(name)
 
 
-## Эффект с тоном [param pitch] и громкостью [param db] этого раза.
+## An effect with pitch [param pitch] and volume [param db] for this playback.
 static func play_tuned(name: String, pitch: float, db: float = 0.0) -> void:
 	var director := AudioDirector.instance()
 	if director != null:
 		director.play(name, pitch, db)
 
 
-## Приглушает музыку на [param seconds] секунд.
+## Ducks the music for [param seconds] seconds.
 static func duck_music(seconds: float) -> void:
 	var director := AudioDirector.instance()
 	if director != null:
 		director.duck(seconds)
 
 
-## Тема здания типа [param building] во время суток [param time] (ADR-0057,
-## решение 7; ADR-0052, решение 1): набор — по типу, вариант — по времени
-## суток. Ночью у отеля — нуар [constant THEME].
+## The theme of a building of kind [param building] at time of day [param time]
+## (ADR-0057, decision 7; ADR-0052, decision 1): the set follows the kind, the variant
+## the time of day. At night the hotel has the noir [constant THEME].
 static func theme_for(
 	time: TimeOfDay.Kind, building: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL
 ) -> String:
@@ -506,8 +513,8 @@ static func theme_for(
 	return base
 
 
-## Мотив тревоги здания типа [param building] — свой у типа (ADR-0057,
-## решение 7), на любое время суток.
+## Alarm motif for a building of kind [param building], specific to the kind (ADR-0057,
+## decision 7), for any time of day.
 static func alarm_for(building: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL) -> String:
 	match building:
 		BuildingIdentity.Kind.OFFICE:
@@ -517,8 +524,8 @@ static func alarm_for(building: BuildingIdentity.Kind = BuildingIdentity.Kind.HO
 	return ALARM_THEME
 
 
-## Включает музыку, если она ещё не та же самая. [param pick] — какой из
-## вариантов трека: здание берёт его по своему сиду.
+## Turns on the music unless it is already the same. [param pick] is which of the
+## track variants: the building picks it by its seed.
 static func play_music(name: String, pick: int = 0) -> void:
 	var director := AudioDirector.instance()
 	if director != null:
@@ -531,34 +538,34 @@ static func stop_music() -> void:
 		director.stop_music()
 
 
-## Музыка из-за стены: за красной дверью и на паузе.
+## Music from behind a wall: behind a red door and on pause.
 static func muffle_music(reason: String, on: bool) -> void:
 	var director := AudioDirector.instance()
 	if director != null:
 		director.muffle_music(reason, on)
 
 
-## Звуки мира из-за стены: Otto за красной дверью слышит коридор глухо.
+## World sounds from behind a wall: Otto behind a red door hears the corridor muffled.
 static func muffle_world(on: bool) -> void:
 	var director := AudioDirector.instance()
 	if director != null:
 		director.muffle_world(on)
 
 
-## Погода и время суток вокруг: по ним директор выбирает петли фона снаружи и
-## внутри.
+## Weather and time of day around: the director picks the ambience loops outside and
+## inside by them.
 static func set_weather(weather: Weather.Kind, time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT) -> void:
 	var director := AudioDirector.instance()
 	if director != null:
 		director.set_weather(weather, time)
 
 
-## Петли фона под погоду [param weather]. Снаружи — улица и дождь или ветер;
-## на этажах — тишина коридора и, в дождь, дождь за стеклом. Гром сюда не
-## входит: он приходит от молний.
+## Ambience loops for weather [param weather]. Outside, the street and rain or wind;
+## on the floors, the corridor silence and, in rain, rain behind the glass. Thunder is
+## not included: it comes from lightning.
 ##
-## Улица — своя на время суток [param time] (ADR-0052, решение 8), тишина
-## коридора — своя у типа здания [param building] (ADR-0055, решение 8).
+## The street is specific to time of day [param time] (ADR-0052, decision 8), the
+## corridor silence to building kind [param building] (ADR-0055, decision 8).
 static func weather_loops(
 	weather: Weather.Kind,
 	outdoors: bool,
@@ -573,18 +580,18 @@ static func weather_loops(
 	var inside := PackedStringArray([room_tone_of(building)])
 	if raining:
 		inside.append(RAIN_WINDOW)
-	# Фон зала особого этажа — только внутри (ADR-0057, решение 4).
+	# The special-floor hall ambience is inside only (ADR-0057, decision 4).
 	if not hall.is_empty():
 		inside.append(hall)
 	return inside
 
 
-## Фон зала роли [param role] или пусто, если своего звука у зала нет.
+## Ambience of a hall with role [param role], or empty if the hall has no sound of its own.
 static func hall_tone_of(role: FloorRole.Role) -> String:
 	return String(HALL_TONES.get(role, ""))
 
 
-## Тишина коридора здания типа [param building].
+## Corridor silence for a building of kind [param building].
 static func room_tone_of(building: BuildingIdentity.Kind) -> String:
 	match building:
 		BuildingIdentity.Kind.OFFICE:
@@ -594,16 +601,16 @@ static func room_tone_of(building: BuildingIdentity.Kind) -> String:
 	return ROOM_TONE
 
 
-## Тип здания, в котором партия: по нему тишина коридора. [param hall] — фон
-## зала особого этажа, у которого Otto ([method hall_tone_of]).
+## The kind of building the game is in: the corridor silence follows it. [param hall] is
+## the ambience of the special-floor hall Otto is at ([method hall_tone_of]).
 static func set_building(building: BuildingIdentity.Kind, hall: String = "") -> void:
 	var director := AudioDirector.instance()
 	if director != null:
 		director.set_building(building, hall)
 
 
-## Улица во время суток [param time]: утром птицы, днём плотный гул, вечером
-## тише, ночью — прежний ночной город.
+## The street at time of day [param time]: birds in the morning, a dense hum by day,
+## quieter in the evening, the former night city at night.
 static func city_for(time: TimeOfDay.Kind) -> String:
 	match time:
 		TimeOfDay.Kind.MORNING:
@@ -615,35 +622,37 @@ static func city_for(time: TimeOfDay.Kind) -> String:
 	return CITY
 
 
-## Фон снаружи или из-за стекла.
+## Ambience outside or from behind the glass.
 static func set_outdoors(on: bool) -> void:
 	var director := AudioDirector.instance()
 	if director != null:
 		director.set_outdoors(on)
 
 
-## Гром от разряда в [param distance] метрах.
+## Thunder from a strike [param distance] meters away.
 static func thunder(distance: float) -> void:
 	var director := AudioDirector.instance()
 	if director != null:
 		director.thunder(distance)
 
 
-## Ставит громкость шины, 0..1. Настройки зовут её на каждый ползунок.
+## Sets the bus volume, 0..1. The settings call it on every slider.
 static func set_level(bus: String, level: float) -> void:
 	var director := AudioDirector.instance()
 	if director != null:
 		director.set_level(bus, level)
 
 
-## Позиционный источник на узле: его слышно только рядом с ним.
+## A positional source on a node: it is audible only near it.
 ##
-## Нужен тому, что звучит на своём месте, а не в партии целиком: шахт в здании
-## пять, и гудеть в ухо должна та, рядом с которой стоишь. Заводится здесь, а не
-## в узлах: лифт и эскалатор собирали его одинаково, слово в слово.
-## [param reach] — докуда слышно, м.
-## [param always] — петля звучит с первого кадра и не выключается: гул шахты,
-## неон. Ставится до входа в дерево: вошедший источник автозапуск уже не видит.
+## Needed by whatever sounds in its own place rather than across the whole game: there
+## are five shafts in a building, and the one you stand next to should hum in your ear.
+## It is created here, not in the nodes: the elevator and the escalator built it the same
+## way, word for word.
+## [param reach] is how far it can be heard, m.
+## [param always]: the loop plays from the first frame and is never turned off: the shaft
+## hum, neon. Set before entering the tree: a source that has entered no longer sees
+## autoplay.
 static func source(
 	host: Node, name: String, reach: float, always: bool = false
 ) -> AudioStreamPlayer3D:
@@ -656,9 +665,9 @@ static func source(
 	return player
 
 
-## Разовый звук на месте [param at] (координаты сцены): его слышно рядом, а
-## не везде. Источник — на [param host], поверх его движения, и убирает себя
-## сам, когда отзвучал. [param pitch] и [param db] — тон и громкость этого раза.
+## A one-shot sound at [param at] (scene coordinates): audible nearby, not
+## everywhere. The source is on [param host], on top of its movement, and removes itself
+## when it has finished. [param pitch] and [param db] are the pitch and volume this time.
 static func play_at(
 	host: Node, name: String, at: Vector3, reach: float = 24.0, db: float = 0.0, pitch: float = 1.0
 ) -> void:
@@ -673,12 +682,12 @@ static func play_at(
 	player.play()
 
 
-## Держит петлю включённой или выключенной.
+## Keeps a loop on or off.
 ##
-## Присваивать [member AudioStreamPlayer3D.playing] каждый кадр нельзя: сеттер
-## зовёт [method AudioStreamPlayer3D.play] заново, и от двухсекундного гула
-## слышно только первые три миллисекунды — вместо мотора выходит треск на
-## частоте кадров (проверено: позиция воспроизведения стоит на 0.003 с).
+## Assigning [member AudioStreamPlayer3D.playing] every frame is not possible: the setter
+## calls [method AudioStreamPlayer3D.play] again, and of a two-second hum only the first
+## three milliseconds are heard: instead of an engine you get a crackle at the
+## frame rate (verified: the playback position stays at 0.003 s).
 static func keep_playing(player: AudioStreamPlayer3D, on: bool) -> void:
 	if on == player.playing:
 		return
@@ -688,6 +697,6 @@ static func keep_playing(player: AudioStreamPlayer3D, on: bool) -> void:
 		player.stop()
 
 
-## Сбрасывает кэш. Нужен тестам: они грузят звуки в своём порядке.
+## Resets the cache. Needed by tests: they load sounds in their own order.
 static func forget() -> void:
 	_cache.clear()

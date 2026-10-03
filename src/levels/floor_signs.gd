@@ -1,84 +1,85 @@
 class_name FloorSigns
 extends Node3D
 
-## Номера этажей: табло с красными цифрами у правой стены каждого этажа.
+## Floor numbers: an indicator with red digits at the right wall of each floor.
 ##
-## В оригинале она висит на каждом этаже, под самым потолком, вплотную к правой
-## стене. Это не обстановка, а игровая сводка: сколько ещё спускаться и где
-## лежит документ (ADR-0026, решение 9). Поэтому цифры светятся сами — тем же
-## приёмом, что табло дверей (ADR-0023, решение 6), — и читаются на погашенном
-## этаже.
+## In the original it hangs on every floor, right under the ceiling, against the right
+## wall. It is not dressing but a game summary: how much further to descend and where
+## a document lies (ADR-0026, decision 9). So the digits glow by themselves — the same
+## technique as the door indicators (ADR-0023, decision 6) — and read on a darkened
+## floor.
 ##
-## С M21b светится только цифра, а не вся табличка (замечание пользователя:
-## красный светящийся щит «сильно выделяется» среди обоев и мебели). Табло как
-## настоящее: стальная рамка, тёмное стекло, красные цифры с ореолом. Красный —
-## от таблички оригинала.
+## Since M21b only the digit glows, not the whole sign (user's remark:
+## a red glowing shield "stands out a lot" among the wallpaper and furniture). The indicator is like
+## a real one: a steel frame, dark glass, red digits with a halo. The red
+## comes from the original's sign.
 ##
-## Нумерация как в оригинале: верхний этаж — самый большой номер, нижний — первый.
-## На крыше таблички нет: там нет ни стены, ни потолка, и в оригинале её там нет.
+## Numbering as in the original: the top floor has the highest number, the bottom one is first.
+## There is no sign on the roof: there is neither a wall nor a ceiling, and the original has none
+## there.
 ##
-## Нижний этаж — подземный паркинг (ADR-0038, решение 3), и везде, где игрок
-## видит этаж, он «P», а не «1»: на табличке, на табло шахт, на колоннах паркинга
-## и в HUD. Номера остальных этажей не сдвигаются — [method number_of] прежний.
+## The bottom floor is an underground garage (ADR-0038, decision 3), and everywhere the player
+## sees the floor, it is "P", not "1": on the sign, on the shaft indicators, on the garage columns
+## and in the HUD. The other floors' numbers do not shift — [method number_of] is unchanged.
 
-## Как подписан нижний этаж — паркинг — там, где у других номер.
+## How the bottom floor — the garage — is labelled where others have a number.
 const PARKING_MARK := "P"
 
-## Кегль шрифта: чем он крупнее, тем чётче цифра. Высоту цифры в мире задаёт
-## [constant Proportions.FLOOR_DIGIT], а не он.
+## Font size: the larger it is, the sharper the digit. The digit height in the world is set by
+## [constant Proportions.FLOOR_DIGIT], not by it.
 const FONT_SIZE: int = 64
 
-## Доля кегля, которую занимает у Exo 2 цифра по высоте: по ней кегль
-## переводится в метры. Замер по глифам: от 0.69 («1», «4», «7») до 0.72
-## («0», «3»); у Pixellari, на котором табличка жила до M22b, было 0.69.
+## The fraction of the font size a digit takes in height in Exo 2: by it the size
+## is converted to metres. Measured by glyphs: from 0.69 ("1", "4", "7") to 0.72
+## ("0", "3"); Pixellari, which the sign used before M22b, had 0.69.
 const DIGIT_SHARE: float = 0.71
 
-## На сколько табличка стоит перед задней стеной: перед пилястрами, чтобы
-## не утонуть в них у края простенка.
+## How far the sign stands in front of the back wall: in front of the pilasters, so as
+## not to sink into them at the edge of a wall section.
 const STANDOFF: float = 0.25
 
-## Рамка табло: насколько шире стекла с каждой стороны и её цвет — тёмная сталь.
+## Indicator frame: how much wider than the glass on each side, and its colour — dark steel.
 const BEZEL: float = 0.04
 const BEZEL_COLOR := Color(0.34, 0.35, 0.38)
-## Стекло: почти чёрное с красным отливом — цифре есть на чём гореть.
+## Glass: almost black with a red sheen — something for the digit to glow on.
 const GLASS := Color(0.06, 0.02, 0.02)
-## Цифра — красный светодиод с ореолом того же тона.
+## The digit is a red LED with a halo of the same tone.
 const DIGIT := Color(1.0, 0.28, 0.2)
 
 var _rules: BuildingRules = null
 
 
-## Вешает таблички на все этажи здания.
+## Hangs signs on all floors of the building.
 func hang(rules: BuildingRules) -> void:
 	_rules = rules
 	for index in rules.floors:
 		_hang_on(index)
 
 
-## Номер этажа так, как его видит игрок: верхний — [member BuildingRules.floors],
-## нижний — первый.
+## Floor number as the player sees it: the top is [member BuildingRules.floors],
+## the bottom is first.
 static func number_of(rules: BuildingRules, index: int) -> int:
 	return rules.floors - index
 
 
-## Паркинг ли этаж [param index]: нижний этаж здания.
+## Whether floor [param index] is the garage: the building's bottom floor.
 static func is_parking(rules: BuildingRules, index: int) -> bool:
 	return index == rules.floors - 1
 
 
-## Подпись этажа [param index] так, как её видит игрок: номер, а у паркинга —
+## Label of floor [param index] as the player sees it: the number, and for the garage —
 ## [constant PARKING_MARK].
 static func label_of(rules: BuildingRules, index: int) -> String:
 	return PARKING_MARK if is_parking(rules, index) else str(number_of(rules, index))
 
 
-## Где висит середина таблички этажа, в координатах правил.
+## Where the middle of a floor's sign hangs, in rule coordinates.
 ##
-## Не вплотную к потолку, как в оригинале, а ниже на полосу, которую закрывает
-## кромка перекрытия. Камера смотрит на [constant SideCamera.TILT_DEGREES]
-## сверху, и передний край плиты загораживает у задней стены полосу под
-## потолком — на первом кадре вехи табличка уходила под неё наполовину, и от
-## цифр оставался низ.
+## Not against the ceiling, as in the original, but lower by the band covered by
+## the slab edge. The camera looks [constant SideCamera.TILT_DEGREES]
+## from above, and the front edge of the slab hides a band under the ceiling at the back
+## wall — in the milestone's first shot the sign went half under it, and only the bottom
+## of the digits remained.
 static func centre_on(rules: BuildingRules, index: int) -> Vector2:
 	var inner_right := rules.floor_span(index).y - BuildingShell.WALL_WIDTH
 	var plate := Proportions.FLOOR_SIGN
@@ -88,11 +89,11 @@ static func centre_on(rules: BuildingRules, index: int) -> Vector2:
 	)
 
 
-## Полоса под потолком, которую кромка перекрытия закрывает от камеры на
-## глубине [param z] (по умолчанию — таблички), м.
+## The band under the ceiling that the slab edge hides from the camera at
+## depth [param z] (by default — the sign's), m.
 ##
-## Нужна всему, что висит под потолком у задней стены: трубы обстановки на
-## первых кадрах M19 целиком уходили под кромку (авторевью M19).
+## Needed by everything hanging under the ceiling at the back wall: the dressing pipes in
+## the first M19 shots went entirely under the edge (M19 code review).
 static func hidden_band(z: float = WorldSpace.BACK_WALL_Z + STANDOFF) -> float:
 	var depth := WorldSpace.CORRIDOR_DEPTH * 0.5 - z
 	return depth * tan(deg_to_rad(SideCamera.TILT_DEGREES))
@@ -106,7 +107,7 @@ func _hang_on(index: int) -> void:
 	sign_node.position.z = WorldSpace.BACK_WALL_Z + STANDOFF
 	add_child(sign_node)
 
-	# Первым — стекло, вторым — цифра: тест ищет её вторым ребёнком.
+	# First the glass, second the digit: the test looks for it as the second child.
 	var glass := GreyboxLook.box(Vector3(plate.x, plate.y, 0.03), GreyboxLook.polished(GLASS))
 	sign_node.add_child(glass)
 
@@ -118,7 +119,7 @@ func _hang_on(index: int) -> void:
 	label.modulate = DIGIT
 	label.outline_modulate = Color(DIGIT, 0.35)
 	label.outline_size = 10
-	# Цифра — свет, а не краска: освещение сцены её не трогает.
+	# The digit is light, not paint: the scene lighting does not touch it.
 	label.shaded = false
 	label.position.z = 0.02
 	sign_node.add_child(label)

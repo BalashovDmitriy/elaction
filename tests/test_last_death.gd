@@ -1,9 +1,9 @@
 extends GutTest
 
-## Последняя смерть Otto — замедление и наезд (ADR-0042, решение 5).
+## Otto's last death — slowdown and zoom-in (ADR-0042, decision 5).
 ##
-## Сцена сама уходит из дерева, когда кончилась, — поэтому конец ловится своим
-## флажком, а не слежкой GUT за сигналами освобождённого узла.
+## The scene leaves the tree by itself when it ends — so the end is caught by its own
+## flag, not by GUT watching the signals of a freed node.
 
 var _finished: bool = false
 
@@ -34,7 +34,7 @@ func test_the_world_slows_down_and_comes_back() -> void:
 	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "и мир в своём темпе")
 
 
-## Тесты гоняют мир ускоренным: замедление — от того темпа, а не от единицы.
+## Tests run the world sped up: the slowdown is relative to that tempo, not to one.
 func test_the_slowdown_is_relative() -> void:
 	Engine.time_scale = 4.0
 	var scene := _play()
@@ -49,7 +49,7 @@ func test_a_dropped_scene_does_not_leave_the_world_slow() -> void:
 	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "выброшенная сцена темп вернула")
 
 
-## Сцена идёт по настоящим часам: в замедленном мире она не растягивается.
+## The scene runs by the real clock: in a slowed world it does not stretch.
 func test_the_scene_runs_on_real_time() -> void:
 	_play()
 	await wait_seconds(LastDeath.DURATION + 0.5, "сцена по настоящим часам")

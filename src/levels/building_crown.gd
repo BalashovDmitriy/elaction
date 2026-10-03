@@ -1,29 +1,30 @@
 class_name BuildingCrown
 extends Node3D
 
-## Высокая корона над крышей по типу здания (ADR-0058, решение 2).
+## A tall crown above the roof by building kind (ADR-0058, decision 2).
 ##
-## Отель — ступенчатая корона ар-деко из светлого камня с неоновыми гранями,
-## веером лучей и шпилем; офис — стеклянная вершина со срезом и антенной-мачтой;
-## жилой дом — деревянный бак на высоких опорах над кирпичной будкой выхода.
+## Hotel — a stepped art deco crown of light stone with neon edges, a fan of rays and a
+## spire; office — a glass top with a slant cut and an antenna mast; residential — a
+## wooden water tank on tall supports above a brick stair bulkhead.
 ##
-## Корона стоит за плоскостью игры, у задней стены здания: Otto ходит по
-## настилу перед ней, вертолёт висит у коридора ([constant Helicopter.DEPTH_Z])
-## и облетает её по общему правилу препятствий ([method
-## RoofArrival.roof_obstacles]). Поэтому части — отдельные меши, а не мультимеш:
-## мультимеш правило не видит. Тел и источников света нет — неон светится
-## эмиссией и днём погашен, как вывеска ([method TimeOfDay.sign_lit]).
+## The crown stands behind the play plane, at the building's back wall: Otto walks on
+## the deck in front of it, the helicopter hovers at the corridor
+## ([constant Helicopter.DEPTH_Z]) and flies around it by the common obstacle rule
+## ([method RoofArrival.roof_obstacles]). So the parts are separate meshes, not a
+## multimesh: the rule does not see a multimesh. No bodies and no light sources — the
+## neon glows by emission and is off in the daytime, like the sign
+## ([method TimeOfDay.sign_lit]).
 ##
-## Координаты: x — вдоль крыши, высота — над настилом, z — сцены.
+## Coordinates: x — along the roof, height — above the deck, z — the scene's.
 
-## Глубина короны и её задняя грань, м: от задней стены здания вперёд, но не
-## ближе [constant FRONT_Z] — дальше размаха винта вертолёта.
+## Depth of the crown and its back face, m: from the building's back wall forward, but
+## no closer than [constant FRONT_Z] — beyond the helicopter rotor's sweep.
 const BACK_Z: float = WorldSpace.BACK_WALL_Z - WorldSpace.ROOM_DEPTH + 0.05
 const FRONT_Z: float = WorldSpace.BACK_WALL_Z - 5.3
 const DEPTH: float = FRONT_Z - BACK_Z
 
-## Отель: доля ширины кровли под основанием, ступени (доля ширины основания,
-## высота, м), шпиль.
+## Hotel: share of the roof width under the base, steps (share of the base width,
+## height, m), spire.
 const HOTEL_SHARE: float = 0.6
 const HOTEL_TIERS: Array[Vector2] = [
 	Vector2(1.0, 1.7), Vector2(0.78, 1.5), Vector2(0.56, 1.3), Vector2(0.36, 1.1), Vector2(0.2, 0.9)
@@ -35,7 +36,7 @@ const BRASS := Color(0.78, 0.6, 0.3)
 const NEON_STRIP: float = 0.07
 const RAYS: int = 9
 
-## Офис: доля ширины кровли, высота стеклянного объёма и среза, мачта.
+## Office: share of the roof width, height of the glass volume and the cut, mast.
 const OFFICE_SHARE: float = 0.66
 const OFFICE_GLASS_HEIGHT: float = 2.6
 const OFFICE_SLOPE: float = 3.2
@@ -46,7 +47,7 @@ const MULLION_STEP: float = 1.1
 const OFFICE_LIGHTS := Color(0.85, 0.9, 1.0)
 const BEACON := Color(1.0, 0.15, 0.1)
 
-## Жилой дом: будка выхода, опоры и бак.
+## Residential: stair bulkhead, supports and tank.
 const BULKHEAD := Vector3(2.6, 2.3, 1.6)
 const BRICK := Color(0.46, 0.24, 0.17)
 const LEG_HEIGHT: float = 3.2
@@ -59,14 +60,14 @@ const IRON := Color(0.2, 0.2, 0.21)
 var _surface: float = 0.0
 var _lit: bool = true
 var _neon := Color.WHITE
-## Огонь на мачте офиса — мигает, как огонь антенны крыши ([RoofKit]); null у
-## других типов.
+## Light on the office mast — blinks like the roof antenna light ([RoofKit]); null for
+## other kinds.
 var _beacon: MeshInstance3D = null
 var _clock: float = 0.0
 
 
-## Ставит корону здания: по типу из [member BuildingRules.kind], по ширине
-## кровли и времени суток.
+## Places the building's crown: by kind from [member BuildingRules.kind], by roof width
+## and time of day.
 func build(rules: BuildingRules) -> void:
 	name = "Crown"
 	_surface = rules.floor_surface(BuildingRules.ROOF)
@@ -86,14 +87,14 @@ func build(rules: BuildingRules) -> void:
 	set_process(_beacon != null)
 
 
-## Мигает огнём мачты тем же ритмом, что огонь антенны крыши. Картинка, а не
-## правило: по настенным часам.
+## Blinks the mast light at the same rhythm as the roof antenna light. A picture, not a
+## rule: by the wall clock.
 func _process(delta: float) -> void:
 	_clock = fmod(_clock + delta, RoofKit.BEACON_PERIOD)
 	_beacon.visible = _clock < RoofKit.BEACON_PERIOD * RoofKit.BEACON_ON
 
 
-## Высота верха короны над настилом, м: тестам и кадру вступления.
+## Height of the crown's top above the deck, m: for tests and the intro frame.
 func top() -> float:
 	var highest := 0.0
 	for node: Node in find_children("*", "MeshInstance3D", true, false):
@@ -103,8 +104,8 @@ func top() -> float:
 	return highest
 
 
-## Ступени ар-деко: каждая уже предыдущей, по краям — неоновые грани, на
-## второй — веер лучей, наверху шпиль.
+## Art deco steps: each narrower than the previous, neon edges along the sides, a fan
+## of rays on the second, a spire on top.
 func _hotel(middle: float, base: float) -> void:
 	var stone := GreyboxLook.surface(STONE)
 	var shade := GreyboxLook.surface(STONE_SHADE)
@@ -114,7 +115,7 @@ func _hotel(middle: float, base: float) -> void:
 		var width := base * HOTEL_TIERS[tier].x
 		var height := HOTEL_TIERS[tier].y
 		_box(stone, Vector3(width, height, DEPTH), middle, rise, BACK_Z + DEPTH * 0.5)
-		# Карниз ступени — тёмная полоса, чтобы ступени читались и днём.
+		# The step's cornice is a dark strip, so the steps read in the daytime too.
 		_box(
 			shade,
 			Vector3(width + 0.12, 0.12, DEPTH + 0.1),
@@ -141,7 +142,7 @@ func _hotel(middle: float, base: float) -> void:
 	_mesh(spire, GreyboxLook.metal(BRASS), middle, rise, BACK_Z + DEPTH * 0.5)
 
 
-## Веер лучей над ступенью: тонкие планки из одной точки, как солнце ар-деко.
+## A fan of rays above a step: thin slats from one point, like an art deco sun.
 func _rays(middle: float, bottom: float, reach: float, look: Material) -> void:
 	for ray: int in RAYS:
 		var angle := lerpf(-PI * 0.42, PI * 0.42, float(ray) / float(RAYS - 1))
@@ -154,8 +155,8 @@ func _rays(middle: float, bottom: float, reach: float, look: Material) -> void:
 		_add(part)
 
 
-## Стеклянная вершина офиса: объём в стекле с переплётом и полосами света,
-## над ним — срез клином, на высоком краю мачта с огнём.
+## The office's glass top: a glazed volume with mullions and light strips, above it a
+## wedge cut, on the high edge a mast with a light.
 func _office(middle: float, width: float) -> void:
 	var glass := GreyboxLook.polished(OFFICE_GLASS)
 	var frame := GreyboxLook.metal(MULLION)
@@ -172,7 +173,7 @@ func _office(middle: float, width: float) -> void:
 	wedge.left_to_right = 1.0
 	wedge.size = Vector3(width, OFFICE_SLOPE, DEPTH)
 	_mesh(wedge, glass, middle, OFFICE_GLASS_HEIGHT, z)
-	# Кромка среза — светлая планка вдоль ската: силуэт читается и ночью.
+	# The cut's edge is a light slat along the slope: the silhouette reads at night too.
 	var edge := GreyboxLook.box(
 		Vector3(Vector2(width, OFFICE_SLOPE).length(), 0.06, 0.06), _neon_look()
 	)
@@ -195,8 +196,8 @@ func _office(middle: float, width: float) -> void:
 	_beacon = _mesh(tip, GreyboxLook.light(BEACON), mast_x, mast_base + MAST.y, z)
 
 
-## Жилой дом: кирпичная будка выхода на крышу, рядом бак на опорах с обручами
-## и конусной крышей, лесенка.
+## Residential: a brick bulkhead to the roof, next to it a tank on supports with hoops
+## and a conical roof, a ladder.
 func _residential(middle: float, width: float) -> void:
 	var brick := GreyboxLook.surface(BRICK)
 	var iron := GreyboxLook.metal(IRON)
@@ -213,8 +214,8 @@ func _residential(middle: float, width: float) -> void:
 	)
 	var tank_x := middle + width * 0.12
 	var spread := TANK.x * 0.8
-	# Бак шире глубины короны: его середина отодвинута назад, чтобы передний
-	# край не вышел к винту ([constant FRONT_Z]); задний уходит за здание.
+	# The tank is wider than the crown's depth: its middle is moved back so the front edge
+	# does not reach the rotor ([constant FRONT_Z]); the back one goes behind the building.
 	var tank_z := FRONT_Z - TANK.x * 1.12
 	for side: float in [-1.0, 1.0]:
 		var leg := CylinderMesh.new()
@@ -251,22 +252,22 @@ func _residential(middle: float, width: float) -> void:
 		_box(iron, Vector3(0.03, LEG_HEIGHT, 0.03), tank_x - TANK.x - 0.3 + side, 0.0, FRONT_Z)
 
 
-## Неон короны: светится ночью и в сумерках, днём — погашенная трубка.
+## Crown neon: glows at night and at dusk, in the daytime — an unlit tube.
 func _neon_look() -> StandardMaterial3D:
 	if _lit:
 		return GreyboxLook.light(_neon)
 	return GreyboxLook.surface(VerticalSign.unlit_tube(_neon))
 
 
-## Коробка размером [param size] низом на высоте [param rise] над настилом.
+## A box of size [param size] with its bottom at height [param rise] above the deck.
 func _box(material: Material, size: Vector3, x: float, rise: float, z: float) -> void:
 	var part := GreyboxLook.box(size, material as StandardMaterial3D)
 	part.position = _at(x, rise + size.y * 0.5, z)
 	_add(part)
 
 
-## Меш низом на высоте [param rise]: у цилиндров, конусов и клиньев нуль — в
-## середине, и он поднимается на половину высоты.
+## A mesh with its bottom at height [param rise]: cylinders, cones and wedges have their
+## origin in the middle, and it is raised by half the height.
 func _mesh(
 	mesh: PrimitiveMesh, material: Material, x: float, rise: float, z: float
 ) -> MeshInstance3D:

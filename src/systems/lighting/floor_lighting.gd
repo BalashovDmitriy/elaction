@@ -1,38 +1,38 @@
 class_name FloorLighting
 extends RefCounted
 
-## Свет этажей здания — по зонам ламп.
+## Building floor light — by lamp zones.
 ##
-## На этаже несколько ламп, и каждая освещает свою зону: полосу этажа, к которой
-## она ближе остальных, с границами посередине между соседями. Сбитая лампа
-## гасит свою зону, и обратно та не загорается (ADR-0023, решение 2).
+## A floor has several lamps, and each lights its own zone: the strip of the floor it
+## is closer to than the others, with boundaries halfway between neighbours. A shot-down lamp
+## darkens its zone, and the zone does not light up again (ADR-0023, decision 2).
 ##
-## Это второй шаг от оригинала: в 1983 гасло всё здание на несколько секунд,
-## ADR-0007 сделал темноту поэтажной и навсегда, здесь она стала зонной — иначе
-## с несколькими лампами на этаж любой выстрел был бы выключателем всего этажа.
+## This is the second step away from the original: in 1983 the whole building went dark for
+## a few seconds, ADR-0007 made darkness per floor and permanent, here it became per zone —
+## otherwise with several lamps per floor any shot would be a switch for the whole floor.
 ##
-## Класс только помнит, где лампы и какие погашены. Картинку и поведение агентов
-## по нему настраивает уровень, поэтому проверяется без сцены.
+## The class only remembers where the lamps are and which are out. The level sets up the
+## picture and agent behaviour from it, so it is checked without a scene.
 
-## Лампы по этажам: этаж → x ламп в порядке развески.
+## Lamps by floor: floor → x of the lamps in hanging order.
 ##
-## Порядок не трогается после добавления нарочно: номер лампы в этом списке —
-## ключ её темноты в [member _dark], и пересортировка списка переставляла бы
-## темноту с одной зоны на другую. Кто левее, решает [method _nearest] по x,
-## а не по месту в списке.
+## The order is deliberately not touched after adding: a lamp's index in this list is
+## the key of its darkness in [member _dark], and re-sorting the list would move
+## darkness from one zone to another. Which one is further left is decided by
+## [method _nearest] by x, not by the place in the list.
 var _lamps: Dictionary = {}
-## Погашенные лампы: этаж → {номер лампы в списке этажа: true}.
+## Lamps that are out: floor → {lamp index in the floor's list: true}.
 var _dark: Dictionary = {}
-## Тёмные этажи карты: ламп на них нет, и темны они с начала здания
-## (ADR-0028, решение 4). Этаж → true.
+## Dark floors of the map: they have no lamps, and they are dark from the start of the
+## building (ADR-0028, decision 4). Floor → true.
 var _unlit: Dictionary = {}
-## Ночь ли: не ночью сбитая лампа зону не гасит — её освещает день
-## (ADR-0051, решение 5).
+## Whether it is night: not at night a shot-down lamp does not darken its zone — daylight
+## lights it (ADR-0051, decision 5).
 var _night: bool = true
 
 
-## Вешает лампу на этаж. Зовёт уровень, раскладывая здание: зона считается
-## от того, что висит, а не от того, что задумано.
+## Hangs a lamp on a floor. Called by the level while laying out the building: the zone is
+## computed from what hangs, not from what was intended.
 func hang(floor_index: int, x: float) -> void:
 	if not _lamps.has(floor_index):
 		_lamps[floor_index] = PackedFloat64Array()
@@ -41,15 +41,15 @@ func hang(floor_index: int, x: float) -> void:
 	_lamps[floor_index] = xs
 
 
-## Объявляет этаж тёмным целиком: ламп на нём нет по карте, а не по тесноте.
+## Declares a floor entirely dark: it has no lamps by the map, not for lack of room.
 ##
-## Этаж без ламп по умолчанию светел — ему светит город, как крыше. Тёмный этаж
-## о себе заявляет сам: зовёт уровень, раскладывая здание, как и [method hang].
+## A floor without lamps is lit by default — the city lights it, like the roof. A dark floor
+## declares itself: the level calls this while laying out the building, as with [method hang].
 func mark_unlit(floor_index: int) -> void:
 	_unlit[floor_index] = true
 
 
-## Берёт у правил здания время суток и тёмные этажи карты.
+## Takes the time of day and the map's dark floors from the building rules.
 func follow(rules: BuildingRules) -> void:
 	_night = rules.is_night()
 	for index in rules.floors:
@@ -57,9 +57,9 @@ func follow(rules: BuildingRules) -> void:
 			mark_unlit(index)
 
 
-## Гасит зону лампы, ближайшей к [param x]. Лампа падает там же, где висела,
-## поэтому её место и есть её зона. Возвращает false, если зона уже была погашена
-## или ламп на этаже нет вовсе, а не ночью — всегда: зону освещает день.
+## Darkens the zone of the lamp closest to [param x]. A lamp falls where it hung,
+## so its place is its zone. Returns false if the zone was already dark
+## or the floor has no lamps at all, and not at night — always: daylight lights the zone.
 func darken(floor_index: int, x: float) -> bool:
 	var index := _nearest(floor_index, x)
 	if index < 0 or not _night:
@@ -73,9 +73,9 @@ func darken(floor_index: int, x: float) -> bool:
 	return true
 
 
-## Темно ли в точке этажа: погашена ли зона ближайшей к ней лампы.
-## Тёмный этаж карты тёмен везде; прочий этаж без ламп — крыша — не гаснет
-## никогда: ему светит город.
+## Whether it is dark at a floor point: whether the zone of the lamp closest to it is dark.
+## A dark floor of the map is dark everywhere; any other floor without lamps — the roof —
+## never goes dark: the city lights it.
 func is_dark_at(floor_index: int, x: float) -> bool:
 	if _unlit.has(floor_index):
 		return true
@@ -85,8 +85,8 @@ func is_dark_at(floor_index: int, x: float) -> bool:
 	return (_dark[floor_index] as Dictionary).has(index)
 
 
-## Погашен ли этаж целиком: все его зоны, и хоть одна у него есть. Тёмный этаж
-## карты погашен всегда.
+## Whether the whole floor is dark: all its zones, and it has at least one. A dark floor
+## of the map is always dark.
 func is_dark(floor_index: int) -> bool:
 	if _unlit.has(floor_index):
 		return true
@@ -96,7 +96,7 @@ func is_dark(floor_index: int) -> bool:
 	return (_dark[floor_index] as Dictionary).size() >= xs.size()
 
 
-## Где висит лампа, чья зона накрывает точку. NAN, если ламп на этаже нет.
+## Where the lamp whose zone covers the point hangs. NAN if the floor has no lamps.
 func zone_of(floor_index: int, x: float) -> float:
 	var index := _nearest(floor_index, x)
 	if index < 0:
@@ -104,9 +104,9 @@ func zone_of(floor_index: int, x: float) -> float:
 	return (_lamps[floor_index] as PackedFloat64Array)[index]
 
 
-## Номер ближайшей к точке лампы этажа или -1. При равном расстоянии — левая:
-## граница зон принадлежит той лампе, что ближе к началу этажа. Сравнивается по
-## x, а не по месту в списке: порядок развески ответ решать не должен.
+## Index of the floor lamp closest to the point, or -1. At equal distance — the left one:
+## a zone boundary belongs to the lamp closer to the start of the floor. Compared by
+## x, not by place in the list: the hanging order must not decide the answer.
 func _nearest(floor_index: int, x: float) -> int:
 	if not _lamps.has(floor_index):
 		return -1
@@ -122,12 +122,12 @@ func _nearest(floor_index: int, x: float) -> int:
 	return best
 
 
-## [param count] живых ламп из [param lamps], ближайших к точке кадра
-## [param centre] в плоскости правил: им тень заливки (ADR-0044, решение 11).
+## [param count] live lamps from [param lamps] closest to frame point
+## [param centre] in the rules plane: they get the fill shadow (ADR-0044, decision 11).
 ##
-## Выбирают только из тех, что тень кладут вообще: в полосе [param band] и на
-## этажах [param floors]. Лампа запасного этажа или из-за края кадра тени не
-## кладёт, и место, доставшееся ей, лампа в кадре теряла бы зря (авторевью M24h).
+## They are picked only from those that cast a shadow at all: within band [param band] and
+## on floors [param floors]. A lamp on a spare floor or beyond the frame edge casts no
+## shadow, and the slot it got would be wasted for a lamp in frame (code review M24h).
 static func nearest(
 	lamps: Array[Lamp],
 	centre: Vector2,
@@ -153,10 +153,10 @@ static func nearest(
 	return alive.slice(0, count)
 
 
-## Свет кадра [param seen]: лампы и бра красных дверей горят только на этажах
-## в кадре и рядом (ADR-0010, пункт 8). Свет лампы кладёт тени, то есть стоит
-## дорого, и горит только в кадре; на запасных этажах — без тени (ADR-0042,
-## решение 2). Бра — тем же правилом (ADR-0042, решение 8).
+## Light of frame [param seen]: lamps and red door sconces are lit only on floors
+## in frame and nearby (ADR-0010, item 8). Lamp light casts shadows, i.e. it is
+## expensive, and is lit only in frame; on spare floors — without shadow (ADR-0042,
+## decision 2). Sconces — by the same rule (ADR-0042, decision 8).
 static func show_in_frame(
 	rules: BuildingRules, seen: Rect2, lamps: Array[Lamp], doors: Array[Door]
 ) -> void:
@@ -182,8 +182,8 @@ static func show_in_frame(
 			)
 
 
-## Эскалатор светит в проём между двумя этажами: горит, пока в кадре хоть
-## один из них.
+## An escalator shines into the opening between two floors: it is lit while at least
+## one of them is in frame.
 static func show_escalators(span: Vector2i, strip: Vector2, escalators: Array[Escalator]) -> void:
 	for escalator: Escalator in escalators:
 		escalator.set_light_visible(

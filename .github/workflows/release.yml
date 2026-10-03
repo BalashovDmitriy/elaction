@@ -1,8 +1,8 @@
 name: Релиз
 
-# Тег `v*` собирает архивы и публикует релиз. Запуск руками собирает то же самое
-# и прикладывает архивы к прогону, но ничего не публикует — так сборку можно
-# проверить, не заводя тег и не выпуская лишнего.
+# The `v*` tag builds the archives and publishes a release. A manual run builds the same
+# and attaches the archives to the run, but publishes nothing — this way the build can be
+# checked without creating a tag and releasing anything extra.
 on:
   push:
     tags: ["v*"]
@@ -22,15 +22,15 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Тег и config/version обязаны сходиться, иначе архив назовётся одной
-      # версией, а игра в углу меню покажет другую. Падаем до сборки.
+      # The tag and config/version must match, otherwise the archive is named with one
+      # version and the game shows another in the menu corner. Fail before the build.
       - name: Тег сходится с версией проекта
         if: startsWith(github.ref, 'refs/tags/v')
         run: python tools/version.py --check "${{ github.ref_name }}"
 
-      # Без аргумента берётся версия из project.godot — значит, проверка есть
-      # и на ручном прогоне, ради которого он и заводился: заметки к релизу
-      # должны быть готовы до тега, а не сочиняться в вебе после него.
+      # Without an argument the version is taken from project.godot — so the check also exists
+      # on a manual run, which is what it was set up for: release notes
+      # must be ready before the tag, not composed in the web UI after it.
       - name: Заметки к релизу есть в CHANGELOG
         run: python tools/changelog.py ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
 
@@ -53,8 +53,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Шаблоны экспорта лежат в папке пользователя, и на разных ОС она разная.
-      # Считаем путь один раз: дальше на него смотрят и кэш, и установка.
+      # Export templates live in the user folder, and it differs between OSes.
+      # Compute the path once: both the cache and the install look at it afterwards.
       - name: Путь к шаблонам экспорта
         shell: bash
         run: |
@@ -64,7 +64,7 @@ jobs:
             echo "TEMPLATES_DIR=$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable" >> "$GITHUB_ENV"
           fi
 
-      # Шаблоны весят сотни мегабайт и меняются только с версией движка.
+      # Templates weigh hundreds of megabytes and change only with the engine version.
       - name: Кэш шаблонов экспорта
         uses: actions/cache@v6
         with:
@@ -96,13 +96,13 @@ jobs:
           $base = "https://github.com/godotengine/godot/releases/download/$env:GODOT_VERSION-stable"
           Invoke-WebRequest -Uri "$base/Godot_v$env:GODOT_VERSION-stable_win64.exe.zip" -OutFile godot.zip
           Expand-Archive godot.zip -DestinationPath godot
-          # Обычная сборка не пишет в родительскую консоль — берём консольную,
-          # иначе вывод экспорта в логе будет пустым.
+          # The regular build does not write to the parent console — take the console one,
+          # otherwise the export output in the log will be empty.
           $exe = (Get-ChildItem godot -Recurse -Filter "*_console.exe" | Select-Object -First 1).FullName
           "GODOT_BIN=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
           if (-not (Test-Path $env:TEMPLATES_DIR)) {
-            # .tpz — тот же zip, но Expand-Archive смотрит на расширение.
+            # .tpz is the same zip, but Expand-Archive looks at the extension.
             Invoke-WebRequest -Uri "$base/Godot_v$env:GODOT_VERSION-stable_export_templates.tpz" -OutFile templates.zip
             Expand-Archive templates.zip -DestinationPath tpz
             New-Item -ItemType Directory -Force -Path $env:TEMPLATES_DIR | Out-Null
@@ -111,19 +111,19 @@ jobs:
           & $exe --version
 
       - name: Экспорт
-        # Shader Baker (ADR-0039) у Godot 4.5 умел зависать на экспорте на часы
-        # (godotengine/godot#112794): предел, чтобы релиз падал, а не висел.
+        # Shader Baker (ADR-0039) in Godot 4.5 could hang on export for hours
+        # (godotengine/godot#112794): a limit so the release fails rather than hangs.
         timeout-minutes: 30
         run: python tools/export.py ${{ matrix.preset }}
 
       - name: Архив
         run: python tools/package.py ${{ matrix.preset }}
 
-      # Прогоняется распакованный архив, а не собранный файл: проверять надо то,
-      # что скачает игрок, — вместе с правом на запуск внутри zip (ADR-0013,
-      # пункт 6). Только Linux: у Windows-сборки нет консоли, она не пишет
-      # в родительский процесс, и маркер запуска читать неоткуда. Windows-архив
-      # проверяется руками — это «прогон на чистой машине» из DoD.
+      # The unpacked archive is run, not the built file: what must be checked is what the player
+      # downloads — together with the execute permission inside the zip (ADR-0013, point 6). Linux
+      # only: the Windows build has no console, it does not write to the parent process, and there
+      # is nowhere to read the launch marker from. The Windows archive is checked by hand — this is
+      # the "run on a clean machine" from the DoD.
       - name: Прогон распакованного архива
         if: runner.os == 'Linux'
         shell: bash

@@ -1,90 +1,90 @@
 class_name BuildingStyle
 extends RefCounted
 
-## Вид коридора по типу здания (ADR-0048, ADR-0055): чем отель, офис и жилой
-## дом отличаются друг от друга, кроме обстановки.
+## Corridor look by building kind (ADR-0048, ADR-0055): how the hotel, office and residential
+## building differ from each other, apart from dressing.
 ##
-## Раньше тип здания менял фактуры стен, металл табличек и набор мебели, а
-## двери, светильники, дорожка и карниз были одни на оба — и коридоры читались
-## одинаковыми (замечание пользователя, 2026-09-30). Здесь всё, что у типа
-## своё, одним местом: пол, двери, светильники, бра, таблички. Механика одна —
-## лампа бьётся, дверь открывается одинаково, меняется только вид.
+## Previously the building kind changed wall textures, sign metal and the furniture set, while
+## doors, light fixtures, the runner and the cornice were the same for both — and corridors read
+## alike (user's remark, 2026-09-30). Here everything a kind has of its
+## own is in one place: floor, doors, light fixtures, sconces, signs. The mechanics are the same —
+## a lamp breaks, a door opens the same way, only the look changes.
 ##
-## Без узлов: строят по нему [FloorDetail], [Door], [Lamp], [BuildingProps].
+## No nodes: [FloorDetail], [Door], [Lamp], [BuildingProps] build from it.
 
-## Светильник этажа: подвесной плафон, офисная лампа дневного света,
-## стеклянная тарелка или голая лампочка жилого дома, люстра отеля (ADR-0056,
-## решение 5).
+## Floor light fixture: a pendant shade, an office fluorescent lamp,
+## a glass dish or a bare bulb in the residential building, a hotel chandelier (ADR-0056,
+## decision 5).
 enum Fixture { PENDANT, PANEL, DOME, BULB, CHANDELIER }
 
-## Отделы на табличках офиса.
+## Departments on office signs.
 const DEPARTMENTS: PackedStringArray = [
 	"ACCOUNTS", "LEGAL", "SALES", "ARCHIVE", "PAYROLL", "RESEARCH", "BOARD", "SECURITY"
 ]
 
-## Ковровая дорожка вдоль коридора: только в отеле. В офисе — ковровая плитка
-## во весь пол, в жилом доме — плитка шахматкой.
+## Carpet runner along the corridor: only in the hotel. In the office — carpet tiles
+## over the whole floor, in the residential building — checkerboard tiles.
 var runner: bool = true
-## Плитка во весь пол: цвет и шаг сетки швов, м.
+## Tiles over the whole floor: colour and joint grid pitch, m.
 var tile_color := Color(0.2, 0.22, 0.25)
 var tile_step: float = 0.6
-## Шахматка: через одну плитку — второй цвет (жилой дом, ADR-0055, решение 4).
+## Checkerboard: every other tile is the second colour (residential building, ADR-0055, decision 4).
 var checker: bool = false
 var tile_alt := Color(0.16, 0.16, 0.17)
-## Карниз под потолком: у отеля — лепной, выше и с выносом; у офиса — узкий.
+## Cornice under the ceiling: the hotel's is moulded, taller and projecting; the office's is narrow.
 var crown := Vector2(0.12, 0.1)
 var crown_color := Color(0.3, 0.3, 0.32)
-## Створка: тон, филёнки (отель) или стекло в створке (офис), тон коробки и
-## ручки.
+## Door leaf: tone, panels (hotel) or glass in the leaf (office), frame tone and
+## handle.
 var leaf_tone := GreyboxLook.DOOR
 var panels: bool = true
 var vision_glass: bool = false
 var frame_tone := Color(0.26, 0.2, 0.14)
 var handle_tone := Color(0.78, 0.64, 0.32)
-## Глазок в створке: у квартир.
+## Peephole in the leaf: for apartments.
 var peephole: bool = false
-## Табло над дверью: тёплое у отеля, холодное белое у офиса.
+## Indicator above the door: warm in the hotel, cold white in the office.
 var sign_tone := GreyboxLook.SIGN_WARM
-## Светильник этажа.
+## Floor light fixture.
 var fixture: Fixture = Fixture.PENDANT
-## Бра на пилястрах — только в отеле.
+## Sconces on pilasters — only in the hotel.
 var sconces: bool = true
-## Табличка у двери: у отеля — номер, у офиса — отдел и номер, у квартиры —
-## этаж и буква, как 12C.
+## Sign by the door: the hotel has a room number, the office — department and number, an apartment —
+## floor and letter, like 12C.
 var departments: bool = false
 var apartment_letters: bool = false
-## Мелочи у дверей номеров: табличка «Не беспокоить» на ручке и поднос или
-## газета у порога — доля дверей.
+## Small things at room doors: a "Do not disturb" sign on the handle and a tray or
+## newspaper at the threshold — a share of doors.
 var door_hanger_share: float = 0.0
 var door_tray_share: float = 0.0
-## Мелочи у дверей квартир: коврик у порога и пакет с покупками — доля дверей.
+## Small things at apartment doors: a doormat and a shopping bag — a share of doors.
 var door_mat_share: float = 0.0
 var door_bag_share: float = 0.0
-## Доля ламп, что мигают: у жилого дома трубки старые (ADR-0055, решение 4).
+## Share of lamps that flicker: the residential building has old tubes (ADR-0055, decision 4).
 var flicker_share: float = 0.0
-## С каким шансом место на стене получает картину: у отеля и жилого дома
-## реже — место нужно нишам, зеркалам, окнам и щиткам ([WallFeatures]).
-var decor_share: float = 0.9  # почти всегда: пустая стена читалась «квадратом»
-## Панель низа стены: высота и тон рейки над ней. У отеля — высокие
-## деревянные панели с золочёной рейкой (ADR-0056, решение 4).
+## With what chance a wall spot gets a picture: in the hotel and the residential building
+## less often — the space is needed for niches, mirrors, windows and panels ([WallFeatures]).
+var decor_share: float = 0.9  # almost always: a blank wall read as a "square"
+## Lower wall panel: height and tone of the rail above it. The hotel has tall
+## wooden panels with a gilded rail (ADR-0056, decision 4).
 var wainscot_height: float = BuildingRibs.SKIRTING_HEIGHT
 var rail_tone := GreyboxLook.TRIM
-## Свет ламп и его сила по типу ([BuildingAir], ADR-0056, решение 1).
+## Lamp light and its energy by kind ([BuildingAir], ADR-0056, decision 1).
 var lamp_light := BuildingAir.LAMP_LIGHT[BuildingIdentity.Kind.HOTEL]
 var lamp_gain: float = BuildingAir.LAMP_GAIN[BuildingIdentity.Kind.HOTEL]
-## Доля ламп, что висят голой лампочкой на проводе вместо [member fixture]:
-## у жилого дома плафоны побиты (ADR-0056, решение 5).
+## Share of lamps hanging as a bare bulb on a wire instead of [member fixture]:
+## in the residential building the shades are broken (ADR-0056, decision 5).
 var bulb_share: float = 0.0
-## Доля этажей с трубой под потолком: на виду — только в жилом доме, у офиса
-## их прячет подвесной потолок (ADR-0056, решение 5).
+## Share of floors with a pipe under the ceiling: exposed only in the residential building, in the
+## office a suspended ceiling hides them (ADR-0056, decision 5).
 var pipe_share: float = 0.0
-## Задняя стена — стекло в рост двери, за ним зал [OpenSpace] (офис, ADR-0056,
-## решение 4): на стене ничего не висит, панели низа, пилястр и стыков нет,
-## своей комнаты у двери нет.
+## The back wall is glass at door height, with an [OpenSpace] hall behind it (office, ADR-0056,
+## decision 4): nothing hangs on the wall, there are no lower panels, pilasters or joints,
+## and no room of its own at the door.
 var glass_wall: bool = false
 
 
-## Стиль здания [param identity].
+## Style of building [param identity].
 static func of(identity: BuildingIdentity) -> BuildingStyle:
 	var style := BuildingStyle.new()
 	if identity != null:
@@ -118,9 +118,9 @@ static func of(identity: BuildingIdentity) -> BuildingStyle:
 	return style
 
 
-## Жилой дом восьмидесятых (ADR-0055, решение 4): плитка шахматкой, крашеная
-## стальная дверь квартиры с глазком, тарелка под потолком, коврики у дверей.
-## Створка — тёмно-зелёная краска: не красная, красная дверь — у документа.
+## A residential building of the eighties (ADR-0055, decision 4): checkerboard tiles, a painted
+## steel apartment door with a peephole, a dish fixture under the ceiling, doormats at the doors.
+## The leaf is dark green paint: not red, the red door is the document's.
 static func _residential(style: BuildingStyle) -> BuildingStyle:
 	style.tile_color = Color(0.6, 0.57, 0.5)
 	style.tile_alt = Color(0.17, 0.17, 0.18)

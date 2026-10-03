@@ -1,69 +1,72 @@
-# ADR-0034 · M22: уровень «Ультра», сглаживание и выбор уровня по замеру
+# ADR-0034 · M22: the "Ultra" level, antialiasing and choosing the level by measurement
 
-- **Статус:** принято
-- **Дата:** 2026-09-24
-- **Дополняет:** [ADR-0030](0030-grading-and-quality.md), решение 5
+- **Status:** accepted
+- **Date:** 2026-09-24
+- **Extends:** [ADR-0030](0030-grading-and-quality.md), decision 5
 
-## Контекст
+## Context
 
-ADR-0030 завёл три уровня качества. Пользователь спросил о трассировке лучей;
-в Godot 4.7 её нет — только низкоуровневый Vulkan RT в `RenderingDevice`
-(STATUS, долг). Решено: верхний уровень «Ультра» средствами движка. Заодно —
-сглаживание: у рёбер перекрытий и тонких тросов шахты видна лесенка, а
-настройки сглаживания в игре нет.
+ADR-0030 introduced three quality levels. The user asked about ray tracing;
+Godot 4.7 does not have it — only low-level Vulkan RT in `RenderingDevice`
+(STATUS, debt). Decided: a top level "Ultra" using engine means. Along with it —
+antialiasing: staircase edges are visible on slab edges and thin shaft ropes,
+and the game has no antialiasing setting.
 
-До M22 уровень по умолчанию — высокий для всех, какой бы ни была видеокарта.
+Before M22 the default level is high for everyone, whatever the graphics card.
 
-## Решения
+## Decisions
 
-### 1. «Ультра» — четвёртый уровень
+### 1. "Ultra" — the fourth level
 
-Решение пользователя. Сверх «Высокого»:
+The user's decision. On top of "High":
 
-- **Объёмный свет ламп** — ореол в воздухе коридора: источникам ламп, столбам
-  шахт и отсвету неона отдаётся втрое больше света в объёмный туман
-  (`light_volumetric_fog_energy`), сетка тумана вдвое мельче. Гуще туман не
-  делается: на пробе с полуторной густотой дымка ложилась поверх Otto, и
-  обводка теряла контраст.
-- **Отражённый свет (SSIL)** — свет ламп отскакивает от пола и стен. Экранный,
-  разреза здания не боится.
-- **Тени высокого разрешения** — атлас теней вдвое крупнее, полутень мягче.
+- **Volumetric lamp light** — a halo in the corridor air: lamp sources, shaft
+  columns and the neon glow give three times more light to the volumetric fog
+  (`light_volumetric_fog_energy`), the fog grid is twice as fine. The fog is not
+  made denser: in a trial with 1.5× density the haze lay over Otto, and the
+  outline lost contrast.
+- **Indirect light (SSIL)** — lamp light bounces off the floor and walls.
+  Screen-space, so the building cutaway does not break it.
+- **High-resolution shadows** — the shadow atlas is twice as large, the penumbra
+  softer.
 
-SDFGI не берём: в разрезе здания свет потёк бы сквозь стены, и погашенный
-этаж — правило игры — перестал бы читаться тёмным.
+SDFGI is not used: in the building cutaway light would leak through walls, and a
+dark floor — a game rule — would stop reading as dark.
 
-### 2. Сглаживание — внутри уровней
+### 2. Antialiasing — inside the levels
 
-Решение пользователя. Отдельного пункта в настройках нет:
+The user's decision. There is no separate settings item:
 
-| | Низкое | Среднее | Высокое | Ультра |
+| | Low | Medium | High | Ultra |
 |---|---|---|---|---|
-| Сглаживание | FXAA | MSAA ×2 | MSAA ×2 | MSAA ×4 |
+| Antialiasing | FXAA | MSAA ×2 | MSAA ×2 | MSAA ×4 |
 
-TAA в «Ультра» был и снят по кадрам: он размывает тонкую светлую обводку
-актёров (ADR-0022, решение 4), на которой держится читаемость на погашенном
-этаже, и Otto на «Ультра» выходил мягче, чем на «Высоком».
+TAA was in "Ultra" and was removed based on frames: it blurs the thin light outline
+of the actors (ADR-0022, decision 4), which carries readability on a dark floor,
+and Otto on "Ultra" came out softer than on "High".
 
-### 3. Уровень при первом запуске — по замеру
+### 3. The level on first launch — by measurement
 
-Решение пользователя. Пока уровень не выбран, игра на первом запуске меряет
-кадр и берёт верхний уровень, который держит медиану кадра GPU с запасом (не
-дольше 12 мс из 16.6). Меряет не за главным меню — за ним здания нет, уровень
-выгружается, — а на вступлении первого здания: Otto едет по тросу на крышу,
-игры в эти секунды почти нет, а кадр один из самых насыщенных. Начинает с
-«Ультра», после смены уровня пропускает кадры компиляции шейдеров и спускается
-ступенями; дольше 8 секунд замер не идёт (`QualityProbe`).
+The user's decision. While no level is chosen, the game on first launch measures
+the frame and takes the highest level that keeps the median GPU frame with a
+margin (no longer than 12 ms of 16.6). It measures not behind the main menu —
+there is no building behind it, the level is unloaded — but during the intro of
+the first building: Otto rides a rope up to the roof, there is almost no gameplay
+in those seconds, and the frame is one of the busiest. It starts with "Ultra",
+after a level change skips the shader compilation frames and steps down; the
+measurement lasts no longer than 8 seconds (`QualityProbe`).
 
-Выбранный уровень пишется в настройки; дальше его меняет только игрок. Уровень,
-сохранённый до M22, считается выбранным игроком.
+The chosen level is written to the settings; after that only the player changes
+it. A level saved before M22 counts as chosen by the player.
 
-### 4. Тон — доводим нуар
+### 4. Tone — finishing the noir
 
-Решение пользователя. Кривые ADR-0030 (решение 1) подбираются по кадрам
-отеля, офиса, крыши и погашенного этажа; игровые огоньки остаются яркими.
+The user's decision. The ADR-0030 curves (decision 1) are tuned against frames of
+the hotel, office, roof and a dark floor; game indicator lights stay bright.
 
-## Последствия
+## Consequences
 
-- `Graphics.Quality` получает `ULTRA`; все таблицы по уровню растут на столбец,
-  и тест держит, что каждый уровень включает обещанное и не меняет правил.
-- В настройках четыре уровня; строка «Ультра» — на обоих языках.
+- `Graphics.Quality` gets `ULTRA`; all per-level tables grow by a column,
+  and a test holds that each level turns on what it promises and does not change
+  the rules.
+- The settings have four levels; the "Ultra" string is in both languages.

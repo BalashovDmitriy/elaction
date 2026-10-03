@@ -1,9 +1,9 @@
 extends GutTest
 
-## Риг актёра на живом скелете из `.glb`.
+## Actor rig on a live skeleton from `.glb`.
 ##
-## Проверяется то, ради чего веха: присед укладывает фигуру под пулю агента, а
-## переход между позами — движение, а не подмена картинки (ADR-0022).
+## Checks what the milestone is for: a crouch tucks the figure under an agent's bullet, and
+## the transition between poses is motion, not a picture swap (ADR-0022).
 
 const OTTO_MODEL := preload("res://assets/models/otto.glb")
 const AGENT_MODEL := preload("res://assets/models/agent.glb")
@@ -11,7 +11,7 @@ const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
 
-## Кадр в 60 Гц: за него сглаживание обязано сдвинуть кости, но не долететь.
+## A frame at 60 Hz: over it smoothing must move the bones, but not arrive.
 const FRAME: float = 1.0 / 60.0
 
 
@@ -22,23 +22,23 @@ func _rig(model: PackedScene) -> FigureRig:
 	return rig
 
 
-## Otto и агенты всех типов зданий: модели агента собраны одной сборкой
-## (ADR-0055, решение 7), и каждую риг обязан поднять так же, как прежнюю.
+## Otto and agents of all building kinds: the agent models are built by one build
+## (ADR-0055, decision 7), and the rig must lift each one the same way as the former one.
 func _models() -> Array[PackedScene]:
 	var all: Array[PackedScene] = [OTTO_MODEL]
 	all.append_array(AgentWardrobe.MODELS)
 	return all
 
 
-## Otto из сцены: высоты его выстрелов и коллизий берутся у него, а не
-## переписываются в тест числами.
+## Otto from the scene: his shot and collision heights are taken from him, not
+## rewritten into the test as numbers.
 func _otto() -> Otto:
 	var otto := OTTO_SCENE.instantiate() as Otto
 	autofree(otto)
 	return otto
 
 
-## Пуля — коробка, и мимо фигуры она проходит краем, а не осью.
+## A bullet is a box, and it passes the figure by its edge, not its axis.
 func _bullet_half_height() -> float:
 	var bullet := BULLET_SCENE.instantiate()
 	var shape := (bullet.get_node("Shape") as CollisionShape3D).shape as BoxShape3D
@@ -62,8 +62,8 @@ func test_both_models_carry_every_bone() -> void:
 
 
 func test_the_rig_stands_as_tall_as_the_collision_says() -> void:
-	# Рост фигуры — коллизия Otto плюс причёска сверху: ниже коллизии рост
-	# быть не может, иначе пуля агента шла бы над головой.
+	# Figure height is Otto's collision plus the hairdo on top: the height cannot be below the
+	# collision, otherwise an agent's bullet would pass over the head.
 	var rig := _rig(OTTO_MODEL)
 	var otto := OTTO_SCENE.instantiate() as Otto
 	var standing := (
@@ -74,7 +74,7 @@ func test_the_rig_stands_as_tall_as_the_collision_says() -> void:
 	assert_lt(rig.height(), standing * 1.2, "и не выше её больше чем на причёску")
 
 
-## DoD вехи: Otto в приседе по-прежнему ниже пули агента.
+## Milestone DoD: Otto crouching is still below an agent's bullet.
 func test_a_crouching_figure_ducks_under_the_agent_bullet() -> void:
 	var rig := _rig(OTTO_MODEL)
 	var enemy := ENEMY_SCENE.instantiate() as Enemy
@@ -97,9 +97,9 @@ func test_a_crouching_figure_ducks_under_the_agent_bullet() -> void:
 	)
 
 
-## Зеркально к Otto (ADR-0016): на колене агент уходит под пулю стоящего
-## Otto, залёгши — под пулю присевшего. В M15 это держала коробка, резавшаяся по
-## ростам из правил здания; у фигуры рост свой, и сверять его надо с пулей.
+## Mirroring Otto (ADR-0016): kneeling, the agent goes under a standing Otto's bullet, lying down —
+## under a crouching one's. In M15 a box held this, cut by heights from the building rules; the
+## figure has its own height, and it must be checked against the bullet.
 func test_a_kneeling_agent_ducks_under_the_standing_shot() -> void:
 	var rig := _rig(AGENT_MODEL)
 	var shot := _otto().shot_height_standing
@@ -117,11 +117,11 @@ func test_a_prone_agent_lies_under_the_crouching_shot() -> void:
 	rig.show_pose(ActorPose.PRONE)
 	rig.snap()
 	var lying := rig.skinned_aabb()
-	# Лицом вниз поля шляпы встают вертикально, и ниже их диаметра фигура не
-	# ляжет: макушка залёгшего — это кромка полей, 0.66 м против пули на 0.66
-	# (M18c: агент вырос до роста Otto, и поля вместе с ним).
-	# Поэтому мерка — верхний край пули, не нижний: тело под ней целиком, задеть
-	# она может только кромку. Опустить ниже можно только другой моделью шляпы.
+	# Face down, the hat brim stands vertical, and the figure will not lie lower than its diameter:
+	# the top of a lying one is the brim edge, 0.66 m against a bullet at 0.66 (M18c: the agent grew
+	# to Otto's height, and the brim with him). Hence the measure is the bullet's top edge, not the
+	# bottom: the body is wholly under it, it can only graze the brim edge. Going lower is possible
+	# only with a different hat model.
 	assert_lt(
 		lying.end.y, shot + _bullet_half_height(), "залёгший ниже верхнего края пули (%.2f)" % shot
 	)
@@ -132,9 +132,9 @@ func test_a_prone_agent_lies_under_the_crouching_shot() -> void:
 
 
 func test_the_choke_puts_the_arms_forward() -> void:
-	# Знак углов: «вперёд» обязано быть вперёд, куда бы ни смотрела локальная
-	# ось кости. В покое фигура смотрит в +Z, и мерка — относительно покоя.
-	# С M24d удара ногой нет (ADR-0040): знак проверяет захват за шею.
+	# Sign of angles: "forward" must be forward, wherever the bone's local axis
+	# points. At rest the figure faces +Z, and the measure is relative to rest.
+	# Since M24d there is no kick (ADR-0040): the neck hold checks the sign.
 	var rig := _rig(OTTO_MODEL)
 	rig.show_pose("stand")
 	rig.snap()
@@ -143,8 +143,8 @@ func test_the_choke_puts_the_arms_forward() -> void:
 	rig.snap()
 	var holding := rig.skinned_aabb()
 	assert_gt(holding.end.z, standing.end.z, "руки в захвате вынесены вперёд, за габарит тела")
-	# Рука вверх — тоже знак: пистолет, вскинутый для удара рукоятью, выше макушки
-	# (руки у модели пака короткие: вровень с полями шляпы, не выше).
+	# Arm up is also a sign: the pistol raised for a butt strike is above the top of the head
+	# (the pack model's arms are short: level with the hat brim, no higher).
 	rig.show_pose("whip_raise")
 	rig.snap()
 	assert_gt(rig.skinned_aabb().end.y, standing.end.y, "вскинутая рука выше макушки")
@@ -156,13 +156,13 @@ func test_a_lying_figure_is_long_and_low() -> void:
 	rig.snap()
 	var box := rig.skinned_aabb()
 	assert_lt(box.end.y, rig.height() * 0.5, "лежащий низкий")
-	# Клип смерти пака роняет тело не строго назад, а с поворотом: длина —
-	# по диагонали пола, а не только вдоль взгляда.
+	# The pack's death clip drops the body not straight back but with a twist: the length is
+	# along the floor diagonal, not just along the gaze.
 	assert_gt(Vector2(box.size.x, box.size.z).length(), rig.height() * 0.8, "и длинный по полу")
 	assert_gte(box.position.y, -0.01, "и не утоплен в пол")
 
 
-## Заземление общее: у каждой позы своя глубина, и ни одна не уходит под пол.
+## Grounding is shared: each pose has its own depth, and none goes below the floor.
 func test_no_pose_sinks_below_the_floor() -> void:
 	var rig := _rig(OTTO_MODEL)
 	for pose_name: String in ActorPose.OTTO_POSES:
@@ -174,8 +174,8 @@ func test_no_pose_sinks_below_the_floor() -> void:
 
 
 func test_a_pose_change_is_a_motion_not_a_swap() -> void:
-	# «На стоп-кадре видно, что это движение, а не подмена картинки»: за один
-	# кадр кости сдвигаются к цели, но не долетают.
+	# "A still frame shows it is motion, not a picture swap": over one
+	# frame the bones move toward the target but do not arrive.
 	var rig := _rig(OTTO_MODEL)
 	rig.show_pose("idle")
 	rig.snap()
@@ -184,8 +184,8 @@ func test_a_pose_change_is_a_motion_not_a_swap() -> void:
 	var target := rig.target_rotation(FigureRig.LEG_L)
 	var whole := start.angle_to(target)
 	assert_gt(whole, deg_to_rad(40.0), "присед уводит бедро далеко от стойки")
-	# Шаг сглаживания задаётся здесь, а не ждётся кадром: в headless-прогоне
-	# кадр длится «сколько получится», и на нём риг успел бы долететь.
+	# The smoothing step is set here rather than awaited as a frame: in a headless run
+	# a frame lasts "however long it takes", and in it the rig would manage to arrive.
 	rig.advance(FRAME)
 	var moved := start.angle_to(rig.bone_rotation(FigureRig.LEG_L))
 	assert_gt(moved, deg_to_rad(3.0), "бедро уже пошло к удару")
@@ -206,7 +206,7 @@ func test_walking_moves_the_legs_with_the_phase() -> void:
 	rig.set_walk_phase(0.0)
 	rig.snap()
 	var before := rig.bone_rotation(FigureRig.LEG_L)
-	# Полтора кадра ходьбы — четверть шага клипа: бедро проходит заметный угол.
+	# One and a half walk frames — a quarter of a clip step: the thigh sweeps a noticeable angle.
 	rig.set_walk_phase(1.5)
 	rig.snap()
 	var after := rig.bone_rotation(FigureRig.LEG_L)
@@ -214,8 +214,8 @@ func test_walking_moves_the_legs_with_the_phase() -> void:
 
 
 func test_a_standing_actor_keeps_walking_where_he_stopped() -> void:
-	# Часы ходьбы копятся из фазы актёра: встал — встали и ноги, а не прыгнули
-	# в начало клипа.
+	# The walk clock accumulates from the actor's phase: stopped — the legs stopped too, rather than
+	# jumping to the start of the clip.
 	var rig := _rig(OTTO_MODEL)
 	rig.show_pose("walk_0")
 	rig.set_walk_phase(1.0)
@@ -226,11 +226,11 @@ func test_a_standing_actor_keeps_walking_where_he_stopped() -> void:
 	assert_almost_eq(rig.bone_rotation(FigureRig.LEG_L).angle_to(stopped), 0.0, 0.001)
 
 
-## Ходьба клипом, а заземления нет: клип стоит на полу сам. Если пак однажды
-## придёт с ходьбой над полом, это видно здесь, а не на кадре.
+## Walking by clip, and there is no grounding: the clip stands on the floor by itself. If the pack
+## ever comes with a walk above the floor, it shows here, not in a shot.
 ##
-## Мерка — после шага `advance`, а не после `snap`: снимок заземляет по всем
-## вершинам, и по нему низ был бы в нуле при любом клипе (авторевью M21).
+## The measure is after an `advance` step, not after `snap`: a snapshot grounds by all
+## vertices, and by it the bottom would be at zero for any clip (M21 code review).
 func test_the_walk_clip_keeps_its_feet_on_the_floor() -> void:
 	var rig := _rig(OTTO_MODEL)
 	rig.show_pose("walk_0")
@@ -243,10 +243,10 @@ func test_the_walk_clip_keeps_its_feet_on_the_floor() -> void:
 		assert_lt(floor_level, 0.05, "фаза %.1f: и не над ним" % (step * 0.5))
 
 
-## Переход кончается: и к позе кодом, и к клипу риг долетает за полсекунды.
-## Порог в углах мельче шума float32 не срабатывал никогда, а ходьба уходила от
-## сглаживания вперёд, и каждый актёр, хоть раз сменивший позу, до конца жизни
-## перебирал кости и вершины каждый кадр (авторевью M21).
+## The transition ends: both to a code pose and to a clip, the rig arrives within half a second.
+## A threshold in angles finer than float32 noise never fired, and walking ran ahead of
+## smoothing, and every actor that had changed pose even once went on for the rest of its life
+## iterating bones and vertices every frame (M21 code review).
 func test_a_transition_ends_for_poses_and_clips() -> void:
 	var rig := _rig(OTTO_MODEL)
 	var phase := 0.0
@@ -265,8 +265,8 @@ func test_a_transition_ends_for_poses_and_clips() -> void:
 		)
 
 
-## В игре лежащий заземлён так же, как на снимке: конец клипа смерти пака уходит
-## в пол на 6 см, и риг, долетев до него, обязан тело поднять.
+## In the game a lying one is grounded the same as in a snapshot: the end of the pack's death clip
+## goes 6 cm into the floor, and the rig, having arrived at it, must lift the body.
 func test_a_settled_corpse_lies_on_the_floor() -> void:
 	var rig := _rig(OTTO_MODEL)
 	rig.show_pose("dead_1")
@@ -278,9 +278,9 @@ func test_a_settled_corpse_lies_on_the_floor() -> void:
 	assert_lt(floor_level, 0.03, "и не висит над ним")
 
 
-## Долетевший до клипа риг не заземляет его вовсе: с M24c любой клип ставит на
-## пол `build_actors.py` (ADR-0039). Мерка — после шагов `advance`, как в игре, а
-## не после `snap`: снимок заземляет по всем вершинам и промаха сборки не видит.
+## A rig that has arrived at a clip does not ground it at all: since M24c `build_actors.py` puts
+## any clip on the floor (ADR-0039). The measure is after `advance` steps, as in the game, and
+## not after `snap`: a snapshot grounds by all vertices and does not see a build miss.
 func test_every_clip_stands_on_the_floor_by_itself() -> void:
 	for model: PackedScene in _models():
 		var rig := _rig(model)
@@ -296,9 +296,9 @@ func test_every_clip_stands_on_the_floor_by_itself() -> void:
 			assert_lt(low, 0.05, "%s %s: и не над ним (%.3f)" % [who, pose_name, low])
 
 
-## Заземление на ходу — по крайним вершинам костей, а не по всем: расхождение
-## низа с полным габаритом обязано быть в миллиметрах, иначе актёр висит или
-## тонет. Верх по крайним не сверяется: риг берёт у них только низ.
+## Grounding on the move is by the bones' outermost vertices, not by all: the gap between
+## the bottom and the full extent must be in millimetres, otherwise the actor floats or
+## sinks. The top is not checked by the outermost ones: the rig takes only the bottom from them.
 func test_the_hull_grounds_like_the_whole_mesh() -> void:
 	for model: PackedScene in _models():
 		var rig := _rig(model)
@@ -330,7 +330,7 @@ func test_every_clip_is_in_both_models() -> void:
 			)
 
 
-## Шляпа — то, чем агент отличается от Otto в темноте (ADR-0032, решение 3).
+## The hat is what tells an agent from Otto in darkness (ADR-0032, decision 3).
 func test_the_agent_stands_taller_by_his_hat() -> void:
 	var otto := _rig(OTTO_MODEL)
 	var agent := _rig(AGENT_MODEL)
@@ -346,8 +346,8 @@ func test_facing_turns_the_figure_along_the_floor() -> void:
 	assert_almost_eq(rig.rotation.y, -PI * 0.5, 0.001, "влево — в другую сторону")
 
 
-## Разворот — движение телом за паузу разворота, через «лицом в камеру»
-## (ADR-0039, решение 3), а не подмена стороны.
+## A turn is body motion over the turn pause, through "facing the camera"
+## (ADR-0039, decision 3), not a side swap.
 func test_a_turn_swings_the_body_through_the_camera() -> void:
 	var rig := _rig(OTTO_MODEL)
 	rig.face(1.0)

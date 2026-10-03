@@ -1,58 +1,57 @@
 class_name Takedown
 extends RefCounted
 
-## Добивание вплотную (ADR-0040): кого можно добить, с какой стороны, какой
-## сценкой и за сколько очков.
+## Close-up takedown (ADR-0040): whom can be taken down, from which side, with which scene and for
+## how many points.
 ##
-## С M24d удара ногой нет. Кнопка выстрела вдали стреляет, а вплотную к агенту
-## на том же этаже — добивает; приземлившийся вплотную к агенту — с прыжка или с
-## этажа выше — добивает сам (ADR-0042, решение 9). Сценка — короткая
-## постановка двоих: кто в какой позе с какого момента, где стоит агент, когда
-## он погибает. Вариант берётся случайно из подходящих к стороне, без повтора
-## подряд.
+## Since M24d there is no kick. The fire button shoots at a distance, and close to an agent on the
+## same floor — makes a takedown; one who lands close to an agent — from a jump or from the floor
+## above — makes a takedown by himself (ADR-0042, decision 9). A scene is a short staging of two:
+## who is in which pose from which moment, where the agent stands, when he dies. The variant is
+## picked at random from those fitting the side, without repeating in a row.
 ##
-## Правило без узлов, как [OttoStateMachine]: проверяется без сцены. Ведёт
-## сценку в игре [TakedownScene].
+## A rule without nodes, like [OttoStateMachine]: checked without a scene. [TakedownScene] runs the
+## scene in the game.
 
-## С какой стороны Otto достал агента.
+## From which side Otto got the agent.
 enum Side { FRONT, BACK, ABOVE }
 
-## Как далеко по горизонтали агент ещё «вплотную», м — между осями тел.
-## Шире удара ногой ROM (16 px, 0.53 м): вплотную — это шаг, а не касание.
+## How far horizontally an agent is still "close up", m — between body axes. Wider than the ROM kick
+## (16 px, 0.53 m): close up is a step, not a touch.
 const REACH: float = 0.9
-## Насколько могут расходиться полы Otto и агента, м: один этаж, а не соседний.
+## How far the floors of Otto and the agent may differ, m: one floor, not the adjacent one.
 const SAME_FLOOR: float = 0.3
 
-## Очки по стороне (решение пользователя, ADR-0040): сзади и сверху — вровень с
-## лампой и лифтом, спереди — вдвое против выстрела.
+## Points by side (the user's decision, ADR-0040): from behind and from above — on a par with a lamp
+## and an elevator, from the front — twice a shot.
 const SCORES: Dictionary = {Side.FRONT: 200, Side.BACK: 300, Side.ABOVE: 300}
-## Надбавка в темноте и на этажах 11–15 — как у ROM за выстрел и удар, но своя.
+## Bonus in darkness and on floors 11–15 — as in the ROM for a shot and a kick, but our own.
 const DARK_BONUS: int = 100
 
 
-## Одна сценка: позы двоих по времени.
+## One scene: the poses of the two over time.
 class Scene:
 	extends RefCounted
 
 	var name: String
-	## [enum Takedown.Side]. Числом: GDScript путает тип перечисления в статических
-	## функциях класса и во внешнем коде.
+	## [enum Takedown.Side]. As a number: GDScript confuses the enum type in static class functions and
+	## in external code.
 	var side: int
-	## Сколько идёт сценка, с — в своём темпе, мир вокруг замедлен.
+	## How long the scene lasts, s — at its own pace, the world around is slowed down.
 	var duration: float
-	## Когда агент погибает, с: до этого сценку можно прервать, и агент живёт.
+	## When the agent dies, s: before that the scene can be interrupted, and the agent lives.
 	var kill_at: float
-	## Где стоит агент: столько метров перед Otto, по его взгляду.
+	## Where the agent stands: this many metres in front of Otto, along his gaze.
 	var offset: float
-	## Лицом ли агент к Otto. Спереди — да, сзади — нет.
+	## Whether the agent faces Otto. From the front — yes, from behind — no.
 	var faces_otto: bool
-	## Позы по времени: [[время, поза], …], по возрастанию времени.
+	## Poses over time: [[time, pose], …], in ascending time.
 	var otto: Array[Array] = []
 	var agent: Array[Array] = []
-	## Поза трупа после сценки: в чём агент лёг, в том и лежит.
+	## The corpse pose after the scene: the agent lies in whatever pose he went down in.
 	var corpse: String = "dead_1"
 
-	## Поза актёра в момент [param time]: последняя начавшаяся.
+	## The actor's pose at moment [param time]: the last one that started.
 	static func pose_at(track: Array[Array], time: float) -> String:
 		var shown := String(track[0][1]) if not track.is_empty() else ""
 		for key: Array in track:
@@ -61,10 +60,10 @@ class Scene:
 		return shown
 
 
-## Достаёт ли Otto агента вплотную: тот же этаж, рядом, и агент перед ним — по
-## взгляду Otto. Спиной к агенту Otto стреляет туда, куда смотрит.
+## Whether Otto reaches the agent close up: the same floor, nearby, and the agent is in front of him
+## — along Otto's gaze. With his back to the agent Otto shoots where he is looking.
 ##
-## Координаты — сцены: X вдоль этажа, Y — ноги, вверх.
+## Coordinates are scene ones: X along the floor, Y — feet, upward.
 static func can_reach(otto: Vector2, facing: float, agent: Vector2) -> bool:
 	if absf(agent.y - otto.y) > SAME_FLOOR:
 		return false
@@ -72,9 +71,9 @@ static func can_reach(otto: Vector2, facing: float, agent: Vector2) -> bool:
 	return ahead >= -0.05 and ahead <= REACH
 
 
-## Стоит ли тело на кабине — на её полу или крыше. Таких не добивают и такие не
-## добивают: сценка замораживает обоих, а кабина едет дальше и уезжает из-под
-## пары (авторевью M24d).
+## Whether the body stands on a cab — on its floor or roof. Such ones are not taken down and do not
+## take down: the scene freezes both, while the cab drives on and leaves from under the pair (M24d
+## code review).
 static func rides_a_car(body: CharacterBody3D) -> bool:
 	if not body.is_on_floor():
 		return false
@@ -84,7 +83,8 @@ static func rides_a_car(body: CharacterBody3D) -> bool:
 	return false
 
 
-## С какой стороны агента Otto: агент смотрит на него — спереди, иначе сзади.
+## From which side of the agent Otto is: the agent looks at him — from the front, otherwise from
+## behind.
 static func side_of(otto_x: float, agent_x: float, agent_facing: float) -> int:
 	var towards := signf(otto_x - agent_x)
 	if is_zero_approx(towards):
@@ -92,22 +92,22 @@ static func side_of(otto_x: float, agent_x: float, agent_facing: float) -> int:
 	return Side.FRONT if towards == signf(agent_facing) else Side.BACK
 
 
-## Приземлился ли Otto на агента: на его этаже и вплотную к нему, с любой
-## стороны (ADR-0042, решение 9). Откуда летел — с прыжка или с этажа выше, — не
-## важно: в ROM удар в прыжке убивал при любом касании тел.
+## Whether Otto landed on the agent: on his floor and close to him, from any side (ADR-0042,
+## decision 9). Where he flew from — a jump or the floor above — does not matter: in the ROM a jump
+## kick killed on any touch of the bodies.
 static func lands_on(otto_feet: Vector2, agent_feet: Vector2) -> bool:
 	return (
 		absf(otto_feet.y - agent_feet.y) <= SAME_FLOOR and absf(otto_feet.x - agent_feet.x) <= REACH
 	)
 
 
-## Очки за добивание.
+## Points for a takedown.
 static func score(side: int, in_the_dark: bool) -> int:
 	var base: int = SCORES[side]
 	return base + DARK_BONUS if in_the_dark else base
 
 
-## Сценки стороны.
+## The side's scenes.
 static func scenes_for(side: int) -> Array[Scene]:
 	var found: Array[Scene] = []
 	for scene: Scene in all_scenes():
@@ -116,7 +116,7 @@ static func scenes_for(side: int) -> Array[Scene]:
 	return found
 
 
-## Сценка стороны случайно, но не та же, что была прошлой — если есть другая.
+## A scene of the side at random, but not the same as the previous one — if there is another.
 static func pick(side: int, last: String, rng: RandomNumberGenerator) -> Scene:
 	var choices := scenes_for(side)
 	if choices.size() > 1:
@@ -124,13 +124,13 @@ static func pick(side: int, last: String, rng: RandomNumberGenerator) -> Scene:
 	return choices[rng.randi_range(0, choices.size() - 1)]
 
 
-## Все сценки. Собираются заново на вызов: их мало, а общая таблица менялась
-## бы у всех разом.
+## All scenes. Built anew on each call: there are few of them, and a shared table would change for
+## everyone at once.
 static func all_scenes() -> Array[Scene]:
 	return [_combo(), _pistol_whip(), _choke(), _neck_snap(), _pounce()]
 
 
-## Спереди: джеб, кросс — агента отбрасывает на спину.
+## Front: jab, cross — the agent is thrown onto his back.
 static func _combo() -> Scene:
 	var scene := _scene("combo", Side.FRONT, 1.15, 0.72, 0.72, true)
 	scene.otto = [[0.0, "punch_jab"], [0.34, "punch_cross"], [0.95, "idle"]]
@@ -139,8 +139,8 @@ static func _combo() -> Scene:
 	return scene
 
 
-## Спереди: замах рукоятью сверху — агент оседает. Позы кодом: бросок UAL,
-## пробованный первым, — выпад вниз, и Otto нырял агенту в ноги (кадры M24D).
+## Front: an overhead swing with the gun butt — the agent slumps. Poses in code: the UAL throw,
+## tried first, is a lunge downward, and Otto dived into the agent's legs (M24D shots).
 static func _pistol_whip() -> Scene:
 	var scene := _scene("pistol_whip", Side.FRONT, 1.0, 0.42, 0.62, true)
 	scene.otto = [[0.0, "whip_raise"], [0.3, "whip_strike"], [0.8, "idle"]]
@@ -148,7 +148,7 @@ static func _pistol_whip() -> Scene:
 	return scene
 
 
-## Сзади: захват за шею, агент бьётся и обмякает.
+## Behind: a neck hold, the agent struggles and goes limp.
 static func _choke() -> Scene:
 	var scene := _scene("choke", Side.BACK, 1.35, 1.02, 0.4, false)
 	scene.otto = [[0.0, "choke_hold"], [1.12, "idle"]]
@@ -164,7 +164,7 @@ static func _choke() -> Scene:
 	return scene
 
 
-## Сзади: руки на голову — рывок вбок, агент падает камнем.
+## Behind: hands on the head — a jerk sideways, the agent drops like a stone.
 static func _neck_snap() -> Scene:
 	var scene := _scene("neck_snap", Side.BACK, 0.95, 0.46, 0.32, false)
 	scene.otto = [[0.0, "snap_grab"], [0.38, "snap_twist"], [0.78, "idle"]]
@@ -172,7 +172,7 @@ static func _neck_snap() -> Scene:
 	return scene
 
 
-## Сверху: упал на агента — тот отлетает на спину, Otto добивает над ним.
+## Above: fell on the agent — he flies onto his back, Otto finishes him off from above.
 static func _pounce() -> Scene:
 	var scene := _scene("pounce", Side.ABOVE, 1.0, 0.55, 0.55, true)
 	scene.otto = [[0.0, "land"], [0.3, "pounce_strike"], [0.82, "idle"]]

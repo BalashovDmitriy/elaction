@@ -1,105 +1,110 @@
-# ADR-0036 · M23: звук из свободных библиотек, нуар-джаз, фон по месту
+# ADR-0036 · M23: sound from free libraries, noir jazz, ambience by place
 
-- **Статус:** принято
-- **Дата:** 2026-09-25
-- **Отменяет:** [ADR-0012](0012-sound-and-interface.md), пункты 1 и 2 и их правку
-  — звук синтезом и свой мотив
+- **Status:** accepted
+- **Date:** 2026-09-25
+- **Supersedes:** [ADR-0012](0012-sound-and-interface.md), items 1 and 2 and their amendment
+  — synthesized sound and our own motif
 
-## Контекст
+## Context
 
-После M22 и M22b картинка современная, а звук остался из M8a: 17 эффектов, тема
-здания и мотив тревоги синтезированы `tools/render_audio.py` из волн и шума.
-Замечание пользователя: звук «теперь кажется очень примитивным».
+After M22 and M22b the picture is modern, but the sound remained from M8a: 17
+effects, the building theme and the alarm motif are synthesized by
+`tools/render_audio.py` from waves and noise. The user's remark: the sound "now
+seems very primitive".
 
-Что показала сверка с оригиналом:
+What the check against the original showed:
 
-- **Музыка аркады — одна тема Yoshio Imamura** в нескольких обличьях: тема
-  здания и её же «Hurry Up» по тревоге (@466E в дизассемблере jotd). Рип аркады
-  называет ещё восемь коротких джинглов: вступление здания, вход в красную дверь,
-  документ, жизнь, бонус, смерть, смерть под кабиной, конец партии.
-- **ROM различает звуки тоньше нашего:** выстрел Otto и агента, пуля в стену,
-  три смерти Otto, прыжок, крюк на крыше, эскалатор вверх и вниз. Полный список
-  команд — в STATUS, раздел M23.
-- **Фона нет ни у нас, ни в аркаде**, хотя с M19 и M22 в кадре город, дождь и
-  молнии.
+- **The arcade music is one Yoshio Imamura theme** in several guises: the
+  building theme and its own "Hurry Up" on alarm (@466E in jotd's disassembly).
+  The arcade rip names eight more short jingles: building intro, entering a red
+  door, document, life, bonus, death, death under a cab, game over.
+- **The ROM distinguishes sounds more finely than we do:** Otto's and an agent's
+  shot, a bullet into a wall, three deaths of Otto, a jump, the hook on the roof,
+  escalator up and down. The full command list is in STATUS, section M23.
+- **There is no ambience either in ours or in the arcade**, although since M19 and
+  M22 the frame has the city, rain and lightning.
 
-## Решения
+## Decisions
 
-### 1. Звук — из свободных библиотек, синтез уходит целиком
+### 1. Sound — from free libraries, synthesis goes away entirely
 
-Решение пользователя. Музыка, эффекты, джинглы и звуки меню берутся готовыми
-файлами с лицензией **CC0 или CC-BY**; `tools/render_audio.py` и
-`tools/audio_dsp.py` удаляются. Авторы — в `CREDITS.md` и в
-`assets/audio/credits.json`, по образцу моделей
+The user's decision. Music, effects, jingles and menu sounds are taken as ready
+files with a **CC0 or CC-BY** license; `tools/render_audio.py` and
+`tools/audio_dsp.py` are removed. Authors are in `CREDITS.md` and in
+`assets/audio/credits.json`, following the models
 ([ADR-0033](0033-dressing-from-packs.md)).
 
-Лицензии с оговорками — «royalty free» без права выкладывать файл, Pixabay
-License, бандлы GDC — не берём: репозиторий публичный, и файл в нём — это уже
-распространение.
+Licenses with strings attached — "royalty free" without the right to publish the
+file, the Pixabay License, GDC bundles — are not used: the repository is public,
+and a file in it is already distribution.
 
-### 2. Характер — шпионский нуар-джаз
+### 2. Character — spy noir jazz
 
-Решение пользователя. Контрабас, щётки, приглушённая труба, вибрафон — к
-шпионскому сюжету и нуар-тону M22. Под этот характер подбираются и эффекты:
-глухой выстрел в помещении, а не лазер, механика лифта, а не писк.
+The user's decision. Double bass, brushes, muted trumpet, vibraphone — matching
+the spy plot and the M22 noir tone. The effects are chosen for the same character:
+a muffled indoor gunshot rather than a laser, elevator machinery rather than a
+beep.
 
-### 3. Свой трек на каждый экран
+### 3. A track for each screen
 
-Решение пользователя. Здание, тревога, меню и конец партии — отдельные треки
-одного характера. Одной темы в разных обличьях, как у аркады, из библиотек не
-собрать: у разных треков разные темы. Джинглы — короткие файлы в той же
-идиоме.
+The user's decision. Building, alarm, menu and game over are separate tracks of
+one character. One theme in different guises, like the arcade's, cannot be
+assembled from libraries: different tracks have different themes. Jingles are
+short files in the same idiom.
 
-### 4. Звуки оригинала не добавляем
+### 4. We do not add the original's sounds
 
-Решение пользователя. Звучат те же события, что и сейчас, — с новым звуком.
-Различия ROM (выстрел агента, три смерти, прыжок, крюк, джинглы входа в дверь и
-вступления) в веху не входят. Новое сверх нынешнего — только фон и то, что уже
-записано в EPIC: шаги по разным полам, гул шахты, гром.
+The user's decision. The same events sound as now — with new sound. ROM
+distinctions (agent shot, three deaths, jump, hook, door-entry and intro jingles)
+are not in the milestone. New beyond the current set is only ambience and what is
+already written in EPIC: footsteps on different floors, shaft hum, thunder.
 
-### 5. Фон — по месту
+### 5. Ambience — by place
 
-Решение пользователя. На крыше, у выхода и в меню — улица и дождь в полную
-силу; на этажах — глухо, как из-за стекла, гром пробивается. Гром идёт за
-молнией с задержкой по дальности разряда (`Lightning`).
+The user's decision. On the roof, at the exit and in the menu — street and rain at
+full strength; on floors — muffled, as if through glass, thunder breaks through.
+Thunder follows lightning with a delay by the distance of the strike
+(`Lightning`).
 
-Фон — своя шина `Ambience`, дочерняя к `SFX`: громкость эффектов в настройках
-управляет и им, а приглушение на этажах — фильтр низких частот на этой шине, а
-не второй набор файлов.
+Ambience has its own bus `Ambience`, a child of `SFX`: the effects volume in the
+settings controls it too, and the muffling on floors is a low-pass filter on that
+bus, not a second set of files.
 
-### 6. Музыка следит за игрой
+### 6. Music follows the game
 
-Решение пользователя. Тревога входит наплывом, а не обрывом; за красной дверью и
-на паузе музыка глуше, как из-за стены, — фильтр на шине `Music`; джингл на
-время звучания приглушает трек.
+The user's decision. The alarm comes in with a swell, not a cut; behind a red door
+and on pause the music is muffled, as if through a wall — a filter on the `Music`
+bus; a jingle ducks the track while it plays.
 
-### 7. Выбор — на слух пользователя
+### 7. The choice — by the user's ear
 
-Проверить звук на слух разработчик не может. По каждому слоту готовится два–четыре
-кандидата с автором и лицензией на локальной странице с плеером; выбирает
-пользователь, в игру собирается выбранное.
+The developer cannot check sound by ear. For each slot two to four candidates
+with author and license are prepared on a local page with a player; the user
+chooses, and the chosen ones are built into the game.
 
-### 8. Варианты и то, что не подошло
+### 8. Variants and what did not fit
 
-Выбор множественный (решение пользователя): несколько треков одного экрана
-чередуются жребием по сиду здания, несколько вариантов эффекта — жребием на
-каждое звучание (`AudioStreamRandomizer`). Файлы — `имя.ogg`, `имя.2.ogg`, ….
+The choice is multiple (the user's decision): several tracks for one screen
+alternate by a draw on the building seed, several variants of an effect — by a
+draw on each playback (`AudioStreamRandomizer`). Files are `name.ogg`,
+`name.2.ogg`, ….
 
-Для попадания пули в тело ни один кандидат не подошёл. Своего звука у него нет:
-попадание всегда убивает, и его слышно смертью. Дождь за стеклом и тишина
-коридора нашлись записями — на этажах звучат они, а не фильтр поверх уличных.
+For a bullet hitting a body no candidate fit. It has no sound of its own: a hit
+always kills, and it is heard as the death. Rain behind glass and corridor
+silence were found as recordings — those play on floors, not a filter over the
+street ones.
 
-## Чего в вехе нет
+## Not in the milestone
 
-- Звуков ROM сверх нынешних событий — пункт 4.
-- Музыки по слоям напряжения: треки, разложенные по дорожкам, в свободных
-  библиотеках почти не встречаются.
+- ROM sounds beyond the current events — item 4.
+- Music in tension layers: tracks split into stems are almost never found in free
+  libraries.
 
-## Последствия
+## Consequences
 
-- `assets/audio/` меняется целиком; имена звуков в `Sounds` остаются, чтобы
-  код игры не трогать без нужды.
-- Появляются шина `Ambience` и эффекты фильтра на шинах `Music` и `Ambience`
-  в `buses.tres`.
-- Архив релиза везёт `CREDITS.md` — CC-BY требует указать авторство.
-- ADR-0012, пункты 1 и 2, отменены; строка статуса — в его шапке.
+- `assets/audio/` changes entirely; sound names in `Sounds` stay, so that the game
+  code is not touched without need.
+- The `Ambience` bus and filter effects on the `Music` and `Ambience` buses appear
+  in `buses.tres`.
+- The release archive carries `CREDITS.md` — CC-BY requires attribution.
+- ADR-0012, items 1 and 2, are superseded; the status line is in its header.

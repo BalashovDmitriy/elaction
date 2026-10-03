@@ -1,6 +1,6 @@
 extends GutTest
 
-## Дуло пистолета — там, откуда вылетает пуля (ADR-0043, решение 16).
+## The pistol muzzle is where the bullet leaves from (ADR-0043, decision 16).
 
 const OTTO_MODEL := preload("res://assets/models/otto.glb")
 
@@ -12,15 +12,15 @@ func _rig(model: PackedScene) -> FigureRig:
 	return rig
 
 
-## Дуло пистолета стоит там, откуда вылетает пуля по ROM: стоя, из приседа и
-## лёжа, у Otto и у агента (ADR-0043, решение 16). Риг наводит руку сам; пуля
-## летит на своей высоте, и бой от наведения не меняется.
+## The pistol muzzle stands where the bullet leaves from per ROM: standing, crouching and
+## lying, for Otto and for an agent (ADR-0043, decision 16). The rig aims the arm itself; the bullet
+## flies at its own height, and combat does not change from the aiming.
 func test_the_muzzle_meets_the_bullet_line() -> void:
 	var cases := [
 		[OTTO_MODEL, "shoot", Proportions.SHOT_HIGH],
 		[OTTO_MODEL, ActorPose.CROUCH, Proportions.SHOT_LOW],
 	]
-	# Агент каждого типа здания (ADR-0055, решение 7): модель своя, пуля та же.
+	# An agent of each building kind (ADR-0055, decision 7): its own model, the same bullet.
 	for agent: PackedScene in AgentWardrobe.MODELS:
 		cases.append([agent, "shoot", Proportions.AGENT_SHOT])
 		cases.append([agent, ActorPose.CROUCH, Proportions.SHOT_LOW])
@@ -40,9 +40,9 @@ func test_the_muzzle_meets_the_bullet_line() -> void:
 		assert_almost_eq(muzzle.z, wanted.z, 0.05, label + ": и на выносе ствола")
 
 
-## Присевший стреляет, не меняя позы: рука наводится и на застывшем риге, а
-## выстрел кончился — опускается. Застывший риг кадров не раскладывает, и без
-## этого рука не поднималась бы вовсе или висела бы вскинутой до смены позы.
+## A crouching one shoots without changing pose: the arm aims even on a frozen rig, and
+## when the shot is over — lowers. A frozen rig does not lay out frames, and without
+## this the arm would not rise at all or would hang raised until the pose changed.
 func test_the_arm_aims_on_a_settled_pose() -> void:
 	var rig := _rig(OTTO_MODEL)
 	rig.face(1.0, true)

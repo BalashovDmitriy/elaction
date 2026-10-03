@@ -1,19 +1,19 @@
 extends GutTest
 
-## Тесты меню M22b (ADR-0035): страницы, пункты, фон и один шрифт.
+## M22b menu tests (ADR-0035): pages, items, background and a single font.
 ##
-## Меню видит каждый игрок первым, а сломанная страница молчит: пустая
-## колонка — это не ошибка в логе, а экран, с которого не уйти. Поэтому каждая
-## страница собирается и отдаёт фокус первому пункту — без него с геймпада по
-## меню не походить.
+## Every player sees the menu first, and a broken page is silent: an empty
+## column is not an error in the log but a screen you cannot leave. So every
+## page is built and gives focus to its first item: without it you cannot move around
+## the menu with a gamepad.
 
 const MENU_SCENE := preload("res://src/ui/menu.tscn")
 const MAIN_SCENE := preload("res://src/main.tscn")
 
-## Сколько кадров дать отложенному фокусу и вспышке выбора.
+## How many frames to give the deferred focus and the selection flash.
 const SETTLE_FRAMES: int = 4
 
-## Где искать ссылки на шрифт, которого в проекте больше нет.
+## Where to look for references to a font the project no longer has.
 const SOURCE_DIRS: Array[String] = ["res://src", "res://tools"]
 
 
@@ -36,9 +36,9 @@ func test_every_page_builds_and_takes_focus() -> void:
 
 
 func test_settings_have_every_choice() -> void:
-	# Громкость трижды, язык, сложность, графика, экран, разрешение, предел
-	# кадров, синхронизация, кровь, кадры в секунду — и «назад». Масштаба
-	# рендера с M24f нет: его долю задаёт разрешение (ADR-0042, решение 3).
+	# Volume three times, language, difficulty, graphics, screen, resolution, frame
+	# limit, sync, blood, frames per second, and "back". There has been no render
+	# scale since M24f: its share is set by the resolution (ADR-0042, decision 3).
 	var menu := _menu()
 	menu.show_page(Menu.Page.SETTINGS)
 	var kinds: Array[int] = []
@@ -50,9 +50,9 @@ func test_settings_have_every_choice() -> void:
 	assert_eq(kinds.count(MenuRow.Kind.ACTION), 1, "назад")
 
 
-## Предел кадров — по монитору по умолчанию, числа подписаны как счётчик HUD;
-## а следом — флажок синхронизации, включённый по умолчанию. Листать пункт тест
-## не листает: выбор пишет настройки в файл игрока.
+## The frame limit follows the monitor by default, the numbers are labeled like the HUD
+## counter; next comes the sync checkbox, on by default. The test does not cycle the
+## item: a selection writes the settings to the player's file.
 func test_the_frame_limit_row_offers_the_caps() -> void:
 	var menu := _menu()
 	menu.show_page(Menu.Page.SETTINGS)
@@ -73,8 +73,8 @@ func test_the_frame_limit_row_offers_the_caps() -> void:
 	assert_true(rows[at + 1].on, "синхронизация включена")
 
 
-## Настройки растут пунктами, а экран — нет: «назад» не должен заехать на
-## подсказку внизу. С пределом кадров и синхронизацией запас — пять пикселей.
+## Settings grow in items, but the screen does not: "back" must not run onto the
+## hint at the bottom. With the frame limit and sync the margin is five pixels.
 func test_the_settings_fit_above_the_hint() -> void:
 	var menu := _menu()
 	menu.show_page(Menu.Page.SETTINGS)
@@ -85,8 +85,8 @@ func test_the_settings_fit_above_the_hint() -> void:
 
 
 func test_the_game_behind_blurs_only_over_a_game() -> void:
-	# Из главного меню за ним город, а размывать нечего; на паузе и в конце
-	# партии за ним замершее здание — и оно размывается, вместе с подстраницами.
+	# From the main menu the city is behind it, and there is nothing to blur; on pause and at
+	# the end of a game a frozen building is behind it, and it is blurred, subpages included.
 	var menu := _menu()
 	var blur := menu.get_node("Root/Blur") as ColorRect
 	menu.show_page(Menu.Page.MAIN)
@@ -176,7 +176,7 @@ func test_the_sign_measures_its_glow() -> void:
 
 
 func test_the_sign_blinks_and_stops_on_demand() -> void:
-	# Снимки гасят мигание посреди моргания — и буква не должна остаться тёмной.
+	# Shots stop the flicker in the middle of a blink, and the letter must not stay dark.
 	var title := NeonTitle.new()
 	add_child_autofree(title)
 	assert_true(title.is_letter_lit(), "вывеска зажигается горящей")
@@ -189,7 +189,7 @@ func test_the_sign_blinks_and_stops_on_demand() -> void:
 
 
 func test_a_level_at_its_end_stays_quiet() -> void:
-	# Упёрлась в край — ни щелчка, ни записи в шину на каждое нажатие.
+	# Hit the edge: no click and no bus write on every press.
 	var row := MenuRow.slider("x", 1.0)
 	autofree(row)
 	watch_signals(row)
@@ -200,8 +200,8 @@ func test_a_level_at_its_end_stays_quiet() -> void:
 
 
 func test_a_row_takes_its_neon_after_it_is_built() -> void:
-	# Меню красит пункт уже собранным: кромка обязана перекраситься сразу, а не
-	# с первой вспышкой фокуса.
+	# The menu colors an item that is already built: the edge must be recolored at once, not
+	# with the first focus flash.
 	var row := MenuRow.action("x")
 	add_child_autofree(row)
 	row.neon = VerticalSign.NEON_OFFICE
@@ -210,10 +210,10 @@ func test_a_row_takes_its_neon_after_it_is_built() -> void:
 
 
 func test_escape_from_settings_over_the_pause_stops_at_the_pause() -> void:
-	# Esc — и «назад» меню, и «пауза» игры. С настроек над паузой меню уходит на
-	# паузу ещё до кадра main, и по одной текущей странице то же нажатие тут же
-	# снимало паузу (авторевью M22b). Кадр разыгран руками: сначала ввод, потом
-	# _process — в этом порядке движок их и зовёт.
+	# Esc is both "back" in the menu and "pause" in the game. From the settings above the
+	# pause the menu goes to pause even before main's frame, and judging by the current page
+	# alone the same press immediately lifted the pause (M22b code review). The frame is
+	# played by hand: input first, then _process, in the order the engine calls them.
 	var locale := TranslationServer.get_locale()
 	var main := MAIN_SCENE.instantiate()
 	add_child_autofree(main)
@@ -243,9 +243,9 @@ func test_escape_from_settings_over_the_pause_stops_at_the_pause() -> void:
 
 
 func test_leaving_the_pause_brings_the_music_back() -> void:
-	# «Заново» с паузы снимало паузу дерева, но не глухую музыку паузы: вся
-	# новая партия звучала из-за стены (авторевью M23). Из паузы теперь выходят
-	# только через _unpause — «продолжить», «заново» и «в меню» разом.
+	# "Restart" from the pause lifted the tree's pause but not the pause's muffled music: the
+	# whole new game sounded as if from behind a wall (M23 code review). The pause is now
+	# exited only via _unpause: "continue", "restart" and "to menu" alike.
 	var director := AudioDirector.instance()
 	if director == null:
 		return
@@ -261,8 +261,8 @@ func test_leaving_the_pause_brings_the_music_back() -> void:
 
 
 func test_no_code_points_at_pixellari() -> void:
-	# ADR-0035, решение 3: один шрифт. Забытая ссылка на удалённый файл — это
-	# ошибка загрузки в той сцене, куда реже всего заглядывают.
+	# ADR-0035, decision 3: one font. A forgotten reference to a deleted file is a
+	# load error in the scene that gets looked at least often.
 	for dir: String in SOURCE_DIRS:
 		for path: String in _sources(dir):
 			var text := FileAccess.get_file_as_string(path)
@@ -279,8 +279,8 @@ func _sources(dir: String) -> Array[String]:
 	return found
 
 
-## Справку по управлению не находили: из главного меню она была, с паузы — нет
-## (ADR-0037, решение 9).
+## The controls help could not be found: it was there from the main menu, not from the
+## pause (ADR-0037, decision 9).
 func test_the_controls_open_from_the_pause_and_lead_back() -> void:
 	var menu := _menu()
 	menu.show_page(Menu.Page.PAUSE)
@@ -290,8 +290,8 @@ func test_the_controls_open_from_the_pause_and_lead_back() -> void:
 		return
 	found.pressed.emit()
 	assert_eq(menu.current_page(), Menu.Page.CONTROLS, "пункт открывает справку")
-	# «Назад» сохраняет настройки на диск: пустые тестовые затёрли бы настройки
-	# игрока.
+	# "Back" saves the settings to disk: empty test ones would overwrite the player's
+	# settings.
 	menu.settings = null
 	var back := _row_labelled(menu, tr("UI_BACK"))
 	assert_not_null(back, "у справки есть «Назад»")
@@ -309,8 +309,9 @@ func _row_labelled(menu: Menu, text: String) -> MenuRow:
 	return null
 
 
-## Конец партии не принимает нажатий первые полторы секунды: давивший прыжок
-## игрок иначе жал бы «Заново» тем же пробелом (ADR-0042, решение 5).
+## The game-over screen ignores presses for the first second and a half: otherwise a
+## player mashing jump would press "Restart" with the same space bar (ADR-0042,
+## decision 5).
 func test_game_over_rows_hold_still_at_first() -> void:
 	var menu := _menu()
 	menu.show_page(Menu.Page.GAME_OVER)

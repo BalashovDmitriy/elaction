@@ -1,127 +1,121 @@
 extends GutTest
 
-## Бот проходит здание целиком.
+## The bot plays through the whole building.
 ##
-## Самая честная проверка уровня: собирается настоящая сцена с физикой, и Otto
-## действительно спускается, забирает документы и уходит в выход. Ловит то, чего
-## не видят ни раскладка, ни дымовой тест, — например, кабину, чьи остановки не
-## совпадают с полами, или коврик двери, до которого не дойти.
+## The most honest level check: a real scene with physics is assembled, and Otto actually goes down,
+## takes the documents and leaves through the exit. It catches what neither the layout nor the smoke
+## test sees — for example, a cab whose stops do not match the floors, or a door mat that cannot be
+## reached.
 ##
-## Зданий три вида: маленькое без охраны, настоящее без охраны и настоящее
-## с агентами. Первые два проверяют проходимость, третий — бой: это DoD вехи
-## M11 (ADR-0016, пункты 7 и 8). Бой меряется числом смертей, а не тем, дожил
-## ли бот на трёх жизнях, — жизни ему не ограничены.
+## There are three kinds of building: a small one without guards, a real one without guards and a
+## real one with agents. The first two check traversability, the third — combat: this is the DoD of
+## milestone M11 (ADR-0016, items 7 and 8). Combat is measured by the number of deaths, not by
+## whether the bot survived on three lives, — its lives are unlimited.
 ##
-## Маленькое ловит вырожденные раскладки и стоит копейки, поэтому сидов у него
-## много. Настоящее — то самое, в которое играет игрок: пока его не гонял никто,
-## здание собиралось с крышей в 20 px просвета, и этого не видел ни один тест
-## (ADR-0014, пункт 5).
+## The small one catches degenerate layouts and costs next to nothing, so it has many seeds. The
+## real one is the very one the player plays: until nobody ran it, the building was assembled with a
+## 20 px gap at the roof, and not a single test saw it (ADR-0014, item 5).
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const SEEDS: Array[int] = [1, 2, 3, 4, 5]
 
-## Сиды настоящего здания. Их меньше: каждое — это тридцать этажей и пять
-## документов, то есть полторы минуты игрового времени на прогон.
+## Seeds of the real building. There are fewer of them: each is thirty floors and five documents,
+## that is a minute and a half of game time per run.
 const TALL_SEEDS: Array[int] = [1, 2]
 
-## Потолок на прохождение, физических кадров. При 60 кадрах в секунду это минута
-## игрового времени на четыре этажа — с запасом даже на ожидание кабины.
+## Cap for a playthrough, in physics frames. At 60 frames per second this is a minute of game time
+## for four floors — with margin even for waiting for a cab.
 const FRAME_BUDGET: int = 900
 
-## Потолок на настоящее здание, **шагов петли бота** — тех самых, что считает
-## цикл ниже. Один шаг — два физических кадра, это стережёт
-## [method test_a_tick_is_two_physics_frames].
+## Cap for the real building, in **bot loop steps** — the very ones the loop below counts. One step
+## is two physics frames, guarded by [method test_a_tick_is_two_physics_frames].
 ##
-## Замер `tools/playthrough.gd` на пяти сидах, 2026-09-22: **1992–3176 шагов**,
-## все пять проходят с пятью документами из пяти. Потолок — вдвое от худшего
-## сида, округлённо.
+## Measurement with `tools/playthrough.gd` on five seeds, 2026-09-22: **1992–3176 steps**, all five
+## pass with five documents out of five. The cap is twice the worst seed, rounded.
 ##
-## Мерить надо в тех же единицах, в каких считает тест. Прежний комментарий
-## обещал «около 5500 кадров» — число из инструмента, который тогда ходил одним
-## кадром на шаг, тогда как тест ходил двумя. Разошедшиеся единицы и стоили
-## вехе трёх коммитов разбора.
+## Measure in the same units the test counts in. The former comment promised "about 5500 frames" — a
+## number from the tool, which then went one frame per step, whereas the test went two. The
+## diverging units cost the milestone three investigation commits.
 const TALL_BUDGET: int = 7000
 
-## Сиды настоящего здания с охраной. Это самый дорогой прогон в проекте: к
-## тридцати этажам добавляется бой, и каждая дуэль — это ещё секунды.
+## Seeds of the real building with guards. This is the most expensive run in the project: combat is
+## added to thirty floors, and every duel adds more seconds.
 const GUARDED_SEEDS: Array[int] = [1, 2, 3]
 
-## Потолок на здание с охраной, шагов петли бота. Тот же, что и без неё: бой
-## добавляет к прогону десятки шагов, а не тысячи — дуэль решается за секунду.
-## Замер `tools/playthrough.gd --agents` на трёх сидах, 2026-09-22:
-## **2756–3176 шагов** против 1992–3176 без боя.
+## Cap for the building with guards, in bot loop steps. The same as without them: combat adds tens
+## of steps to a run, not thousands — a duel is decided in a second. Measurement with
+## `tools/playthrough.gd --agents` on three seeds, 2026-09-22: **2756–3176 steps** against 1992–3176
+## without combat.
 ##
-## Вдвое больше худшего сида, но не больше: этот прогон — самый дорогой
-## в проекте, и провалившийся сид не должен жечь минуты CI, прежде чем сказать
-## об этом.
+## Twice the worst seed, but no more: this run is the most expensive in the project, and a failing
+## seed must not burn minutes of CI before saying so.
 const GUARDED_BUDGET: int = 7000
 
-## Сколько жизней выдаётся боту в прогоне с боем. Не три, а столько, чтобы
-## партия дошла до конца при любой мыслимой неудаче: мерой служит число
-## смертей, а не факт «дожил» (ADR-0016, пункт 8).
+## How many lives the bot gets in a run with combat. Not three, but enough for the game to reach the
+## end under any conceivable bad luck: the measure is the number of deaths, not the fact of
+## "survived" (ADR-0016, item 8).
 const ENDLESS_LIVES: int = 99
 
-## Во сколько смертей бою позволено обойтись боту на одном здании.
+## How many deaths combat is allowed to cost the bot in one building.
 ##
-## Замер 2026-09-23, после здания по карте (ADR-0028), навык 0 — первое здание
-## на лёгком уровне: **0, 1, 0** на сидах 1–3 (`tools/playthrough.gd --agents
-## --endless`); этот тест на сиде 2 насчитал 4. В M18d было 0, 0, 0 и порог 3:
-## дверей с M18e в два с половиной раза больше, и агенты выходят ближе — первое
-## здание стало дороже по решению вехи, а не по поломке.
+## Measurement 2026-09-23, after the map-based building (ADR-0028), skill 0 — the first building at
+## the easy level: **0, 1, 0** on seeds 1–3 (`tools/playthrough.gd --agents --endless`); this test
+## counted 4 on seed 2. In M18d it was 0, 0, 0 with threshold 3: since M18e there are two and a half
+## times more doors, and agents come out closer — the first building became more expensive by the
+## milestone's decision, not by a breakage.
 ##
-## Шкала по навыку (`--skill=N`, сиды 1–3): 3 — 4, 7, 0; 6 — 10, 36, 41 (на
-## третьем бот собрал всё, но не уложился в 12000 шагов); 10 — 22, 11, 21.
-## Пик на шести — свойство бота, как и в M18d: там агенты уже быстры, но
-## стоят, а на десяти три выстрела из четырёх лёжа, и от такой пули бот прыгает
-## лучше, чем выигрывает дуэль.
+## Scale by skill (`--skill=N`, seeds 1–3): 3 — 4, 7, 0; 6 — 10, 36, 41 (on the third the bot
+## collected everything but did not fit in 12000 steps); 10 — 22, 11, 21. The peak at six is a
+## property of the bot, as in M18d: there agents are already fast but stand, while at ten three
+## shots out of four are fired lying down, and the bot jumps over such a bullet better than it wins
+## a duel.
 ##
-## Поэтому порог с запасом, а не впритык к худшему: подгонять его под
-## неустойчивое число — значит закрепить в проверке шум. Ловит он просадку
-## в разы, а не на единицу, и этого хватает: за единицами следят напечатанные
-## числа каждого сида, они видны и на зелёном прогоне.
+## So the threshold has margin rather than sitting right at the worst: fitting it to an unstable
+## number would lock noise into the check. It catches a regression of several times, not of one, and
+## that is enough: the printed numbers of each seed track the ones, and they are visible on a green
+## run too.
 ##
-## Число это — о сложности игры, и правится оно замером, а не подгонкой под
-## зелёный тест (ADR-0016). Выросло — значит бой стал злее, и решать надо,
-## хотели мы этого или нет.
+## This number is about the game's difficulty, and it is changed by measurement, not by fitting it
+## to a green test (ADR-0016). If it grew, combat got meaner, and someone has to decide whether we
+## wanted that or not.
 ##
-## Замер 2026-10-02, после правил ROM (ADR-0053): возвращение без агентов на
-## этаже, толпа уходит в двери, выпуск не ближе 1.2 м — **1, 4, 6** на сидах 1–3.
-## Сид 3 и раньше стоял на пороге (5 из 5); бой по ROM чуть злее, и порог поднят
-## до шести решением пользователя.
+## Measurement 2026-10-02, after the ROM rules (ADR-0053): return with no agents on the floor, the
+## crowd leaves through doors, release no closer than 1.2 m — **1, 4, 6** on seeds 1–3. Seed 3 was
+## at the threshold before too (5 of 5); combat by the ROM is a bit meaner, and the threshold was
+## raised to six by the user's decision.
 const DEATHS_ALLOWED: int = 6
 
-## Сколько шагов боту даётся на то, чтобы хоть как-то продвинуться, прежде чем
-## прогон признаётся зациклившимся.
+## How many steps the bot gets to make at least some progress before the run is declared stuck in a
+## loop.
 ##
-## Законная причина стоять на месте у бота одна — ждать кабину, и она ограничена
-## оборотом самой длинной шахты: четырнадцать этажей, тринадцать пролётов, по
-## 2 с хода и [member ElevatorCar.floor_pause] стоянки — около 91 с в оба конца,
-## то есть примерно 2730 шагов. Порог взят чуть выше и всё равно вдвое ниже
-## бюджета прогона.
+## The bot has one legitimate reason to stand still — waiting for a cab, and it is bounded by the
+## round trip of the longest shaft: fourteen floors, thirteen spans, 2 s of travel each plus [member
+## ElevatorCar.floor_pause] of stop — about 91 s both ways, that is roughly 2730 steps. The
+## threshold is taken slightly higher and is still half the run budget.
 ##
-## Нужен он не ради скорости, хотя и ради неё тоже. На M18a зациклившийся сид
-## выжигал весь бюджет и сообщал «не уложился за N кадров» — формулировка,
-## которая увела разбор в сторону бюджета на три коммита, тогда как бот стоял
-## на одном этаже с 2900-го шага. Сторож говорит «застрял там-то, решал то-то»,
-## и это ровно те два факта, по которым причина нашлась.
+## It is needed not for speed, though for speed too. On M18a a looping seed burned the whole budget
+## and reported "did not fit in N frames" — a wording that led the investigation toward the budget
+## for three commits, whereas the bot had been standing on one floor since step 2900. The watchdog
+## says "stuck at such-and-such place, deciding such-and-such", and those are exactly the two facts
+## by which the cause was found.
 const STALL_LIMIT: int = 3000
 
 
-## Сторож простоя: следит, что бот продвигается, и обрывает зациклившийся прогон.
+## Idle watchdog: checks that the bot makes progress and cuts off a looping run.
 ##
-## Продвижением считается любой рост меры, которую передаёт прогон, — этаж
-## глубже прежнего, собранный документ, потраченная жизнь. Ожидание кабины
-## продвижением не считается, поэтому порог и взят по обороту шахты.
+## Progress is any growth of the measure the run passes in — a floor deeper than before, a collected
+## document, a spent life. Waiting for a cab does not count as progress, which is why the threshold
+## is based on a shaft round trip.
 class _Watchdog:
 	extends RefCounted
 
-	## Сработал ли сторож: прогон оборван как зациклившийся.
+	## Whether the watchdog fired: the run was cut off as looping.
 	var tripped: bool = false
 
 	var _best: int = -1
 	var _idle: int = 0
 
-	## Принимает меру продвижения и говорит, пора ли обрывать прогон.
+	## Takes the progress measure and says whether it is time to cut off the run.
 	func stalled(depth: int, done: int) -> bool:
 		var measure := depth * 100 + done
 		if measure > _best:
@@ -132,13 +126,13 @@ class _Watchdog:
 		tripped = _idle > STALL_LIMIT
 		return tripped
 
-	## Чем именно бот занят в месте, где встал. Решение бота здесь важнее
-	## координат: по «жмёт [] на 21-м этаже» причина не видна, а по «ждёт кабину
-	## шахты x=6.6, чтобы уехать на 27-й» — видна сразу.
+	## What exactly the bot is doing at the place where it stopped. The bot's decision matters more
+	## here than coordinates: from "presses [] on the 21st floor" the cause is not visible, but from
+	## "waits for the cab of shaft x=6.6 to ride to the 27th" it is visible at once.
 	func report(level: GreyboxLevel, bot: OttoBot, depth: int) -> String:
 		var at := WorldSpace.to_plane(level.otto.global_position)
 		return (
-			"бот зациклился: %d шагов без продвижения, этаж %d, Otto %s, решение: %s"
+			"bot is looping: %d steps without progress, floor %d, Otto %s, decision: %s"
 			% [_idle, depth, at, bot.decision()]
 		)
 
@@ -160,65 +154,64 @@ func _build(building_seed: int, rules: BuildingRules = null, agents: bool = fals
 	return level
 
 
-## Убирает здание из дерева сразу, не дожидаясь конца теста.
+## Removes the building from the tree at once, without waiting for the end of the test.
 ##
-## [method GutTest.add_child_autofree] освобождает только после всего теста, а сиды
-## перебираются внутри одного: без этого пять зданий стоят друг в друге в одном
-## физическом мире. Бот жмёт действия глобально, значит идут все пять Otto разом,
-## и красные двери прошлых зданий по-прежнему шлют документы в общий [GameState] —
-## проверка «документы собраны» проходила бы чужим трудом. Освободит их GUT.
+## [method GutTest.add_child_autofree] frees only after the whole test, and seeds are iterated
+## inside one test: without this five buildings stand inside each other in one physics world. The
+## bot presses actions globally, so all five Ottos walk at once, and the red doors of previous
+## buildings still send documents to the shared [GameState] — the "documents collected" check would
+## pass thanks to someone else's work. GUT will free them.
 func _drop(level: GreyboxLevel) -> void:
 	remove_child(level)
 
 
-## Шаг петли управления ботом: **два физических кадра, и это нарочно**.
+## A step of the bot control loop: **two physics frames, and this is on purpose**.
 ##
-## [method GutTest.wait_physics_frames] ждёт, пока счётчик станет *больше*
-## запрошенного ([code]addons/gut/awaiter.gd[/code]), поэтому
-## `wait_physics_frames(1)` пропускает два кадра, а не один. На M13 это заметили
-## и оставили как правило: бот — самая грубая петля управления, какая случится
-## с игрой, и допуск в мире не должен быть меньше пути за два кадра под
-## [member Engine.time_scale] (`docs/testing.md`, пункт 4). Тем правилом поймали
-## кабину, которая замирала в 24 единицах от этажа.
+## [method GutTest.wait_physics_frames] waits until the counter becomes *greater* than requested
+## ([code]addons/gut/awaiter.gd[/code]), so `wait_physics_frames(1)` skips two frames, not one. On
+## M13 this was noticed and kept as a rule: the bot is the coarsest control loop the game will ever
+## have, and a tolerance in the world must not be smaller than the distance covered in two frames
+## under [member Engine.time_scale] (`docs/testing.md`, item 4). That rule caught a cab that froze
+## 24 units from a floor.
 ##
-## Менять на один кадр нельзя — это отменит правило. Менять на два кадра
-## в одном месте и на один в другом нельзя тем более: на M18a тест и
-## [code]tools/playthrough.gd[/code] разошлись именно так, и сид 2 «не проходил
-## здание» в тесте, проходя в инструменте за 6377 кадров. Поломку успели списать
-## сперва на длину маршрута по графу, потом на баланс боя. Инструмент и тест
-## обязаны водить Otto одинаково, иначе они меряют разные игры.
+## It must not be changed to one frame — that would cancel the rule. Changing it to two frames in
+## one place and one in another is even worse: on M18a the test and
+## [code]tools/playthrough.gd[/code] diverged exactly like that, and seed 2 "did not pass the
+## building" in the test while passing in the tool in 6377 frames. The breakage was blamed first on
+## the route length through the graph, then on combat balance. The tool and the test must drive Otto
+## the same way, otherwise they measure different games.
 func _tick() -> void:
 	await wait_physics_frames(1)
 
 
-## Шаг петли бота длится два физических кадра — на этом стоят и бюджеты выше,
-## и правило M13 про допуски (`docs/testing.md`, пункт 4).
+## A bot loop step lasts two physics frames — both the budgets above and the M13 rule about
+## tolerances rest on this (`docs/testing.md`, item 4).
 ##
-## Проверка дешёвая, а стережёт дорогое: единица, в которой считают бюджеты,
-## задана поведением чужого кода — [method GutTest.wait_physics_frames] ждёт,
-## пока счётчик станет *больше* запрошенного. Обновление GUT может это
-## поменять молча, и тогда бюджеты станут значить вдвое больше или меньше,
-## а бот — вдвое отзывчивее или грубее. На M18a такое расхождение между
-## тестом и инструментом замера обошлось в три коммита разбора.
+## The check is cheap, but it guards something expensive: the unit in which the budgets are counted
+## is set by the behaviour of someone else's code — [method GutTest.wait_physics_frames] waits until
+## the counter becomes *greater* than requested. A GUT update may silently change that, and then the
+## budgets will mean twice as much or half as much, and the bot will be twice as responsive or twice
+## as coarse. On M18a such a divergence between the test and the measuring tool cost three
+## investigation commits.
 func test_a_tick_is_two_physics_frames() -> void:
-	# Считает движок, а не свой обработчик [signal SceneTree.physics_frame]:
-	# обработчики идут в порядке подключения, аваитер GUT подключён раньше и
-	# будит корутину прямо внутри эмиссии — до того, как подсчёт успеет
-	# сработать. Такой счётчик занижает ответ ровно на один кадр.
+	# The engine counts, not our own [signal SceneTree.physics_frame] handler: handlers run in
+	# connection order, GUT's awaiter is connected earlier and wakes the coroutine right inside the
+	# emission — before the count gets a chance to run. Such a counter undercounts by exactly one
+	# frame.
 	var before := Engine.get_physics_frames()
 	await _tick()
 	assert_eq(int(Engine.get_physics_frames() - before), 2, "шаг петли бота — два физических кадра")
 
 
 func before_all() -> void:
-	# Кадров у прогона мало, поэтому игровое время идёт быстрее реального.
+	# The run has few frames, so game time runs faster than real time.
 	Engine.time_scale = 4.0
 
 
 func after_all() -> void:
 	Engine.time_scale = 1.0
-	# Автолоад один на весь прогон: оставленная «в игре» партия досчитывала бы
-	# тревогу в чужих тестах. Возвращаем его в исходное.
+	# The autoload is one for the whole run: a game left "in play" would keep counting the alarm in
+	# other tests. Return it to its initial state.
 	GameState.instance().reset()
 
 
@@ -261,11 +254,11 @@ func test_bot_finishes_every_building() -> void:
 		_drop(level)
 
 
-## Бот проходит то самое здание, в которое играет игрок: тридцать этажей, пять
-## документов, крыша сверху и ступенчатый силуэт.
+## The bot plays through the very building the player plays: thirty floors, five documents, a roof
+## on top and a stepped silhouette.
 ##
-## Здание на четыре этажа не ловит ничего из этого: у него одна полоса шахт,
-## один документ и ширина, которая не меняется.
+## A four-floor building catches none of this: it has one strip of shafts, one document and a width
+## that does not change.
 func test_bot_finishes_the_real_building_seed_1() -> void:
 	await _play_tall(TALL_SEEDS[0])
 
@@ -274,11 +267,11 @@ func test_bot_finishes_the_real_building_seed_2() -> void:
 	await _play_tall(TALL_SEEDS[1])
 
 
-## Один прогон настоящего здания без охраны.
+## One run of the real building without guards.
 ##
-## Сид приходит снаружи, а не перебирается циклом: прогон стоит полторы минуты,
-## и раскидать сиды по процессам можно, только если у каждого свой тест
-## (`tools/run_tests.py`, раскладка по шардам).
+## The seed comes from outside rather than being iterated in a loop: a run takes a minute and a
+## half, and seeds can be spread across processes only if each has its own test
+## (`tools/run_tests.py`, shard layout).
 func _play_tall(building_seed: int) -> void:
 	GameState.instance().start_game()
 	var level := _build(building_seed, BuildingRules.new())
@@ -317,30 +310,29 @@ func _play_tall(building_seed: int) -> void:
 		game.documents_total,
 		"сид %d: документы собраны не все" % building_seed
 	)
-	# Бот сбивает лампы из кабины (ADR-0053, решение 4): без этого прогон не
-	# проверял бы темноту вовсе.
+	# The bot shoots down lamps from a cab (ADR-0053, decision 4): without this the run would not check
+	# darkness at all.
 	assert_gt(bot.lamp_shots, 0, "сид %d: бот ни разу не выстрелил по лампе" % building_seed)
 	assert_lt(level.lamps().size(), lamps_before, "сид %d: ни одна лампа не упала" % building_seed)
 	_drop(level)
 
 
-## DoD вехи M11: здание с агентами проходимо, и бой стоит боту не дороже
-## [constant DEATHS_ALLOWED] смертей.
+## DoD of milestone M11: a building with agents is traversable, and combat costs the bot no more
+## than [constant DEATHS_ALLOWED] deaths.
 ##
-## Самый дорогой тест проекта и единственный, который меряет баланс боя, а не
-## геометрию (ADR-0016, пункты 7 и 8).
+## The most expensive test of the project and the only one that measures combat balance rather than
+## geometry (ADR-0016, items 7 and 8).
 ##
-## **Жизни боту не ограничены нарочно.** Прежняя проверка — «прошёл на трёх
-## жизнях» — стояла на обрыве: сид с одной смертью и сид с тремя давали один
-## ответ, а между ними вся разница сложности. Живой игрок всё равно играет
-## иначе, чем бот, и переносить на него ровно три жизни бессмысленно. Поэтому
-## прогон всегда доходит до конца, а мерой служит **число смертей** — величина
-## непрерывная, по которой видно направление, а не только факт. На неё же
-## лягут будущие уровни сложности.
+## **The bot's lives are unlimited on purpose.** The former check — "passed on three lives" — stood
+## on a cliff edge: a seed with one death and a seed with three gave the same answer, and the whole
+## difference in difficulty lies between them. A live player plays differently from the bot anyway,
+## and carrying exactly three lives over to it is pointless. So the run always reaches the end, and
+## the measure is the **number of deaths** — a continuous quantity that shows direction, not just a
+## fact. Future difficulty levels will rest on it too.
 ##
-## Бот играет хуже человека — он не отступает, не пользуется дверями как укрытием
-## и не считает наперёд. Поэтому это нижняя планка играбельности: здание, которое
-## он не проходит, живому игроку тем более не по зубам.
+## The bot plays worse than a human — it does not retreat, does not use doors as cover and does not
+## think ahead. So this is the lower bar of playability: a building it cannot pass is all the more
+## beyond a live player.
 func test_bot_survives_the_real_building_with_agents_seed_1() -> void:
 	await _play_guarded(GUARDED_SEEDS[0])
 
@@ -353,13 +345,13 @@ func test_bot_survives_the_real_building_with_agents_seed_3() -> void:
 	await _play_guarded(GUARDED_SEEDS[2])
 
 
-## Один прогон здания с охраной. Сид приходит снаружи по той же причине, что
-## и у [method _play_tall]: тремя сидами подряд это 328 с — сорок процентов
-## всего набора и его пол, ниже которого не опускается никакая раскладка.
+## One run of a building with guards. The seed comes from outside for the same reason as in [method
+## _play_tall]: three seeds in a row take 328 s — forty percent of the whole suite and its floor,
+## below which no layout goes.
 func _play_guarded(building_seed: int) -> void:
 	GameState.instance().start_game()
-	# Журнал прогона — всегда: провал этого теста разбирается по нему, без
-	# перезапусков с отладочной печатью (`tools/run_log.py`).
+	# The run log — always: a failure of this test is investigated from it, without reruns with debug
+	# printing (`tools/run_log.py`).
 	RunLog.open(
 		ProjectSettings.globalize_path("res://logs/playthrough_seed%d.jsonl" % building_seed)
 	)
@@ -369,10 +361,9 @@ func _play_guarded(building_seed: int) -> void:
 
 	var bot := OttoBot.new(level)
 	var game := GameState.instance()
-	# Жизни выдаются разом и с запасом, а не подливаются на нуле: подливание
-	# меняло бы ход партии в самый острый её момент, и замер мерил бы уже
-	# другую игру. На нуле уровень вообще не назначает возвращение в игру,
-	# и Otto остался бы лежать.
+	# Lives are given all at once and with margin, not topped up at zero: topping up would change the
+	# course of the game at its sharpest moment, and the measurement would measure a different game. At
+	# zero the level does not schedule a return to the game at all, and Otto would stay lying.
 	game.lives = ENDLESS_LIVES
 	game.lives_changed.emit(game.lives)
 	var frames := 0
@@ -390,8 +381,8 @@ func _play_guarded(building_seed: int) -> void:
 		if level.otto.is_dead() and not was_dead:
 			deaths += 1
 		was_dead = level.otto.is_dead()
-		# Смерть тоже считается движением: воскресший Otto начинает заново
-		# и стоять на месте ему уже не дают.
+		# Death also counts as movement: a respawned Otto starts over and is no longer allowed to stand
+		# still.
 		if watchdog.stalled(deepest, game.documents_collected + deaths):
 			break
 	bot.release()
@@ -401,10 +392,9 @@ func _play_guarded(building_seed: int) -> void:
 		watchdog.tripped, "сид %d: %s" % [building_seed, watchdog.report(level, bot, deepest)]
 	)
 
-	# Числа печатаются всегда, а не только на провале: по ним видно, куда
-	# ползёт сложность от вехи к вехе, — а это и есть то, ради чего прогон
-	# с боем держат. Зелёный тест без чисел рассказал бы только, что порог
-	# ещё не перейдён.
+	# The numbers are always printed, not only on failure: they show where the difficulty creeps from
+	# milestone to milestone, — and that is exactly why the run with combat is kept. A green test
+	# without numbers would only tell that the threshold has not been crossed yet.
 	gut.p(
 		(
 			"сид %d: смертей %d, шагов %d, документы %d/%d"

@@ -1,6 +1,6 @@
 extends GutTest
 
-## Прогрев шейдеров редких эффектов (ADR-0039, решение 8).
+## Shader warm-up of rare effects (ADR-0039, decision 8).
 
 
 func test_every_rare_effect_is_shown_once() -> void:
@@ -16,7 +16,7 @@ func test_every_rare_effect_is_shown_once() -> void:
 
 
 func test_the_bolt_warms_where_the_lightning_lives() -> void:
-	# Разряд рисуется в окне города, и греть его надо там же, под молнией.
+	# The bolt is drawn in the city window, and it must be warmed there too, under the lightning.
 	var host := Node3D.new()
 	add_child_autofree(host)
 	var lightning := Lightning.new()
@@ -30,7 +30,7 @@ func test_the_bolt_warms_where_the_lightning_lives() -> void:
 
 
 func test_the_blood_setting_survives_the_warmup() -> void:
-	# Кровь греется и выключенная, но настройку игрока прогрев не трогает.
+	# Blood is warmed even when off, but the warm-up does not touch the player's setting.
 	var host := Node3D.new()
 	add_child_autofree(host)
 	var was := Blood.enabled
@@ -41,7 +41,7 @@ func test_the_blood_setting_survives_the_warmup() -> void:
 
 
 func test_headless_runs_skip_the_warmup() -> void:
-	# Рисовать нечем — и греть нечего: тесты не должны держать кадр чёрным.
+	# Nothing to draw with — nothing to warm: tests must not keep the frame black.
 	var host := Node3D.new()
 	add_child_autofree(host)
 	assert_false(ShaderWarmup.run(host), "без окна прогрева нет")

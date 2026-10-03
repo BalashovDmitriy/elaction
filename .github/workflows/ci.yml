@@ -25,20 +25,20 @@ jobs:
       - name: Установить тулинг
         run: pip install -r requirements-dev.txt
 
-      # Тот же набор хуков, что стоит локально — расхождения исключены.
+      # The same set of hooks as installed locally — discrepancies are ruled out.
       - name: pre-commit
         run: pre-commit run --all-files --show-diff-on-failure
 
-  # Набор идёт матрицей: `run_tests.py --part K/N` делит его на N машин по весам
-  # тестов, а на машине часть идёт очередью по её потокам, кадрами без
-  # настоящих часов (`--fixed-fps`, docs/testing.md). Упирается прогон в самые
-  # долгие задания — сиды бота и трупы машины.
+  # The suite runs as a matrix: `run_tests.py --part K/N` splits it across N machines by test
+  # weights, and on a machine its part runs as a queue over its threads, by frames without the real
+  # clock (`--fixed-fps`, docs/testing.md). The run is bounded by the longest jobs — the bot seeds
+  # and the car corpses.
   engine:
     name: Проверка движком (${{ matrix.part }}/3)
     runs-on: ubuntu-latest
     strategy:
-      # Упавшая часть не снимает остальные: иначе второй провал видно только
-      # со второго пуша.
+      # A failed part does not cancel the others: otherwise the second failure would be visible only
+      # from the second push.
       fail-fast: false
       matrix:
         part: [1, 2, 3]

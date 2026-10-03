@@ -1,18 +1,18 @@
 shader_type spatial;
 render_mode unshaded, fog_disabled, cull_back;
 
-// Неоновая вывеска города (M24a, ADR-0037, решение 4): тёмная подложка,
-// трубка по краю и буквы — не прочесть, но видно, что это надпись. Длинная
-// сторона — строка: у вертикальной вывески буквы идут столбиком. Изредка
-// вывеска мигает, как неон на последнем издыхании.
+// A city neon sign (M24a, ADR-0037, decision 4): a dark backing,
+// a tube along the edge and letters — unreadable, but clearly lettering. The long
+// side is the line: on a vertical sign the letters go in a column. Occasionally
+// a sign blinks, like neon on its last legs.
 //
-// Вывеска мельче десятка пикселей — буквы сливаются в ровное свечение: иначе
-// штрихи дальних вывесок мерцали бы на ходу камеры.
+// A sign smaller than a dozen pixels — the letters merge into an even glow: otherwise
+// the strokes of distant signs would flicker as the camera moves.
 //
-// INSTANCE_CUSTOM.x — жребий вывески 0–1.
+// INSTANCE_CUSTOM.x — sign draw 0–1.
 
-// Сколько неона горит, 0–1, и сколько дня (ADR-0051): днём вывеска — доска
-// с буквами, трубки бледные.
+// How much neon is lit, 0–1, and how much daylight (ADR-0051): by day a sign is a board
+// with letters, the tubes are pale.
 uniform float power = 1.0;
 uniform float daylight = 0.0;
 
@@ -37,7 +37,7 @@ void fragment() {
 	float blur = max(fwidth(at.x), fwidth(at.y));
 	float tube = 1.0 - smoothstep(0.05, 0.05 + blur * 1.5, abs(min(edge.x, edge.y) - inset));
 
-	// Строка букв вдоль длинной стороны: ячейка — буква 3×5 штрихов.
+	// A line of letters along the long side: a cell is a letter of 3×5 strokes.
 	bool upright = size.y > size.x;
 	vec2 run = upright ? vec2(at.y, at.x) : at;
 	vec2 span = upright ? size.yx : size;
@@ -50,7 +50,8 @@ void fragment() {
 	vec2 inner = vec2(fract(cell.x), cell.y);
 	vec2 stroke = floor(inner * vec2(3.0, 5.0));
 	float on = step(0.42, hash(vec2(index + seed * 31.0, stroke.x * 7.0 + stroke.y)));
-	// Середина буквы — почти всегда штрих: иначе надпись выходила решетом.
+	// The middle of a letter is almost always a stroke: otherwise the lettering came out
+	// like a sieve.
 	on = max(on, step(abs(stroke.x - 1.0), 0.0) * step(0.3, hash(vec2(index, seed))));
 	vec2 within = fract(inner * vec2(3.0, 5.0));
 	float pad = 0.18;
@@ -60,11 +61,11 @@ void fragment() {
 	inside *= step(inner.x, 0.92) * step(0.0, cell.y) * step(cell.y, 1.0);
 	float glyph = on * dot_in * inside;
 
-	// Мелкая вывеска — ровное свечение вместо штрихов.
+	// A small sign — an even glow instead of strokes.
 	float detail = 1.0 - smoothstep(0.04, 0.12, blur / min(size.x, size.y) * 3.0);
 	float neon = max(tube, glyph);
 	neon = mix(0.55, neon, detail);
-	// Мигает каждая восьмая вывеска.
+	// Every eighth sign blinks.
 	float flicker = 1.0;
 	if (seed > 0.875) {
 		flicker = mix(0.15, 1.0, step(0.12, hash(vec2(floor(TIME * 7.0), seed))));

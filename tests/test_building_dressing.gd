@@ -1,8 +1,8 @@
 extends GutTest
 
-## Раскладка обстановки моделями паков ([BuildingDressing], ADR-0033, решение 3)
-## — на любом здании, отеле и офисе: широкая мебель не задевает двери, шахты и
-## стены, на стене не висит лишнего, и этажи не пустые.
+## Dressing layout with pack models ([BuildingDressing], ADR-0033, decision 3)
+## — on any building, hotel and office: wide furniture does not touch doors, shafts and
+## walls, nothing extra hangs on the wall, and floors are not empty.
 
 const SEEDS: Array[int] = [1, 2, 3, 5, 8, 13, 21, 34]
 const SKILLS: Array[int] = [0, 5]
@@ -21,9 +21,9 @@ func _identities() -> Array[BuildingIdentity]:
 	return all
 
 
-## Что на этаже мебель задевать не вправе: проёмы дверей, шахты с наличниками
-## и панелью кнопок вызова, глухие стены, пролёт эскалатора с этажа выше и выход.
-## Сторону панели решает [BuildingShafts] — её здесь не пересчитать, не повторив.
+## What furniture on a floor has no right to touch: door openings, shafts with trims and the call
+## button panel, solid walls, the escalator run from the floor above, and the exit. The panel side
+## is decided by [BuildingShafts] — it cannot be recomputed here without repeating it.
 func _blockers(rules: BuildingRules, plan: BuildingPlan, index: int) -> Array[Vector2]:
 	var zones: Array[Vector2] = []
 	var door_half := Door.LEAF_SIZE.x * 0.5
@@ -68,7 +68,7 @@ func test_furniture_keeps_off_doors_shafts_walls_and_escalators() -> void:
 	assert_gt(checked, 0, "мебели нет — проверять нечего")
 
 
-## Мебель не встаёт друг на друга: широкая занимает соседние места.
+## Furniture does not stand on top of each other: a wide item takes the neighbouring slots.
 func test_furniture_does_not_overlap() -> void:
 	for building_seed: int in SEEDS:
 		var rules := _rules(5)
@@ -88,8 +88,8 @@ func test_furniture_does_not_overlap() -> void:
 				)
 
 
-## На стене не висит у шахты (там панель кнопок) и над высокой мебелью — в
-## отеле и в офисе: комод с лампой бывает только в отеле.
+## Nothing hangs on the wall at a shaft (the button panel is there) or above tall furniture — in
+## the hotel and the office: a chest of drawers with a lamp exists only in the hotel.
 func test_wall_decor_keeps_off_shafts_and_tall_furniture() -> void:
 	var hung := 0
 	for identity in _identities():
@@ -109,7 +109,7 @@ func test_wall_decor_keeps_off_shafts_and_tall_furniture() -> void:
 				for prop in dressing.props:
 					if prop.floor_index != item.floor_index:
 						continue
-					# Рост — с лампой сверху: она заходила на низ картины.
+					# Height includes the lamp on top: it overlapped the bottom of a picture.
 					if PropCatalog.footprint(prop.name).y > BuildingDressing.TALL:
 						assert_gte(
 							absf(prop.x - item.x) + 0.001,
@@ -119,9 +119,9 @@ func test_wall_decor_keeps_off_shafts_and_tall_furniture() -> void:
 	assert_gt(hung, 0, "стены пустые")
 
 
-## Предметы — из своего здания: в отеле нет кулеров и картотек, в офисе —
-## напольных часов и комодов, в жилом доме — ни того, ни другого, зато коляска
-## и почтовые ящики. Труб на виду в отеле нет.
+## Items come from their own building: the hotel has no water coolers or filing cabinets, the office
+## — no grandfather clocks or chests of drawers, the residential building — neither, but it has a
+## pram and mailboxes. The hotel has no pipes in plain sight.
 func test_each_building_gets_its_own_things() -> void:
 	var rules := _rules(5)
 	for identity in _identities():
@@ -138,15 +138,15 @@ func test_each_building_gets_its_own_things() -> void:
 				assert_eq(dressing.pipes.size(), 0, "в отеле трубы на виду")
 
 
-## «Богато, но читаемо»: на стенах в среднем больше предмета на этаж, мебели —
-## больше предмета на три этажа коридора (особые этажи с M24o обставлены залом,
-## ADR-0057). Узкий этаж башни с четырьмя дверями, двумя
-## лампами и шахтой держит всего три-четыре свободных места, и больше мебели
-## на него не встанет.
+## "Rich but readable": on the walls on average more than one item per floor, furniture —
+## more than one item per three corridor floors (special floors since M24o are furnished as a hall,
+## ADR-0057). A narrow tower floor with four doors, two
+## lamps and a shaft holds only three or four free slots, and no more furniture
+## will fit on it.
 ##
-## Зданий сорок, а не восемь: с M24b пять шахт сходятся этажом выше, над
-## подвалом (ADR-0038, решение 3), мебели в среднем стало 0.69 вместо 0.71 на
-## этаж, и на восьми сидах разброс жребия уводил отель под порог.
+## Forty buildings, not eight: since M24b five shafts meet one floor up, above
+## the basement (ADR-0038, decision 3), furniture on average became 0.69 instead of 0.71 per
+## floor, and on eight seeds the draw spread pushed the hotel under the threshold.
 func test_floors_are_not_bare() -> void:
 	var rules := _rules(5)
 	for identity in _identities():
@@ -157,25 +157,25 @@ func test_floors_are_not_bare() -> void:
 		for building_seed: int in range(1, 41):
 			var plan := BuildingPlan.generate(rules, building_seed)
 			var dressing := BuildingDressing.lay(rules, plan, building_seed, identity)
-			# Особые этажи обставлены залом, а не коридором (ADR-0057).
+			# Special floors are furnished as a hall, not a corridor (ADR-0057).
 			for index: int in rules.floors - 1:
 				floors += 0 if FloorRole.hall_at(rules, index) else 1
 			furniture += dressing.props.size()
 			decor += dressing.decor.size()
-			# С M24n часть стены — ниши, зеркала, окна, щитки (ADR-0056): стена не
-			# пустая и без картины.
+			# Since M24n part of the wall is niches, mirrors, windows, panels (ADR-0056): the wall
+			# is not empty even without a picture.
 			decor += WallFeatures.lay(rules, plan, building_seed, identity, dressing).size()
-		# Широкие этажи стилобата с M24o — залы (ADR-0057): коридоры остались
-		# в узкой башне, и предмет на три этажа — уже не мало.
+		# The podium's wide floors since M24o are halls (ADR-0057): corridors remained
+		# in the narrow tower, and an item per three floors is no longer little.
 		assert_gt(float(furniture) / floors, 0.3, "мебели меньше предмета на три этажа")
 		if identity.kind == BuildingIdentity.Kind.OFFICE:
-			# У офиса стена — стекло (ADR-0056): на нём не висит ничего.
+			# The office wall is glass (ADR-0056): nothing hangs on it.
 			assert_eq(decor, 0, "на стекле офиса что-то висит")
 			continue
 		assert_gt(float(decor) / floors, 1.0, "на стенах меньше предмета на этаж")
 
 
-## Мебель не встаёт на гараж — этаж выхода пустой, с одной машиной.
+## Furniture does not stand in the garage — the exit floor is empty, with one car.
 func test_the_garage_stays_empty() -> void:
 	var rules := _rules(5)
 	for building_seed: int in SEEDS:

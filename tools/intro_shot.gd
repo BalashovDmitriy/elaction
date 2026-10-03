@@ -1,33 +1,34 @@
 extends Node3D
 
-## Снимки вступления: вертолёт привозит Otto на крышу (ADR-0038, решение 1;
-## режиссура M24k — ADR-0052, решение 6).
+## Intro shots: the helicopter brings Otto to the roof (ADR-0038, decision 1;
+## M24k staging, ADR-0052, decision 6).
 ##
-## Сценарий съёмки начинает с приземления — ждёт, пока Otto встанет, — и сама
-## сценка в него не попадает. Инструмент собирает здание и снимает вступление по
-## состоянию, а не секундомером: вертолёт влетает, висит, трос спущен, Otto
-## на тросе, приземлился, вертолёт уходит. `--model` — модель крупно, на сером
-## фоне с ровным светом: проверить, куда смотрит нос и где винт.
+## The capture scenario starts with the landing, waiting until Otto stands up, and the
+## scene itself does not get into it. The tool builds a building and shoots the intro by
+## state, not by stopwatch: the helicopter flies in, hovers, the rope is lowered, Otto is
+## on the rope, has landed, the helicopter leaves. `--model` shows the model close up, on
+## a gray background with even light: to check where the nose points and where the rotor
+## is.
 ##
-## С M24k снимок — на каждый шаг вступления ([enum RoofArrival.Step]) и на
-## уход: дверь задвигается, пилот кивает, вертолёт кренится. `--full` — полное
-## вступление первого здания, иначе короткое; `--time=0..3` — время суток
-## ([enum TimeOfDay.Kind]); `--series=N` — ещё и кадр каждые N шагов физики,
-## покадровой серией.
+## Since M24k there is a shot for every intro step ([enum RoofArrival.Step]) and for the
+## departure: the door slides shut, the pilot nods, the helicopter banks. `--full` is the
+## full intro of the first building, otherwise the short one; `--time=0..3` is the time of
+## day ([enum TimeOfDay.Kind]); `--series=N` also adds a shot every N physics steps, as a
+## frame-by-frame series.
 ##
-## Запуск:
+## Run:
 ##     godot --path . res://tools/intro_shot.tscn
 ##     godot --path . res://tools/intro_shot.tscn -- --folder=M24k --seed=3 --full --time=1
 ##     godot --path . res://tools/intro_shot.tscn -- --model
 ##
-## Кадры ложатся в screens/<папка>/ — папка локальная, в репозиторий не идёт.
+## Shots go to screens/<folder>/; the folder is local and does not go into the repository.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 
 const DEFAULT_FOLDER := "M24b"
 
-## Сколько кадров ждать события, прежде чем сдаться.
+## How many frames to wait for an event before giving up.
 const PATIENCE: int = 900
 
 var _level: GreyboxLevel = null
@@ -38,7 +39,7 @@ var _model: bool = false
 var _full: bool = false
 var _time: int = TimeOfDay.Kind.NIGHT
 var _series: int = 0
-## Погода руками, или -1 — жребий по сиду.
+## Weather set by hand, or -1 for a draw by the seed.
 var _weather: int = -1
 var _shot_steps: Dictionary = {}
 var _tick: int = 0
@@ -83,7 +84,7 @@ func _run() -> void:
 	_level.full_intro = _full
 	add_child(_level)
 
-	# Шаг за шагом: снимок — в середине каждого шага, когда поза уже встала.
+	# Step by step: the shot is in the middle of each step, when the pose has settled.
 	var names := RoofArrival.Step.keys()
 	while _level.is_in_the_intro():
 		var step := _level.arrival().step()
@@ -146,7 +147,8 @@ func _otto_x() -> float:
 	return _level.otto.global_position.x
 
 
-## Otto на тросе и уже поехал: ниже крюка на рост с руками и ещё полметра.
+## Otto is on the rope and already moving: below the hook by his height with arms plus
+## another half meter.
 func _falling_through() -> bool:
 	var helicopter := _heli()
 	if helicopter == null:

@@ -1,20 +1,20 @@
 extends GutTest
 
-## Одежда шахт без совпадающих граней (ADR-0037, решение 2).
+## Shaft dress without coinciding faces (ADR-0037, decision 2).
 ##
-## Две грани разных материалов в одной плоскости и с одной нормалью мерцают:
-## глубина у них одна, и какая ближе, решает округление — от кадра к кадру
-## по-разному, стоит камере сдвинуться на долю пикселя. На неподвижном кадре
-## этого не видно, поэтому проверка идёт по геометрии, а не по картинке, и на
-## нескольких сидах: шахты, их концы и машинное отделение стоят по раскладке.
+## Two faces of different materials in one plane and with one normal flicker: they have the same
+## depth, and which is closer is decided by rounding — differently from frame to frame, as soon as
+## the camera moves by a fraction of a pixel. On a still frame this is not visible, so the check
+## goes by geometry, not by picture, and on several seeds: shafts, their ends and the machine room
+## stand by the layout.
 ##
-## Грани, обращённые друг к другу, не в счёт: это две коробки встык, и обе
-## такие грани спрятаны внутри. Боковые, по x, — тоже: камера ортографическая
-## и наклонена только вокруг x ([SideCamera]), боковую грань она видит ребром.
+## Faces turned toward each other do not count: these are two boxes butted together, and both
+## such faces are hidden inside. Side ones, along x, do not either: the camera is orthographic
+## and tilted only around x ([SideCamera]), it sees a side face edge-on.
 
 const SEEDS: Array[int] = [1, 2, 3, 5, 8]
 
-## Допуск «в одной плоскости», м.
+## "In one plane" tolerance, m.
 const COPLANAR: float = 0.001
 
 
@@ -35,7 +35,7 @@ func test_no_two_materials_share_a_face_in_any_shaft() -> void:
 		)
 
 
-## Коробки одежды: [AABB, материал]. Все детали шахты — коробки без поворота.
+## Dress boxes: [AABB, material]. All shaft parts are boxes without rotation.
 func _boxes(root: Node) -> Array[Array]:
 	var found: Array[Array] = []
 	for node: Node in root.find_children("*", "MeshInstance3D", true, false):
@@ -49,8 +49,8 @@ func _boxes(root: Node) -> Array[Array]:
 	return found
 
 
-## Пары коробок разных материалов с гранью в одной плоскости и одной нормалью,
-## которые перекрываются по площади.
+## Pairs of boxes of different materials with a face in one plane and one normal
+## that overlap by area.
 func _clashes(boxes: Array[Array]) -> Array[String]:
 	var clashes: Array[String] = []
 	for i in boxes.size():
@@ -67,8 +67,8 @@ func _clashes(boxes: Array[Array]) -> Array[String]:
 	return clashes
 
 
-## Лежат ли грани [param a] и [param b] с одной нормалью по оси [param axis] в
-## одной плоскости и перекрываются ли они.
+## Whether faces [param a] and [param b] with one normal along axis [param axis] lie in
+## one plane and whether they overlap.
 func _share_face(a: AABB, b: AABB, axis: int) -> bool:
 	var low := absf(a.position[axis] - b.position[axis]) < COPLANAR
 	var high := absf(a.end[axis] - b.end[axis]) < COPLANAR

@@ -1,30 +1,30 @@
 extends GutTest
 
-## Тесты архитектуры здания: крыша, силуэт и выпуск агентов.
+## Tests of the building architecture: roof, silhouette and agent release.
 ##
-## Всё, что здесь проверяется, собирается **по настоящим правилам игры**, а не по
-## уменьшенным. Прежние тесты уровня строили здания на 4–8 этажей и все до одного
-## выключали агентов, поэтому здание, в которое играет игрок, не проверял никто:
-## 241 тест был зелёным, пока партия кончалась на крыше за полторы секунды
-## (ADR-0014, «Почему это дожило до релиза»).
+## Everything checked here is built **by the real game rules**, not by
+## reduced ones. The former level tests built buildings of 4–8 floors and every one of them
+## turned agents off, so nobody checked the building the player actually plays:
+## 241 tests were green while a game ended on the roof in a second and a half
+## (ADR-0014, "Why this survived until release").
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
-## Сколько кадров даётся геометрии и агентам, чтобы встать на места.
+## How many frames geometry and agents get to settle into place.
 const SETTLE_FRAMES: int = 4
 const ENEMY := preload("res://src/actors/enemy/enemy.tscn")
 
-## Сколько кадров дверям даётся на то, чтобы выпустить всех, кого они могут.
+## How many frames the doors get to release everyone they can.
 ##
-## Дверь выпускает следующего не раньше чем через свою паузу, а уровень отдаёт
-## не больше одного за кадр: чтобы толпа собралась целиком, нужны секунды, а не
-## кадр-другой.
+## A door releases the next one no sooner than after its pause, and the level hands out
+## no more than one per frame: for the whole crowd to gather takes seconds, not
+## a frame or two.
 const CROWD_FRAMES: int = 240
 
-## Сколько кадров Otto стоит на крыше, ничего не делая.
+## How many frames Otto stands on the roof doing nothing.
 ##
-## Именно так игрок и начинает партию: кадр появился, он ещё не взялся за
-## управление. Раньше за это время он успевал потерять все три жизни.
+## This is exactly how a player starts a game: the frame has appeared, he has not yet taken
+## the controls. Before, in that time he managed to lose all three lives.
 const IDLE_FRAMES: int = 180
 
 
@@ -37,7 +37,7 @@ func after_all() -> void:
 	GameState.instance().reset()
 
 
-## Правила настоящие: тридцать этажей, пять документов, агенты на месте.
+## Real rules: thirty floors, five documents, agents in place.
 func _build(building_seed: int, agents: bool, rules: BuildingRules = null) -> GreyboxLevel:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
@@ -52,12 +52,12 @@ func _drop(level: GreyboxLevel) -> void:
 	remove_child(level)
 
 
-## Ждёт, пока двери выпустят хоть кого-нибудь.
+## Waits until the doors release at least someone.
 ##
-## Дверь сперва открывается и только потом отдаёт агента (ADR-0020, решение 2),
-## и на телеграф уходит заметно больше, чем кадр-другой. Смотреть агентов сразу
-## после сборки значит не смотреть ничего: ровно так два теста здесь и стали
-## пустыми в первом же прогоне M14.
+## A door opens first and only then hands out an agent (ADR-0020, decision 2),
+## and the telegraph takes noticeably more than a frame or two. Looking at agents right
+## after the build means looking at nothing: that is exactly how two tests here became
+## empty in the very first M14 run.
 func _wait_for_agents(level: GreyboxLevel) -> Array[Enemy]:
 	for _frame: int in CROWD_FRAMES:
 		await wait_physics_frames(1)
@@ -67,12 +67,13 @@ func _wait_for_agents(level: GreyboxLevel) -> Array[Enemy]:
 	return []
 
 
-## Живые агенты здания. Перебор детей — дело самого уровня ([method
-## GreyboxLevel.agents]), здесь остаётся только отсев мёртвых.
+## Living agents of the building. Walking the children is the level's own job ([method
+## GreyboxLevel.agents]); all that is left here is filtering out the dead.
 ##
-## И тех, кого уже убрали за кромку кадра: [method Node.queue_free] освобождает
-## узел лишь в конце кадра, а угрозой он перестал быть сразу — без этого отсева
-## потолок живых считался бы с лишним телом и тест падал бы на ровном месте.
+## And those already removed past the frame edge: [method Node.queue_free] frees
+## the node only at the end of the frame, while it stopped being a threat at once — without
+## this filter the living cap would count an extra body and the test would fail out of
+## nowhere.
 func _agents_in(level: GreyboxLevel) -> Array[Enemy]:
 	var found: Array[Enemy] = []
 	for agent in level.agents():
@@ -81,15 +82,15 @@ func _agents_in(level: GreyboxLevel) -> Array[Enemy]:
 	return found
 
 
-## Тот самый баг, с которого началась веха: Otto стоял макушкой выше края кадра
-## и уходил в прыжке на 94 px за него, а камера туда не поднималась.
+## The very bug the milestone started with: Otto stood with the top of his head above the
+## frame edge and went 94 px beyond it in a jump, and the camera did not rise there.
 func test_otto_and_his_jump_fit_in_frame_on_the_roof() -> void:
 	var level := _build(1, false)
 	await _wait_for_the_landing(level)
 
 	var otto := level.otto
-	# Макушка — рост стоячей формы над ногами. Кадр и макушка меряются в
-	# плоскости правил, где «выше» — это меньший Y.
+	# The top of the head is the height of the standing shape above the feet. The frame and
+	# the head are measured in the rules plane, where "higher" means a smaller Y.
 	var standing := otto.get_node("StandingShape") as CollisionShape3D
 	var height := (standing.shape as BoxShape3D).size.y
 	var head := WorldSpace.to_plane(otto.global_position).y - height
@@ -100,8 +101,8 @@ func test_otto_and_his_jump_fit_in_frame_on_the_roof() -> void:
 	_drop(level)
 
 
-## На крыше нет дверей, а значит и агентов. Раньше их там стояло двое, ближе
-## дальности своего огня, и партия кончалась, не начавшись.
+## There are no doors on the roof, and so no agents. Before, two stood there, closer than
+## their firing range, and the game ended before it began.
 func test_the_roof_is_empty_when_the_game_starts() -> void:
 	for building_seed: int in [1, 2, 3]:
 		var level := _build(building_seed, true)
@@ -118,8 +119,8 @@ func test_the_roof_is_empty_when_the_game_starts() -> void:
 		_drop(level)
 
 
-## Игрок должен успеть осмотреться. Проверка идёт бездействием нарочно: бот,
-## который отстреливается, скрыл бы ровно ту беду, которую тест стережёт.
+## The player must have time to look around. The check uses inaction on purpose: a bot
+## that shoots back would hide exactly the trouble the test guards against.
 func test_otto_survives_doing_nothing_at_the_start() -> void:
 	for building_seed: int in [1, 2, 3]:
 		var level := _build(building_seed, true)
@@ -134,8 +135,8 @@ func test_otto_survives_doing_nothing_at_the_start() -> void:
 		_drop(level)
 
 
-## Двери выпускают агентов рядом с игроком, а не все разом. Раньше в здании
-## жило 55 тел с физикой и ИИ от первого кадра до конца партии.
+## Doors release agents near the player, not all at once. Before, the building
+## had 55 bodies with physics and AI from the first frame to the end of the game.
 func test_only_the_doors_near_otto_let_agents_out() -> void:
 	var level := _build(1, true)
 	await wait_physics_frames(SETTLE_FRAMES)
@@ -151,7 +152,7 @@ func test_only_the_doors_near_otto_let_agents_out() -> void:
 	_drop(level)
 
 
-## Агент далеко внизу не нужен ни игроку, ни физике: этаж уехал из кадра.
+## An agent far below is needed by neither the player nor physics: the floor left the frame.
 func test_no_agent_walks_a_floor_far_from_otto() -> void:
 	var level := _build(1, true)
 	var agents := await _wait_for_agents(level)
@@ -167,12 +168,12 @@ func test_no_agent_walks_a_floor_far_from_otto() -> void:
 	_drop(level)
 
 
-## Возвращение в игру по ROM (ADR-0053, решение 2): агент, убивший Otto, уходит
-## вместе со всеми живыми, а Otto встаёт в точке ROM своего этажа, а не там, где
-## погиб. Тело убитого раньше агента остаётся лежать.
+## Returning to play by the ROM (ADR-0053, decision 2): the agent who killed Otto leaves
+## together with all the living, and Otto stands up at the ROM point of his floor, not where
+## he died. The body of an agent killed earlier stays lying.
 ##
-## Агент стоит неподвижно ([code]walk_speed[/code] = 0): так он точно ещё на
-## этаже, когда Otto возвращается, и проверяется уход, а не то, куда он дошёл.
+## The agent stands still ([code]walk_speed[/code] = 0): this way he is certainly still on
+## the floor when Otto returns, and the leaving is checked, not where he walked to.
 func test_otto_comes_back_to_the_rom_spot_and_the_agents_leave() -> void:
 	var level := _build(1, false)
 	await wait_physics_frames(SETTLE_FRAMES)
@@ -192,7 +193,7 @@ func test_otto_comes_back_to_the_rom_spot_and_the_agents_leave() -> void:
 	level.add_child(body)
 	body.global_position = WorldSpace.to_scene(Vector2(spots[-1], surface))
 	body.setup(level.otto, -1.0)
-	# Из проёма агент выходит неуязвимым ([method Enemy.is_emerging]).
+	# An agent comes out of an opening invulnerable ([method Enemy.is_emerging]).
 	var emerged := 0
 	while body.is_emerging() and emerged < 120:
 		await wait_physics_frames(1)
@@ -210,7 +211,7 @@ func test_otto_comes_back_to_the_rom_spot_and_the_agents_leave() -> void:
 
 	assert_false(is_instance_valid(shooter), "убивший Otto агент не ушёл")
 	assert_true(is_instance_valid(body), "тело агента убрали вместе с живыми")
-	# Третий этаж тридцатиэтажки — двадцать седьмой ROM: Otto остаётся на нём.
+	# The third floor of a thirty-storey building is ROM's twenty-seventh: Otto stays on it.
 	assert_eq(_floor_of(rules, level.otto), floor_index, "Otto вернулся не на свой этаж")
 	var back := WorldSpace.to_plane(level.otto.global_position).x
 	var red_x := RespawnSpot.red_door_x(level.doors(), rules, floor_index)
@@ -219,15 +220,15 @@ func test_otto_comes_back_to_the_rom_spot_and_the_agents_leave() -> void:
 	_drop(level)
 
 
-## Передышка после возвращения в игру: без неё вторая смерть приходит раньше,
-## чем игрок успевает нажать хоть что-нибудь.
+## A breather after returning to play: without it the second death comes before
+## the player manages to press anything at all.
 func test_otto_is_untouchable_right_after_coming_back() -> void:
 	var level := _build(1, false)
 	await wait_physics_frames(SETTLE_FRAMES)
 
 	level.otto.kill()
-	# Ждём ровно возвращения, а не «с запасом»: передышка короткая, и лишние
-	# кадры съели бы её раньше, чем тест успел бы её проверить.
+	# We wait for exactly the return, not "with a margin": the breather is short, and extra
+	# frames would eat it before the test had a chance to check it.
 	var waited := 0
 	while level.otto.is_dead() and waited < 120:
 		await wait_physics_frames(1)
@@ -239,9 +240,9 @@ func test_otto_is_untouchable_right_after_coming_back() -> void:
 	_drop(level)
 
 
-## Внизу здания тесно: там на каждом этаже по две двери, а полоса выпуска — девять
-## этажей. Без потолка живых набиралось до восемнадцати, и нижние этажи выходили
-## тиром, где стреляют со всех сторон разом (ADR-0016, пункт 6).
+## The bottom of the building is crowded: each floor there has two doors, and the release
+## band is nine floors. Without a cap the living reached eighteen, and the bottom floors
+## became a shooting gallery with fire from all sides at once (ADR-0016, item 6).
 func test_no_more_live_agents_than_the_rules_allow() -> void:
 	for building_seed: int in [1, 2, 3]:
 		var level := _build(building_seed, true)
@@ -254,7 +255,7 @@ func test_no_more_live_agents_than_the_rules_allow() -> void:
 			most = maxi(most, _agents_in(level).size())
 
 		assert_gt(most, 0, "сид %d: двери на нижних этажах никого не выпустили" % building_seed)
-		# Потолок ROM — три, а поздно в здании четыре (ADR-0027, решение 2).
+		# The ROM cap is three, and late in the building four (ADR-0027, decision 2).
 		var ceiling := rules.agents_at_once(GameState.instance().alarm.elapsed())
 		assert_lte(
 			most,
@@ -264,10 +265,10 @@ func test_no_more_live_agents_than_the_rules_allow() -> void:
 		_drop(level)
 
 
-## Правила доезжают из здания до самого агента.
+## The rules reach from the building all the way to the agent.
 ##
-## Проверяется переключателем «не стрелять»: с ним агент не стреляет вовсе, и
-## это видно по пулям и по тому, что Otto жив.
+## Checked with the "do not shoot" switch: with it the agent does not shoot at all, and
+## this shows in the bullets and in Otto being alive.
 func test_agents_take_their_combat_numbers_from_the_rules() -> void:
 	var toothless := BuildingRules.new()
 	toothless.agents_hold_fire = true
@@ -286,7 +287,7 @@ func test_agents_take_their_combat_numbers_from_the_rules() -> void:
 	_drop(armed)
 
 
-## Ставит Otto посреди этажа: туда, где стоял бы игрок, а не в проём.
+## Puts Otto in the middle of the floor: where a player would stand, not in an opening.
 func _stand_on(level: GreyboxLevel, index: int) -> void:
 	var rules := level.rules
 	level.otto.global_position = WorldSpace.to_scene(
@@ -294,15 +295,15 @@ func _stand_on(level: GreyboxLevel, index: int) -> void:
 	)
 
 
-## Этаж, на котором стоит узел, по правилам здания.
+## The floor the node stands on, by the building rules.
 func _floor_of(rules: BuildingRules, node: Node3D) -> int:
 	return rules.floor_index_near(WorldSpace.to_plane(node.global_position).y)
 
 
-## Сколько вражеских пуль оказалось в воздухе разом за [constant CROWD_FRAMES].
+## How many enemy bullets were in the air at once during [constant CROWD_FRAMES].
 ##
-## Не «сколько их сейчас»: пуля живёт доли секунды, и один замер попал бы
-## в промежуток между выстрелами.
+## Not "how many there are now": a bullet lives a fraction of a second, and a single sample
+## would fall into a gap between shots.
 func _worst_moment(level: GreyboxLevel) -> int:
 	var most := 0
 	for _frame in CROWD_FRAMES:
@@ -316,15 +317,16 @@ func _worst_moment(level: GreyboxLevel) -> int:
 	return most
 
 
-## Ждёт, пока Otto съедет по тросу на крышу ([method GreyboxLevel.wait_for_the_landing]).
+## Waits until Otto slides down the rope to the roof
+## ([method GreyboxLevel.wait_for_the_landing]).
 func _wait_for_the_landing(level: GreyboxLevel) -> void:
 	assert_true(await level.wait_for_the_landing(), "Otto съехал по тросу и встал на крышу")
 
 
-## Агент выходит там, где Otto: на его этаже, этажом выше или ниже (@5A26).
+## An agent comes out where Otto is: on his floor, a floor above or below (@5A26).
 ##
-## До M18d выпуск шёл по всей полосе видимых этажей от ближайшей двери;
-## по ROM жребий бросается только на три этажа вокруг Otto (ADR-0027, решение 2).
+## Before M18d the release went over the whole band of visible floors from the nearest door;
+## by the ROM the draw is cast only over three floors around Otto (ADR-0027, decision 2).
 func test_agents_step_out_next_to_otto() -> void:
 	for building_seed: int in [1, 2, 3]:
 		var level := _build(building_seed, true)
@@ -341,8 +343,8 @@ func test_agents_step_out_next_to_otto() -> void:
 					continue
 				seen[id] = true
 				var floor_index := _floor_of(rules, agent)
-				# Этаж Otto — на миг выхода: погибший внизу возвращается не ниже
-				# пятого этажа ROM (ADR-0053, решение 2), и выпуск идёт за ним.
+				# Otto's floor at the moment of release: one who died below returns no lower than
+				# the fifth ROM floor (ADR-0053, decision 2), and the release follows him.
 				here = _floor_of(rules, level.otto)
 				assert_lte(
 					absi(floor_index - here),

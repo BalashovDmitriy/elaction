@@ -1,9 +1,9 @@
 extends GutTest
 
-## Тесты состояния партии.
+## Game state tests.
 ##
-## Тест создаёт свой экземпляр и глобального автолоада не трогает: он становится
-## общим только при входе в дерево, а тестовый туда не попадает.
+## The test creates its own instance and does not touch the global autoload: it becomes
+## shared only on entering the tree, and the test one does not get there.
 
 
 func _state() -> GameState:
@@ -93,15 +93,15 @@ func test_kill_in_the_light_costs_its_face_value() -> void:
 	assert_eq(GameState.kill_score(GameState.ENEMY_SHOT_SCORE, false), 100)
 
 
-## Надбавка плоская: 100 → 150. Пока здесь стояло удвоение, вечная темнота была
-## фермой очков (ADR-0010, пункт 6). Удара ногой с M24d нет (ADR-0040), у
-## добиваний надбавка своя — test_takedown.gd.
+## The bonus is flat: 100 → 150. While doubling stood here, eternal darkness was
+## a points farm (ADR-0010, point 6). There is no kick since M24d (ADR-0040),
+## takedowns have their own bonus — test_takedown.gd.
 func test_kill_in_the_dark_is_worth_more() -> void:
 	assert_eq(GameState.kill_score(GameState.ENEMY_SHOT_SCORE, true), 150)
 
 
-## Плоская и одинаковая для всех способов из таблицы: удвоение вернулось бы
-## здесь первым — у дорогих лампы и кабины.
+## Flat and the same for all methods in the table: doubling would come back
+## here first — for the expensive lamps and cab.
 func test_the_dark_bonus_is_the_same_whatever_the_kill() -> void:
 	var shot := GameState.kill_score(GameState.ENEMY_SHOT_SCORE, true) - GameState.ENEMY_SHOT_SCORE
 	for base: int in [GameState.LAMP_SCORE, GameState.CRUSH_SCORE]:
@@ -127,7 +127,7 @@ func test_finished_building_pays_by_its_number() -> void:
 func test_new_building_takes_the_alarm_off() -> void:
 	var game := _state()
 	game.start_game()
-	# Лимит меняется до того, как заводится отсчёт: иначе он останется прежним.
+	# The limit changes before the countdown starts: otherwise it would stay the same.
 	game.alarm.time_limit = 0.0
 	game.alarm.enter_building()
 	game.alarm.tick(0.1)

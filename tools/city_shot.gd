@@ -1,9 +1,9 @@
 extends Node
 
-## Крупный план города M24j: камера города у ближнего ряда, без расфокуса —
-## видно, как лёг запечённый фасад, окна и свет (ADR-0051, решение 10).
+## Close-up of the M24j city: the city camera at the near row, without defocus — you can see how the
+## baked facade, windows and light came out (ADR-0051, decision 10).
 ##
-## Запуск:
+## Run:
 ##     godot --path . res://tools/city_shot.tscn -- --time=1 --weather=0
 ##     godot --path . res://tools/city_shot.tscn -- --time=3 --distance=40
 
@@ -12,7 +12,7 @@ const SETTLE_FRAMES: int = 30
 
 var _time: int = 1
 var _weather: int = 0
-## Насколько камера перед ближним рядом, м.
+## How far the camera is in front of the near row, m.
 var _distance: float = 35.0
 var _haze: bool = false
 

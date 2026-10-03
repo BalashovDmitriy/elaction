@@ -1,35 +1,35 @@
 class_name CarCut
 extends RefCounted
 
-## Срез тела днищем кабины (ADR-0043, решения 7–9).
+## A body cut by the cab's floor (ADR-0043, decisions 7–9).
 ##
-## Кабина, опускаясь, режет фигуру по своим стенкам: всё, что между ними и
-## выше днища, пропадает, и срез идёт вниз вместе с кабиной. Режет шейдер
-## ([method FigureRig.carve]), а не геометрия: фигура из пака скиннута, и
-## резать её меш на ходу — пересчитывать вершины каждый кадр. Срез держит
-## самую низкую высоту днища: ушедшая вверх кабина отрезанного не возвращает.
+## The cab, coming down, cuts the figure along its walls: everything between them and
+## above the cab floor disappears, and the cut moves down with the cab. The shader cuts
+## ([method FigureRig.carve]), not the geometry: the pack figure is skinned, and cutting
+## its mesh on the fly means recomputing vertices every frame. The cut keeps the lowest
+## height of the cab floor: a cab that went back up does not restore what was cut off.
 ##
-## Пока срез проходит по телу, из него брызжет кровь; дойдя до пола, кабина
-## оставляет под собой пятно. Какие части тела пропали, решает [Corpse].
+## While the cut passes through the body, blood sprays from it; having reached the floor,
+## the cab leaves a pool under itself. Which body parts disappeared is decided by [Corpse].
 
-## Через сколько метров хода днища по телу брызги повторяются.
+## Every how many metres of the cab floor's travel through the body the spray repeats.
 const SPRAY_STEP: float = 0.08
 
 var left: float = 0.0
 var right: float = 0.0
-## Высота днища, до которой срез дошёл, м сцены.
+## The cab floor height the cut has reached, scene m.
 var top: float = INF
-## Габарит тела в мире на миг первого касания.
+## The body's bounds in the world at the moment of first contact.
 var body := AABB()
-## Кабина дошла до пола под телом: срез окончен, пятно лежит.
+## The cab reached the floor under the body: the cut is over, the pool lies.
 var done: bool = false
 
 var _sprayed_at: float = INF
 
 
-## Ведёт срез [param figure] кабиной со стенками [param from_x]..[param to_x] и
-## днищем на высоте [param bottom]; тело лежит в габарите [param reach]. Брызги
-## и пятно кладёт в [param host]. Возвращает true, если срез опустился.
+## Drives the cut of [param figure] by a cab with walls [param from_x]..[param to_x] and
+## floor at height [param bottom]; the body lies within bounds [param reach]. Puts the
+## spray and the pool into [param host]. Returns true if the cut went down.
 func advance(
 	figure: FigureRig, host: Node, from_x: float, to_x: float, bottom: float, reach: AABB
 ) -> bool:
@@ -57,8 +57,8 @@ func advance(
 	return true
 
 
-## Брызги из среза: у стенки, за которой тело продолжается, — наружу, из-под
-## днища — в обе стороны.
+## Spray from the cut: at the wall beyond which the body continues — outward, from under
+## the cab floor — both ways.
 func _spray(host: Node, low: float, high: float) -> void:
 	var z := body.get_center().z
 	var at := clampf(top, body.position.y, body.end.y)

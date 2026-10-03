@@ -1,23 +1,23 @@
 extends GutTest
 
-## Улёгшееся тело застывает (ADR-0044, решение 11).
+## A settled body freezes (ADR-0044, decision 11).
 ##
-## Замер M24h: двадцать трупов с рэгдоллом не засыпали — в стопке соседи будили
-## друг друга. Застывшее тело статично: физика его не считает, но на него
-## по-прежнему ложатся другие, и выглядит оно так же. Опора ушла — тело снова
-## живёт физикой ([method Ragdoll.wake]). Выпавшее из мира — пропадает.
+## M24h measurement: twenty corpses with ragdolls did not fall asleep — in a pile neighbours woke
+## each other. A frozen body is static: physics does not compute it, but others still
+## lie on it, and it looks the same. If the support goes, the body again
+## lives by physics ([method Ragdoll.wake]). One that fell out of the world disappears.
 
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
-## Сколько шагов дать телу лечь и застыть.
+## How many steps to give a body to lie down and freeze.
 const SETTLE_FRAMES: int = 480
-## Сколько шагов ждать, пока кабина доедет до тела: пауза плюс перегон.
+## How many steps to wait for the cab to reach the body: the pause plus the run.
 const RIDE_FRAMES: int = 1200
 
 
 func before_all() -> void:
-	# Как в test_enemy_corpse: мир быстрее, шаг физики мельче — иначе суставы
-	# рэгдолла на длинном шаге разлетаются.
+	# As in test_enemy_corpse: the world is faster, the physics step smaller — otherwise the ragdoll
+	# joints fly apart on a long step.
 	Engine.time_scale = 4.0
 	Engine.physics_ticks_per_second = 240
 
@@ -29,7 +29,7 @@ func after_all() -> void:
 	GameState.instance().reset()
 
 
-## Куски тел, брызги и пятна кладёт в сцену кабина, а не тест: убираются тут.
+## Body pieces, splashes and stains are put into the scene by the cab, not the test: removed here.
 func after_each() -> void:
 	for child: Node in get_children():
 		if child is CorpsePiece or child is Decal or child is Blood:
@@ -89,10 +89,10 @@ func test_another_body_lies_on_a_frozen_one() -> void:
 	var top := first.corpse.ragdoll.bounds().end.y
 	var second: Enemy = await _corpse_at(Vector3(0.0, top + 0.3, 0.0))
 	await wait_physics_frames(SETTLE_FRAMES / 2)
-	# Второе может и скатиться с первого на пол — это не провал. Провал —
-	# лежать над застывшим, но ниже его верха.
-	# Меряется тазом второго: габарит тела с раскинутыми руками и ногами
-	# перекрывает соседа и у скатившегося на пол.
+	# The second may also roll off the first onto the floor — that is not a failure. A failure is
+	# lying above the frozen one, but below its top.
+	# Measured by the second one's pelvis: the bounds of a body with spread arms and legs
+	# overlap the neighbour even for one that rolled onto the floor.
 	var lower := first.corpse.ragdoll.bounds()
 	var pelvis := Ragdoll.center_of(second.corpse.ragdoll.parts["Body"] as PhysicalBone3D)
 	if pelvis.x > lower.position.x + 0.1 and pelvis.x < lower.end.x - 0.1:
@@ -117,8 +117,8 @@ func test_a_frozen_body_wakes_when_its_floor_goes() -> void:
 	assert_lt(agent.corpse.ragdoll.bounds().position.y, before - 0.5, "и падает")
 
 
-## Кабина на двух остановках, с полом [param width] м шириной. Стоит наверху,
-## пока её не отпустят ([method _let_go]).
+## A cab with two stops, with a floor [param width] m wide. It stands at the top
+## until released ([method _let_go]).
 func _held_car(width: float = ElevatorCar.DEFAULT_WIDTH) -> ElevatorCar:
 	var car := CAR_SCENE.instantiate() as ElevatorCar
 	add_child_autofree(car)
@@ -128,8 +128,8 @@ func _held_car(width: float = ElevatorCar.DEFAULT_WIDTH) -> ElevatorCar:
 	return car
 
 
-## Отпускает кабину вниз и ждёт, пока доедет — и там держит, — или пока
-## [param done] не вернёт true.
+## Lets the cab go down and waits until it arrives — and holds it there — or until
+## [param done] returns true.
 func _let_go(car: ElevatorCar, done: Callable = Callable()) -> void:
 	car.floor_pause = 0.2
 	car.setup(PackedFloat32Array([0.0, Proportions.FLOOR]), 0)
@@ -137,18 +137,18 @@ func _let_go(car: ElevatorCar, done: Callable = Callable()) -> void:
 		await wait_physics_frames(1)
 		if (done.is_valid() and done.call()) or car.global_position.y <= -Proportions.FLOOR + 0.01:
 			break
-	# Доехавшая пустая кабина постояла бы и поехала обратно. Держат стоящую, а
-	# в кадр прибытия она ещё отчитывается ходом.
+	# An empty cab that arrived would stand a while and go back. A standing one is held, and
+	# in the arrival frame it still reports movement.
 	await wait_physics_frames(1)
 	car.hold(1000.0)
 	await wait_physics_frames(30)
 
 
-## Стопка тел на полу вставшей кабины не застывает и едет с ней: застывшая
-## повисла бы в воздухе, когда кабина уедет. Верхнее тело лежит не только на
-## кабине, но и на нижнем.
+## A pile of bodies on the floor of a stopped cab does not freeze and rides with it: a frozen one
+## would hang in the air when the cab leaves. The upper body lies not only on the
+## cab but also on the lower one.
 func test_a_pile_in_a_standing_car_rides_on_with_it() -> void:
-	# Пол кабины шире тела: стопка ложится на неё целиком, а не свешивается.
+	# The cab floor is wider than a body: the pile lies on it entirely instead of hanging over.
 	var car := _held_car(6.0)
 	var below: Enemy = await _corpse_at(Vector3(0.0, 0.05, 0.0))
 	await wait_physics_frames(SETTLE_FRAMES / 4)
@@ -162,8 +162,8 @@ func test_a_pile_in_a_standing_car_rides_on_with_it() -> void:
 	assert_lt(above.corpse.ragdoll.bounds().position.y, floor_y + 1.0, "и верхнее — не повисло")
 
 
-## Застывшее в яме шахты тело кабина, съехав, всё равно режет: застывшее
-## статично, и зона давки обязана видеть и такие тела.
+## A body frozen in the shaft pit is still cut by the cab coming down: a frozen one is
+## static, and the crush zone must see such bodies too.
 func test_a_frozen_body_in_a_shaft_pit_is_still_cut() -> void:
 	GameState.instance().start_game()
 	_floor_at(-Proportions.FLOOR)

@@ -1,5 +1,5 @@
 shader_type spatial;
-// Погасшие окна города: в дымке, как фасад, — чуть светлее его.
+// Dark city windows: in the haze, like the facade — slightly lighter than it.
 render_mode unshaded, cull_back;
 
 #include "res://src/levels/city_window.gdshaderinc"

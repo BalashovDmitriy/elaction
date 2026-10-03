@@ -1,18 +1,18 @@
 extends GutTest
 
-## Читаемость на погашенном этаже (ADR-0023, решение 6): у двери табло, у
-## кабины индикаторы, у выхода вывеска, светильник лампы светится сам, актёров
-## высвечивает свет камеры на их слое. Всё это свету ламп не подчиняется, поэтому
-## проверка структурная: кадр с погашенными лампами обязан это показывать.
+## Readability on a dark floor (ADR-0023, decision 6): a door has an indicator board, a
+## cab has indicators, the exit has a sign, a lamp fixture glows by itself, actors are
+## lit by the camera light on their layer. None of this obeys lamp light, so the
+## check is structural: a frame with the lamps out must show it.
 ##
-## Здание настоящее, по правилам по умолчанию, на нескольких сидах: двери и
-## кабины стоят по сиду, и одного здания мало.
+## The building is real, with the default rules, on several seeds: doors and
+## cabs stand by seed, and one building is not enough.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 const SEEDS: Array[int] = [1, 2, 3]
 
-## Сколько кадров даётся зданию, чтобы встать на места.
+## How many frames the building gets to settle into place.
 const SETTLE_FRAMES: int = 4
 
 
@@ -35,7 +35,7 @@ func _build(building_seed: int) -> GreyboxLevel:
 	return level
 
 
-## Цвет огонька, если узел — светящаяся коробка, иначе прозрачный.
+## Indicator light colour if the node is a glowing box, otherwise transparent.
 static func _glow_of(node: Node) -> Color:
 	var part := node as MeshInstance3D
 	if part == null:
@@ -46,7 +46,7 @@ static func _glow_of(node: Node) -> Color:
 	return material.emission
 
 
-## Сколько прямых детей узла горят цветом [param colour].
+## How many direct children of the node glow in colour [param colour].
 static func _lights_of(node: Node, colour: Color) -> int:
 	var count := 0
 	for child: Node in node.get_children():
@@ -69,7 +69,8 @@ func test_every_door_carries_a_sign_that_tells_red_from_plain() -> void:
 			)
 			if door.has_document:
 				red += 1
-			# Сама створка светом сцены не пренебрегает: огонёк — табло, не дверь.
+			# The leaf itself does not ignore scene light: the indicator light is the board, not the
+			# door.
 			assert_eq(
 				_glow_of(door.get_node("Leaf")),
 				Color.TRANSPARENT,
@@ -83,7 +84,8 @@ func test_every_door_carries_a_sign_that_tells_red_from_plain() -> void:
 		remove_child(level)
 
 
-## Взятый документ гасит красное табло: дверь стала обычной, и табло тёплое.
+## A taken document turns off the red indicator board: the door became ordinary, and the
+## board is warm.
 func test_a_taken_document_turns_the_sign_warm() -> void:
 	var level := _build(1)
 	await wait_physics_frames(SETTLE_FRAMES)
@@ -116,7 +118,7 @@ func test_the_exit_wears_a_green_sign() -> void:
 	for building_seed: int in SEEDS:
 		var level := _build(building_seed)
 		await wait_physics_frames(SETTLE_FRAMES)
-		# С M24b вывеска — над воротами паркинга в левом торце ([GarageGate]).
+		# Since M24b the sign is above the garage gate in the left end wall ([GarageGate]).
 		var board := level.get_node_or_null("Garage/Gate/ExitSign")
 		assert_not_null(board, "сид %d: над выходом вывеска" % building_seed)
 		if board != null:
@@ -136,7 +138,7 @@ func test_the_exit_wears_a_green_sign() -> void:
 		remove_child(level)
 
 
-## Светильник — сам источник, и он виден, пока висит.
+## The fixture is the light source itself, and it is visible while it hangs.
 func test_lamps_glow_themselves() -> void:
 	var level := _build(1)
 	await wait_physics_frames(SETTLE_FRAMES)
@@ -147,9 +149,9 @@ func test_lamps_glow_themselves() -> void:
 	remove_child(level)
 
 
-## Актёры — модели: обводки с M24f на них нет, их держит свет камеры на слое
-## фигур (ADR-0042, решение 7). Меши фигуры — под её ригом, [code]Body[/code]:
-## луч прицела агента тоже меш, но светящаяся нить, а не тело.
+## Actors are models: since M24f they have no outline, the camera light on the figure
+## layer holds them (ADR-0042, decision 7). The figure's meshes are under its rig,
+## [code]Body[/code]: the agent's aiming beam is a mesh too, but a glowing thread, not a body.
 func test_actors_are_lit_by_the_camera_fill() -> void:
 	var level := _build(1)
 	var agent := ENEMY_SCENE.instantiate() as Enemy

@@ -1,21 +1,21 @@
 extends GutTest
 
-## Тесты правил здания.
+## Building rules tests.
 ##
-## Отсюда берётся вся вертикальная арифметика: где поверхность этажа, какой этаж
-## ближе к точке, где потолок. По ним же считается место возврата после смерти
-## и геометрия затемняющей полосы. И злость агентов — она растёт из двух мест
-## сразу, и потолок на ней держит игру проходимой.
+## All vertical arithmetic comes from here: where a floor surface is, which floor is
+## closer to a point, where the ceiling is. The respawn spot after death and the geometry
+## of the darkening band are computed by them too. And agent anger — it grows from two places
+## at once, and the cap on it keeps the game passable.
 
 
 func _rules() -> BuildingRules:
 	var rules := BuildingRules.new()
 	rules.floors = 30
-	# Здание теста — свой маленький мир в целых числах, и задаётся он целиком:
-	# все длины, от которых зависят проверки ниже. Пока часть бралась из
-	# умолчаний, тест держался на том, что 480 и 3840 точны в любом float; с
-	# M15 умолчания метрические — 4.8 и 38.4, — и точные равенства поплыли на
-	# последнем бите дроби ([Vector2] к тому же хранит float32).
+	# The test building is its own small world in integers, and it is set in full:
+	# all the lengths the checks below depend on. While part was taken from the
+	# defaults, the test relied on 480 and 3840 being exact in any float; since
+	# M15 the defaults are metric — 4.8 and 38.4 — and exact equalities drifted in the
+	# last bit of the fraction ([Vector2] also stores float32).
 	rules.floor_height = 120.0
 	rules.slab_height = 20.0
 	rules.sky_height = 160.0
@@ -34,8 +34,8 @@ func test_the_roof_lies_above_the_top_floor() -> void:
 	)
 
 
-## Из-за этого нулевой этаж и был неиграбельным: просвет 20 px против 100 px
-## у всех остальных, и макушка Otto уходила за верхний край кадра (ADR-0014).
+## This is why floor zero was unplayable: a clearance of 20 px against 100 px
+## for all the others, and Otto's head went past the top edge of the frame (ADR-0014).
 func test_every_level_has_the_same_headroom() -> void:
 	var rules := _rules()
 	var expected := rules.floor_height - rules.slab_height
@@ -51,7 +51,7 @@ func test_the_roof_has_sky_above_it() -> void:
 	assert_eq(rules.floor_surface(roof) - rules.story_top(roof), rules.sky_height)
 
 
-## Прыжок Otto — 80 px. Если он не помещается над крышей, игрок улетает за кадр.
+## Otto's jump is 80 px. If it does not fit above the roof, the player flies out of frame.
 func test_a_jump_from_the_roof_stays_inside_the_world() -> void:
 	var rules := _rules()
 	var otto := preload("res://src/actors/otto/otto.tscn").instantiate() as Otto
@@ -96,8 +96,8 @@ func test_slots_spread_between_the_margins() -> void:
 	assert_eq(rules.slot_x(rules.slots - 1), rules.width - rules.margin)
 
 
-## Навык растёт с каждым зданием и стартует с уровня сложности партии — как
-## в ROM, где к DIP-переключателю прибавляются пройденные здания (ADR-0027).
+## Skill grows with every building and starts from the game's difficulty level — as
+## in the ROM, where cleared buildings are added to the DIP switch (ADR-0027).
 func test_skill_grows_building_by_building() -> void:
 	assert_eq(BuildingRules.for_building(1).skill, 0, "первое здание на лёгком — ноль")
 	assert_eq(BuildingRules.for_building(2).skill, 1, "каждое следующее — на единицу")
@@ -105,7 +105,7 @@ func test_skill_grows_building_by_building() -> void:
 	assert_eq(BuildingRules.for_building(5, 2).skill, 6)
 
 
-## Ручной потолок агентов — для прогонов; без него — ROM, три или четыре.
+## Manual agent cap — for runs; without it — the ROM's, three or four.
 func test_agents_at_once_follow_the_rom_unless_capped() -> void:
 	var rules := BuildingRules.new()
 	assert_eq(rules.agents_at_once(0.0), 3, "с начала здания трое")
@@ -119,9 +119,10 @@ func test_stance_heights_hold_together() -> void:
 	assert_gt(rules.agent_dark_fire_range, 0.0, "в темноте вплотную агент Otto видит")
 
 
-## Ламп по ширине: узкий верх — одна, широкий низ — три. Ряд светильников по
-## потолку, как на референсе, и по зоне темноты на каждую (ADR-0023). Тёмные
-## этажи карты — без ламп, и рост книзу через них не считается (ADR-0028).
+## Lamps by width: a narrow top — one, a wide bottom — three. A row of fixtures along the
+## ceiling, as in the reference, and one darkness zone each (ADR-0023). Dark
+## floors of the map have no lamps, and the growth downwards does not count through them
+## (ADR-0028).
 func test_wider_floors_hang_more_lamps() -> void:
 	var rules := _rules()
 	assert_eq(rules.lamps_on(0), 1, "наверху одна лампа")

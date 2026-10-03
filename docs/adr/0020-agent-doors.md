@@ -1,134 +1,130 @@
-# ADR-0020 · Дверь агента: телеграф, проём и неуязвимость
+# ADR-0020 · Agent door: telegraph, doorway and invulnerability
 
-- **Статус:** принято; решение 7 ушло вместе с 2D-кадрами — в 3D створка
-  стала моделью, с M18c на петлях ([ADR-0026](0026-proportions.md), решение 3);
-  решение 2 дополнено: створка идёт в конце смены ([ADR-0028](0028-building-by-the-map.md),
-  решение 7); красных дверей из решения 6 — 5–10 по навыку (ADR-0028, решение 3)
-- **Дата:** 2026-09-19
+- **Status:** accepted; decision 7 went away together with the 2D frames — in 3D the door leaf
+  became a model, on hinges since M18c ([ADR-0026](0026-proportions.md), decision 3);
+  decision 2 extended: the leaf moves at the end of a shift ([ADR-0028](0028-building-by-the-map.md),
+  decision 7); red doors from decision 6 — 5–10 by skill level (ADR-0028, decision 3)
+- **Date:** 2026-09-19
 
-## Контекст
+## Context
 
-Игра, сыгранная руками, дала упрёк первым номером: агенты появляются **поверх
-закрытой двери**, а двери при этом не открываются вовсе. Створка в кадре стоит
-закрытой, и прямо на ней возникает человек.
+Playing the game by hand produced the complaint at the top of the list: agents appear **on top of
+a closed door**, and the doors do not open at all. The leaf in the frame stays closed, and a man
+materializes right on it.
 
-В коде так и есть. `DoorVisit` знает фазы `CLOSED → OPENING → OPEN` и все три
-ассета нарисованы, но работает это только для визитов Otto. Агента же уровень
-создаёт узлом сразу на коврике: `_release_agent` ставит `global_position = mat`
-и отдаёт готового врага. Фаза `EMERGING` в мозге агента есть — 0.6 с он не ходит
-и не стреляет, — но эти 0.6 с он просто стоит перед закрытой дверью.
+That is exactly how the code works. `DoorVisit` knows the phases `CLOSED → OPENING → OPEN` and all
+three assets are drawn, but this works only for Otto's visits. The level creates an agent as a
+node straight on the mat: `_release_agent` sets `global_position = mat` and hands over a finished
+enemy. The agent's brain has an `EMERGING` phase — for 0.6 s he does not walk or shoot — but for
+those 0.6 s he just stands in front of a closed door.
 
-Это баг логики, а не картинки: он переживёт переезд в 3D ([ADR-0019](0019-3d-pivot.md))
-и воспроизведётся там один в один. Поэтому чиним до пивота, пока рядом есть
-работающая игра для сравнения.
+This is a logic bug, not a picture bug: it will survive the move to 3D ([ADR-0019](0019-3d-pivot.md))
+and reproduce there one to one. So we fix it before the pivot, while a working game is at hand for
+comparison.
 
-### Что показала сверка с оригиналом
+### What the check against the original showed
 
-- **Агенты выходят из закрытых дверей** — источники говорят это прямо. Механика
-  совпадает.
-- **Выходят с этажа игрока и с соседних** — совпадает с нашей полосой выпуска.
-- **Документы за красными дверями, забрал — дверь перестала быть красной.**
-  Совпадает, но у нас опустевшая дверь так и не начинала выпускать агентов.
-- **Открывается ли створка перед выходом агента — источники молчат.** Скриншоты
-  этого не ловят. Решаем сами; сверкой не подтверждено.
-- **Нашлось то, чего у нас нет:** войдя в красную дверь, Otto сбивает агентов со
-  следа — они теряют точную позицию и знают лишь направление. В эту веху не берём,
-  записано в долг.
+- **Agents come out of closed doors** — the sources say so directly. The mechanic matches.
+- **They come out from the player's floor and neighbouring ones** — matches our release band.
+- **Documents are behind red doors; once taken, the door stops being red.** Matches, but our
+  emptied door never started releasing agents.
+- **Whether the leaf opens before an agent comes out — the sources are silent.** Screenshots do
+  not capture it. We decide ourselves; not confirmed by the check.
+- **Found something we do not have:** by entering a red door Otto throws agents off his trail —
+  they lose his exact position and know only the direction. Not taken into this milestone,
+  recorded as debt.
 
-## Решения
+## Decisions
 
-### 1. Цикл двери — отдельный класс без узла
+### 1. The door cycle is a separate class without a node
 
-`DoorCycle` на `RefCounted`: фазы `CLOSED → OPENING → OPEN → CLOSING`, ход створки
-в долях, и ни одного обращения к сцене. Узел двери спрашивает у него, что
-показывать, и исполняет.
+`DoorCycle` on `RefCounted`: phases `CLOSED → OPENING → OPEN → CLOSING`, leaf travel as a fraction,
+and not a single access to the scene. The door node asks it what to show and does it.
 
-`DoorVisit` остаётся, но отдаёт створку: он про правила визита — кого пустить,
-когда выпустить, — а не про то, где сейчас дверь. Раньше он тянул и то и другое
-одним таймером.
+`DoorVisit` stays, but gives up the leaf: it is about the visit rules — whom to let in, when to let
+out — not about where the door is now. Previously it pulled both with one timer.
 
-Причина не в чистоте. В 3D узел двери будет другим, а правила — те же
-([ADR-0019](0019-3d-pivot.md), решение 2): веха, написанная так, переезжает
-бесплатно.
+The reason is not purity. In 3D the door node will be different, and the rules the same
+([ADR-0019](0019-3d-pivot.md), decision 2): a milestone written this way moves for free.
 
-### 2. Телеграф 0.7 с
+### 2. A 0.7 s telegraph
 
-Дверь открывается полностью, и только потом из неё выходит агент. Игрок успевает
-увидеть створку и уйти.
+The door opens fully, and only then an agent comes out of it. The player has time to see the leaf
+and leave.
 
-Это делает игру мягче, и сознательно: жалоба была именно на внезапность. Цену
-меряем — см. решение 9.
+This makes the game softer, deliberately: the complaint was precisely about the suddenness. We
+measure the cost — see decision 9.
 
-Число сверкой не подтверждено, как и сам факт телеграфа.
+The number is not confirmed by the check, nor is the fact of the telegraph itself.
 
-### 3. Агент неуязвим, пока не вышел из проёма
+### 3. The agent is invulnerable until he has left the doorway
 
-Иначе телеграф превращается в тир: игрок держит дверь на прицеле и снимает
-каждого на выходе, а 0.7 с дают на это сколько угодно времени.
+Otherwise the telegraph turns into a shooting gallery: the player keeps the door in his sights and
+picks off each one on the way out, and 0.7 s gives all the time in the world for that.
 
-Неуязвимость кончается ровно тогда, когда агент освободил проём и пошёл по этажу —
-то есть когда он уже полноценный противник.
+Invulnerability ends exactly when the agent has cleared the doorway and walked off along the
+floor — that is, when he is already a full-fledged opponent.
 
-### 4. Дверь закрывается сразу за вышедшим
+### 4. The door closes right behind the one who came out
 
-Открытая дверь в кадре значит «оттуда сейчас полезут». Один знак — одно значение.
-Если оставлять её открытой, пока агент жив, на этаже со сменой агентов половина
-дверей будет стоять нараспашку и знак перестанет читаться.
+An open door in the frame means "someone is about to come out of there". One sign — one meaning.
+If it is left open while the agent is alive, on a floor with agent turnover half the doors will
+stand wide open and the sign will stop reading.
 
-### 5. Otto в проёме дверь не останавливает
+### 5. Otto in the doorway does not stop the door
 
-Встал перед открывающейся створкой — агент всё равно выйдет. Дверь не передумывает.
+Stand in front of an opening leaf — the agent will come out anyway. The door does not change its
+mind.
 
-Проверка «не выпускать, если Otto вплотную» ([ADR-0016](0016-combat-balance.md))
-остаётся и работает как раньше: она решает, **начинать** ли цикл, а не прерывать
-начатый.
+The check "do not release if Otto is right next to it" ([ADR-0016](0016-combat-balance.md))
+stays and works as before: it decides whether to **start** the cycle, not whether to interrupt one
+already started.
 
-### 6. Опустевшая красная дверь становится обычной
+### 6. An emptied red door becomes an ordinary one
 
-Забрали документ — дверь выглядит обычной и ведёт себя как обычная, то есть
-начинает выпускать агентов. Раньше она оставалась вечным укрытием.
+The document taken — the door looks ordinary and behaves like an ordinary one, that is, starts
+releasing agents. Previously it remained a permanent shelter.
 
-Прибавка невелика: красных дверей пять на здание при полусотне обычных.
+The addition is small: five red doors per building versus fifty ordinary ones.
 
-### 7. Плавность — перекрёстное затухание трёх кадров
+### 7. Smoothness — a cross-fade of three frames
 
-Новых кадров створки не рисуем. `DoorCycle` отдаёт ход в долях, узел показывает
-два соседних кадра и перегоняет между ними прозрачность.
+We do not draw new leaf frames. `DoorCycle` gives the travel as a fraction, the node shows two
+neighbouring frames and cross-fades the transparency between them.
 
-Честнее было бы дорисовать шесть кадров в генераторе, и для 2D это дало бы лучший
-результат. Не делаем осознанно: весь набор ассетов уходит вместе с пивотом
-([ADR-0019](0019-3d-pivot.md), решение 8), и рисовать в него неделю незачем.
-Настоящая плавность придёт в M16 анимацией модели.
+It would be more honest to draw six more frames in the generator, and for 2D that would give a
+better result. Not done deliberately: the whole asset set goes away with the pivot
+([ADR-0019](0019-3d-pivot.md), decision 8), and there is no reason to spend a week drawing into it.
+Real smoothness will come in M16 with model animation.
 
-### 8. Дверь агента звучит тем же звуком
+### 8. The agent's door makes the same sound
 
-`DOOR_OPEN` и `DOOR_CLOSE`, источник позиционный. Звук — второй канал
-предупреждения: слышно даже то, что открылось за спиной. Отдельный эффект
-для засады не заводим.
+`DOOR_OPEN` and `DOOR_CLOSE`, a positional source. Sound is a second warning channel: you can hear
+even what opened behind your back. No separate effect for an ambush.
 
-### 9. Цена телеграфа меряется ботом, а не на глаз
+### 9. The cost of the telegraph is measured by the bot, not by eye
 
-Решения 2 и 3 вместе ослабляют засаду: игрок всегда успевает уйти, а убить
-агента на выходе нельзя. Насколько ослабляют — вопрос чисел, и он входит в DoD
-вехи: прогон `test_bot_survives_the_real_building_with_agents` на тех же сидах
-до и после, со сравнением смертей и убийств.
+Decisions 2 and 3 together weaken the ambush: the player always has time to leave, and an agent
+cannot be killed on the way out. By how much is a question of numbers, and it is part of the
+milestone DoD: the run `test_bot_survives_the_real_building_with_agents` on the same seeds before
+and after, comparing deaths and kills.
 
-Если опасность дверей обнулилась — компенсируем, и чем именно, решаем по числам,
-а не заранее.
+If the danger of doors dropped to zero — we compensate, and with what exactly is decided from the
+numbers, not in advance.
 
-## Чего в вехе нет
+## What is not in the milestone
 
-- **Кадров анимации ходьбы и прыжка.** Отзыв про плавность актёров закрывается
-  моделью с анимацией в M16, а не дорисовкой спрайтов.
-- **Потери следа за красной дверью.** Найдено сверкой, в долг.
-- **Правок в раскладку дверей.** Их число и места задаёт `BuildingPlan`, и он
-  не трогается.
+- **Walk and jump animation frames.** The feedback on actor smoothness is closed by a model with
+  animation in M16, not by drawing more sprites.
+- **Losing the trail behind a red door.** Found by the check, as debt.
+- **Changes to the door layout.** Their number and places are set by `BuildingPlan`, and it is not
+  touched.
 
-## Источники
+## Sources
 
 - [Video Game History Wiki](https://videogamehistory.fandom.com/wiki/Elevator_Action) —
-  агенты выходят из закрытых дверей
-- [Just Games Retro](https://www.justgamesretro.com/nes/elevator-action) — двери
-  этажа игрока и соседних, красная дверь после документа, потеря следа
-- [The Cutting Room Floor](https://tcrf.net/Elevator_Action_(Arcade)) — кадры
-  анимаций в оригинале считали поштучно
+  agents come out of closed doors
+- [Just Games Retro](https://www.justgamesretro.com/nes/elevator-action) — doors of the player's
+  floor and neighbouring ones, the red door after the document, losing the trail
+- [The Cutting Room Floor](https://tcrf.net/Elevator_Action_(Arcade)) — animation frames in the
+  original were counted one by one

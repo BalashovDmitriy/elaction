@@ -1,29 +1,28 @@
-# ADR-0009 · Игровой цикл, тревога и рост сложности
+# ADR-0009 · Game loop, alarm and difficulty growth
 
-- **Статус:** принято; пункт 2 заменён — сложность здания и злость агента по ROM
-  ([ADR-0027](0027-rom-combat.md), решение 1), агенты уклоняются с M11
-  ([ADR-0016](0016-combat-balance.md)); время до тревоги — 277 с вместо 300 из
-  пункта 5 ([ADR-0027](0027-rom-combat.md), решение 7)
-- **Дата:** 2026-09-12
+- **Status:** accepted; item 2 replaced — building difficulty and agent anger by ROM
+  ([ADR-0027](0027-rom-combat.md), decision 1), agents dodge since M11
+  ([ADR-0016](0016-combat-balance.md)); time to alarm is 277 s instead of 300 from
+  item 5 ([ADR-0027](0027-rom-combat.md), decision 7)
+- **Date:** 2026-09-12
 
-## Контекст
+## Context
 
-M5b — вторая половина разделённой вехи M5 (см. [ADR-0008](0008-building-generation.md)).
-Здание уже собирается генерацией; здесь появляется то, что связывает здания в партию:
-переход между ними, тревога по таймеру и нарастающая сложность.
+M5b is the second half of the split milestone M5 (see [ADR-0008](0008-building-generation.md)).
+The building is already assembled by generation; here comes what ties buildings into a session:
+the transition between them, the timed alarm and increasing difficulty.
 
-Сверка проводилась перед M5 целиком, поэтому здесь фиксируются решения. Мануал Taito
-по-прежнему недоступен, и три числа приходится брать на глаз — они перечислены ниже.
+The check was done before M5 as a whole, so this records decisions. Taito's manual is still
+unavailable, and three numbers have to be taken by eye — they are listed below.
 
-## Решения
+## Decisions
 
-### 1. Тревога включается по фиксированному времени на здание
+### 1. The alarm turns on after a fixed time per building
 
-Момент срабатывания не называет ни один источник. Взято постоянное время на здание,
-одинаковое для всех, вынесенное в параметр: после сверки в MAME поменять нужно будет
-одно число, а не механику.
+No source gives the trigger moment. A constant time per building is taken, the same for all,
+moved into a parameter: after a check in MAME one number will need changing, not the mechanic.
 
-Само поведение тревоги — по оригиналу, целиком:
+The alarm behaviour itself follows the original, in full:
 
 > If Otto takes too much time to clear a level, an alarm will sound; the enemy agents
 > then become more aggressive, and the elevators will be slower to respond.
@@ -31,91 +30,91 @@ M5b — вторая половина разделённой вехи M5 (см. 
 > The alarm does not go off when the player loses a life, it only resets after
 > finishing a building.
 
-**Смерть тревогу не снимает.** Это наказание на всё прохождение здания, а не на попытку,
-и единственное, что ограничивает ферму очков на погашенном этаже — о ней сказано
-в [ADR-0007](0007-lamps-and-darkness.md), пункт 3.
+**Death does not clear the alarm.** It is a penalty for the whole run through the building, not
+for an attempt, and the only thing limiting the point farm on a darkened floor — mentioned
+in [ADR-0007](0007-lamps-and-darkness.md), item 3.
 
-### 2. От здания к зданию злее и многочисленнее агенты
+### 2. From building to building, agents get angrier and more numerous
 
-Источники называют три способа роста сложности: агенты стреляют чаще, лифты внизу
-запутаннее, и в поздних зданиях агенты ложатся на пол, отчего попасть в них почти
-нельзя.
+The sources name three ways difficulty grows: agents shoot more often, the elevators lower down
+are more tangled, and in later buildings agents lie down on the floor, making them almost
+impossible to hit.
 
-Берётся только первый. Он выражается числами в уже готовых `EnemyBrain` и правилах
-здания — дальность, пауза между выстрелами, как часто дверь выпускает нового, — то
-есть проверяется тестами и не требует новых механик.
+Only the first is taken. It is expressed by numbers in the already finished `EnemyBrain` and
+the building rules — range, pause between shots, how often a door releases a new one — that
+is, it is tested and requires no new mechanics.
 
-Остальные два записаны как несделанное: запутанность шахт — это правила генерации,
-а лежачие агенты — новое поведение и новая поза, обе вещи тянут на отдельную работу.
+The other two are recorded as not done: tangled shafts are generation rules, and lying agents
+are a new behaviour and a new pose; both amount to separate work.
 
-### 3. Бонус за здание — 1000 × номер
+### 3. Building bonus — 1000 × number
 
-Решение принято в [ADR-0008](0008-building-generation.md), пункт 5, и здесь только
-реализуется. Источники расходятся: один называет плоскую 1000, другой — с множителем.
-**Не сверено.**
+The decision was made in [ADR-0008](0008-building-generation.md), item 5, and is only
+implemented here. The sources disagree: one gives a flat 1000, another a multiplier.
+**Not checked.**
 
-### 4. Пауза — не механика оригинала, но нужна
+### 4. Pause — not an original mechanic, but needed
 
-В аркаде паузы нет: там за игру платят монетой. Esc сейчас просто закрывает игру, что
-неудобно и в разработке, и для игрока.
+The arcade has no pause: there you pay a coin per game. Esc currently just closes the game,
+which is inconvenient both in development and for the player.
 
-Esc ставит игру на паузу и показывает подсказку: продолжить, начать заново или выйти.
-Настоящее меню — в M8; здесь только механика, чтобы не плодить UI, который будет
-выброшен.
+Esc pauses the game and shows a hint: continue, restart or quit. The real menu is in M8; here
+only the mechanic, so as not to breed UI that will be thrown away.
 
-Тревога на паузе не идёт: иначе пауза стоила бы игроку здания.
+The alarm does not run while paused: otherwise pausing would cost the player the building.
 
-### 5. Время до тревоги — 300 с, временно, до живой игры
+### 5. Time to alarm — 300 s, temporarily, until live play
 
-*Дополнение от 2026-09-22, веха M18a.*
+*Addendum of 2026-09-22, milestone M18a.*
 
-Сто секунд из пункта 1 поставили, когда спуск был жадным: бот брал ближайшую шахту
-и шёл вниз. Раскладка M18a развернула это — шахты пересекаются, этаж бывает разрезан
-стеной и открытым проёмом, и маршрут строится по графу достижимости, то есть состоит
-из пересадок, а иногда и из подъёма.
+The hundred seconds of item 1 were set when the descent was greedy: the bot took the nearest
+shaft and went down. The M18a layout reversed that — shafts overlap, a floor can be cut by a
+wall and an open opening, and the route is built over the reachability graph, that is, it
+consists of transfers and sometimes even a climb.
 
-Замер `tools/playthrough.gd` на пяти сидах, без боя: **5352–6773 кадра, то есть
-89–113 с**. При лимите в сто секунд сирена успевала включиться до конца безупречной
-партии на четырёх сидах из пяти. И это не косметика: сирена вешает задержку на все
-кабины (`GreyboxLevel.ALARM_CAR_DELAY`) — ровно на то, из чего теперь состоит спуск.
-Получалась петля: длиннее маршрут → сирена → кабины медленнее → ещё длиннее.
+Measurement with `tools/playthrough.gd` on five seeds, without combat: **5352–6773 frames, that
+is 89–113 s**. With a hundred-second limit the siren managed to turn on before the end of a
+flawless run on four seeds out of five. And this is not cosmetic: the siren adds a delay to all
+cabs (`GreyboxLevel.ALARM_CAR_DELAY`) — exactly what the descent now consists of. It formed a
+loop: longer route → siren → slower cabs → even longer.
 
-**Решение: 300 с, и это временное число, а не измеренный баланс.** Замер даёт нижнюю
-границу (бот не мешкает, но и не изучает здание), верхнюю дала бы живая игра, которой
-ещё не было. Запас взят с избытком сознательно: веха и так усложнила прохождение,
-и лишнее давление на время замеров боя только путало бы картину. Число уточняется
-после того, как по зданию пройдёт человек.
+**Decision: 300 s, and this is a temporary number, not measured balance.** The measurement gives
+a lower bound (the bot does not dawdle, but does not explore the building either); the upper
+bound would come from live play, which has not happened yet. The margin is taken in excess
+deliberately: the milestone has already made the run harder, and extra time pressure during
+combat measurements would only muddle the picture. The number is refined after a human plays
+through the building.
 
-**Цена запаса.** При пяти минутах сирена в обычной партии не включается вовсе. Значит
-до тех пор, пока у приседа нет цены (открытый вопрос №7, припарковано вехой M16a),
-за отсидку не наказывает ничто: присевшего Otto не берёт ни один выстрел, и сирена
-была единственным, что этому мешало.
+**The cost of the margin.** At five minutes the siren does not turn on at all in a normal
+session. So until crouching has a cost (open question No. 7, parked by milestone M16a),
+nothing punishes sitting it out: no shot hits a crouching Otto, and the siren was the only
+thing preventing it.
 
-## Что осталось несверенным
+## What remains unchecked
 
-| Вопрос | Как закрыть |
+| Question | How to close it |
 |---|---|
-| Через сколько включается тревога | MAME, замер по кадрам |
-| Бонус за здание: 1000 или 1000 × номер | MAME |
-| Насколько именно лифт «медленнее отвечает» при тревоге | MAME |
+| After how long the alarm turns on | MAME, frame-by-frame measurement |
+| Building bonus: 1000 or 1000 × number | MAME |
+| How much exactly the elevator "responds slower" during the alarm | MAME |
 
-## Что осталось несделанным
+## What remains not done
 
-- **Шахты не становятся запутаннее в поздних зданиях**, хотя в оригинале становятся.
-  Это правила генерации, и менять их надо вместе с проверкой проходимости.
-- **Агенты не ложатся на пол.** Механика найдена при сверке перед M5, в эпике её не
-  было; это новое поведение и новая поза, работа на отдельную веху.
+- **Shafts do not get more tangled in later buildings**, although they do in the original.
+  These are generation rules, and they must change together with the traversability check.
+- **Agents do not lie down on the floor.** The mechanic was found in the check before M5 and
+  was not in the epic; it is a new behaviour and a new pose, work for a separate milestone.
 
-## Последствия
+## Consequences
 
-- **Появляется партия, а не уровень.** `GameState` начинает хранить номер здания и сид,
-  а `main` — пересобирать уровень при переходе. До сих пор уровень жил один на запуск.
-- **Тревога — первое состояние партии, которое меняет поведение готовых систем.**
-  Она трогает и агентов, и кабину лифта, то есть M2 и M4a.
-- **Пауза требует разделить, что замирает, а что нет.** Ввод паузы должен работать
-  на паузе, а тревога — нет.
+- **A session appears, not a level.** `GameState` starts storing the building number and seed,
+  and `main` rebuilds the level on transition. Until now there was one level per launch.
+- **The alarm is the first session state that changes the behaviour of finished systems.**
+  It touches both agents and the elevator cab, that is, M2 and M4a.
+- **Pause requires separating what freezes and what does not.** Pause input must work while
+  paused, and the alarm must not.
 
-## Источники
+## Sources
 
 - [Elevator Action — Wikipedia](https://en.wikipedia.org/wiki/Elevator_Action)
 - [Elevator Action — Video Game History Wiki](https://videogamehistory.fandom.com/wiki/Elevator_Action)

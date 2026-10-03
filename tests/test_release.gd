@@ -1,15 +1,15 @@
 extends GutTest
 
-## Тесты релиза: версия и пресеты экспорта.
+## Release tests: version and export presets.
 ##
-## Версия живёт в четырёх местах — `project.godot`, два поля пресета Windows,
-## имя архива и тег ([ADR-0013](../docs/adr/0013-release-and-versioning.md),
-## пункт 3). Разъезжаются они молча: архив назовётся одной версией, игра в углу
-## меню покажет другую, и заметит это уже тот, кто скачал.
+## The version lives in four places — `project.godot`, two fields of the Windows preset, the archive
+## name and the tag ([ADR-0013](../docs/adr/0013-release-and-versioning.md), item 3). They drift
+## apart silently: the archive is named with one version, the game shows another in the menu corner,
+## and the one who notices is whoever downloaded it.
 ##
-## Пресеты проверяются по той же причине, что и список звуков: правка в них
-## не видна ни в кадре, ни в логе. Забытый `exclude_filter` уносит игроку тесты
-## и инструменты разработчика, а неверная иконка — дефолтного робота Godot.
+## Presets are checked for the same reason as the sound list: an edit in them is visible neither in
+## the frame nor in the log. A forgotten `exclude_filter` ships tests and developer tools to the
+## player, and a wrong icon ships Godot's default robot.
 
 const PRESETS_PATH := "res://export_presets.cfg"
 const CHANGELOG_PATH := "res://CHANGELOG.md"
@@ -17,17 +17,17 @@ const ICON_PATH := "res://icon.ico"
 const PACKAGE_PATH := "res://tools/package.py"
 const FONTS_DIR := "res://assets/fonts"
 
-## Пресет, который должен быть, и платформа, на которой он собирается.
+## The preset that must exist, and the platform it is built for.
 const WANTED_PRESETS: Dictionary = {
 	"Windows Desktop": "Windows Desktop",
 	"Linux": "Linux",
 }
 
-## Что не должно уехать игроку внутри сборки.
+## What must not end up with the player inside the build.
 const EXCLUDED: Array[String] = ["tests/", "tools/", "addons/"]
 
 
-## Разбирает export_presets.cfg. Пустой — если файла нет или он не читается.
+## Parses export_presets.cfg. Empty if the file is missing or cannot be read.
 func _presets() -> ConfigFile:
 	var config := ConfigFile.new()
 	var code := config.load(PRESETS_PATH)
@@ -35,7 +35,7 @@ func _presets() -> ConfigFile:
 	return config
 
 
-## Секции пресетов без секций опций: `preset.0`, но не `preset.0.options`.
+## Preset sections without options sections: `preset.0`, but not `preset.0.options`.
 func _preset_sections(config: ConfigFile) -> Array[String]:
 	var sections: Array[String] = []
 	for section: String in config.get_sections():
@@ -44,7 +44,7 @@ func _preset_sections(config: ConfigFile) -> Array[String]:
 	return sections
 
 
-## Секция пресета с таким именем — или пустая строка, если такого нет.
+## The preset section with this name — or an empty string if there is none.
 func _section_of(config: ConfigFile, name: String) -> String:
 	for section: String in _preset_sections(config):
 		if str(config.get_value(section, "name", "")) == name:
@@ -61,7 +61,7 @@ func test_the_version_looks_like_a_version() -> void:
 
 
 func test_the_banner_names_the_version() -> void:
-	# По этой строке tools/smoke.py решает, поднялась ли собранная игра.
+	# By this line tools/smoke.py decides whether the built game came up.
 	assert_string_contains(Release.banner(), Release.version())
 	assert_string_contains(Release.banner(), "elaction")
 
@@ -94,9 +94,8 @@ func test_every_preset_stands_on_its_own_platform() -> void:
 
 
 func test_the_windows_preset_carries_the_project_version() -> void:
-	# Пустыми эти поля быть не могут: на пустой версии rcedit падает и экспорт
-	# не собирается вовсе (godot#83379). Windows ждёт четыре числа, поэтому
-	# к версии проекта добавлен ноль.
+	# These fields cannot be empty: on an empty version rcedit crashes and the export does not build at
+	# all (godot#83379). Windows expects four numbers, so a zero is appended to the project version.
 	var config := _presets()
 	var options := _section_of(config, "Windows Desktop") + ".options"
 	var wanted := Release.version() + ".0"
@@ -114,7 +113,7 @@ func test_the_windows_preset_points_at_the_icon() -> void:
 
 
 func test_resources_live_inside_the_executable() -> void:
-	# Иначе рядом с игрой лежит .pck, который теряют при распаковке архива.
+	# Otherwise a .pck lies next to the game, and it gets lost when the archive is unpacked.
 	var config := _presets()
 	for section: String in _preset_sections(config):
 		var options := section + ".options"
@@ -133,16 +132,16 @@ func test_the_player_does_not_get_tests_and_tools() -> void:
 
 
 func test_the_changelog_has_a_section_for_this_version() -> void:
-	# Релиз без заметок выходит молча, и замечают это после публикации.
+	# A release without notes goes out silently, and this is noticed after publication.
 	var text := FileAccess.get_file_as_string(CHANGELOG_PATH)
 	assert_false(text.is_empty(), "CHANGELOG.md читается")
 	assert_string_contains(text, "## [%s]" % Release.version())
 
 
 func test_every_font_ships_with_its_license() -> void:
-	# OFL требует прикладывать лицензию к продукту, а шрифт добавляют одной
-	# строкой в тему — список архива в tools/package.py при этом не вспоминают.
-	# Так Exo 2 проехал бы без лицензии: HUD на нём с M22, архив о нём не знал.
+	# The OFL requires shipping the licence with the product, and a font is added to the theme with one
+	# line — the archive list in tools/package.py is not remembered then. That is how Exo 2 would have
+	# shipped without a licence: the HUD has used it since M22, the archive did not know about it.
 	var extras := FileAccess.get_file_as_string(PACKAGE_PATH)
 	assert_false(extras.is_empty(), "tools/package.py читается")
 	var fonts := 0
@@ -157,7 +156,7 @@ func test_every_font_ships_with_its_license() -> void:
 
 
 func test_the_credits_ship_with_the_game() -> void:
-	# CC-BY 3.0 моделей обстановки требует назвать авторов там, где модели
-	# распространяют, — а распространяет их архив релиза.
+	# CC-BY 3.0 of the dressing models requires naming the authors where the models are distributed —
+	# and the release archive distributes them.
 	var extras := FileAccess.get_file_as_string(PACKAGE_PATH)
 	assert_string_contains(extras, '"CREDITS.md"')

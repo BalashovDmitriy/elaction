@@ -1,43 +1,43 @@
 class_name AimLaser
 extends Node3D
 
-## Луч прицела агента: тонкая красная нить от ствола по линии будущего выстрела
-## (ADR-0037, решение 5; решение пользователя).
+## Agent's aim laser: a thin red thread from the barrel along the line of the future shot
+## (ADR-0037, decision 5; user's decision).
 ##
-## С M24a пуля агента втрое быстрее ROM, и уклониться от неё, увидев саму пулю,
-## уже нельзя. Время на ответ даёт замах ROM: пока агент замахивается, от ствола
-## идёт луч на высоте будущей пули — высокий: присесть или прыгнуть, низкий —
-## прыгнуть. В тени луч — единственный знак, поэтому он светится сам.
+## Since M24a the agent's bullet is three times faster than ROM, and dodging it on seeing the bullet
+## itself is no longer possible. ROM's wind-up gives time to respond: while the agent winds up, from
+## the barrel runs a laser at the height of the future bullet — high: crouch or jump, low — jump. In
+## shadow the laser is the only sign, so it glows by itself.
 ##
-## Источником света луч не служит: только эмиссия, без [Light3D] — источников на
-## здание и так десятки. Кончается там, куда придёт пуля: на стене, на Otto или
-## на дальности пули; в конце — красная точка.
+## The laser does not serve as a light source: emission only, no [Light3D] — there are already
+## dozens of sources per building. It ends where the bullet will arrive: at a wall, at Otto or at
+## the bullet's range; at the end there is a red dot.
 ##
-## Узел стоит у ствола: его ставит агент, и луч идёт вдоль +X узла в сторону
+## The node stands at the barrel: the agent places it, and the laser runs along the node's +X toward
 ## [member direction].
 
-## Толщина луча и размер точки на конце, м.
+## Laser thickness and the size of the dot at the end, m.
 const THICKNESS: float = 0.026
 const DOT_SIZE: float = 0.16
 
 const COLOR := Color(1.0, 0.02, 0.02)
-## Насколько ярко светится луч: заметно и на погашенном этаже.
+## How brightly the laser glows: noticeable even on a darkened floor.
 const GLOW: float = 2.2
-## Дрожание луча: насколько он гаснет в худший кадр, из 1, и как часто, Гц.
+## Laser flicker: how much it dims in the worst frame, out of 1, and how often, Hz.
 const FLICKER: float = 0.35
 const FLICKER_RATE: float = 23.0
 
 static var _beam_material: StandardMaterial3D = null
 static var _dot_material: StandardMaterial3D = null
 
-## Куда смотрит луч: −1 влево, +1 вправо.
+## Where the laser points: −1 left, +1 right.
 var direction: float = 1.0
-## Во что луч упирается: маска пули агента — геометрия и Otto.
+## What the laser stops at: the agent bullet's mask — geometry and Otto.
 var mask: int = 1 | 2
-## Дальше этого луч не тянется: дальность пули.
+## The laser does not reach beyond this: the bullet range.
 var reach: float = 14.4
-## Сколько ещё до вылета пули, с, и с какой скоростью она полетит, м/с. Ставит
-## агент каждый кадр замаха: по ним видно, когда пуля придёт.
+## How long until the bullet leaves, s, and at what speed it will fly, m/s. The agent sets
+## these every wind-up frame: they show when the bullet will arrive.
 var shot_in: float = 0.0
 var shot_speed: float = 1.0
 
@@ -47,7 +47,7 @@ var _length: float = 0.0
 var _clock: float = 0.0
 
 
-## Собирает погашенный луч.
+## Assembles the laser switched off.
 static func make() -> AimLaser:
 	var laser := AimLaser.new()
 	laser.name = "AimLaser"
@@ -56,8 +56,8 @@ static func make() -> AimLaser:
 	return laser
 
 
-## Зажигает луч в сторону [param towards] и тянет его до первого препятствия.
-## Зовётся каждый кадр замаха: Otto двигается, и конец луча идёт за ним.
+## Lights the laser toward [param towards] and stretches it to the first obstacle.
+## Called every wind-up frame: Otto moves, and the end of the laser follows him.
 func aim(towards: float) -> void:
 	direction = signf(towards) if not is_zero_approx(towards) else 1.0
 	visible = true
@@ -68,32 +68,33 @@ func aim(towards: float) -> void:
 	_dot.position.x = direction * _length
 
 
-## Гасит луч: выстрел ушёл, замах сорван или агент убит. Погашенный луч кадра
-## не ест: луч есть у каждого агента и у каждого трупа до конца здания.
+## Puts out the laser: the shot has left, the wind-up was broken or the agent was killed. A
+## switched-off laser costs no frame time: every agent and every corpse has a laser until the end of
+## the building.
 func put_out() -> void:
 	visible = false
 	set_process(false)
 
 
-## Горит ли луч.
+## Whether the laser is lit.
 func is_on() -> bool:
 	return visible
 
 
-## Через сколько секунд пуля долетит на [param distance] метров от ствола:
-## остаток замаха и полёт.
+## In how many seconds the bullet flies [param distance] metres from the barrel:
+## the rest of the wind-up plus the flight.
 func time_to(distance: float) -> float:
 	return shot_in + distance / maxf(shot_speed, 0.01)
 
 
-## Длина луча, м: до стены, до Otto или до дальности пули.
+## Laser length, m: to a wall, to Otto or to the bullet range.
 func length() -> float:
 	return _length if visible else 0.0
 
 
 func _ready() -> void:
-	# Движок включает [method _process] на входе в дерево сам: собранный
-	# погашенным луч выключает его обратно.
+	# The engine enables [method _process] on entering the tree by itself: a laser assembled
+	# switched off turns it back off.
 	set_process(visible)
 
 
@@ -101,13 +102,13 @@ func _process(delta: float) -> void:
 	if not visible:
 		return
 	_clock += delta
-	# Дрожание — две несоразмерные синусоиды: ровное мигание читалось бы
-	# сигналом, а не лучом.
+	# Flicker is two incommensurate sine waves: an even blink would read as
+	# a signal rather than a laser.
 	var wave := sin(_clock * TAU * FLICKER_RATE) * sin(_clock * TAU * FLICKER_RATE * 0.37)
 	_beam.transparency = FLICKER * absf(wave)
 
 
-## Длина луча по лучу физики — тем же, во что упрётся пуля.
+## Laser length by a physics ray — the same thing the bullet will hit.
 func _trace() -> float:
 	if not is_inside_tree():
 		return reach
@@ -124,7 +125,7 @@ func _build() -> void:
 	_beam = MeshInstance3D.new()
 	_beam.name = "Beam"
 	var quad := QuadMesh.new()
-	# Единичная длина: луч тянется масштабом по X.
+	# Unit length: the laser stretches by X scale.
 	quad.size = Vector2(1.0, THICKNESS)
 	_beam.mesh = quad
 	_beam.material_override = _beam_mat()
@@ -141,8 +142,8 @@ func _build() -> void:
 	add_child(_dot)
 
 
-## Луч: чёрное альбедо и красная эмиссия. Свет сцены его не красит, а эмиссия
-## видна и в темноте; не unshaded — у unshaded Godot 4 эмиссию не берёт.
+## Laser: black albedo and red emission. Scene light does not tint it, while the emission
+## is visible in darkness too; not unshaded — Godot 4 unshaded does not take emission.
 static func _beam_mat() -> StandardMaterial3D:
 	if _beam_material == null:
 		_beam_material = StandardMaterial3D.new()
@@ -155,8 +156,8 @@ static func _beam_mat() -> StandardMaterial3D:
 	return _beam_material
 
 
-## Точка на конце: мягкое красное пятно лицом к камере, поверх стены — луч
-## упирается в торец, а торец камере виден ребром.
+## The dot at the end: a soft red spot facing the camera, on top of the wall — the laser
+## hits the end face, and the end face is seen edge-on by the camera.
 static func _dot_mat() -> StandardMaterial3D:
 	if _dot_material == null:
 		var gradient := Gradient.new()

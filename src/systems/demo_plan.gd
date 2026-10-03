@@ -1,38 +1,38 @@
 class_name DemoPlan
 extends RefCounted
 
-## Демо-режим (ADR-0041): когда включается, сколько идёт и откуда.
+## Demo mode (ADR-0041): when it turns on, how long it runs and from where.
 ##
-## Как в автомате: демо стартует по очереди с трёх мест — верха, середины и низа
-## здания, — идёт около 30 с и кончается смертью Otto. Играет бот тестов, а не
-## запись нажатий. Правило без узлов, как [OttoStateMachine]; ведёт демо в игре
+## As in the cabinet: the demo starts in turn from three places — the top, middle and bottom of the
+## building — runs about 30 s and ends with Otto's death. The test bot plays, not a recording of
+## presses. A rule without nodes, like [OttoStateMachine]; the demo is driven in the game by
 ## [DemoRun].
 
-## Откуда демо стартует.
+## Where the demo starts from.
 enum Point { ROOF, MIDDLE, BOTTOM }
 
-## Сколько бездействия в главном меню до демо, с (решение пользователя).
+## How much idleness in the main menu before the demo, s (user's decision).
 const IDLE_TIME: float = 45.0
-## Сколько идёт демо, с — между записями ROM (25 и 35 с).
+## How long the demo runs, s — between the ROM recordings (25 and 35 s).
 const LENGTH: float = 30.0
 
-## Этажи старта по счёту ROM — снизу, из тридцати: 18 и 5 (`$802C`). Верхняя
-## точка — крыша с вертолётом, а не 28-й этаж ROM: вертолёт — лучшее, что есть
-## у здания.
+## Start floors by the ROM count — from the bottom, out of thirty: 18 and 5 (`$802C`). The top
+## point is the roof with the helicopter, not ROM's 28th floor: the helicopter is the best thing
+## the building has.
 const ROM_FLOORS: Dictionary = {Point.MIDDLE: 18, Point.BOTTOM: 5}
 
-## На сколько этажей от этажа ROM демо ищет шахту, чья кабина начинает с этого
-## этажа: там бот садится сразу, а не ждёт кабину полдемо.
+## How many floors from the ROM floor the demo searches for a shaft whose cab starts on that
+## floor: there the bot boards at once rather than waiting for the cab half the demo.
 const SHAFT_SEARCH: int = 4
 
 
-## Следующая точка по кругу.
+## The next point round the circle.
 static func next(point: int) -> int:
 	return (point + 1) % Point.size()
 
 
-## Индекс этажа старта для здания с [param floors] этажами: у нас они считаются
-## сверху, у ROM — снизу. Для крыши — [constant BuildingRules.ROOF].
+## Start floor index for a building with [param floors] floors: ours are counted
+## from the top, ROM's from the bottom. For the roof — [constant BuildingRules.ROOF].
 static func floor_of(point: int, floors: int) -> int:
 	if not ROM_FLOORS.has(point):
 		return BuildingRules.ROOF

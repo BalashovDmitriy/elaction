@@ -1,8 +1,8 @@
 extends GutTest
 
-## Очки на виду: счёт набегает к новому числу, прибавка всплывает у счёта и над
-## местом события, бонус за здание над местом не всплывает, новая партия
-## сбрасывает счёт сразу.
+## Points in view: the score counts up to the new number, the increment pops up at the score and
+## above the place of the event, the building bonus does not pop up above a place, a new game resets
+## the score at once.
 
 
 func after_each() -> void:

@@ -1,9 +1,9 @@
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled;
 
-// Круг на луже (M24a, ADR-0037, решение 3): кольцо расходится от места удара
-// и гаснет, за ним — второе, поменьше. Квад лежит на настиле; возраст —
-// доля жизни частицы.
+// A ring on a puddle (M24a, ADR-0037, decision 3): a ring spreads from the impact point
+// and fades, followed by a second, smaller one. The quad lies on the deck; the age is
+// the fraction of the particle's lifetime.
 
 uniform vec4 tint : source_color = vec4(0.62, 0.7, 0.9, 0.16);
 

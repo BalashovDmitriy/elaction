@@ -1,12 +1,12 @@
 extends GutTest
 
-## Трупы в кабине не мешают ею управлять (M24f).
+## Corpses in a cab do not interfere with controlling it (M24f).
 ##
-## Отзыв после игры: «если в лифте два трупа агентов, то лифтом становится
-## нельзя управлять» — Otto в кабине, стрелки не работают. Воспроизвести это
-## тестами не удалось; трупы с M24f не переходят в узел кабины, а лежат на её
-## полу физическим телом (ADR-0042, решение 1), и тесты сторожат, чтобы
-## кабина с ними слушалась.
+## Feedback after playing: "if there are two agent corpses in the elevator, the elevator
+## can no longer be controlled" — Otto is in the cab, the arrows do not work. Tests could
+## not reproduce it; since M24f corpses do not move into the cab's node but lie on its
+## floor as a physical body (ADR-0042, decision 1), and the tests guard that the cab
+## obeys with them.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
@@ -66,7 +66,7 @@ func _moves_with(level: GreyboxLevel, car: ElevatorCar, corpses: int) -> float:
 	var stops := PackedFloat32Array()
 	for floor_index: int in range(shaft.top, shaft.bottom + 1):
 		stops.append(level.rules.floor_surface(floor_index))
-	# Середина полосы: есть куда ехать и вверх, и вниз.
+	# Middle of the band: there is somewhere to go both up and down.
 	car.setup(stops, (shaft.bottom - shaft.top) / 2)
 	await wait_physics_frames(1)
 	level.otto.global_position = car.global_position
@@ -91,7 +91,7 @@ func test_the_car_obeys_with_two_corpses_inside() -> void:
 	assert_gt(moved, MOVED, "кабина слушается и с двумя трупами")
 
 
-## Все кабины трёх зданий: Otto садится туда, где трупы уже лежат.
+## All cabs of three buildings: Otto gets in where corpses already lie.
 func test_every_car_obeys_after_corpses_rode_in_it() -> void:
 	for building_seed: int in [1, 2, 3]:
 		var level := _build(building_seed)
@@ -124,7 +124,7 @@ func test_every_car_obeys_after_corpses_rode_in_it() -> void:
 		await wait_physics_frames(2)
 
 
-## Два добивания сверху внутри кабины — и кабина всё ещё слушается.
+## Two takedowns from above inside the cab — and the cab still obeys.
 func test_the_car_obeys_after_takedowns_inside() -> void:
 	var level := _build(1)
 	await wait_physics_frames(SETTLE_FRAMES)

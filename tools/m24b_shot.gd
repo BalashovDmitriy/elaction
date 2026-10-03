@@ -1,32 +1,32 @@
 extends Node
 
-## Кадры M24b, до которых сценарий съёмки по времени не доходит (ADR-0038):
-## красная дверь, запертый подвал и выход через машину.
+## M24b shots that the timed capture script does not reach (ADR-0038):
+## the red door, the locked basement and the exit by car.
 ##
-## Инструмент собирает настоящую партию — [code]src/main.tscn[/code] с HUD и
-## затемнением, — меняет её здание на здание нужного сида и снимает по
-## состоянию, а не секундомером:
+## The tool assembles a real game — [code]src/main.tscn[/code] with the HUD and
+## the fade — swaps its building for a building of the required seed and shoots by
+## state, not by stopwatch:
 ##
-## 1. Красная дверь: Otto входит (створка открывается), Otto внутри (створка
-##    закрыта, у двери ждёт агент), Otto выходит.
-## 2. Подвал: над подвалом, у шахты вниз — створки закрыты; все документы
-##    собраны — створки расходятся и разошлись.
-## 3. Выход: Otto у машины, садится — дверца открыта, он шагает к борту, —
-##    фары и ворота, машина уезжает по пандусу, кадр едет за ней на улицу,
-##    бонус на HUD, затемнение.
+## 1. Red door: Otto enters (the leaf opens), Otto inside (the leaf
+##    closed, an agent waits at the door), Otto comes out.
+## 2. Basement: above the basement, at the shaft down — the leaves are closed; all documents
+##    collected — the leaves part and have parted.
+## 3. Exit: Otto at the car, gets in — the door is open, he steps to the side —
+##    headlights and the gate, the car drives off up the ramp, the frame follows it to the street,
+##    the bonus on the HUD, the fade.
 ##
-## Otto ставится по раскладке, как в [code]garage_shot.gd[/code]; к двери и к
-## машине его подводят игровыми действиями. Агент у двери ставится руками: жребий
-## [DoorWatch] бросается агенту раз за визит, и не пошедший ждать заменяется
-## новым, пока не пойдёт.
+## Otto is placed by the layout, as in [code]garage_shot.gd[/code]; to the door and to
+## the car he is led by game actions. The agent at the door is placed by hand: the [DoorWatch]
+## draw is rolled for an agent once per visit, and one that did not go to wait is replaced
+## by a new one until one does.
 ##
-## Рендер настоящий, не headless — нужен экран.
+## Real rendering, not headless — a screen is needed.
 ##
-## Запуск:
+## Run:
 ##     godot --path . res://tools/m24b_shot.tscn
 ##     godot --path . res://tools/m24b_shot.tscn -- --seed=3 --folder=M24b --quality=2
 ##
-## Кадры ложатся в screens/<папка>/ — папка локальная, в репозиторий не идёт.
+## Shots go to screens/<folder>/ — the folder is local and does not go into the repository.
 
 const MAIN_SCENE := preload("res://src/main.tscn")
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
@@ -34,16 +34,16 @@ const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 
 const DEFAULT_FOLDER := "M24b"
-## Сколько кадров дать камере догнать Otto после переноса.
+## How many frames to give the camera to catch up with Otto after a move.
 const SETTLE_FRAMES: int = 45
-## Сколько кадров ждать события, прежде чем сдаться.
+## How many frames to wait for an event before giving up.
 const PATIENCE: int = 900
-## Где агент появляется от двери, м: дальше места ожидания, чтобы было видно,
-## что он к ней подошёл.
+## Where the agent appears relative to the door, m: further than the waiting spot, so that it is
+## visible that he walked up to it.
 const AGENT_OFFSET: float = 3.2
-## Насколько правее водительской двери Otto встаёт перед посадкой, м.
+## How far right of the driver's door Otto stands before boarding, m.
 const CAR_APPROACH: float = 2.8
-## Насколько от края шахты Otto стоит над подвалом, м.
+## How far from the shaft edge Otto stands above the basement, m.
 const SHAFT_GAP: float = 0.5
 
 var _main: Node = null
@@ -52,10 +52,10 @@ var _hud: Hud = null
 var _curtain: FadeCurtain = null
 var _seed: int = 1
 var _folder: String = DEFAULT_FOLDER
-## Номер здания в партии (`--building=`): от него жребий машины у выхода —
-## первое всегда с красной спортивной ([method CarModel.choose]).
+## Building number in the game (`--building=`): the exit car draw depends on it —
+## the first is always the red sports car ([method CarModel.choose]).
 var _building: int = 1
-## Только выход (`--only=exit`): посадка и выезд без двери и подвала.
+## Exit only (`--only=exit`): boarding and the drive-out without the door and basement.
 var _only: String = ""
 
 
@@ -92,9 +92,9 @@ func _run() -> void:
 	get_tree().quit()
 
 
-## Партия в main, как у игрока, но здание — своего сида: main строит здание по
-## номеру и соли партии, а съёмке нужно здание по `--seed`. Своё здание
-## подключается к main теми же вызовами, что в [method Main._enter_building].
+## A game in main, as for the player, but the building is of its own seed: main builds the building
+## by the game's number and salt, while the capture needs a building by `--seed`. Its own building
+## is connected to main by the same calls as in [method Main._enter_building].
 func _start() -> void:
 	_main = MAIN_SCENE.instantiate()
 	add_child(_main)
@@ -104,7 +104,7 @@ func _start() -> void:
 	_curtain = _main.get(&"_curtain") as FadeCurtain
 	GameState.instance().start_game()
 	GameState.instance().building = _building
-	# Тип здания — в жребий машины, как у уровня ([method GreyboxLevel._spawn_car]).
+	# Building kind goes into the car draw, as in the level ([method GreyboxLevel._spawn_car]).
 	var car := CarModel.choose(_building, _seed, BuildingIdentity.of(_building, _seed).kind)
 	print("машина: модель %d, краска %d" % [car.model, car.paint])
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
@@ -119,7 +119,7 @@ func _start() -> void:
 	_hud.follow(_level)
 
 
-## Красная дверь: вход, внутри с агентом у двери, выход.
+## Red door: entry, inside with an agent at the door, exit.
 func _door() -> void:
 	var door := _red_door()
 	if door == null:
@@ -135,7 +135,7 @@ func _door() -> void:
 		await _shoot("door_01_entering")
 	await _until(func() -> bool: return _level.otto.is_hidden() and door.openness() <= 0.0)
 	var agent := await _post_agent(door)
-	# Ждём, пока агент встанет на место, но не дольше, чем Otto сидит внутри.
+	# Wait until the agent takes his spot, but no longer than Otto stays inside.
 	await _until(
 		func() -> bool:
 			return (
@@ -151,13 +151,13 @@ func _door() -> void:
 	await _until(func() -> bool: return not _level.otto.is_hidden())
 	await _frames(2)
 	await _shoot("door_03_out")
-	# Агент своё отснял: дальше он только стрелял бы в Otto.
+	# The agent has done his part: from here he would only shoot at Otto.
 	for enemy: Enemy in _level.agents():
 		enemy.queue_free()
 	await _until(func() -> bool: return _level.otto.is_on_foot())
 
 
-## Подвал: над ним у шахты — заперт; последний документ — створки расходятся.
+## Basement: above it at the shaft — locked; the last document — the leaves part.
 func _basement() -> void:
 	var rules := _level.rules
 	var bottom := rules.floors - 1
@@ -170,8 +170,8 @@ func _basement() -> void:
 	var aside := rules.shaft_width * 0.5 + Proportions.BODY_WIDTH * 0.5 + SHAFT_GAP
 	_place(_clear_side(above, shaft.x, aside), rules.floor_surface(above))
 	await _settle()
-	# Кабина над подвалом стоит на створках и закрывает их собой: снимаем, когда
-	# она ушла хотя бы на этаж вверх.
+	# The cab above the basement stands on the leaves and covers them: shoot when
+	# it has gone at least one floor up.
 	var car := _car_in(shaft)
 	var clear := func() -> bool:
 		return (
@@ -195,7 +195,7 @@ func _basement() -> void:
 	await _shoot("basement_03_open")
 
 
-## Выход: у машины, посадка, фары и ворота, отъезд, бонус, затемнение.
+## Exit: at the car, boarding, headlights and gate, departure, bonus, fade.
 func _exit() -> void:
 	var rules := _level.rules
 	var boarding := _level.get(&"_boarding") as ExitBoarding
@@ -230,28 +230,28 @@ func _exit() -> void:
 		return
 	await _seconds(0.45)
 	await _shoot("exit_04_driving")
-	# Кадр едет за машиной: подъём по пандусу и выезд на улицу.
+	# The frame follows the car: the climb up the ramp and out onto the street.
 	await _seconds(0.9)
 	if car.is_leaving():
 		await _shoot("exit_04b_ramp")
-	# У края мостовой: ждёт просвета с правым поворотником (ADR-0046, решение 2).
+	# At the kerb: waits for a gap with the right turn signal on (ADR-0046, decision 2).
 	if await _until(func() -> bool: return car.is_signalling() and car.indicator_lit()):
 		await _shoot("exit_04c_signal")
 	await _until(func() -> bool: return car.stage == ExitCar.Stage.MERGE)
 	await _seconds(0.3)
 	if car.is_leaving():
 		await _shoot("exit_04d_merge")
-	# Бонус досчитан: машина к этому времени уже ушла, здание сдано.
+	# The bonus has finished counting: by now the car has left, the building is done.
 	await _until(func() -> bool: return _hud.bonus_text() == Hud.format_score(bonus))
 	await _shoot("exit_05_bonus")
 	if await _until(func() -> bool: return _curtain.opacity() >= 0.5):
 		await _shoot("exit_06_fade")
 
 
-## Покадровый разбор отъезда (`--sequence`): кадр каждые 0.15 с, пока машина
-## едет и не упало затемнение, и строка о ней — где она, наклон, горят ли фары,
-## где камера. По этим строкам и кадрам видно, где свет фар перестаёт ложиться
-## на дорогу.
+## Frame-by-frame analysis of the departure (`--sequence`): a frame every 0.15 s while the car
+## drives and the fade has not fallen, and a line about it — where it is, the tilt, whether the
+## headlights are on, where the camera is. These lines and frames show where the headlight light
+## stops landing on the road.
 func _drive_sequence(car: ExitCar) -> void:
 	var index := 0
 	while car.is_leaving() and _curtain.opacity() < 0.95 and index < 90:
@@ -275,8 +275,8 @@ func _drive_sequence(car: ExitCar) -> void:
 		index += 1
 
 
-## Красная дверь, у которой по обе стороны есть место для агента: без стен и
-## проёмов на [constant AGENT_OFFSET] в обе стороны.
+## A red door with room for an agent on both sides: no walls or
+## openings for [constant AGENT_OFFSET] in both directions.
 func _red_door() -> Door:
 	var first: Door = null
 	for door: Door in _level.doors():
@@ -291,7 +291,7 @@ func _red_door() -> Door:
 	return first
 
 
-## Ставит агента на этаже двери, пока жребий [DoorWatch] не пошлёт кого-то ждать.
+## Places an agent on the door's floor until the [DoorWatch] draw sends someone to wait.
 func _post_agent(door: Door) -> Enemy:
 	var mat := door.mat_position()
 	var index := _level.rules.floor_index_near(mat.y)
@@ -314,14 +314,15 @@ func _post_agent(door: Door) -> Enemy:
 	return null
 
 
-## Дошёл ли агент до места у двери.
+## Whether the agent reached the spot at the door.
 func _standing_at(agent: Enemy) -> bool:
 	if is_nan(agent.watch_at):
 		return false
 	return absf(WorldSpace.to_plane(agent.global_position).x - agent.watch_at) <= 0.2
 
 
-## Нет ли на этаже [param index] ни стены, ни проёма между [param low] и [param high].
+## Whether floor [param index] has neither a wall nor an opening between [param low] and [param
+## high].
 func _walkable(index: int, low: float, high: float) -> bool:
 	for block: Vector2 in _level.plan().blocks_on(_level.rules, index):
 		if maxf(block.x, block.y) > low and minf(block.x, block.y) < high:
@@ -329,7 +330,7 @@ func _walkable(index: int, low: float, high: float) -> bool:
 	return true
 
 
-## Сторона шахты в [param x], где на этаже есть пол, на [param aside] от её оси.
+## The side of the shaft at [param x] where the floor has floor, [param aside] from its axis.
 func _clear_side(index: int, x: float, aside: float) -> float:
 	var half := Proportions.BODY_WIDTH * 0.5
 	for side: float in [1.0, -1.0]:
@@ -339,7 +340,7 @@ func _clear_side(index: int, x: float, aside: float) -> float:
 	return x + aside
 
 
-## Шахта, которая спускается в подвал.
+## The shaft that goes down to the basement.
 func _basement_shaft() -> BuildingPlan.ShaftSpot:
 	var bottom := _level.rules.floors - 1
 	for shaft: BuildingPlan.ShaftSpot in _level.plan().shafts:
@@ -348,7 +349,7 @@ func _basement_shaft() -> BuildingPlan.ShaftSpot:
 	return null
 
 
-## Ведущая кабина шахты [param shaft].
+## The leading cab of shaft [param shaft].
 func _car_in(shaft: BuildingPlan.ShaftSpot) -> ElevatorCar:
 	for child: Node in _level.get_children():
 		var car := child as ElevatorCar

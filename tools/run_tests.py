@@ -1,27 +1,28 @@
 #!/usr/bin/env python3
-"""Прогон тестов GUT в headless-режиме, несколькими процессами сразу.
+"""Run GUT tests headless, in several processes at once.
 
-Набор режется на задания — файл тестов, отдельный тест разрезанного файла или
-пачку мелких файлов, — и задания идут очередью: процессов Godot столько, сколько
-потоков у процессора, и освободившийся берёт следующее, самое тяжёлое из
-оставшихся. Так прогон не ждёт хвоста одной перегруженной кучки, как ждал при
-раскладке заранее.
+The suite is cut into jobs — a test file, a single test of a split file or a
+batch of small files — and the jobs go through a queue: there are as many Godot
+processes as the CPU has threads, and a freed one takes the next job, the heaviest
+of those left. This way the run does not wait for the tail of one overloaded pile,
+as it did with a layout fixed in advance.
 
-Движок идёт с `--fixed-fps`: кадр — ровно 1/60 с игрового времени, а настоящие
-часы кадры не держат. Тесты со сценой ждут кадров физики, и без флага процесс
-спал между кадрами — шесть процессов грузили процессор на 5–30 %, а набор шёл
-шесть минут. С флагом тот же набор идёт около минуты. Код игры поэтому меряет
-время кадрами (`delta / Engine.time_scale`), а не `Time.get_ticks_msec()`: под
-этим флагом часы и кадры расходятся (docs/testing.md).
+The engine runs with `--fixed-fps`: a frame is exactly 1/60 s of game time, and the
+real clock does not hold frames back. Tests with a scene wait for physics frames,
+and without the flag the process slept between frames — six processes loaded the
+CPU at 5–30 %, and the suite took six minutes. With the flag the same suite takes
+about a minute. That is why the game code measures time in frames
+(`delta / Engine.time_scale`), not with `Time.get_ticks_msec()`: under this flag
+the clock and frames diverge (docs/testing.md).
 
-Запуск:
-    python tools/run_tests.py                # процессов по числу потоков
-    python tools/run_tests.py --jobs 1       # один процесс за раз
-    python tools/run_tests.py --part 2/3     # вторая треть набора — одна машина матрицы CI
-    python tools/run_tests.py --real-time    # без --fixed-fps: кадры по настоящим часам
+Run:
+    python tools/run_tests.py                # processes by thread count
+    python tools/run_tests.py --jobs 1       # one process at a time
+    python tools/run_tests.py --part 2/3     # second third of the suite — one CI matrix machine
+    python tools/run_tests.py --real-time    # without --fixed-fps: frames by the real clock
 
-Части делятся жадно по весам `KNOWN_SLOW`: CI гоняет набор матрицей на
-нескольких машинах, и на каждой её часть снова идёт очередью.
+Parts are split greedily by the `KNOWN_SLOW` weights: CI runs the suite as a matrix on
+several machines, and on each its part again goes through a queue.
 """
 
 from __future__ import annotations
@@ -39,48 +40,47 @@ from godot_bin import PROJECT_ROOT, require_godot, run, use_utf8_output
 GUT_CMDLN = "addons/gut/gut_cmdln.gd"
 SUCCESS_MARKER = "All tests passed"
 
-# Сколько ждём одно задание, с. Свой лимит, а не общий из godot_bin: там он на
-# один запуск движка — импорт ресурсов, съёмка кадра.
+# How long we wait for one job, s. Our own limit, not the shared one from godot_bin: that one is for
+# a single engine launch — resource import, taking a shot.
 TEST_TIMEOUT = 600
 
-# С какой доли лимита пора беспокоиться о задании. Запас съедается по вехе за
-# раз, и заметить это надо на прогоне, а не когда задание уже снимается.
+# At what share of the limit it is time to worry about a job. The margin is eaten up one milestone
+# at a time, and this has to be noticed on a run, not when the job is already being killed.
 CROWDED_RATIO = 0.5
 
-# Кадров в секунду игрового времени под `--fixed-fps`: как у физики игры.
+# Frames per second of game time under `--fixed-fps`: as in the game's physics.
 FIXED_FPS = 60
 
-# Больше процессов разом не заводим: под `--fixed-fps` каждый грузит свой поток,
-# и сверх числа потоков они только толкаются.
+# We do not start more processes at once: under `--fixed-fps` each loads its own thread, and beyond
+# the thread count they only jostle.
 JOBS_MAX = 16
 
-# Пачка мелких файлов — одно задание, пока её вес не дорос до этого, с. Старт
-# движка стоит секунды две, и процесс на файл в полсекунды съел бы больше, чем
-# сами тесты; а пачка крупнее держала бы хвост прогона.
+# A batch of small files is one job until its weight grows to this, s. An engine start costs about
+# two seconds, and a process per half-second file would eat more than the tests themselves; a bigger
+# batch would hold up the tail of the run.
 BATCH_COST = 8.0
 
-# Строки, после которых ждать нечего. Бот печатает это, упершись в тупик, и
-# дальше только добирает бюджет шагов — на настоящем здании это минуты.
-STALLED_MARKERS = ("бот зациклился",)
+# Lines after which there is nothing to wait for. The bot prints this when it hits a dead end, and
+# afterwards only uses up the step budget — on the real building that is minutes.
+STALLED_MARKERS = ("bot is looping",)
 
-# Jolt под нехваткой потоков: очередь задач физики переполнилась, и движок
-# ждёт, пока она освободится, — шаг доходит до конца, но GUT считает строку
-# ошибки движка провалом теста. На CI (2026-10-02) так упал test_car_cut.gd;
-# локально шесть параллельных прогонов того же задания чистые. Задание с этой
-# строкой повторяется один раз: настоящий провал повторится и во второй раз.
+# Jolt under thread shortage: the physics task queue overflowed, and the engine waits for it to free
+# up — the step completes, but GUT counts the engine error line as a test failure. On CI
+# (2026-10-02) test_car_cut.gd failed this way; locally six parallel runs of the same job are clean.
+# A job with this line is retried once: a real failure will repeat the second time too.
 JOLT_STARVED = "Jolt Physics job system exceeded the maximum number of jobs"
 
-# Скрипт, не прошедший разбор, молча выпадает из прогона: GUT считает тесты
-# остальных файлов и рапортует об успехе. Поэтому ищем следы поломки отдельно.
+# A script that failed to parse silently drops out of the run: GUT counts the tests of the other
+# files and reports success. So we look for traces of breakage separately.
 BROKEN_SCRIPT_MARKERS = (
     "Parse Error",
     "Failed to load script",
     "SCRIPT ERROR",
 )
 
-# Файлы, которые режутся по отдельным тестам: задание не умеет делить файл, а
-# `test_building_playthrough.gd` весил треть набора (docs/testing.md). Режется он
-# без единой правки в самом тесте: GUT принимает `-gunit_test_name`.
+# Files that are split by individual tests: a job cannot split a file, and
+# `test_building_playthrough.gd` weighed a third of the suite (docs/testing.md). It is split without
+# a single edit in the test itself: GUT accepts `-gunit_test_name`.
 SPLIT_BY_TEST: dict[str, list[str]] = {
     "test_building_playthrough.gd": [
         "test_bot_survives_the_real_building_with_agents_seed_1",
@@ -93,10 +93,10 @@ SPLIT_BY_TEST: dict[str, list[str]] = {
     ],
 }
 
-# Кто сколько идёт под `--fixed-fps`, с, двенадцатью процессами разом — замер
-# `python tools/run_tests.py --batch-cost 0 --slowest 120` (M24j). Файлы короче
-# трёх секунд не записаны — они идут по [UNKNOWN_COST]. Очередь берёт тяжёлое первым; разъехались числа — прогон это
-# переживёт, только хвост выйдет длиннее.
+# How long each one takes under `--fixed-fps`, s, with twelve processes at once — measured with
+# `python tools/run_tests.py --batch-cost 0 --slowest 120` (M24j). Files shorter than three seconds
+# are not listed — they go by [UNKNOWN_COST]. The queue takes the heavy ones first; if the numbers
+# drift, the run will survive it, only the tail will come out longer.
 KNOWN_SLOW: dict[str, float] = {
     "test_bot_survives_the_real_building_with_agents_seed_1": 53.0,
     "test_bot_survives_the_real_building_with_agents_seed_3": 51.0,
@@ -159,18 +159,18 @@ KNOWN_SLOW: dict[str, float] = {
     "test_agent_spawn.gd": 3.0,
 }
 
-# Во сколько считать файл, о котором ничего не известно.
+# What to count a file as when nothing is known about it.
 UNKNOWN_COST = 1.5
 
-# Подробность вывода GUT. Своё число, а не из конфига: конфиг задание не читает.
+# GUT output verbosity. Our own number, not from the config: the job does not read the config.
 LOG_LEVEL = 1
 
-# Сколько самых долгих заданий печатать в конце: по ним правится `KNOWN_SLOW`.
+# How many of the longest jobs to print at the end: `KNOWN_SLOW` is corrected by them.
 SLOWEST_SHOWN = 8
 
 
 class Unit:
-    """Файл целиком или один тест из разрезанного файла."""
+    """A whole file or one test of a split file."""
 
     def __init__(self, script: Path, only: str = "") -> None:
         self.script = script
@@ -184,7 +184,7 @@ class Unit:
 
 
 class Job:
-    """Что гоняет один процесс Godot: один разрезанный тест или пачка файлов."""
+    """What one Godot process runs: one split test or a batch of files."""
 
     def __init__(self, units: list[Unit]) -> None:
         self.units = units
@@ -208,7 +208,7 @@ class Job:
 
 
 def units_of(scripts: list[Path]) -> list[Unit]:
-    """Разбивает набор на единицы работы: файл или отдельный тест в нём."""
+    """Splits the suite into work units: a file or a single test in it."""
     found: list[Unit] = []
     for script in scripts:
         names = SPLIT_BY_TEST.get(script.name)
@@ -221,8 +221,8 @@ def units_of(scripts: list[Path]) -> list[Unit]:
 
 
 def jobs_of(units: list[Unit], batch_cost: float = BATCH_COST) -> list[Job]:
-    """Задания очереди, тяжёлые первыми: разрезанный тест и известный тяжёлый
-    файл — по одному, мелкие файлы — пачками до [BATCH_COST] с."""
+    """Queue jobs, heaviest first: a split test and a known heavy file go one
+    by one, small files in batches of up to [BATCH_COST] s."""
     jobs: list[Job] = []
     batch: list[Unit] = []
     for unit in sorted(units, key=lambda unit: -unit.cost()):
@@ -239,7 +239,7 @@ def jobs_of(units: list[Unit], batch_cost: float = BATCH_COST) -> list[Job]:
 
 
 def split_units(units: list[Unit], piles: int) -> list[list[Unit]]:
-    """Раскидывает единицы по кучкам: самая долгая — в самую лёгкую."""
+    """Spreads units over piles: the longest goes into the lightest."""
     ordered = sorted(units, key=lambda unit: -unit.cost())
     found: list[list[Unit]] = [[] for _ in range(piles)]
     weights = [0.0] * piles
@@ -251,7 +251,7 @@ def split_units(units: list[Unit], piles: int) -> list[list[Unit]]:
 
 
 def part_of(units: list[Unit], part: str) -> list[Unit]:
-    """Единицы части `K/N`: набор делится на N кучек, берётся K-я, с единицы."""
+    """Units of part `K/N`: the suite is split into N piles, the K-th is taken, from one."""
     number, _, total = part.partition("/")
     wrong = f"часть {part}: ждём K/N, где 1 ≤ K ≤ N"
     if not (number.isdigit() and total.isdigit()):
@@ -260,16 +260,17 @@ def part_of(units: list[Unit], part: str) -> list[Unit]:
     if not 1 <= k <= n:
         raise ValueError(wrong)
     piles = split_units(units, n)
-    # Кучек бывает меньше N, если единиц меньше машин: лишней машине нечего делать.
+    # There may be fewer than N piles if there are fewer units than machines: the extra machine has
+    # nothing to do.
     return piles[k - 1] if k <= len(piles) else []
 
 
 def run_job(godot: str, job: Job, home: Path, real_time: bool) -> tuple[int, str, float]:
-    """Гоняет задание своим процессом Godot.
+    """Runs a job in its own Godot process.
 
-    Своя папка `user://` нужна потому, что `test_records` и `test_interface`
-    пишут в неё, а флага для неё у Godot нет — он выводит её из `APPDATA` или
-    `HOME`. Без этого процессы затирают друг другу файл рекордов.
+    A separate `user://` folder is needed because `test_records` and `test_interface`
+    write to it, and Godot has no flag for it — it derives it from `APPDATA` or
+    `HOME`. Without this the processes overwrite each other's high score file.
     """
     home.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)
@@ -278,8 +279,8 @@ def run_job(godot: str, job: Job, home: Path, real_time: bool) -> tuple[int, str
     env["XDG_DATA_HOME"] = str(home)
     pace = [] if real_time else ["--fixed-fps", str(FIXED_FPS)]
     started = time.monotonic()
-    # `-gconfig=` пустым — это отказ от `.gutconfig.json`, и он обязателен.
-    # Иначе `-gdir` берётся оттуда, и каждый процесс гоняет набор целиком.
+    # An empty `-gconfig=` opts out of `.gutconfig.json`, and it is mandatory. Otherwise `-gdir` is
+    # taken from there, and every process runs the whole suite.
     code, output = run(
         godot,
         [
@@ -305,9 +306,9 @@ def run_job(godot: str, job: Job, home: Path, real_time: bool) -> tuple[int, str
 def run_job_once_more(
     godot: str, job: Job, home: Path, real_time: bool
 ) -> tuple[int, str, float, bool]:
-    """Задание, а упавшее от нехватки потоков у Jolt — ещё раз.
+    """A job, and one that failed from Jolt's thread shortage — once more.
 
-    Последнее поле — был ли повтор: его печатают, чтобы он не проходил молча.
+    The last field is whether there was a retry: it is printed so it does not pass silently.
     """
     code, output, took = run_job(godot, job, home, real_time)
     if verdict(code, output, job.label()) and JOLT_STARVED in output:
@@ -317,7 +318,7 @@ def run_job_once_more(
 
 
 def verdict(code: int, output: str, where: str) -> str:
-    """Что не так с заданием, или пустая строка, если всё в порядке."""
+    """What is wrong with a job, or an empty string if everything is fine."""
     if code != 0 and SUCCESS_MARKER in output:
         return f"{where}: провал, код возврата {code}."
     broken = [marker for marker in BROKEN_SCRIPT_MARKERS if marker in output]
@@ -326,7 +327,7 @@ def verdict(code: int, output: str, where: str) -> str:
             f"{where}: в выводе есть {', '.join(broken)} — какой-то скрипт не разобрался. "
             "Такой файл выпадает из прогона незаметно, поэтому это провал."
         )
-    # GUT возвращает 0 и когда тесты не нашлись, поэтому сверяемся с итогом.
+    # GUT returns 0 even when no tests were found, so we check against the summary.
     if SUCCESS_MARKER not in output:
         return f'{where}: в выводе GUT нет строки "{SUCCESS_MARKER}" — тесты не прошли.'
     if code != 0:
@@ -335,11 +336,11 @@ def verdict(code: int, output: str, where: str) -> str:
 
 
 def passing(output: str) -> int:
-    """Сколько тестов прошло по итогу GUT."""
+    """How many tests passed according to the GUT summary."""
     total = 0
     for line in output.splitlines():
-        # Когда не прошёл ни один, GUT пишет «none», а не 0: без проверки разбор
-        # ронял весь прогон, и список упавших до печати не доходил.
+        # When none passed, GUT writes "none", not 0: without the check, parsing crashed the whole
+        # run, and the list of failed ones never got printed.
         count = line.split()[-1] if "Passing Tests" in line else ""
         if count.isdigit():
             total += int(count)
@@ -417,8 +418,8 @@ def main() -> int:
                 trouble = verdict(code, output, job.label())
                 if trouble:
                     failures.append(trouble)
-                    # Вывод целиком нужен только у упавшего: у зелёного это
-                    # сотни строк, в которых нечего искать.
+                    # Full output is needed only for a failed one: for a green one it is hundreds of
+                    # lines with nothing to look for.
                     print(output.strip(), flush=True)
                 if took > TEST_TIMEOUT * CROWDED_RATIO:
                     print(f"  {job.label()}: {took:.0f} с — запас до лимита меньше половины")

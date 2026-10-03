@@ -1,25 +1,25 @@
 extends GutTest
 
-## Кабина режет тела, трупы ложатся друг на друга (ADR-0043, решения 7–12).
+## The cab cuts bodies, corpses lie on top of each other (ADR-0043, decisions 7–12).
 ##
-## Днищем сверху кабина срезает то, что под ней, стенкой — рвёт тело поперёк
-## порога, когда трогается. Без крови не режет: тело под днищем исчезает, а с
-## порога его тянут суставы. Сцена минимальная — пол, кабина, тело.
+## With its bottom from above the cab cuts off what is under it, with its wall it tears a body
+## across the threshold when it starts. Without blood it does not cut: a body under the bottom
+## disappears, while at the threshold the joints pull it. The scene is minimal — floor, cab, body.
 
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
 
-## Сколько шагов физики ждать, пока тело ляжет.
+## How many physics steps to wait for a body to lie down.
 const SETTLE_FRAMES: int = 120
-## Сколько шагов физики ждать, пока кабина доедет: пауза у этажа плюс
-## перегон, с запасом.
+## How many physics steps to wait for the cab to arrive: the pause at a floor plus
+## the run, with margin.
 const RIDE_FRAMES: int = 600
 
 
 func before_all() -> void:
-	# Мир вчетверо быстрее, а шаг физики прежний: на вчетверо длинном шаге
-	# суставы рэгдолла разлетаются, и тело проваливается сквозь пол.
+	# The world is four times faster, but the physics step is the same: on a four times longer step
+	# the ragdoll joints fly apart, and the body falls through the floor.
 	Engine.time_scale = 4.0
 	Engine.physics_ticks_per_second = 240
 
@@ -36,7 +36,7 @@ func before_each() -> void:
 	GameState.instance().start_game()
 
 
-## Куски тел, брызги и пятна кладёт в сцену кабина, а не тест: убираются тут.
+## Body pieces, splashes and stains are put into the scene by the cab, not the test: removed here.
 func after_each() -> void:
 	for child: Node in get_children():
 		if child is CorpsePiece or child is Decal or child is Blood:
@@ -55,7 +55,7 @@ func _floor_at(height: float, width: float = 8.0, x: float = 0.0) -> void:
 	ground.global_position = Vector3(x, height, 0.0)
 
 
-## Убитый в точке [param at], отброшенный пулей в сторону [param push].
+## Killed at point [param at], thrown by a bullet toward [param push].
 func _corpse_at(at: Vector3, push: float = 0.0) -> Enemy:
 	var agent := ENEMY_SCENE.instantiate() as Enemy
 	agent.walk_speed = 0.0
@@ -70,7 +70,7 @@ func _corpse_at(at: Vector3, push: float = 0.0) -> Enemy:
 	return agent
 
 
-## Кабина над нижним этажом шахты: стоит этажом выше и поедет вниз сама.
+## A cab above the shaft's bottom floor: it stands a floor higher and will go down on its own.
 func _car_above_the_bottom() -> ElevatorCar:
 	var car := CAR_SCENE.instantiate() as ElevatorCar
 	add_child_autofree(car)
@@ -103,7 +103,7 @@ func _pieces() -> Array[CorpsePiece]:
 	return found
 
 
-## Середины частей тела по X.
+## Middles of body parts along X.
 func _centers(corpse: Corpse) -> PackedFloat32Array:
 	var found := PackedFloat32Array()
 	for part: PhysicalBone3D in corpse.ragdoll.parts.values():
@@ -111,7 +111,7 @@ func _centers(corpse: Corpse) -> PackedFloat32Array:
 	return found
 
 
-## Убитый над лежащим ложится на него, а не сквозь (решение 10).
+## One killed above a lying one lies on top of it, not through it (decision 10).
 func test_a_corpse_lands_on_another() -> void:
 	_floor_at(0.0)
 	var below: Enemy = await _corpse_at(Vector3(0.0, 0.02, 0.0))
@@ -124,7 +124,7 @@ func test_a_corpse_lands_on_another() -> void:
 	assert_gt(pelvis_above.y, pelvis_below.y + 0.05, "верхний лежит на нижнем, а не сквозь")
 
 
-## Нижний пропал — верхний падает на пол.
+## The lower one is gone — the upper one falls to the floor.
 func test_the_pile_falls_when_the_bottom_corpse_is_gone() -> void:
 	_floor_at(0.0)
 	var below: Enemy = await _corpse_at(Vector3(0.0, 0.02, 0.0))
@@ -138,7 +138,7 @@ func test_the_pile_falls_when_the_bottom_corpse_is_gone() -> void:
 	assert_lt(above.corpse.ragdoll.bounds().position.y, 0.08, "верхний упал на пол")
 
 
-## Живые трупов не видят: у них в маске нет слоя трупов.
+## The living do not see corpses: their mask has no corpse layer.
 func test_the_living_walk_through_corpses() -> void:
 	_floor_at(0.0)
 	var dead: Enemy = await _corpse_at(Vector3(0.0, 0.02, 0.0))
@@ -151,8 +151,8 @@ func test_the_living_walk_through_corpses() -> void:
 	assert_eq(otto.collision_mask & part.collision_layer, 0, "Otto сквозь трупы")
 
 
-## Труп целиком под днищем пропадает, на полу остаётся пятно (решение 7).
-## Кабина вдвое шире шахты: лежащее тело длиннее обычной.
+## A corpse fully under the bottom disappears, a stain stays on the floor (decision 7).
+## The cab is twice as wide as the shaft: a lying body is longer than a regular one.
 func test_a_corpse_under_the_car_is_cut_away() -> void:
 	_floor_at(-Proportions.FLOOR)
 	var car := _car_above_the_bottom()
@@ -164,8 +164,8 @@ func test_a_corpse_under_the_car_is_cut_away() -> void:
 	assert_gt(_count("Puddle"), 0, "на полу пятно")
 
 
-## Труп поперёк стенки кабины на дне срезан по стенке: снаружи он остался
-## (решение 8).
+## A corpse lying across the cab wall at the bottom is cut along the wall: outside it stays
+## (decision 8).
 func test_a_corpse_across_the_wall_is_cut_along_it() -> void:
 	_floor_at(-Proportions.FLOOR)
 	var car := _car_above_the_bottom()
@@ -173,15 +173,15 @@ func test_a_corpse_across_the_wall_is_cut_along_it() -> void:
 	var agent: Enemy = await _corpse_at(Vector3(wall + 0.3, -Proportions.FLOOR + 0.02, 0.0), -1.0)
 	await wait_physics_frames(SETTLE_FRAMES)
 	await _ride_down(car)
-	# Прижатую к днищу часть физика выталкивает из-под кабины не за шаг.
+	# Physics pushes a part pressed against the bottom out from under the cab in more than a step.
 	await wait_physics_frames(SETTLE_FRAMES)
 	assert_false(agent.corpse.gone, "снаружи тело осталось")
-	# Середина части у стенки — на радиус капсулы от неё: часть прижата снаружи.
+	# The middle of a part at the wall is a capsule radius from it: the part is pressed from outside.
 	for x: float in _centers(agent.corpse):
 		assert_lt(x, wall + 0.1, "осталось только то, что снаружи")
 
 
-## Без крови тело под днищем исчезает целиком, пятна нет.
+## Without blood a body under the bottom disappears entirely, no stain.
 func test_without_blood_a_corpse_under_the_car_vanishes() -> void:
 	Blood.enabled = false
 	_floor_at(-Proportions.FLOOR)
@@ -193,13 +193,13 @@ func test_without_blood_a_corpse_under_the_car_vanishes() -> void:
 	assert_eq(_count("Puddle"), 0, "пятна нет")
 
 
-## Кабина стоит на этаже, площадка слева вровень; труп поперёк порога:
-## ступни в кабине, голова на площадке.
+## The cab stands at a floor, the landing on the left is level; a corpse across the threshold:
+## feet in the cab, head on the landing.
 func _corpse_across_the_threshold() -> Array:
 	var car := CAR_SCENE.instantiate() as ElevatorCar
 	add_child_autofree(car)
 	car.setup(PackedFloat32Array([0.0, Proportions.FLOOR]), 0)
-	# Кабина стоит, пока тело ложится: сама она тронулась бы через паузу этажа.
+	# The cab stands still while the body lies down: on its own it would start after the floor pause.
 	car.hold(Engine.time_scale * SETTLE_FRAMES / 60.0 + 1.0)
 	await wait_physics_frames(2)
 	var wall := car.global_position.x - car.width() * 0.5
@@ -219,7 +219,7 @@ func _ride_away(car: ElevatorCar) -> void:
 			break
 
 
-## Тело поперёк порога лежит, пока кабина стоит.
+## A body across the threshold lies while the cab stands.
 func test_a_corpse_lies_across_a_standing_car() -> void:
 	var setup: Array = await _corpse_across_the_threshold()
 	var agent := setup[1] as Enemy
@@ -229,8 +229,8 @@ func test_a_corpse_lies_across_a_standing_car() -> void:
 	assert_gt(reach.y, wall, "другим в кабине")
 
 
-## Кабина тронулась — тело рвётся по стенке: части внутри едут с ней, части
-## снаружи лежат на площадке (решение 11).
+## The cab has started — the body tears along the wall: parts inside ride with it, parts
+## outside lie on the landing (decision 11).
 func test_a_leaving_car_tears_the_corpse_across_its_wall() -> void:
 	var setup: Array = await _corpse_across_the_threshold()
 	var car := setup[0] as ElevatorCar
@@ -249,7 +249,7 @@ func test_a_leaving_car_tears_the_corpse_across_its_wall() -> void:
 	assert_lt(piece.end.y, floor_y - 1.0, "кусок уехал вниз вместе с кабиной")
 
 
-## Без крови тело не рвётся.
+## Without blood the body does not tear.
 func test_without_blood_a_leaving_car_does_not_tear() -> void:
 	Blood.enabled = false
 	var setup: Array = await _corpse_across_the_threshold()
@@ -257,17 +257,17 @@ func test_without_blood_a_leaving_car_does_not_tear() -> void:
 	assert_eq(_pieces().size(), 0, "кусков нет")
 
 
-## Кабина, идущая вверх, зажимает тело на своей крыше под верхом шахты: тела
-## больше нет, а не торчит сквозь крышу и плиту разом (ADR-0042).
+## A cab going up pins a body on its roof under the top of the shaft: the body
+## is gone, instead of sticking through the roof and the slab at once (ADR-0042).
 func test_a_corpse_on_the_roof_is_squeezed_away_at_the_shaft_top() -> void:
 	var car := CAR_SCENE.instantiate() as ElevatorCar
 	add_child_autofree(car)
-	# Стоит внизу и поедет вверх сама.
+	# Stands at the bottom and will go up on its own.
 	car.setup(PackedFloat32Array([0.0, Proportions.FLOOR]), 1)
 	car.hold(Engine.time_scale * SETTLE_FRAMES / 60.0 + 1.0)
 	await wait_physics_frames(2)
-	# Верх шахты: низ плиты — на 0.12 м выше крыши кабины на верхней остановке,
-	# тоньше лежащего тела.
+	# Top of the shaft: the slab underside is 0.12 m above the cab roof at the top stop,
+	# thinner than a lying body.
 	_floor_at(ElevatorCar.DEFAULT_CLEAR_HEIGHT + 0.12 + 0.4)
 	var roof := car.global_position.y + ElevatorCar.DEFAULT_CLEAR_HEIGHT
 	var agent: Enemy = await _corpse_at(Vector3(car.global_position.x, roof + 0.02, 0.0))
@@ -281,7 +281,7 @@ func test_a_corpse_on_the_roof_is_squeezed_away_at_the_shaft_top() -> void:
 	assert_true(agent.corpse.gone, "зажатого тела нет")
 
 
-## Otto под днищем режется, как агент; воскресший — целый (решения 9 и 12).
+## Otto under the bottom is cut like an agent; resurrected — whole (decisions 9 and 12).
 func test_otto_under_the_car_is_cut_and_revives_whole() -> void:
 	_floor_at(-Proportions.FLOOR)
 	var car := _car_above_the_bottom()

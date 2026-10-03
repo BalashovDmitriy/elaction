@@ -1,50 +1,50 @@
 class_name BuildingPalette
 extends Resource
 
-## Палитра раунда: чем красится здание и каким светом оно горит.
+## Round palette: what the building is painted with and what light it glows with.
 ##
-## В оригинале планировка почти не меняется, а цвета меняются с каждым раундом
-## («colors change with new levels»). Поэтому цвет — не константа уровня, а
-## правило здания: [method BuildingRules.for_building] берёт палитру по номеру
-## раунда, и набор зацикливается, как зацикливаются сами раунды
-## ([ADR-0017](../../docs/adr/0017-spectrum-palette-and-shafts.md), решение 2).
+## In the original the layout barely changes, while colours change with every round
+## ("colors change with new levels"). So colour is not a level constant but a
+## building rule: [method BuildingRules.for_building] takes the palette by the round
+## number, and the set loops, just as the rounds themselves loop
+## ([ADR-0017](../../docs/adr/0017-spectrum-palette-and-shafts.md), decision 2).
 ##
-## Тон раунда ложится на материалы здания: с M21b — множителем на фактуру
-## стены ([BuildingFinish]), так что рисунок обоев и штукатурки остаётся, а
-## цвет даёт раунд.
+## The round tone falls on the building materials: since M21b — as a multiplier on the wall
+## texture ([BuildingFinish]), so the wallpaper and plaster pattern stays, while
+## the round gives the colour.
 ##
-## Первый раунд — кадр порта: бирюзовые этажи, красная кладка, синяя шахта.
+## The first round is the port's frame: turquoise floors, red masonry, a blue shaft.
 
-## Наборы палитр по типу здания ([enum BuildingIdentity.Kind]), собранные по
-## первому требованию. Пустой — значит ещё не собраны.
+## Palette sets by building kind ([enum BuildingIdentity.Kind]), built on
+## first request. Empty means not built yet.
 static var _families: Array = []
 
-## Тон внутренностей этажа: задняя стена, откосы окон.
+## Tone of the floor interior: back wall, window reveals.
 @export var story := Color(0.0, 0.78, 0.78)
 
-## Тон боковой кладки и надстройки на крыше.
+## Tone of the side masonry and the roof superstructure.
 @export var masonry := Color(0.85, 0.16, 0.16)
 
-## Тон направляющих и створок шахты.
+## Tone of the shaft rails and doors.
 @export var shaft := Color(0.22, 0.32, 0.95)
 
-## Общий тон здания — и он же тон погашенного этажа (ADR-0010, пункт 3).
+## The building's overall tone — and also the tone of a darkened floor (ADR-0010, point 3).
 ##
-## Отличается от света ламп своего типа здания ([constant BuildingAir.LAMP_LIGHT])
-## не только яркостью, а оттенком: в темноте агенты продолжают стрелять, и
-## «просто темнее» означало бы смерть ни за что.
-## Разрыв между парой проверяется тестом на каждой палитре каждого набора.
+## It differs from the lamp light of its building kind ([constant BuildingAir.LAMP_LIGHT])
+## not only in brightness but in hue: in the dark agents keep shooting, and
+## "just darker" would mean dying for nothing.
+## The gap between the pair is checked by a test on every palette of every set.
 @export var dark := Color(0.34, 0.42, 0.72)
 
 
-## Сколько палитр в наборе. Набор конечный и идёт по кругу; у всех типов
-## палитр поровну.
+## How many palettes are in a set. The set is finite and loops; all kinds have
+## the same number of palettes.
 static func count() -> int:
 	return _all(BuildingIdentity.Kind.HOTEL).size()
 
 
-## Палитра раунда здания типа [param kind]. Нумерация с единицы, дальше по
-## кругу.
+## Round palette of a building of kind [param kind]. Numbered from one, then
+## around the loop.
 static func of_round(
 	number: int, kind: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL
 ) -> BuildingPalette:
@@ -52,9 +52,9 @@ static func of_round(
 	return all[posmod(maxi(number, 1) - 1, all.size())]
 
 
-## Та же палитра раунда — из набора типа [param kind] (ADR-0056, решение 2):
-## правила знают номер раунда, а тип здания узнаёт уровень. Чужая палитра —
-## не из наборов — остаётся как есть: её поставили руками.
+## The same round palette — from the set of kind [param kind] (ADR-0056, decision 2):
+## the rules know the round number, and the level learns the building kind. A foreign palette —
+## not from the sets — stays as is: it was set by hand.
 static func of_kind(palette: BuildingPalette, kind: BuildingIdentity.Kind) -> BuildingPalette:
 	for family: int in BuildingIdentity.Kind.size():
 		var index := _all(family as BuildingIdentity.Kind).find(palette)
@@ -63,47 +63,47 @@ static func of_kind(palette: BuildingPalette, kind: BuildingIdentity.Kind) -> Bu
 	return palette
 
 
-## Набор типа [param kind]. Строится один раз: палитра — ресурс, и раздавать
-## всем зданиям одну и ту же копию дешевле, чем собирать её заново на каждое.
+## The set of kind [param kind]. Built once: a palette is a resource, and handing
+## the same copy to all buildings is cheaper than building it anew for each.
 ##
-## Отель держит набор порта Spectrum — первый кадр игры как в оригинале, —
-## остальные типы — свои гаммы (ADR-0056, решение 2): офис холодный, жилой дом
-## выцветший и землистый. Тон погашенной зоны у всех один по яркости —
-## темнота одинаково тёмная (решение 3).
+## The hotel keeps the Spectrum port set — the game's first frame as in the original —
+## the other kinds have their own ranges (ADR-0056, decision 2): the office is cold, the residential
+## building faded and earthy. The darkened zone tone has the same brightness for all —
+## darkness is equally dark (decision 3).
 static func _all(kind: BuildingIdentity.Kind) -> Array:
 	if _families.is_empty():
 		_families = [_hotel(), _office(), _residential()]
 	return _families[kind]
 
 
-## Отель: набор порта Spectrum. Цвета взяты из атрибутной палитры, но не
-## буквально: у порта они в полную силу и без света, а у нас поверх лягут
-## заливка этажа и блик.
+## Hotel: the Spectrum port set. Colours are taken from the attribute palette, but not
+## literally: in the port they are at full strength and without light, while ours will get
+## the floor fill and a highlight on top.
 static func _hotel() -> Array[BuildingPalette]:
 	return [
-		# Кадр порта: бирюзовые этажи, красная кладка, синяя шахта.
+		# The port's frame: turquoise floors, red masonry, a blue shaft.
 		_make(
 			Color(0.0, 0.78, 0.78),
 			Color(0.85, 0.16, 0.16),
 			Color(0.22, 0.32, 0.95),
 			Color(0.34, 0.42, 0.72)
 		),
-		# Зелёный раунд: кладка уходит в пурпур, шахта остаётся холодной.
+		# Green round: the masonry goes purple, the shaft stays cold.
 		_make(
 			Color(0.22, 0.80, 0.30),
 			Color(0.78, 0.20, 0.72),
 			Color(0.20, 0.36, 0.92),
 			Color(0.30, 0.40, 0.70)
 		),
-		# Пурпурный раунд: шахта бирюзовая, иначе она слилась бы со стеной.
+		# Purple round: the shaft is turquoise, otherwise it would merge with the wall.
 		_make(
 			Color(0.80, 0.26, 0.80),
 			Color(0.26, 0.34, 0.86),
 			Color(0.16, 0.78, 0.78),
 			Color(0.32, 0.38, 0.74)
 		),
-		# Жёлтый раунд: самый тёплый этаж в наборе, и погашенный отделяется
-		# от него сильнее всего.
+		# Yellow round: the warmest floor in the set, and the darkened one stands out
+		# from it the most.
 		_make(
 			Color(0.82, 0.76, 0.18),
 			Color(0.80, 0.22, 0.20),
@@ -113,7 +113,7 @@ static func _hotel() -> Array[BuildingPalette]:
 	]
 
 
-## Офис: холодная гамма — сталь, лёд, морская волна, графит с сиреневым.
+## Office: a cold range — steel, ice, sea green, graphite with lilac.
 static func _office() -> Array[BuildingPalette]:
 	return [
 		_make(
@@ -143,8 +143,8 @@ static func _office() -> Array[BuildingPalette]:
 	]
 
 
-## Жилой дом: выцветшая краска подъездов — мята, горчица, бирюза
-## учреждения, терракота.
+## Residential building: faded stairwell paint — mint, mustard, institutional
+## turquoise, terracotta.
 static func _residential() -> Array[BuildingPalette]:
 	return [
 		_make(

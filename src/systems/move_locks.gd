@@ -1,56 +1,56 @@
 class_name MoveLocks
 extends RefCounted
 
-## Короткие паузы управления: разворот и приземление (ADR-0039, решение 4).
+## Short control pauses: turning and landing (ADR-0039, decision 4).
 ##
-## В автомате разворот и старт мгновенные; паузы — решение пользователя ради
-## веса движения. Пока тело поворачивается, актёр не идёт; после прыжка или
-## падения он коротко восстанавливается — не идёт и не прыгает. Стрелять и
-## приседать можно всегда: паузы про ноги, а не про руки.
+## In the arcade turning and starting are instant; the pauses are the user's decision for the
+## weight of movement. While the body turns, the actor does not walk; after a jump or
+## a fall he briefly recovers — does not walk and does not jump. Shooting and
+## crouching are always allowed: the pauses are about legs, not arms.
 ##
-## Правило без узлов: Otto и агент зовут его одинаково, а тест проверяет без
-## сцены, как [OttoStateMachine].
+## A rule without nodes: Otto and an agent call it the same way, and a test checks it without
+## a scene, like [OttoStateMachine].
 
-## Сколько длится разворот, с. Столько же тело поворачивается в [FigureRig].
+## How long a turn lasts, s. The body turns for the same time in [FigureRig].
 const TURN_TIME: float = 0.1
-## Сколько длится восстановление после приземления, с.
+## How long recovery after landing lasts, s.
 const LAND_TIME: float = 0.15
-## Остаток паузы, который уже не пауза, с. 0.1 минус шесть кадров по 1/60 в
-## float — не ноль, а 3e-17, и разворот держал бы ноги седьмой кадр.
+## A pause remainder that is no longer a pause, s. 0.1 minus six frames of 1/60 in
+## float is not zero but 3e-17, and the turn would hold the legs a seventh frame.
 const SPENT: float = 1e-6
 
 var _turn: float = 0.0
 var _land: float = 0.0
 
 
-## Актёр начал разворот на месте.
+## The actor started turning in place.
 func turn() -> void:
 	_turn = TURN_TIME
 
 
-## Актёр приземлился.
+## The actor landed.
 func land() -> void:
 	_land = LAND_TIME
 
 
-## Проходит [param delta] секунд.
+## [param delta] seconds pass.
 func tick(delta: float) -> void:
 	_turn = maxf(_turn - delta, 0.0)
 	_land = maxf(_land - delta, 0.0)
 
 
-## Можно ли идти: не разворачивается и не восстанавливается.
+## Whether one can walk: not turning and not recovering.
 func can_walk() -> bool:
 	return _turn < SPENT and _land < SPENT
 
 
-## Можно ли прыгнуть: не восстанавливается после приземления. Прыжок с
-## разворота разрешён — прыгают туда, куда уже смотрят.
+## Whether one can jump: not recovering after landing. A jump out of
+## a turn is allowed — one jumps where one is already looking.
 func can_jump() -> bool:
 	return _land < SPENT
 
 
-## Снимает обе паузы: возвращение в игру, перестановка уровнем.
+## Removes both pauses: returning to play, being moved by the level.
 func clear() -> void:
 	_turn = 0.0
 	_land = 0.0

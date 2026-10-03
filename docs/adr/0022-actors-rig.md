@@ -1,124 +1,120 @@
-# ADR-0022 · Актёры: риг из Blender, анимация кодом
+# ADR-0022 · Actors: rig from Blender, animation in code
 
-- **Статус:** изменён. Решения 1–3 заменены [ADR-0032](0032-actor-models.md):
-  модель пака Quaternius с коленями, клипы пака вместе с позами кодом, пропорции
-  пака; рост 1.68 м — [ADR-0026](0026-proportions.md), решение 2. Решение 4
-  (обводка) в силе. `tools/palette.py` из решения 5 удалён в M22
-  ([ADR-0030](0030-grading-and-quality.md), решение 8)
-- **Дата:** 2026-09-20
+- **Status:** changed. Decisions 1–3 are replaced by [ADR-0032](0032-actor-models.md):
+  a Quaternius pack model with knees, the pack's clips together with code poses, the pack's
+  proportions; height 1.68 m — [ADR-0026](0026-proportions.md), decision 2. Decision 4
+  (outline) in force. `tools/palette.py` from decision 5 was removed in M22
+  ([ADR-0030](0030-grading-and-quality.md), decision 8)
+- **Date:** 2026-09-20
 
-## Контекст
+## Context
 
-M16 — вторая веха пивота: вместо коробок греев-бокса Otto, агент и машина у
-выхода получают модели и анимации. [ADR-0019](0019-3d-pivot.md) записал, что
-Blender остаётся в пайплайне и «больше не рендерит спрайты, а отдаёт модели».
-Как именно — решается здесь.
+M16 is the second milestone of the pivot: instead of greybox boxes, Otto, the agent and the car at
+the exit get models and animations. [ADR-0019](0019-3d-pivot.md) recorded that Blender stays in the
+pipeline and "no longer renders sprites but exports models". How exactly is decided here.
 
-### Что нашла сверка
+### What the check found
 
-- **Набор поз у нас уже полный.** По The Cutting Room Floor, у падающего агента
-  в оригинале было заметно больше кадров, чем осталось в финале; освободившееся
-  место потратили на прыжок и раздавленного кабиной. Все эти позы у нас есть с M7b:
-  ходьба, присед, прыжок, удар, выстрел, две смерти и раздавленный, у агента —
-  колено и лёжа. Новых поз веха не заводит.
-- **Фигура уже описана кодом.** `tools/render_actors.py` строил актёра в Blender
-  из коробок — ноги, корпус, руки, голова, шляпа или помпадур, пистолет на руке —
-  и держал таблицу поз углами конечностей. Это готовый параметрический риг, и
-  вопрос вехи не «как смоделировать», а «где этот риг живёт и кто двигает его».
-- **Пропорции чиби — намеренные** ([ADR-0011](0011-asset-pipeline.md), пункт 8):
-  крупная голова у Taito — решение авторов, а не следствие шестнадцати пикселей.
+- **Our set of poses is already complete.** According to The Cutting Room Floor, the falling agent
+  in the original had noticeably more frames than remained in the final version; the freed space
+  was spent on the jump and on being crushed by the cab. We have had all these poses since M7b:
+  walk, crouch, jump, kick, shoot, two deaths and crushed, and for the agent — kneeling and prone.
+  The milestone introduces no new poses.
+- **The figure is already described by code.** `tools/render_actors.py` built an actor in Blender
+  from boxes — legs, torso, arms, head, hat or pompadour, a pistol in the hand — and held a pose
+  table as limb angles. This is a ready parametric rig, and the milestone's question is not "how to
+  model" but "where this rig lives and who moves it".
+- **The chibi proportions are deliberate** ([ADR-0011](0011-asset-pipeline.md), item 8):
+  Taito's big head is the authors' decision, not a consequence of sixteen pixels.
 
-## Решения
+## Decisions
 
-### 1. Blender строит риг и отдаёт glTF; клипов анимации в нём нет
+### 1. Blender builds the rig and exports glTF; there are no animation clips in it
 
-`tools/build_actors.py` — наследник `render_actors.py` — собирает в Blender ту же
-фигуру из коробок, но не рендерит её, а вешает на **арматуру**: кости бёдер,
-корпуса, головы, двух рук и двух ног. Каждая коробка целиком привязана весами к
-одной кости — это скиннинг без сгибов, коробки остаются жёсткими. Фигура
-сливается в один меш и экспортируется в `assets/models/<актёр>.glb` вместе с
-материалами; машина у выхода — тем же скриптом, без арматуры.
+`tools/build_actors.py` — the successor of `render_actors.py` — assembles in Blender the same figure
+from boxes, but instead of rendering it hangs it on an **armature**: bones for the hips, torso,
+head, two arms and two legs. Each box is fully weighted to one bone — skinning without bends, the
+boxes stay rigid. The figure is merged into one mesh and exported to `assets/models/<actor>.glb`
+together with materials; the car at the exit — by the same script, without an armature.
 
-Рассматривался порт фигуры прямо в Godot узлами-шарнирами — дешевле и без
-экспорта. Отвергнут ради скелета: `Skeleton3D` с костями — штатная точка опоры
-для всего, что придёт позже, от скиннутой модели до ретаргета анимаций, и код,
-который двигает кости, при такой замене не меняется. Blender при этом остаётся
-инструментом разработчика, а не сборки: `.glb` версионируются, как раньше
-версионировались PNG ([ADR-0011](0011-asset-pipeline.md), пункт 2).
+Porting the figure straight into Godot as hinge nodes was considered — cheaper and without export.
+Rejected for the sake of a skeleton: `Skeleton3D` with bones is the standard anchor for everything
+that comes later, from a skinned model to animation retargeting, and the code that moves bones does
+not change with such a replacement. Blender meanwhile stays a developer tool, not a build tool:
+`.glb` files are versioned, as PNGs were versioned before ([ADR-0011](0011-asset-pipeline.md),
+item 2).
 
-### 2. Анимация процедурная и живёт в коде
+### 2. Animation is procedural and lives in code
 
-Таблица поз переезжает из Python в GDScript — [`FigurePoses`](../../src/systems/assets/figure_poses.gd):
-на позу — углы ног и рук, наклон корпуса, наклон тела целиком, просадка бёдер.
-[`FigureRig`](../../src/systems/assets/figure_rig.gd) — узел поверх импортированного
-`.glb` — находит кости по имени и каждый кадр ведёт их к углам позы с
-экспоненциальным сглаживанием; ходьба — не три кадра, а непрерывный цикл: ноги
-и руки качаются синусом в противофазе, тело чуть приподнимается на середине шага.
+The pose table moves from Python to GDScript — [`FigurePoses`](../../src/systems/assets/figure_poses.gd):
+per pose — leg and arm angles, torso tilt, whole-body tilt, hip drop.
+[`FigureRig`](../../src/systems/assets/figure_rig.gd) — a node on top of the imported `.glb` — finds
+bones by name and every frame drives them toward the pose angles with exponential smoothing; walking
+is not three frames but a continuous cycle: legs and arms swing by a sine in antiphase, the body
+rises slightly at mid-step.
 
-EPIC записывал `AnimationTree`. Он не берётся сознательно: у нас позы — данные, а
-не клипы, переходы между любыми двумя позами одинаковы, и правило «какую позу
-показать» уже есть — `ActorPose`, тот же, что выбирал спрайт. Дерево анимаций
-дублировало бы его в редакторе, править позы пришлось бы руками, а тесты видели
-бы только результат. Процедурный риг проверяется без рендера — по углам костей.
+The EPIC listed `AnimationTree`. It is deliberately not taken: our poses are data, not clips,
+transitions between any two poses are the same, and the rule "which pose to show" already exists —
+`ActorPose`, the same one that picked the sprite. An animation tree would duplicate it in the
+editor, poses would have to be edited by hand, and tests would see only the result. The procedural
+rig is checked without rendering — by bone angles.
 
-Отзыв «плавности анимаций» закрывается этим решением целиком: сглаживание
-делает плавным любой переход, а цикл ходьбы — саму ходьбу.
+The "animation smoothness" feedback is closed entirely by this decision: smoothing makes any
+transition smooth, and the walk cycle makes the walk itself smooth.
 
-### 3. Пропорции чиби, рост прежний
+### 3. Chibi proportions, same height
 
-Otto — 1.26 м, агент — 1.17 м, ровно по коллизиям; голова — треть роста. Меньше
-головы не будет: в кадре из трёх этажей актёр — десятая часть высоты экрана,
-и шляпа с помпадуром остаются единственным, по чему в темноте отличают своего
-от чужого ([ADR-0011](0011-asset-pipeline.md), пункт 13).
+Otto — 1.26 m, agent — 1.17 m, exactly by the collisions; the head is a third of the height. The
+head will not be smaller: in a three-floor frame an actor is a tenth of the screen height, and the
+hat and pompadour remain the only thing by which friend is told from foe in the dark
+([ADR-0011](0011-asset-pipeline.md), item 13).
 
-Присед и колено — не другая фигура, как было у спрайтов, а поза скелета: бёдра
-опускаются, ноги сгибаются вперёд, корпус наклоняется. Вписаться в коллизию
-приседа (0.81 м) фигура обязана, и это проверяется тестом по габариту костей,
-а не на глаз.
+Crouching and kneeling are not a different figure, as with sprites, but a skeleton pose: the hips
+drop, the legs bend forward, the torso leans. The figure must fit into the crouch collision
+(0.81 m), and this is checked by a test on the bone extents, not by eye.
 
-### 4. Актёр освещается сценой; читаемость даёт обводка
+### 4. The actor is lit by the scene; readability comes from an outline
 
-С M16 актёр перестаёт светиться сам: материалы приходят из `.glb` обычными,
-и лампа кладёт на фигуру тень. Требование [ADR-0019](0019-3d-pivot.md), решение 5,
-при этом не снимается — на погашенном этаже актёра обязано быть видно, потому
-что стрелять он не перестаёт. Его выполняет **обводка**: второй проход поверх
-меша (`material_overlay`) — инвертированная оболочка, лицевые грани отсечены,
-без затенения, чуть шире тела. Она видна при любом свете, потому что свету
-не подчиняется.
+From M16 the actor stops emitting light itself: materials come from the `.glb` as ordinary ones,
+and the lamp casts shadow on the figure. The requirement of [ADR-0019](0019-3d-pivot.md),
+decision 5, is not lifted by this — on a darkened floor the actor must be visible, because he does
+not stop shooting. It is met by an **outline**: a second pass over the mesh (`material_overlay`) —
+an inverted hull, front faces culled, unshaded, slightly wider than the body. It is visible in any
+light because it does not obey light.
 
-Rim-свет для этого не годится, хотя первым приходит в голову: у
-`StandardMaterial3D` это слагаемое освещения, и на этаже без лампы он гаснет
-вместе со всем остальным. Силу и цвет обводки подберёт M17 вместе с светом;
-здесь она есть и держит читаемость.
+Rim light does not work for this, though it comes to mind first: in `StandardMaterial3D` it is a
+term of the lighting, and on a floor without a lamp it goes out with everything else. The strength
+and colour of the outline will be tuned by M17 together with the light; here it exists and holds
+readability.
 
-### 5. Что уходит
+### 5. What goes away
 
-Со спрайтовым пайплайном покончено: `tools/render_actors.py`,
-`tools/render_env.py`, `assets/sprites/` целиком. `ActorBox` греев-бокса заменяется
-`FigureRig`. `tools/palette.py` остаётся — это источник цветов и для новых
-материалов. `requirements-assets.txt` тоже остаётся: Pillow, numpy и soundfile
-нужны не спрайтам, а генераторам звука и иконки (`render_audio.py`, `render_icon.py`).
+The sprite pipeline is done with: `tools/render_actors.py`, `tools/render_env.py`, `assets/sprites/`
+in full. The greybox `ActorBox` is replaced by `FigureRig`. `tools/palette.py` stays — it is the
+source of colours for the new materials too. `requirements-assets.txt` stays too: Pillow, numpy and
+soundfile are needed not by sprites but by the sound and icon generators (`render_audio.py`,
+`render_icon.py`).
 
-[ADR-0011](0011-asset-pipeline.md) при этом отменяется в части «рендер в
-спрайты» и остаётся в части ролей: Blender — актёрам, код — всему остальному.
+[ADR-0011](0011-asset-pipeline.md) is thereby superseded in the "render to sprites" part and stays
+in the roles part: Blender for actors, code for everything else.
 
-## Чего в вехе нет
+## What is not in the milestone
 
-- **Скиннутой модели с суставами.** Коробки, привязанные к костям, — это риг
-  без сгибов: колено не гнётся, локоть не гнётся. Модель со сгибами встанет на
-  тот же скелет, когда дойдут руки, и `FigureRig` этого не заметит.
-- **Материалов и света под фигуру.** Шершавый костюм, ткань против кожи —
-  M17 вместе со всем светом.
-- **Второго типа агента.** Стрелок с колена в каске — припаркованная M16a.
+- **A skinned model with joints.** Boxes bound to bones are a rig without bends: the knee does not
+  bend, the elbow does not bend. A model with bends will go onto the same skeleton when we get to
+  it, and `FigureRig` will not notice.
+- **Materials and lighting for the figure.** A rough suit, cloth versus skin — M17 together with all
+  the lighting.
+- **A second agent type.** A kneeling shooter in a helmet — the parked M16a.
 
-## Как проверяем
+## How we check
 
-**DoD вехи:** на стоп-кадре ходьбы видно, что это шаг, а не подмена картинки,
-и Otto в приседе по-прежнему ниже пули агента.
+**Milestone DoD:** a still frame of the walk shows that it is a step, not a picture swap, and Otto
+crouching is still below the agent's bullet.
 
-- `test_figure_poses.gd` — без сцены: у каждой позы `ActorPose` есть запись,
-  цикл ходьбы качает ноги в противофазе, смесь двух поз в концах совпадает с ними.
-- `test_figure_rig.gd` — со сценой: модели грузятся и несут все кости; поза
-  приседа укладывает габарит фигуры ниже пули агента; за один кадр перехода
-  кости сдвигаются, но не долетают, — это и есть «не подмена картинки».
-- `test_proportions.gd` не меняется: коллизии те же.
+- `test_figure_poses.gd` — without a scene: every `ActorPose` pose has an entry, the walk cycle
+  swings the legs in antiphase, a blend of two poses at its ends matches them.
+- `test_figure_rig.gd` — with a scene: the models load and carry all bones; the crouch pose puts the
+  figure's extents below the agent's bullet; within one transition frame the bones move but do not
+  arrive — this is exactly "not a picture swap".
+- `test_proportions.gd` does not change: the collisions are the same.

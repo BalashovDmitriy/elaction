@@ -1,10 +1,10 @@
 extends GutTest
 
-## Тесты таблицы рекордов.
+## High score table tests.
 ##
-## Правила таблицы — чистые функции, и проверяются без диска. На диск ходят
-## только два теста: рекорд, переживший перезапуск, — единственное, ради чего
-## таблица вообще существует.
+## The table rules are pure functions and are checked without the disk. Only two tests
+## touch the disk: a record that survives a restart is the only reason the
+## table exists at all.
 
 const TEMP := "user://test_records.json"
 
@@ -28,7 +28,7 @@ func test_the_table_is_sorted_from_the_best() -> void:
 
 
 func test_the_table_keeps_only_ten_rows() -> void:
-	# Одиннадцатая строка никому не интересна, а файл растёт вечно.
+	# Nobody is interested in the eleventh line, and the file grows forever.
 	var many: Array[int] = []
 	for index: int in 25:
 		many.append(index * 100)
@@ -53,8 +53,9 @@ func test_a_poor_score_does_not_make_the_table() -> void:
 
 
 func test_a_repeated_score_does_not_fake_a_record() -> void:
-	# Тот же счёт в тот же день бывает дважды. Поиск строки по паре «счёт и дата»
-	# находил чужую — и счёт, не попавший в десятку, объявлялся рекордом.
+	# The same score on the same day can happen twice. Looking up a line by the "score and
+	# date" pair found someone else's — and a score that did not make the top ten was declared
+	# a record.
 	var records := Records.new()
 	var many: Array[int] = []
 	for _index: int in Records.LIMIT:
@@ -64,7 +65,7 @@ func test_a_repeated_score_does_not_fake_a_record() -> void:
 
 
 func test_the_best_of_an_empty_table_is_zero() -> void:
-	# HUD и меню показывают число, и особый случай им ни к чему.
+	# The HUD and the menu show a number, and they have no use for a special case.
 	assert_eq(Records.new().best(), 0)
 
 
@@ -80,16 +81,16 @@ func test_records_survive_a_restart() -> void:
 
 
 func test_a_broken_file_does_not_break_the_game() -> void:
-	# Файл можно испортить руками или недописать при отключении света. Рекорды
-	# не та вещь, ради которой стоит падать на запуске.
+	# The file can be corrupted by hand or left half-written in a power cut. Records
+	# are not the kind of thing worth crashing on startup for.
 	var file := FileAccess.open(TEMP, FileAccess.WRITE)
 	file.store_string("{это не таблица}")
 	file.close()
 
 	var loaded := Records.load_from(TEMP)
 	assert_eq(loaded.rows.size(), 0, "таблица начинается заново")
-	# Предупреждение здесь ожидаемое, и тест его засчитывает: молча глотать
-	# испорченный файл нельзя, а падать из-за рекордов — тем более.
+	# The warning here is expected, and the test counts it: silently swallowing
+	# a corrupted file is not allowed, and crashing because of records even less so.
 	assert_push_warning("не читается", "игрок узнает, что таблица потеряна")
 
 

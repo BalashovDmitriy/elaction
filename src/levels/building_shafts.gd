@@ -1,41 +1,42 @@
 class_name BuildingShafts
 extends Node3D
 
-## Одежда шахт здания: стальной лист, направляющие, распорки, порталы этажей с
-## табло кабины и кнопками вызова, упоры и машинное отделение.
+## Dressing of the building's shafts: steel sheet, guide rails, braces, floor portals with
+## the cab indicator board and call buttons, buffers and the machine room.
 ##
-## Своим узлом, а не прямыми детьми уровня. Частей выходит за полсотни на здание,
-## а по детям уровня ходят и агенты, и кабины, и половина тестов — каждый такой
-## обход перебирал бы ещё и стойки со створками. Ровно по этой причине из уровня
-## в своё время вынесли задний план.
+## As its own node, not as direct children of the level. There are over fifty parts per
+## building, and agents, cabs and half the tests all walk the level's children: every
+## such walk would also go through posts and door panels. For exactly this reason the
+## background was moved out of the level at the time.
 ##
-## Тел здесь нет ни у чего: по направляющим не ходят, они только видны. Ездит
-## кабина, а проём в перекрытии режет само перекрытие.
+## Nothing here has a body: nobody walks on the rails, they are only seen. The cab
+## moves, and the opening in the slab is cut by the slab itself.
 ##
-## С M21b шахта стальная (ADR-0033, решение 6): у задней стены во всю высоту —
-## металлический лист с болтами, по перекрытиям — распорки, у портала —
-## хромированный наличник и порог из рифлёной стали. Над порталом — табло с
-## этажом, где кабина сейчас, и стрелкой хода; сбоку — кнопки вызова, горит та,
-## в сторону которой кабина едет к этому этажу (решение 7, только вид).
+## Since M21b the shaft is steel (ADR-0033, decision 6): at the back wall, full height,
+## a metal sheet with bolts, braces along the slabs, at the portal a
+## chrome casing and a checker-plate steel threshold. Above the portal is a board with
+## the floor where the cab is now and a travel arrow; at the side are call buttons, the
+## lit one is the direction in which the cab travels to this floor (decision 7, look only).
 
-## Ширина направляющей шахты, м. Стойка идёт по краю проёма во всю его высоту.
+## Width of a shaft guide rail, m. The post runs along the edge of the opening at its
+## full height.
 const RAIL_WIDTH: float = 0.18
 
-## Доля тона шахты палитры раунда в направляющих (ADR-0031, решение 5).
+## Share of the round palette's shaft tone in the rails (ADR-0031, decision 5).
 const SHAFT_TONE: float = 0.25
 
-## Портал шахты на этаже (ADR-0031, решение 1): доля ширины под каждую
-## раскрытую створку, наличник, перемычка и порог, м; цвета металла.
+## The shaft portal on a floor (ADR-0031, decision 1): share of width for each
+## open door panel, the casing, lintel and threshold, m; metal colors.
 const PORTAL_LEAF_SHARE: float = 0.22
 const PORTAL_JAMB: float = 0.07
 const PORTAL_HEAD: float = 0.1
 const PORTAL_SILL: float = 0.03
 const PORTAL_RECESS := Color(0.07, 0.08, 0.1)
-## Портал и табло по типу здания (ADR-0057, решение 6): латунь у отеля, хром
-## у офиса, крашеная сталь грузового лифта у жилого дома; цифры — кремовые у
-## отеля, холодные у офиса, белые у жилого дома. Не янтарь и не красный: это
-## цвета огоньков игры — табло двери и двери с документом (ADR-0023, решение 6).
-## По [enum BuildingIdentity.Kind].
+## Portal and board by building kind (ADR-0057, decision 6): brass at the hotel, chrome
+## at the office, the painted steel of a freight elevator at the residential building;
+## digits are cream at the hotel, cold at the office, white at the residential building.
+## Not amber and not red: these are the colors of the game's indicator lights, the door
+## board and the document door (ADR-0023, decision 6). By [enum BuildingIdentity.Kind].
 const KIND_TRIM: Array[Color] = [
 	Color(0.8, 0.62, 0.32), Color(0.78, 0.8, 0.83), Color(0.3, 0.35, 0.31)
 ]
@@ -45,39 +46,39 @@ const KIND_LEAF: Array[Color] = [
 const KIND_DIGITS: Array[Color] = [
 	Color(0.98, 0.92, 0.78), Color(0.55, 0.82, 1.0), Color(0.85, 0.88, 0.9)
 ]
-## Циферблат отеля над табло: радиус, стрелка и её размах, рад — от нижнего
-## этажа шахты слева до верхнего справа, как у лифтов тридцатых.
+## The hotel dial above the board: radius, hand and its sweep, rad, from the shaft's
+## bottom floor on the left to the top one on the right, as in thirties elevators.
 const DIAL_RADIUS: float = 0.15
 const DIAL_FACE := Color(0.92, 0.86, 0.7)
 const NEEDLE := Vector3(0.014, 0.12, 0.01)
 const NEEDLE_SWING: float = deg_to_rad(75.0)
 
-## Насколько проём и створки портала не доходят до пола и перемычки, м: доля
-## пикселя, но грани разных материалов больше не в одной плоскости.
+## How far the opening and the portal panels stop short of the floor and the lintel, m:
+## a fraction of a pixel, but faces of different materials are no longer in one plane.
 const PORTAL_EPSILON: float = 0.004
 
-## Лист во всю высоту шахты: насколько шире проёма и толщина, м.
+## The full-height shaft sheet: how much wider than the opening, and thickness, m.
 const PLATE_MARGIN: float = 0.05
 const PLATE_THICKNESS: float = 0.02
 
-## Распорка между направляющими на уровне перекрытия: высота, м.
+## A brace between the rails at slab level: height, m.
 const BRACE_HEIGHT: float = 0.12
 
-## Табло кабины над порталом: размер, зазор над перемычкой, м; цвет цифр —
-## холодный светодиод, как у табло M19 (не красный: красный огонёк на высоте
-## вывески двери — знак двери с документом, авторевью M19).
+## The cab board above the portal: size, gap above the lintel, m; digit color is
+## a cold LED, as on the M19 board (not red: a red light at the height of the
+## door sign is the mark of a document door, M19 code review).
 const BOARD := Vector3(0.7, 0.26, 0.05)
 const BOARD_GAP: float = 0.06
-## Стрелка хода на табло — треугольник геометрией, а не знак шрифта: ▲ и ▼ нет
-## ни в Exo 2, ни в прежнем Pixellari, и их рисовал системный запасной шрифт,
-## которого на другой машине может не быть. Размер стрелки, на сколько она
-## левее середины табло и на сколько цифры при ней правее, м.
+## The travel arrow on the board is a geometric triangle, not a font glyph: ▲ and ▼ are
+## in neither Exo 2 nor the former Pixellari, and they were drawn by the system fallback
+## font, which another machine may not have. The arrow size, how far it is
+## left of the board's middle and how far the digits next to it are to the right, m.
 const ARROW := Vector3(0.09, 0.08, 0.008)
 const ARROW_SHIFT: float = 0.2
 const DIGITS_SHIFT: float = 0.06
 
-## Панель кнопок сбоку портала: размер, высота середины, отступ от наличника,
-## кнопка; цвет горящей и тёмной кнопки.
+## The button panel at the side of the portal: size, middle height, offset from the
+## casing, button; colors of a lit and a dark button.
 const CALL_PANEL := Vector3(0.12, 0.26, 0.02)
 const CALL_RISE: float = 1.15
 const CALL_GAP: float = 0.14
@@ -85,60 +86,63 @@ const CALL_BUTTON := Vector3(0.055, 0.055, 0.02)
 const CALL_LIT := Color(0.92, 0.96, 1.0)
 const CALL_DARK := Color(0.2, 0.21, 0.23)
 
-## Табло и панель висят перед пилястрами, как табличка этажа
-## ([constant FloorSigns.STANDOFF]): у края простенка пилястра стоит вплотную
-## к порталу, выступает из стены на [constant BuildingRibs.PILASTER_DEPTH], и
-## панель на самой стене тонула в ней целиком (авторевью M21b).
+## The board and panel hang in front of the pilasters, like the floor sign
+## ([constant FloorSigns.STANDOFF]): at the pier edge the pilaster stands close
+## to the portal, sticks out of the wall by [constant BuildingRibs.PILASTER_DEPTH], and
+## a panel on the wall itself sank into it entirely (M21b code review).
 const MOUNT_Z: float = WorldSpace.BACK_WALL_Z + BuildingRibs.PILASTER_DEPTH + 0.01
 
-## Что показывает табло, пока кабина на крыше: этажа с таким номером нет.
+## What the board shows while the cab is on the roof: there is no floor with that number.
 const ROOF_LABEL := "R"
 
-## Высота упора в конце полосы шахты, м.
+## Height of the buffer at the end of the shaft band, m.
 const BUFFER_HEIGHT: float = 0.24
 
-## Насколько упор уже и мельче направляющих, м (ADR-0037, решение 2). Упор
-## стоит между стойками и не доходит до их граней: грани разных материалов в
-## одной плоскости мерцали на ходу камеры — глубина у них одна, и какая из двух
-## ближе, решал случай.
+## How much narrower and shallower the buffer is than the rails, m (ADR-0037, decision
+## 2). The buffer stands between the posts and does not reach their faces: faces of
+## different materials in one plane flickered as the camera moved: they have the same
+## depth, and which of the two is closer was decided by chance.
 const BUFFER_INSET: float = 0.01
 
-## Надстройка машинного отделения на крыше, м.
+## The machine room structure on the roof, m.
 const MACHINE_ROOM_SIZE := Vector2(2.16, 1.32)
 
-## Глубина стоек и упоров и куда они утоплены: за кабину, но перед стеной.
-## Кабина идёт в плоскости игры и закрывает их собой, проходя мимо.
+## Depth of the posts and buffers and how far they are recessed: behind the cab, but in
+## front of the wall. The cab moves in the play plane and covers them as it passes.
 const RAIL_DEPTH: float = 0.3
 const RAIL_Z: float = -0.45
 
-## Толщина створок шахты и машинного отделения. Створки висят на задней стене,
-## как и двери этажей; домик стоит на крыше у той же стены.
+## Thickness of the shaft panels and the machine room. The panels hang on the back wall,
+## like the floor doors; the hut stands on the roof by the same wall.
 ##
-## Домик не доходит до плоскости игры: его передняя грань кончается за спиной
-## Otto (тело толщиной [constant WorldSpace.BODY_DEPTH] вокруг нуля), иначе он
-## проходил бы сквозь стену домика, а не перед ней (авторевью M15).
+## The hut does not reach the play plane: its front face ends behind Otto's back (a body
+## [constant WorldSpace.BODY_DEPTH] thick around zero), otherwise he would pass through
+## the hut's wall rather than in front of it (M15 code review).
 ##
-## И на 4 см глубже направляющих: при 0.7 м его фасад вставал в одну плоскость
-## с передней гранью стоек, и верх шахты на крыше мерцал (ADR-0037, решение 2).
+## And 4 cm deeper than the rails: at 0.7 m its facade fell into one plane
+## with the front face of the posts, and the top of the shaft on the roof flickered
+## (ADR-0037, decision 2).
 const PANEL_THICKNESS: float = 0.08
 const MACHINE_ROOM_DEPTH: float = 0.74
 
-## Столб света в шахте: радиус, яркость, цвет и вынос перед направляющими, м.
+## The light column in the shaft: radius, brightness, color and offset in front of the
+## rails, m.
 ##
-## Долг с M12 ([ADR-0017](../../../docs/adr/0017-spectrum-palette-and-shafts.md),
-## решение 3), закрытый в M18b
-## ([ADR-0025](../../../docs/adr/0025-shafts-escalators-and-riders.md), решение 3).
-## Источник настоящий, а не свечение материала: свет обязан лечь на направляющие,
-## створки и пол перед проёмом, иначе на погашенном этаже шахта висит светящейся
-## полосой в черноте и «здесь путь вниз» читается хуже, чем сбитой лампой.
+## A debt since M12 ([ADR-0017](../../../docs/adr/0017-spectrum-palette-and-shafts.md),
+## decision 3), closed in M18b
+## ([ADR-0025](../../../docs/adr/0025-shafts-escalators-and-riders.md), decision 3).
+## The source is real, not material glow: the light must fall on the rails, the panels
+## and the floor in front of the opening, otherwise on an unlit floor the shaft hangs as
+## a glowing strip in the blackness and "the way down is here" reads worse than with a
+## knocked-down lamp.
 ##
-## Холодный против тёплых ламп (ADR-0023, решение 3): шахта — металл, и свет
-## в ней не домашний. Теней не кладёт — их в шахте некуда ронять, а стоят они
-## дороже всего остального.
-## Радиус — чуть шире самой шахты (1.2 м), и это не скупость. На 4.2 м столбы
-## пяти шахт стилобата заливали этаж целиком, и погашенный этаж переставал быть
-## погашенным: темнота M17 отменялась светом, который к ней отношения не имеет.
-## Столб обязан светить в шахте, а не вместо ламп.
+## Cold against the warm lamps (ADR-0023, decision 3): the shaft is metal, and the light
+## in it is not homely. It casts no shadows: there is nowhere to drop them in the shaft,
+## and they cost more than everything else.
+## The radius is slightly wider than the shaft itself (1.2 m), and this is not stinginess.
+## At 4.2 m the columns of the five podium shafts flooded the whole floor, and an unlit
+## floor stopped being unlit: the M17 darkness was canceled by light that has nothing
+## to do with it. The column must light the shaft, not replace the lamps.
 const GLOW_RANGE: float = 1.8
 const GLOW_ENERGY: float = 1.1
 const GLOW_COLOR := Color(0.74, 0.84, 1.0)
@@ -146,51 +150,52 @@ const GLOW_Z: float = -0.35
 
 var _rules: BuildingRules
 var _plan: BuildingPlan
-## Источники столба: этаж → те, что на нём стоят. Гаснут вне кадра, как лампы.
+## Column light sources: floor → those standing on it. They go out off-frame, like lamps.
 var _glow: Dictionary = {}
-## Табло и кнопки порталов: x шахты → этаж → [ShaftBoard]. В одном столбце
-## бывает несколько шахт — этажи у них не пересекаются, поэтому ключ «x и этаж»
-## однозначен, но обновлять табло надо по этажам своей шахты, а не по столбцу.
+## Portal boards and buttons: shaft x → floor → [ShaftBoard]. One column can hold
+## several shafts; their floors do not intersect, so the "x and floor" key is
+## unambiguous, but boards must be updated by the floors of their own shaft, not by
+## column.
 var _boards: Dictionary = {}
-## Кабины, за которыми следят табло: кабина → её шахта.
+## Cabs the boards watch: cab → its shaft.
 var _watched: Dictionary = {}
-## Что табло уже показывают: кабина → [этаж, направление]. Надписи меняются
-## только при смене, а не каждый кадр.
+## What the boards already show: cab → [floor, direction]. The labels change
+## only on a change, not every frame.
 var _shown: Dictionary = {}
-## Этажи в кадре: табло перерисовываются только на них (M24h, ADR-0044,
-## решение 11). Кабины здания ходят в ногу, и на каждом пройденном этаже все
-## табло всех шахт перестраивали надписи разом — полторы сотни в один кадр,
-## до 10 мс шага физики. Невидимые табло дописываются, когда этаж входит в
-## кадр ([method light_span]) или когда их спрашивают ([method board_text]).
-## До первого [method light_span] видно всё.
+## Floors in frame: boards are redrawn only on them (M24h, ADR-0044,
+## decision 11). The building's cabs move in step, and on every floor passed all
+## boards of all shafts rebuilt their labels at once: a hundred and fifty in one frame,
+## up to 10 ms of a physics step. Invisible boards are updated when the floor enters the
+## frame ([method light_span]) or when they are asked ([method board_text]).
+## Until the first [method light_span] everything is visible.
 var _span := Vector2i(-1_000_000, 1_000_000)
-## Табло и кнопки — своим узлом: по прямым детям шахт тесты ищут их части
-## (направляющие, упоры, трос спуска), и панель кнопок в 12 см шириной
-## сходила бы за трос.
+## Boards and buttons as their own node: tests look for shaft parts among the shafts'
+## direct children (rails, buffers, the descent rope), and a 12 cm wide button panel
+## would pass for a rope.
 var _board_host: Node3D = null
-## Треугольник стрелки, один на все табло.
+## The arrow triangle, one for all boards.
 var _arrow_mesh: PrismMesh = null
-## Обод и поле циферблата отеля: одни на все табло здания.
+## The rim and face of the hotel dial: one for all boards of the building.
 var _dial_discs: Array[CylinderMesh] = []
 
 
-## Табло и кнопки одного портала.
+## The board and buttons of one portal.
 class ShaftBoard:
 	extends RefCounted
 	var floor_index: int = 0
 	var digits: Label3D = null
 	var arrow: MeshInstance3D = null
-	## Середина табло: от неё цифры сдвигаются, когда горит стрелка.
+	## The board's middle: digits shift from it when the arrow is lit.
 	var center: Vector3 = Vector3.ZERO
 	var up_button: MeshInstance3D = null
 	var down_button: MeshInstance3D = null
-	## Стрелка циферблата отеля; у других типов — null.
+	## The hand of the hotel dial; null for other kinds.
 	var needle: Node3D = null
-	## Какая кнопка горит: [constant Intent.UP], [constant Intent.DOWN] или 0.
+	## Which button is lit: [constant Intent.UP], [constant Intent.DOWN] or 0.
 	var lit: float = 0.0
 
 
-## Одевает все шахты здания разом.
+## Dresses all shafts of the building at once.
 func dress(rules: BuildingRules, plan: BuildingPlan) -> void:
 	_rules = rules
 	_plan = plan
@@ -205,20 +210,20 @@ func dress(rules: BuildingRules, plan: BuildingPlan) -> void:
 	apply_graphics()
 
 
-## Столбы света шахт в объёмном тумане — по уровню качества (ADR-0034,
-## решение 1): на «Ультра» в шахте виден луч.
+## Shaft light columns in volumetric fog, by quality level (ADR-0034,
+## decision 1): on "Ultra" a beam is visible in the shaft.
 func apply_graphics() -> void:
 	for index: int in _glow:
 		for light: OmniLight3D in _glow[index]:
 			light.light_volumetric_fog_energy = Graphics.light_in_fog()
 
 
-## Зажигает столбы света на видимых этажах и гасит остальные.
+## Lights the light columns on visible floors and turns off the rest.
 ##
-## Тем же правилом, что и лампы (ADR-0010, пункт 8): в здании до дюжины шахт и
-## по источнику на каждый их этаж, а в кадр влезает два с половиной этажа.
-## Гаснет источник, но не сам столб: погашенный этаж от невидимого отличается
-## тем, что его видно.
+## By the same rule as the lamps (ADR-0010, item 8): a building has up to a dozen shafts
+## with a source for each of their floors, and two and a half floors fit into the frame.
+## The source goes out, but not the column itself: an unlit floor differs from an
+## invisible one in that it can be seen.
 func light_span(span: Vector2i, strip: Vector2 = Vector2(-INF, INF)) -> void:
 	if span != _span:
 		_span = span
@@ -231,29 +236,29 @@ func light_span(span: Vector2i, strip: Vector2 = Vector2(-INF, INF)) -> void:
 			light.visible = lit and VisibleFloors.in_band(strip, light.global_position.x)
 
 
-## Верх шахты: докуда идут её стойки и упор.
+## Top of the shaft: how far its posts and buffer go.
 ##
-## У шахты, доходящей до крыши, потолка нет — над ней небо, и [method
-## BuildingRules.story_top] отдаёт верх мира. Стойка и упор ушли бы в открытое
-## небо над крышей; кончается такая шахта внутри машинного отделения, оно и
-## есть её верх.
+## A shaft reaching the roof has no ceiling: the sky is above it, and [method
+## BuildingRules.story_top] returns the top of the world. The post and buffer would go
+## into the open sky above the roof; such a shaft ends inside the machine room, which is
+## its top.
 func top_of(shaft: BuildingPlan.ShaftSpot) -> float:
 	if shaft.top > BuildingRules.ROOF:
 		return _rules.story_top(shaft.top)
 	return _rules.floor_surface(BuildingRules.ROOF) - MACHINE_ROOM_SIZE.y * 0.5
 
 
-## Одевает шахту: направляющие во всю её высоту и створки на каждом её этаже.
+## Dresses a shaft: rails over its full height and panels on each of its floors.
 ##
-## До M12 шахта была дырой в перекрытии — в кадре её почти не было, хотя спуск
-## по зданию и есть игра (ADR-0017, решение 3). Направляющие дают ей края,
-## створки — отметку этажа: по ним видно, где кабина встаёт.
+## Before M12 the shaft was a hole in the slab: it was almost absent from the frame,
+## although descending through the building is the game (ADR-0017, decision 3). Rails
+## give it edges, panels a floor mark: they show where the cab stops.
 func _dress_shaft(shaft: BuildingPlan.ShaftSpot) -> void:
 	_mark_shaft_ends(shaft)
 	var top := top_of(shaft)
 	var bottom := _rules.floor_surface(shaft.bottom)
 	var half := _rules.shaft_width * 0.5
-	# Шахта — металл (ADR-0023, решение 5): направляющие ловят блик ламп.
+	# The shaft is metal (ADR-0023, decision 5): the rails catch the lamp glint.
 	var rail := GreyboxLook.metal(GreyboxLook.SHAFT.lerp(_rules.palette.shaft, SHAFT_TONE))
 
 	for side: float in [-1.0, 1.0]:
@@ -261,11 +266,12 @@ func _dress_shaft(shaft: BuildingPlan.ShaftSpot) -> void:
 		var left := x if side < 0.0 else x - RAIL_WIDTH
 		_add_part(Rect2(left, top, RAIL_WIDTH, bottom - top), rail, RAIL_Z, RAIL_DEPTH)
 
-	# Лист с болтами во всю высоту шахты, у задней стены: шахта — стальной
-	# столб сквозь здание, а не продолжение обоев коридора.
+	# A bolted sheet over the full shaft height, at the back wall: the shaft is a steel
+	# column through the building, not a continuation of the corridor wallpaper.
 	var plate_half := half + PORTAL_JAMB + PLATE_MARGIN
 	_add_part(
-		# На миллиметры ниже дна: низ листа не в плоскости низа проёма.
+		# Millimeters below the bottom: the bottom of the sheet is not in the plane of the
+		# bottom of the opening.
 		Rect2(shaft.x - plate_half, top, plate_half * 2.0, bottom - top + PORTAL_EPSILON),
 		BuildingFinish.shaft_plates(),
 		WorldSpace.BACK_WALL_Z + PLATE_THICKNESS * 0.5 + 0.002,
@@ -278,7 +284,7 @@ func _dress_shaft(shaft: BuildingPlan.ShaftSpot) -> void:
 			_build_portal(shaft.x, surface)
 			_build_board(shaft.x, index, surface)
 		if index > shaft.top:
-			# Распорка на уровне перекрытия над этажом: там кабина не встаёт.
+			# A brace at slab level above the floor: the cab does not stop there.
 			var slab := _rules.story_top(index)
 			_add_part(
 				Rect2(shaft.x - half, slab, half * 2.0, BRACE_HEIGHT), rail, RAIL_Z, RAIL_DEPTH
@@ -286,9 +292,9 @@ func _dress_shaft(shaft: BuildingPlan.ShaftSpot) -> void:
 		_light_the_shaft(shaft.x, index, surface)
 
 
-## Портал шахты на этаже, как на референсе: тёмный проём, раскрытые створки по
-## бокам, наличник, перемычка и порог (ADR-0031, решение 1). Всё у задней стены
-## и без тел: кабина ходит перед ним, и её видно целиком.
+## The shaft portal on a floor, as in the reference: a dark opening, open panels on the
+## sides, a casing, lintel and threshold (ADR-0031, decision 1). All at the back wall
+## and without bodies: the cab moves in front of it and is visible in full.
 func _build_portal(x: float, surface: float) -> void:
 	var half := _rules.shaft_width * 0.5
 	var height := Proportions.DOOR.y
@@ -297,9 +303,9 @@ func _build_portal(x: float, surface: float) -> void:
 	var leaf := GreyboxLook.metal(KIND_LEAF[_rules.kind])
 	var trim := GreyboxLook.metal(KIND_TRIM[_rules.kind])
 
-	# Створки и порог чуть не доходят до пола и перемычки: низ проёма, створок
-	# и порога ложился в одну плоскость (ADR-0037, решение 2). Проём — во всю
-	# высоту двери: по ней его узнают тесты одежды.
+	# The panels and threshold stop just short of the floor and lintel: the bottom of the
+	# opening, panels and threshold fell into one plane (ADR-0037, decision 2). The opening
+	# is the full door height: the dressing tests recognize it by that.
 	_add_part(
 		Rect2(x - half, surface - height, half * 2.0, height), recess, back_z, PANEL_THICKNESS
 	)
@@ -336,8 +342,8 @@ func _build_portal(x: float, surface: float) -> void:
 	)
 
 
-## Табло над порталом и кнопки сбоку. Цифры — этаж, где кабина сейчас; пока
-## табло кабину не видело, горит свой этаж.
+## The board above the portal and buttons at the side. The digits are the floor where the
+## cab is now; until the board has seen the cab, its own floor is lit.
 func _build_board(x: float, index: int, surface: float) -> void:
 	var board := ShaftBoard.new()
 	board.floor_index = index
@@ -358,8 +364,8 @@ func _build_board(x: float, index: int, surface: float) -> void:
 	if _arrow_mesh == null:
 		_arrow_mesh = PrismMesh.new()
 		_arrow_mesh.size = ARROW
-		# Стрелка светится так же, как цифры рядом: [Label3D] не затеняется, и
-		# затеняемая стрелка на тёмном этаже гасла бы, а под лампой — пересвечивала.
+		# The arrow glows the same as the digits next to it: [Label3D] is not shaded, and
+		# a shaded arrow would go out on a dark floor and be overexposed under a lamp.
 		var ink := StandardMaterial3D.new()
 		ink.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		ink.albedo_color = KIND_DIGITS[_rules.kind]
@@ -396,8 +402,8 @@ func _build_board(x: float, index: int, surface: float) -> void:
 	_show(board, floor_label(_rules, index), 0.0, 0.0)
 
 
-## Циферблат отеля с центром в [param centre]: латунный обод, светлое поле,
-## стрелка. Возвращает узел стрелки — его поворачивает [method _paint].
+## The hotel dial centered at [param centre]: a brass rim, a light face, a
+## hand. Returns the hand node: [method _paint] rotates it.
 func _dial(centre: Vector3) -> Node3D:
 	var brass := GreyboxLook.metal(KIND_TRIM[BuildingIdentity.Kind.HOTEL])
 	if _dial_discs.is_empty():
@@ -430,27 +436,27 @@ func _dial(centre: Vector3) -> Node3D:
 	return pivot
 
 
-## Поворот стрелки циферблата под этаж [param index] шахты [param shaft]:
-## нижний — влево до упора, верхний — вправо.
+## Rotation of the dial hand for floor [param index] of shaft [param shaft]:
+## the bottom one fully left, the top one to the right.
 static func needle_angle(shaft: BuildingPlan.ShaftSpot, index: int) -> float:
 	var reach := maxi(shaft.bottom - shaft.top, 1)
 	var up := float(shaft.bottom - clampi(index, shaft.top, shaft.bottom)) / float(reach)
 	return lerpf(NEEDLE_SWING, -NEEDLE_SWING, up)
 
 
-## Что пишет табло про этаж [param index]: подпись таблички этажа — номер, у
-## паркинга «P» ([method FloorSigns.label_of]), — а на крыше
-## [constant ROOF_LABEL]. Номер крыши по формуле вышел бы на единицу больше
-## верхнего этажа — этажа, которого в здании нет.
+## What the board writes about floor [param index]: the floor sign label, a number, "P"
+## for the garage ([method FloorSigns.label_of]), and on the roof
+## [constant ROOF_LABEL]. The roof number by formula would come out one more than the
+## top floor: a floor the building does not have.
 static func floor_label(rules: BuildingRules, index: int) -> String:
 	if index <= BuildingRules.ROOF:
 		return ROOF_LABEL
 	return FloorSigns.label_of(rules, index)
 
 
-## Сколько панель кнопок занимает у шахты [param x] на этаже [param index]:
-## пара «левый край, правый край», или нулевая пара, если панели нет. Мебель
-## перед ней не встаёт ([method BuildingDressing.blocked_zones]).
+## How much the button panel takes at shaft [param x] on floor [param index]:
+## a "left edge, right edge" pair, or a zero pair if there is no panel. Furniture
+## does not stand in front of it ([method BuildingDressing.blocked_zones]).
 static func call_panel_span(
 	rules: BuildingRules, plan: BuildingPlan, x: float, index: int
 ) -> Vector2:
@@ -462,13 +468,13 @@ static func call_panel_span(
 	return Vector2(minf(near, far), maxf(near, far))
 
 
-## С какой стороны портала панели кнопок место: там, где до двери
-## хватает стены и панель не уходит в боковую стену здания. Справа, если
-## свободны обе; 0 — если заняты обе.
+## On which side of the portal the button panel has room: where there is enough wall
+## before the door and the panel does not go into the building's side wall. Right if
+## both are free; 0 if both are taken.
 ##
-## Дверь считается с наличником, а слева от шахты — ещё и с табличкой номера,
-## которая висит справа от двери ([BuildingProps]): по середине двери панель
-## вставала на наличник двери соседнего места и на её табличку.
+## The door counts with its casing, and left of the shaft also with the number sign,
+## which hangs to the right of the door ([BuildingProps]): by the middle of the door the
+## panel landed on the casing of the neighboring spot's door and on its sign.
 static func call_side(rules: BuildingRules, plan: BuildingPlan, x: float, index: int) -> float:
 	var reach := rules.shaft_width * 0.5 + PORTAL_JAMB + CALL_GAP + CALL_PANEL.x
 	var bounds := rules.floor_span(index)
@@ -490,8 +496,8 @@ static func call_side(rules: BuildingRules, plan: BuildingPlan, x: float, index:
 	return -1.0 if left else 0.0
 
 
-## Табло шахты [param shaft] следят за кабиной [param car]: этаж и направление
-## хода. У двухэтажной — за ведущим ярусом.
+## Boards of shaft [param shaft] watch cab [param car]: floor and direction of
+## travel. For a two-deck one, the leading deck.
 func watch(car: ElevatorCar, shaft: BuildingPlan.ShaftSpot) -> void:
 	_watched[car] = shaft
 	set_physics_process(true)
@@ -504,10 +510,11 @@ func _physics_process(_delta: float) -> void:
 		refresh(car)
 
 
-## Показывает на табло шахты кабины [param car] её этаж и ход — если что-то
-## изменилось с прошлого раза.
+## Shows cab [param car]'s floor and travel on its shaft's boards, if something
+## has changed since last time.
 func refresh(car: ElevatorCar) -> void:
-	# Нижний ярус двухэтажной кабины табло не ведёт: этаж показывает ведущий.
+	# The lower deck of a two-deck cab does not drive the boards: the leading one shows the
+	# floor.
 	if not _watched.has(car):
 		return
 	var shaft := _watched[car] as BuildingPlan.ShaftSpot
@@ -520,16 +527,16 @@ func refresh(car: ElevatorCar) -> void:
 	_paint(car, _span)
 
 
-## Пишет на табло шахты кабины [param car] то, что она показывает сейчас, —
-## на этажах полосы [param span].
+## Writes on the boards of cab [param car]'s shaft what it shows now,
+## on the floors of band [param span].
 func _paint(car: ElevatorCar, span: Vector2i) -> void:
 	var shaft := _watched[car] as BuildingPlan.ShaftSpot
 	var shown: Array = _shown[car]
 	var index := int(shown[0])
 	var heading := float(shown[1])
 	var label := floor_label(_rules, index)
-	# Только этажи своей шахты: в том же столбце бывает другая, со своей кабиной,
-	# и табло столбца целиком показывали бы то одну кабину, то другую.
+	# Only the floors of its own shaft: the same column can hold another one with its own
+	# cab, and the boards of the whole column would show now one cab, now the other.
 	var column := _boards.get(shaft.x, {}) as Dictionary
 	for floor_index in range(maxi(shaft.top, span.x), mini(shaft.bottom, span.y) + 1):
 		var board := column.get(floor_index) as ShaftBoard
@@ -539,17 +546,17 @@ func _paint(car: ElevatorCar, span: Vector2i) -> void:
 				board.needle.rotation.z = needle_angle(shaft, index)
 
 
-## Ход кабины по её скорости: [constant Intent.UP], [constant Intent.DOWN] или
-## 0. Скорость — в плоскости правил, где y растёт вниз: едущая вниз кабина
-## отчитывается положительной скоростью, как и в [method ElevatorCar.speed_now].
+## Cab travel by its velocity: [constant Intent.UP], [constant Intent.DOWN] or
+## 0. Velocity is in the rules plane, where y grows downward: a cab going down
+## reports a positive velocity, as in [method ElevatorCar.speed_now].
 static func heading_of(speed: float) -> float:
 	if is_zero_approx(speed):
 		return 0.0
 	return Intent.DOWN if speed > 0.0 else Intent.UP
 
 
-## Едет ли кабина к этажу табло: вниз — к этажам под ней, вверх — к этажам над
-## ней. Направления — [Intent]; индексы этажей растут вниз, нулевой — верхний.
+## Whether the cab travels toward the board's floor: down means floors below it, up means
+## floors above it. Directions are [Intent]; floor indices grow downward, zero is the top.
 static func coming(heading: float, car_floor: int, board_floor: int) -> float:
 	if heading == Intent.DOWN and board_floor > car_floor:
 		return Intent.DOWN
@@ -558,45 +565,45 @@ static func coming(heading: float, car_floor: int, board_floor: int) -> float:
 	return 0.0
 
 
-## Ближайший к полу кабины этаж её шахты.
+## The floor of its shaft nearest to the cab floor.
 func _nearest_floor(car: ElevatorCar) -> int:
 	var index := _rules.floor_index_near(WorldSpace.to_plane(car.global_position).y)
 	var shaft := _watched.get(car) as BuildingPlan.ShaftSpot
 	return clampi(index, shaft.top, shaft.bottom) if shaft != null else index
 
 
-## Пишет на табло этаж и стрелку хода кабины [param heading] и зажигает кнопку
-## [param call] — ту, в сторону которой кабина идёт к этому этажу.
+## Writes the floor and the cab's travel arrow [param heading] on the board and lights
+## button [param call], the one in whose direction the cab travels to this floor.
 func _show(board: ShaftBoard, label: String, heading: float, call: float) -> void:
 	board.digits.text = label
-	# Ход приходит из [method heading_of]: вверх, вниз или 0 — других не бывает.
+	# Travel comes from [method heading_of]: up, down or 0; there is nothing else.
 	var moving := heading != 0.0
 	board.arrow.visible = moving
 	board.arrow.rotation.z = PI if heading == Intent.DOWN else 0.0
 	board.digits.position = board.center + Vector3(DIGITS_SHIFT if moving else 0.0, 0.0, 0.0)
 	board.lit = call if board.up_button != null else 0.0
 	if board.up_button != null:
-		# Погасшая кнопка возвращается к тёмному металлу: без материала коробка
-		# рисовалась бы белым материалом движка по умолчанию.
+		# A button that goes out returns to dark metal: without a material the box
+		# would be drawn with the engine's default white material.
 		var lit := GreyboxLook.light(CALL_LIT)
 		var dark := GreyboxLook.metal(CALL_DARK)
 		board.up_button.material_override = lit if call == Intent.UP else dark
 		board.down_button.material_override = lit if call == Intent.DOWN else dark
 
 
-## Следят ли табло за этой кабиной.
+## Whether the boards watch this cab.
 func watches(car: ElevatorCar) -> bool:
 	return _watched.has(car)
 
 
-## Что показывает табло портала шахты [param x] на этаже [param index].
+## What the portal board of shaft [param x] on floor [param index] shows.
 func board_text(x: float, index: int) -> String:
 	_catch_up(x, index)
 	var board := (_boards.get(x, {}) as Dictionary).get(index) as ShaftBoard
 	return board.digits.text if board != null else ""
 
 
-## Дописывает табло портала вне кадра, которое спросили: оно отстало.
+## Updates an off-frame portal board that was asked about: it has fallen behind.
 func _catch_up(x: float, index: int) -> void:
 	for car: ElevatorCar in _watched:
 		var shaft := _watched[car] as BuildingPlan.ShaftSpot
@@ -605,19 +612,20 @@ func _catch_up(x: float, index: int) -> void:
 				_paint(car, Vector2i(index, index))
 
 
-## Какая кнопка горит на этом портале: [constant Intent.UP], [constant
-## Intent.DOWN] или 0 — ни одна (или панели нет).
+## Which button is lit on this portal: [constant Intent.UP], [constant
+## Intent.DOWN] or 0, none (or there is no panel).
 func lit_button(x: float, index: int) -> float:
 	_catch_up(x, index)
 	var board := (_boards.get(x, {}) as Dictionary).get(index) as ShaftBoard
 	return board.lit if board != null else 0.0
 
 
-## Источник столба на одном этаже шахты: посреди пролёта, перед направляющими.
+## The column source on one floor of a shaft: in the middle of the span, in front of
+## the rails.
 ##
-## По источнику на этаж, а не один на всю шахту: полоса бывает в четырнадцать
-## этажей, и один источник с таким радиусом освещал бы её середину и оставлял
-## тёмными оба конца — а кабина ходит по всей полосе.
+## One source per floor, not one for the whole shaft: a band can be fourteen
+## floors, and one source with such a radius would light its middle and leave
+## both ends dark, while the cab moves along the whole band.
 func _light_the_shaft(x: float, index: int, surface: float) -> void:
 	var light := OmniLight3D.new()
 	light.omni_range = GLOW_RANGE
@@ -633,18 +641,20 @@ func _light_the_shaft(x: float, index: int, surface: float) -> void:
 	(_glow[index] as Array[OmniLight3D]).append(light)
 
 
-## Упоры в концах полосы: дальше кабина не идёт, и это видно.
+## Buffers at the ends of the band: the cab goes no further, and that is visible.
 ##
-## Отзыв после игры: «лифт не слушается команд и стоит, а сошёл — уехал». Это
-## и был конец полосы — кабина слышала команду, но идти дальше ей некуда, а
-## пустая она тут же уезжала по своему расписанию. Упор объясняет предел без
-## единого слова; второй указатель — стрелки в самой кабине.
+## Feedback after playing: "the elevator does not obey commands and stands still, and
+## once I stepped off it drove away". That was the end of the band: the cab heard the
+## command but had nowhere further to go, and empty, it immediately drove off on its
+## schedule. A buffer explains the limit without a single word; the second pointer is the
+## arrows in the cab itself.
 ##
-## Нижний упор лежит на дне шахты, то есть над полом нижнего её этажа, а не
-## в толще плиты, где его не видно вовсе.
+## The lower buffer lies at the shaft bottom, that is, above the floor of its bottom
+## floor, not inside the slab, where it is not visible at all.
 ##
-## Упор — между стойками, уже и мельче их на [constant BUFFER_INSET]: во всю
-## ширину шахты его грани ложились на грани стоек (ADR-0037, решение 2).
+## The buffer is between the posts, narrower and shallower than them by
+## [constant BUFFER_INSET]: across the full shaft width its faces fell onto the post faces
+## (ADR-0037, decision 2).
 func _mark_shaft_ends(shaft: BuildingPlan.ShaftSpot) -> void:
 	var inner := _rules.shaft_width * 0.5 - RAIL_WIDTH - BUFFER_INSET
 	var top := top_of(shaft)
@@ -656,7 +666,7 @@ func _mark_shaft_ends(shaft: BuildingPlan.ShaftSpot) -> void:
 		_add_part(Rect2(shaft.x - inner, from, inner * 2.0, BUFFER_HEIGHT), buffer, RAIL_Z, depth)
 
 
-## Кусок одежды шахты: коробка без тела на месте прямоугольника правил.
+## A piece of shaft dressing: a box without a body at the place of a rules rectangle.
 func _add_part(rect: Rect2, material: StandardMaterial3D, z: float, depth: float) -> void:
 	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
 		return
@@ -667,11 +677,11 @@ func _add_part(rect: Rect2, material: StandardMaterial3D, z: float, depth: float
 	add_child(part)
 
 
-## Надстройка машинного отделения над верхней шахтой.
+## The machine room structure above the top shaft.
 ##
-## Тела у неё нет намеренно: под ней проём той самой шахты, с которой начинается
-## спуск, и сплошная надстройка заперла бы Otto на крыше. Стоит она у задней
-## стены, и он проходит перед ней.
+## It has no body on purpose: under it is the opening of the very shaft the descent
+## starts from, and a solid structure would lock Otto on the roof. It stands at the back
+## wall, and he passes in front of it.
 func _spawn_machine_room() -> void:
 	var shaft := _plan.roof_shaft()
 	if shaft == null:

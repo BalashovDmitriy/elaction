@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Снимки экрана игры для анализа после играбельной вехи.
+"""Game screenshots for analysis after a playable milestone.
 
-Запускает игру с аргументом `--capture=<веха>`. Автолоад Screenshotter
-прогоняет короткий сценарий вехи (свой на каждую, см. AUTO_PLANS), сохраняет
-по кадру на каждый шаг и закрывает игру.
+Launches the game with the argument `--capture=<milestone>`. The Screenshotter autoload
+runs a short milestone script (each has its own, see AUTO_PLANS), saves
+a frame per step and closes the game.
 
-Снимки складываются в `screens/<веха>/<время>_<шаг>.jpg`.
+Shots go to `screens/<milestone>/<time>_<step>.jpg`.
 
-Важно: рендер настоящий, не headless — нужен экран. В CI не запускается.
+Important: real rendering, not headless — a screen is needed. Not run in CI.
 
-Запуск:
+Run:
     python tools/capture.py M1
 """
 
@@ -47,8 +47,9 @@ def main() -> int:
     for shot in new_shots:
         print(f"  {shot.relative_to(PROJECT_ROOT).as_posix()}")
 
-    # Игра закрывает себя сама после сценария: любой другой код — падение
-    # посреди прогона, и набор кадров тогда неполный, даже если что-то снялось.
+    # The game closes itself after the script: any other exit code is a crash
+    # in the middle of the run, and then the set of shots is incomplete, even if something
+    # was captured.
     if code != 0:
         print(f"Игра завершилась с кодом {code}, набор кадров неполон. Вывод игры:")
         print(output.strip()[-2000:])

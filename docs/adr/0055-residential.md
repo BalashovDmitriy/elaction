@@ -1,105 +1,105 @@
-# ADR-0055 · M24m: жилой дом и свои агенты у каждого типа здания
+# ADR-0055 · M24m: a residential building and own agents for each building kind
 
-- **Статус:** принято
-- **Дата:** 2026-10-02
-- **Дополняет:** [ADR-0033](0033-dressing-from-packs.md) (отель или офис жребием),
-  [ADR-0047](0047-room-behind-the-door.md) (комната за дверью),
-  [ADR-0048](0048-hotel-and-office-apart.md) (отель и офис порознь),
-  [ADR-0032](0032-actor-models.md) (модели актёров)
+- **Status:** accepted
+- **Date:** 2026-10-02
+- **Extends:** [ADR-0033](0033-dressing-from-packs.md) (hotel or office by draw),
+  [ADR-0047](0047-room-behind-the-door.md) (the room behind the door),
+  [ADR-0048](0048-hotel-and-office-apart.md) (hotel and office apart),
+  [ADR-0032](0032-actor-models.md) (actor models)
 
-## Контекст
+## Context
 
-С M21b здание бывает отелем или офисом (`BuildingIdentity.Kind`), с M24i они
-различаются коридором, дверьми, светильниками и комнатой за дверью. Просьба
-пользователя (2026-09-30): третий тип — жилой комплекс, и у каждого типа свои
-агенты.
+Since M21b a building is a hotel or an office (`BuildingIdentity.Kind`), since M24i they
+differ in corridor, doors, light fixtures and the room behind the door. The user's
+request (2026-09-30): a third kind — a residential complex, and each kind with its own
+agents.
 
-**Сверка с оригиналом.** В аркаде 1983 года здание одно: геометрия — одна
-таблица ROM на все здания (`docs/reference/arcade-rom.md`, раздел Building),
-агенты одинаковые во всех зданиях — тёмные костюмы и шляпы. Типы зданий и
-разные агенты — расширение ремейка. Ближайший ориентир — сиквел Elevator
-Action Returns (1994): места разные (башня, аэропорт, торговый центр,
-канализация), у каждого свой состав врагов — агенты в плащах, бизнесмены,
-полиция, панки, — а механика боя общая.
+**Check against the original.** In the 1983 arcade there is one building: the geometry
+is one ROM table for all buildings (`docs/reference/arcade-rom.md`, section Building),
+the agents are the same in all buildings — dark suits and hats. Building kinds and
+different agents are an extension of the remake. The closest reference is the sequel
+Elevator Action Returns (1994): the locations differ (a tower, an airport, a shopping
+mall, sewers), each with its own set of enemies — agents in trench coats,
+businessmen, police, punks — while the combat mechanics are shared.
 
-**Код.** Тип — `enum Kind { HOTEL, OFFICE }`, почти все ветвления — бинарное
-`is_hotel()`: стиль коридора, фактуры, мебель, вывеска, HUD, шаг, комната за
-дверью, тесты и `tools/room_shot.gd`. Агент — один файл `agent.glb`, цвета
-вшиты при сборке в `tools/build_actors.py`. В каталоге мебели нет кухни,
-телевизора и обеденного стола.
+**Code.** The kind is `enum Kind { HOTEL, OFFICE }`, almost all branches are a binary
+`is_hotel()`: corridor style, textures, furniture, sign, HUD, footsteps, the room behind
+the door, tests and `tools/room_shot.gd`. The agent is a single file `agent.glb`, colors
+baked in at build time in `tools/build_actors.py`. The furniture catalog has no kitchen,
+TV or dining table.
 
-## Решения
+## Decisions
 
-Вопросы заданы пользователю 2026-10-02.
+Questions asked of the user on 2026-10-02.
 
-1. **Американский жилой дом 80-х.** Кирпичная жилая башня в духе Нью-Йорка
-   эпохи аркады, имена и вывеска по-английски, как у отеля и офиса.
-2. **Жребий поровну на три.** Отель, офис и жилой дом — по трети; первое
-   здание остаётся отелем EMPIRE. Типы у сидов перетасуются; тесты берут тип
-   из `BuildingIdentity.of`, а не из памяти. Ветвления `is_hotel()` уходят на
-   `Kind`: у третьего типа своё значение в каждом месте, а не «всё, что не
-   отель».
-3. **Вывеска — тот же вертикальный неон на углу,** свой цвет у жилого дома,
-   не совпадающий с игровыми огоньками и неоном отеля и офиса. Неон на жилом
-   доме — допущение ради стиля.
-4. **Коридор жилого дома:**
-   - двери квартир — стальная крашеная створка, глазок, номер квартиры вроде
-     `12C`, коврик у порога, иногда пакет покупок или велосипед;
-   - пол — плитка шахматкой или линолеум, стены крашены в два тона, на
-     потолке плафоны-тарелки;
-   - потёртость — трещины, пятна, тэги граффити, на части этажей мигающая
-     лампа;
-   - обстановка — почтовые ящики, детская коляска, батареи, мешки с мусором,
-     огнетушитель вместо диванов и цветов отеля.
+1. **An American residential building of the 80s.** A brick residential tower in the
+   spirit of New York of the arcade era, names and sign in English, like the hotel and
+   office.
+2. **An even three-way draw.** Hotel, office and residential building — a third each;
+   the first building stays the EMPIRE hotel. Kinds for seeds are reshuffled; tests take
+   the kind from `BuildingIdentity.of`, not from memory. `is_hotel()` branches move to
+   `Kind`: the third kind has its own value in every place, not "everything that is not
+   a hotel".
+3. **The sign — the same vertical neon on the corner,** with its own color for the
+   residential building, not matching the game indicator lights or the hotel and office
+   neon. Neon on a residential building is a liberty taken for style.
+4. **The residential corridor:**
+   - apartment doors — a painted steel leaf, a peephole, an apartment number like
+     `12C`, a mat at the threshold, sometimes a grocery bag or a bicycle;
+   - floor — checkerboard tile or linoleum, walls painted in two tones, dish-shaped
+     ceiling lights;
+   - wear — cracks, stains, graffiti tags, a flickering lamp on some floors;
+   - dressing — mailboxes, a baby stroller, radiators, trash bags, a fire extinguisher
+     instead of the hotel's sofas and plants.
 
-   Мигание лампы — вид, а не механика: зона остаётся светлой, пока лампа
-   цела, как в ROM.
-5. **За красной дверью — квартира, жребием из трёх:** кухня, гостиная с
-   диваном и телевизором или спальня. Телевизор в темноте светится мерцающим
-   голубым. Правила комнаты из ADR-0047 те же: главный предмет в створе,
-   створка свободна.
-6. **Мебель, которой нет, — из CC0-паков** (Kenney Furniture Kit,
-   Quaternius и poly.pizza): холодильник, плита, мойка, кухонный гарнитур,
-   телевизор, обеденный стол со стульями, почтовые ящики, коляска, батарея.
-   Сначала поиск и кадр каталога, потом расстановка.
-7. **Свои агенты у каждого типа — свой гардероб, механика общая.** Одна модель
-   Business Man, перекраска и головной убор — профилями той же сборки
-   `tools/build_actors.py`, что и прежний агент: три `.glb`, тело уровень
-   выбирает по типу здания (`AgentWardrobe`). Перекраска в игре, как у прохожих
-   M24l, отвергнута по ходу: у прохожих модель собрана из частей, а у агента
-   федора и очки — меши сборки, и в игре их пришлось бы строить заново.
-   - отель — нынешний нуар: тёмный костюм, федора, очки;
-   - офис — угольный деловой костюм без шляпы, бордовый галстук, очки;
-   - жилой дом — уличные: тёмно-коричневая куртка поверх водолазки, твидовая
-     кепка, без очков. Плащ на этой модели не собрать: полы на кости бёдер
-     читались сумкой ещё у прохожих (ADR-0054, решение 11).
+   The lamp flicker is a look, not a mechanic: the zone stays lit while the lamp is
+   intact, as in the ROM.
+5. **Behind the red door — an apartment, a draw of three:** a kitchen, a living room
+   with a sofa and a TV, or a bedroom. The TV glows flickering blue in the dark. The
+   room rules of ADR-0047 are the same: the main item in line with the door, the leaf
+   area free.
+6. **Missing furniture — from CC0 packs** (Kenney Furniture Kit, Quaternius and
+   poly.pizza): fridge, stove, sink, kitchen units, TV, a dining table with chairs,
+   mailboxes, a stroller, a radiator. First the search and a catalog frame, then the
+   placement.
+7. **Own agents for each kind — their own wardrobe, shared mechanics.** One Business Man
+   model, recoloring and headwear as profiles of the same `tools/build_actors.py` build
+   as the old agent: three `.glb` files, the level picks the body by building kind
+   (`AgentWardrobe`). In-game recoloring, as for the M24l pedestrians, was rejected
+   along the way: the pedestrian model is assembled from parts, while the agent's fedora
+   and glasses are build meshes, and in the game they would have to be built anew.
+   - hotel — the current noir: dark suit, fedora, glasses;
+   - office — a charcoal business suit without a hat, a burgundy tie, glasses;
+   - residential — street wear: a dark-brown jacket over a turtleneck, a tweed flat cap,
+     no glasses. A trench coat cannot be built on this model: skirts on the hip bones
+     already read as a bag on the pedestrians (ADR-0054, decision 11).
 
-   Агент читается агентом в любом типе: силуэт и тёмный тон держатся, прохожих
-   внутри здания нет.
-8. **Звук:** свой фон коридора у каждого из трёх типов, а в жилом доме ещё и
-   редкие глухие звуки из-за дверей — телевизор, собака, спор соседей. Звуки
-   выбирает пользователь на слух со страницы прослушивания, как в M24l. Шаг по
-   линолеуму.
+   An agent reads as an agent in any kind: the silhouette and dark tone hold, and there
+   are no pedestrians inside the building.
+8. **Sound:** its own corridor ambience for each of the three kinds, and in the
+   residential building also rare muffled sounds from behind doors — a TV, a dog,
+   neighbors arguing. The user picks the sounds by ear from a listening page, as in
+   M24l. Footsteps on linoleum.
 
-### Звук, выбранный на слух
+### Sound chosen by ear
 
-Страница прослушивания, 2026-10-02: фон коридора офиса — Soup_UnderScore
-708021 (CC0), пустой офис с гулом кондиционера; жилого дома — SpliceSound
-338104 (CC0), коридор дома в Бруклине, изредка соседи; за дверью —
-телевизор markb 104578 (CC-BY 4.0), собака klankbeeld 773829 (CC-BY 4.0),
-ссора SieuAmThanh 848362 (CC0); шаг — roman_gens 475080 (CC-BY 4.0), четыре
-удара. Записанное вблизи приглушено при сборке срезом верхов (`muffle`
-в `build_audio.py`). Звук за дверью — `DoorLife`: закрытая дверь квартиры
-без документа на этаже в кадре, раз в одну–две с половиной минуты, слышно на
-семь метров.
+Listening page, 2026-10-02: the office corridor ambience — Soup_UnderScore 708021 (CC0),
+an empty office with air-conditioning hum; the residential one — SpliceSound 338104
+(CC0), a building corridor in Brooklyn, occasional neighbors; behind the door — a TV by
+markb 104578 (CC-BY 4.0), a dog by klankbeeld 773829 (CC-BY 4.0), an argument by
+SieuAmThanh 848362 (CC0); footsteps — roman_gens 475080 (CC-BY 4.0), four steps. What was
+recorded up close is muffled at build time by cutting the highs (`muffle` in
+`build_audio.py`). The sound behind a door is `DoorLife`: a closed apartment door without
+a document on a floor in the frame, once every one to two and a half minutes, audible
+within seven meters.
 
-## Последствия
+## Consequences
 
-- Каждое место, что ветвится по типу, получает третью ветку; тесты, что
-  обходят `[true, false]` для отеля и офиса, обходят все три `Kind`.
-- Агент перестаёт быть одним файлом: моделей три, по типу здания. Добивания
-  ищут шляпу по имени меша (`takedown_scene.gd`) — кепка зовётся так же и
-  слетает так же, у офисного агента шляпы нет, и сценка без неё обходится.
-- Звуки из-за дверей — первые звуки здания, не связанные с игроком и агентами;
-  их громкость и частота подбираются в миксе, чтобы не путались с дверью
-  агента.
+- Every place that branches by kind gets a third branch; tests that go through
+  `[true, false]` for hotel and office go through all three `Kind` values.
+- The agent stops being one file: there are three models, by building kind. Takedowns
+  look for the hat by mesh name (`takedown_scene.gd`) — the cap has the same name and
+  flies off the same way, the office agent has no hat, and the scene does without it.
+- Sounds from behind doors are the first building sounds unrelated to the player and
+  agents; their volume and frequency are tuned in the mix so they are not confused with
+  an agent's door.

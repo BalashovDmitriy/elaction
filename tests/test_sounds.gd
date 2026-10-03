@@ -1,10 +1,10 @@
 extends GutTest
 
-## Тесты звука.
+## Sound tests.
 ##
-## Список имён и папка обязаны совпадать в обе стороны: забытое событие молчит,
-## а файл, который никто не зовёт, копится в репозитории, — и ни то, ни другое
-## не видно ни в кадре, ни в логе. У каждого файла — автор (ADR-0036).
+## The name list and the folder must match both ways: a forgotten event is silent,
+## and a file nobody calls piles up in the repository — and neither one nor the other
+## is visible in a frame or in the log. Every file has an author (ADR-0036).
 
 const CREDITS_JSON := "res://assets/audio/credits.json"
 const CREDITS_MD := "res://CREDITS.md"
@@ -25,8 +25,8 @@ func after_all() -> void:
 
 
 func test_every_sound_has_a_file_and_each_variant_exactly_one() -> void:
-	# Вариант может лежать в WAV или OGG — формат выбирает сборка. Два файла с
-	# одним именем означали бы, что игра берёт один, а правят другой.
+	# A variant may be in WAV or OGG — the build chooses the format. Two files with
+	# one name would mean the game takes one while the other is edited.
 	for name: String in Sounds.names():
 		var count := Sounds.variant_paths(name).size()
 		assert_gt(count, 0, "у звука %s есть файл" % name)
@@ -54,7 +54,7 @@ func test_the_folder_holds_nothing_but_the_listed_sounds() -> void:
 		var stem := file.get_basename()
 		var name := stem.get_slice(".", 0)
 		assert_true(known.has(name), "звук %s кому-то нужен" % stem)
-		# Вариант за пропуском игра бы не нашла: `имя.3` без `имя.2` — мёртвый файл.
+		# The game would not find a variant after a gap: `name.3` without `name.2` is a dead file.
 		if known.has(name):
 			var stems := PackedStringArray()
 			for index: int in Sounds.variant_paths(name).size():
@@ -63,10 +63,10 @@ func test_the_folder_holds_nothing_but_the_listed_sounds() -> void:
 
 
 func test_every_file_has_its_author() -> void:
-	# CC-BY требует указать автора, и указан он должен быть там, где его увидят:
-	# в credits.json для сборки и в CREDITS.md, который едет с игрой.
-	# Разбор через Variant: `as Dictionary` на сломанном файле не даёт null,
-	# и проверка «читается» не срабатывала бы никогда.
+	# CC-BY requires crediting the author, and it must be done where it will be seen:
+	# in credits.json for the build and in CREDITS.md, which ships with the game.
+	# Parsing via Variant: `as Dictionary` on a broken file does not give null,
+	# and the "is readable" check would never fire.
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(CREDITS_JSON))
 	assert_true(parsed is Dictionary, "credits.json читается")
 	if not parsed is Dictionary:
@@ -90,8 +90,8 @@ func test_every_file_has_its_author() -> void:
 
 
 func test_sounds_that_should_loop_do_loop() -> void:
-	# Тема, оборвавшаяся через двадцать секунд, — это не «музыка тихая», это
-	# тишина до конца партии, и заметить её можно только на слух.
+	# A theme that cut off after twenty seconds is not "the music is quiet", it is
+	# silence until the end of the game, and it can only be noticed by ear.
 	for name: String in Sounds.LOOPED:
 		for each: AudioStream in Sounds.variants(name):
 			assert_true(_loops(each), "%s зациклен" % name)
@@ -106,7 +106,7 @@ func test_one_shot_sounds_do_not_loop() -> void:
 
 
 func test_several_variants_are_drawn_on_every_play() -> void:
-	# Пять шагов по бетону — пять файлов: шаги подряд не звучат одним.
+	# Five steps on concrete — five files: consecutive steps do not sound as one.
 	assert_gt(Sounds.variant_paths(Sounds.STEP_CONCRETE).size(), 1, "у шага по бетону варианты")
 	assert_true(
 		Sounds.stream(Sounds.STEP_CONCRETE) is AudioStreamRandomizer, "и жребий на каждый шаг"
@@ -115,8 +115,8 @@ func test_several_variants_are_drawn_on_every_play() -> void:
 
 
 func test_the_building_track_is_picked_by_the_building() -> void:
-	# Треков здания несколько (решение пользователя): одно и то же здание звучит
-	# одним треком, соседние — разными.
+	# There are several building tracks (the user's decision): the same building sounds
+	# with one track, neighbouring ones with different ones.
 	var count := Sounds.variants(Sounds.THEME).size()
 	assert_gt(count, 1, "треков здания несколько")
 	assert_eq(
@@ -131,10 +131,10 @@ func test_the_building_track_is_picked_by_the_building() -> void:
 
 
 func test_a_loop_is_not_restarted_while_it_plays() -> void:
-	# Присваивание `playing = true` каждый физический кадр зовёт `play()` заново,
-	# и от двухсекундного гула кабины слышно первые три миллисекунды. Второй вызов
-	# [method Sounds.keep_playing] обязан оставить идущую петлю в покое — видно это
-	# по объекту воспроизведения: заведённая заново петля получила бы новый.
+	# Assigning `playing = true` every physics frame calls `play()` anew,
+	# and of the two-second cab hum only the first three milliseconds are heard. A second call
+	# of [method Sounds.keep_playing] must leave a running loop alone — this is visible
+	# in the playback object: a loop started anew would get a new one.
 	var host: Node3D = add_child_autofree(Node3D.new()) as Node3D
 	var player := Sounds.source(host, Sounds.ELEVATOR_HUM, 360.0)
 
@@ -156,7 +156,7 @@ func test_an_always_on_source_starts_by_itself() -> void:
 	assert_true(player.playing, "неон гудит без приглашения")
 
 
-## Зациклен ли поток. Форматов два, и у каждого свой способ об этом сказать.
+## Whether the stream loops. There are two formats, and each has its own way of saying so.
 func _loops(stream: AudioStream) -> bool:
 	var wav := stream as AudioStreamWAV
 	if wav != null:
@@ -171,7 +171,7 @@ func _audio_files() -> PackedStringArray:
 	if folder == null:
 		return files
 	for file: String in folder.get_files():
-		# Godot в экспортированной сборке видит .import, в проекте — исходник.
+		# In an exported build Godot sees .import, in the project — the source.
 		if file.ends_with(".wav") or file.ends_with(".ogg"):
 			files.append(file)
 	return files

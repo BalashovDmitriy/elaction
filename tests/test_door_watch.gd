@@ -1,10 +1,10 @@
 extends GutTest
 
-## Тесты агента у двери, за которой спрятался Otto (ADR-0038, решение 2).
+## Tests of an agent at the door Otto hid behind (ADR-0038, decision 2).
 ##
-## Правило пользователя, в ROM его нет: агенты его этажа иногда подходят к двери и
-## ждут. Стерегутся здесь границы «иногда»: не больше одного у двери, жребий раз
-## на визит, вышел Otto — ждать некого. Проверка на здании — в
+## The user's rule, not in the ROM: agents of his floor sometimes walk up to the door and
+## wait. What is guarded here are the bounds of "sometimes": no more than one at the door,
+## one draw per visit, Otto came out — nobody to wait for. The building check is in
 ## [code]test_red_door.gd[/code].
 
 const FLOOR: int = 7
@@ -19,7 +19,7 @@ func _watch(seed_value: int) -> DoorWatch:
 	return watch
 
 
-## Один кадр уровня: каждого агента спрашивают, где ему ждать. Возвращает ответы.
+## One level frame: each agent is asked where to wait. Returns the answers.
 func _frame(watch: DoorWatch, ids: Array[int], xs: Array[float]) -> Array[float]:
 	var posts: Array[float] = []
 	watch.start_frame()
@@ -51,8 +51,8 @@ func test_never_more_than_one_agent_waits_at_the_door() -> void:
 
 
 func test_the_roll_is_once_per_visit_not_per_frame() -> void:
-	# Жребий за кадр дал бы «иногда» каждому за секунду: на шестидесяти сидах
-	# одинокий агент пошёл бы всегда. Раз на визит — примерно в половине.
+	# A draw per frame would give "sometimes" to everyone within a second: on sixty seeds
+	# a lone agent would always go. Once per visit — in about half.
 	var went := 0
 	var ids: Array[int] = [5]
 	var xs: Array[float] = [4.0]
@@ -107,8 +107,8 @@ func test_the_watcher_lets_go_when_otto_comes_out() -> void:
 
 
 func test_a_gone_watcher_frees_the_door() -> void:
-	# Ждущего убили: в следующем кадре о нём не спросят, и место у двери
-	# свободно — но жребий уже брошенным не перебрасывается.
+	# The waiting one was killed: next frame nobody asks about him, and the place at the door
+	# is free — but a draw already cast is not recast.
 	var found := false
 	for seed_value: int in range(1, 60):
 		var watch := _watch(seed_value)

@@ -1,17 +1,17 @@
 extends Node3D
 
-## Кабины трёх типов рядом (ADR-0057, решение 6): латунь отеля, нержавейка
-## офиса, грузовая жилого дома — с решёткой сложенной и закрытой. Модель
-## Otto стоит в каждой: читается ли он за прутьями.
+## Cabs of the three kinds side by side (ADR-0057, decision 6): hotel brass, office
+## stainless steel, residential freight — with the gate folded and closed. An Otto
+## model stands in each: whether he reads behind the bars.
 ##
-## Запуск:
+## Run:
 ##     godot --path . res://tools/cab_shot.tscn
 ##     godot --path . res://tools/cab_shot.tscn -- --folder=M24o
 
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 const OTTO := preload("res://src/actors/otto/otto.tscn")
 
-## Шаг кабин, м, ширина и просвет — как в здании по умолчанию.
+## Cab step, m, width and clearance — as in the default building.
 const STEP: float = 2.6
 const WIDTH: float = 1.8
 const CLEAR: float = 3.0
@@ -44,7 +44,7 @@ func _stage() -> void:
 	lamp.omni_range = 12.0
 	lamp.light_energy = 2.0
 	add_child(lamp)
-	# Отель, офис, жилой дом с решёткой сложенной, жилой дом с закрытой.
+	# Hotel, office, residential with the gate folded, residential with it closed.
 	var looks: Array[Array] = [
 		[BuildingIdentity.Kind.HOTEL, 1.0],
 		[BuildingIdentity.Kind.OFFICE, 1.0],

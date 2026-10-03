@@ -1,41 +1,42 @@
-# ADR-0049 · M24i: свой вертолёт
+# ADR-0049 · M24i: our own helicopter
 
-- **Статус:** принято
-- **Дата:** 2026-09-30
-- **Дополняет:** [ADR-0045](0045-takedowns-helicopter-dressing.md), решение 5,
-  [ADR-0038](0038-building-start-and-end.md), решение 1 (вертолёт вступления)
+- **Status:** accepted
+- **Date:** 2026-09-30
+- **Extends:** [ADR-0045](0045-takedowns-helicopter-dressing.md), decision 5,
+  [ADR-0038](0038-building-start-and-end.md), decision 1 (the intro helicopter)
 
-## Контекст
+## Context
 
-Решение 5 ADR-0045: вертолёт — свободной моделью детальнее, а нет достойной —
-своя модель скриптом. Лоу-поли kazuma (CC0) по кадрам M24g читался плоским
-силуэтом: десяток граней, винт одной линией, полозья палками, ни дверей, ни
-хвостового винта.
+Decision 5 of ADR-0045: the helicopter — a more detailed free model, and if there is
+no worthy one — our own model by script. The low-poly kazuma (CC0) in the M24g frames
+read as a flat silhouette: a dozen faces, the rotor as one line, skids as sticks, no
+doors, no tail rotor.
 
-Сверка кандидатов на poly.pizza (2026-09-30): лучший — Helicopter,
-jeremy (CC-BY), но это один меш в три цвета, винт от корпуса не отделить,
-двери нет. Остальные — игрушечные или военные.
+Check of candidates on poly.pizza (2026-09-30): the best is Helicopter,
+jeremy (CC-BY), but it is one mesh in three colors, the rotor cannot be separated from
+the body, there is no door. The rest are toy-like or military.
 
-## Решения
+## Decisions
 
-1. **Своя модель, `tools/build_helicopter.py`.** Лёгкий вертолёт лофтом по
-   сечениям: округлый нос, кабина, сужение в балку, киль со стабилизатором,
-   капот с заборником и выхлопом, полозья на поперечинах со ступеньками.
-   Остекление — лобовое и окна кабины с переплётом. Сдвижная дверь откачена
-   назад, проём прорезан: в него видно салон — кресла, стенку, пол.
-2. **Винты — отдельные узлы** `MainRotor` и `TailRotor` с началом на оси: игра
-   крутит несущий и хвостовой, хвостовой — быстрее. Под лопастями — диск
-   размытия: полупрозрачный круг с бегущими по нему лопастями.
-3. **Точки модели — пустышками:** огни, прожектор, свет кабины и лебёдка.
-   Игра ставит туда свои огни и источники, а не угадывает место по габариту.
-   Лебёдка — на оси винта: вступление вешает вертолёт так, чтобы трос пришёлся
-   над местом приземления.
-4. **Перекраска по имени материала:** корпус — тёмный металлик с холодным
-   ободком, стекло — тёмное с отражением и слабым свечением приборов, проём
-   — тёплым светом кабины. Свет, лепящий объём, — прежний: огни, свет кабины и
-   прожектор снизу, пока вертолёт висит.
+1. **Our own model, `tools/build_helicopter.py`.** A light helicopter lofted through
+   cross-sections: a rounded nose, a cabin, a taper into the boom, a fin with a
+   stabilizer, a cowling with an intake and exhaust, skids on cross tubes with steps.
+   Glazing — the windshield and cabin windows with frames. The sliding door is
+   pushed back, the opening is cut: the cabin is visible through it — seats, a
+   bulkhead, the floor.
+2. **Rotors — separate nodes** `MainRotor` and `TailRotor` with their origin on the
+   axis: the game spins the main and tail rotors, the tail one faster. Under the
+   blades — a blur disc: a semi-transparent circle with blades running over it.
+3. **Model points — as empties:** lights, searchlight, cabin light and winch. The
+   game puts its own lights and sources there rather than guessing the place from the
+   bounds. The winch is on the rotor axis: the intro hangs the helicopter so that the
+   rope falls above the landing spot.
+4. **Recoloring by material name:** the body is dark metallic with a cold rim, the
+   glass is dark with a reflection and a faint glow of instruments, the opening — with
+   the warm cabin light. The light that sculpts the volume is as before: lights, cabin
+   light and the searchlight from below while the helicopter hovers.
 
-## Последствия
+## Consequences
 
-- `Helicopter` ищет части модели по именам, а не по номерам поверхностей.
-- kazuma убран из авторов: модели в игре больше нет.
+- `Helicopter` finds model parts by name, not by surface index.
+- kazuma is removed from the credits: the model is no longer in the game.

@@ -1,29 +1,29 @@
 class_name CitySky
 extends RefCounted
 
-## Небо города по времени суток и погоде (ADR-0051, решение 11): HDRI-панорама
-## Poly Haven, выбранная пользователем, и свет солнца — или луны — оттуда же,
-## где оно на панораме.
+## City sky by time of day and weather (ADR-0051, decision 11): a Poly Haven HDRI panorama
+## chosen by the user, and the light of the sun — or the moon — from the same
+## place where it is on the panorama.
 ##
-## Панорамы качает [code]tools/build_sky.py[/code]; он же печатает, где на каждой
-## солнце, — эти числа здесь. Панорама поворачивается так, чтобы её солнце
-## стояло по [method TimeOfDay.sun_direction]: за спиной камеры и сбоку, иначе
-## фасады города стояли бы против света.
+## Panoramas are downloaded by [code]tools/build_sky.py[/code]; it also prints where the sun is on
+## each one — those numbers are here. The panorama is rotated so that its sun
+## stands at [method TimeOfDay.sun_direction]: behind the camera and to the side, otherwise
+## the city facades would stand against the light.
 
 const SHADER := preload("res://src/levels/city_sky.gdshader")
 
-## Сила неба ночью и в непогоду вечером — доля дневной: панорамы Poly Haven
-## выставлены на дневную экспозицию, а ночь у нас — ночь.
+## Sky energy at night and in bad weather in the evening — a share of the daytime one: Poly Haven
+## panoramas are exposed for daytime, while our night is night.
 const NIGHT_ENERGY: float = 0.05
 const DUSK_ENERGY: float = 0.35
 
-## Свет луны — холодный и слабый.
+## Moonlight — cold and weak.
 const MOON_COLOUR := Color(0.62, 0.72, 1.0)
 const MOON_ENERGY: float = 0.12
 
 
-## Панорама: файл, где на ней солнце — азимут и высота, градусы, — и во
-## сколько раз приглушить её, чтобы город стоял в кадре, а не в засветке.
+## Panorama: the file, where the sun is on it — azimuth and elevation, degrees — and how
+## many times to dim it so that the city stands in the frame rather than blown out.
 class Look:
 	extends RefCounted
 	var path: String = ""
@@ -38,8 +38,8 @@ class Look:
 		energy = gain
 
 
-## Панорамы по случаям (`tools/build_sky.py`). Ночная — с луной: её свет
-## ставится на место солнца.
+## Panoramas per case (`tools/build_sky.py`). The night one — with the moon: its light
+## is put in the place of the sun.
 static var _looks: Dictionary = {}
 
 
@@ -57,9 +57,9 @@ static func _all() -> Dictionary:
 	return _looks
 
 
-## Какая панорама у этого времени и погоды. В туман и дождь утром и днём —
-## свои, в снег — туманная, белёсая; вечером и ночью — одна пасмурная, ночью
-## приглушённая.
+## Which panorama this time and weather have. In fog and rain in the morning and daytime —
+## their own, in snow — the foggy, whitish one; in the evening and at night — one overcast, at night
+## dimmed.
 static func key_of(time: TimeOfDay.Kind, weather: Weather.Kind) -> String:
 	if weather == Weather.Kind.CLEAR:
 		return ["morning_clear", "day_clear", "evening_clear", "night_clear"][time]
@@ -72,7 +72,7 @@ static func look(time: TimeOfDay.Kind, weather: Weather.Kind) -> Look:
 	return _all()[key_of(time, weather)]
 
 
-## Сила неба: ночью пасмурная панорама приглушена как ночная.
+## Sky energy: at night the overcast panorama is dimmed like the night one.
 static func energy(time: TimeOfDay.Kind, weather: Weather.Kind) -> float:
 	var chosen := look(time, weather)
 	if TimeOfDay.is_night(time) and weather != Weather.Kind.CLEAR:
@@ -80,7 +80,7 @@ static func energy(time: TimeOfDay.Kind, weather: Weather.Kind) -> float:
 	return chosen.energy
 
 
-## Материал неба: панорама, повёрнутая солнцем к [method TimeOfDay.sun_direction].
+## Sky material: the panorama rotated with its sun toward [method TimeOfDay.sun_direction].
 static func material(time: TimeOfDay.Kind, weather: Weather.Kind) -> ShaderMaterial:
 	var chosen := look(time, weather)
 	var sky := ShaderMaterial.new()
@@ -93,7 +93,7 @@ static func material(time: TimeOfDay.Kind, weather: Weather.Kind) -> ShaderMater
 	return sky
 
 
-## Свет над городом: солнце, а ночью луна — с панорамы, там же, где на ней.
+## Light over the city: the sun, and at night the moon — from the panorama, where it is on it.
 static func light(time: TimeOfDay.Kind, weather: Weather.Kind) -> DirectionalLight3D:
 	var sun := DirectionalLight3D.new()
 	sun.name = "Sun"

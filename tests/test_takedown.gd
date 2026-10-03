@@ -1,13 +1,13 @@
 extends GutTest
 
-## Добивания вместо удара ногой (ADR-0040): правило, позы сценок и сценка на
-## живых Otto и агенте.
+## Takedowns instead of the kick (ADR-0040): the rule, the scene poses and a scene with a live Otto
+## and agent.
 
 const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 const AGENT_MODEL := preload("res://assets/models/agent.glb")
 
-## Сколько ждать конца сценки, с — с запасом на самую длинную.
+## How long to wait for the end of a scene, s — with margin for the longest one.
 const SCENE_WAIT: float = 3.0
 
 
@@ -18,7 +18,7 @@ func after_each() -> void:
 	GameState.instance().reset()
 
 
-# --- Правило -------------------------------------------------------------------
+# --- Rule ----------------------------------------------------------------------
 
 
 func test_reach_is_close_ahead_on_the_same_floor() -> void:
@@ -36,8 +36,8 @@ func test_the_side_is_where_the_agent_looks() -> void:
 
 
 func test_landing_next_to_an_agent_is_a_pounce() -> void:
-	# ADR-0042, решение 9: вплотную на том же этаже — с любой стороны, с прыжка
-	# или с этажа выше, неважно.
+	# ADR-0042, decision 9: close up on the same floor — from any side, from a jump or from the floor
+	# above, it does not matter.
 	var agent := Vector2(0.0, 0.0)
 	assert_true(Takedown.lands_on(Vector2(0.2, 0.0), agent), "на агента — напрыгнул")
 	assert_true(Takedown.lands_on(Vector2(-0.8, 0.05), agent), "вплотную сзади — тоже")
@@ -46,8 +46,8 @@ func test_landing_next_to_an_agent_is_a_pounce() -> void:
 
 
 func test_scores_by_side_with_the_dark_bonus() -> void:
-	# Решение пользователя (ADR-0040): спереди 200, сзади и сверху 300, в темноте
-	# +100. Дороже выстрела (100) при любой стороне.
+	# The user's decision (ADR-0040): from the front 200, from behind and from above 300, in darkness
+	# +100. More than a shot (100) from any side.
 	assert_eq(Takedown.score(Takedown.Side.FRONT, false), 200)
 	assert_eq(Takedown.score(Takedown.Side.BACK, false), 300)
 	assert_eq(Takedown.score(Takedown.Side.ABOVE, false), 300)
@@ -73,8 +73,8 @@ func test_a_scene_does_not_repeat_in_a_row() -> void:
 
 
 func test_every_scene_is_playable() -> void:
-	# Позы сценок — из таблицы рига: неизвестная встала бы стойкой, и сценка
-	# играла бы сама себя без движения.
+	# Scene poses come from the rig table: an unknown one would play as a stance, and the scene would
+	# play itself out without movement.
 	for scene: Takedown.Scene in Takedown.all_scenes():
 		assert_gt(scene.kill_at, 0.0, "%s: агент гибнет не в первый кадр" % scene.name)
 		assert_lt(scene.kill_at, scene.duration, "%s: и до конца сценки" % scene.name)
@@ -105,7 +105,7 @@ func test_a_snapped_neck_turns_the_head_aside() -> void:
 	)
 
 
-# --- Сценка на живых -------------------------------------------------------------
+# --- Scene with live actors ------------------------------------------------------
 
 
 func _floor() -> void:
@@ -137,7 +137,7 @@ func _otto_at(x: float, y: float = 0.05) -> Otto:
 	return otto
 
 
-## Агент, вышедший сразу и не стреляющий: сценку проверяют, а не дуэль.
+## An agent who came out at once and does not shoot: the scene is under test, not a duel.
 func _agent_at(otto: Otto, x: float, facing: float) -> Enemy:
 	var agent := ENEMY_SCENE.instantiate() as Enemy
 	agent.emerge_time = 0.0
@@ -185,8 +185,8 @@ func test_shooting_close_up_takes_the_agent_down_from_the_front() -> void:
 	if director == null:
 		return
 	assert_eq(director.scene().side, Takedown.Side.FRONT, "агент лицом к Otto — спереди")
-	# Замедление неровное (ADR-0050): заход быстрее, к удару — [constant
-	# TakedownScene.SLOW], на ударе — стоп-кадр.
+	# The slow-down is uneven (ADR-0050): the approach is faster, toward the blow — [constant
+	# TakedownScene.SLOW], on the blow — a freeze frame.
 	assert_between(
 		Engine.time_scale,
 		TakedownScene.SLOW - 0.001,
@@ -246,8 +246,8 @@ func test_a_far_agent_is_shot_not_taken_down() -> void:
 
 
 func test_otto_killed_mid_scene_lets_the_agent_live() -> void:
-	# Otto в сценке уязвим (ADR-0040, решение 5): погиб до ключевого кадра —
-	# агент жив и снова в бою, мир в своём темпе.
+	# Otto is vulnerable in the scene (ADR-0040, decision 5): if he dies before the key frame — the
+	# agent is alive and back in combat, the world at its own pace.
 	_floor()
 	var otto := _otto_at(0.0)
 	await wait_physics_frames(4)
@@ -265,13 +265,13 @@ func test_otto_killed_mid_scene_lets_the_agent_live() -> void:
 
 func test_falling_onto_an_agent_pounces_by_itself() -> void:
 	_floor()
-	# Загон из двух низких стенок: агент ходит быстрее, чем Otto падает, и из-под
-	# падающего уходит — в игре так и надо, а в тесте он разворачивается на месте.
+	# A pen of two low walls: the agent walks faster than Otto falls and gets out from under the
+	# falling Otto — in the game that is how it should be, but in the test he turns around in place.
 	_wall(-0.9)
 	_wall(0.9)
 	var otto := _otto_at(-6.0)
 	var agent := _agent_at(otto, 0.0, -1.0)
-	# Сверху напрыгивают на вышедшего: в проёме агент неуязвим.
+	# Jumping on from above onto one who has come out: in the doorway the agent is invulnerable.
 	var wait := 120
 	while wait > 0 and not agent.takedown_ready:
 		await wait_physics_frames(1)
@@ -291,7 +291,7 @@ func test_falling_onto_an_agent_pounces_by_itself() -> void:
 
 
 func test_a_dead_otto_does_not_pounce() -> void:
-	# Убитый в полёте падает телом: напрыгивает только живой.
+	# One killed in flight falls as a body: only a living Otto jumps on.
 	_floor()
 	_wall(-0.9)
 	_wall(0.9)
@@ -311,15 +311,14 @@ func test_a_dead_otto_does_not_pounce() -> void:
 
 
 func test_a_jump_onto_an_agent_pounces() -> void:
-	# Отзыв после M24e: прыжок с приземлением на агента не добивал никогда —
-	# напрыгивание ждало опоры выше этажа агента. С M24f приземлился вплотную —
-	# напрыгнул (ADR-0042, решение 9).
+	# Feedback after M24e: a jump landing on an agent never made a takedown — jumping on waited for
+	# support above the agent's floor. Since M24f, landed close up — jumped on (ADR-0042, decision 9).
 	_floor()
 	_wall(-0.9)
 	_wall(0.9)
 	var otto := _otto_at(0.0)
 	var agent := _agent_at(otto, 0.0, -1.0)
-	# Прыгают с пола: поставленный Otto сперва долетает до него.
+	# Jumps are made from the floor: the placed Otto first falls down to it.
 	var wait := 120
 	while wait > 0 and not (agent.takedown_ready and otto.is_grounded()):
 		await wait_physics_frames(1)
@@ -340,8 +339,8 @@ func test_a_jump_onto_an_agent_pounces() -> void:
 
 
 func test_the_director_does_not_push_the_agent_into_a_wall() -> void:
-	# Агента, прижатого к стене, режиссёр ставит у стены, а не в неё (авторевью
-	# M24d): сценка спереди просит 0.62–0.72 м, а до стены меньше.
+	# An agent pressed against a wall is placed by the director at the wall, not into it (M24d code
+	# review): the front scene asks for 0.62–0.72 m, and the wall is closer than that.
 	_floor()
 	_wall(0.75)
 	var otto := _otto_at(0.0)
@@ -359,8 +358,8 @@ func test_the_director_does_not_push_the_agent_into_a_wall() -> void:
 
 
 func test_a_freed_agent_ends_the_scene_quietly() -> void:
-	# Агента выбросили посреди сценки — сценка снимается, мир в своём темпе, и
-	# никто не обращается к освобождённому узлу.
+	# The agent was thrown out in the middle of the scene — the scene is removed, the world at its own
+	# pace, and nobody accesses the freed node.
 	_floor()
 	var otto := _otto_at(0.0)
 	await wait_physics_frames(4)
@@ -375,8 +374,8 @@ func test_a_freed_agent_ends_the_scene_quietly() -> void:
 	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "мир в своём темпе")
 
 
-## Толчок камеры на ударе (ADR-0050): кадр сдвинут и накренён, а за
-## [constant SideCamera.KICK_FADE] настоящего времени встаёт на место.
+## Camera kick on the blow (ADR-0050): the view is shifted and tilted, and within [constant
+## SideCamera.KICK_FADE] of real time it settles back.
 func test_the_camera_kicks_on_the_blow_and_settles() -> void:
 	var target := Node3D.new()
 	add_child_autofree(target)

@@ -1,7 +1,7 @@
 extends GutTest
 
-## Ячейки выпуска агентов по ROM (ADR-0027, решение 2): занятая и ждущая смены
-## не годятся, а ручной потолок прогонов сверх четырёх ячеек ROM получает свои.
+## Agent release cells by the ROM (ADR-0027, decision 2): an occupied cell and one waiting for a
+## change do not fit, and a manual cap of runs above the ROM's four cells gets its own.
 
 
 func test_a_taken_slot_is_not_offered_again() -> void:
@@ -12,7 +12,7 @@ func test_a_taken_slot_is_not_offered_again() -> void:
 	assert_ne(spawn.open_slot(3), first, "занятую второй раз не дают")
 
 
-## Освободившаяся ячейка ждёт смены по сложности (@3866), и только потом годна.
+## A freed cell waits for a change by difficulty (@3866), and only then is it usable.
 func test_a_released_slot_waits_for_its_shift() -> void:
 	var spawn := AgentSpawn.new()
 	for slot: int in 3:
@@ -24,8 +24,8 @@ func test_a_released_slot_waits_for_its_shift() -> void:
 	assert_eq(spawn.open_slot(3), 0, "пришла — ячейка снова годна")
 
 
-## `tools/playthrough.gd --at-once=8`: потолок сверх четырёх ячеек ROM не
-## упирается в них молча.
+## `tools/playthrough.gd --at-once=8`: a cap above the ROM's four cells does not silently run into
+## them.
 func test_a_manual_cap_above_the_rom_gets_its_slots() -> void:
 	var spawn := AgentSpawn.new()
 	for _agent: int in 8:
@@ -35,8 +35,9 @@ func test_a_manual_cap_above_the_rom_gets_its_slots() -> void:
 	assert_eq(spawn.open_slot(8), -1, "девятой нет")
 
 
-## Телеграф в конце смены (ADR-0028, решение 7): ячейка годится за ход створки
-## до конца смены, и агент выходит, когда смена кончилась, а не на 0.7 с позже.
+## Telegraph at the end of the change (ADR-0028, decision 7): a cell becomes usable one leaf
+## movement before the end of the change, and the agent comes out when the change has ended, not 0.7
+## s later.
 func test_a_slot_opens_a_door_travel_before_its_shift_ends() -> void:
 	var spawn := AgentSpawn.new()
 	for slot: int in 3:

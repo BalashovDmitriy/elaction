@@ -1,184 +1,182 @@
 class_name OttoBot
 extends RefCounted
 
-## Бот, проходящий здание: спускается сверху вниз, собирает документы, уходит в выход.
+## A bot that plays through the building: goes down from top to bottom, collects the documents,
+## leaves through the exit.
 ##
-## Водится **по состоянию, а не по времени**: не «держи вправо 3.5 секунды», а
-## «держи вправо, пока не дойдёшь». Тесты по выдержкам в этом проекте ломались
-## четырежды подряд — на сценариях съёмки — и каждый раз молча снимали не то, что
-## обещали. Здесь такого быть не должно: бот смотрит, где он есть, и решает заново.
+## It is driven **by state, not by time**: not "hold right for 3.5 seconds" but "hold right until
+## you get there". Timed tests in this project broke four times in a row — on shooting scenarios —
+## and each time silently captured something other than what they promised. That must not happen
+## here: the bot looks at where it is and decides anew.
 ##
-## Путь бот берёт из графа здания ([method BuildingRoute.walkable]), а не ищет
-## жадно. До M18 жадности хватало: шахты шли встык, и на каждом стыке стоял
-## эскалатор. Теперь шахты перехлёстываются, эскалаторы ходят в обе стороны, а
-## глухая стена делит этаж надвое — и «ехать вниз ближайшей шахтой» упирается
-## в тупик, из которого выход только назад и вверх (ADR-0024).
+## The bot takes its path from the building graph ([method BuildingRoute.walkable]) rather than
+## searching greedily. Up to M18 greed was enough: shafts were laid end to end, and every junction
+## had an escalator. Now shafts overlap, escalators run both ways, and a blank wall splits a floor
+## in two — and "ride down the nearest shaft" runs into a dead end whose only way out is back and up
+## (ADR-0024).
 ##
-## Отстреливаться и уклоняться бот умеет: под высокую пулю приседает, через низкую
-## прыгает. Без этого он мерил бы не игру, а себя — в оригинале присед и прыжок и
-## есть защита от огня (ADR-0006, пункт 3), и стоящий под выстрелом бот доказывал
-## бы только то, что стоять под выстрелом нельзя.
+## The bot can shoot back and dodge: it crouches under a high bullet and jumps over a low one.
+## Without this it would measure itself rather than the game — in the original, crouch and jump are
+## the defence against fire (ADR-0006, item 3), and a bot standing under fire would only prove that
+## you cannot stand under fire.
 ##
-## С M24a пуля агента втрое быстрее ROM (ADR-0037, решение 5), и бот, как и игрок,
-## уходит от выстрела по лучу прицела, а не по самой пуле: луч горит весь замах
-## ROM, на высоте будущей пули. Высокий — присесть сразу, низкий — прыгнуть так,
-## чтобы пуля пришла, пока ноги над ней.
+## Since M24a an agent's bullet is three times faster than in the ROM (ADR-0037, decision 5), and
+## the bot, like the player, dodges by the aiming beam rather than by the bullet itself: the beam is
+## lit for the whole ROM wind-up, at the height of the future bullet. High — crouch at once; low —
+## jump so that the bullet arrives while the feet are above it.
 ##
-## Подошедшего вплотную агента бот не обходит, а встречает. С M24d — добиванием
-## (ADR-0040): агента, который не целится, бот нагоняет стоя и жмёт выстрел в
-## упор, а выстрел вплотную и есть добивание. Спиной к нему агента подкарауливают
-## издалека — сзади добивание дороже; лицом — только совсем рядом, иначе выстрел
-## придёт раньше. Целящегося бот, как и прежде, встречает дуэлью из приседа.
+## The bot does not walk around an agent who has come up close, it meets him. Since M24d — with a
+## takedown (ADR-0040): an agent who is not aiming is caught up with standing and shot point-blank,
+## and a point-blank shot is the takedown. An agent with his back to the bot is stalked from afar —
+## a takedown from behind is worth more; one facing it only from very close, otherwise his shot
+## comes first. An aiming agent the bot, as before, meets with a duel from a crouch.
 ##
-## Думает бот в координатах правил — там же, где раскладка и этажи. Из сцены он
-## переводит в одном месте, [method _at]: сцена считает Y вверх, правила вниз, и
-## бот, читающий сцену напрямую, шёл бы по зданию вверх ногами (ADR-0021).
+## The bot thinks in rule coordinates — the same as the layout and floors. It converts from the
+## scene in one place, [method _at]: the scene counts Y upward, the rules downward, and a bot
+## reading the scene directly would walk the building upside down (ADR-0021).
 
-## Насколько близко к цели по горизонтали считается «дошёл», м.
+## How close to the target horizontally counts as "arrived", m.
 const REACHED: float = 0.18
 
-## С какого расстояния бот открывает огонь, м.
+## From what distance the bot opens fire, m.
 ##
-## Полкадра по ширине: дальности огня у агента нет, он бьёт, пока он в кадре
-## (ADR-0027, решение 3а), — и кто выстрелил первым, тот и жив. Стреляет бот,
-## только если агент уже на его линии.
+## Half a frame wide: an agent has no fire range, he shoots while he is in the frame (ADR-0027,
+## decision 3a), — and whoever shoots first lives. The bot fires only if the agent is already on its
+## line.
 const ENGAGE: float = SideCamera.DEFAULT_HALF_HEIGHT * 16.0 / 9.0
 
-## Насколько агент должен совпадать с Otto по высоте, чтобы считаться целью, м.
-## Пуля летит по горизонтали, и агент этажом ниже — не цель, а трата патрона.
+## How closely an agent must match Otto in height to count as a target, m. The bullet flies
+## horizontally, and an agent a floor below is not a target but a wasted round.
 const SAME_LINE: float = 0.72
 
-## С какого расстояния бот идёт добивать агента, стоящего к нему спиной, м.
-## Дальше агент успеет обернуться: он бродит с паузами (ADR-0027, решение 3а).
+## From what distance the bot goes to take down an agent standing with his back to it, m. Any
+## farther and the agent has time to turn around: he wanders with pauses (ADR-0027, decision 3a).
 const TAKEDOWN_SNEAK: float = 5.0
 
-## С какого расстояния бот бросается добивать агента, смотрящего на него, м. Два
-## шага: дольше идти под взглядом агента — дать ему замахнуться.
+## From what distance the bot rushes to take down an agent facing it, m. Two steps: walking longer
+## under the agent's gaze gives him time to wind up.
 const TAKEDOWN_RUSH: float = 2.2
 
-## Сколько бот готов драться, не сходя с места, с игрового времени.
+## How long the bot is willing to fight without moving, in seconds of game time.
 ##
-## Отсчёт идёт, пока рядом вообще кто-то есть, и обнуляется, только когда линия
-## чиста. Дальше бот идёт напролом: агент бывает и недосягаем — за проёмом, на
-## кабине, в глухом углу, — а двери подсылают следующего каждые три секунды.
-## Бот, который стоит до победы, не уходит с этажа никогда.
+## The count runs while anyone at all is nearby and resets only when the line is clear. After that
+## the bot pushes through: an agent can also be out of reach — beyond an opening, on a cab, in a
+## blind corner — and doors send the next one every three seconds. A bot that stands until it wins
+## never leaves the floor.
 const DUEL_PATIENCE: float = 2.0
 
-## За сколько секунд до попадания бот замечает летящую пулю.
+## How many seconds before impact the bot notices a flying bullet.
 ##
-## Прежние 2.88 м при пуле ROM, 8.88 м/с, — это 0.32 с; пуля втрое быстрее, и
-## мерить её надо временем, а не метрами (ADR-0037, решение 5). Главный знак
-## теперь луч прицела, а пуля в полёте — запасной: луч мог упереться в стену
-## между ними, а бот — не успеть по нему.
+## The former 2.88 m with the ROM bullet at 8.88 m/s is 0.32 s; the bullet is three times faster,
+## and it has to be measured in time, not metres (ADR-0037, decision 5). The main sign is now the
+## aiming beam, and a bullet in flight is the fallback: the beam may have hit a wall between them,
+## and the bot may have missed reacting to it.
 const DODGE_SIGHT: float = 0.32
 
-## За сколько секунд до попадания бот прыгает через низкую пулю.
+## How many seconds before impact the bot jumps over a low bullet.
 ##
-## Ступни Otto поднимаются над низкой пулей ROM (0.68 м) через 0.1 с после
-## толчка и держатся над ней до 0.85 с (прыжок 7.9 м/с при тяжести 16.6). Решает
-## бот раз в два кадра под [member Engine.time_scale] 4, то есть раз в 0.13 с, —
-## прыгнув при 0.55 с до пули, он встречает её с ногами наверху при любом шаге.
+## Otto's feet rise above a low ROM bullet (0.68 m) 0.1 s after take-off and stay above it until
+## 0.85 s (jump 7.9 m/s with gravity 16.6). The bot decides once every two frames under [member
+## Engine.time_scale] 4, that is once every 0.13 s, — jumping at 0.55 s before the bullet, it meets
+## it with its feet up at any step.
 const JUMP_LEAD: float = 0.55
 
-## Половина ширины тела Otto, м.
+## Half the width of Otto's body, m.
 ##
-## Вместе с длиной пули ([method Bullet.half_length]) даёт габарит, из которого
-## она должна выйти, прежде чем вставать. Агент на этом попадался —
-## распрямлялся ровно под пулей и ловил её грудью, — и Otto попадался бы так же.
+## Together with the bullet length ([method Bullet.half_length]) it gives the clearance the bullet
+## must leave before standing up. Agents got caught by this — straightening up right under the
+## bullet and taking it in the chest — and Otto would get caught the same way.
 const BODY_HALF_WIDTH: float = Proportions.BODY_WIDTH * 0.5
 
-## Выше этой высоты над ногами пуля считается высокой: от неё приседают.
-## Сидячая форма Otto — 1.08 м, и пуля выше неё проходит над головой.
+## Above this height over the feet a bullet counts as high: you crouch under it. Otto's crouching
+## shape is 1.08 m, and a bullet above it passes over the head.
 const HIGH_BULLET: float = Proportions.CROUCH
 
-## Где встать рядом с шахтой, ожидая кабину, м от её оси.
+## Where to stand next to a shaft while waiting for the cab, m from its axis.
 ##
-## **Вне габарита кабины, а не у самого края проёма.** Кабина широкая 1.8 м
-## ([constant Proportions.SHAFT], [member BuildingRules.shaft_width] здания по
-## умолчанию), то есть занимает 0.9 м от оси; Otto
-## широк [constant BODY_HALF_WIDTH] = 0.36. Значит его середина обязана держаться
-## дальше 1.26 м от оси, иначе край заходит в габарит кабины.
+## **Outside the cab's clearance, not at the very edge of the opening.** The cab is 1.8 m wide
+## ([constant Proportions.SHAFT], the building's default [member BuildingRules.shaft_width]), that
+## is it takes 0.9 m from the axis; Otto is [constant BODY_HALF_WIDTH] = 0.36 wide. So his middle
+## must stay farther than 1.26 m from the axis, otherwise his edge enters the cab's clearance.
 ##
-## Встать бот может на [constant REACHED] ближе цели, и последний шаг он делает
-## целиком: путь за два кадра под [member Engine.time_scale] 4 — это 0.36 м при
-## [member Otto.walk_speed] 2.7 м/с (`docs/testing.md`, пункт 4). Ближе, чем
-## [code]WAIT_ASIDE - REACHED[/code] = 1.47 м, он поэтому не встаёт — с запасом
-## в 0.21 м от опасных 1.26. Соседнее место в 1.8 м от оси шахтой не бывает
-## (ADR-0026, решение 3), поэтому там, где бот ждёт, всегда есть пол.
+## The bot may stop [constant REACHED] short of the target, and it makes the last step whole: the
+## distance covered in two frames under [member Engine.time_scale] 4 is 0.36 m at [member
+## Otto.walk_speed] 2.7 m/s (`docs/testing.md`, item 4). So it never stops closer than
+## [code]WAIT_ASIDE - REACHED[/code] = 1.47 m — with a 0.21 m margin from the dangerous 1.26. The
+## neighbouring spot 1.8 m from the axis is never a shaft (ADR-0026, decision 3), so where the bot
+## waits there is always a floor.
 ##
-## Прежние 0.96 м этого не учитывали, и край Otto оказывался в 0.54 м от оси —
-## внутри кабины. Поднимающаяся снизу кабина цепляла его крышей и увозила
-## наверх, а крышей управлять нельзя ([method Otto.is_riding]). На сиде 2 это
-## давало бесконечный круг: подъём на крышу, падение обратно на этаж, снова
-## ожидание — бот не сходил с 21-го этажа до конца прогона.
+## The former 0.96 m did not account for this, and Otto's edge ended up 0.54 m from the axis —
+## inside the cab. A cab coming up from below caught him with its roof and carried him up, and the
+## roof cannot be controlled ([method Otto.is_riding]). On seed 2 this gave an endless loop: up onto
+## the roof, fall back to the floor, wait again — the bot did not leave the 21st floor until the end
+## of the run.
 const WAIT_ASIDE: float = Proportions.SHAFT * 0.5 + BODY_HALF_WIDTH + REACHED + 0.21
 
-## Насколько кабина считается пришедшей на этаж, м.
+## How close the cab must be to count as arrived at the floor, m.
 const CAR_ALIGNED: float = 0.12
 
-## Действия, которые Otto читает по фронту нажатия, а не по удержанию.
+## Actions Otto reads on the press edge, not on holding.
 ##
-## Их нельзя отпустить и нажать заново в одном кадре: движок такого фронта не
-## видит, и нажатие пропадает целиком. Бот так и делал — и за всю веху не
-## выстрелил ни разу и ни разу не прыгнул, а замеры показывали один присед.
-## Поэтому одиночное действие держится кадр, следующий кадр отдыхает и только
-## потом нажимается снова.
+## They cannot be released and pressed again in the same frame: the engine does not see such an
+## edge, and the press is lost entirely. The bot did exactly that — and over the whole milestone it
+## never fired once and never jumped once, and the measurements showed only crouching. So a single
+## action is held for a frame, the next frame rests, and only then is it pressed again.
 const TAPS: Array[StringName] = [&"jump", &"shoot"]
 
-## За сколько секунд до попадания бот в кабине уводит её с линии огня.
+## How many seconds before impact the bot in a cab moves it off the line of fire.
 const CAR_DODGE_SIGHT: float = 0.6
 
-## Ниже этой высоты над ногами пулю в кабине перепрыгивают: потолок кабины
-## не пускает прыжок выше.
+## Below this height over the feet a bullet in a cab is jumped over: the cab's ceiling does not let
+## the jump go higher.
 const CAR_LOW_BULLET: float = 0.6
 
-## Допуск на то, что луч дотянулся до Otto, м.
+## Tolerance for the beam having reached Otto, m.
 const LASER_SLACK: float = 0.1
 
-## Ближе этого к этажу отпущенная кабина дотягивает сама
-## ([member ElevatorMotion.settle_distance]).
+## Closer than this to a floor a released cab finishes the way by itself ([member
+## ElevatorMotion.settle_distance]).
 const SETTLE_BY_ITSELF: float = 0.3
 
-## Сбивает ли бот лампы. Лампу сбивают из кабины, как в аркаде
-## (`test_a_lamp_is_out_of_reach_from_the_floor`): ствол едущего Otto проходит
-## её высоту. До ADR-0053 бот ламп не трогал, и прогон не проверял ровно то,
-## ради чего заведена темнота, — что из тени Otto видно только вблизи
-## ([member BuildingRules.agent_dark_fire_range]). Выключается для замера
-## «без ламп» (`tools/playthrough.gd`, флаг [code]--no-lamps[/code]).
+## Whether the bot shoots down lamps. A lamp is shot down from a cab, as in the arcade
+## (`test_a_lamp_is_out_of_reach_from_the_floor`): the gun of a riding Otto passes its height.
+## Before ADR-0053 the bot did not touch lamps, and the run did not check exactly what darkness
+## exists for — that from the shadow Otto is seen only up close ([member
+## BuildingRules.agent_dark_fire_range]). Turned off for the "no lamps" measurement
+## (`tools/playthrough.gd`, flag [code]--no-lamps[/code]).
 var shoots_lamps: bool = true
-## Сколько раз бот стрелял по лампе: для замера.
+## How many times the bot shot at a lamp: for measurement.
 var lamp_shots: int = 0
 
 var _level: GreyboxLevel
 var _rules: BuildingRules
 var _otto: Otto
 var _pressed: Array[StringName] = []
-## Идём ли мы в кабину, которая стоит на этаже.
+## Whether we are heading into a cab that stands at the floor.
 var _boarding: bool = false
-## Сколько бот уже дерётся не сходя с места, с. Считается игровым временем, а не
-## кадрами: замер идёт под [member Engine.time_scale], и кадр там вчетверо длиннее.
+## How long the bot has already been fighting without moving, s. Counted in game time, not frames:
+## the measurement runs under [member Engine.time_scale], and a frame there is four times longer.
 var _duel_time: float = 0.0
-## Одиночные действия, отпущенные в этом кадре: нажать их снова можно только
-## со следующего.
+## Single actions released in this frame: they can be pressed again only from the next one.
 var _resting: Array[StringName] = []
-## Куски этажей и подписанные переходы между ними — [method BuildingRoute.walkable].
+## Floor pieces and the labelled transitions between them — [method BuildingRoute.walkable].
 var _graph: Dictionary = {}
-## На каком уровне выходить из кабины. Пока едем — цель поездки.
+## At which level to step out of the cab. While riding — the goal of the ride.
 var _ride_to: int = 0
-## Куда эта поездка идёт. Направление запоминается при входе: по нему
-## останавливаются, и пересчитывать его на ходу нельзя — выйдут качели.
+## Where this ride is going. The direction is remembered on entry: stopping is based on it, and it
+## must not be recomputed on the way — that would make a seesaw.
 var _riding_down: bool = true
-## Столбец шахты, которой задумана поездка. Без него бот, решив «иду к соседней
-## шахте и еду до этажа N», ехал в той кабине, в которой стоял, — если её пролёт
-## этаж N тоже накрывает. С перехлёстом это сплошь и рядом.
+## Column of the shaft the ride is planned in. Without it the bot, having decided "I go to the
+## neighbouring shaft and ride to floor N", rode in the cab it was standing in — if that cab's span
+## also covers floor N. With overlap this happens all the time.
 var _ride_shaft_x: float = INF
-## Что бот решил последним разбором: для трассы прогона.
+## What the bot decided at the last evaluation: for the run trace.
 var _decision: String = ""
-## Решение, уже записанное в журнал прогона.
+## The decision already written to the run log.
 var _logged: String = ""
-## Сколько ещё держать кабину в сторону, выбранную от пули, с. Решение
-## держится до пролёта пули: сменивший ход тут же выходит из-под луча, и
-## пересчёт на каждом шаге качал бы кабину туда-сюда прямо на линии огня.
+## How much longer to hold the cab in the direction chosen to escape the bullet, s. The decision
+## holds until the bullet has passed: whoever changes course immediately leaves the beam, and
+## recomputing at every step would rock the cab back and forth right on the line of fire.
 var _car_dodge_left: float = 0.0
 var _car_dodge_dir: float = 0.0
 
@@ -187,12 +185,12 @@ func _init(level: GreyboxLevel) -> void:
 	_level = level
 	_rules = level.rules
 	_otto = level.otto
-	# Граф считается один раз: раскладка за партию не меняется, а решение
-	# принимается каждый кадр.
+	# The graph is computed once: the layout does not change during a game, and a decision is made
+	# every frame.
 	_graph = BuildingRoute.walkable(level.plan(), _rules)
 
 
-## Один шаг решения. Зовётся каждый физический кадр.
+## One decision step. Called every physics frame.
 func step() -> void:
 	_log_the_decision()
 	_release_all()
@@ -207,21 +205,19 @@ func step() -> void:
 	else:
 		_duel_time += _otto.get_physics_process_delta_time()
 
-	# Уклонение идёт вместо шага, но не вместо выстрела: чужая пуля важнее
-	# спуска, а вот стрелять она не мешает. Бот, который на время уклонения
-	# переставал делать всё остальное, вставал намертво — двери подсылают
-	# агентов без перерыва, и пуля в воздухе есть почти всегда.
+	# Dodging replaces the step, but not the shot: an enemy bullet matters more than the descent, but
+	# it does not prevent shooting. A bot that stopped doing everything else while dodging froze in
+	# place — doors send agents without a break, and there is almost always a bullet in the air.
 	var incoming := _incoming()
 	var bullet_height := _dodge_height(incoming)
-	# Уклонение отменяет дуэль: нажата будет не сторона, а присед или прыжок.
-	# В кабине присесть нельзя, и уклонение там своё — увести кабину с линии
-	# ([method _dodge_in_car]). До M24a его не было вовсе: пуля ROM медленная,
-	# и бот успевал выстрелить первым. Втрое быстрая пуля по едущему вниз Otto
-	# — это половина смертей замера M24a.
+	# Dodging cancels the duel: what gets pressed is not a direction but crouch or jump. In a cab you
+	# cannot crouch, and dodging there is different — move the cab off the line ([method
+	# _dodge_in_car]). Before M24a it did not exist at all: the ROM bullet is slow, and the bot managed
+	# to shoot first. A three-times-faster bullet against an Otto riding down — that is half of the
+	# deaths in the M24a measurement.
 	#
-	# Приседать в стоящей кабине пробовали на M18: замер это отверг — бот
-	# приседал вместо того, чтобы идти, и на одном сиде не собрал ни одного
-	# документа за весь прогон.
+	# Crouching in a standing cab was tried on M18: the measurement rejected it — the bot crouched
+	# instead of walking, and on one seed did not collect a single document in the whole run.
 	var dodging := bullet_height >= 0.0 and not _otto.is_riding()
 	var car := _car_of_otto() if _otto.is_riding() else null
 	_car_dodge_left = maxf(_car_dodge_left - _otto.get_physics_process_delta_time(), 0.0)
@@ -231,10 +227,10 @@ func step() -> void:
 		car != null
 		and (_car_dodge_left > 0.0 or (incoming.x >= 0.0 and incoming.y <= CAR_DODGE_SIGHT))
 	)
-	# Добить важнее, чем дуэль: агента, который не целится, бот нагоняет стоя.
+	# A takedown matters more than a duel: an agent who is not aiming is caught up with standing.
 	var closing := not dodging and not car_dodging and _worth_a_takedown(threat)
-	# Повёрнут ли ствол к цели этим же кадром: в дуэли бот сам нажимает сторону,
-	# и целиться отдельным кадром не надо.
+	# Whether the gun turns toward the target in this same frame: in a duel the bot presses the
+	# direction itself, and there is no need to aim in a separate frame.
 	var aiming := not dodging and not car_dodging and not closing and _duelling(threat)
 	if dodging:
 		_dodge(bullet_height)
@@ -248,10 +244,10 @@ func step() -> void:
 	else:
 		_advance(floor_index)
 
-	# Огонь идёт вдогонку плану, а не вместо него. Бой, который останавливает
-	# спуск, останавливает его навсегда: двери подсылают следующего каждые три
-	# секунды, и бот, который сперва «зачищает этаж», не уходит с него никогда.
-	# Поэтому на ходу бот стреляет только вперёд: разворот спорил бы с шагом.
+	# Fire comes on top of the plan, not instead of it. A fight that stops the descent stops it
+	# forever: doors send the next one every three seconds, and a bot that first "clears the floor"
+	# never leaves it. So on the move the bot shoots only forward: turning around would fight with the
+	# step.
 	if threat != null and (aiming or is_equal_approx(_otto.facing(), _side_of(threat))):
 		_press(&"shoot")
 	elif shoots_lamps and _lamp_in_line() != null and _press(&"shoot"):
@@ -259,14 +255,14 @@ func step() -> void:
 		_decision = "сбиваю лампу"
 
 
-## Лампа, в которую уйдёт пуля, если выстрелить сейчас, или null: Otto едет в
-## кабине, ствол на высоте лампы, лампа перед ним, в поле боя и не за стеной.
-## Разворачиваться к лампе бот не станет — в кабине разворот это шаг, а шаг на
-## ходу уводит к борту; лампа на другой стороне достанется следующей поездке.
+## The lamp the bullet will hit if fired now, or null: Otto rides in a cab, the gun is at lamp
+## height, the lamp is in front of him, within the combat field and not behind a wall. The bot will
+## not turn toward a lamp — in a cab turning is a step, and a step while moving leads toward the
+## edge; a lamp on the other side is left for the next ride.
 ##
-## Пока своя пуля в полёте, по лампе бот не стреляет: лампа висит, пока пуля не
-## долетела, и стреляй он каждый свободный кадр — высадил бы в неё все три пули
-## ([constant Gun.MAX_LIVE_BULLETS]) и встретил бы следующего агента без патрона.
+## While its own bullet is in flight, the bot does not shoot at a lamp: the lamp hangs until the
+## bullet arrives, and if it fired every free frame it would put all three bullets into it
+## ([constant Gun.MAX_LIVE_BULLETS]) and meet the next agent without ammo.
 func _lamp_in_line() -> Lamp:
 	if not _otto.is_riding() or Bullet.any_in_flight(_otto.get_tree(), Bullet.FROM_OTTO):
 		return null
@@ -279,14 +275,14 @@ func _lamp_in_line() -> Lamp:
 			continue
 		if absf(lamp.global_position.y - muzzle) > reach:
 			continue
-		# Пуля за стену не уходит: такой выстрел — патрон в стену.
+		# A bullet does not pass through a wall: such a shot is a round into the wall.
 		if _level.plan().wall_between(lamp.floor_index, x, lamp.global_position.x):
 			continue
 		return lamp
 	return null
 
 
-## Пишет в журнал прогона решение бота, когда оно поменялось.
+## Writes the bot's decision to the run log when it has changed.
 func _log_the_decision() -> void:
 	if _decision == _logged or not RunLog.is_on():
 		return
@@ -294,25 +290,25 @@ func _log_the_decision() -> void:
 	RunLog.write("bot", {"decision": _decision, "at": RunLog.at(_otto)})
 
 
-## Шаг к цели: чем бот воспользуется прямо сейчас.
+## Step toward the target: what the bot will use right now.
 ##
-## Решение принимает граф здания, а не жадный спуск: с M18 шахты
-## перехлёстываются, эскалаторы ходят в обе стороны, а глухая стена делит этаж
-## надвое (ADR-0024). «Ехать вниз ближайшей шахтой» на таком здании упирается
-## в тупик — бот доходил до середины и давил в стену до конца прогона.
+## The decision is made by the building graph, not a greedy descent: since M18 shafts overlap,
+## escalators run both ways, and a blank wall splits a floor in two (ADR-0024). "Ride down the
+## nearest shaft" in such a building runs into a dead end — the bot reached the middle and pushed
+## against the wall until the end of the run.
 func _advance(floor_index: int) -> void:
 	if _riding_further():
 		_decision = "едем к этажу %d %s" % [_ride_to, "вниз" if _riding_down else "вверх"]
 		_ride_on()
 		return
 	if _otto.is_riding() and not _car_aligned_under_otto():
-		# Кабина между этажами — увёл её с линии огня. Отпущенная, она и сама
-		# доедет до этажа по ходу (ADR-0053, решение 1), но бот ведёт её к
-		# ближнему: он бывает и позади.
+		# The cab is between floors — moved it off the line of fire. Released, it would reach a floor
+		# along its direction by itself (ADR-0053, decision 1), but the bot drives it to the nearest one:
+		# that one can also be behind.
 		var nearest := _rules.floor_surface(floor_index)
 		_decision = "довожу кабину до этажа %d" % floor_index
-		# Вблизи этажа кабина дотягивает сама, стоит только отпустить: держать
-		# сторону — значит качать её вокруг этажа.
+		# Near a floor the cab finishes the way by itself, you only need to release it: holding a
+		# direction means rocking it around the floor.
 		if absf(_at(_otto).y - nearest) > SETTLE_BY_ITSELF:
 			_press(&"move_down" if _at(_otto).y < nearest else &"move_up")
 		return
@@ -322,12 +318,12 @@ func _advance(floor_index: int) -> void:
 		_graph, floor_index, _at(_otto).x, int(goal["floor"]), float(goal["x"])
 	)
 	if move.is_empty():
-		# Цель недостижима. Генератор такого не выпускает, и ловит это тест
-		# проходимости; здесь остаётся только не ломиться наугад.
+		# The target is unreachable. The generator does not produce such buildings, and the traversability
+		# test catches it; all that is left here is not to charge blindly.
 		#
-		# Решение переписывается, а не оставляется прежним: по нему читает трассу
-		# прогона и сторож простоя, а прошлое — успешное — решение увело бы разбор
-		# ровно туда, где всё в порядке.
+		# The decision is overwritten rather than left as before: the run trace and the idle watchdog read
+		# it, and the previous — successful — decision would send the investigation exactly where
+		# everything is fine.
 		_decision = (
 			"хода нет: цель %s на %d"
 			% ["документ" if bool(goal["enter"]) else "выход", int(goal["floor"])]
@@ -361,10 +357,10 @@ func _advance(floor_index: int) -> void:
 				_press(&"move_up")
 
 
-## Куда бот идёт: к верхнему несобранному документу, а если все собраны — к выходу.
+## Where the bot goes: to the topmost uncollected document, and if all are collected — to the exit.
 ##
-## Верхний, а не ближайший: спуск идёт сверху вниз, и документ выше текущего
-## этажа означает, что его пропустили, — а без всех пяти выход возвращает назад.
+## The topmost, not the nearest: the descent goes from top to bottom, and a document above the
+## current floor means it was skipped, — and without all five the exit sends you back.
 func _goal() -> Dictionary:
 	var best: BuildingPlan.DoorSpot = null
 	for spot in _level.plan().doors:
@@ -377,23 +373,24 @@ func _goal() -> Dictionary:
 	return {"floor": _rules.floors - 1, "x": _level.exit_position().x, "enter": false}
 
 
-## Что бот решил этим кадром: цель и ход к ней. Нужно трассе прогона — по
-## «жмёт [down]» не видно, куда он собирался и почему передумал.
+## What the bot decided this frame: the target and the move toward it. The run trace needs this —
+## from "presses [down]" you cannot see where it was going and why it changed its mind.
 func decision() -> String:
 	return _decision
 
 
-## Отпускает всё, что держал: без этого Otto продолжал бы идти после смены решения.
+## Releases everything it was holding: without this Otto would keep walking after a change of
+## decision.
 func release() -> void:
 	_release_all()
 
 
-## Где узел стоит в плоскости правил.
+## Where the node stands in the rules plane.
 static func _at(node: Node3D) -> Vector2:
 	return WorldSpace.to_plane(node.global_position)
 
 
-## Ближайший живой агент на линии огня или null.
+## The nearest living agent on the line of fire, or null.
 func _threat() -> Enemy:
 	var here := _at(_otto)
 	var closest: Enemy = null
@@ -411,13 +408,13 @@ func _threat() -> Enemy:
 	return closest
 
 
-## Ближайшая угроза: высота будущей или летящей пули над ногами Otto, м, и через
-## сколько секунд она придёт. Нечему лететь — высота −1.
+## The nearest threat: the height of a future or flying bullet over Otto's feet, m, and in how many
+## seconds it will arrive. Nothing to fly — height −1.
 ##
-## Первым смотрится луч прицела: пуля втрое быстрее ROM, и видно её слишком
-## поздно, а луч горит весь замах (ADR-0037, решение 5) — и при злости 10 и выше
-## не короче [constant EnemyBrain.MIN_TELL]. Пуля в полёте — запасной знак: на
-## случай, когда луч бот пропустил.
+## The aiming beam is checked first: the bullet is three times faster than in the ROM and is seen
+## too late, while the beam is lit for the whole wind-up (ADR-0037, decision 5) — and at anger 10
+## and above it is no shorter than [constant EnemyBrain.MIN_TELL]. A bullet in flight is the
+## fallback sign: for the case when the bot missed the beam.
 func _incoming() -> Vector2:
 	var best := Vector2(-1.0, INF)
 	for agent in _level.agents():
@@ -433,9 +430,9 @@ func _incoming() -> Vector2:
 		var to_bullet := WorldSpace.direction_to_plane(
 			bullet.global_position - _otto.global_position
 		)
-		# Летит ли она в нас — и не ушла ли уже за спину. Мерка не «с какой
-		# стороны», а «сколько ей до нас осталось»: пуля, миновавшая середину,
-		# но не вышедшая из габарита хвостом, всё ещё попадает.
+		# Whether it is flying at us — and whether it has already gone behind us. The measure is not "from
+		# which side" but "how far it still has to us": a bullet that has passed the middle but not yet
+		# left the clearance with its tail still hits.
 		if -to_bullet.x * bullet.direction < -(BODY_HALF_WIDTH + bullet.half_length()):
 			continue
 		var time := absf(to_bullet.x) / maxf(bullet.speed, 0.01)
@@ -445,13 +442,12 @@ func _incoming() -> Vector2:
 	return best
 
 
-## Луч прицела агента, если он смотрит в Otto: высота будущей пули над ногами
-## Otto, м, и секунды до попадания — замах и полёт. Иначе высота −1.
+## An agent's aiming beam if it looks at Otto: the height of the future bullet over Otto's feet, m,
+## and seconds until impact — wind-up and flight. Otherwise height −1.
 ##
-## Луч в Otto — это луч, который до него дотянулся: упёршийся в стену между
-## ними не в счёт. Присевший под высоким лучом его уже не перекрывает, и луч
-## уходит дальше, — поэтому мерится длина, а не то, во что он упёрся: иначе бот
-## вставал бы ровно под выстрел.
+## A beam at Otto is a beam that reached him: one that hit a wall between them does not count. One
+## who crouched under a high beam no longer blocks it, and the beam goes farther, — so the length is
+## measured, not what it hit: otherwise the bot would stand up right into the shot.
 func _laser_threat(agent: Enemy) -> Vector2:
 	var laser := agent.laser
 	if laser == null or not laser.is_on():
@@ -460,14 +456,14 @@ func _laser_threat(agent: Enemy) -> Vector2:
 	if signf(to_otto.x) != laser.direction:
 		return Vector2(-1.0, INF)
 	var gap := absf(to_otto.x)
-	# Луч, упёршийся в самого Otto, кончается ровно у края его тела, и сравнение
-	# без допуска отбрасывало его через раз — по погрешности плавающей точки.
+	# A beam that hits Otto himself ends exactly at the edge of his body, and a comparison without
+	# tolerance rejected it every other time — due to floating point error.
 	if laser.length() < gap - BODY_HALF_WIDTH - LASER_SLACK:
 		return Vector2(-1.0, INF)
 	var height := -to_otto.y
 	var time := laser.time_to(gap)
-	# В кабине Otto сам едет на линию или с неё: мерится высота на момент, когда
-	# пуля придёт. Возвращается нынешняя — по ней решает [method _dodge_in_car].
+	# In a cab Otto himself rides onto the line or off it: the height is measured for the moment the
+	# bullet arrives. The current one is returned — [method _dodge_in_car] decides by it.
 	var car := _car_of_otto() if _otto.is_riding() else null
 	var arriving := height + (car.speed_now() * time if car != null else 0.0)
 	var slack := 0.1 if car != null else 0.0
@@ -476,11 +472,11 @@ func _laser_threat(agent: Enemy) -> Vector2:
 	return Vector2(height, time)
 
 
-## Высота, от которой уходить этим кадром, или −1.
+## The height to dodge this frame, or −1.
 ##
-## Под высокую пулю присесть можно сразу: присед мгновенный, и сидеть под лучом
-## безопасно весь замах. Через низкую прыгают вовремя: раньше [constant
-## JUMP_LEAD] бот приземлился бы прямо на неё.
+## Under a high bullet you can crouch at once: the crouch is instant, and sitting under the beam is
+## safe for the whole wind-up. A low one is jumped over in time: earlier than [constant JUMP_LEAD]
+## the bot would land right on it.
 func _dodge_height(incoming: Vector2) -> float:
 	if incoming.x < 0.0:
 		return -1.0
@@ -489,14 +485,14 @@ func _dodge_height(incoming: Vector2) -> float:
 	return -1.0
 
 
-## Уходит с линии огня: под высокую пулю приседает, через низкую прыгает.
+## Leaves the line of fire: crouches under a high bullet, jumps over a low one.
 ##
-## Прыгать можно только с пола: в воздухе нажатие пропадёт впустую, и бот
-## встретит пулю стоя. С пола не получилось — приседаем, это хоть что-то.
+## A jump is possible only from the floor: in the air the press is wasted, and the bot meets the
+## bullet standing. If it did not work from the floor — crouch, that is at least something.
 ##
-## «Не получилось» — это и кадр отдыха: прыжок одиночный, и на таком кадре
-## [method _press] его не нажимает. Пустой кадр под пулей дороже неидеального
-## уклонения, поэтому ответ проверяется, а не предполагается.
+## "Did not work" also covers the rest frame: the jump is a single action, and on such a frame
+## [method _press] does not press it. An empty frame under a bullet costs more than an imperfect
+## dodge, so the result is checked, not assumed.
 func _dodge(bullet_height: float) -> void:
 	if bullet_height > HIGH_BULLET:
 		_press(&"move_down")
@@ -506,13 +502,13 @@ func _dodge(bullet_height: float) -> void:
 	_press(&"move_down")
 
 
-## Стоит ли идти добивать [param threat] (ADR-0040): стоя на своих ногах, не в
-## кабине, агент готов к добиванию и не целится — и близко: спиной — до
-## [constant TAKEDOWN_SNEAK], лицом — до [constant TAKEDOWN_RUSH].
+## Whether to go and take down [param threat] (ADR-0040): standing on its own feet, not in a cab,
+## the agent is ready for a takedown and not aiming — and close: back turned — up to [constant
+## TAKEDOWN_SNEAK], facing — up to [constant TAKEDOWN_RUSH].
 ##
-## И только на своём куске этажа. Нагоняет бот напрямик, мимо графа, а между ним
-## и агентом бывает проём шахты или глухая стена: шагнувший в пустую шахту гибнет,
-## упёршийся в стену стоит до конца прогона (авторевью M24e).
+## And only on its own floor piece. The bot catches up in a straight line, bypassing the graph, and
+## between it and the agent there may be a shaft opening or a blank wall: one who steps into an
+## empty shaft dies, one who runs into a wall stands until the end of the run (M24e code review).
 func _worth_a_takedown(threat: Enemy) -> bool:
 	if threat == null or not threat.takedown_ready:
 		return false
@@ -529,8 +525,8 @@ func _worth_a_takedown(threat: Enemy) -> bool:
 	return absf(there.x - here.x) <= reach
 
 
-## Нагоняет агента стоя и в упор жмёт выстрел: вплотную он и есть добивание.
-## Пока не вплотную, бот идёт и не стреляет — пуля забрала бы агента дешевле.
+## Catches up with the agent standing and fires point-blank: close up the shot is the takedown.
+## While not close, the bot walks and does not shoot — a bullet would take the agent cheaper.
 func _close_in(threat: Enemy) -> void:
 	var side := _side_of(threat)
 	var gap := absf(threat.global_position.x - _otto.global_position.x)
@@ -543,8 +539,8 @@ func _close_in(threat: Enemy) -> void:
 	_press(&"move_right" if side > 0.0 else &"move_left")
 
 
-## На одном ли куске этажа [param floor_index] точки [param a] и [param b]: дойти
-## от одной до другой можно пешком, без кабины и эскалатора.
+## Whether points [param a] and [param b] are on the same piece of floor [param floor_index]: you
+## can walk from one to the other on foot, without a cab or escalator.
 func _same_piece(floor_index: int, a: float, b: float) -> bool:
 	var pieces: Dictionary = _graph["pieces"]
 	for piece: Vector2 in pieces.get(floor_index, []):
@@ -553,22 +549,22 @@ func _same_piece(floor_index: int, a: float, b: float) -> bool:
 	return false
 
 
-## С какой стороны от Otto стоит агент: -1 слева, +1 справа.
+## On which side of Otto the agent stands: -1 left, +1 right.
 func _side_of(agent: Enemy) -> float:
 	return signf(_at(agent).x - _at(_otto).x)
 
 
-## Пора ли драться, а не идти дальше.
+## Whether it is time to fight rather than move on.
 ##
-## Пройти мимо агента, который держит тебя на мушке, нельзя: на считанных
-## сантиметрах размен мгновенный, и уклонение там уже ничего не решает — именно
-## этим кончались все замеры вехи (ADR-0016, «Чем веха кончилась»).
+## You cannot walk past an agent who has you in his sights: at a few centimetres the exchange is
+## instant, and dodging no longer decides anything there — this is exactly how all the measurements
+## of the milestone ended (ADR-0016, "How the milestone ended").
 func _duelling(threat: Enemy) -> bool:
 	if threat == null:
 		return false
-	# Дуэль — это присесть и повернуться, а в кабине нельзя ни того, ни другого:
-	# присед там выключен (ADR-0004, пункт 3), а шаг вбок в пути уводит в пустую
-	# шахту. Пока кабина не встала у этажа, бот просто едет.
+	# A duel means crouching and turning, and in a cab you can do neither: crouch is disabled there
+	# (ADR-0004, item 3), and a side step on the way leads into an empty shaft. Until the cab stops at
+	# a floor, the bot just rides.
 	var riding := _otto.is_riding()
 	if riding and not _car_aligned():
 		return false
@@ -577,33 +573,33 @@ func _duelling(threat: Enemy) -> bool:
 	return absf(_at(threat).x - _at(_otto).x) <= _duel_reach()
 
 
-## Ближе какого расстояния бот не проходит мимо агента, а дерётся, м.
+## Closer than what distance the bot does not walk past an agent but fights, m.
 ##
-## Та же мерка, что у огня: драться стоит ровно с теми, кто может попасть, а
-## попасть с M18d может любой в кадре (ADR-0027, решение 3а).
+## The same measure as for fire: it is worth fighting exactly those who can hit, and since M18d
+## anyone in the frame can hit (ADR-0027, decision 3a).
 func _duel_reach() -> float:
 	return ENGAGE
 
 
-## Дуэль: присесть, повернуться к агенту и держать его под огнём.
+## Duel: crouch, turn to the agent and keep him under fire.
 ##
-## Присед здесь не отступление, а лучшая позиция из всех: пуля агента летит в
-## 1.4 м над полом и проходит над присевшим (его форма — 1.08 м), а сам Otto
-## из приседа бьёт ниже — и достаёт и стоящего, и вставшего на колено. Ходить
-## присев нельзя, но в дуэли и не надо.
+## Crouching here is not a retreat but the best position of all: the agent's bullet flies 1.4 m
+## above the floor and passes over a crouching figure (its shape is 1.08 m), while Otto himself
+## shoots lower from a crouch — and hits both a standing agent and one who has dropped to a knee.
+## You cannot walk crouched, but in a duel you do not need to.
 ##
-## Сторона нажимается этим же кадром, и выстрел уйдёт уже в неё: Otto берёт
-## направление огня из того же нажатия, которым поворачивается.
+## The direction is pressed in this same frame, and the shot goes that way: Otto takes the fire
+## direction from the same press he turns with.
 func _hold_the_line(threat: Enemy) -> void:
 	if not _otto.is_riding():
 		_press(&"move_down")
 	_press(&"move_right" if _side_of(threat) > 0.0 else &"move_left")
 
 
-## Стоит ли кабина, в которой едет бот, у этажа.
+## Whether the cab the bot rides in stands at a floor.
 ##
-## Пока она в пути, шаг вбок — это шаг в пустую шахту, а падение в неё
-## смертельно. У этажа выйти можно: под ногами пол.
+## While it is moving, a side step is a step into an empty shaft, and falling into it is deadly. At
+## a floor you can step out: there is a floor underfoot.
 func _car_aligned() -> bool:
 	var here := _at(_otto)
 	for child in _level.get_children():
@@ -611,9 +607,10 @@ func _car_aligned() -> bool:
 		if car == null:
 			continue
 		var at := _at(car)
-		# Мерка вширь узкая нарочно, хотя Otto и едет где встал, а не на оси:
-		# на всю ширину кабины дуэль в ней включается почти всегда, а из неё бот
-		# выходит боком на этаж — и до низа здания не доезжает (ADR-0016).
+		# The horizontal measure is narrow on purpose, even though Otto rides where he stood, not on the
+		# axis: across the full width of the cab the duel would almost always switch on in it, and the bot
+		# would step sideways out of it onto the floor — and never reach the bottom of the building
+		# (ADR-0016).
 		if absf(at.x - here.x) > CAR_ALIGNED:
 			continue
 		if absf(at.y - here.y) > CAR_ALIGNED:
@@ -622,39 +619,39 @@ func _car_aligned() -> bool:
 	return false
 
 
-## Везёт ли кабина дальше, или пора выходить и идти своим ходом.
+## Whether the cab carries on, or it is time to step out and go on foot.
 ##
-## Сравнение идёт с самим полом, а не с номером этажа: номер меняется на
-## полпути, и бот бросал ехать, вися в полупролёте, откуда выйти нельзя.
+## The comparison is with the floor itself, not the floor number: the number changes halfway, and
+## the bot stopped riding while hanging mid-span, where you cannot step out.
 ##
-## А стоящую на этаже кабину бот проходит насквозь по дороге к эскалатору, и
-## считать это поездкой нельзя: иначе он разворачивался и ходил туда-сюда.
+## And a cab standing at a floor the bot walks straight through on the way to an escalator, and that
+## must not count as a ride: otherwise it turned around and walked back and forth.
 func _riding_further() -> bool:
 	if not _otto.is_riding():
 		return false
 
-	# Кабина, в которой стоим, до цели поездки может и не доходить: шахты
-	# перехлёстываются, и пересадка идёт в кабине, стоящей на своём дне. Такую
-	# надо покинуть, а не давить в ней «вниз» до конца прогона.
-	# Та ли это кабина: стоять можно в одной, а ехать собираться в другой.
+	# The cab we stand in may not reach the goal of the ride: shafts overlap, and a transfer happens in
+	# a cab standing at its bottom. Such a cab has to be left, not pressed "down" in until the end of
+	# the run.
+	# Whether this is the right cab: you can stand in one and plan to ride in another.
 	var shaft := _shaft_under_otto()
 	if shaft == null or not is_equal_approx(shaft.x, _ride_shaft_x):
 		return false
 	if _ride_to < shaft.top or _ride_to > shaft.bottom:
 		return false
 
-	# Остановка односторонняя: «пока не совпало с полом» не годится, потому что
-	# за кадр кабина проходит больше допуска выравнивания и цель перескакивает.
-	# Бот тогда жмёт то вверх, то вниз и качается вокруг этажа до конца прогона.
+	# The stop is one-sided: "until it matches the floor" does not work, because in one frame the cab
+	# moves more than the alignment tolerance and overshoots the target. The bot then presses up and
+	# down alternately and rocks around the floor until the end of the run.
 	var surface := _rules.floor_surface(_ride_to)
 	var y := _at(_otto).y
 	return y < surface - CAR_ALIGNED if _riding_down else y > surface + CAR_ALIGNED
 
 
-## Шахта, в чьём столбце стоит Otto. [code]null[/code] — он не в шахте.
+## The shaft in whose column Otto stands. [code]null[/code] — he is not in a shaft.
 ##
-## Столбца мало: две шахты могут стоять в одном месте на разной высоте. Поэтому
-## проверяется и уровень — на одном уровне столбцы у шахт разные.
+## The column is not enough: two shafts can stand in the same place at different heights. So the
+## level is checked too — on one level the shafts have different columns.
 func _shaft_under_otto() -> BuildingPlan.ShaftSpot:
 	var here := _at(_otto)
 	var index := _rules.floor_index_near(here.y)
@@ -666,32 +663,32 @@ func _shaft_under_otto() -> BuildingPlan.ShaftSpot:
 	return null
 
 
-## Ведёт кабину к уровню, на котором решено выходить. Вверх тоже: с M18 путь
-## вниз иногда лежит через этаж выше, где этаж не разрезан (ADR-0024).
+## Drives the cab to the level where it was decided to step out. Upward too: since M18 the way down
+## sometimes goes through a floor above where the floor is not cut (ADR-0024).
 func _ride_on() -> void:
 	_press(&"move_down" if _riding_down else &"move_up")
 
 
-## Заходит в кабину, дождавшись её у самого края проёма.
+## Enters the cab, having waited for it at the very edge of the opening.
 ##
-## Входит только на приезд кабины и только стоя рядом. Если заходить в любой
-## момент стоянки, можно попасть на её конец: кабина уедет, пока бот делает
-## последние шаги, и он шагнёт в пустую шахту — а падение в неё смертельно.
-## Пропустить приезд не страшно: кабина вернётся, кадров на это заложено.
+## Enters only on the cab's arrival and only when standing next to it. Entering at any moment of the
+## stop can catch its end: the cab leaves while the bot makes the last steps, and he steps into an
+## empty shaft — and falling into it is deadly. Missing an arrival is not a problem: the cab will
+## come back, the frames are budgeted for it.
 func _take_the_car(shaft_x: float, floor_index: int) -> void:
 	var surface := _rules.floor_surface(floor_index)
 	var here := _car_waits_at(shaft_x, surface)
 	var x := _at(_otto).x
 	var aside := absf(x - shaft_x) <= WAIT_ASIDE + REACHED
 
-	# Садится, как только кабина здесь и он рядом, — не дожидаясь её приезда.
-	# Ждать именно приезда бот умел с M2, и это было дёшево, пока кабина была
-	# одна на полосу. С перехлёстом он ждёт у шахт постоянно — и переход через
-	# проём идёт как раз к стоящей кабине, которая приезжать уже не собирается.
-	# Каждое такое ожидание — стойка под огнём: все смерти замера случились там.
+	# Boards as soon as the cab is here and he is next to it — without waiting for it to arrive.
+	# Waiting specifically for the arrival the bot could do since M2, and it was cheap while there was
+	# one cab per strip. With overlap it waits at shafts all the time — and crossing an opening goes
+	# exactly to a standing cab that is not going to arrive anymore. Every such wait is standing under
+	# fire: all deaths in the measurement happened there.
 	#
-	# Безопасно это потому, что к столбцу он двигается только пока кабина на
-	# месте: ушла — [code]_boarding[/code] снимается тем же кадром.
+	# It is safe because it moves toward the column only while the cab is in place: once it leaves,
+	# [code]_boarding[/code] is cleared in the same frame.
 	if here and aside:
 		_boarding = true
 	if not here:
@@ -705,12 +702,12 @@ func _take_the_car(shaft_x: float, floor_index: int) -> void:
 	_walk_to(shaft_x + side * WAIT_ASIDE)
 
 
-## Переходит проём шахты насквозь: через стоящую кабину.
+## Crosses a shaft opening straight through: via a standing cab.
 ##
-## Шахта режет этаж своим проёмом, и половины сообщаются только так — как в
-## оригинале, где кабина перекрывает проём собой. Пока кабины нет, к проёму
-## подходить нельзя: шагнувший в пустую шахту гибнет, — поэтому бот сперва
-## дожидается её там же, где дожидается поездки.
+## A shaft cuts the floor with its opening, and the halves connect only this way — as in the
+## original, where the cab covers the opening with itself. While there is no cab, the opening must
+## not be approached: one who steps into an empty shaft dies, — so the bot first waits for it in the
+## same place where it waits for a ride.
 func _cross_the_shaft(shaft_x: float, to_x: float, floor_index: int) -> void:
 	if not _car_waits_at(shaft_x, _rules.floor_surface(floor_index)):
 		_take_the_car(shaft_x, floor_index)
@@ -718,15 +715,15 @@ func _cross_the_shaft(shaft_x: float, to_x: float, floor_index: int) -> void:
 	_walk_to(to_x)
 
 
-## Встаёт на площадку эскалатора и отправляется. Вверх — тоже: полотно ходит
-## в обе стороны, и обойти разрезанный этаж иногда можно только так.
+## Steps onto the escalator landing and sets off. Upward too: the belt runs both ways, and sometimes
+## this is the only way around a cut floor.
 func _take_the_escalator(pad_x: float, upward: bool) -> void:
 	if not _walk_to(pad_x):
 		return
 	_press(&"move_up" if upward else &"move_down")
 
 
-## Идёт к точке. Возвращает true, когда уже пришёл.
+## Walks to a point. Returns true when already there.
 func _walk_to(x: float) -> bool:
 	var gap := x - _at(_otto).x
 	if absf(gap) <= REACHED:
@@ -735,18 +732,17 @@ func _walk_to(x: float) -> bool:
 	return false
 
 
-## Стоит ли на этаже кабина, в которую можно шагнуть.
+## Whether a cab one can step into stands at the floor.
 ##
-## Мало оказаться рядом: кабина должна **совпасть полом с полом этажа**, а не
-## просто пройти мимо в допуске [constant CAR_ALIGNED]. Допуск этот — 0.12 м,
-## а кабина идёт 1.8 м/с и проскакивает его за четыре кадра; шагнув в такую,
-## Otto попадает не внутрь, а на крышу — её потолок как раз проходит сквозь
-## уровень пола, пока кабина подъезжает снизу.
+## Being close is not enough: the cab must **match the floor with its own floor**, not merely pass
+## by within the [constant CAR_ALIGNED] tolerance. That tolerance is 0.12 m, and the cab goes 1.8
+## m/s and passes through it in four frames; stepping into such a cab, Otto lands not inside but on
+## the roof — its ceiling passes right through the floor level while the cab approaches from below.
 ##
-## С крыши кабиной не управляют (так в оригинале, [method Otto.is_riding] это
-## прямо оговаривает), а сойти с неё между этажами некуда. На M18a это и вышло:
-## на сиде 2 бот простоял на крыше 21356 решений до конца прогона. Поэтому
-## посадка идёт только по [method ElevatorCar.is_aligned] — то есть по стоянке.
+## A cab cannot be controlled from the roof (as in the original, [method Otto.is_riding] states this
+## explicitly), and there is nowhere to get off between floors. On M18a this is exactly what
+## happened: on seed 2 the bot stood on the roof for 21356 decisions until the end of the run. So
+## boarding goes only by [method ElevatorCar.is_aligned] — that is, by the stop.
 func _car_waits_at(x: float, surface: float) -> bool:
 	for child in _level.get_children():
 		var car := child as ElevatorCar
@@ -760,10 +756,12 @@ func _car_waits_at(x: float, surface: float) -> bool:
 	return false
 
 
-## Дверь ещё красная: собранная перестаёт ею быть, и второй раз в неё не надо.
+## The door is still red: a collected one stops being red, and there is no need to go into it a
+## second time.
 ##
-## Сверяется и этаж: места на этажах общие, и красная дверь сверху, стоящая в том
-## же столбце, выдавала бы уже собранную за несобранную — бот ходил бы к ней вечно.
+## The floor is checked too: places are shared between floors, and a red door above standing in the
+## same column would pass an already collected door off as uncollected — the bot would walk to it
+## forever.
 func _still_pending(spot: BuildingPlan.DoorSpot) -> bool:
 	for door in _level.doors():
 		if not door.is_pending():
@@ -774,9 +772,9 @@ func _still_pending(spot: BuildingPlan.DoorSpot) -> bool:
 	return false
 
 
-## Нажимает действие. Возвращает, нажалось ли: одиночное действие, отпущенное
-## этим же кадром, нажать нельзя — фронта не выйдет, кадр пропускается, и на
-## следующем нажатие уходит.
+## Presses an action. Returns whether it got pressed: a single action released in this same frame
+## cannot be pressed — there would be no edge, the frame is skipped, and the press goes out on the
+## next one.
 func _press(action: StringName) -> bool:
 	if _resting.has(action):
 		return false
@@ -794,7 +792,7 @@ func _release_all() -> void:
 	_pressed.clear()
 
 
-## Кабина, в которой едет Otto, или null.
+## The cab Otto rides in, or null.
 func _car_of_otto() -> ElevatorCar:
 	var here := _at(_otto)
 	for child in _level.get_children():
@@ -808,18 +806,18 @@ func _car_of_otto() -> ElevatorCar:
 	return null
 
 
-## Стоит ли кабина Otto у этажа.
+## Whether Otto's cab stands at a floor.
 func _car_aligned_under_otto() -> bool:
 	var car := _car_of_otto()
 	return car == null or car.is_aligned()
 
 
-## Уход от выстрела в кабине: присесть там нельзя, зато можно увести кабину.
+## Dodging a shot in a cab: you cannot crouch there, but you can move the cab.
 ##
-## Кабина идёт ровным ходом без разгона, и за оставшееся до пули время она
-## сдвигает Otto на [code]скорость · время[/code]. Вниз — пуля уходит над
-## головой, вверх — под ноги, в днище. Берётся сторона с большим запасом;
-## низкую пулю в стоящей кабине проще перепрыгнуть.
+## The cab moves at a steady speed without acceleration, and in the time left before the bullet it
+## shifts Otto by [code]speed · time[/code]. Down — the bullet passes over the head, up — under the
+## feet, into the floor. The side with the larger margin is chosen; a low bullet in a standing cab
+## is easier to jump over.
 func _dodge_in_car(car: ElevatorCar, incoming: Vector2) -> void:
 	if _car_dodge_left > 0.0:
 		if car.can_go(_car_dodge_dir):

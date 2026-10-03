@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Поиск и запуск исполняемого файла Godot.
+"""Finding and running the Godot executable.
 
-Общий модуль для скриптов в `tools/`: godot_check.py, run_tests.py, capture.py.
+A shared module for scripts in `tools/`: godot_check.py, run_tests.py, capture.py.
 
-Порядок поиска: $GODOT_BIN -> PATH -> стандартные пути установки winget.
+Search order: $GODOT_BIN -> PATH -> standard winget install paths.
 """
 
 from __future__ import annotations
@@ -17,15 +17,15 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# Код возврата для «Godot не уложился в таймаут» — как у утилиты timeout(1).
+# Return code for "Godot did not finish within the timeout", as in the timeout(1) utility.
 TIMEOUT_EXIT_CODE = 124
 
-# На Windows обычная сборка не пишет в родительскую консоль — нужен _console.
+# On Windows the regular build does not write to the parent console: _console is needed.
 _BINARY_NAMES = ["godot_console", "godot"] if sys.platform == "win32" else ["godot"]
 
 
 def find_godot() -> str | None:
-    """Возвращает путь к исполняемому файлу Godot или None, если он не найден."""
+    """Returns the path to the Godot executable, or None if it is not found."""
     from_env = os.environ.get("GODOT_BIN")
     if from_env and Path(from_env).exists():
         return from_env
@@ -50,7 +50,7 @@ def find_godot() -> str | None:
 
 
 def require_godot() -> str:
-    """Как find_godot, но печатает подсказку и завершает процесс, если Godot нет."""
+    """Like find_godot, but prints a hint and exits the process if Godot is missing."""
     godot = find_godot()
     if godot is None:
         print("Godot не найден. Установите его или задайте GODOT_BIN=<путь к godot>.")
@@ -60,10 +60,10 @@ def require_godot() -> str:
 
 
 def as_text(value: str | bytes | None) -> str:
-    """Вывод снятого по таймауту процесса: он бывает str, bytes и None сразу.
+    """Output of a process killed by timeout: it can be str, bytes and None at once.
 
-    На POSIX TimeoutExpired несёт то, что успело прочитаться, — байтами, а поток,
-    в который никто не написал, остаётся None. Складывать их напрямую нельзя.
+    On POSIX TimeoutExpired carries what managed to be read, as bytes, and a stream
+    nobody wrote to stays None. They cannot be concatenated directly.
     """
     if value is None:
         return ""
@@ -80,17 +80,18 @@ def run(
     stop_on: tuple[str, ...] = (),
     env: dict[str, str] | None = None,
 ) -> tuple[int, str]:
-    """Запускает Godot в папке проекта и возвращает (код возврата, объединённый вывод).
+    """Runs Godot in the project folder and returns (return code, combined output).
 
-    **Вывод идёт наружу построчно, пока процесс работает.** Набор тестов идёт
-    больше десяти минут, а бот печатает «зациклился» задолго до последней строки:
-    молчащий прогон заставлял ждать конца там, где всё понятно на третьей минуте.
+    **Output goes out line by line while the process runs.** The test suite runs for
+    more than ten minutes, and the bot prints "looped" long before the last line:
+    a silent run made you wait for the end where everything is clear by the third minute.
 
-    [stop_on] — сторож: увидев в выводе любую из этих строк, прогон снимается
-    сразу. Ждать после неё нечего, а ждать приходится минутами.
+    [stop_on] is a watchdog: on seeing any of these lines in the output, the run is
+    stopped immediately. There is nothing to wait for after it, and the waiting takes
+    minutes.
 
-    Зависший Godot (например, модальное окно ошибки) снимается по таймауту и
-    отдаётся как обычный неуспех с кодом TIMEOUT_EXIT_CODE, а не как traceback.
+    A hung Godot (for example, a modal error window) is stopped by timeout and
+    returned as an ordinary failure with code TIMEOUT_EXIT_CODE, not as a traceback.
     """
     started = time.monotonic()
     process = subprocess.Popen(
@@ -101,8 +102,8 @@ def run(
         encoding="utf-8",
         errors="replace",
         bufsize=1,
-        # Своё окружение нужно шардам: `user://` Godot выводит из APPDATA/HOME,
-        # и без этого два процесса пишут в один файл рекордов.
+        # Shards need their own environment: Godot derives `user://` from APPDATA/HOME,
+        # and without this two processes write to the same high-score file.
         env=env,
     )
 
@@ -111,8 +112,8 @@ def run(
     for line in process.stdout:
         lines.append(line)
         if echo:
-            # flush на каждой строке: без него труба копит вывод сама, и весь
-            # смысл потока теряется.
+            # flush on every line: without it the pipe buffers the output itself, and the whole
+            # point of streaming is lost.
             print(line, end="", flush=True)
         if any(mark in line for mark in stop_on):
             return _cut_short(process, lines, f"Прогон снят сторожем: {line.strip()}")
@@ -130,7 +131,7 @@ def run(
 
 
 def _cut_short(process: subprocess.Popen, lines: list[str], why: str) -> tuple[int, str]:
-    """Снимает процесс и отдаёт то, что он успел сказать."""
+    """Stops the process and returns what it managed to say."""
     process.kill()
     if process.stdout is not None:
         process.stdout.close()
@@ -140,6 +141,6 @@ def _cut_short(process: subprocess.Popen, lines: list[str], why: str) -> tuple[i
 
 
 def use_utf8_output() -> None:
-    """Вывод в UTF-8 независимо от кодовой страницы консоли Windows."""
+    """Output in UTF-8 regardless of the Windows console code page."""
     for stream in (sys.stdout, sys.stderr):
         stream.reconfigure(encoding="utf-8", errors="replace")

@@ -1,14 +1,14 @@
 class_name HallLook
 extends RefCounted
 
-## Материалы и мебель залов особых этажей ([FloorHall], ADR-0057, решение 5):
-## сетка-рабица, вода бассейна, индикаторы серверов, стекло переговорных, пар
-## котельной и мебель Kenney Furniture Kit, перекрашенная под тип здания. Всё
-## статикой — на здание по одному экземпляру.
+## Materials and furniture of special-floor halls ([FloorHall], ADR-0057, decision 5):
+## chain-link mesh, pool water, server indicators, meeting room glass, boiler room steam
+## and Kenney Furniture Kit furniture repainted for the building kind. All static — one
+## instance per building.
 
-## Цвет мебели паков по имени материала Kenney Furniture Kit — по типу здания:
-## у отеля орех, бордовый бархат и латунь, у офиса светлый ясень, серо-синяя
-## ткань и сталь, у жилого дома дуб, горчичная ткань и крашеный металл.
+## Pack furniture colour by Kenney Furniture Kit material name — by building kind: the
+## hotel has walnut, burgundy velvet and brass, the office light ash, grey-blue fabric
+## and steel, the residential building oak, mustard fabric and painted metal.
 const HOTEL_TONES := {
 	"wood": Color(0.3, 0.17, 0.1),
 	"woodDark": Color(0.18, 0.1, 0.06),
@@ -27,7 +27,7 @@ const RESIDENTIAL_TONES := {
 	"carpet": Color(0.5, 0.37, 0.14),
 	"metal": Color(0.5, 0.5, 0.46),
 }
-## Общие для всех типов: бытовая техника, сталь, бельё, абажур.
+## Shared by all kinds: appliances, steel, linen, lampshade.
 const COMMON_TONES := {
 	"metalLight": Color(0.82, 0.83, 0.8),
 	"metalMedium": Color(0.4, 0.42, 0.44),
@@ -36,7 +36,7 @@ const COMMON_TONES := {
 	"_defaultMat": Color(0.78, 0.78, 0.76),
 }
 const LAMP_SHADE := Color(1.0, 0.86, 0.6)
-## Индикаторы серверов мигают каждый в свой такт: такт — от места в мире.
+## Server indicators each blink at their own beat: the beat comes from the world position.
 const LED_SHADER := """
 shader_type spatial;
 render_mode unshaded;
@@ -51,7 +51,7 @@ void fragment() {
 	ALBEDO = colour * (0.25 + 0.75 * blink);
 }
 """
-## Вода бассейна: рябь бликом и светом со дна, по месту в мире.
+## Pool water: ripple glints and light from the bottom, by world position.
 const WATER_SHADER := """
 shader_type spatial;
 uniform vec4 deep : source_color;
@@ -78,12 +78,12 @@ static var _chain_link: StandardMaterial3D = null
 static var _led: ShaderMaterial = null
 static var _water: ShaderMaterial = null
 static var _glass_look: StandardMaterial3D = null
-## Меши мебели паков, перекрашенные под тип: ключ — "имя:тип".
+## Pack furniture meshes repainted for the kind: the key is "name:kind".
 static var _templates: Dictionary = {}
 
 
-## Сетка-рабица: проволока ромбом, сквозь неё виден зал. Рисунок в координатах
-## мира — шаг ячейки один на любом пролёте.
+## Chain-link mesh: wire in a diamond pattern, the hall is visible through it. The
+## pattern is in world coordinates — the cell step is the same on any span.
 static func chain_link() -> StandardMaterial3D:
 	if _chain_link != null:
 		return _chain_link
@@ -109,7 +109,7 @@ static func chain_link() -> StandardMaterial3D:
 	return _chain_link
 
 
-## Сбрасывает материалы и меши: тестам, как [method GreyboxLook.forget].
+## Resets materials and meshes: for tests, like [method GreyboxLook.forget].
 static func forget() -> void:
 	_chain_link = null
 	_led = null
@@ -118,7 +118,7 @@ static func forget() -> void:
 	_templates.clear()
 
 
-## Меши предмета пака серединой основания в нуле, перекрашенные под тип здания.
+## Meshes of a pack item with the base's middle at zero, repainted for the building kind.
 static func template(prop_name: String, kind: BuildingIdentity.Kind) -> Array:
 	var key := "%s:%d" % [prop_name, kind]
 	if _templates.has(key):
@@ -147,7 +147,7 @@ static func template(prop_name: String, kind: BuildingIdentity.Kind) -> Array:
 	return parts
 
 
-## Копия меша, у которой материалы Kenney заменены на цвета типа здания.
+## A copy of the mesh with Kenney materials replaced by the building kind's colours.
 static func _recolour(source: Mesh, kind: BuildingIdentity.Kind) -> Mesh:
 	var tones: Dictionary = HOTEL_TONES
 	match kind:
@@ -174,8 +174,8 @@ static func _recolour(source: Mesh, kind: BuildingIdentity.Kind) -> Mesh:
 	return copy
 
 
-## Стекло переговорных и турникетов — то же, что у стены офиса
-## ([BuildingShell]): один материал на здание.
+## Glass of meeting rooms and turnstiles — the same as the office wall's
+## ([BuildingShell]): one material per building.
 static func glass() -> StandardMaterial3D:
 	if _glass_look == null:
 		_glass_look = StandardMaterial3D.new()
@@ -187,7 +187,7 @@ static func glass() -> StandardMaterial3D:
 	return _glass_look
 
 
-## Индикаторы серверов: мигают каждый в свой такт ([constant LED_SHADER]).
+## Server indicators: each blinks at its own beat ([constant LED_SHADER]).
 static func led() -> ShaderMaterial:
 	if _led == null:
 		var shader := Shader.new()
@@ -199,7 +199,7 @@ static func led() -> ShaderMaterial:
 	return _led
 
 
-## Вода бассейна в ряби ([constant WATER_SHADER]).
+## Rippling pool water ([constant WATER_SHADER]).
 static func water() -> ShaderMaterial:
 	if _water == null:
 		var shader := Shader.new()
@@ -211,7 +211,7 @@ static func water() -> ShaderMaterial:
 	return _water
 
 
-## Пар над котлом: редкие клубы вверх и в стороны, без теней.
+## Steam over the boiler: sparse puffs up and to the sides, without shadows.
 static func steam_plume(at: Vector3) -> GPUParticles3D:
 	var steam := GPUParticles3D.new()
 	steam.name = "Steam"

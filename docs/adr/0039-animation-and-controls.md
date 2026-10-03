@@ -1,162 +1,168 @@
-# ADR-0039 · M24c: анимация клипами UAL, короткие паузы, переназначение клавиш
+# ADR-0039 · M24c: animation with UAL clips, short pauses, key rebinding
 
-- **Статус:** принято
-- **Дата:** 2026-09-26
-- **Дополняет:** [ADR-0032](0032-actor-models.md), решение 1 — какие позы клипом,
-  какие кодом; [ADR-0012](0012-sound-and-interface.md), пункт 10 — экран управления
-- **Отменяет:** «переназначение клавиш откладывается» из ADR-0012, пункт 10
+- **Status:** accepted
+- **Date:** 2026-09-26
+- **Extends:** [ADR-0032](0032-actor-models.md), decision 1 — which poses are clips,
+  which are code; [ADR-0012](0012-sound-and-interface.md), item 10 — the controls screen
+- **Supersedes:** "key rebinding is deferred" from ADR-0012, item 10
 
-## Контекст
+## Context
 
-После M23 пользователь прислал замечания по анимации и управлению, их отложили
-в M24c (ADR-0037, «Чего в вехе нет»). Уточнение перед вехой показало, что плохо
-всё движение, а не одно приземление:
+After M23 the user sent remarks on animation and controls; they were deferred
+to M24c (ADR-0037, "Not in the milestone"). Clarification before the milestone
+showed that all movement is bad, not just landing:
 
-- **Приземление.** После прыжка Otto подгибает ногу и медленно выпрямляется.
-  Падение после верхней точки показывает позу удара с подогнутой опорной ногой,
-  и на полу тело доползает из неё в стойку.
-- **Вязкие переходы.** Любая смена позы — экспонента на 0,43 с
-  (`FigureRig.smoothing`): стоп, разворот, выстрел отстают от управления.
-- **Прыжок одной позой.** В воздухе замершая поза, нет толчка, полёта и
-  приземления.
-- **Ходьба и разворот.** Старт и остановка резкие, разворот — мгновенный поворот
-  тела.
+- **Landing.** After a jump Otto bends a leg and slowly straightens. The fall
+  after the top point shows the kick pose with the supporting leg bent, and on the
+  floor the body crawls from it into the stance.
+- **Sluggish transitions.** Any pose change is an exponential over 0.43 s
+  (`FigureRig.smoothing`): stop, turn, shot lag behind the controls.
+- **A jump in one pose.** In the air a frozen pose, no push-off, flight or
+  landing.
+- **Walking and turning.** Start and stop are abrupt, a turn is an instant body
+  rotation.
 
-### Что показала сверка
+### What the check showed
 
-- **Оригинал.** Джойстик на четыре положения и две кнопки: «выстрел» и
-  «прыжок / удар», кнопки продублированы по обе стороны джойстика для правшей и
-  левшей. Переназначения в автомате нет. Прыжок и удар — спрайты без фаз;
-  разворот и старт мгновенные. Плавность здесь наш выбор, а не сверка.
-- **Клипов у пака мало.** Из 24 клипов Business Man в игре четыре: стойка,
-  ходьба, выстрел, смерть. Прыжка, приседа и приземления в паке нет.
-- **Universal Animation Library** (Quaternius, CC0). Бесплатная часть — 45
-  клипов, среди них `Jump_Start`, `Jump_Loop`, `Jump_Land`, `Crouch_Idle_Loop`,
+- **The original.** A four-way joystick and two buttons: "shoot" and
+  "jump / kick", the buttons duplicated on both sides of the joystick for right-
+  and left-handed players. The cabinet has no rebinding. Jump and kick are sprites
+  without phases; turn and start are instant. Smoothness here is our choice, not a
+  check result.
+- **The pack has few clips.** Of Business Man's 24 clips the game uses four:
+  stance, walk, shot, death. The pack has no jump, crouch or landing.
+- **Universal Animation Library** (Quaternius, CC0). The free part is 45
+  clips, among them `Jump_Start`, `Jump_Loop`, `Jump_Land`, `Crouch_Idle_Loop`,
   `Crouch_Fwd_Loop`, `Pistol_Idle_Loop`, `Pistol_Shoot`, `Pistol_Aim_*`,
-  `Walk_Loop`, `Walk_Formal_Loop`, `Death01`, `Roll`, `Hit_*`. Разворота нет.
-- **Скелет UAL другой:** 53 кости по схеме Rigify (`DEF-hips`, `DEF-spine.001`…
-  `DEF-thigh.L`, `DEF-shin.L`, `DEF-foot.L`). Кость к кости он ложится на
-  скелет пака: бёдра, три позвонка, шея, голова, плечо, плечо руки, предплечье,
-  кисть, бедро, голень, стопа. Разница одна, но важная: стопы пака висят на
-  корне под IK, а у UAL — на голени.
+  `Walk_Loop`, `Walk_Formal_Loop`, `Death01`, `Roll`, `Hit_*`. There is no turn.
+- **The UAL skeleton is different:** 53 bones in the Rigify scheme (`DEF-hips`,
+  `DEF-spine.001`… `DEF-thigh.L`, `DEF-shin.L`, `DEF-foot.L`). Bone for bone it
+  maps onto the pack skeleton: hips, three vertebrae, neck, head, shoulder, upper
+  arm, forearm, hand, thigh, shin, foot. There is one difference, but an important
+  one: the pack's feet hang from the root under IK, while in UAL they hang from the
+  shin.
 
-## Решения
+## Decisions
 
-### 1. Движение — клипами UAL, перенесёнными на скелет пака
+### 1. Movement — UAL clips retargeted to the pack skeleton
 
-Решение пользователя. Вся локомоция берётся из UAL, чтобы движение было одного
-стиля: стойка, ходьба, толчок, приземление, выстрел и смерть. Удар ногой
-остаётся позой кодом: в UAL удара нет, а прыжок в оригинале и есть удар.
-Присед UAL (`Crouch_Idle_Loop`) не взят: присед держит высоту пули ROM, и поза
-кодом её держит (решение 2). Основа поз кодом — нейтральная стойка UAL
-`Idle_Loop`, руки вниз: от стойки с пистолетом в двух руках углы рук поехали.
+The user's decision. All locomotion comes from UAL so that movement has one style:
+stance, walk, push-off, landing, shot and death. The kick stays a code pose: UAL
+has no kick, and the jump in the original is the kick. The UAL crouch
+(`Crouch_Idle_Loop`) is not used: the crouch holds the ROM bullet height, and the
+code pose holds it (decision 2). The base of the code poses is the neutral UAL
+stance `Idle_Loop`, arms down: from the two-handed pistol stance the arm angles
+drifted.
 
-По ходу вехи уточнено:
+Refined during the milestone:
 
-- импортёр glTF поворачивает арматуру пака на 90° вокруг X, поэтому повороты
-  переносятся в мире, а не в пространстве арматуры;
-- ноги пака длиннее, чем у UAL, и каждый кадр клипа ставится на пол по
-  вершинам при сборке — без этого подошва в шаге уходила в пол на 6 см;
-- Godot срезает суффикс `_loop` с имени клипа при импорте.
+- the glTF importer rotates the pack armature by 90° around X, so rotations are
+  transferred in world space, not in armature space;
+- the pack's legs are longer than UAL's, and every clip frame is placed on the
+  floor by vertices at build time — without this the sole sank 6 cm into the
+  floor in a step;
+- Godot strips the `_loop` suffix from a clip name on import.
 
-Перенос делает `tools/build_actors.py` в Blender, там же, где уже собираются
-модели: клип UAL читается на своём скелете, повороты костей переводятся на
-кости пака по таблице соответствия и запекаются в клип модели. Стопы пака
-ставятся на конец голени — так же, как риг уже ставит их в позах кодом. В игре
-по-прежнему `FigureRig` читает клипы сам, без `AnimationTree` (ADR-0032,
-решение 1): на этом стоят `snap()` и габарит по вершинам.
+The retargeting is done by `tools/build_actors.py` in Blender, where the models are
+already built: a UAL clip is read on its own skeleton, bone rotations are
+transferred to the pack bones by a mapping table and baked into the model's clip.
+The pack's feet are placed at the end of the shin — the same way the rig already
+places them in code poses. In the game `FigureRig` still reads clips itself,
+without `AnimationTree` (ADR-0032, decision 1): `snap()` and vertex-based bounds
+rely on this.
 
-Исходник UAL (`AnimationLibrary_Godot_Standard.glb`) лежит в
-`assets/source/quaternius/` с лицензией, как исходник пака.
+The UAL source (`AnimationLibrary_Godot_Standard.glb`) lies in
+`assets/source/quaternius/` with the license, like the pack source.
 
-### 2. Высоты ROM остаются законом
+### 2. ROM heights remain law
 
-Присед, агент на колене и залёгший держат высоты пуль ROM (ADR-0027), и тесты
-по вершинам это проверяют. Клип UAL встаёт на такую позу, только если проходит
-тот же тест; иначе поза остаётся кодом, а клип даёт вход и выход из неё.
+Crouch, an agent on one knee and a prone agent hold the ROM bullet heights
+(ADR-0027), and vertex tests check this. A UAL clip replaces such a pose only if it
+passes the same test; otherwise the pose stays code, and the clip provides the
+entry into and exit from it.
 
-### 3. Разворот — поворотом тела кодом
+### 3. Turn — by rotating the body in code
 
-Клипа разворота в UAL нет. Тело поворачивается к новому направлению за время
-паузы разворота (решение 4), ноги в это время идут клипом стойки или шага.
+UAL has no turn clip. The body rotates to the new direction during the turn pause
+(decision 4); the legs meanwhile play the stance or step clip.
 
-### 4. Короткие паузы управления
+### 4. Short control pauses
 
-Решение пользователя: разворот и приземление слегка задерживают управление.
-Движение от этого весомее, но это расхождение с автоматом, где всё мгновенно,
-и оно меняет бой: пули агентов летят втрое быстрее ROM (ADR-0037).
+The user's decision: turning and landing slightly delay control. Movement feels
+weightier, but this diverges from the cabinet, where everything is instant, and it
+changes combat: agent bullets fly three times faster than in the ROM (ADR-0037).
 
-- **Разворот:** пока тело поворачивается, Otto не идёт; стрелять можно. Только
-  на полу: в воздухе поворот лицом свободный, как в ROM (@42A7).
-- **Приземление:** после прыжка или падения короткое восстановление, в нём нельзя
-  идти и прыгать; стрелять и приседать можно. Прыжок, нажатый в восстановлении
-  и удержанный, срабатывает, как оно кончится: потерянное нажатие читалось бы
-  как несработавшая кнопка.
+- **Turn:** while the body rotates, Otto does not walk; shooting is allowed. Only
+  on the floor: in the air turning to face is free, as in the ROM (@42A7).
+- **Landing:** after a jump or a fall a short recovery during which one cannot
+  walk or jump; shooting and crouching are allowed. A jump pressed during recovery
+  and held fires as soon as it ends: a lost press would read as a button that did
+  not work.
 
-Длительности подбираются по кадрам и по тесту боя с агентами: он не должен
-выйти за порог смертей (ADR-0027). Взяты 0,1 с на разворот и 0,15 с на
-приземление: с ними тест боя в пороге, а бот тестов прошёл без правок. Паузы — числа правил, без узлов, и проверяются так же,
-как `OttoStateMachine`. Агенты подчиняются тем же паузам.
+Durations are tuned against frames and the combat test with agents: it must not
+exceed the death threshold (ADR-0027). Chosen: 0.1 s for a turn and 0.15 s for
+landing: with them the combat test is within the threshold, and the test bot
+passed without changes. The pauses are rule numbers, without nodes, and are tested
+the same way as `OttoStateMachine`. Agents obey the same pauses.
 
-### 5. Переходы между позами короче и по месту
+### 5. Transitions between poses are shorter and per case
 
-Одна экспонента на всё уходит. У перехода своё время: в клип ходьбы и из него
-быстро, в приземление — сразу с первого кадра, из смерти — никак. Смесь двух
-клипов — по времени, а не по доле остатка, чтобы переход кончался, а не
-подползал.
+One exponential for everything goes away. Each transition has its own time: into
+and out of the walk clip — fast, into landing — immediately from the first frame,
+out of death — never. Blending two clips is by time, not by a fraction of the
+remainder, so a transition ends rather than creeping in.
 
-### 6. Агенты — те же клипы
+### 6. Agents — the same clips
 
-Скелет общий: агент ходит, прыгает (если спрыгивает) и умирает теми же клипами.
-Позы под высоты ROM — на колене, лёжа — остаются кодом (решение 2).
+The skeleton is shared: an agent walks, jumps (if jumping down) and dies with the
+same clips. Poses for ROM heights — on one knee, prone — stay code (decision 2).
 
-### 7. Переназначение: одна клавиша и одна кнопка на действие
+### 7. Rebinding: one key and one button per action
 
-Решение пользователя. Экран управления из показывающего становится
-настраивающим: на каждое действие одна клавиша клавиатуры и одна кнопка
-геймпада, плюс «сбросить по умолчанию».
+The user's decision. The controls screen goes from showing to configuring: each
+action has one keyboard key and one gamepad button, plus "reset to defaults".
 
-- Переназначаются шесть игровых действий: четыре направления, прыжок, выстрел.
-- **Пауза на Esc и Start не переназначается:** без неё из игры не выйти, если
-  назначить что-то не то. Скриншот на F12 тоже закреплён.
-- Стик геймпада всегда ведёт направления вместе с крестовиной.
-- **Занятая клавиша меняется местами:** действие, у которого её забрали, получает
-  прежнюю клавишу нового. Ни одно действие не остаётся без клавиши.
-- Клавиши — по физическому месту (`physical_keycode`), как и сейчас: схема
-  переживает смену раскладки.
-- Схема хранится в `settings.cfg` рядом с остальными настройками.
+- Six game actions are rebindable: four directions, jump, shoot.
+- **Pause on Esc and Start is not rebindable:** without it one cannot leave the
+  game after assigning something wrong. The screenshot on F12 is also fixed.
+- The gamepad stick always drives directions together with the D-pad.
+- **A taken key is swapped:** the action it was taken from gets the new action's
+  previous key. No action is left without a key.
+- Keys are by physical location (`physical_keycode`), as now: the scheme survives
+  a layout change.
+- The scheme is stored in `settings.cfg` next to the other settings.
 
-По умолчанию — стрелки, пробел, X; WASD, Z и J, которые сейчас идут вторыми
-клавишами, из умолчания уходят: слот клавиатуры один. Кто играет на WASD,
-назначит их сам.
+Defaults are arrows, space, X; WASD, Z and J, which are now secondary keys, leave
+the defaults: there is one keyboard slot. Those who play on WASD will assign them
+themselves.
 
-### 8. Прогрев шейдеров
+### 8. Shader warm-up
 
-Первый выстрел дёргает кадр: шейдеры вспышки, дыма, искр, крови и молнии
-собираются в момент первого показа. Два средства вместе:
+The first shot stutters the frame: shaders for the flash, smoke, sparks, blood and
+lightning are compiled at the moment of first display. Two means together:
 
-- **Shader Baker** в пресетах экспорта: сборка поставляется с готовыми шейдерами
-  под целевой драйвер. Оговорка: `tools/export.py` экспортирует с `--headless`,
-  а без настоящего рендера Godot 4.7 печёт не всё («won't be able to include
-  core shaders»). Видеокарты у раннеров CI нет, поэтому главное средство —
-  второе.
-- **Первый показ под чёрным:** первое здание запуска открывается из чёрного, и
-  под ним каждый редкий эффект один раз рисуется в кадре камеры — спрятанный или
-  вне кадра не рисуется и не прогревает. Разряд молнии греется в окне города,
-  где он и рисуется. Кэш конвейеров общий на процесс — прогрев раз за запуск.
+- **Shader Baker** in the export presets: the build ships with ready shaders for
+  the target driver. Caveat: `tools/export.py` exports with `--headless`, and
+  without a real renderer Godot 4.7 does not bake everything ("won't be able to
+  include core shaders"). CI runners have no graphics card, so the main means is
+  the second one.
+- **First display under black:** the first building of a launch opens from black,
+  and under it every rare effect is drawn once in the camera frame — one hidden or
+  out of frame is not drawn and does not warm up. The lightning bolt warms up in
+  the city window, where it is drawn. The pipeline cache is shared per process —
+  warm-up once per launch.
 
-## Чего в вехе нет
+## Not in the milestone
 
-- **Демо-режим** — отдельная веха после M24c. Решение пользователя: меню в
-  нынешнем виде нравится, демо не должно его заменять — только включаться
-  поверх по бездействию.
-- Платная часть UAL и вторая библиотека (UAL 2): бесплатной хватает на всё
-  нужное.
+- **Demo mode** — a separate milestone after M24c. The user's decision: the menu
+  as it is now is liked, the demo must not replace it — only turn on over it on
+  idle.
+- The paid part of UAL and the second library (UAL 2): the free part covers
+  everything needed.
 
-## Последствия
+## Consequences
 
-- Модели Otto и агента тяжелеют на десяток клипов; клип весит мало, но
-  `build_actors.py` становится дольше.
-- Тест боя с агентами прошёл заново с паузами, в пороге.
-- Экран управления получает тесты: обмен клавиш, сброс, сохранение и чтение
-  схемы.
+- The Otto and agent models get heavier by a dozen clips; a clip weighs little,
+  but `build_actors.py` takes longer.
+- The combat test with agents passed again with the pauses, within the threshold.
+- The controls screen gets tests: key swap, reset, saving and reading the scheme.

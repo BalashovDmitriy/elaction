@@ -1,109 +1,115 @@
-# ADR-0051 · M24j: время суток
+# ADR-0051 · M24j: time of day
 
-- **Статус:** принято
-- **Дата:** 2026-10-01
-- **Дополняет:** [ADR-0029](0029-city-weather-dressing.md) (погода по сиду),
-  [ADR-0030](0030-grading-and-quality.md) (нуар-грейдинг),
-  [ADR-0007](0007-lamps-and-darkness.md) и [ADR-0023](0023-light-and-readability.md)
-  (темнота), [ADR-0035](0035-menu.md) (меню)
+- **Status:** accepted
+- **Date:** 2026-10-01
+- **Extends:** [ADR-0029](0029-city-weather-dressing.md) (weather by seed),
+  [ADR-0030](0030-grading-and-quality.md) (noir grading),
+  [ADR-0007](0007-lamps-and-darkness.md) and [ADR-0023](0023-light-and-readability.md)
+  (darkness), [ADR-0035](0035-menu.md) (menu)
 
-## Контекст
+## Context
 
-Просьба пользователя (2026-09-30): к ночи — утро, день и вечер, к ясной погоде и
-дождю — снег. Всё в кадре собрано под ночь: город за зданием нарисован
-неосвещаемыми материалами с ночными тонами, небо — один тёмный цвет, грейдинг —
-ночной нуар, правило темноты держится на том, что снаружи темно.
+The user's request (2026-09-30): add morning, day and evening to the night, and snow
+to clear weather and rain. Everything in the frame is built for night: the city
+behind the building is drawn with unlit materials in night tones, the sky is one dark
+color, grading is night noir, the darkness rule relies on it being dark outside.
 
-**Сверка с оригиналом.** В аркаде 1983 года вокруг здания чёрная пустота во всех
-четырёх палитрах ROM (`set_level_palette_26ca`, цвет 0 — `#000000`); от здания к
-зданию по кругу меняются только четыре цвета отделки. Времени суток игра не
-называет, погоды нет. Ни один найденный порт (NES, Game Boy, ZX, CPC, C64, MSX)
-дня и погоды не знает. В Elevator Action Returns (1994) есть ночная высотка
-(«Colors of Night») и сумеречный город. Значит, ночь и вечер опираются на серию,
-утро и день, дождь и снег — расширение ремейка; ближайший ориентир эпохи для
-снега — зимний участок Spy Hunter (1983).
+**Check against the original.** In the 1983 arcade there is black emptiness around
+the building in all four ROM palettes (`set_level_palette_26ca`, color 0 —
+`#000000`); from building to building only the four trim colors cycle. The game does
+not name a time of day, there is no weather. None of the ports found (NES, Game Boy,
+ZX, CPC, C64, MSX) know day or weather. Elevator Action Returns (1994) has a night
+high-rise ("Colors of Night") and a twilight city. So night and evening rest on the
+series, while morning and day, rain and snow are an extension of the remake; the
+closest period reference for snow is the winter section of Spy Hunter (1983).
 
-## Решения
+## Decisions
 
-Вопросы заданы пользователю 2026-10-01.
+Questions asked of the user on 2026-10-01.
 
-1. **Веха делится.** M24j — новый город и небо на все четыре времени суток
-   вместе с механикой времени (решения 10–13); M24k — время суток для
-   остального: улица выезда, окно комнаты, вертолёт, музыка и фон; M24l — снег;
-   M24m — жилой комплекс.
-2. **Погод четыре, туман остаётся:** ясно, туман, дождь и (с M24k) снег. Вместе
-   с четырьмя временами суток — 16 сочетаний, в M24j — 12.
-3. **Время суток — свой жребий по сиду здания** со своей солью, независимо от
-   погоды и от палитры раунда. Раздача погод по сидам не меняется. Ночь
-   выпадает чаще: ночь 40 %, утро, день и вечер — по 20 %.
-4. **Время в здании застыло:** выпадает на здание целиком, от вертолёта до
-   машины.
-5. **Темнота — только ночью.** Утром, днём и вечером тёмных этажей 11–15 нет,
-   сбитая лампа падает, но зону не гасит, и агенты видят Otto на всём этаже.
-   Ночью правило ADR-0007 и ADR-0023 — как было. Это расхождение с ROM, где
-   тёмные этажи есть в каждом здании; механика темноты остаётся в 40 % зданий.
-6. **Огни — по жизни.** Днём фонари, уличный неон, огни на крышах и зарево улиц
-   выключены, вывеска здания горит бледно, окна города — стекло с отражением
-   неба, горят единицы. Утром и вечером огни горят частично. Фары у машин днём
-   горят только в дождь и туман.
-7. **Гроза — только вечером и ночью.** Утром и днём дождь без молний.
-8. **Музыка — своя по времени суток:** к ночному нуар-джазу — по свободному
-   треку того же стиля на утро, день и вечер. Фон — свой на сочетание: днём
-   улица шумнее, утром тише.
-9. **Меню — всегда ночь,** погода жребием, как было: меню — лицо игры с неоновой
-   вывеской названия.
+1. **The milestone is split.** M24j — a new city and sky for all four times of day
+   together with the time mechanics (decisions 10–13); M24k — time of day for the
+   rest: the exit street, the room window, the helicopter, music and ambience; M24l —
+   snow; M24m — the residential complex.
+2. **Four weathers, fog stays:** clear, fog, rain and (from M24k) snow. Together with
+   four times of day — 16 combinations, 12 in M24j.
+3. **Time of day — its own draw by the building seed** with its own salt, independent
+   of weather and of the round palette. Weather assignment by seed does not change.
+   Night comes up more often: night 40 %, morning, day and evening 20 % each.
+4. **Time in the building is frozen:** it is drawn for the whole building, from the
+   helicopter to the car.
+5. **Darkness — only at night.** In the morning, day and evening there are no dark
+   floors 11–15, a shot-out lamp falls but does not darken the zone, and agents see
+   Otto on the whole floor. At night the rule of ADR-0007 and ADR-0023 is as before.
+   This diverges from the ROM, where dark floors exist in every building; the darkness
+   mechanic remains in 40 % of buildings.
+6. **Lights — as in real life.** In the day street lamps, street neon, rooftop lights
+   and the street glow are off, the building sign glows faintly, the city windows are
+   glass reflecting the sky, only a few are lit. In the morning and evening lights are
+   partly on. Car headlights in the day are on only in rain and fog.
+7. **Thunderstorms — only in the evening and at night.** In the morning and day rain
+   comes without lightning.
+8. **Music — its own per time of day:** in addition to the night noir jazz — a free
+   track of the same style for morning, day and evening. Ambience — its own per
+   combination: in the day the street is noisier, in the morning quieter.
+9. **The menu — always night,** weather by draw, as before: the menu is the face of
+   the game with the neon title sign.
 
-Вопросы второго блока заданы 2026-10-01, после первых кадров дня: город M19
-дневным светом не спасти. Ночью он держался темнотой — силуэт и россыпь огней,
-— днём стало видно, что это неосвещаемые коробки с нарисованной сеткой окон.
-Пользователь: «фон нужно будет переделывать полностью в зависимости от времени
-суток».
+The questions of the second block were asked on 2026-10-01, after the first daytime
+frames: the M19 city cannot be saved by daylight. At night it held up through
+darkness — a silhouette and a scatter of lights — while in the day it became visible
+that these are unlit boxes with a painted window grid. The user: "the background will
+need to be completely redone depending on the time of day".
 
-10. **Город — моделями свободных паков** (Kenney City Kit, Quaternius, CC0) с
-    настоящими материалами: солнце даёт объём и тени, ночью горят окна. Как
-    обстановка в M21b ([ADR-0033](0033-dressing-from-packs.md)).
-11. **Небо — HDRI-панорамы Poly Haven (CC0)** на каждое время суток и погоду;
-    они же освещают город — цвет теней, отражения в стёклах. Варианты
-    выбирает пользователь по картинкам.
-12. **Город один на все времена суток,** ночь — его состояние: горят окна и
-    неон, небо тёмное. Ночной вид меняется; цель — не хуже прежнего.
-13. **Временный дневной вид прежнего города** (`city_sky.gdshader`, дневные
-    числа в шейдерах фасада и окон) — только мост до нового города и уходит
-    вместе со старым.
+10. **The city — from free pack models** (Kenney City Kit, Quaternius, CC0) with real
+    materials: the sun gives volume and shadows, at night windows are lit. Like the
+    dressing in M21b ([ADR-0033](0033-dressing-from-packs.md)).
+11. **The sky — Poly Haven HDRI panoramas (CC0)** for each time of day and weather;
+    they also light the city — shadow color, reflections in glass. The user picks the
+    variants from pictures.
+12. **One city for all times of day,** night is its state: windows and neon are lit,
+    the sky is dark. The night look changes; the goal is no worse than before.
+13. **The temporary day look of the old city** (`city_sky.gdshader`, daytime numbers
+    in the facade and window shaders) is only a bridge to the new city and goes away
+    together with the old one.
 
-## Как устроено
+## How it works
 
-- `TimeOfDay` — время суток здания, как `Weather` — погода: жребий по сиду и
-  таблица вида на каждое время — небо (зенит и горизонт), солнце (направление,
-  цвет, сила), воздух здания и его кривая грейдинга, тон фасадов города, доля
-  горящих окон, сила огней.
-- Солнце светит только снаружи: на город, крышу и улицу. Здание показано в
-  разрезе, и свет внутри — лампы и общий свет здания; днём общий свет ярче,
-  поэтому сбитая лампа зону не гасит и визуально.
-- `BuildingRules` несёт время суток, правило темноты спрашивает его.
+- `TimeOfDay` is the building's time of day, as `Weather` is the weather: a draw by
+  seed and a look table for each time — the sky (zenith and horizon), the sun
+  (direction, color, strength), the building air and its grading curve, the tone of
+  the city facades, the share of lit windows, the strength of lights.
+- The sun shines only outside: on the city, the roof and the street. The building is
+  shown as a cutaway, and the light inside is lamps and the building's ambient light;
+  in the day the ambient light is brighter, so a shot-out lamp does not darken the zone
+  visually either.
+- `BuildingRules` carries the time of day, the darkness rule asks it.
 
-- **Город (решение 10).** Дома пака целиком — 18–45 тыс. треугольников, а
-  город — сотни домов, поэтому фасад запекается: `tools/build_city.py` собирает
-  в Blender из модулей Downtown на каждый из шести стилей (кирпич, двойные окна,
-  ниша, стекло, контора, камень) три ряда — карниз, этаж, первый этаж — и снимает
-  их ортокамерой в четыре прохода: цвет, нормаль, затенение с шероховатостью и
-  металлом, маска окон. Игра кладёт атлас на коробки домов прежней раскладки
-  ([CityPlan]) шейдером `city_building.gdshader`: этажи повторяются, свет
-  настоящий, окна — гладкое стекло, ночью горит доля окон по маске и хешу окна.
-  Пак в репозиторий не идёт, как и исходники звука: он в `.cache/downtown/`.
-- **Небо (решение 11).** Выбор пользователя (2026-10-01): утро —
-  `syferfontein_0d_clear_puresky`, день — `qwantani_mid_morning_puresky`, вечер —
-  `belfast_sunset_puresky`, ночь — `qwantani_moonrise_puresky`, туман утром и днём
-  — `kloofendal_28d_misty_puresky`, дождь утром и днём — `mud_road_puresky`,
-  непогода вечером и ночью — `kloppenheim_01_puresky`. В 1k: город за ними
-  размыт. `tools/build_sky.py` находит на каждой солнце, и [CitySky] поворачивает
-  панораму своим шейдером так, чтобы оно стояло там же, откуда светит свет города
-  — солнце, а ночью луна. Небо же — свет теней и отражения в стёклах.
+- **City (decision 10).** Whole pack buildings are 18–45 thousand triangles, and the
+  city is hundreds of buildings, so the facade is baked: `tools/build_city.py`
+  assembles in Blender, from the Downtown modules, three rows — cornice, floor, ground
+  floor — for each of six styles (brick, double windows, recess, glass, office, stone)
+  and shoots them with an ortho camera in four passes: color, normal, occlusion with
+  roughness and metalness, window mask. The game applies the atlas to the building
+  boxes of the old layout ([CityPlan]) with the shader `city_building.gdshader`: floors
+  repeat, the light is real, windows are smooth glass, at night a share of windows is
+  lit by the mask and a window hash. The pack does not go into the repository, like the
+  sound sources: it is in `.cache/downtown/`.
+- **Sky (decision 11).** The user's choice (2026-10-01): morning —
+  `syferfontein_0d_clear_puresky`, day — `qwantani_mid_morning_puresky`, evening —
+  `belfast_sunset_puresky`, night — `qwantani_moonrise_puresky`, fog in the morning and
+  day — `kloofendal_28d_misty_puresky`, rain in the morning and day —
+  `mud_road_puresky`, bad weather in the evening and at night —
+  `kloppenheim_01_puresky`. In 1k: the city behind them is blurred.
+  `tools/build_sky.py` finds the sun on each one, and [CitySky] rotates the panorama
+  with its shader so that it stands where the city light comes from — the sun, and at
+  night the moon. The sky is also the shadow light and the reflections in glass.
 
-## Последствия
+## Consequences
 
-- Город, небо, улица выезда, окно комнаты за дверью, вывеска и вертолёт
-  получают дневной вид; ночной вид не меняется.
-- Тесты проверяют жребий и долю ночи, темноту только ночью, огни по времени,
-  грозу только вечером и ночью и что каждое из двенадцати сочетаний собирается.
-- Кадры вехи — на все двенадцать сочетаний.
+- The city, sky, exit street, the room window behind a door, the sign and the
+  helicopter get a daytime look; the night look does not change.
+- Tests check the draw and the share of night, darkness only at night, lights by time,
+  thunderstorms only in the evening and at night, and that each of the twelve
+  combinations builds.
+- Milestone frames — for all twelve combinations.

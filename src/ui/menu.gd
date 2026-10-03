@@ -1,17 +1,18 @@
 class_name Menu
 extends CanvasLayer
 
-## Экраны вне игры: меню, пауза, конец партии, настройки, рекорды, управление.
+## Out-of-game screens: menu, pause, game over, settings, high scores, controls.
 ##
-## Один узел на все страницы, а не сцена на каждую: страницы отличаются только
-## содержимым одной колонки, и держать ради этого шесть файлов значило бы шесть
-## раз повторить фон, вывеску и разбор ввода.
+## One node for all pages, not a scene for each: the pages differ only in
+## the contents of one column, and keeping six files for that would mean repeating the
+## background, the sign and input handling six times.
 ##
-## Содержимое собирается кодом, потому что оно данные: список пунктов, список
-## переключателей, строки таблицы. Разметка в сцене — только фон, вывеска и
-## колонка (ADR-0035).
+## The contents are built in code because they are data: a list of items, a list of
+## switches, table rows. The layout in the scene is only the background, the sign and
+## the column (ADR-0035).
 
-## Что игрок выбрал. Решает не меню, а [Main]: оно знает про здание и партию.
+## What the player chose. It is decided not by the menu but by [Main]: it knows about the
+## building and the game.
 signal play_pressed
 signal resume_pressed
 signal restart_pressed
@@ -20,9 +21,9 @@ signal quit_pressed
 
 enum Page { MAIN, PAUSE, GAME_OVER, SETTINGS, RECORDS, CONTROLS, CREDITS }
 
-## Подписи действий экрана управления. Сами действия и их порядок — у
-## [KeyBindings]; подписей из [InputMap] не достать — они здесь. Присед — то же
-## «вниз», и подпись говорит об этом, а не заводит строку-дубль.
+## Labels of the controls screen actions. The actions themselves and their order belong
+## to [KeyBindings]; labels cannot be obtained from [InputMap], so they are here. Crouch
+## is the same "down", and the label says so instead of adding a duplicate row.
 const ACTION_NAMES: Dictionary = {
 	&"move_left": "UI_MOVE_LEFT",
 	&"move_right": "UI_MOVE_RIGHT",
@@ -32,10 +33,10 @@ const ACTION_NAMES: Dictionary = {
 	&"shoot": "UI_SHOOT",
 }
 
-## Имена кнопок геймпада. В [InputMap] они лежат номерами, а номер игроку
-## ничего не говорит — на коробке написаны буквы. Значения, начинающиеся с
-## `UI_`, переводятся: у крестовины имени на коробке нет. Стрелок нет ни в
-## одном шрифте игры (долг M22b), поэтому направление — словом.
+## Gamepad button names. In [InputMap] they are stored as numbers, and a number tells the
+## player nothing: the box has letters printed on it. Values starting with
+## `UI_` are translated: the D-pad has no name on the box. None of the game's fonts
+## has arrows (M22b debt), so the direction is given as a word.
 const PAD_NAMES: Dictionary = {
 	JOY_BUTTON_A: "A",
 	JOY_BUTTON_B: "B",
@@ -53,40 +54,40 @@ const PAD_NAMES: Dictionary = {
 	JOY_BUTTON_DPAD_RIGHT: "UI_DPAD_RIGHT",
 }
 
-## Ширина колонки: пунктов и настроек, px.
+## Column width: items and settings, px.
 const COLUMN_WIDTH: float = 560.0
 const WIDE_COLUMN: float = 900.0
-## Сколько длится смена страницы и насколько колонка въезжает слева.
+## How long a page change lasts and how far the column slides in from the left.
 const PAGE_TIME: float = 0.22
 const PAGE_SLIDE: float = 36.0
-## Где начинается колонка: под вывеской на главной и выше на остальных —
-## настройкам нужна вся высота экрана.
+## Where the column starts: below the sign on the main page and higher on the others:
+## the settings need the full screen height.
 const COLUMN_TOP: float = 340.0
 const COLUMN_TOP_HIGH: float = 110.0
-## Кегль заголовка страницы и строк таблиц.
+## Font size of the page title and table rows.
 const CAPTION_SIZE: int = 28
 const TABLE_SIZE: int = 30
 
 var settings: GameSettings = null
 var records: Records = null
 
-## Счёт последней партии и её место в таблице: показываются на экране конца.
+## Score of the last game and its place in the table: shown on the game-over screen.
 var _last_score: int = 0
 var _last_place: int = -1
 
 var _page: Page = Page.MAIN
 
-## Страница, на которую вернёт «назад». Запоминается, а не угадывается по паузе:
-## после партии, попавшей в таблицу, дерево тоже стоит на паузе, и по одному
-## этому признаку «назад» из рекордов уводило с экрана конца партии в паузу.
+## The page "back" returns to. It is remembered, not guessed from the pause:
+## after a game that made it into the table, the tree is also paused, and by that sign
+## alone "back" from the high scores led from the game-over screen to the pause.
 var _back_to: Page = Page.MAIN
 
-## Пока страница собирается и забирает фокус, переход фокуса не звучит: иначе
-## каждая страница открывалась бы щелчком, которого игрок не делал.
+## While a page is being built and takes focus, the focus change makes no sound:
+## otherwise every page would open with a click the player did not make.
 var _settling: bool = false
 var _page_tween: Tween = null
-## Действие, которому экран управления сейчас ждёт клавишу, и его пункт.
-## Пусто — никто не ждёт.
+## The action the controls screen is waiting for a key for right now, and its item.
+## Empty means nobody is waiting.
 var _listening: StringName = &""
 var _listen_row: MenuRow = null
 
@@ -100,40 +101,41 @@ var _listen_row: MenuRow = null
 
 
 func _ready() -> void:
-	# Меню живёт на паузе: под ней оно и открывается.
+	# The menu lives on pause: it opens under the pause.
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	# Версия в углу — чтобы игрок мог назвать её, не открывая свойства файла.
+	# The version in the corner, so that the player can name it without opening the file
+	# properties.
 	_version.text = Release.tag()
 	_style_static_labels()
 
 
-## Показывает страницу и забирает фокус на пункт [param focus], обычно первый:
-## иначе стрелками и геймпадом по меню не походить.
+## Shows a page and takes focus to item [param focus], usually the first one:
+## otherwise you cannot move around the menu with the arrows and a gamepad.
 func show_page(page: Page, focus: int = 0) -> void:
 	_page = page
 	_listening = &""
 	_listen_row = null
 	if page == Page.MAIN or page == Page.PAUSE or page == Page.GAME_OVER:
-		# Корневые страницы — те, с которых уходят в подстраницы. Последняя из них
-		# и есть то, куда вернёт «назад».
+		# Root pages are the ones subpages are entered from. The last of them
+		# is where "back" returns to.
 		_back_to = page
 	visible = true
 	_settling = true
 	for child: Node in _column.get_children():
-		# Сначала из колонки, потом в утиль: [method Node.queue_free] удаляет узел
-		# лишь в конце кадра, а отложенный [method _focus_row] успевает раньше —
-		# и фокус доставался пункту прошлой страницы, которую тут же и удаляли.
+		# First out of the column, then to the trash: [method Node.queue_free] deletes the node
+		# only at the end of the frame, and the deferred [method _focus_row] gets there earlier,
+		# so focus went to an item of the previous page, which was being deleted right then.
 		_column.remove_child(child)
 		child.queue_free()
 
-	# Над игрой — пауза и конец партии со своими подстраницами — за меню стоит
-	# замершее здание, и оно размывается. Из главного меню за ним город.
+	# Over the game (the pause and game over with their subpages) a frozen building stands
+	# behind the menu, and it is blurred. From the main menu the city is behind it.
 	var over_game := _back_to != Page.MAIN
 	_blur.visible = over_game
 	_title.visible = page == Page.MAIN
 	_subtitle.visible = page == Page.MAIN
-	# «Esc — назад» только там, где Esc и правда ведёт назад: с корневых страниц
-	# уходят пунктами, а на паузе Esc её закрывает.
+	# "Esc: back" only where Esc really leads back: root pages are left
+	# through items, and on the pause Esc closes it.
 	_hint.text = tr("UI_HINT_ROOT" if _is_root(page) else "UI_HINT")
 	var wide := (
 		page == Page.SETTINGS
@@ -142,8 +144,8 @@ func show_page(page: Page, focus: int = 0) -> void:
 		or page == Page.CREDITS
 	)
 	_column.custom_minimum_size.x = WIDE_COLUMN if wide else COLUMN_WIDTH
-	# Контейнер сам не сужается: после широких настроек узкая страница осталась
-	# бы шириной настроек, и пункты тянулись бы через полэкрана.
+	# The container does not shrink by itself: after the wide settings a narrow page would
+	# stay the width of the settings, and the items would stretch across half the screen.
 	_column.reset_size()
 	_slot.position.y = COLUMN_TOP if page == Page.MAIN else COLUMN_TOP_HIGH
 	_column.add_theme_constant_override("separation", 8 if wide else 14)
@@ -168,9 +170,9 @@ func show_page(page: Page, focus: int = 0) -> void:
 	_focus_row.call_deferred(focus)
 
 
-## Держит пункты страницы выключенными [param seconds] секунд: нажатие,
-## начатое ещё в игре, не должно выбрать пункт (ADR-0042, решение 5). Фокус
-## остаётся на месте — выключенный пункт его держит, а не отдаёт.
+## Keeps the page items disabled for [param seconds] seconds: a press
+## started while still in the game must not select an item (ADR-0042, decision 5). Focus
+## stays in place: a disabled item holds it instead of giving it away.
 func hold_rows(seconds: float) -> void:
 	var held := rows()
 	for row: MenuRow in held:
@@ -182,12 +184,12 @@ func hold_rows(seconds: float) -> void:
 			row.disabled = false
 
 
-## Прячет меню целиком — игра продолжается.
+## Hides the menu entirely: the game continues.
 func close() -> void:
 	visible = false
 
 
-## Запоминает итог партии для экрана конца.
+## Remembers the game result for the game-over screen.
 func remember(score: int, place: int) -> void:
 	_last_score = score
 	_last_place = place
@@ -197,20 +199,20 @@ func current_page() -> Page:
 	return _page
 
 
-## Пункты текущей страницы — тем, кто водит меню снаружи: тестам и снимкам.
+## Items of the current page, for those who drive the menu from outside: tests and shots.
 func rows() -> Array[MenuRow]:
 	var found: Array[MenuRow] = []
 	_collect_rows(_column, found)
 	return found
 
 
-## Вывеска — нужна тестам и снимкам, чтобы остановить мигание.
+## The sign: tests and shots need it to stop the flicker.
 func title() -> NeonTitle:
 	return _title
 
 
-## Ждущее назначение забирает следующее нажатие раньше, чем его увидит фокус
-## меню: иначе стрелка, которую назначают, ушла бы на соседний пункт.
+## A pending assignment takes the next press before the menu focus sees it:
+## otherwise the arrow being assigned would move to the neighboring item.
 func _input(event: InputEvent) -> void:
 	if not visible or _listening == &"":
 		return
@@ -230,7 +232,7 @@ func _input(event: InputEvent) -> void:
 			_bound(settings.bindings.bind_pad(_listening, button.button_index))
 
 
-## Экран управления ждёт ли сейчас клавишу. Тестам.
+## Whether the controls screen is waiting for a key right now. For tests.
 func is_listening() -> bool:
 	return _listening != &""
 
@@ -238,14 +240,14 @@ func is_listening() -> bool:
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
-	# «Назад» с подстраницы — Esc или B. С корневых страниц уходят только
-	# пунктами: пауза закрывается своим действием, и это решает [Main].
+	# "Back" from a subpage is Esc or B. Root pages are left only through
+	# items: the pause is closed by its own action, and [Main] decides that.
 	if event.is_action_pressed(&"ui_cancel") and not _is_root(_page):
 		get_viewport().set_input_as_handled()
 		_go_back()
 
 
-# --- Страницы ----------------------------------------------------------------
+# --- Pages -------------------------------------------------------------------
 
 
 func _build_main() -> void:
@@ -262,7 +264,8 @@ func _build_pause() -> void:
 	_action("UI_RESUME", func() -> void: resume_pressed.emit())
 	_action("UI_RESTART", func() -> void: restart_pressed.emit())
 	_action("UI_SETTINGS", func() -> void: show_page(Page.SETTINGS))
-	# Справка — и с паузы: из главного меню её не находили (ADR-0037, решение 9).
+	# Help is available from the pause too: from the main menu it could not be found
+	# (ADR-0037, decision 9).
 	_action("UI_CONTROLS", func() -> void: show_page(Page.CONTROLS))
 	_action("UI_TO_MENU", func() -> void: to_menu_pressed.emit())
 
@@ -310,8 +313,8 @@ func _build_records() -> void:
 	if rows_shown.is_empty():
 		_note(tr("UI_NO_RECORDS"))
 	else:
-		# Сеткой, а не строкой с пробелами: Exo 2 пропорциональный, и колонки
-		# из пробелов у него разъезжаются.
+		# A grid, not a line with spaces: Exo 2 is proportional, and columns
+		# made of spaces drift apart in it.
 		var grid := GridContainer.new()
 		grid.columns = 3
 		grid.add_theme_constant_override("h_separation", 48)
@@ -327,14 +330,14 @@ func _build_records() -> void:
 	_back()
 
 
-## Авторы чужих моделей, фактур, звуков и шрифтов — из `CREDITS.md` через
-## [Credits] (ADR-0042, решение 6). По разделу — строка имён с лицензиями.
-## Страница авторов — только по-английски, на любом языке игры (просьба
-## пользователя, 2026-10-01): у её ключей обе колонки перевода английские.
+## Authors of third-party models, textures, sounds and fonts, from `CREDITS.md` via
+## [Credits] (ADR-0042, decision 6). Per section, a line of names with licenses.
+## The credits page is in English only, in any game language (the user's request,
+## 2026-10-01): both translation columns of its keys are English.
 func _build_credits() -> void:
 	_caption("UI_CREDITS_TITLE")
-	# Первым — автор идеи и разработки, за ним — оригинал, по которому ремейк,
-	# потом — авторы ассетов из `CREDITS.md`.
+	# First the author of the idea and development, then the original the remake is based on,
+	# then the authors of the assets from `CREDITS.md`.
 	_credit_line(tr("UI_CREDITS_CREATOR"), tr("UI_CREDITS_CREATOR_NAME"))
 	_credit_line(tr("UI_CREDITS_ORIGINAL"), tr("UI_CREDITS_ORIGINAL_NAME"))
 	_gap(10.0)
@@ -345,7 +348,7 @@ func _build_credits() -> void:
 	_back()
 
 
-## Заголовок раздела страницы «Авторы» и строка имён под ним.
+## A section heading of the "Credits" page and the line of names under it.
 func _credit_line(title: String, line: String) -> void:
 	var heading := NeonStyle.label(20, _neon(), 700)
 	heading.text = title.to_upper()
@@ -362,15 +365,15 @@ func _build_controls() -> void:
 	if settings == null:
 		_back()
 		return
-	# Одна строка на действие: нажал — строка ждёт клавишу или кнопку, и первая
-	# нажатая встаёт на место (ADR-0039, решение 7). Только клавиши, без
-	# объяснений игры (решение пользователя, ADR-0037, решение 9).
+	# One row per action: press it, the row waits for a key or a button, and the first
+	# one pressed takes its place (ADR-0039, decision 7). Keys only, no
+	# explanations of the game (the user's decision, ADR-0037, decision 9).
 	for action: StringName in KeyBindings.ACTIONS:
 		var row := _add_row(
 			MenuRow.binding(tr(String(ACTION_NAMES[action])), _binding_text(action))
 		)
 		row.pressed.connect(_listen.bind(action, row))
-	# Пауза закреплена: без неё из игры не выйти, если назначить не то.
+	# Pause is fixed: without it you cannot leave the game if you assign the wrong thing.
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 40)
@@ -383,7 +386,7 @@ func _build_controls() -> void:
 	_back()
 
 
-## Клавиша и кнопка действия, как их видит схема.
+## The action's key and button, as the scheme sees them.
 func _binding_text(action: StringName) -> String:
 	var bindings := settings.bindings
 	var pad := String(PAD_NAMES.get(bindings.pad_of(action), str(bindings.pad_of(action))))
@@ -401,8 +404,8 @@ func _listen(action: StringName, row: MenuRow) -> void:
 	row.show_text(tr("UI_PRESS_KEY"))
 
 
-## Назначение прошло или нет — схема на диск и в [InputMap], строки заново.
-## Обмен меняет и чужую строку, поэтому переписываются все.
+## Whether the assignment went through or not: the scheme goes to disk and into
+## [InputMap], the rows are rebuilt. A swap also changes another row, so all are rewritten.
 func _bound(taken: bool) -> void:
 	Sounds.play(Sounds.UI_MOVE if taken else Sounds.UI_BACK)
 	if taken:
@@ -428,9 +431,9 @@ func _reset_keys() -> void:
 	_stop_listening()
 
 
-## Возвращает на страницу, с которой ушли, и записывает настройки на диск:
-## громкость меняется по шагу, и сохранять её на каждый шаг значило бы писать
-## файл двадцать раз за одно движение.
+## Returns to the page we came from and writes the settings to disk:
+## volume changes in steps, and saving it on every step would mean writing
+## the file twenty times for a single movement.
 func _go_back() -> void:
 	Sounds.play(Sounds.UI_BACK)
 	if settings != null:
@@ -438,10 +441,10 @@ func _go_back() -> void:
 	show_page(_back_to)
 
 
-# --- Кирпичи -----------------------------------------------------------------
+# --- Building blocks ---------------------------------------------------------
 
 
-## Заголовок страницы неоновыми капителями — как подписи на плашках HUD.
+## The page title in neon small caps, like the labels on the HUD plates.
 func _caption(key: String) -> void:
 	var label := NeonStyle.label(CAPTION_SIZE, _neon(), 700)
 	label.text = tr(key).to_upper()
@@ -495,10 +498,10 @@ func _add_row(row: MenuRow) -> MenuRow:
 	return row
 
 
-## Громкость: полоса и проценты, влево-вправо по пять.
+## Volume: a bar and percent, left and right in steps of five.
 func _level(key: String, bus: String) -> void:
 	var row := _add_row(MenuRow.slider(tr(key), settings.level_of(bus)))
-	# Громкость применяется сразу, а на диск уезжает при уходе со страницы.
+	# Volume applies at once and goes to disk when leaving the page.
 	row.changed.connect(func(value: Variant) -> void: settings.set_level(bus, float(value)))
 
 
@@ -514,7 +517,7 @@ func _languages() -> void:
 	row.changed.connect(_on_language_selected)
 
 
-## Уровень сложности: четыре положения DIP-переключателя автомата.
+## Difficulty level: the four positions of the cabinet's DIP switch.
 func _difficulty() -> void:
 	var names: Array[String] = []
 	for level: int in GameSettings.DIFFICULTIES:
@@ -527,7 +530,7 @@ func _difficulty() -> void:
 	)
 
 
-## Качество графики: четыре уровня (ADR-0030, решение 5; «Ультра» — ADR-0034).
+## Graphics quality: four levels (ADR-0030, decision 5; "Ultra" is ADR-0034).
 func _quality() -> void:
 	var names: Array[String] = []
 	for level: int in Graphics.Quality.size():
@@ -536,14 +539,14 @@ func _quality() -> void:
 	row.changed.connect(
 		func(value: Variant) -> void:
 			settings.quality = int(value)
-			# Выбрал игрок — замер первого запуска его уже не перебьёт.
+			# The player chose: the first-launch measurement will no longer override it.
 			settings.quality_measured = true
 			settings.apply()
 			settings.save_to()
 	)
 
 
-## Режим окна: окно, без рамки, полный экран в родном разрешении.
+## Window mode: windowed, borderless, fullscreen at the native resolution.
 func _window_mode() -> void:
 	var names: Array[String] = []
 	for mode: int in DisplayModes.Mode.size():
@@ -554,15 +557,15 @@ func _window_mode() -> void:
 			settings.window_mode = int(value)
 			settings.apply()
 			settings.save_to()
-			# Список разрешений зависит от режима ([method DisplayModes.choices]):
-			# страница собирается заново, фокус остаётся на режиме — иначе в полном
-			# экране не выбрать родное нестандартное, а в окне оставалось бы оно.
+			# The list of resolutions depends on the mode ([method DisplayModes.choices]):
+			# the page is rebuilt, focus stays on the mode: otherwise in fullscreen
+			# the native non-standard one could not be chosen, and in a window it would remain.
 			show_page(_page, rows().find(row))
 	)
 
 
-## Размер окна — из тех, что держит монитор игрока; в полном экране и без рамки
-## — разрешение 3D ([method DisplayModes.share]).
+## Window size, from those the player's monitor supports; in fullscreen and borderless,
+## the 3D resolution ([method DisplayModes.share]).
 func _resolution() -> void:
 	var area := DisplayModes.screen_rect().size
 	var mode := settings.window_mode as DisplayModes.Mode
@@ -587,8 +590,9 @@ func _resolution() -> void:
 	)
 
 
-## Предел кадров: по монитору, числом или без предела. Частоты монитора в
-## списке нет — Godot их не перечисляет и не меняет ([constant DisplayModes.FRAME_LIMITS]).
+## Frame limit: by monitor, a number or unlimited. Monitor refresh rates are not in
+## the list: Godot neither enumerates nor changes them
+## ([constant DisplayModes.FRAME_LIMITS]).
 func _frame_limit() -> void:
 	var names: Array[String] = []
 	for limit: int in DisplayModes.FRAME_LIMITS:
@@ -603,7 +607,7 @@ func _frame_limit() -> void:
 	)
 
 
-## Подпись предела кадров: числа — как счётчик в углу HUD, «144 FPS».
+## Frame limit label: numbers like the counter in the HUD corner, "144 FPS".
 func frame_limit_name(limit: int) -> String:
 	match limit:
 		DisplayModes.FRAME_MONITOR:
@@ -614,7 +618,7 @@ func frame_limit_name(limit: int) -> String:
 			return "%d FPS" % limit
 
 
-## Вертикальная синхронизация: без неё кадров больше, но бывают разрывы.
+## Vertical sync: without it there are more frames, but tearing happens.
 func _vsync() -> void:
 	var row := _add_row(MenuRow.toggle(tr("UI_VSYNC"), settings.vsync))
 	row.changed.connect(
@@ -625,7 +629,7 @@ func _vsync() -> void:
 	)
 
 
-## Кровь при попадании пули — выключаемая, как принято в играх (ADR-0031).
+## Blood on a bullet hit: can be turned off, as is customary in games (ADR-0031).
 func _blood() -> void:
 	var row := _add_row(MenuRow.toggle(tr("UI_BLOOD"), settings.blood))
 	row.changed.connect(
@@ -636,7 +640,7 @@ func _blood() -> void:
 	)
 
 
-## Счётчик кадров в углу HUD.
+## The frame counter in the HUD corner.
 func _fps() -> void:
 	var row := _add_row(MenuRow.toggle(tr("UI_SHOW_FPS"), settings.show_fps))
 	row.changed.connect(
@@ -647,7 +651,7 @@ func _fps() -> void:
 	)
 
 
-## Цвет неона: отеля, как у первого здания и у кромки HUD по умолчанию.
+## Neon color: the hotel one, as for the first building and the HUD edge by default.
 func _neon() -> Color:
 	return Hud.DEFAULT_NEON
 
@@ -656,7 +660,7 @@ func _is_root(page: Page) -> bool:
 	return page == Page.MAIN or page == Page.PAUSE or page == Page.GAME_OVER
 
 
-## Колонка въезжает слева и проявляется — страница сменилась, а не мигнула.
+## The column slides in from the left and fades in: the page changed rather than blinked.
 func _slide_in() -> void:
 	if _page_tween != null:
 		_page_tween.kill()
@@ -676,8 +680,8 @@ func _style_static_labels() -> void:
 	_subtitle.text = tr("UI_SUBTITLE")
 
 
-## Фокус на пункт [param at] страницы: иначе стрелками и геймпадом по меню не
-## походить. Переход фокуса после этого снова звучит.
+## Focus to item [param at] of the page: otherwise you cannot move around the menu with
+## the arrows and a gamepad. After this, focus changes make sound again.
 func _focus_row(at: int) -> void:
 	var found := rows()
 	if not found.is_empty():
@@ -702,9 +706,9 @@ func _on_language_selected(index: Variant) -> void:
 	settings.locale = GameSettings.LOCALES[int(index)]
 	settings.apply()
 	settings.save_to()
-	# Страница перерисовывается целиком: подписи собраны кодом, и сами
-	# они на смену языка не отзовутся. Фокус остаётся на языке: с первого пункта
-	# следующее «вправо» крутило бы уже громкость (авторевью M22b).
+	# The page is redrawn entirely: the labels are built in code, and they
+	# will not respond to a language change by themselves. Focus stays on the language: from
+	# the first item the next "right" would already turn the volume (M22b code review).
 	var keep := rows().find(get_viewport().gui_get_focus_owner() as MenuRow)
 	_subtitle.text = tr("UI_SUBTITLE")
 	show_page(_page, maxi(keep, 0))
