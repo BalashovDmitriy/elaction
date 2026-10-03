@@ -54,13 +54,13 @@ func _riding_down() -> Array:
 	add_child_autofree(otto)
 	otto.global_position = Vector3(0.0, 0.0, WorldSpace.PLAY_Z)
 	await wait_physics_frames(3)
-	assert_true(otto.is_riding(), "Otto сел в кабину")
+	assert_true(otto.is_riding(), "Otto got into the car")
 	Input.action_press(&"move_down")
 	for _frame: int in RIDE_FRAMES:
 		await wait_physics_frames(1)
 		if not car.is_aligned():
 			break
-	assert_false(car.is_aligned(), "кабина тронулась")
+	assert_false(car.is_aligned(), "the car started moving")
 	return [car, otto]
 
 
@@ -80,12 +80,12 @@ func test_otto_walks_in_a_moving_car_and_stops_at_its_wall() -> void:
 		assert_lte(
 			otto.global_position.x - car.global_position.x,
 			room + 0.02,
-			"между этажами борт — стена"
+			"between floors the side is a wall"
 		)
-		assert_true(otto.is_riding(), "и из кабины он не вышел")
+		assert_true(otto.is_riding(), "and he did not leave the car")
 	Input.action_release(&"move_right")
 	Input.action_release(&"move_down")
-	assert_true(walked, "в едущей кабине Otto идёт")
+	assert_true(walked, "Otto walks in a moving car")
 
 
 ## The side holds in a jump too: flight speed is taken from the ground, and a running jump
@@ -106,13 +106,13 @@ func test_a_jump_in_a_moving_car_stops_at_its_wall_too() -> void:
 		assert_lte(
 			otto.global_position.x - car.global_position.x,
 			room + 0.02,
-			"в прыжке борт — тоже стена"
+			"in a jump the side is also a wall"
 		)
 	Input.action_release(&"jump")
 	Input.action_release(&"move_right")
 	Input.action_release(&"move_down")
-	assert_true(flew, "Otto прыгнул в едущей кабине")
-	assert_true(otto.is_riding(), "и прыжок не вынес его из кабины")
+	assert_true(flew, "Otto jumped in a moving car")
+	assert_true(otto.is_riding(), "and the jump did not carry him out of the car")
 
 
 func test_otto_steps_out_of_a_moving_car_near_a_floor() -> void:
@@ -128,8 +128,8 @@ func test_otto_steps_out_of_a_moving_car_near_a_floor() -> void:
 			break
 	Input.action_release(&"move_right")
 	Input.action_release(&"move_down")
-	assert_false(otto.is_riding(), "Otto вышел из кабины")
-	assert_true(left_on_the_move, "вышел на ходу, не дожидаясь этажа")
+	assert_false(otto.is_riding(), "Otto left the car")
+	assert_true(left_on_the_move, "left on the move, without waiting for the floor")
 	await wait_physics_frames(60)
-	assert_false(otto.is_dead(), "спрыгнул на этаж и жив")
-	assert_gt(otto.global_position.x, SHAFT_EDGE, "стоит на этаже, а не в шахте")
+	assert_false(otto.is_dead(), "jumped onto the floor and is alive")
+	assert_gt(otto.global_position.x, SHAFT_EDGE, "stands on the floor, not in the shaft")

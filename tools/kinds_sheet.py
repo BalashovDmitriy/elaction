@@ -25,17 +25,17 @@ from PIL import Image
 from godot_bin import PROJECT_ROOT, require_godot, run, use_utf8_output
 
 FLOORS = (2, 24)
-KINDS = ("отель", "офис", "жилой дом")
+KINDS = ("hotel", "office", "residential")
 
 
 def main() -> int:
     use_utf8_output()
-    parser = argparse.ArgumentParser(description="Три типа здания рядом.")
+    parser = argparse.ArgumentParser(description="Three building kinds side by side.")
     parser.add_argument("milestone")
     parser.add_argument("--time", type=int, default=3)
     parser.add_argument("--weather", type=int, default=0)
     parser.add_argument("--floors", default=",".join(str(f) for f in FLOORS),
-                        help="этажи через запятую, по номеру сверху")
+                        help="floors, comma-separated, numbered from the top")
     args = parser.parse_args()
     floors = tuple(int(f) for f in args.floors.split(","))
     godot = require_godot()

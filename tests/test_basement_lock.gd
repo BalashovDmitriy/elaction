@@ -53,7 +53,7 @@ func test_a_locked_car_does_not_take_its_rider_to_the_bottom() -> void:
 	var motion := _shaft(0)
 	motion.bottom_locked = true
 	assert_almost_eq(_run(motion, 10.0, ElevatorMotion.DOWN, true), MIDDLE, 0.01)
-	assert_false(motion.can_go(ElevatorMotion.DOWN), "ниже запертой остановки не пускает")
+	assert_false(motion.can_go(ElevatorMotion.DOWN), "does not go below the locked stop")
 	assert_true(motion.can_go(ElevatorMotion.UP))
 
 
@@ -64,7 +64,7 @@ func test_a_locked_car_does_not_go_to_the_bottom_on_its_own() -> void:
 	for _frame: int in 200:
 		motion.update(STEP, 0.0, false)
 		deepest = maxf(deepest, motion.position)
-	assert_almost_eq(deepest, MIDDLE, 0.01, "сама разворачивается над подвалом")
+	assert_almost_eq(deepest, MIDDLE, 0.01, "turns around by itself above the basement")
 
 
 func test_the_unlocked_car_reaches_the_bottom() -> void:
@@ -80,7 +80,7 @@ func test_the_lock_does_not_drag_a_car_already_below() -> void:
 	var motion := _shaft(2)
 	motion.bottom_locked = true
 	assert_almost_eq(_run(motion, 1.0, ElevatorMotion.DOWN, true), BOTTOM, 0.01)
-	assert_almost_eq(_run(motion, 0.5, ElevatorMotion.UP, true), 150.0, 0.01, "вверх — можно")
+	assert_almost_eq(_run(motion, 0.5, ElevatorMotion.UP, true), 150.0, 0.01, "up - allowed")
 
 
 func test_a_one_floor_shaft_has_nothing_to_lock() -> void:
@@ -114,10 +114,13 @@ func test_every_shaft_into_the_basement_is_covered_on_any_seed() -> void:
 						and is_equal_approx(rect.position.y, rules.floor_surface(above))
 					)
 				)
-			assert_true(covered, "сид %d: шахта на x=%.1f закрыта люком" % [building_seed, shaft.x])
-		assert_gt(into_basement, 0, "сид %d: в подвал ведёт шахта" % building_seed)
+			assert_true(
+				covered,
+				"seed %d: the shaft at x=%.1f is covered by a hatch" % [building_seed, shaft.x]
+			)
+		assert_gt(into_basement, 0, "seed %d: a shaft leads to the basement" % building_seed)
 		assert_eq(
-			hatches.size(), into_basement, "сид %d: люков столько же, сколько шахт" % building_seed
+			hatches.size(), into_basement, "seed %d: as many hatches as shafts" % building_seed
 		)
 
 
@@ -153,7 +156,10 @@ func test_no_car_reaches_the_basement_on_any_seed() -> void:
 			assert_lte(
 				deepest,
 				ceiling,
-				"сид %d: кабина на x=%.1f не спускается в подвал" % [building_seed, shaft.x]
+				(
+					"seed %d: the car at x=%.1f does not go down to the basement"
+					% [building_seed, shaft.x]
+				)
 			)
 
 
@@ -198,7 +204,7 @@ func test_the_building_without_documents_leaves_the_basement_open() -> void:
 	var level := await _building(0)
 	var lock := _lock_of(level)
 	assert_not_null(lock)
-	assert_false(lock.is_locked(), "запирать не за чем")
+	assert_false(lock.is_locked(), "nothing to lock")
 	for car in _basement_cars(level):
 		assert_false(car.is_bottom_locked())
 
@@ -208,11 +214,11 @@ func test_the_building_without_documents_leaves_the_basement_open() -> void:
 func test_the_hatch_holds_until_the_last_document() -> void:
 	var level := await _building(1)
 	var lock := _lock_of(level)
-	assert_true(lock.is_locked(), "документ не собран — подвал заперт")
+	assert_true(lock.is_locked(), "document not collected - the basement is locked")
 	var cars := _basement_cars(level)
-	assert_gt(cars.size(), 0, "в подвал ведёт кабина")
+	assert_gt(cars.size(), 0, "a car leads to the basement")
 	for car in cars:
-		assert_true(car.is_bottom_locked(), "кабина в подвал не везёт")
+		assert_true(car.is_bottom_locked(), "the car does not go to the basement")
 
 	var rules := level.rules
 	var above := rules.floors - 2
@@ -222,8 +228,8 @@ func test_the_hatch_holds_until_the_last_document() -> void:
 	for _frame: int in FALL_FRAMES:
 		await get_tree().physics_frame
 	var at := WorldSpace.to_plane(level.otto.global_position)
-	assert_true(level.otto.is_grounded(), "стоит на створках")
-	assert_eq(rules.floor_index_near(at.y), above, "над подвалом, а не в нём")
+	assert_true(level.otto.is_grounded(), "stands on the leaves")
+	assert_eq(rules.floor_index_near(at.y), above, "above the basement, not in it")
 
 	# A jump in place: lands on the same leaves.
 	Input.action_press(&"jump")
@@ -232,21 +238,25 @@ func test_the_hatch_holds_until_the_last_document() -> void:
 	for _frame: int in FALL_FRAMES:
 		await get_tree().physics_frame
 	at = WorldSpace.to_plane(level.otto.global_position)
-	assert_true(level.otto.is_grounded(), "после прыжка — снова на створках")
-	assert_eq(rules.floor_index_near(at.y), above, "прыжок в подвал не пускает")
+	assert_true(level.otto.is_grounded(), "after the jump - on the leaves again")
+	assert_eq(rules.floor_index_near(at.y), above, "the jump does not let him into the basement")
 
 	assert_gt(lock.closed_hatches(), 0)
 	GameState.instance().collect_document()
-	assert_false(lock.is_locked(), "последний документ открыл подвал")
-	assert_eq(lock.closed_hatches(), 0, "створки больше не держат")
+	assert_false(lock.is_locked(), "the last document opened the basement")
+	assert_eq(lock.closed_hatches(), 0, "the leaves no longer hold")
 	for car in cars:
-		assert_false(car.is_bottom_locked(), "кабина снова возит в подвал")
+		assert_false(car.is_bottom_locked(), "the car goes to the basement again")
 	for _frame: int in FALL_FRAMES:
 		await get_tree().physics_frame
 	at = WorldSpace.to_plane(level.otto.global_position)
-	assert_eq(rules.floor_index_near(at.y), rules.floors - 1, "провалился в подвал")
-	assert_false(level.otto.is_dead(), "этаж падения не убивает")
-	assert_eq(lock.find_children("Hatch", "", false, false).size(), 0, "створки разошлись и убраны")
+	assert_eq(rules.floor_index_near(at.y), rules.floors - 1, "fell into the basement")
+	assert_false(level.otto.is_dead(), "a one-floor fall does not kill")
+	assert_eq(
+		lock.find_children("Hatch", "", false, false).size(),
+		0,
+		"the leaves parted and were removed"
+	)
 
 
 ## A corpse asleep on the leaves falls into the basement together with them: a removed support does
@@ -271,15 +281,15 @@ func test_a_corpse_asleep_on_the_hatch_falls_when_it_opens() -> void:
 		if _sleeping(agent.corpse.ragdoll):
 			break
 	var lying := agent.corpse.ragdoll.bounds().position.y
-	assert_true(_sleeping(agent.corpse.ragdoll), "труп уснул")
-	assert_almost_eq(lying, feet.y, 0.15, "лежит на створках")
+	assert_true(_sleeping(agent.corpse.ragdoll), "the corpse fell asleep")
+	assert_almost_eq(lying, feet.y, 0.15, "lies on the leaves")
 	GameState.instance().collect_document()
 	for _frame: int in FALL_FRAMES * 2:
 		await get_tree().physics_frame
 	assert_lt(
 		agent.corpse.ragdoll.bounds().position.y,
 		lying - rules.floor_height * 0.5,
-		"упал в подвал, а не висит над проёмом"
+		"fell into the basement, not hanging over the opening"
 	)
 
 
@@ -288,15 +298,17 @@ func test_a_corpse_asleep_on_the_hatch_falls_when_it_opens() -> void:
 func test_the_locked_hatch_reads_as_a_steel_shutter() -> void:
 	var level := await _building(1)
 	var lock := _lock_of(level)
-	assert_gt(lock.find_children("Hazard*", "MeshInstance3D", true, false).size(), 0, "зебра")
+	assert_gt(
+		lock.find_children("Hazard*", "MeshInstance3D", true, false).size(), 0, "zebra stripes"
+	)
 	var lamps := lock.find_children("LockLamp*", "MeshInstance3D", true, false)
-	assert_gt(lamps.size(), 0, "огоньки замка")
+	assert_gt(lamps.size(), 0, "lock lights")
 	for lamp: Node in lamps:
-		assert_true((lamp as MeshInstance3D).visible, "горят, пока заперто")
+		assert_true((lamp as MeshInstance3D).visible, "lit while locked")
 	GameState.instance().collect_document()
 	for lamp: Node in lamps:
 		if is_instance_valid(lamp):
-			assert_false((lamp as MeshInstance3D).visible, "открыто — погасли")
+			assert_false((lamp as MeshInstance3D).visible, "open - went out")
 
 
 ## This building's basement shaft and its cab.
@@ -326,7 +338,7 @@ func test_the_rider_goes_down_only_after_the_last_document() -> void:
 	var shaft := _basement_shaft(level)
 	var car := _basement_cars(level)[0]
 	if shaft.double_deck:
-		pass_test("пара: нижний ярус стоит над подвалом, проверяется раскладкой")
+		pass_test("pair: the bottom tier sits above the basement, checked by the layout")
 		return
 	_park_above_the_basement(level, car, shaft)
 	var rules := level.rules
@@ -335,8 +347,8 @@ func test_the_rider_goes_down_only_after_the_last_document() -> void:
 	Input.action_press(&"move_down")
 	for _frame: int in FALL_FRAMES * 2:
 		await get_tree().physics_frame
-	assert_true(level.otto.is_riding(), "Otto в кабине")
-	assert_almost_eq(WorldSpace.to_plane(car.global_position).y, above, 0.02, "кабина стоит")
+	assert_true(level.otto.is_riding(), "Otto is in the car")
+	assert_almost_eq(WorldSpace.to_plane(car.global_position).y, above, 0.02, "the car stands")
 
 	GameState.instance().collect_document()
 	var basement := rules.floor_surface(rules.floors - 1)
@@ -346,10 +358,10 @@ func test_the_rider_goes_down_only_after_the_last_document() -> void:
 			break
 	Input.action_release(&"move_down")
 	assert_almost_eq(
-		WorldSpace.to_plane(car.global_position).y, basement, 0.02, "кабина доехала до подвала"
+		WorldSpace.to_plane(car.global_position).y, basement, 0.02, "the car reached the basement"
 	)
 	var at := WorldSpace.to_plane(level.otto.global_position)
-	assert_eq(rules.floor_index_near(at.y), rules.floors - 1, "и Otto с ней")
+	assert_eq(rules.floor_index_near(at.y), rules.floors - 1, "and Otto with it")
 
 
 ## One standing on the roof of a cab above the basement does not go down: the cab turns back.
@@ -369,5 +381,5 @@ func test_the_car_roof_does_not_carry_otto_into_the_basement() -> void:
 	for _frame: int in FALL_FRAMES * 4:
 		await get_tree().physics_frame
 		deepest = maxf(deepest, WorldSpace.to_plane(level.otto.global_position).y)
-	assert_lte(deepest, above + 0.02, "Otto не ниже этажа над подвалом")
-	assert_lte(WorldSpace.to_plane(car.global_position).y, above + 0.02, "кабина — тоже")
+	assert_lte(deepest, above + 0.02, "Otto is not below the floor above the basement")
+	assert_lte(WorldSpace.to_plane(car.global_position).y, above + 0.02, "the car too")

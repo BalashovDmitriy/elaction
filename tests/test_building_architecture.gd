@@ -96,8 +96,8 @@ func test_otto_and_his_jump_fit_in_frame_on_the_roof() -> void:
 	var head := WorldSpace.to_plane(otto.global_position).y - height
 	var view := otto.camera_view()
 
-	assert_gt(head, view.position.y, "макушка Otto ниже верхнего края кадра")
-	assert_gt(head - otto.jump_height(), view.position.y, "и в верхней точке прыжка тоже")
+	assert_gt(head, view.position.y, "Otto's top of head is below the top edge of the frame")
+	assert_gt(head - otto.jump_height(), view.position.y, "and at the top of the jump too")
 	_drop(level)
 
 
@@ -107,14 +107,14 @@ func test_the_roof_is_empty_when_the_game_starts() -> void:
 	for building_seed: int in [1, 2, 3]:
 		var level := _build(building_seed, true)
 		var agents := await _wait_for_agents(level)
-		assert_false(agents.is_empty(), "сид %d: двери никого не выпустили" % building_seed)
+		assert_false(agents.is_empty(), "seed %d: doors released nobody" % building_seed)
 
 		var rules := level.rules
 		for agent in agents:
 			assert_gt(
 				_floor_of(rules, agent),
 				BuildingRules.ROOF,
-				"сид %d: агент на крыше" % building_seed
+				"seed %d: agent on the roof" % building_seed
 			)
 		_drop(level)
 
@@ -126,11 +126,13 @@ func test_otto_survives_doing_nothing_at_the_start() -> void:
 		var level := _build(building_seed, true)
 		await wait_physics_frames(IDLE_FRAMES)
 
-		assert_false(level.otto.is_dead(), "сид %d: Otto погиб, не сделав хода" % building_seed)
+		assert_false(
+			level.otto.is_dead(), "seed %d: Otto died without making a move" % building_seed
+		)
 		assert_eq(
 			GameState.instance().lives,
 			GameState.STARTING_LIVES,
-			"сид %d: жизни уходят на старте" % building_seed
+			"seed %d: lives are lost at the start" % building_seed
 		)
 		_drop(level)
 
@@ -147,8 +149,8 @@ func test_only_the_doors_near_otto_let_agents_out() -> void:
 			agent_doors += 1
 
 	var alive := _agents_in(level).size()
-	assert_gt(agent_doors, 30, "в здании и правда много агентских дверей")
-	assert_lt(alive, 10, "а в кадре — единицы")
+	assert_gt(agent_doors, 30, "the building really has many agent doors")
+	assert_lt(alive, 10, "and only a few in frame")
 	_drop(level)
 
 
@@ -156,14 +158,14 @@ func test_only_the_doors_near_otto_let_agents_out() -> void:
 func test_no_agent_walks_a_floor_far_from_otto() -> void:
 	var level := _build(1, true)
 	var agents := await _wait_for_agents(level)
-	assert_false(agents.is_empty(), "двери никого не выпустили")
+	assert_false(agents.is_empty(), "doors released nobody")
 
 	var rules := level.rules
 	var here := _floor_of(rules, level.otto)
 	for agent in agents:
 		var floor_index := _floor_of(rules, agent)
 		assert_lt(
-			absi(floor_index - here), 10, "агент на этаже %d, Otto на %d" % [floor_index, here]
+			absi(floor_index - here), 10, "agent on floor %d, Otto on %d" % [floor_index, here]
 		)
 	_drop(level)
 
@@ -182,7 +184,7 @@ func test_otto_comes_back_to_the_rom_spot_and_the_agents_leave() -> void:
 	var floor_index := 3
 	var surface := rules.floor_surface(floor_index)
 	var spots := level.plan().safe_spots(rules, floor_index)
-	assert_gt(spots.size(), 1, "на этаже есть из чего выбирать")
+	assert_gt(spots.size(), 1, "the floor has spots to choose from")
 
 	var shooter := ENEMY.instantiate() as Enemy
 	shooter.walk_speed = 0.0
@@ -199,7 +201,7 @@ func test_otto_comes_back_to_the_rom_spot_and_the_agents_leave() -> void:
 		await wait_physics_frames(1)
 		emerged += 1
 	body.kill()
-	assert_true(body.is_dead(), "второго агента не убить")
+	assert_true(body.is_dead(), "the second agent cannot be killed")
 
 	level.otto.global_position = WorldSpace.to_scene(Vector2(spots[0], surface))
 	level.otto.kill()
@@ -209,14 +211,14 @@ func test_otto_comes_back_to_the_rom_spot_and_the_agents_leave() -> void:
 		waited += 1
 	await wait_physics_frames(1)
 
-	assert_false(is_instance_valid(shooter), "убивший Otto агент не ушёл")
-	assert_true(is_instance_valid(body), "тело агента убрали вместе с живыми")
+	assert_false(is_instance_valid(shooter), "the agent who killed Otto did not leave")
+	assert_true(is_instance_valid(body), "agent body was removed along with the living")
 	# The third floor of a thirty-storey building is ROM's twenty-seventh: Otto stays on it.
-	assert_eq(_floor_of(rules, level.otto), floor_index, "Otto вернулся не на свой этаж")
+	assert_eq(_floor_of(rules, level.otto), floor_index, "Otto did not return to his own floor")
 	var back := WorldSpace.to_plane(level.otto.global_position).x
 	var red_x := RespawnSpot.red_door_x(level.doors(), rules, floor_index)
 	var spot := RespawnSpot.choose(level.plan(), rules, floor_index, red_x)
-	assert_almost_eq(back, spot, 0.01, "Otto вернулся не в точку ROM")
+	assert_almost_eq(back, spot, 0.01, "Otto did not return to the ROM spot")
 	_drop(level)
 
 
@@ -233,10 +235,10 @@ func test_otto_is_untouchable_right_after_coming_back() -> void:
 	while level.otto.is_dead() and waited < 120:
 		await wait_physics_frames(1)
 		waited += 1
-	assert_false(level.otto.is_dead(), "Otto вернулся в игру")
+	assert_false(level.otto.is_dead(), "Otto is back in the game")
 
 	level.otto.kill()
-	assert_false(level.otto.is_dead(), "и сразу второй раз его не убить")
+	assert_false(level.otto.is_dead(), "and he cannot be killed a second time right away")
 	_drop(level)
 
 
@@ -254,13 +256,13 @@ func test_no_more_live_agents_than_the_rules_allow() -> void:
 			await wait_physics_frames(1)
 			most = maxi(most, _agents_in(level).size())
 
-		assert_gt(most, 0, "сид %d: двери на нижних этажах никого не выпустили" % building_seed)
+		assert_gt(most, 0, "seed %d: doors on the lower floors released nobody" % building_seed)
 		# The ROM cap is three, and late in the building four (ADR-0027, decision 2).
 		var ceiling := rules.agents_at_once(GameState.instance().alarm.elapsed())
 		assert_lte(
 			most,
 			ceiling,
-			"сид %d: живых агентов разом %d при потолке %d" % [building_seed, most, ceiling]
+			"seed %d: live agents at once %d with a ceiling of %d" % [building_seed, most, ceiling]
 		)
 		_drop(level)
 
@@ -275,15 +277,17 @@ func test_agents_take_their_combat_numbers_from_the_rules() -> void:
 	var harmless := _build(1, true, toothless)
 	_stand_on(harmless, harmless.rules.floors - 2)
 	var quiet := await _worst_moment(harmless)
-	assert_gt(_agents_in(harmless).size(), 0, "агенты вышли")
-	assert_eq(quiet, 0, "но им велено не стрелять")
-	assert_false(harmless.otto.is_dead(), "и Otto цел, простояв среди них столбом")
+	assert_gt(_agents_in(harmless).size(), 0, "agents came out")
+	assert_eq(quiet, 0, "but they were told not to shoot")
+	assert_false(
+		harmless.otto.is_dead(), "and Otto is unharmed after standing among them like a post"
+	)
 	_drop(harmless)
 
 	var armed := _build(1, true)
 	_stand_on(armed, armed.rules.floors - 2)
 	var shots := await _worst_moment(armed)
-	assert_gt(shots, 0, "без запрета те же агенты стреляют")
+	assert_gt(shots, 0, "without the ban the same agents shoot")
 	_drop(armed)
 
 
@@ -320,7 +324,7 @@ func _worst_moment(level: GreyboxLevel) -> int:
 ## Waits until Otto slides down the rope to the roof
 ## ([method GreyboxLevel.wait_for_the_landing]).
 func _wait_for_the_landing(level: GreyboxLevel) -> void:
-	assert_true(await level.wait_for_the_landing(), "Otto съехал по тросу и встал на крышу")
+	assert_true(await level.wait_for_the_landing(), "Otto slid down the rope and stood on the roof")
 
 
 ## An agent comes out where Otto is: on his floor, a floor above or below (@5A26).
@@ -350,9 +354,9 @@ func test_agents_step_out_next_to_otto() -> void:
 					absi(floor_index - here),
 					1,
 					(
-						"сид %d: агент вышел на этаже %d, Otto на %d"
+						"seed %d: agent came out on floor %d, Otto on %d"
 						% [building_seed, floor_index, here]
 					)
 				)
-		assert_gt(seen.size(), 0, "сид %d: никто не вышел" % building_seed)
+		assert_gt(seen.size(), 0, "seed %d: nobody came out" % building_seed)
 		_drop(level)

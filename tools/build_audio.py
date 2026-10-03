@@ -490,7 +490,7 @@ def build(names: list[str]) -> None:
                 "licence": source.licence,
                 "url": source.page,
             }
-            print(f"{target.name:28s} {len(shaped) / rate:6.1f} с  {source.author}")
+            print(f"{target.name:28s} {len(shaped) / rate:6.1f} s  {source.author}")
         # Import settings of a file that no longer exists (fewer variants,
         # WAV changed to OGG) would remain in the repository as orphans. A rewritten
         # file keeps its own — together with its uid.
@@ -515,9 +515,9 @@ def credits_table() -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("names", nargs="*", help="какие звуки собрать; без имён — все")
-    parser.add_argument("--list", action="store_true", help="перечислить звуки")
-    parser.add_argument("--credits", action="store_true", help="таблица для CREDITS.md")
+    parser.add_argument("names", nargs="*", help="which sounds to build; all if no names")
+    parser.add_argument("--list", action="store_true", help="list the sounds")
+    parser.add_argument("--credits", action="store_true", help="table for CREDITS.md")
     args = parser.parse_args()
     if args.list:
         for name, sources in SOUNDS.items():
@@ -528,7 +528,7 @@ def main() -> None:
         return
     unknown = [name for name in args.names if name not in SOUNDS]
     if unknown:
-        sys.exit(f"нет таких звуков: {', '.join(unknown)}")
+        sys.exit(f"no such sounds: {', '.join(unknown)}")
     build(args.names or list(SOUNDS))
 
 

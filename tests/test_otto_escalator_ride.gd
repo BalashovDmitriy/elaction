@@ -18,7 +18,9 @@ func test_escalator_ride_ignores_input() -> void:
 	var machine := OttoStateMachine.new()
 	machine.ride()
 	var state := machine.update(_snapshot(1.0, true, true), true, 0.0)
-	assert_eq(state, OttoStateMachine.State.RIDE, "пока везёт эскалатор, ввод не действует")
+	assert_eq(
+		state, OttoStateMachine.State.RIDE, "while the escalator carries him, input has no effect"
+	)
 
 
 func test_stop_riding_returns_control() -> void:
@@ -40,4 +42,4 @@ func test_escalator_does_not_revive_the_dead() -> void:
 	var machine := OttoStateMachine.new()
 	machine.kill()
 	machine.ride()
-	assert_eq(machine.state, OttoStateMachine.State.DEAD, "из DEAD выводит только reset")
+	assert_eq(machine.state, OttoStateMachine.State.DEAD, "only reset leaves DEAD")

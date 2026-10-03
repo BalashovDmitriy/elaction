@@ -63,7 +63,7 @@ func test_agent_kneels_under_a_high_bullet() -> void:
 	await _step_out(agent)
 	_bullet_at(agent, _rules.agent_kneel_height + 0.05)
 	await wait_physics_frames(REACT_FRAMES)
-	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "от высокой пули — на колено")
+	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "from a high bullet — to a knee")
 
 
 func test_agent_drops_prone_under_a_low_bullet() -> void:
@@ -71,7 +71,7 @@ func test_agent_drops_prone_under_a_low_bullet() -> void:
 	await _step_out(agent)
 	_bullet_at(agent, _rules.agent_kneel_height - 0.03)
 	await wait_physics_frames(REACT_FRAMES)
-	assert_eq(agent.stance(), EnemyBrain.Stance.PRONE, "от низкой — лёжа")
+	assert_eq(agent.stance(), EnemyBrain.Stance.PRONE, "from a low one — prone")
 
 
 ## The agent's own bullet is no reason to lie down: its mask is different, and it flies away from
@@ -82,7 +82,7 @@ func test_agent_ignores_bullets_that_are_not_his_problem() -> void:
 	var bullet := _bullet_at(agent, 0.66)
 	bullet.collision_mask = Bullet.FROM_ENEMY
 	await wait_physics_frames(2)
-	assert_eq(agent.stance(), EnemyBrain.Stance.STAND, "чужой выстрел агенту не страшен")
+	assert_eq(agent.stance(), EnemyBrain.Stance.STAND, "another's shot is no threat to the agent")
 
 
 ## A bullet flying away is no reason either: it has already gone past.
@@ -92,7 +92,9 @@ func test_agent_ignores_a_bullet_flying_away() -> void:
 	var bullet := _bullet_at(agent, 0.66)
 	bullet.direction = 1.0
 	await wait_physics_frames(2)
-	assert_eq(agent.stance(), EnemyBrain.Stance.STAND, "вслед ушедшей пуле не приседают")
+	assert_eq(
+		agent.stance(), EnemyBrain.Stance.STAND, "they do not duck after a bullet that has passed"
+	)
 
 
 ## A bullet that has passed the middle but not left the body is the most dangerous of all.
@@ -105,7 +107,7 @@ func test_agent_stays_down_until_the_bullet_clears_his_body() -> void:
 	await _step_out(agent)
 	var bullet := _bullet_at(agent, _rules.agent_kneel_height + 0.05)
 	await wait_physics_frames(REACT_FRAMES)
-	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "сперва уходит с линии")
+	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "first he leaves the line")
 
 	# Steps are measured from the body itself and the bullet itself, not with numbers: the agent and
 	# the assets have already moved to a different scale twice, and the hand-written numbers then
@@ -116,13 +118,15 @@ func test_agent_stays_down_until_the_bullet_clears_his_body() -> void:
 	# The bullet is past the middle, but still in the body.
 	bullet.global_position.x = agent.global_position.x - body_half * 0.5
 	await wait_physics_frames(2)
-	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "и не встаёт, пока она в габарите")
+	assert_eq(
+		agent.stance(), EnemyBrain.Stance.KNEEL, "and does not stand while it is within his bounds"
+	)
 
 	# The middle of the bullet is outside the body's bounds, but the tail is still inside: half a body
 	# width is not enough for it to clear the chest.
 	bullet.global_position.x = agent.global_position.x - (body_half + tail * 0.5)
 	await wait_physics_frames(2)
-	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "и пока её держит хвост — тоже")
+	assert_eq(agent.stance(), EnemyBrain.Stance.KNEEL, "and while the tail holds it — also")
 
 	# One that has gone behind no longer holds him — but the agent stands up at the end of the action:
 	# in the ROM a dodge lasts the whole action, not while the bullet is near (@1C7A).
@@ -131,7 +135,9 @@ func test_agent_stays_down_until_the_bullet_clears_his_body() -> void:
 		ceilf((Arcade.action_time(Arcade.TOP) + 0.1) * Engine.physics_ticks_per_second)
 	)
 	await wait_physics_frames(action)
-	assert_eq(agent.stance(), EnemyBrain.Stance.STAND, "ушедшая за спину больше не держит")
+	assert_eq(
+		agent.stance(), EnemyBrain.Stance.STAND, "one that went behind his back no longer holds him"
+	)
 
 
 ## Half the width of the agent's body, m. Taken from the shape, as the agent takes it himself.

@@ -38,9 +38,9 @@ func test_the_curtain_swaps_under_black_once() -> void:
 	while curtain.is_running() and frames < PATIENCE:
 		await get_tree().process_frame
 		frames += 1
-	assert_eq(swaps[0], 1, "здание меняется один раз")
-	assert_true(seen_black[0], "и под полным чёрным")
-	assert_almost_eq(curtain.opacity(), 0.0, 0.001, "кадр вышел из чёрного")
+	assert_eq(swaps[0], 1, "the building changes once")
+	assert_true(seen_black[0], "and under full black")
+	assert_almost_eq(curtain.opacity(), 0.0, 0.001, "the frame came out of black")
 
 
 func test_a_cancelled_curtain_never_swaps() -> void:
@@ -52,22 +52,22 @@ func test_a_cancelled_curtain_never_swaps() -> void:
 	curtain.cancel()
 	for _frame: int in 90:
 		await get_tree().process_frame
-	assert_eq(swaps[0], 0, "брошенная смена здание не меняет")
-	assert_eq(curtain.opacity(), 0.0, "и не оставляет кадр чёрным")
+	assert_eq(swaps[0], 0, "an abandoned swap does not change the building")
+	assert_eq(curtain.opacity(), 0.0, "and does not leave the frame black")
 
 
 func test_the_bonus_counts_up_to_the_building_bonus() -> void:
 	var hud := HUD_SCENE.instantiate() as Hud
 	add_child_autofree(hud)
-	assert_false(hud.bonus_shown(), "до выхода бонуса нет")
+	assert_false(hud.bonus_shown(), "no bonus before the exit")
 	hud.count_bonus(3000)
 	assert_true(hud.bonus_shown())
-	assert_eq(hud.bonus_text(), "0", "набегает от нуля")
+	assert_eq(hud.bonus_text(), "0", "counts up from zero")
 	var frames := 0
 	while hud.bonus_text() != Hud.format_score(3000) and frames < PATIENCE:
 		await get_tree().process_frame
 		frames += 1
-	assert_eq(hud.bonus_text(), "3 000", "досчитал до бонуса")
+	assert_eq(hud.bonus_text(), "3 000", "counted up to the bonus")
 	hud.hide_bonus()
 	assert_false(hud.bonus_shown())
 
@@ -86,10 +86,10 @@ func test_main_builds_the_next_building_under_the_curtain() -> void:
 	var game := GameState.instance()
 	var bonus := Hud.format_score(Arcade.building_bonus(1))
 	first.car_started.emit()
-	assert_true(hud.bonus_shown(), "машина тронулась — бонус на кадре")
+	assert_true(hud.bonus_shown(), "the car moved — the bonus is on screen")
 	var score := game.score
 	first.building_cleared.emit()
-	assert_same(main.get(&"_level"), first, "здание меняется не встык")
+	assert_same(main.get(&"_level"), first, "the building does not change right away")
 
 	# Until the frame is black, the game is the same: score without the bonus, round one,
 	# the old building. The bonus on the plate finishes counting before the frame starts
@@ -107,16 +107,20 @@ func test_main_builds_the_next_building_under_the_curtain() -> void:
 			changed_before_black = true
 		await get_tree().process_frame
 		frames += 1
-	assert_true(counted_before_fade, "бонус досчитан до затемнения")
-	assert_false(changed_before_black, "счёт и раунд не меняются, пока кадр не чёрный")
-	assert_ne(main.get(&"_level"), first, "следующее здание собрано")
-	assert_almost_eq(darkest, 1.0, 0.05, "под чёрным")
-	assert_eq(game.score, score + Arcade.building_bonus(1), "под чёрным бонус здания — в счёт")
-	assert_eq(game.building, 2, "и следующий раунд")
-	assert_false(hud.bonus_shown(), "бонус ушёл вместе со старым зданием")
+	assert_true(counted_before_fade, "the bonus is counted before the fade")
+	assert_false(changed_before_black, "score and round do not change until the frame is black")
+	assert_ne(main.get(&"_level"), first, "the next building is assembled")
+	assert_almost_eq(darkest, 1.0, 0.05, "under black")
+	assert_eq(
+		game.score,
+		score + Arcade.building_bonus(1),
+		"under black the building bonus goes into the score"
+	)
+	assert_eq(game.building, 2, "and the next round")
+	assert_false(hud.bonus_shown(), "the bonus went away with the old building")
 	frames = 0
 	while curtain.is_running() and frames < PATIENCE:
 		await get_tree().process_frame
 		frames += 1
-	assert_almost_eq(curtain.opacity(), 0.0, 0.001, "кадр вышел из чёрного")
+	assert_almost_eq(curtain.opacity(), 0.0, 0.001, "the frame came out of black")
 	main.call("_open_menu")

@@ -87,20 +87,20 @@ def render(sections: list[dict]) -> str:
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--check", action="store_true", help="только сверить")
+    parser.add_argument("--check", action="store_true", help="only compare")
     args = parser.parse_args()
     sections = parse(SOURCE.read_text(encoding="utf-8"))
     wanted = render(sections)
     if args.check:
         current = TARGET.read_text(encoding="utf-8") if TARGET.exists() else ""
         if current != wanted:
-            print("assets/credits.json расходится с CREDITS.md: python tools/build_credits.py")
+            print("assets/credits.json differs from CREDITS.md: python tools/build_credits.py")
             return 1
-        print("assets/credits.json совпадает с CREDITS.md")
+        print("assets/credits.json matches CREDITS.md")
         return 0
     TARGET.write_bytes(wanted.encode("utf-8"))
     count = sum(len(section["authors"]) for section in sections)
-    print(f"assets/credits.json: разделов {len(SECTIONS)}, авторов {count}")
+    print(f"assets/credits.json: sections {len(SECTIONS)}, authors {count}")
     return 0
 
 

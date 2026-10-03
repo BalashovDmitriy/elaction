@@ -241,7 +241,7 @@ def inside_blender() -> int:
     build_truss()
     TARGET.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.export_scene.gltf(filepath=str(TARGET), export_format="GLB", export_yup=True)
-    print(f"записан {TARGET}")
+    print(f"wrote {TARGET}")
     return 0
 
 

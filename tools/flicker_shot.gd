@@ -93,9 +93,9 @@ func _run() -> void:
 	var base := previous
 	base.save_png("%s/flicker_frame_f%d.png" % [_folder, _floor])
 	_overlay(base, heat).save_png("%s/flicker_map_f%d.png" % [_folder, _floor])
-	print("  мерцание: пикселей с разницей хоть в одном кадре — %d" % changed_frames)
+	print("  flicker: pixels that differ in at least one frame — %d" % changed_frames)
 	# Camera and Otto over these frames: if they shake, all edges flicker at once.
-	print("  камера ходила на %s м, Otto по высоте на %.5f м" % [high - low, otto_high - otto_low])
+	print("  camera moved by %s m, Otto in height by %.5f m" % [high - low, otto_high - otto_low])
 	get_tree().quit()
 
 

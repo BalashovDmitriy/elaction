@@ -16,9 +16,9 @@ func _camera() -> SideCamera:
 
 func test_the_camera_looks_down_from_above() -> void:
 	var camera := _camera()
-	assert_lt(camera.rotation.x, 0.0, "взгляд опущен")
+	assert_lt(camera.rotation.x, 0.0, "the view is lowered")
 	assert_almost_eq(rad_to_deg(-camera.rotation.x), SideCamera.TILT_DEGREES, 0.001)
-	assert_eq(camera.projection, Camera3D.PROJECTION_ORTHOGONAL, "и всё ещё орто")
+	assert_eq(camera.projection, Camera3D.PROJECTION_ORTHOGONAL, "and still ortho")
 
 
 ## The camera stands above the target exactly enough for its axis to hit the target at
@@ -33,7 +33,7 @@ func test_the_axis_passes_through_the_target_in_the_play_plane() -> void:
 	assert_almost_eq(hit.z, WorldSpace.PLAY_Z, 0.001)
 	assert_almost_eq(hit.x, POINT.x, 0.001)
 	assert_almost_eq(hit.y, POINT.y, 0.001)
-	assert_gt(camera.global_position.y, POINT.y, "камера выше цели")
+	assert_gt(camera.global_position.y, POINT.y, "the camera is above the target")
 
 
 ## A tilted frame cuts the play plane at an angle and covers more than its size
@@ -51,7 +51,7 @@ func test_the_listener_stays_in_the_play_plane() -> void:
 	var camera := _camera()
 	camera.snap_to(POINT)
 	var found := camera.find_children("*", "AudioListener3D", false, false)
-	assert_eq(found.size(), 1, "слушатель один")
+	assert_eq(found.size(), 1, "one listener")
 	var listener := found[0] as AudioListener3D
 	assert_almost_eq(listener.global_position.z, WorldSpace.PLAY_Z, 0.01)
 	assert_almost_eq(listener.global_position.y, POINT.y, 0.01)

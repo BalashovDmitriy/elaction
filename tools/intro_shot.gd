@@ -166,7 +166,7 @@ func _until(done: Callable) -> bool:
 		if done.call():
 			return true
 		await get_tree().physics_frame
-	push_error("не дождался события за %d кадров" % PATIENCE)
+	push_error("event not reached within %d frames" % PATIENCE)
 	return false
 
 

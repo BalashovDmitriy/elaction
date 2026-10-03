@@ -28,7 +28,7 @@ func test_halls_stand_on_the_rom_bands() -> void:
 		for rom: int in range(1, Arcade.FLOORS + 1):
 			var hall := FloorRole.is_hall(FloorRole.of_rom(kind, rom))
 			var banded := rom <= 7 or (rom >= 11 and rom <= 15)
-			assert_eq(hall, banded, "тип %d, этаж ROM %d" % [kind, rom])
+			assert_eq(hall, banded, "kind %d, ROM floor %d" % [kind, rom])
 
 
 ## The lower band is public halls, the dark one technical ones.
@@ -38,7 +38,7 @@ func test_dark_band_is_technical_and_lower_band_public() -> void:
 			var role := FloorRole.of_rom(kind, rom)
 			assert_true(
 				FloorRole.is_technical(role) or role == FloorRole.Role.LAUNDRY,
-				"тип %d, ROM %d: %s" % [kind, rom, FloorRole.name_of(role)]
+				"kind %d, ROM %d: %s" % [kind, rom, FloorRole.name_of(role)]
 			)
 		for rom: int in range(3, 8):
 			assert_false(FloorRole.is_technical(FloorRole.of_rom(kind, rom)), "ROM %d" % rom)
@@ -54,7 +54,7 @@ func test_neighbour_halls_differ() -> void:
 			var role := FloorRole.of_rom(kind, rom)
 			var above := FloorRole.of_rom(kind, rom + 1)
 			if FloorRole.is_hall(role) and FloorRole.is_hall(above):
-				assert_ne(role, above, "тип %d, ROM %d и %d" % [kind, rom, rom + 1])
+				assert_ne(role, above, "kind %d, ROM %d and %d" % [kind, rom, rom + 1])
 
 
 ## The kinds are set apart: for every pair of kinds, the halls on the same floors differ
@@ -71,7 +71,7 @@ func test_kinds_get_their_own_halls() -> void:
 				total += 1
 				if role == FloorRole.of_rom(KINDS[second], rom):
 					same += 1
-			assert_lt(same * 2, total, "типы %d и %d" % [first, second])
+			assert_lt(same * 2, total, "kinds %d and %d" % [first, second])
 
 
 ## The roof and the garage are not halls at any building height; a building of any
@@ -82,12 +82,12 @@ func test_roof_and_garage_are_never_halls() -> void:
 		rules.floors = floors
 		for kind: BuildingIdentity.Kind in KINDS:
 			rules.kind = kind
-			assert_false(FloorRole.hall_at(rules, BuildingRules.ROOF), "крыша, %d этажей" % floors)
-			assert_false(FloorRole.hall_at(rules, floors - 1), "паркинг, %d этажей" % floors)
+			assert_false(FloorRole.hall_at(rules, BuildingRules.ROOF), "roof, %d floors" % floors)
+			assert_false(FloorRole.hall_at(rules, floors - 1), "parking, %d floors" % floors)
 			var halls := 0
 			for index: int in floors - 1:
 				halls += 1 if FloorRole.hall_at(rules, index) else 0
-			assert_gt(halls, 0, "тип %d, %d этажей: есть особые" % [kind, floors])
+			assert_gt(halls, 0, "kind %d, %d floors: has special ones" % [kind, floors])
 
 
 ## What separates a hall: technical ones by mesh, the server room and meeting rooms by
@@ -108,28 +108,28 @@ func test_halls_in_a_built_building_of_every_kind() -> void:
 	for kind: BuildingIdentity.Kind in KINDS:
 		var level := await _level(kind)
 		var rules := level.rules
-		assert_eq(rules.kind, kind, "уровень ставит тип в правила")
+		assert_eq(rules.kind, kind, "the level puts the kind into the rules")
 		var halls := level.find_children("FloorHall", "FloorHall", true, false)
-		assert_eq(halls.size(), 1, "тип %d: залы собраны" % kind)
+		assert_eq(halls.size(), 1, "kind %d: halls are assembled" % kind)
 		if halls.is_empty():
 			continue
 		var hall := halls[0] as FloorHall
-		assert_gt(hall.parts(), 0, "детали остались в мультимешах")
-		assert_eq(hall.find_children("*", "PhysicsBody3D", true, false).size(), 0, "без тел")
+		assert_gt(hall.parts(), 0, "the details stayed in multimeshes")
+		assert_eq(hall.find_children("*", "PhysicsBody3D", true, false).size(), 0, "no bodies")
 		for many: Node in hall.find_children("*", "MultiMeshInstance3D", true, false):
 			assert_eq(
 				(many as MultiMeshInstance3D).cast_shadow,
 				GeometryInstance3D.SHADOW_CASTING_SETTING_OFF,
-				"без теней"
+				"no shadows"
 			)
 		for light: OmniLight3D in hall.lights():
-			assert_false(light.shadow_enabled, "свет зала без теней")
+			assert_false(light.shadow_enabled, "the hall light has no shadows")
 			var index := _story_of(rules, WorldSpace.to_plane(light.position).y)
-			assert_true(FloorRole.hall_at(rules, index), "свет — на особом этаже %d" % index)
-			assert_false(rules.is_unlit(index), "на тёмном этаже свет зала погашен")
+			assert_true(FloorRole.hall_at(rules, index), "light — on special floor %d" % index)
+			assert_false(rules.is_unlit(index), "on a dark floor the hall light is off")
 		hall.light_span(Vector2i(-10, -5))
 		for light: OmniLight3D in hall.lights():
-			assert_false(light.visible, "вне кадра свет зала гаснет")
+			assert_false(light.visible, "out of frame the hall light goes off")
 		_assert_clear_of_doors(level.rules, level.plan(), hall, kind)
 
 
@@ -152,8 +152,10 @@ func test_halls_of_any_building_stay_in_their_spans() -> void:
 					inverted += 1
 				if not _within_a_span(rules, plan, place.origin):
 					outside += 1
-			assert_eq(inverted, 0, "тип %d, сид %d: детали наизнанку" % [kind, building_seed])
-			assert_eq(outside, 0, "тип %d, сид %d: детали вне пролёта" % [kind, building_seed])
+			assert_eq(inverted, 0, "kind %d, seed %d: details inside out" % [kind, building_seed])
+			assert_eq(
+				outside, 0, "kind %d, seed %d: details outside the span" % [kind, building_seed]
+			)
 			_assert_clear_of_doors(rules, plan, hall, kind)
 			hall.free()
 
@@ -168,12 +170,12 @@ func test_no_corridor_dressing_on_hall_floors() -> void:
 		for prop: BuildingDressing.PropSpot in scenery.dressing.props:
 			assert_false(
 				FloorRole.hall_at(rules, prop.floor_index),
-				"мебель коридора на этаже %d" % prop.floor_index
+				"corridor furniture on floor %d" % prop.floor_index
 			)
 		for decor: BuildingDressing.PropSpot in scenery.dressing.decor:
 			assert_false(
 				FloorRole.hall_at(rules, decor.floor_index),
-				"вещь на стене этажа %d" % decor.floor_index
+				"a thing on the wall of floor %d" % decor.floor_index
 			)
 
 
@@ -198,7 +200,7 @@ func _assert_clear_of_doors(
 	# Placements come from the set, not from the multimesh: under the headless engine the
 	# multimesh does not store them and returns identity ones, and the check saw no details.
 	var places := hall.placements()
-	assert_eq(places.size(), hall.parts(), "места всех деталей известны")
+	assert_eq(places.size(), hall.parts(), "the places of all details are known")
 	var checked := 0
 	for place: Transform3D in places:
 		# Floor, walls and window bands span the whole span; their middle can be anywhere.
@@ -215,13 +217,13 @@ func _assert_clear_of_doors(
 			assert_true(
 				absf(place.origin.x - spot.x) >= clear - 0.05,
 				(
-					"тип %d, этаж %d: деталь в %.2f перед дверью в %.2f"
+					"kind %d, floor %d: a detail at %.2f in front of the door at %.2f"
 					% [kind, index, place.origin.x, spot.x]
 				)
 			)
 	# The door leaf's strip is narrow, and few small items end up in it: as many are
 	# checked as were found; zero is an honest answer too.
-	gut.p("тип %d: у дверей проверено деталей %d" % [kind, checked])
+	gut.p("kind %d: details checked at doors %d" % [kind, checked])
 
 
 ## The floor whose height contains [param y]: from the floor of the floor above to its

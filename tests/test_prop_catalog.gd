@@ -23,7 +23,7 @@ func test_every_model_has_an_author_and_a_licence() -> void:
 	var credits := _credits()
 	var page := FileAccess.get_file_as_string(CREDITS_MD)
 	for entry in PropCatalog.entries():
-		assert_true(credits.has(entry.name), "%s: нет в credits.json" % entry.name)
+		assert_true(credits.has(entry.name), "%s: not in credits.json" % entry.name)
 		if not credits.has(entry.name):
 			continue
 		var line: Dictionary = credits[entry.name]
@@ -32,9 +32,9 @@ func test_every_model_has_an_author_and_a_licence() -> void:
 		var own := String(line.get("author", "")) == "elaction" and licence == "MIT"
 		assert_true(
 			own or licence.begins_with("CC0") or licence.begins_with("CC-BY"),
-			"%s: лицензия %s не из разрешённых" % [entry.name, licence]
+			"%s: licence %s is not an allowed one" % [entry.name, licence]
 		)
-		assert_false(String(line.get("author", "")).is_empty(), "%s: без автора" % entry.name)
+		assert_false(String(line.get("author", "")).is_empty(), "%s: no author" % entry.name)
 		assert_string_contains(page, "`%s`" % entry.name, false)
 
 
@@ -43,17 +43,19 @@ func test_every_model_file_is_in_the_catalog() -> void:
 	for file in DirAccess.get_files_at(PropCatalog.DIR):
 		if file.ends_with(".glb"):
 			var name := file.get_basename()
-			assert_not_null(PropCatalog.entry(name), "%s лежит в папке, но не в каталоге" % name)
+			assert_not_null(
+				PropCatalog.entry(name), "%s is in the folder but not in the catalog" % name
+			)
 
 
 func test_props_have_no_bodies() -> void:
 	for entry in PropCatalog.entries():
 		var prop := PropCatalog.make(entry.name)
-		assert_not_null(prop, "%s не собирается" % entry.name)
+		assert_not_null(prop, "%s does not build" % entry.name)
 		if prop == null:
 			continue
 		var bodies := prop.find_children("*", "CollisionObject3D", true, false)
-		assert_eq(bodies.size(), 0, "%s: у декора есть тело" % entry.name)
+		assert_eq(bodies.size(), 0, "%s: the decor has a body" % entry.name)
 		prop.free()
 
 
@@ -64,20 +66,28 @@ func test_props_take_their_size_from_the_catalog() -> void:
 		var size := PropCatalog.footprint(entry.name)
 		match entry.place:
 			PropCatalog.Place.FLOOR:
-				assert_lte(size.z, PropCatalog.MAX_DEPTH + 0.001, "%s глубже места" % entry.name)
+				assert_lte(
+					size.z,
+					PropCatalog.MAX_DEPTH + 0.001,
+					"%s is deeper than its place" % entry.name
+				)
 				if entry.top.is_empty():
-					assert_almost_eq(size.y, entry.height, 0.01, "%s: рост" % entry.name)
+					assert_almost_eq(size.y, entry.height, 0.01, "%s: height" % entry.name)
 			PropCatalog.Place.WALL:
 				assert_lte(
-					size.x, PropCatalog.WALL_MAX_WIDTH + 0.001, "%s шире простенка" % entry.name
+					size.x,
+					PropCatalog.WALL_MAX_WIDTH + 0.001,
+					"%s is wider than the wall section" % entry.name
 				)
-				assert_lte(size.y, entry.height + 0.01, "%s: не выше каталога" % entry.name)
+				assert_lte(
+					size.y, entry.height + 0.01, "%s: not taller than the catalog" % entry.name
+				)
 			PropCatalog.Place.ROOM:
 				# The room behind a door has enough depth: it is not squeezed in depth.
 				if entry.top.is_empty():
-					assert_almost_eq(size.y, entry.height, 0.01, "%s: рост" % entry.name)
+					assert_almost_eq(size.y, entry.height, 0.01, "%s: height" % entry.name)
 			_:
-				assert_almost_eq(size.y, entry.height, 0.01, "%s: рост" % entry.name)
+				assert_almost_eq(size.y, entry.height, 0.01, "%s: height" % entry.name)
 
 
 ## Furniture stands on the floor with its back face against the wall: the model zero is the
@@ -86,9 +96,9 @@ func test_a_prop_stands_on_its_origin() -> void:
 	for entry in PropCatalog.pick(PropCatalog.Place.FLOOR, PropCatalog.Fit.ANY):
 		var prop := PropCatalog.make(entry.name)
 		var box := PropCatalog.bounds_of(prop)
-		assert_almost_eq(box.position.y, 0.0, 0.01, "%s: низ на полу" % entry.name)
-		assert_almost_eq(box.position.z, 0.0, 0.01, "%s: зад у стены" % entry.name)
-		assert_almost_eq(box.get_center().x, 0.0, 0.05, "%s: середина по ширине" % entry.name)
+		assert_almost_eq(box.position.y, 0.0, 0.01, "%s: bottom on the floor" % entry.name)
+		assert_almost_eq(box.position.z, 0.0, 0.01, "%s: back at the wall" % entry.name)
+		assert_almost_eq(box.get_center().x, 0.0, 0.05, "%s: centered in width" % entry.name)
 		prop.free()
 
 
@@ -98,23 +108,23 @@ func test_each_kind_of_building_has_its_own_furniture() -> void:
 	for fit: PropCatalog.Fit in FITS:
 		var floor_items := PropCatalog.pick(PropCatalog.Place.FLOOR, fit)
 		var wall_items := PropCatalog.pick(PropCatalog.Place.WALL, fit)
-		assert_gt(floor_items.size(), 8, "мебели мало")
-		assert_gt(wall_items.size(), 4, "на стены мало")
+		assert_gt(floor_items.size(), 8, "too little furniture")
+		assert_gt(wall_items.size(), 4, "too little for the walls")
 		var own := 0
 		for item in floor_items + wall_items:
 			assert_true(
 				item.fit == fit or item.fit == PropCatalog.Fit.ANY,
-				"%s не из этого здания" % item.name
+				"%s is not from this building" % item.name
 			)
 			if item.fit == fit:
 				own += 1
-		assert_gt(own, 3, "у типа %d своих предметов мало" % fit)
+		assert_gt(own, 3, "kind %d has too few items of its own" % fit)
 
 
 func test_the_lamp_on_top_is_never_drawn_on_its_own() -> void:
 	for fit: PropCatalog.Fit in FITS:
 		for item in PropCatalog.pick(PropCatalog.Place.FLOOR, fit):
-			assert_ne(item.place, PropCatalog.Place.TOP, "%s стоит только на мебели" % item.name)
+			assert_ne(item.place, PropCatalog.Place.TOP, "%s stands only on furniture" % item.name)
 
 
 func test_the_first_building_is_the_empire_hotel() -> void:
@@ -132,17 +142,19 @@ func test_buildings_draw_all_three_kinds_and_keep_their_draw() -> void:
 	for building in range(2, draws + 2):
 		var one := BuildingIdentity.of(building, building * 17)
 		var again := BuildingIdentity.of(building, building * 17)
-		assert_eq(one.kind, again.kind, "жребий повторяется для того же здания")
+		assert_eq(one.kind, again.kind, "the draw repeats for the same building")
 		assert_eq(one.name, again.name)
-		assert_has(BuildingIdentity.names_of(one.kind), one.name, "имя из своего списка")
+		assert_has(BuildingIdentity.names_of(one.kind), one.name, "the name is from its own list")
 		kinds[one.kind] = int(kinds.get(one.kind, 0)) + 1
 		var lines := one.sign_lines()
-		assert_eq(lines[0], one.name, "вывеска начинается с имени")
+		assert_eq(lines[0], one.name, "the sign starts with the name")
 		match one.kind:
 			BuildingIdentity.Kind.OFFICE:
-				assert_eq(lines.size(), 1, "у офиса — одно имя")
+				assert_eq(lines.size(), 1, "an office has one name")
 			BuildingIdentity.Kind.RESIDENTIAL:
-				assert_eq(lines[1], BuildingIdentity.RESIDENTIAL_WORD, "у жилого дома — APTS")
-	assert_eq(kinds.size(), 3, "выпадают отели, офисы и жилые дома")
+				assert_eq(
+					lines[1], BuildingIdentity.RESIDENTIAL_WORD, "a residential building has APTS"
+				)
+	assert_eq(kinds.size(), 3, "hotels, offices and residential buildings all come up")
 	for kind: int in kinds:
-		assert_lt(int(kinds[kind]), draws / 2, "тип %d выпадает слишком часто" % kind)
+		assert_lt(int(kinds[kind]), draws / 2, "kind %d comes up too often" % kind)

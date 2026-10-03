@@ -44,7 +44,7 @@ static func pick_shaft(
 			candidates.append(number)
 	if candidates.is_empty():
 		if not plan.shafts.is_empty():
-			push_error("в подвал не спускается ни одна шахта")
+			push_error("no shaft goes down to the basement")
 		return null
 	return plan.shafts[BuildingPlan.pick_any(rng, candidates)]
 

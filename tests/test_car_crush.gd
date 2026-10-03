@@ -78,8 +78,10 @@ func test_a_descending_car_crushes_the_agent_under_it() -> void:
 		if agent.is_dead():
 			break
 
-	assert_true(agent.is_dead(), "кабина раздавила агента под днищем")
-	assert_eq(GameState.instance().score - before, 0, "кабина ехала сама — очков нет, как в ROM")
+	assert_true(agent.is_dead(), "the car crushed the agent under the bottom")
+	assert_eq(
+		GameState.instance().score - before, 0, "the car moved by itself — no points, as in the ROM"
+	)
 
 
 ## Crush points come only from the cab Otto rides in (@4A97 ROM,
@@ -94,18 +96,18 @@ func test_otto_s_own_car_scores_the_crush() -> void:
 	var agent := _agent_under_the_car()
 	var before := GameState.instance().score
 	await wait_physics_frames(3)
-	assert_true(otto.is_riding(), "Otto сел в кабину")
+	assert_true(otto.is_riding(), "Otto got into the car")
 	Input.action_press(&"move_down")
 	await _ride_down(func() -> bool: return agent.is_dead())
 	Input.action_release(&"move_down")
-	assert_true(agent.is_dead(), "кабина Otto раздавила агента")
+	assert_true(agent.is_dead(), "Otto's car crushed the agent")
 	var gained := GameState.instance().score - before
 	assert_true(
 		(
 			gained == GameState.CRUSH_SCORE
 			or gained == GameState.kill_score(GameState.CRUSH_SCORE, true)
 		),
-		"300 очков, с надбавкой за темноту, если темно: %d" % gained
+		"300 points, with a darkness bonus if dark: %d" % gained
 	)
 
 
@@ -121,9 +123,9 @@ func test_a_car_edge_pushes_the_agent_aside() -> void:
 	await _ride_down(
 		func() -> bool: return agent.is_dead() or car.is_aligned() and car.global_position.y < -1.0
 	)
-	assert_false(agent.is_dead(), "задетый краем жив")
+	assert_false(agent.is_dead(), "the one clipped by the edge is alive")
 	var clear := (car.width() + Proportions.BODY_WIDTH) * 0.5
-	assert_gte(agent.global_position.x, clear - 0.05, "его вытолкнуло за борт")
+	assert_gte(agent.global_position.x, clear - 0.05, "he was pushed over the side")
 
 
 func test_a_car_edge_pushes_otto_aside() -> void:
@@ -136,9 +138,9 @@ func test_a_car_edge_pushes_otto_aside() -> void:
 	await _ride_down(
 		func() -> bool: return otto.is_dead() or car.is_aligned() and car.global_position.y < -1.0
 	)
-	assert_false(otto.is_dead(), "задетый краем Otto жив")
+	assert_false(otto.is_dead(), "Otto, clipped by the edge, is alive")
 	assert_lte(
-		otto.global_position.x, -(car.width() + Proportions.BODY_WIDTH) * 0.5 + 0.05, "вытолкнут"
+		otto.global_position.x, -(car.width() + Proportions.BODY_WIDTH) * 0.5 + 0.05, "pushed out"
 	)
 
 
@@ -164,5 +166,5 @@ func test_a_descending_car_crushes_otto_under_it() -> void:
 		if otto.is_dead() or boarded:
 			break
 
-	assert_false(boarded, "стоящий под кабиной — не пассажир")
-	assert_true(otto.is_dead(), "кабина раздавила Otto под днищем")
+	assert_false(boarded, "standing under the car — not a passenger")
+	assert_true(otto.is_dead(), "the car crushed Otto under the bottom")

@@ -32,13 +32,13 @@ func _fingerprint(plan: BuildingPlan) -> String:
 func test_same_seed_builds_the_same_building() -> void:
 	var first := BuildingPlan.generate(_rules(), 7)
 	var second := BuildingPlan.generate(_rules(), 7)
-	assert_eq(_fingerprint(first), _fingerprint(second), "сид задаёт здание целиком")
+	assert_eq(_fingerprint(first), _fingerprint(second), "the seed defines the whole building")
 
 
 func test_another_seed_moves_the_documents() -> void:
 	var first := BuildingPlan.generate(_rules(), 1)
 	var second := BuildingPlan.generate(_rules(), 2)
-	assert_ne(_fingerprint(first), _fingerprint(second), "здания различаются")
+	assert_ne(_fingerprint(first), _fingerprint(second), "buildings differ")
 
 
 func test_building_holds_exactly_the_wanted_documents() -> void:
@@ -51,7 +51,7 @@ func test_documents_lie_on_different_floors() -> void:
 	var plan := BuildingPlan.generate(_rules(), 8)
 	var seen: Dictionary = {}
 	for index: int in plan.document_floors():
-		assert_false(seen.has(index), "на этаже не больше одной красной двери")
+		assert_false(seen.has(index), "no more than one red door per floor")
 		seen[index] = true
 
 
@@ -61,8 +61,8 @@ func test_documents_are_spread_over_the_height() -> void:
 	var floors := plan.document_floors()
 	var lowest: int = floors[floors.size() - 1]
 	# Otherwise the whole building could be skipped.
-	assert_gt(lowest, rules.floors / 2, "нижний документ — в нижней половине здания")
-	assert_lt(floors[0], rules.floors / 2, "верхний — в верхней")
+	assert_gt(lowest, rules.floors / 2, "the lowest document is in the lower half of the building")
+	assert_lt(floors[0], rules.floors / 2, "the top one is in the upper half")
 
 
 func test_nothing_shares_a_place_on_a_floor() -> void:
@@ -92,7 +92,7 @@ func test_otto_does_not_come_back_to_life_inside_the_exit() -> void:
 	var rules := _rules()
 	for building_seed in range(1, 12):
 		var plan := BuildingPlan.generate(rules, building_seed)
-		assert_ne(plan.safe_x(rules, plan.floors - 1), plan.exit_x, "сид %d" % building_seed)
+		assert_ne(plan.safe_x(rules, plan.floors - 1), plan.exit_x, "seed %d" % building_seed)
 
 
 ## The respawn spot must not fall into an opening: falling right after death is not it.
@@ -105,14 +105,14 @@ func test_safe_spot_never_hangs_over_a_hole() -> void:
 			if escalator.floor_index != index:
 				continue
 			var gap := escalator.gap(rules)
-			assert_false(x >= gap.x and x <= gap.y, "этаж %d стоит над проёмом" % index)
+			assert_false(x >= gap.x and x <= gap.y, "floor %d stands above the opening" % index)
 
 
 ## Above the roof is sky, there is nothing to hang a lamp on: it would hang in the air.
 func test_no_lamp_hangs_over_the_roof() -> void:
 	var plan := BuildingPlan.generate(_rules(), 13)
 	for lamp in plan.lamps:
-		assert_gt(lamp.floor_index, BuildingRules.ROOF, "над крышей нет потолка")
+		assert_gt(lamp.floor_index, BuildingRules.ROOF, "no ceiling above the roof")
 
 
 ## Floor zero stopped being the roof and finally gets a lamp: it has a ceiling
@@ -123,7 +123,7 @@ func test_the_top_floor_gets_a_lamp_now_that_it_has_a_ceiling() -> void:
 	for lamp in plan.lamps:
 		if lamp.floor_index == 0:
 			on_top += 1
-	assert_gt(on_top, 0, "у верхнего этажа есть потолок, значит есть и лампа")
+	assert_gt(on_top, 0, "the top floor has a ceiling, so it has a lamp")
 
 
 ## A floor has as many lamps as its width asks for — if there were enough slots: lamps
@@ -137,19 +137,23 @@ func test_floors_get_as_many_lamps_as_their_width_asks() -> void:
 			var on_floor := _lamps_on(plan, index)
 			if rules.is_unlit(index):
 				assert_eq(
-					on_floor.size(), 0, "сид %d: тёмный этаж %d с лампой" % [building_seed, index]
+					on_floor.size(),
+					0,
+					"seed %d: dark floor %d with a lamp" % [building_seed, index]
 				)
 				continue
-			assert_gte(on_floor.size(), 1, "сид %d: этаж %d без ламп" % [building_seed, index])
+			assert_gte(
+				on_floor.size(), 1, "seed %d: floor %d without lamps" % [building_seed, index]
+			)
 			assert_lte(
 				on_floor.size(),
 				rules.lamps_on(index),
-				"сид %d: этаж %d — ламп больше, чем просит ширина" % [building_seed, index]
+				"seed %d: floor %d — more lamps than the width asks for" % [building_seed, index]
 			)
 		assert_gt(
 			_lamps_on(plan, rules.floors - 1).size(),
 			_lamps_on(plan, 0).size(),
-			"сид %d: внизу ламп больше, чем наверху" % building_seed
+			"seed %d: more lamps at the bottom than at the top" % building_seed
 		)
 
 
@@ -175,12 +179,12 @@ func test_lamps_are_spread_along_the_floor() -> void:
 				mean,
 				span.x + quarter,
 				span.y - quarter,
-				"сид %d: этаж %d — лампы сбились в один край" % [building_seed, index]
+				"seed %d: floor %d — lamps bunched at one edge" % [building_seed, index]
 			)
 			assert_gt(
 				on_floor[on_floor.size() - 1] - on_floor[0],
 				0.0,
-				"сид %d: этаж %d — две лампы в одном месте" % [building_seed, index]
+				"seed %d: floor %d — two lamps in one place" % [building_seed, index]
 			)
 
 
@@ -216,7 +220,7 @@ func test_a_crowded_floor_still_gets_a_lamp() -> void:
 			assert_gte(
 				on_floor.size(),
 				1,
-				"сид %d: этаж %d остался без единой лампы" % [building_seed, index]
+				"seed %d: floor %d is left without a single lamp" % [building_seed, index]
 			)
 
 
@@ -235,7 +239,7 @@ func test_the_roof_carries_no_doors() -> void:
 	for building_seed: int in SEEDS:
 		var plan := BuildingPlan.generate(_rules(), building_seed)
 		for door in plan.doors:
-			assert_gt(door.floor_index, BuildingRules.ROOF, "сид %d" % building_seed)
+			assert_gt(door.floor_index, BuildingRules.ROOF, "seed %d" % building_seed)
 
 
 ## Everything the layout places must stand inside the silhouette of its level:
@@ -248,19 +252,19 @@ func test_nothing_is_placed_outside_its_own_floor() -> void:
 			var span := rules.floor_span(door.floor_index)
 			assert_true(
 				door.x > span.x and door.x < span.y,
-				"сид %d: дверь на этаже %d за стеной" % [building_seed, door.floor_index]
+				"seed %d: door on floor %d behind the wall" % [building_seed, door.floor_index]
 			)
 		for lamp in plan.lamps:
 			var span := rules.floor_span(lamp.floor_index)
 			assert_true(
 				lamp.x > span.x and lamp.x < span.y,
-				"сид %d: лампа на этаже %d за стеной" % [building_seed, lamp.floor_index]
+				"seed %d: lamp on floor %d behind the wall" % [building_seed, lamp.floor_index]
 			)
 
 
 func _claim(busy: Dictionary, floor_index: int, x: float) -> void:
 	var key := "%d:%.0f" % [floor_index, x]
-	assert_false(busy.has(key), "место %s занято дважды" % key)
+	assert_false(busy.has(key), "spot %s taken twice" % key)
 	busy[key] = true
 
 
@@ -288,7 +292,7 @@ func test_nothing_on_a_floor_overlaps_its_neighbours() -> void:
 					before[1] as float,
 					(after[0] as float) + 0.001,
 					(
-						"сид %d, этаж %d: %s налезает на %s"
+						"seed %d, floor %d: %s overlaps %s"
 						% [building_seed, index, before[2], after[2]]
 					)
 				)
@@ -308,7 +312,7 @@ func test_shafts_never_stand_side_by_side() -> void:
 				assert_gt(
 					absf(one.x - other.x),
 					pitch * 1.5,
-					"сид %d: шахты %d и %d рядом" % [building_seed, one.slot, other.slot]
+					"seed %d: shafts %d and %d are adjacent" % [building_seed, one.slot, other.slot]
 				)
 
 
@@ -318,22 +322,22 @@ func _footprints(plan: BuildingPlan, rules: BuildingRules, index: int) -> Array:
 	var shaft_half := rules.shaft_width * 0.5
 	for shaft in plan.shafts:
 		if shaft.top <= index and index <= shaft.bottom:
-			bands.append([shaft.x - shaft_half, shaft.x + shaft_half, "шахта"])
+			bands.append([shaft.x - shaft_half, shaft.x + shaft_half, "shaft"])
 	for escalator in plan.escalators:
 		if escalator.floor_index == index:
 			var gap := escalator.gap(rules)
-			bands.append([gap.x, gap.y, "эскалатор"])
+			bands.append([gap.x, gap.y, "escalator"])
 	var door_half := Door.LEAF_SIZE.x * 0.5
 	for door in plan.doors:
 		if door.floor_index == index:
-			bands.append([door.x - door_half, door.x + door_half, "дверь"])
+			bands.append([door.x - door_half, door.x + door_half, "door"])
 	if index == plan.floors - 1:
 		var exit_half := BuildingShell.EXIT_WIDTH * 0.5
-		bands.append([plan.exit_x - exit_half, plan.exit_x + exit_half, "выход"])
+		bands.append([plan.exit_x - exit_half, plan.exit_x + exit_half, "exit"])
 	var wall_half := rules.inner_wall_width * 0.5
 	for wall in plan.walls:
 		if wall.floor_index == index:
-			bands.append([wall.x - wall_half, wall.x + wall_half, "стена"])
+			bands.append([wall.x - wall_half, wall.x + wall_half, "wall"])
 	return bands
 
 
@@ -350,7 +354,7 @@ func test_floor_between_openings_fits_a_body() -> void:
 		for index: int in rules.levels():
 			var holes: Array = []
 			for band: Array in _footprints(plan, rules, index):
-				if band[2] == "шахта" or band[2] == "эскалатор":
+				if band[2] == "shaft" or band[2] == "escalator":
 					holes.append(band)
 			holes.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
 			for number in range(1, holes.size()):
@@ -361,7 +365,7 @@ func test_floor_between_openings_fits_a_body() -> void:
 					strip,
 					Proportions.BODY_WIDTH,
 					(
-						"сид %d, этаж %d: между %s и %s %.2f м пола"
+						"seed %d, floor %d: between %s and %s there is %.2f m of floor"
 						% [building_seed, index, holes[number - 1][2], holes[number][2], strip]
 					)
 				)

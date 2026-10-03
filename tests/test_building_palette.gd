@@ -52,8 +52,8 @@ func _apart(first: Color, second: Color) -> float:
 ## The set is finite and cycles: rounds in the original go around in a circle.
 func test_the_set_repeats_itself() -> void:
 	var size := BuildingPalette.count()
-	assert_gt(size, 1, "раунды должны отличаться хоть чем-то")
-	assert_eq(BuildingPalette.of_round(size + 1), BuildingPalette.of_round(1), "набор по кругу")
+	assert_gt(size, 1, "rounds must differ in something")
+	assert_eq(BuildingPalette.of_round(size + 1), BuildingPalette.of_round(1), "the set cycles")
 	assert_eq(BuildingPalette.of_round(size + 2), BuildingPalette.of_round(2))
 
 
@@ -68,7 +68,7 @@ func test_a_round_below_one_still_gets_a_palette() -> void:
 func test_rules_take_the_palette_of_their_round() -> void:
 	for number: int in [1, 2, 3, 4, 5, 9]:
 		var rules := BuildingRules.for_building(number)
-		assert_eq(rules.palette, BuildingPalette.of_round(number), "раунд %d" % number)
+		assert_eq(rules.palette, BuildingPalette.of_round(number), "round %d" % number)
 
 
 ## Consecutive buildings differ to the eye — that is the milestone's DoD.
@@ -85,7 +85,7 @@ func test_neighbouring_rounds_differ() -> void:
 			assert_gt(
 				_hue_gap(here.story, next.story),
 				HUE_GAP,
-				"тип %d: раунды %d и %d красят этаж одинаково" % [kind, number, number + 1]
+				"kind %d: rounds %d and %d paint a floor the same" % [kind, number, number + 1]
 			)
 
 
@@ -99,13 +99,15 @@ func test_every_kind_keeps_the_dark_floor_readable_in_every_round() -> void:
 		var light: Color = BuildingAir.LAMP_LIGHT[kind]
 		for number: int in range(1, BuildingPalette.count() + 1):
 			var palette := BuildingPalette.of_round(number, kind)
-			var where := "тип %d, раунд %d" % [kind, number]
+			var where := "kind %d, round %d" % [kind, number]
 			var dark := palette.dark.get_luminance()
-			assert_gt(light.get_luminance() - dark, LIGHT_GAP, where + ": темнота не темнее")
-			assert_gt(dark, DARK_FLOOR, where + ": темнота ушла в чёрное")
-			assert_gt(_hue_gap(light, palette.dark), HUE_GAP, where + ": только яркостью")
-			assert_gt(_apart(palette.shaft, palette.story), APART, where + ": шахта как стена")
-			assert_gt(_apart(palette.masonry, palette.story), APART, where + ": кладка как стена")
+			assert_gt(light.get_luminance() - dark, LIGHT_GAP, where + ": the dark is not darker")
+			assert_gt(dark, DARK_FLOOR, where + ": the dark went to black")
+			assert_gt(_hue_gap(light, palette.dark), HUE_GAP, where + ": by brightness only")
+			assert_gt(_apart(palette.shaft, palette.story), APART, where + ": shaft like a wall")
+			assert_gt(
+				_apart(palette.masonry, palette.story), APART, where + ": masonry like a wall"
+			)
 
 
 ## Darkness is equally dark (decision 3): the darkened zone's tone has the same
@@ -118,7 +120,7 @@ func test_the_dark_is_equally_dark_in_every_kind() -> void:
 			var dark := BuildingPalette.of_round(number, kind).dark.get_luminance()
 			lightest = maxf(lightest, dark)
 			darkest = minf(darkest, dark)
-	assert_lt(lightest - darkest, 0.06, "темнота у типов разной яркости")
+	assert_lt(lightest - darkest, 0.06, "the dark of kinds has different brightness")
 
 
 ## The level converts the round palette into its kind's set; the round number is the same.
@@ -128,14 +130,16 @@ func test_a_round_palette_moves_to_the_family_of_its_kind() -> void:
 		for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
 			var moved := BuildingPalette.of_kind(hotel, kind)
 			assert_eq(
-				moved, BuildingPalette.of_round(number, kind), "раунд %d, тип %d" % [number, kind]
+				moved, BuildingPalette.of_round(number, kind), "round %d, kind %d" % [number, kind]
 			)
 			assert_eq(
-				BuildingPalette.of_kind(moved, BuildingIdentity.Kind.HOTEL), hotel, "и обратно"
+				BuildingPalette.of_kind(moved, BuildingIdentity.Kind.HOTEL), hotel, "and back"
 			)
 	var custom := BuildingPalette.new()
 	assert_eq(
-		BuildingPalette.of_kind(custom, BuildingIdentity.Kind.OFFICE), custom, "своя — как есть"
+		BuildingPalette.of_kind(custom, BuildingIdentity.Kind.OFFICE),
+		custom,
+		"a custom one stays as is"
 	)
 
 
@@ -151,5 +155,5 @@ func test_kinds_paint_the_same_round_apart() -> void:
 				assert_gt(
 					_apart(one.story, two.story),
 					APART * 0.5,
-					"раунд %d: типы одного цвета" % number
+					"round %d: kinds of the same colour" % number
 				)

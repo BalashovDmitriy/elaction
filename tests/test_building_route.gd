@@ -18,7 +18,7 @@ func test_every_building_can_be_finished() -> void:
 	for building_seed in range(1, SEEDS + 1):
 		var plan := BuildingPlan.generate(rules, building_seed)
 		var missing := BuildingRoute.unreachable_spots(plan, rules)
-		assert_true(missing.is_empty(), "сид %d: недостижимо — %s" % [building_seed, missing])
+		assert_true(missing.is_empty(), "seed %d: unreachable — %s" % [building_seed, missing])
 
 
 func test_start_is_reachable_from_itself() -> void:
@@ -35,7 +35,7 @@ func test_route_reaches_every_floor() -> void:
 	var floors_seen: Dictionary = {}
 	for node: String in seen:
 		floors_seen[node.split(":")[0]] = true
-	assert_eq(floors_seen.size(), rules.floors + 1, "до каждого уровня можно добраться")
+	assert_eq(floors_seen.size(), rules.floors + 1, "every level can be reached")
 
 
 ## Passability must be caught, not always confirmed.
@@ -46,7 +46,7 @@ func test_route_reaches_every_floor() -> void:
 func test_an_isolated_bottom_floor_is_not_winnable() -> void:
 	var rules := _rules()
 	var plan := BuildingPlan.generate(rules, 3)
-	assert_true(BuildingRoute.is_winnable(plan, rules), "целое здание проходимо")
+	assert_true(BuildingRoute.is_winnable(plan, rules), "a whole building is passable")
 
 	var bottom := plan.floors - 1
 	var kept: Array[BuildingPlan.ShaftSpot] = []
@@ -55,7 +55,7 @@ func test_an_isolated_bottom_floor_is_not_winnable() -> void:
 			kept.append(shaft)
 	plan.shafts = kept
 	plan.escalators.clear()
-	assert_false(BuildingRoute.is_winnable(plan, rules), "до отрезанного низа не добраться")
+	assert_false(BuildingRoute.is_winnable(plan, rules), "the cut-off bottom cannot be reached")
 
 
 ## A wall cuts walking but not the slab (ADR-0024, decision 5). There are two
@@ -75,8 +75,8 @@ func test_a_wall_cuts_walking_but_not_the_slab() -> void:
 
 	var slab := BuildingPlan.spans_between(plan.gaps_on(rules, index), span)
 	var walk := BuildingPlan.spans_between(plan.blocks_on(rules, index), span)
-	assert_eq(slab.size(), 1, "нижний этаж — цельная плита, стена на ней стоит")
-	assert_eq(walk.size(), before.size() + 1, "а ходьба разрезана ею надвое")
+	assert_eq(slab.size(), 1, "the bottom floor is a solid slab, the wall stands on it")
+	assert_eq(walk.size(), before.size() + 1, "and the walkway is cut in two by it")
 
 
 ## The graph does not promise a ride the pair will not make.
@@ -116,11 +116,11 @@ func test_a_pair_promises_only_what_both_decks_reach() -> void:
 					assert_true(
 						shaft.rides_between(from_floor, to_floor),
 						(
-							"сид %d: шахта %d..%d с парой обещает %d -> %d"
+							"seed %d: shaft %d..%d with a pair promises %d -> %d"
 							% [building_seed, shaft.top, shaft.bottom, from_floor, to_floor]
 						)
 					)
-	assert_gt(found, 0, "на двадцати сидах хоть одна пара обязана выпасть")
+	assert_gt(found, 0, "at least one pair must come up over twenty seeds")
 
 
 ## Whether the floor lies in the shaft's band.

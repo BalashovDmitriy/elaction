@@ -50,7 +50,7 @@ func test_the_bot_shoots_the_agent_in_its_way() -> void:
 
 	var rules := level.rules
 	var spots := level.plan().safe_spots(rules, FLOOR)
-	assert_gt(spots.size(), 1, "на этаже есть где стоять обоим")
+	assert_gt(spots.size(), 1, "the floor has room for both to stand")
 
 	# Not the first two slots but the two nearest each other: between neighbouring slots there can
 	# be an occupied one — a shaft, an escalator opening — and the first pair would be half a floor
@@ -58,7 +58,7 @@ func test_the_bot_shoots_the_agent_in_its_way() -> void:
 	# at all.
 	var pair := _closest_pair(spots)
 	var gap := pair.y - pair.x
-	assert_lt(gap, OttoBot.ENGAGE, "агент стоит в поле зрения бота")
+	assert_lt(gap, OttoBot.ENGAGE, "the agent stands in the bot's field of view")
 
 	var surface := rules.floor_surface(FLOOR)
 	level.otto.global_position = WorldSpace.to_scene(Vector2(pair.x, surface))
@@ -80,8 +80,10 @@ func test_the_bot_shoots_the_agent_in_its_way() -> void:
 		frames += 1
 	bot.release()
 
-	assert_true(agent.is_dead(), "бот не достал агента в %.2f м за %d кадров" % [gap, DUEL_FRAMES])
-	assert_false(level.otto.is_dead(), "и сам при этом остался жив")
+	assert_true(
+		agent.is_dead(), "the bot did not get the agent at %.2f m in %d frames" % [gap, DUEL_FRAMES]
+	)
+	assert_false(level.otto.is_dead(), "and stayed alive himself")
 	remove_child(level)
 
 
@@ -114,20 +116,20 @@ func test_the_bot_answers_the_aiming_laser() -> void:
 
 	_aim(agent, Proportions.SHOT_HIGH, 1.0)
 	bot.step()
-	assert_true(Input.is_action_pressed(&"move_down"), "под высоким лучом — присесть")
-	assert_false(Input.is_action_pressed(&"move_right"), "а не драться, повернувшись")
+	assert_true(Input.is_action_pressed(&"move_down"), "under a high ray - crouch")
+	assert_false(Input.is_action_pressed(&"move_right"), "and do not fight while turned away")
 	bot.release()
 	await wait_physics_frames(2)
 
 	_aim(agent, Proportions.SHOT_LOW, 2.0)
 	bot.step()
-	assert_false(Input.is_action_pressed(&"jump"), "низкий луч, пуля не скоро — рано прыгать")
+	assert_false(Input.is_action_pressed(&"jump"), "low ray, bullet not soon - too early to jump")
 	bot.release()
 	await wait_physics_frames(2)
 
 	_aim(agent, Proportions.SHOT_LOW, 0.2)
 	bot.step()
-	assert_true(Input.is_action_pressed(&"jump"), "пуля вот-вот — прыжок")
+	assert_true(Input.is_action_pressed(&"jump"), "bullet any moment - jump")
 	bot.release()
 	remove_child(level)
 
@@ -171,12 +173,12 @@ func test_the_bot_takes_down_an_agent_from_behind() -> void:
 		await wait_physics_frames(1)
 		frames += 1
 	bot.release()
-	assert_true(took, "бот добил, а не застрелил")
-	assert_true(agent.is_dead(), "агент добит")
+	assert_true(took, "the bot finished him off instead of shooting")
+	assert_true(agent.is_dead(), "the agent is finished off")
 	assert_eq(
 		GameState.instance().score - before,
 		Takedown.score(Takedown.Side.BACK, agent.is_in_the_dark()),
-		"сзади"
+		"from behind"
 	)
 	remove_child(level)
 

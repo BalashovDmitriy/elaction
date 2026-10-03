@@ -62,7 +62,7 @@ func _ready() -> void:
 func _run() -> void:
 	var spot := _escalator_under_a_lamp()
 	if spot == null:
-		push_error("на сиде %d эскалаторов нет — кадр снять не с чего" % BUILDING_SEED)
+		push_error("no escalators on seed %d — nothing to shoot" % BUILDING_SEED)
 		get_tree().quit(1)
 		return
 
@@ -84,7 +84,7 @@ func _run() -> void:
 		get_tree().quit(1)
 		return
 
-	print("  кадры геометрии в %s" % FOLDER)
+	print("  geometry shots in %s" % FOLDER)
 	get_tree().quit(0)
 
 
@@ -96,7 +96,7 @@ func _shoot_the_pair(label: String) -> bool:
 	var rules := _level.rules
 	var shaft := _double_deck_shaft()
 	if shaft == null:
-		push_error("на сиде %d пара не выпала — кадр снять не с чего" % BUILDING_SEED)
+		push_error("no pair on seed %d — nothing to shoot" % BUILDING_SEED)
 		return false
 
 	var span := shaft.ride_span()
@@ -168,7 +168,9 @@ func _settle_after_the_fall(index: int) -> void:
 		await get_tree().physics_frame
 		left -= 1
 	if left <= 0:
-		push_warning("лампы этажа %d не долетели до пола за %d шагов" % [index, FALL_STEPS])
+		push_warning(
+			"lamps of floor %d did not reach the floor within %d steps" % [index, FALL_STEPS]
+		)
 	await get_tree().physics_frame
 
 

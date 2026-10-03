@@ -65,7 +65,7 @@ func test_every_door_carries_a_sign_that_tells_red_from_plain() -> void:
 			assert_eq(
 				_lights_of(door, wanted),
 				1,
-				"сид %d: у двери одно табло своего цвета" % building_seed
+				"seed %d: a door has one sign of its own colour" % building_seed
 			)
 			if door.has_document:
 				red += 1
@@ -74,12 +74,12 @@ func test_every_door_carries_a_sign_that_tells_red_from_plain() -> void:
 			assert_eq(
 				_glow_of(door.get_node("Leaf")),
 				Color.TRANSPARENT,
-				"сид %d: створка не светится" % building_seed
+				"seed %d: the leaf does not glow" % building_seed
 			)
 		assert_eq(
 			red,
 			BuildingDocuments.count(level.rules, level.building_seed),
-			"сид %d: красных табло столько же, сколько документов" % building_seed
+			"seed %d: as many red signs as documents" % building_seed
 		)
 		remove_child(level)
 
@@ -94,13 +94,13 @@ func test_a_taken_document_turns_the_sign_warm() -> void:
 		if door.has_document:
 			red = door
 			break
-	assert_not_null(red, "в здании есть красная дверь")
+	assert_not_null(red, "the building has a red door")
 	if red == null:
 		return
 	red.has_document = false
 	await wait_physics_frames(1)
-	assert_eq(_lights_of(red, GreyboxLook.SIGN_WARM), 1, "табло стало тёплым")
-	assert_eq(_lights_of(red, GreyboxLook.SIGN_RED), 0, "красного не осталось")
+	assert_eq(_lights_of(red, GreyboxLook.SIGN_WARM), 1, "the sign turned warm")
+	assert_eq(_lights_of(red, GreyboxLook.SIGN_RED), 0, "no red left")
 	remove_child(level)
 
 
@@ -108,9 +108,9 @@ func test_every_car_shows_two_indicators() -> void:
 	var level := _build(1)
 	await wait_physics_frames(SETTLE_FRAMES)
 	var cars := level.find_children("*", "ElevatorCar", false, false)
-	assert_gt(cars.size(), 0, "в здании есть кабины")
+	assert_gt(cars.size(), 0, "the building has cabs")
 	for car in cars:
-		assert_eq(_lights_of(car, GreyboxLook.INDICATOR), 2, "у кабины два индикатора")
+		assert_eq(_lights_of(car, GreyboxLook.INDICATOR), 2, "a cab has two indicators")
 	remove_child(level)
 
 
@@ -120,10 +120,10 @@ func test_the_exit_wears_a_green_sign() -> void:
 		await wait_physics_frames(SETTLE_FRAMES)
 		# Since M24b the sign is above the garage gate in the left end wall ([GarageGate]).
 		var board := level.get_node_or_null("Garage/Gate/ExitSign")
-		assert_not_null(board, "сид %d: над выходом вывеска" % building_seed)
+		assert_not_null(board, "seed %d: a sign above the exit" % building_seed)
 		if board != null:
 			assert_eq(
-				_glow_of(board), GreyboxLook.SIGN_GREEN, "сид %d: и она зелёная" % building_seed
+				_glow_of(board), GreyboxLook.SIGN_GREEN, "seed %d: and it is green" % building_seed
 			)
 			var at := WorldSpace.to_plane((board as Node3D).global_position)
 			var bottom := level.rules.floors - 1
@@ -131,10 +131,10 @@ func test_the_exit_wears_a_green_sign() -> void:
 				at.y,
 				level.rules.story_top(bottom),
 				level.rules.floor_surface(bottom),
-				"сид %d: под потолком нижнего этажа" % building_seed
+				"seed %d: under the ceiling of the lowest floor" % building_seed
 			)
 			var left := level.rules.floor_span(bottom).x
-			assert_between(at.x, left, left + 1.0, "сид %d: над воротами" % building_seed)
+			assert_between(at.x, left, left + 1.0, "seed %d: above the gate" % building_seed)
 		remove_child(level)
 
 
@@ -143,9 +143,9 @@ func test_lamps_glow_themselves() -> void:
 	var level := _build(1)
 	await wait_physics_frames(SETTLE_FRAMES)
 	var lamps := level.find_children("*", "Lamp", false, false)
-	assert_gt(lamps.size(), 0, "в здании есть лампы")
+	assert_gt(lamps.size(), 0, "the building has lamps")
 	for lamp in lamps:
-		assert_eq(_glow_of(lamp.get_node("Visual")), GreyboxLook.LAMP, "светильник светится")
+		assert_eq(_glow_of(lamp.get_node("Visual")), GreyboxLook.LAMP, "the fixture glows")
 	remove_child(level)
 
 
@@ -159,11 +159,11 @@ func test_actors_are_lit_by_the_camera_fill() -> void:
 	await wait_physics_frames(SETTLE_FRAMES)
 	for actor: Node in [level.otto, agent]:
 		var meshes := actor.get_node("Body").find_children("*", "MeshInstance3D", true, false)
-		assert_gt(meshes.size(), 0, "у актёра есть меши")
+		assert_gt(meshes.size(), 0, "the actor has meshes")
 		for node in meshes:
 			var mesh := node as MeshInstance3D
-			assert_null(mesh.material_overlay, "обводки нет")
-			assert_ne(mesh.layers & FigureRig.RENDER_LAYER, 0, "меш на слое фигур")
+			assert_null(mesh.material_overlay, "no outline")
+			assert_ne(mesh.layers & FigureRig.RENDER_LAYER, 0, "mesh on the figure layer")
 	var fill := level.otto.get_viewport().get_camera_3d().get_node("ActorFill") as Light3D
-	assert_eq(fill.light_cull_mask, FigureRig.RENDER_LAYER, "свет камеры — только на фигуры")
+	assert_eq(fill.light_cull_mask, FigureRig.RENDER_LAYER, "the camera light affects only figures")
 	remove_child(level)

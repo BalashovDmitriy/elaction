@@ -28,7 +28,7 @@ func test_escalators_do_not_cut_walking() -> void:
 				assert_false(
 					middle > block.x and middle < block.y,
 					(
-						"сид %d, этаж %d: над проёмом эскалатора пол"
+						"seed %d, floor %d: a floor above the escalator opening"
 						% [building_seed, escalator.floor_index]
 					)
 				)
@@ -38,12 +38,12 @@ func test_the_hole_is_behind_the_play_plane() -> void:
 	assert_lt(
 		Escalator.HOLE_FRONT_Z,
 		WorldSpace.PLAY_Z - WorldSpace.BODY_DEPTH * 0.5,
-		"край цельной плиты — за телом идущего"
+		"the edge of the solid slab is behind the walker's body"
 	)
 	assert_lte(
 		Escalator.BELT_Z + Escalator.BELT_DEPTH * 0.5,
 		Escalator.HOLE_FRONT_Z,
-		"полотно — в проёме, а не в цельной плите"
+		"the belt is in the opening, not in the solid slab"
 	)
 
 
@@ -56,10 +56,10 @@ func test_the_hole_starts_at_the_bend_and_stays_on_the_floor() -> void:
 		for escalator in plan.escalators:
 			var hole := escalator.hole(rules)
 			var gap := escalator.gap(rules)
-			var where := "сид %d, этаж %d" % [building_seed, escalator.floor_index]
-			assert_gte(hole.x, gap.x - 0.001, where + ": дыра в месте эскалатора")
-			assert_lte(hole.y, gap.y + 0.001, where + ": дыра в месте эскалатора")
-			assert_gt(hole.y - hole.x, Proportions.BODY, where + ": голова едущего проходит")
+			var where := "seed %d, floor %d" % [building_seed, escalator.floor_index]
+			assert_gte(hole.x, gap.x - 0.001, where + ": a hole where the escalator is")
+			assert_lte(hole.y, gap.y + 0.001, where + ": a hole where the escalator is")
+			assert_gt(hole.y - hole.x, Proportions.BODY, where + ": the rider's head passes")
 
 
 ## An Otto placed over the opening stands on the floor: the slab in the play plane is solid.
@@ -71,12 +71,14 @@ func test_otto_stands_over_the_escalator_hole() -> void:
 	add_child_autofree(level)
 	await level.wait_for_the_landing()
 	var plan := level.plan()
-	assert_false(plan.escalators.is_empty(), "в здании есть эскалатор")
+	assert_false(plan.escalators.is_empty(), "the building has an escalator")
 	for escalator: EscalatorSpot in plan.escalators.slice(0, 3):
 		var hole := escalator.hole(level.rules)
 		var surface := level.rules.floor_surface(escalator.floor_index)
 		level.otto.global_position = WorldSpace.to_scene(Vector2((hole.x + hole.y) * 0.5, surface))
 		await wait_physics_frames(FALL_FRAMES)
 		var y := WorldSpace.to_plane(level.otto.global_position).y
-		assert_almost_eq(y, surface, 0.1, "этаж %d: Otto стоит над проёмом" % escalator.floor_index)
-		assert_false(level.otto.is_dead(), "и жив")
+		assert_almost_eq(
+			y, surface, 0.1, "floor %d: Otto stands above the opening" % escalator.floor_index
+		)
+		assert_false(level.otto.is_dead(), "and alive")

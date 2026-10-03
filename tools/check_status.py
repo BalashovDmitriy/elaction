@@ -58,13 +58,13 @@ def main() -> int:
     if STATUS_FILE in staged:
         return 0
 
-    print(f"Коммит меняет игру, но не обновляет {STATUS_FILE}:")
+    print(f"The commit changes the game but does not update {STATUS_FILE}:")
     for path in watched[:10]:
         print(f"  {path}")
     if len(watched) > 10:
-        print(f"  ... и ещё {len(watched) - 10}")
+        print(f"  ... and {len(watched) - 10} more")
     print()
-    print(f"Опишите в {STATUS_FILE}, что изменилось и что следующее, затем:")
+    print(f"Describe in {STATUS_FILE} what changed and what is next, then:")
     print(f"  git add {STATUS_FILE}")
     return 1
 

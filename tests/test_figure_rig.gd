@@ -51,13 +51,13 @@ func test_both_models_carry_every_bone() -> void:
 		var scene := model.instantiate()
 		add_child_autofree(scene)
 		var found := scene.find_children("*", "Skeleton3D", true, false)
-		assert_eq(found.size(), 1, "%s: один скелет" % model.resource_path)
+		assert_eq(found.size(), 1, "%s: one skeleton" % model.resource_path)
 		if found.is_empty():
 			continue
 		var skeleton := found[0] as Skeleton3D
 		for bone_name: String in FigureRig.BONES:
 			assert_gte(
-				skeleton.find_bone(bone_name), 0, "%s: кость %s" % [model.resource_path, bone_name]
+				skeleton.find_bone(bone_name), 0, "%s: bone %s" % [model.resource_path, bone_name]
 			)
 
 
@@ -70,8 +70,8 @@ func test_the_rig_stands_as_tall_as_the_collision_says() -> void:
 		((otto.get_node("StandingShape") as CollisionShape3D).shape as BoxShape3D).size.y
 	)
 	otto.free()
-	assert_gte(rig.height(), standing, "фигура не ниже коллизии стоя")
-	assert_lt(rig.height(), standing * 1.2, "и не выше её больше чем на причёску")
+	assert_gte(rig.height(), standing, "the figure is not lower than the standing collision")
+	assert_lt(rig.height(), standing * 1.2, "and not taller than it by more than a hairdo")
 
 
 ## Milestone DoD: Otto crouching is still below an agent's bullet.
@@ -89,11 +89,15 @@ func test_a_crouching_figure_ducks_under_the_agent_bullet() -> void:
 	rig.show_pose(ActorPose.CROUCH)
 	rig.snap()
 	var top := rig.skinned_aabb().end.y
-	assert_lt(top, bullet_height, "макушка присевшего ниже пули агента (%.2f)" % bullet_height)
+	assert_lt(
+		top,
+		bullet_height,
+		"the crown of a crouching one is below the agent's bullet (%.2f)" % bullet_height
+	)
 	assert_lt(
 		top,
 		crouching * 1.1,
-		"и укладывается в коллизию приседа %.2f с запасом на голову" % crouching
+		"and fits the crouch collision %.2f with room for the head" % crouching
 	)
 
 
@@ -107,7 +111,9 @@ func test_a_kneeling_agent_ducks_under_the_standing_shot() -> void:
 	rig.snap()
 	var top := rig.skinned_aabb().end.y
 	assert_lt(
-		top, shot - _bullet_half_height(), "шляпа на колене ниже нижнего края пули (%.2f)" % shot
+		top,
+		shot - _bullet_half_height(),
+		"a kneeling hat is below the bullet's lower edge (%.2f)" % shot
 	)
 
 
@@ -123,12 +129,16 @@ func test_a_prone_agent_lies_under_the_crouching_shot() -> void:
 	# bottom: the body is wholly under it, it can only graze the brim edge. Going lower is possible
 	# only with a different hat model.
 	assert_lt(
-		lying.end.y, shot + _bullet_half_height(), "залёгший ниже верхнего края пули (%.2f)" % shot
+		lying.end.y,
+		shot + _bullet_half_height(),
+		"a prone one is below the bullet's upper edge (%.2f)" % shot
 	)
-	assert_gt(lying.size.z, rig.height() * 0.9, "и вытянут вдоль пола: руки со стволом вперёд")
+	assert_gt(
+		lying.size.z, rig.height() * 0.9, "and stretched along the floor: arms with the gun forward"
+	)
 	rig.show_pose(ActorPose.CROUCH)
 	rig.snap()
-	assert_lt(lying.end.y, rig.skinned_aabb().end.y, "и ниже, чем на колене")
+	assert_lt(lying.end.y, rig.skinned_aabb().end.y, "and lower than kneeling")
 
 
 func test_the_choke_puts_the_arms_forward() -> void:
@@ -142,12 +152,14 @@ func test_the_choke_puts_the_arms_forward() -> void:
 	rig.show_pose("choke_hold")
 	rig.snap()
 	var holding := rig.skinned_aabb()
-	assert_gt(holding.end.z, standing.end.z, "руки в захвате вынесены вперёд, за габарит тела")
+	assert_gt(
+		holding.end.z, standing.end.z, "arms in the grab are pushed forward, beyond the body bounds"
+	)
 	# Arm up is also a sign: the pistol raised for a butt strike is above the top of the head
 	# (the pack model's arms are short: level with the hat brim, no higher).
 	rig.show_pose("whip_raise")
 	rig.snap()
-	assert_gt(rig.skinned_aabb().end.y, standing.end.y, "вскинутая рука выше макушки")
+	assert_gt(rig.skinned_aabb().end.y, standing.end.y, "a raised arm is above the crown")
 
 
 func test_a_lying_figure_is_long_and_low() -> void:
@@ -155,11 +167,13 @@ func test_a_lying_figure_is_long_and_low() -> void:
 	rig.show_pose("dead_1")
 	rig.snap()
 	var box := rig.skinned_aabb()
-	assert_lt(box.end.y, rig.height() * 0.5, "лежащий низкий")
+	assert_lt(box.end.y, rig.height() * 0.5, "a lying one is low")
 	# The pack's death clip drops the body not straight back but with a twist: the length is
 	# along the floor diagonal, not just along the gaze.
-	assert_gt(Vector2(box.size.x, box.size.z).length(), rig.height() * 0.8, "и длинный по полу")
-	assert_gte(box.position.y, -0.01, "и не утоплен в пол")
+	assert_gt(
+		Vector2(box.size.x, box.size.z).length(), rig.height() * 0.8, "and long along the floor"
+	)
+	assert_gte(box.position.y, -0.01, "and not sunk into the floor")
 
 
 ## Grounding is shared: each pose has its own depth, and none goes below the floor.
@@ -169,8 +183,10 @@ func test_no_pose_sinks_below_the_floor() -> void:
 		rig.show_pose(pose_name)
 		rig.snap()
 		var floor_level := rig.skinned_aabb().position.y
-		assert_gte(floor_level, -0.01, "%s утоплена в пол на %.3f" % [pose_name, -floor_level])
-		assert_lt(floor_level, 0.06, "%s висит над полом на %.3f" % [pose_name, floor_level])
+		assert_gte(
+			floor_level, -0.01, "%s is sunk into the floor by %.3f" % [pose_name, -floor_level]
+		)
+		assert_lt(floor_level, 0.06, "%s hangs above the floor by %.3f" % [pose_name, floor_level])
 
 
 func test_a_pose_change_is_a_motion_not_a_swap() -> void:
@@ -183,20 +199,17 @@ func test_a_pose_change_is_a_motion_not_a_swap() -> void:
 	rig.show_pose("crouch")
 	var target := rig.target_rotation(FigureRig.LEG_L)
 	var whole := start.angle_to(target)
-	assert_gt(whole, deg_to_rad(40.0), "присед уводит бедро далеко от стойки")
+	assert_gt(whole, deg_to_rad(40.0), "a crouch moves the thigh far from standing")
 	# The smoothing step is set here rather than awaited as a frame: in a headless run
 	# a frame lasts "however long it takes", and in it the rig would manage to arrive.
 	rig.advance(FRAME)
 	var moved := start.angle_to(rig.bone_rotation(FigureRig.LEG_L))
-	assert_gt(moved, deg_to_rad(3.0), "бедро уже пошло к удару")
-	assert_lt(moved, whole - deg_to_rad(3.0), "но за один кадр туда не долетело")
+	assert_gt(moved, deg_to_rad(3.0), "the thigh has already gone towards the strike")
+	assert_lt(moved, whole - deg_to_rad(3.0), "but it did not get there in one frame")
 	for _frame in 120:
 		rig.advance(FRAME)
 	assert_almost_eq(
-		rig.bone_rotation(FigureRig.LEG_L).angle_to(target),
-		0.0,
-		0.01,
-		"а за две секунды — долетело"
+		rig.bone_rotation(FigureRig.LEG_L).angle_to(target), 0.0, 0.01, "and in two seconds it did"
 	)
 
 
@@ -210,7 +223,7 @@ func test_walking_moves_the_legs_with_the_phase() -> void:
 	rig.set_walk_phase(1.5)
 	rig.snap()
 	var after := rig.bone_rotation(FigureRig.LEG_L)
-	assert_gt(before.angle_to(after), deg_to_rad(5.0), "фаза ходьбы двигает ноги")
+	assert_gt(before.angle_to(after), deg_to_rad(5.0), "the walk phase moves the legs")
 
 
 func test_a_standing_actor_keeps_walking_where_he_stopped() -> void:
@@ -239,8 +252,8 @@ func test_the_walk_clip_keeps_its_feet_on_the_floor() -> void:
 		rig.snap()
 		rig.advance(0.0)
 		var floor_level := rig.skinned_aabb().position.y
-		assert_gt(floor_level, -0.03, "фаза %.1f: подошва не в полу" % (step * 0.5))
-		assert_lt(floor_level, 0.05, "фаза %.1f: и не над ним" % (step * 0.5))
+		assert_gt(floor_level, -0.03, "phase %.1f: the sole is not in the floor" % (step * 0.5))
+		assert_lt(floor_level, 0.05, "phase %.1f: and not above it" % (step * 0.5))
 
 
 ## The transition ends: both to a code pose and to a clip, the rig arrives within half a second.
@@ -256,12 +269,14 @@ func test_a_transition_ends_for_poses_and_clips() -> void:
 			phase = ActorPose.advance(phase, FRAME)
 			rig.set_walk_phase(phase)
 			rig.advance(FRAME)
-		assert_true(rig.settled(), "%s: переход кончился за три четверти секунды" % pose_name)
+		assert_true(
+			rig.settled(), "%s: the transition ended within three quarters of a second" % pose_name
+		)
 		assert_almost_eq(
 			rig.bone_rotation(FigureRig.LEG_L).angle_to(rig.target_rotation(FigureRig.LEG_L)),
 			0.0,
 			0.01,
-			"%s: бедро в кадре позы, а не позади него" % pose_name
+			"%s: the thigh is in the pose frame, not behind it" % pose_name
 		)
 
 
@@ -272,10 +287,10 @@ func test_a_settled_corpse_lies_on_the_floor() -> void:
 	rig.show_pose("dead_1")
 	for _frame in 60:
 		rig.advance(FRAME)
-	assert_true(rig.settled(), "тело легло")
+	assert_true(rig.settled(), "the body lay down")
 	var floor_level := rig.skinned_aabb().position.y
-	assert_gt(floor_level, -0.015, "лежащий не утоплен в пол")
-	assert_lt(floor_level, 0.03, "и не висит над ним")
+	assert_gt(floor_level, -0.015, "a lying one is not sunk into the floor")
+	assert_lt(floor_level, 0.03, "and does not hang above it")
 
 
 ## A rig that has arrived at a clip does not ground it at all: since M24c `build_actors.py` puts
@@ -286,14 +301,14 @@ func test_every_clip_stands_on_the_floor_by_itself() -> void:
 		var rig := _rig(model)
 		var who := model.resource_path.get_file()
 		for pose_name: String in ["idle", "shoot", "jump", "land", "dead_0", "dead_1"]:
-			assert_not_null(FigurePoses.clip_of(pose_name), "%s — клип" % pose_name)
+			assert_not_null(FigurePoses.clip_of(pose_name), "%s: clip" % pose_name)
 			rig.show_pose(pose_name)
 			for _frame in 30:
 				rig.advance(FRAME)
-			assert_true(rig.settled(), "%s %s: переход кончился" % [who, pose_name])
+			assert_true(rig.settled(), "%s %s: the transition ended" % [who, pose_name])
 			var low := rig.skinned_aabb().position.y
-			assert_gt(low, -0.03, "%s %s: не в полу (%.3f)" % [who, pose_name, low])
-			assert_lt(low, 0.05, "%s %s: и не над ним (%.3f)" % [who, pose_name, low])
+			assert_gt(low, -0.03, "%s %s: not in the floor (%.3f)" % [who, pose_name, low])
+			assert_lt(low, 0.05, "%s %s: and not above it (%.3f)" % [who, pose_name, low])
 
 
 ## Grounding on the move is by the bones' outermost vertices, not by all: the gap between
@@ -311,7 +326,7 @@ func test_the_hull_grounds_like_the_whole_mesh() -> void:
 				hull.position.y,
 				whole.position.y,
 				0.01,
-				"%s %s: низ по крайним" % [model.resource_path.get_file(), pose_name]
+				"%s %s: the bottom by the extremes" % [model.resource_path.get_file(), pose_name]
 			)
 
 
@@ -320,13 +335,13 @@ func test_every_clip_is_in_both_models() -> void:
 		var scene := model.instantiate()
 		add_child_autofree(scene)
 		var players := scene.find_children("*", "AnimationPlayer", true, false)
-		assert_eq(players.size(), 1, "%s: один проигрыватель" % model.resource_path)
+		assert_eq(players.size(), 1, "%s: one player" % model.resource_path)
 		if players.is_empty():
 			continue
 		for clip_name: String in FigurePoses.CLIP_NAMES:
 			assert_true(
 				(players[0] as AnimationPlayer).has_animation(clip_name),
-				"%s: клип %s" % [model.resource_path, clip_name]
+				"%s: clip %s" % [model.resource_path, clip_name]
 			)
 
 
@@ -334,16 +349,16 @@ func test_every_clip_is_in_both_models() -> void:
 func test_the_agent_stands_taller_by_his_hat() -> void:
 	var otto := _rig(OTTO_MODEL)
 	var agent := _rig(AGENT_MODEL)
-	assert_gt(agent.height(), otto.height() + 0.02, "федора над головой")
+	assert_gt(agent.height(), otto.height() + 0.02, "a fedora above the head")
 
 
 func test_facing_turns_the_figure_along_the_floor() -> void:
 	var rig := _rig(OTTO_MODEL)
 	rig.face(1.0)
-	assert_almost_eq(rig.rotation.y, PI * 0.5, 0.001, "вправо — четверть оборота, сразу")
+	assert_almost_eq(rig.rotation.y, PI * 0.5, 0.001, "right: a quarter turn, at once")
 	rig.face(-1.0)
 	rig.snap()
-	assert_almost_eq(rig.rotation.y, -PI * 0.5, 0.001, "влево — в другую сторону")
+	assert_almost_eq(rig.rotation.y, -PI * 0.5, 0.001, "left: the other way")
 
 
 ## A turn is body motion over the turn pause, through "facing the camera"
@@ -352,10 +367,12 @@ func test_a_turn_swings_the_body_through_the_camera() -> void:
 	var rig := _rig(OTTO_MODEL)
 	rig.face(1.0)
 	rig.face(-1.0)
-	assert_almost_eq(rig.rotation.y, PI * 0.5, 0.001, "в первый кадр разворота ещё смотрит вправо")
+	assert_almost_eq(
+		rig.rotation.y, PI * 0.5, 0.001, "in the first frame of the turn it still looks right"
+	)
 	rig.advance(MoveLocks.TURN_TIME * 0.5)
 	rig.face(-1.0)
-	assert_almost_eq(rig.rotation.y, 0.0, 0.05, "на полпути — лицом в камеру, не спиной")
+	assert_almost_eq(rig.rotation.y, 0.0, 0.05, "halfway: face to the camera, not back")
 	rig.advance(MoveLocks.TURN_TIME * 0.5 + 0.001)
 	rig.face(-1.0)
-	assert_almost_eq(rig.rotation.y, -PI * 0.5, 0.001, "за паузу разворота — влево")
+	assert_almost_eq(rig.rotation.y, -PI * 0.5, 0.001, "after the turn pause: left")

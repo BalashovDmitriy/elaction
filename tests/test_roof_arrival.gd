@@ -117,21 +117,21 @@ func test_the_helicopter_lands_otto_on_the_roof() -> void:
 	for building_seed: int in SEEDS:
 		var level := _build(building_seed)
 		var landing := _landing(level)
-		assert_not_null(level.helicopter(), "сид %d: вертолёт прилетел" % building_seed)
+		assert_not_null(level.helicopter(), "seed %d: helicopter arrived" % building_seed)
 		assert_true(
-			level.is_in_the_intro(), "сид %d: здание начинается вступлением" % building_seed
+			level.is_in_the_intro(), "seed %d: building starts with the intro" % building_seed
 		)
-		assert_lt(_otto_at(level).y, landing.y, "сид %d: Otto над крышей" % building_seed)
+		assert_lt(_otto_at(level).y, landing.y, "seed %d: Otto above the roof" % building_seed)
 
-		assert_true(await level.wait_for_the_landing(), "сид %d: Otto встал" % building_seed)
+		assert_true(await level.wait_for_the_landing(), "seed %d: Otto stood up" % building_seed)
 		var at := _otto_at(level)
-		assert_almost_eq(at.x, landing.x, TOLERANCE, "сид %d: на месте приземления" % building_seed)
-		assert_almost_eq(at.y, landing.y, TOLERANCE, "сид %d: на настиле крыши" % building_seed)
-		assert_false(level.is_in_the_intro(), "сид %d: вступление кончилось" % building_seed)
-		assert_true(level.otto.visible, "сид %d: Otto виден" % building_seed)
+		assert_almost_eq(at.x, landing.x, TOLERANCE, "seed %d: at the landing spot" % building_seed)
+		assert_almost_eq(at.y, landing.y, TOLERANCE, "seed %d: on the roof deck" % building_seed)
+		assert_false(level.is_in_the_intro(), "seed %d: the intro ended" % building_seed)
+		assert_true(level.otto.visible, "seed %d: Otto is visible" % building_seed)
 
-		assert_true(await _wait_until_gone(level), "сид %d: вертолёт улетел" % building_seed)
-		assert_null(level.helicopter(), "сид %d: и уровень его забыл" % building_seed)
+		assert_true(await _wait_until_gone(level), "seed %d: helicopter left" % building_seed)
+		assert_null(level.helicopter(), "seed %d: and the level forgot it" % building_seed)
 		_drop(level)
 
 
@@ -144,7 +144,7 @@ func test_otto_obeys_after_the_landing() -> void:
 	Input.action_press(&"move_right")
 	await wait_physics_frames(6)
 	Input.action_release(&"move_right")
-	assert_gt(_otto_at(level).x, before, "Otto слушается игрока")
+	assert_gt(_otto_at(level).x, before, "Otto obeys the player")
 	_drop(level)
 
 
@@ -162,20 +162,22 @@ func test_the_rope_reaches_the_deck_and_the_frame_holds_both() -> void:
 			if helicopter == null or not helicopter.rope_is_down():
 				continue
 			var hook := WorldSpace.to_plane(helicopter.hook())
-			assert_almost_eq(hook.x, landing.x, 0.05, "сид %d: трос над местом" % building_seed)
+			assert_almost_eq(
+				hook.x, landing.x, 0.05, "seed %d: rope above the spot" % building_seed
+			)
 			assert_almost_eq(
 				hook.y + helicopter.rope_length(),
 				landing.y,
 				0.15,
-				"сид %d: трос достаёт до крыши" % building_seed
+				"seed %d: rope reaches the roof" % building_seed
 			)
 			var view := level.otto.camera_view()
 			var extent := _extent(helicopter)
-			assert_gt(extent.position.y, view.position.y, "сид %d: винт в кадре" % building_seed)
-			assert_lt(landing.y, view.end.y, "сид %d: крыша в кадре" % building_seed)
+			assert_gt(extent.position.y, view.position.y, "seed %d: rotor in frame" % building_seed)
+			assert_lt(landing.y, view.end.y, "seed %d: roof in frame" % building_seed)
 			checked = true
 			break
-		assert_true(checked, "сид %d: трос спустился" % building_seed)
+		assert_true(checked, "seed %d: rope was lowered" % building_seed)
 		_drop(level)
 
 
@@ -192,7 +194,7 @@ func test_the_flight_clears_everything_on_the_roof() -> void:
 		var roof := RoofArrival.roof_obstacles(level, deck, [level.otto] as Array[Node])
 		# First — that equipment was found at all: an empty list would always pass.
 		var kit := level.find_children("*", "RoofKit", true, false)
-		assert_eq(kit.size(), 1, "сид %d: на крыше есть техника" % building_seed)
+		assert_eq(kit.size(), 1, "seed %d: there is equipment on the roof" % building_seed)
 		var props := 0
 		for node: Node in kit[0].find_children("*", "MeshInstance3D", true, false):
 			var box := (
@@ -200,7 +202,7 @@ func test_the_flight_clears_everything_on_the_roof() -> void:
 			)
 			if roof.has(box):
 				props += 1
-		assert_gt(props, 3, "сид %d: техника крыши в списке помех" % building_seed)
+		assert_gt(props, 3, "seed %d: roof equipment is in the obstacle list" % building_seed)
 
 		var hits := PackedStringArray()
 		var frames := 0
@@ -211,16 +213,18 @@ func test_the_flight_clears_everything_on_the_roof() -> void:
 					if part.intersects(obstacle) and hits.size() < 5:
 						hits.append(
 							(
-								"x %.1f, y %.1f над крышей"
+								"x %.1f, y %.1f above the roof"
 								% [part.get_center().x, part.position.y - deck]
 							)
 						)
 			await wait_physics_frames(1)
 			frames += 1
 		assert_eq(
-			hits.size(), 0, "сид %d: вертолёт задел технику: %s" % [building_seed, ", ".join(hits)]
+			hits.size(),
+			0,
+			"seed %d: helicopter hit equipment: %s" % [building_seed, ", ".join(hits)]
 		)
-		assert_null(level.helicopter(), "сид %d: вертолёт улетел" % building_seed)
+		assert_null(level.helicopter(), "seed %d: helicopter left" % building_seed)
 		_drop(level)
 
 
@@ -232,16 +236,16 @@ func test_the_helicopter_sounds_its_flight() -> void:
 	var level := _build(1, true)
 	await wait_physics_frames(SETTLE_FRAMES)
 	var voices := _voices(level.helicopter())
-	assert_true(voices.has(Sounds.HELICOPTER), "петля висения есть")
-	assert_true(voices.has(Sounds.HELICOPTER_PASS), "слой пролёта есть")
+	assert_true(voices.has(Sounds.HELICOPTER), "hover loop present")
+	assert_true(voices.has(Sounds.HELICOPTER_PASS), "flyby layer present")
 	if not voices.has(Sounds.HELICOPTER) or not voices.has(Sounds.HELICOPTER_PASS):
 		_drop(level)
 		return
 	var hover := voices[Sounds.HELICOPTER] as AudioStreamPlayer3D
 	var flyby := voices[Sounds.HELICOPTER_PASS] as AudioStreamPlayer3D
 	var rope := voices[Sounds.ROPE_SLIDE] as AudioStreamPlayer3D
-	assert_true(hover.playing and flyby.playing, "оба слоя звучат с прилёта")
-	assert_gt(flyby.volume_db, hover.volume_db, "на подлёте громче пролёт")
+	assert_true(hover.playing and flyby.playing, "both layers sound from arrival")
+	assert_gt(flyby.volume_db, hover.volume_db, "flyby is louder on approach")
 
 	var heard_rope := false
 	var waits := 0
@@ -249,8 +253,8 @@ func test_the_helicopter_sounds_its_flight() -> void:
 		heard_rope = heard_rope or rope.playing
 		await wait_physics_frames(1)
 		waits += 1
-	assert_true(heard_rope, "трос звучал, пока Otto ехал")
-	assert_gt(hover.volume_db, flyby.volume_db, "в висении громче петля висения")
+	assert_true(heard_rope, "rope sounded while Otto rode")
+	assert_gt(hover.volume_db, flyby.volume_db, "hover loop is louder in the hover")
 	_drop(level)
 
 
@@ -277,7 +281,7 @@ func test_the_intro_takes_four_to_six_seconds() -> void:
 		waits += 1
 	var frames := Engine.get_physics_frames() - start
 	var seconds := frames * Engine.time_scale / float(Engine.physics_ticks_per_second)
-	assert_between(seconds, 3.8, 6.0, "вступление идёт %.2f с" % seconds)
+	assert_between(seconds, 3.8, 6.0, "intro lasts %.2f s" % seconds)
 	_drop(level)
 
 
@@ -285,21 +289,21 @@ func test_the_intro_takes_four_to_six_seconds() -> void:
 func test_a_jump_skips_the_intro() -> void:
 	var level := _build(2)
 	await wait_physics_frames(SETTLE_FRAMES * 3)
-	assert_true(level.is_in_the_intro(), "вертолёт ещё летит")
+	assert_true(level.is_in_the_intro(), "helicopter is still flying")
 	Input.action_press(&"jump")
 	await wait_physics_frames(1)
 	Input.action_release(&"jump")
 	await wait_physics_frames(2)
 
-	assert_false(level.is_in_the_intro(), "вступление пропущено")
+	assert_false(level.is_in_the_intro(), "intro skipped")
 	var landing := _landing(level)
-	assert_almost_eq(_otto_at(level).x, landing.x, TOLERANCE, "Otto на месте приземления")
-	assert_almost_eq(_otto_at(level).y, landing.y, TOLERANCE, "и на крыше")
-	assert_true(level.otto.is_grounded(), "стоит на ногах")
+	assert_almost_eq(_otto_at(level).x, landing.x, TOLERANCE, "Otto at the landing spot")
+	assert_almost_eq(_otto_at(level).y, landing.y, TOLERANCE, "and on the roof")
+	assert_true(level.otto.is_grounded(), "stands on his feet")
 	var helicopter := level.helicopter()
 	if helicopter != null:
-		assert_true(helicopter.is_leaving(), "вертолёт уходит")
-	assert_true(await _wait_until_gone(level), "и улетает совсем")
+		assert_true(helicopter.is_leaving(), "helicopter is leaving")
+	assert_true(await _wait_until_gone(level), "and flies away completely")
 	_drop(level)
 
 
@@ -308,13 +312,13 @@ func test_a_shot_skips_but_a_held_button_does_not() -> void:
 	Input.action_press(&"shoot")
 	var level := _build(3)
 	await wait_physics_frames(SETTLE_FRAMES * 3)
-	assert_true(level.is_in_the_intro(), "зажатый выстрел вступление не съел")
+	assert_true(level.is_in_the_intro(), "a held shot did not eat the intro")
 	Input.action_release(&"shoot")
 	await wait_physics_frames(1)
 	Input.action_press(&"shoot")
 	await wait_physics_frames(2)
 	Input.action_release(&"shoot")
-	assert_false(level.is_in_the_intro(), "новое нажатие пропустило вступление")
+	assert_false(level.is_in_the_intro(), "a new press skipped the intro")
 	_drop(level)
 
 
@@ -325,18 +329,18 @@ func test_the_skipping_press_does_not_reach_otto() -> void:
 	for action: StringName in [&"shoot", &"jump"]:
 		var level := _build(4)
 		await wait_physics_frames(SETTLE_FRAMES * 3)
-		assert_true(level.is_in_the_intro(), "%s: вертолёт ещё летит" % action)
+		assert_true(level.is_in_the_intro(), "%s: helicopter is still flying" % action)
 		Input.action_press(action)
 		await wait_physics_frames(1)
 		Input.action_release(action)
-		assert_false(level.is_in_the_intro(), "%s: вступление пропущено" % action)
+		assert_false(level.is_in_the_intro(), "%s: intro skipped" % action)
 		for _frame: int in 3:
 			assert_eq(
 				level.find_children("*", "Bullet", true, false).size(),
 				0,
-				"%s: пропуск не стреляет" % action
+				"%s: skip does not shoot" % action
 			)
-			assert_true(level.otto.is_grounded(), "%s: пропуск не прыгает" % action)
+			assert_true(level.otto.is_grounded(), "%s: skip does not jump" % action)
 			await wait_physics_frames(1)
 		# The next press is Otto's: skipping swallows one press, not the button.
 		if action == &"shoot":
@@ -344,7 +348,7 @@ func test_the_skipping_press_does_not_reach_otto() -> void:
 			await wait_physics_frames(1)
 			Input.action_release(action)
 			assert_eq(
-				level.find_children("*", "Bullet", true, false).size(), 1, "второе нажатие стреляет"
+				level.find_children("*", "Bullet", true, false).size(), 1, "second press shoots"
 			)
 		_drop(level)
 
@@ -360,10 +364,10 @@ func test_moving_otto_ends_the_intro_where_he_was_put() -> void:
 	)
 	level.otto.global_position = WorldSpace.to_scene(spot)
 	await wait_physics_frames(3)
-	assert_false(level.is_in_the_intro(), "вступление кончилось")
-	assert_almost_eq(_otto_at(level).x, spot.x, TOLERANCE, "Otto там, куда поставили")
-	assert_almost_eq(_otto_at(level).y, spot.y, TOLERANCE, "на своём этаже")
-	assert_true(level.otto.visible, "и виден")
+	assert_false(level.is_in_the_intro(), "the intro ended")
+	assert_almost_eq(_otto_at(level).x, spot.x, TOLERANCE, "Otto is where he was put")
+	assert_almost_eq(_otto_at(level).y, spot.y, TOLERANCE, "on his own floor")
+	assert_true(level.otto.visible, "and visible")
 	_drop(level)
 
 
@@ -372,18 +376,18 @@ func test_coming_back_after_death_has_no_helicopter() -> void:
 	var level := _build(1)
 	level.skip_the_intro()
 	await wait_physics_frames(2)
-	assert_true(await _wait_until_gone(level), "вертолёт вступления улетел")
+	assert_true(await _wait_until_gone(level), "intro helicopter left")
 
 	level.otto.kill()
 	var waited := 0
 	while level.otto.is_dead() and waited < 120:
 		await wait_physics_frames(1)
 		waited += 1
-	assert_false(level.otto.is_dead(), "Otto вернулся в игру")
+	assert_false(level.otto.is_dead(), "Otto is back in the game")
 	await wait_physics_frames(SETTLE_FRAMES)
-	assert_false(level.is_in_the_intro(), "вступление не повторилось")
-	assert_eq(_helicopters(level), 0, "вертолёт не прилетел")
-	assert_true(level.otto.visible, "Otto виден")
+	assert_false(level.is_in_the_intro(), "intro did not repeat")
+	assert_eq(_helicopters(level), 0, "helicopter did not arrive")
+	assert_true(level.otto.visible, "Otto is visible")
 	_drop(level)
 
 
@@ -395,21 +399,21 @@ func test_pause_in_the_intro_skips_it_instead_of_pausing() -> void:
 	main._start_game()
 	await wait_physics_frames(SETTLE_FRAMES)
 	var level := main._level as GreyboxLevel
-	assert_true(level.is_in_the_intro(), "игра началась вступлением")
+	assert_true(level.is_in_the_intro(), "game started with the intro")
 
 	Input.action_press(&"pause")
 	main._process(0.0)
 	Input.action_release(&"pause")
 	main._process(0.0)
-	assert_false(level.is_in_the_intro(), "пауза пропустила вступление")
-	assert_false(get_tree().paused, "и не поставила игру на паузу")
-	assert_false((main.get_node("Menu") as Menu).visible, "меню паузы не открылось")
+	assert_false(level.is_in_the_intro(), "pause skipped the intro")
+	assert_false(get_tree().paused, "and did not pause the game")
+	assert_false((main.get_node("Menu") as Menu).visible, "pause menu did not open")
 
 	Input.action_press(&"pause")
 	main._process(0.0)
 	Input.action_release(&"pause")
 	main._process(0.0)
-	assert_true(get_tree().paused, "после вступления пауза снова пауза")
+	assert_true(get_tree().paused, "after the intro pause is a pause again")
 	main._unpause()
 	Sounds.stop_music()
 
@@ -424,18 +428,18 @@ func test_each_rotor_blur_lies_in_its_plane_of_spin() -> void:
 	# The rotation axis is the one around which [Helicopter] itself spins the rotor.
 	for pair: Array in [["MainRotor", Vector3.UP], ["TailRotor", Vector3.BACK]]:
 		var rotor := helicopter.find_child(String(pair[0]), true, false) as Node3D
-		assert_not_null(rotor, "%s есть в модели" % pair[0])
+		assert_not_null(rotor, "%s is in the model" % pair[0])
 		if rotor == null:
 			continue
 		var disc := rotor.get_node_or_null(^"Blur") as MeshInstance3D
-		assert_not_null(disc, "%s: диск размытия" % pair[0])
+		assert_not_null(disc, "%s: blur disc" % pair[0])
 		if disc == null:
 			continue
 		# The normal of a flat mesh is its +Y: it must point along the rotor axis.
 		var normal := disc.transform.basis.y.normalized()
 		var axis: Vector3 = pair[1]
 		assert_almost_eq(
-			absf(normal.dot(axis)), 1.0, 0.001, "%s: диск в плоскости вращения" % pair[0]
+			absf(normal.dot(axis)), 1.0, 0.001, "%s: disc in the rotation plane" % pair[0]
 		)
 
 
@@ -446,7 +450,7 @@ func test_the_full_intro_plays_every_step_in_order() -> void:
 	for building_seed: int in [1, 3, 5]:
 		var level := _build(building_seed, true)
 		var arrival := level.arrival()
-		assert_true(arrival.is_full(), "сид %d: вступление полное" % building_seed)
+		assert_true(arrival.is_full(), "seed %d: intro is full" % building_seed)
 		var seen: Array[int] = []
 		var swung := false
 		var door_shut_in_flight := true
@@ -461,26 +465,26 @@ func test_the_full_intro_plays_every_step_in_order() -> void:
 			if step == RoofArrival.Step.FLY_IN and helicopter.door_share() > 0.0:
 				door_shut_in_flight = false
 			if step in [RoofArrival.Step.PEEK, RoofArrival.Step.SIT, RoofArrival.Step.GRAB]:
-				assert_true(helicopter.door_share() >= 1.0, "сид %d: дверь открыта" % building_seed)
+				assert_true(helicopter.door_share() >= 1.0, "seed %d: door is open" % building_seed)
 			if step == RoofArrival.Step.DROP and helicopter.rope_length() > 1.0:
 				var bottom := helicopter.rope_point(helicopter.rope_length())
 				swung = swung or absf(bottom.x - helicopter.hook().x) > 0.02
 			await wait_physics_frames(1)
-		assert_false(level.is_in_the_intro(), "сид %d: вступление кончилось" % building_seed)
+		assert_false(level.is_in_the_intro(), "seed %d: the intro ended" % building_seed)
 		var order: Array[int] = []
 		for step: int in RoofArrival.Step.values():
 			if step != RoofArrival.Step.DONE:
 				order.append(step)
-		assert_eq(seen, order, "сид %d: шаги по порядку" % building_seed)
-		assert_true(door_shut_in_flight, "сид %d: подлетает с закрытой дверью" % building_seed)
-		assert_true(swung, "сид %d: сброшенный трос качается" % building_seed)
+		assert_eq(seen, order, "seed %d: steps in order" % building_seed)
+		assert_true(door_shut_in_flight, "seed %d: approaches with the door shut" % building_seed)
+		assert_true(swung, "seed %d: dropped rope swings" % building_seed)
 		await level.wait_for_the_landing()
 		var landing := _landing(level)
 		assert_almost_eq(
-			_otto_at(level).x, landing.x, TOLERANCE, "сид %d: на месте" % building_seed
+			_otto_at(level).x, landing.x, TOLERANCE, "seed %d: in place" % building_seed
 		)
 		assert_almost_eq(
-			_otto_at(level).y, landing.y, TOLERANCE, "сид %d: на крыше" % building_seed
+			_otto_at(level).y, landing.y, TOLERANCE, "seed %d: on the roof" % building_seed
 		)
 		var helicopter := level.helicopter()
 		var frames := 0
@@ -494,9 +498,13 @@ func test_the_full_intro_plays_every_step_in_order() -> void:
 			helicopter = level.helicopter()
 		if helicopter != null:
 			assert_eq(
-				helicopter.door_share(), 0.0, "сид %d: уходит с закрытой дверью" % building_seed
+				helicopter.door_share(), 0.0, "seed %d: leaves with the door shut" % building_seed
 			)
-			assert_eq(helicopter.rope_length(), 0.0, "сид %d: и с выбранным тросом" % building_seed)
+			assert_eq(
+				helicopter.rope_length(),
+				0.0,
+				"seed %d: and with the rope reeled in" % building_seed
+			)
 		_drop(level)
 
 
@@ -510,7 +518,7 @@ func test_the_full_intro_takes_ten_to_twelve_seconds() -> void:
 		waits += 1
 	var frames := Engine.get_physics_frames() - start
 	var seconds := frames * Engine.time_scale / float(Engine.physics_ticks_per_second)
-	assert_between(seconds, 9.5, 12.5, "полное вступление идёт %.2f с" % seconds)
+	assert_between(seconds, 9.5, 12.5, "full intro lasts %.2f s" % seconds)
 	_drop(level)
 
 
@@ -519,10 +527,10 @@ func test_the_short_intro_starts_hovering_with_the_door_open() -> void:
 	var level := _build(2)
 	await wait_physics_frames(2)
 	var helicopter := level.helicopter()
-	assert_false(level.arrival().is_full(), "вступление короткое")
-	assert_true(helicopter.is_hovering(), "вертолёт уже висит")
-	assert_true(helicopter.door_share() >= 1.0, "и дверь открыта")
-	assert_true(level.otto.visible, "Otto виден в проёме")
+	assert_false(level.arrival().is_full(), "intro is short")
+	assert_true(helicopter.is_hovering(), "helicopter is already hovering")
+	assert_true(helicopter.door_share() >= 1.0, "and the door is open")
+	assert_true(level.otto.visible, "Otto is visible in the doorway")
 	_drop(level)
 
 
@@ -533,13 +541,13 @@ func test_the_pilot_sits_in_the_cockpit() -> void:
 	add_child_autofree(helicopter)
 	await wait_physics_frames(3)
 	var pilot := helicopter.find_child("Pilot", true, false) as FigureRig
-	assert_not_null(pilot, "пилот есть")
+	assert_not_null(pilot, "pilot present")
 	if pilot == null:
 		return
 	pilot.snap()
 	var box := pilot.skinned_aabb()
 	var at := pilot.global_transform * box
 	var hull := helicopter.hull_box()
-	assert_gt(at.position.y, hull.position.y, "ступни пилота выше днища")
-	assert_lt(at.end.y, hull.end.y, "голова пилота ниже крыши")
-	assert_gt(at.get_center().x, helicopter.doorway().x, "пилот впереди двери")
+	assert_gt(at.position.y, hull.position.y, "pilot's feet above the hull bottom")
+	assert_lt(at.end.y, hull.end.y, "pilot's head below the roof")
+	assert_gt(at.get_center().x, helicopter.doorway().x, "pilot ahead of the door")

@@ -28,10 +28,10 @@ func test_weather_follows_the_seed_and_varies() -> void:
 	for building_seed: int in range(1, 31):
 		var kind := Weather.of_seed(building_seed)
 		assert_eq(
-			Weather.of_seed(building_seed), kind, "сид %d: погода не повторилась" % building_seed
+			Weather.of_seed(building_seed), kind, "seed %d: weather did not repeat" % building_seed
 		)
 		seen[kind] = true
-	assert_eq(seen.size(), Weather.Kind.size(), "на тридцати зданиях выпала не всякая погода")
+	assert_eq(seen.size(), Weather.Kind.size(), "not every weather came up over thirty buildings")
 
 
 ## The city repeats by seed and differs between seeds.
@@ -39,8 +39,8 @@ func test_the_city_follows_the_seed() -> void:
 	var first := CityPlan.generate(1, 0.0, 40.0)
 	var again := CityPlan.generate(1, 0.0, 40.0)
 	var other := CityPlan.generate(2, 0.0, 40.0)
-	assert_eq(_fingerprint(first), _fingerprint(again), "тот же сид — тот же город")
-	assert_ne(_fingerprint(first), _fingerprint(other), "другой сид — другой город")
+	assert_eq(_fingerprint(first), _fingerprint(again), "same seed - same city")
+	assert_ne(_fingerprint(first), _fingerprint(other), "different seed - different city")
 
 
 ## Each row covers the full width of the building: otherwise the gap between houses
@@ -56,8 +56,8 @@ func test_every_row_covers_the_building() -> void:
 				continue
 			from = minf(from, block.x - block.width * 0.5)
 			to = maxf(to, block.x + block.width * 0.5)
-		assert_lt(from, 0.0, "ряд %d не доходит до левого края" % row)
-		assert_gt(to, width, "ряд %d не доходит до правого края" % row)
+		assert_lt(from, 0.0, "row %d does not reach the left edge" % row)
+		assert_gt(to, width, "row %d does not reach the right edge" % row)
 
 
 ## Lit windows lie on their own house's facade.
@@ -65,8 +65,8 @@ func test_lit_windows_stay_on_their_facade() -> void:
 	for block in CityPlan.generate(5, 0.0, 30.0):
 		var grid := CityPlan.window_grid(block)
 		for window: Vector2i in block.lit:
-			assert_between(window.x, 0, grid.x - 1, "окно за краем фасада по ширине")
-			assert_between(window.y, 0, grid.y - 1, "окно за краем фасада по высоте")
+			assert_between(window.x, 0, grid.x - 1, "window past the facade edge in width")
+			assert_between(window.y, 0, grid.y - 1, "window past the facade edge in height")
 
 
 ## Dressing does not take the place of a door, lamp, shaft, escalator or exit and
@@ -82,35 +82,35 @@ func test_props_keep_off_doors_lamps_shafts_and_walls() -> void:
 			total += dressing.props.size()
 			for prop in dressing.props:
 				var where := (
-					"навык %d, сид %d, этаж %d, x=%.1f"
+					"skill %d, seed %d, floor %d, x=%.1f"
 					% [skill, building_seed, prop.floor_index, prop.x]
 				)
-				assert_gt(prop.floor_index, BuildingRules.ROOF, where + ": обстановка на крыше")
+				assert_gt(prop.floor_index, BuildingRules.ROOF, where + ": furnishing on the roof")
 				assert_true(
 					plan.safe_spots(rules, prop.floor_index).has(prop.x),
-					where + ": предмет на шахте, эскалаторе или выходе"
+					where + ": prop on a shaft, escalator or exit"
 				)
 				for door in plan.doors:
 					if door.floor_index == prop.floor_index:
-						assert_gte(absf(door.x - prop.x), step * 0.5, where + ": на месте двери")
+						assert_gte(absf(door.x - prop.x), step * 0.5, where + ": at a door")
 				for lamp in plan.lamps:
 					if lamp.floor_index == prop.floor_index:
-						assert_gte(absf(lamp.x - prop.x), step * 0.5, where + ": под лампой")
+						assert_gte(absf(lamp.x - prop.x), step * 0.5, where + ": under a lamp")
 				# safe_spots does not reserve the escalator's lower landing: people stand on it.
 				for escalator in plan.escalators:
 					if escalator.floor_index + 1 == prop.floor_index:
 						var landing := escalator.x + escalator.towards * rules.escalator_run
 						assert_gte(
-							absf(landing - prop.x), step * 0.5, where + ": на площадке эскалатора"
+							absf(landing - prop.x), step * 0.5, where + ": on an escalator landing"
 						)
 				for wall in plan.walls:
 					if wall.floor_index == prop.floor_index:
 						assert_gte(
 							absf(wall.x - prop.x),
 							step * 0.5 + rules.inner_wall_width * 0.5,
-							where + ": вплотную к стене"
+							where + ": pressed against a wall"
 						)
-	assert_gt(total, 0, "ни одного предмета — проверять было нечего")
+	assert_gt(total, 0, "no props at all - nothing to check")
 
 
 ## The pipe is visible: it hangs below the band covered by the slab edge, and does not
@@ -127,11 +127,11 @@ func test_pipes_show_below_the_slab_edge_and_skip_what_they_would_cover() -> voi
 			var plan := BuildingPlan.generate(rules, building_seed)
 			var dressing := BuildingDressing.lay(rules, plan, building_seed, home)
 			for index: int in dressing.pipes:
-				var where := "навык %d, сид %d, этаж %d" % [skill, building_seed, index]
+				var where := "skill %d, seed %d, floor %d" % [skill, building_seed, index]
 				assert_gte(
 					BuildingProps.pipe_top(rules, index),
 					rules.story_top(index) + FloorSigns.hidden_band(front),
-					where + ": труба за кромкой перекрытия"
+					where + ": pipe past the slab edge"
 				)
 				var covered := _pipe_blockers(rules, plan, index)
 				for span: Vector2 in BuildingProps.pipe_spans(rules, plan, index):
@@ -139,9 +139,9 @@ func test_pipes_show_below_the_slab_edge_and_skip_what_they_would_cover() -> voi
 					for blocker: Vector2 in covered:
 						assert_true(
 							span.y <= blocker.x + 0.001 or span.x >= blocker.y - 0.001,
-							where + ": труба сквозь %s" % blocker
+							where + ": pipe through %s" % blocker
 						)
-	assert_gt(laid, 0, "ни одной трубы — проверять было нечего")
+	assert_gt(laid, 0, "no pipes at all - nothing to check")
 
 
 ## Sign neon, shaft indicator digits and the call button light do not carry the colours
@@ -163,7 +163,7 @@ func test_neon_signs_do_not_wear_the_colours_of_game_signs() -> void:
 			var gap := Vector3(
 				neon.r - sign_colour.r, neon.g - sign_colour.g, neon.b - sign_colour.b
 			)
-			assert_gt(gap.length(), 0.3, "вывеска %s похожа на огонёк %s" % [neon, sign_colour])
+			assert_gt(gap.length(), 0.3, "sign %s looks like the light %s" % [neon, sign_colour])
 
 
 ## Roof slopes are inside its walls, do not go onto the machine room and are below it.
@@ -176,26 +176,31 @@ func test_roof_steps_frame_the_machine_room() -> void:
 		var half_room := BuildingShafts.MACHINE_ROOM_SIZE.x * 0.5
 		var surface := rules.floor_surface(BuildingRules.ROOF)
 		var steps := BuildingRoof.steps(rules, plan)
-		assert_gt(steps.size(), 0, "сид %d: скатов нет" % building_seed)
+		assert_gt(steps.size(), 0, "seed %d: no ramps" % building_seed)
 		for rect in steps:
-			assert_gte(rect.position.x, bounds.x, "сид %d: скат за левой стеной" % building_seed)
+			assert_gte(
+				rect.position.x, bounds.x, "seed %d: ramp past the left wall" % building_seed
+			)
 			assert_lte(
-				rect.end.x, bounds.y + 0.001, "сид %d: скат за правой стеной" % building_seed
+				rect.end.x, bounds.y + 0.001, "seed %d: ramp past the right wall" % building_seed
 			)
 			assert_true(
 				(
 					rect.end.x <= shaft.x - half_room + 0.001
 					or rect.position.x >= shaft.x + half_room - 0.001
 				),
-				"сид %d: скат заходит на машинное отделение" % building_seed
+				"seed %d: ramp runs onto the machine room" % building_seed
 			)
 			assert_almost_eq(
-				rect.end.y, surface, 0.001, "сид %d: скат не стоит на настиле" % building_seed
+				rect.end.y,
+				surface,
+				0.001,
+				"seed %d: ramp does not stand on the deck" % building_seed
 			)
 			assert_lte(
 				rect.size.y,
 				BuildingShafts.MACHINE_ROOM_SIZE.y,
-				"сид %d: скат выше машинного отделения" % building_seed
+				"seed %d: ramp above the machine room" % building_seed
 			)
 
 
@@ -211,18 +216,18 @@ func test_scenery_adds_no_bodies_and_no_lights() -> void:
 	level.building_seed = 1
 	add_child_autofree(level)
 	var scenery := level.get_node_or_null("Scenery")
-	assert_not_null(scenery, "окружения нет")
+	assert_not_null(scenery, "no surroundings")
 	if scenery == null:
 		remove_child(level)
 		return
 	var bodies := scenery.find_children("*", "CollisionObject3D", true, false)
-	assert_eq(bodies.size(), 0, "у декора есть тела")
+	assert_eq(bodies.size(), 0, "the decor has bodies")
 	var lights: Array[Node] = []
 	for light in scenery.find_children("*", "Light3D", true, false):
 		if light.get_viewport() == level.get_viewport():
 			lights.append(light)
-	assert_eq(lights.size(), 2, "в окружении не два источника света")
-	assert_not_null(scenery.get_node_or_null("City"), "города нет")
+	assert_eq(lights.size(), 2, "the surroundings do not have two light sources")
+	assert_not_null(scenery.get_node_or_null("City"), "no city")
 	remove_child(level)
 
 
@@ -266,24 +271,24 @@ func test_the_car_parks_clear_of_shafts_and_the_exit() -> void:
 			var plan := BuildingPlan.generate(rules, building_seed)
 			var x := ExitCar.spot(plan.exit_x, rules, plan)
 			var car := Vector2(x - ExitCar.LENGTH * 0.5, x + ExitCar.LENGTH * 0.5)
-			var label := "навык %d, сид %d" % [skill, building_seed]
-			assert_between(plan.exit_x, car.x, car.y, "%s: выход не у машины" % label)
+			var label := "skill %d, seed %d" % [skill, building_seed]
+			assert_between(plan.exit_x, car.x, car.y, "%s: exit is not at the car" % label)
 			assert_between(
 				x,
 				bounds.x + BuildingShell.WALL_WIDTH + ExitCar.LENGTH * 0.5,
 				bounds.y - BuildingShell.WALL_WIDTH - ExitCar.LENGTH * 0.5,
-				"%s: машина в наружной стене" % label
+				"%s: car in the outer wall" % label
 			)
 			for shaft in plan.shafts:
 				if shaft.top > bottom or shaft.bottom < bottom:
 					continue
 				var shaft_half := rules.shaft_width * 0.5
 				var column := Vector2(shaft.x - shaft_half, shaft.x + shaft_half)
-				_assert_apart(car, column, "%s: машина перед шахтой x=%.1f" % [label, shaft.x])
+				_assert_apart(car, column, "%s: car in front of a shaft x=%.1f" % [label, shaft.x])
 			for wall in plan.walls:
 				if wall.floor_index == bottom:
 					_assert_apart(
-						car, wall.band(rules), "%s: машина в стене x=%.1f" % [label, wall.x]
+						car, wall.band(rules), "%s: car in a wall x=%.1f" % [label, wall.x]
 					)
 			for escalator in plan.escalators:
 				if escalator.floor_index != bottom - 1:
@@ -291,7 +296,7 @@ func test_the_car_parks_clear_of_shafts_and_the_exit() -> void:
 				var landing := escalator.x + escalator.towards * rules.escalator_run
 				var gap := escalator.gap(rules)
 				var run := Vector2(minf(gap.x, landing), maxf(gap.y, landing))
-				_assert_apart(car, run, "%s: машина на эскалаторе x=%.1f" % [label, escalator.x])
+				_assert_apart(car, run, "%s: car on an escalator x=%.1f" % [label, escalator.x])
 
 
 ## Segments [param a] and [param b] do not overlap (touching is allowed).
@@ -317,8 +322,8 @@ func test_the_cabin_walls_stand_on_its_floor() -> void:
 		var box := mesh.transform * mesh.mesh.get_aabb()
 		lowest = minf(lowest, box.position.y)
 		highest = maxf(highest, box.end.y)
-	assert_almost_eq(lowest, floor_top, 0.01, "стенки кабины висят над её полом")
-	assert_almost_eq(highest, roof_bottom, 0.01, "стенки кабины не доходят до крыши")
+	assert_almost_eq(lowest, floor_top, 0.01, "cab walls hang above its floor")
+	assert_almost_eq(highest, roof_bottom, 0.01, "cab walls do not reach the roof")
 	remove_child(car)
 
 
@@ -334,8 +339,8 @@ func test_quality_reaches_the_building_already_standing() -> void:
 	Graphics.broadcast(Graphics.Quality.LOW)
 	var low: Array[bool] = [air.ssr_enabled, air.ssao_enabled, air.volumetric_fog_enabled]
 	Graphics.broadcast(Graphics.Quality.HIGH)
-	assert_eq(low, [false, false, false] as Array[bool], "низкое качество не дошло до воздуха")
-	assert_true(air.ssr_enabled, "высокое качество не вернуло отражения")
+	assert_eq(low, [false, false, false] as Array[bool], "low quality did not reach the air")
+	assert_true(air.ssr_enabled, "high quality did not bring back reflections")
 	remove_child(level)
 
 
@@ -344,14 +349,14 @@ func test_quality_reaches_the_building_already_standing() -> void:
 func test_the_exit_floor_is_a_garage_without_doors() -> void:
 	for skill: int in SKILLS:
 		var rules := _rules(skill)
-		assert_eq(rules.doors_on(rules.floors - 1), 0, "навык %d: гараж с дверями" % skill)
+		assert_eq(rules.doors_on(rules.floors - 1), 0, "skill %d: garage with doors" % skill)
 		for building_seed: int in SEEDS:
 			var plan := BuildingPlan.generate(rules, building_seed)
 			for door in plan.doors:
 				assert_ne(
 					door.floor_index,
 					rules.floors - 1,
-					"навык %d, сид %d: дверь в гараже" % [skill, building_seed]
+					"skill %d, seed %d: door in the garage" % [skill, building_seed]
 				)
 
 
@@ -365,16 +370,16 @@ func test_roof_kit_stays_on_the_roof() -> void:
 	level.building_seed = 2
 	add_child_autofree(level)
 	var kit := level.get_node_or_null("Scenery/RoofKit")
-	assert_not_null(kit, "техники крыши нет")
+	assert_not_null(kit, "no roof equipment")
 	if kit == null:
 		return
 	var bounds := level.rules.floor_span(BuildingRules.ROOF)
 	var parts := kit.find_children("*", "VisualInstance3D", true, false)
-	assert_gt(parts.size(), 10, "на крыше почти ничего не стоит")
+	assert_gt(parts.size(), 10, "almost nothing stands on the roof")
 	for part: Node in parts:
 		var x := (part as Node3D).global_position.x
 		assert_between(
-			x, bounds.x - 0.1, bounds.y + 0.1, "деталь крыши за её стенами: %s" % part.name
+			x, bounds.x - 0.1, bounds.y + 0.1, "roof part past its walls: %s" % part.name
 		)
 	var models := 0
 	for child in kit.get_children():
@@ -383,8 +388,8 @@ func test_roof_kit_stays_on_the_roof() -> void:
 			continue
 		models += 1
 		var front := model.position.z + PropCatalog.bounds_of(model).end.z
-		assert_lte(front, RoofKit.FRONT_Z + 0.001, "%s выступает в плоскость игры" % model.name)
-	assert_gt(models, 3, "моделей на крыше почти нет")
+		assert_lte(front, RoofKit.FRONT_Z + 0.001, "%s sticks out into the play plane" % model.name)
+	assert_gt(models, 3, "almost no models on the roof")
 	remove_child(level)
 
 
@@ -397,13 +402,13 @@ func test_the_counterweight_goes_against_the_car() -> void:
 	detail.follow(0.0, 5.0)
 	var weight := detail._weight.global_position.y
 	detail.follow(20.0, 5.0)
-	assert_gt(weight, detail._weight.global_position.y, "кабина поднялась — противовес опустился")
+	assert_gt(weight, detail._weight.global_position.y, "cab went up - counterweight went down")
 	# The counterweight does not go above the shaft top: for a shaft to the roof the top is in the
 	# machine room, not above the ceiling of the top stop (M20 code review).
 	detail.set_top(21.0)
 	detail.follow(0.0, 5.0)
 	var weight_top := detail._weight.global_position.y + CarDetail.WEIGHT.y * 0.5
-	assert_lte(weight_top, 21.0 + 0.001, "противовес выше верха шахты")
+	assert_lte(weight_top, 21.0 + 0.001, "counterweight above the top of the shaft")
 	remove_child(detail)
 
 
@@ -413,10 +418,10 @@ func test_blood_respects_the_setting() -> void:
 	add_child(host)
 	Blood.enabled = false
 	Blood.spray(host, Vector3.ZERO, 1.0)
-	assert_eq(host.get_child_count(), 0, "выключенная кровь брызнула")
+	assert_eq(host.get_child_count(), 0, "disabled blood splattered")
 	Blood.enabled = true
 	Blood.spray(host, Vector3.ZERO, 1.0)
-	assert_eq(host.get_child_count(), 1, "включённая кровь не брызнула")
+	assert_eq(host.get_child_count(), 1, "enabled blood did not splatter")
 	remove_child(host)
 
 
@@ -429,5 +434,5 @@ func test_a_shot_lamp_throws_sparks() -> void:
 	host.add_child(lamp)
 	lamp.shoot_down()
 	var sparks := host.find_children("*", "Sparks", false, false)
-	assert_eq(sparks.size(), 1, "искр нет или больше одного выброса")
+	assert_eq(sparks.size(), 1, "no sparks or more than one burst")
 	remove_child(host)

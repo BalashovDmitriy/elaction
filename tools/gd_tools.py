@@ -63,8 +63,8 @@ def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--format", action="store_true", help="только формат")
-    parser.add_argument("--lint", action="store_true", help="только линт")
+    parser.add_argument("--format", action="store_true", help="format only")
+    parser.add_argument("--lint", action="store_true", help="lint only")
     args = parser.parse_args()
     wanted = [name for name, on in (("gdformat", args.format), ("gdlint", args.lint)) if on]
     wanted = wanted or list(TOOLS)
@@ -93,11 +93,11 @@ def main() -> int:
                 problems[tool].extend(lines)
     for tool in wanted:
         if tool in failed:
-            print(f"== {tool}: есть замечания ==")
+            print(f"== {tool}: issues found ==")
             for line in problems[tool]:
                 print(line)
         else:
-            print(f"== {tool}: {len(files)} файлов, замечаний нет ==")
+            print(f"== {tool}: {len(files)} files, no issues ==")
     return 1 if failed else 0
 
 

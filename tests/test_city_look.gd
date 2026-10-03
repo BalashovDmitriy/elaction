@@ -17,7 +17,7 @@ func test_every_time_and_weather_has_a_sky() -> void:
 	for time: int in TimeOfDay.Kind.size():
 		for weather: int in Weather.Kind.size():
 			var look := CitySky.look(time as TimeOfDay.Kind, weather as Weather.Kind)
-			assert_true(ResourceLoader.exists(look.path), "нет панорамы %s" % look.path)
+			assert_true(ResourceLoader.exists(look.path), "no panorama %s" % look.path)
 			assert_gt(CitySky.energy(time as TimeOfDay.Kind, weather as Weather.Kind), 0.0)
 
 
@@ -28,11 +28,11 @@ func test_night_is_darker_than_day() -> void:
 		assert_lt(
 			CitySky.energy(TimeOfDay.Kind.NIGHT, kind),
 			CitySky.energy(TimeOfDay.Kind.DAY, kind),
-			"погода %d: ночное небо не темнее дневного" % weather
+			"weather %d: night sky is not darker than the day sky" % weather
 		)
 		var moon := CitySky.light(TimeOfDay.Kind.NIGHT, kind)
 		var sun := CitySky.light(TimeOfDay.Kind.DAY, kind)
-		assert_lt(moon.light_energy, sun.light_energy, "луна не слабее солнца")
+		assert_lt(moon.light_energy, sun.light_energy, "moon is not weaker than the sun")
 		moon.free()
 		sun.free()
 
@@ -48,7 +48,7 @@ func test_the_sky_sun_sits_where_the_light_comes_from() -> void:
 			var shift := float(sky.get_shader_parameter("shift"))
 			var toward := TimeOfDay.sun_direction(kind)
 			var u := fposmod(atan2(toward.x, -toward.z) / TAU + shift, 1.0)
-			assert_almost_eq(u, look.azimuth / 360.0, 0.001, "время %d: солнце не на месте" % time)
+			assert_almost_eq(u, look.azimuth / 360.0, 0.001, "time %d: sun is out of place" % time)
 
 
 ## The city light looks away from the sun: it goes where the lamp's minus z looks.
@@ -67,31 +67,31 @@ func test_houses_take_styles_of_their_kind() -> void:
 		for block in CityPlan.generate(building_seed, 0.0, 40.0):
 			var custom := CityLook.building_custom(block)
 			var style := int(custom.r)
-			assert_has(CityLook.STYLES_OF[block.kind], style, "дом не своего стиля")
-			assert_between(custom.g, 0.0, 1.0, "сид дома вне 0–1")
+			assert_has(CityLook.STYLES_OF[block.kind], style, "house is not of its own style")
+			assert_between(custom.g, 0.0, 1.0, "house seed outside 0-1")
 
 
 ## The atlas the game draws with matches what `build_city.py` assembled.
 func test_the_atlas_matches_its_build() -> void:
 	var layout: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(LAYOUT))
-	assert_eq((layout["styles"] as Array).size(), CityLook.Style.size(), "стилей не столько")
+	assert_eq((layout["styles"] as Array).size(), CityLook.Style.size(), "wrong number of styles")
 	assert_eq(float(layout["density"]), CityLook.ATLAS_DENSITY)
 	assert_eq(float(layout["tile_width"]), CityLook.TILE_WIDTH)
 	var rows: Array = layout["rows"]
 	var heights: Array[float] = [CityLook.ROW_TOP, CityLook.ROW_FLOOR, CityLook.ROW_GROUND]
 	var total := 0.0
 	for index in rows.size():
-		assert_eq(float((rows[index] as Dictionary)["height"]), heights[index], "ряд %d" % index)
+		assert_eq(float((rows[index] as Dictionary)["height"]), heights[index], "row %d" % index)
 		total += heights[index]
 	var albedo := load("res://assets/textures/city/facade_albedo.png") as Texture2D
-	assert_eq(float(albedo.get_width()), CityLook.ATLAS_SIZE.x, "ширина атласа")
+	assert_eq(float(albedo.get_width()), CityLook.ATLAS_SIZE.x, "atlas width")
 	# A style column is a tile plus margins on the sides: without margins the distant mip mixed
 	# neighbouring styles and drew a line every 4 m (M24j code review).
-	assert_eq(float(layout["gutter"]), CityLook.GUTTER, "поле столбца")
-	assert_gt(CityLook.GUTTER, 0.0, "атлас без полей")
+	assert_eq(float(layout["gutter"]), CityLook.GUTTER, "column gutter")
+	assert_gt(CityLook.GUTTER, 0.0, "atlas without gutters")
 	var column := (CityLook.TILE_WIDTH + CityLook.GUTTER * 2.0) * CityLook.ATLAS_DENSITY
-	assert_eq(CityLook.ATLAS_SIZE.x, column * CityLook.Style.size(), "столбцы с полями")
-	assert_eq(float(albedo.get_height()), total * CityLook.ATLAS_DENSITY, "высота атласа")
+	assert_eq(CityLook.ATLAS_SIZE.x, column * CityLook.Style.size(), "columns with gutters")
+	assert_eq(float(albedo.get_height()), total * CityLook.ATLAS_DENSITY, "atlas height")
 
 
 ## The city is assembled on every combination: houses as one multimesh for the whole plan, the city
@@ -105,16 +105,20 @@ func test_the_city_builds_at_every_time() -> void:
 			add_child(city)
 			city.build(rules, 1, weather as Weather.Kind, time as TimeOfDay.Kind)
 			var houses := city.find_child("Buildings", true, false) as MultiMeshInstance3D
-			assert_not_null(houses, "время %d, погода %d: домов нет" % [time, weather])
+			assert_not_null(houses, "time %d, weather %d: no houses" % [time, weather])
 			if houses != null:
 				var blocks := CityPlan.generate(1, 0.0, rules.width)
-				assert_eq(houses.multimesh.instance_count, blocks.size(), "не все дома")
+				assert_eq(houses.multimesh.instance_count, blocks.size(), "not all houses")
 				if weather == Weather.Kind.CLEAR:
 					var look := (houses.multimesh.mesh as BoxMesh).material as ShaderMaterial
 					lit.append(float(look.get_shader_parameter("lit_share")))
 			var lights := city.find_children("*", "DirectionalLight3D", true, false)
-			assert_eq(lights.size(), 1, "у города не один свет неба")
+			assert_eq(lights.size(), 1, "the city does not have exactly one sky light")
 			city.queue_free()
 			await wait_physics_frames(1)
-	assert_lt(lit[TimeOfDay.Kind.DAY], lit[TimeOfDay.Kind.NIGHT], "днём окон горит не меньше")
-	assert_lt(lit[TimeOfDay.Kind.DAY], lit[TimeOfDay.Kind.EVENING], "днём окон горит не меньше")
+	assert_lt(
+		lit[TimeOfDay.Kind.DAY], lit[TimeOfDay.Kind.NIGHT], "windows lit by day are not fewer"
+	)
+	assert_lt(
+		lit[TimeOfDay.Kind.DAY], lit[TimeOfDay.Kind.EVENING], "windows lit by day are not fewer"
+	)

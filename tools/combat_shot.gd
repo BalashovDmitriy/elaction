@@ -77,7 +77,7 @@ func _run() -> void:
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	if _level == null:
 		# Most often this is an unregistered class_name: fixed by godot_check.py.
-		push_error("сцена уровня не собралась — проверьте импорт проекта")
+		push_error("the level scene did not build — check the project import")
 		get_tree().quit(1)
 		return
 	_level.rules = rules
@@ -167,7 +167,7 @@ func _stage(wanted: EnemyBrain.Stance, crouching: bool, label: String) -> void:
 
 	push_error(
 		(
-			"агент не встал в стойку %d за %d кадров: стойка %d, мёртв %s"
+			"agent did not reach stance %d within %d frames: stance %d, dead %s"
 			% [wanted, PATIENCE, _agent.stance(), _agent.is_dead()]
 		)
 	)

@@ -31,22 +31,22 @@ func test_a_fresh_door_is_shut() -> void:
 
 
 func test_a_door_left_alone_does_not_move() -> void:
-	assert_true(_run(_cycle(), 5.0).is_shut(), "никто не просил — никто и не открывал")
+	assert_true(_run(_cycle(), 5.0).is_shut(), "nobody asked - nobody opened")
 
 
 func test_the_door_needs_its_whole_travel_time() -> void:
 	var cycle := _cycle()
 	cycle.open()
-	assert_false(_run(cycle, TRAVEL * 0.5).is_open(), "на полпути дверь ещё не открыта")
-	assert_true(_run(cycle, TRAVEL * 0.5).is_open(), "к концу хода — открыта")
+	assert_false(_run(cycle, TRAVEL * 0.5).is_open(), "halfway the door is not open yet")
+	assert_true(_run(cycle, TRAVEL * 0.5).is_open(), "by the end of the travel - open")
 
 
 func test_openness_grows_with_the_travel() -> void:
 	var cycle := _cycle()
 	cycle.open()
 	var half := _run(cycle, TRAVEL * 0.5).openness()
-	assert_almost_eq(half, 0.5, 0.001, "ход считается долей времени")
-	assert_almost_eq(_run(cycle, TRAVEL).openness(), 1.0, 0.001, "дальше настежь не бывает")
+	assert_almost_eq(half, 0.5, 0.001, "the travel is counted as a fraction of time")
+	assert_almost_eq(_run(cycle, TRAVEL).openness(), 1.0, 0.001, "never more than wide open")
 
 
 func test_a_closing_door_comes_back_to_shut() -> void:
@@ -54,7 +54,7 @@ func test_a_closing_door_comes_back_to_shut() -> void:
 	cycle.open()
 	_run(cycle, TRAVEL)
 	cycle.close()
-	assert_false(_run(cycle, TRAVEL * 0.5).is_shut(), "на полпути обратно ещё не закрыта")
+	assert_false(_run(cycle, TRAVEL * 0.5).is_shut(), "halfway back it is not shut yet")
 	assert_true(_run(cycle, TRAVEL * 0.5).is_shut())
 	assert_eq(cycle.openness(), 0.0)
 
@@ -65,7 +65,7 @@ func test_closing_starts_from_where_the_door_stood() -> void:
 	_run(cycle, TRAVEL * 0.5)
 	cycle.close()
 	# It went half its travel — it returns the same amount, not the whole way anew.
-	assert_true(_run(cycle, TRAVEL * 0.5).is_shut(), "закрывается ровно с того места")
+	assert_true(_run(cycle, TRAVEL * 0.5).is_shut(), "it closes from exactly that spot")
 
 
 func test_opening_an_open_door_changes_nothing() -> void:
@@ -73,7 +73,7 @@ func test_opening_an_open_door_changes_nothing() -> void:
 	cycle.open()
 	_run(cycle, TRAVEL)
 	cycle.open()
-	assert_true(cycle.is_open(), "открытая дверь не начинает открываться заново")
+	assert_true(cycle.is_open(), "an open door does not start opening again")
 	assert_eq(cycle.openness(), 1.0)
 
 
@@ -81,7 +81,7 @@ func test_closing_a_shut_door_changes_nothing() -> void:
 	var cycle := _cycle()
 	cycle.close()
 	assert_true(cycle.is_shut())
-	assert_eq(cycle.openness(), 0.0, "закрытой некуда закрываться")
+	assert_eq(cycle.openness(), 0.0, "a shut door has nowhere to close")
 
 
 func test_a_door_can_turn_back_before_it_opened() -> void:
@@ -91,7 +91,7 @@ func test_a_door_can_turn_back_before_it_opened() -> void:
 	cycle.close()
 	_run(cycle, TRAVEL * 0.25)
 	cycle.open()
-	assert_true(_run(cycle, TRAVEL).is_open(), "передумала на полпути — всё равно дойдёт")
+	assert_true(_run(cycle, TRAVEL).is_open(), "changed its mind halfway - it still gets there")
 
 
 func test_a_door_without_travel_time_is_instant() -> void:
@@ -99,4 +99,4 @@ func test_a_door_without_travel_time_is_instant() -> void:
 	cycle.travel_time = 0.0
 	cycle.open()
 	cycle.tick(STEP)
-	assert_true(cycle.is_open(), "нулевое время хода — мгновенная дверь, а не деление на ноль")
+	assert_true(cycle.is_open(), "zero travel time - an instant door, not a division by zero")

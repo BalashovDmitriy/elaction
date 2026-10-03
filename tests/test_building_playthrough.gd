@@ -206,7 +206,7 @@ func test_a_tick_is_two_physics_frames() -> void:
 	# frame.
 	var before := Engine.get_physics_frames()
 	await _tick()
-	assert_eq(int(Engine.get_physics_frames() - before), 2, "шаг петли бота — два физических кадра")
+	assert_eq(int(Engine.get_physics_frames() - before), 2, "bot loop step is two physics frames")
 
 
 func before_all() -> void:
@@ -240,13 +240,13 @@ func test_bot_finishes_every_building() -> void:
 		assert_eq(
 			game.documents_collected,
 			game.documents_total,
-			"сид %d: выход сработал, но документы не собраны" % building_seed
+			"seed %d: exit worked but documents not collected" % building_seed
 		)
 
 		assert_true(
 			cleared[0],
 			(
-				"сид %d: бот не прошёл за %d кадров. Этаж %d, жизней %d, мёртв: %s"
+				"seed %d: bot did not finish in %d frames. Floor %d, lives %d, dead: %s"
 				% [
 					building_seed,
 					FRAME_BUDGET,
@@ -302,24 +302,24 @@ func _play_tall(building_seed: int) -> void:
 	bot.release()
 
 	assert_false(
-		watchdog.tripped, "сид %d: %s" % [building_seed, watchdog.report(level, bot, deepest)]
+		watchdog.tripped, "seed %d: %s" % [building_seed, watchdog.report(level, bot, deepest)]
 	)
 	assert_true(
 		cleared[0],
 		(
-			"сид %d: бот не прошёл за %d кадров, ниже всего этаж %d из %d"
+			"seed %d: bot did not finish in %d frames, deepest floor %d of %d"
 			% [building_seed, TALL_BUDGET, deepest, level.rules.floors - 1]
 		)
 	)
 	assert_eq(
 		game.documents_collected,
 		game.documents_total,
-		"сид %d: документы собраны не все" % building_seed
+		"seed %d: not all documents collected" % building_seed
 	)
 	# The bot shoots down lamps from a cab (ADR-0053, decision 4): without this the run would not check
 	# darkness at all.
-	assert_gt(bot.lamp_shots, 0, "сид %d: бот ни разу не выстрелил по лампе" % building_seed)
-	assert_lt(level.lamps().size(), lamps_before, "сид %d: ни одна лампа не упала" % building_seed)
+	assert_gt(bot.lamp_shots, 0, "seed %d: bot never shot a lamp" % building_seed)
+	assert_lt(level.lamps().size(), lamps_before, "seed %d: no lamp fell" % building_seed)
 	_drop(level)
 
 
@@ -395,7 +395,7 @@ func _play_guarded(building_seed: int) -> void:
 	RunLog.close()
 
 	assert_false(
-		watchdog.tripped, "сид %d: %s" % [building_seed, watchdog.report(level, bot, deepest)]
+		watchdog.tripped, "seed %d: %s" % [building_seed, watchdog.report(level, bot, deepest)]
 	)
 
 	# The numbers are always printed, not only on failure: they show where the difficulty creeps from
@@ -403,7 +403,7 @@ func _play_guarded(building_seed: int) -> void:
 	# without numbers would only tell that the threshold has not been crossed yet.
 	gut.p(
 		(
-			"сид %d: смертей %d, шагов %d, документы %d/%d"
+			"seed %d: deaths %d, steps %d, documents %d/%d"
 			% [building_seed, deaths, frames, game.documents_collected, game.documents_total]
 		)
 	)
@@ -411,18 +411,21 @@ func _play_guarded(building_seed: int) -> void:
 	assert_true(
 		cleared[0],
 		(
-			"сид %d: бой не пройден за %d шагов. Этаж %d из %d, смертей %d"
+			"seed %d: combat not finished in %d steps. Floor %d of %d, deaths %d"
 			% [building_seed, frames, deepest, level.rules.floors - 1, deaths]
 		)
 	)
 	assert_eq(
 		game.documents_collected,
 		game.documents_total,
-		"сид %d: документы собраны не все" % building_seed
+		"seed %d: not all documents collected" % building_seed
 	)
 	assert_lte(
 		deaths,
 		DEATHS_ALLOWED,
-		"сид %d: бой стоил %d смертей при пороге %d" % [building_seed, deaths, DEATHS_ALLOWED]
+		(
+			"seed %d: combat cost %d deaths with a threshold of %d"
+			% [building_seed, deaths, DEATHS_ALLOWED]
+		)
 	)
 	_drop(level)

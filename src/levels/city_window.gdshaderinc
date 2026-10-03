@@ -1,26 +1,26 @@
-// Окно города (M24a, ADR-0037, решение 4): рама и переплёт, а за стеклом —
-// жизнь. Горящее окно — свет с потолка и лампа, жалюзи, шторы, человек в
-// комнате, мерцание телевизора или лампы дневного света; погасшее — тёмное
-// стекло с отражённым небом и косым бликом.
+// A city window (M24a, ADR-0037, decision 4): a frame and mullions, and life behind
+// the glass. A lit window — ceiling light and a lamp, blinds, curtains, a person in
+// the room, the flicker of a TV or a fluorescent tube; a dark one — dark glass
+// with the reflected sky and a slanted glint.
 //
-// Что за окном, решает жребий окна ([CityLook.window_custom]), а не шейдер:
-// город по сиду повторяется до окна. Пишет в него [CityBackdrop].
+// What is behind the window is decided by the window's lot ([CityLook.window_custom]),
+// not by the shader: the city repeats by seed down to the window. [CityBackdrop] writes it.
 //
-// INSTANCE_CUSTOM: x — жребий окна 0–1, y — что за стеклом ([CityLook.Inside]),
-// z — переплёт (0 — нет, 1 — стойка, 2 — крест), w — горит ли окно.
+// INSTANCE_CUSTOM: x — the window's lot 0–1, y — what is behind the glass
+// ([CityLook.Inside]), z — mullions (0 — none, 1 — a post, 2 — a cross), w — whether lit.
 
 uniform vec3 frame_colour : source_color = vec3(0.012, 0.014, 0.02);
-// Вспышка молнии: погасшие стёкла загораются отражённым небом.
+// Lightning flash: dark panes light up with the reflected sky.
 uniform float flash = 0.0;
 uniform vec3 flash_colour : source_color = vec3(0.55, 0.6, 0.75);
-// Окна включаются и выключаются (M24g, ADR-0043, решение 6): такая доля окон
-// по своему жребию раз в свой период меняет состояние — горящее гаснет, тёмное
-// загорается. Период — от половины до полутора [code]switch_period[/code], с.
+// Windows switch on and off (M24g, ADR-0043, decision 6): this share of windows, by
+// their own lot, changes state once per their own period — a lit one goes dark, a dark
+// one lights up. The period is from half to one and a half [code]switch_period[/code], s.
 uniform float switch_share = 0.14;
 uniform float switch_period = 40.0;
-// Чем загорается погасшее окно: у него своего цвета комнаты нет.
+// What a dark window lights up with: it has no room colour of its own.
 uniform vec3 switch_tone : source_color = vec3(0.95, 0.72, 0.42);
-// Во сколько темнее своего света стекло погасшего окна.
+// How many times darker than its own light the glass of a dark window is.
 const float SWITCHED_OFF = 0.06;
 
 varying vec4 custom;
@@ -35,14 +35,14 @@ float hash1(float n) {
 	return fract(sin(n) * 43758.5453123);
 }
 
-// Полоса шириной [param width] вокруг нуля, сглаженная по экрану.
+// A band of [param width] around zero, smoothed in screen space.
 float bar(float distance, float width) {
 	float blur = fwidth(distance);
 	return 1.0 - smoothstep(width, width + blur * 1.5, abs(distance));
 }
 
-// Переключено ли окно сейчас: 1 — наоборот своему состоянию. Жребий окна —
-// его, а не кадра: город по сиду повторяется и в том, кто когда гасит свет.
+// Whether the window is switched now: 1 — opposite to its own state. The lot is the
+// window's, not the frame's: the city repeats by seed even in who turns the light off when.
 float switched(float seed) {
 	if (hash1(seed * 91.7) > switch_share) {
 		return 0.0;
@@ -54,7 +54,7 @@ float switched(float seed) {
 
 vec3 lit_room(vec2 uv, float seed, float inside, vec3 light) {
 	vec3 c = light;
-	// Свет с потолка и пятно лампы: комната, а не заливка.
+	// Ceiling light and a lamp's spot: a room, not a flat fill.
 	float ceiling = mix(1.2, 0.72, uv.y);
 	float lamp_x = mix(0.25, 0.75, fract(seed * 7.13));
 	float lamp = exp(-pow((uv.x - lamp_x) * 3.2, 2.0) - pow((uv.y - 0.1) * 3.0, 2.0)) * 0.45;
@@ -63,13 +63,13 @@ vec3 lit_room(vec2 uv, float seed, float inside, vec3 light) {
 		return c;
 	}
 	if (inside < 1.5) {
-		// Жалюзи, опущенные до своей высоты.
+		// Blinds lowered to their own height.
 		float drawn = mix(0.3, 1.0, fract(seed * 13.7));
 		float slat = 0.5 + 0.5 * step(0.42, fract(uv.y * 15.0));
 		return c * (uv.y < drawn ? slat * 0.85 : 1.0);
 	}
 	if (inside < 2.5) {
-		// Шторы по бокам со складками, тёплые на просвет.
+		// Curtains at the sides with folds, warm against the light.
 		float open = mix(0.12, 0.38, fract(seed * 5.31));
 		float edge = min(uv.x, 1.0 - uv.x);
 		float drape = 1.0 - smoothstep(open - 0.04, open, edge);
@@ -78,7 +78,7 @@ vec3 lit_room(vec2 uv, float seed, float inside, vec3 light) {
 		return mix(c, cloth * fold, drape);
 	}
 	if (inside < 3.5) {
-		// Человек в комнате: голова и плечи против света.
+		// A person in the room: head and shoulders against the light.
 		float px = mix(0.3, 0.7, fract(seed * 11.3));
 		float head = 1.0 - smoothstep(0.075, 0.095, length((uv - vec2(px, 0.46)) * vec2(1.0, 0.8)));
 		float shoulders = 1.0 - smoothstep(0.17, 0.19, abs(uv.x - px) + max(0.62 - uv.y, 0.0) * 3.0);
@@ -86,20 +86,20 @@ vec3 lit_room(vec2 uv, float seed, float inside, vec3 light) {
 		return c * (1.0 - 0.82 * body);
 	}
 	if (inside < 4.5) {
-		// Телевизор: голубой свет, который дышит и перескакивает.
+		// A TV: blue light that breathes and jumps.
 		float t = TIME * (4.0 + seed * 3.0);
 		float flick = 0.6 + 0.2 * sin(t) * sin(t * 2.7 + seed * 20.0);
 		flick += 0.25 * hash1(floor(TIME * 5.0) + seed * 100.0);
 		return mix(c * 0.3, vec3(0.42, 0.6, 1.0) * flick, 0.75);
 	}
-	// Лампа дневного света, которая вот-вот перегорит.
+	// A fluorescent tube about to burn out.
 	float on = step(0.1, hash1(floor(TIME * 9.0) + seed * 57.0));
 	return mix(vec3(0.82, 0.93, 1.0), c, 0.35) * mix(0.2, 1.0, on);
 }
 
 vec3 dark_glass(vec2 uv, float seed, vec3 base) {
 	vec3 c = base;
-	// Небо в стекле сверху и косой блик.
+	// Sky in the glass at the top and a slanted glint.
 	c += vec3(0.018, 0.022, 0.034) * (1.0 - uv.y);
 	float sheen = 1.0 - smoothstep(0.0, 0.08, abs(uv.x + uv.y * 0.6 - fract(seed * 3.7) * 1.6));
 	c += vec3(0.02, 0.024, 0.036) * sheen;
@@ -110,8 +110,8 @@ void fragment() {
 	vec2 uv = UV;
 	float seed = custom.x;
 	float lit = custom.w;
-	// Окно мельче десятка пикселей — рама и переплёт тают: тонкие линии
-	// мерцали бы на ходу камеры.
+	// A window smaller than ten pixels loses its frame and mullions: thin lines
+	// would shimmer as the camera moves.
 	float detail = 1.0 - smoothstep(0.05, 0.14, max(fwidth(uv.x), fwidth(uv.y)));
 	vec2 edge = min(uv, 1.0 - uv);
 	float frame = 1.0 - smoothstep(0.06, 0.06 + fwidth(uv.x) * 1.5, min(edge.x * 1.25, edge.y));
@@ -126,9 +126,9 @@ void fragment() {
 	if (switched(seed) > 0.5) {
 		lit = 1.0 - lit;
 	}
-	// Своё горящее окно светит своим цветом, загоревшееся тёмное — тёплым.
+	// A window lit by itself shines its own colour, a dark one that lit up — warm.
 	vec3 light = was_lit > 0.5 ? tone : switch_tone;
-	// Погасшее своё горящее — тёмное стекло, а не комната его цвета.
+	// A lit one that went dark is dark glass, not a room of its colour.
 	vec3 base = was_lit > 0.5 ? tone * SWITCHED_OFF : tone;
 	vec3 glass = lit > 0.5 ? lit_room(uv, seed, custom.y, light) : dark_glass(uv, seed, base);
 	float cover = max(frame, bars) * detail;

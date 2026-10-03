@@ -31,32 +31,30 @@ func test_defaults_match_the_first_keys_of_the_project() -> void:
 				key = (event as InputEventKey).physical_keycode
 			if event is InputEventJoypadButton and pad < 0:
 				pad = (event as InputEventJoypadButton).button_index
-		assert_eq(key, int(KeyBindings.DEFAULT_KEYS[action]), "%s: клавиша проекта" % action)
-		assert_eq(pad, int(KeyBindings.DEFAULT_PADS[action]), "%s: кнопка проекта" % action)
+		assert_eq(key, int(KeyBindings.DEFAULT_KEYS[action]), "%s: project key" % action)
+		assert_eq(pad, int(KeyBindings.DEFAULT_PADS[action]), "%s: project button" % action)
 
 
 func test_a_free_key_is_simply_bound() -> void:
 	var bindings := KeyBindings.new()
-	assert_true(bindings.bind_key(&"jump", KEY_C), "свободная клавиша берётся")
-	assert_eq(bindings.key_of(&"jump"), KEY_C, "прыжок на C")
-	assert_false(bindings.is_default(), "схема уже не по умолчанию")
+	assert_true(bindings.bind_key(&"jump", KEY_C), "a free key is taken")
+	assert_eq(bindings.key_of(&"jump"), KEY_C, "jump on C")
+	assert_false(bindings.is_default(), "the scheme is no longer the default")
 
 
 func test_a_taken_key_swaps_places() -> void:
 	var bindings := KeyBindings.new()
 	var old_jump := bindings.key_of(&"jump")
-	assert_true(bindings.bind_key(&"jump", bindings.key_of(&"shoot")), "занятая берётся")
-	assert_eq(
-		bindings.key_of(&"jump"), KeyBindings.DEFAULT_KEYS[&"shoot"], "прыжок на клавише выстрела"
-	)
-	assert_eq(bindings.key_of(&"shoot"), old_jump, "выстрел — на прежней клавише прыжка")
+	assert_true(bindings.bind_key(&"jump", bindings.key_of(&"shoot")), "a taken one is taken too")
+	assert_eq(bindings.key_of(&"jump"), KeyBindings.DEFAULT_KEYS[&"shoot"], "jump on the shoot key")
+	assert_eq(bindings.key_of(&"shoot"), old_jump, "shoot - on the old jump key")
 
 
 func test_a_taken_pad_button_swaps_places() -> void:
 	var bindings := KeyBindings.new()
-	assert_true(bindings.bind_pad(&"shoot", JOY_BUTTON_A), "кнопка прыжка на выстрел")
-	assert_eq(bindings.pad_of(&"shoot"), JOY_BUTTON_A, "выстрел на A")
-	assert_eq(bindings.pad_of(&"jump"), JOY_BUTTON_X, "прыжок — на прежней кнопке выстрела")
+	assert_true(bindings.bind_pad(&"shoot", JOY_BUTTON_A), "jump button given to shoot")
+	assert_eq(bindings.pad_of(&"shoot"), JOY_BUTTON_A, "shoot on A")
+	assert_eq(bindings.pad_of(&"jump"), JOY_BUTTON_X, "jump - on the old shoot button")
 
 
 func test_no_action_is_ever_left_without_a_key() -> void:
@@ -68,22 +66,22 @@ func test_no_action_is_ever_left_without_a_key() -> void:
 		bindings.bind_key(KeyBindings.ACTIONS[step % KeyBindings.ACTIONS.size()], keys[step])
 	var seen := {}
 	for action: StringName in KeyBindings.ACTIONS:
-		assert_ne(bindings.key_of(action), KEY_NONE, "%s с клавишей" % action)
+		assert_ne(bindings.key_of(action), KEY_NONE, "%s has a key" % action)
 		seen[bindings.key_of(action)] = true
-	assert_eq(seen.size(), KeyBindings.ACTIONS.size(), "и все клавиши разные")
+	assert_eq(seen.size(), KeyBindings.ACTIONS.size(), "and all keys are different")
 
 
 func test_pause_and_screenshot_keys_are_not_taken() -> void:
 	var bindings := KeyBindings.new()
-	assert_false(bindings.bind_key(&"jump", KEY_ESCAPE), "Esc — пауза, не отдаётся")
-	assert_false(bindings.bind_key(&"jump", KEY_F12), "F12 — скриншот")
-	assert_false(bindings.bind_pad(&"jump", JOY_BUTTON_START), "Start — пауза")
-	assert_true(bindings.is_default(), "схема не тронута")
+	assert_false(bindings.bind_key(&"jump", KEY_ESCAPE), "Esc is pause, not given away")
+	assert_false(bindings.bind_key(&"jump", KEY_F12), "F12 is the screenshot")
+	assert_false(bindings.bind_pad(&"jump", JOY_BUTTON_START), "Start is pause")
+	assert_true(bindings.is_default(), "the scheme is untouched")
 
 
 func test_pause_is_not_rebindable() -> void:
 	var bindings := KeyBindings.new()
-	assert_false(bindings.bind_key(&"pause", KEY_P), "паузу не переназначить")
+	assert_false(bindings.bind_key(&"pause", KEY_P), "pause cannot be rebound")
 
 
 func test_reset_restores_the_defaults() -> void:
@@ -91,7 +89,7 @@ func test_reset_restores_the_defaults() -> void:
 	bindings.bind_key(&"jump", KEY_C)
 	bindings.bind_pad(&"shoot", JOY_BUTTON_Y)
 	bindings.reset()
-	assert_true(bindings.is_default(), "после сброса — по умолчанию")
+	assert_true(bindings.is_default(), "after a reset - the default")
 
 
 func test_the_scheme_survives_a_save_and_load() -> void:
@@ -101,8 +99,8 @@ func test_the_scheme_survives_a_save_and_load() -> void:
 	var file := ConfigFile.new()
 	bindings.write_to(file)
 	var loaded := KeyBindings.read_from(file)
-	assert_eq(loaded.key_of(&"move_left"), KEY_A, "клавиша прочитана")
-	assert_eq(loaded.pad_of(&"jump"), JOY_BUTTON_B, "кнопка прочитана")
+	assert_eq(loaded.key_of(&"move_left"), KEY_A, "key was read")
+	assert_eq(loaded.pad_of(&"jump"), JOY_BUTTON_B, "button was read")
 
 
 func test_a_broken_file_falls_back_to_defaults() -> void:
@@ -110,10 +108,10 @@ func test_a_broken_file_falls_back_to_defaults() -> void:
 	KeyBindings.new().write_to(file)
 	# Two keys in one slot: the file does not write it that way, but it can be edited by hand.
 	file.set_value(KeyBindings.SECTION, "key_jump", KEY_X)
-	assert_true(KeyBindings.read_from(file).is_default(), "дубль — схема по умолчанию")
+	assert_true(KeyBindings.read_from(file).is_default(), "a duplicate - the default scheme")
 	file.set_value(KeyBindings.SECTION, "key_jump", KEY_ESCAPE)
-	assert_true(KeyBindings.read_from(file).is_default(), "закреплённая — тоже")
-	assert_true(KeyBindings.read_from(ConfigFile.new()).is_default(), "нет секции — тоже")
+	assert_true(KeyBindings.read_from(file).is_default(), "a reserved one - also")
+	assert_true(KeyBindings.read_from(ConfigFile.new()).is_default(), "no section - also")
 
 
 func test_apply_leaves_one_key_one_button_and_the_stick() -> void:
@@ -126,13 +124,13 @@ func test_apply_leaves_one_key_one_button_and_the_stick() -> void:
 	for event: InputEvent in InputMap.action_get_events(&"move_left"):
 		if event is InputEventKey:
 			keys += 1
-			assert_eq((event as InputEventKey).physical_keycode, KEY_A, "клавиша — назначенная")
-			assert_eq(event.device, KeyBindings.ALL_DEVICES, "клавиша с любой клавиатуры")
+			assert_eq((event as InputEventKey).physical_keycode, KEY_A, "key is the assigned one")
+			assert_eq(event.device, KeyBindings.ALL_DEVICES, "key from any keyboard")
 		elif event is InputEventJoypadButton:
 			buttons += 1
-			assert_eq(event.device, KeyBindings.ALL_DEVICES, "кнопка с любого геймпада")
+			assert_eq(event.device, KeyBindings.ALL_DEVICES, "button from any gamepad")
 		elif event is InputEventJoypadMotion:
 			axes += 1
-	assert_eq(keys, 1, "одна клавиша")
-	assert_eq(buttons, 1, "одна кнопка")
-	assert_eq(axes, 1, "и стик на месте")
+	assert_eq(keys, 1, "one key")
+	assert_eq(buttons, 1, "one button")
+	assert_eq(axes, 1, "and the stick is in place")

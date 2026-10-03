@@ -18,7 +18,7 @@ func test_crouch_holds_while_there_is_no_headroom() -> void:
 	var machine := OttoStateMachine.new()
 	machine.update(_snapshot(0.0, true), true, 0.0)
 	var blocked := machine.update(_snapshot(), true, 0.0, false)
-	assert_eq(blocked, OttoStateMachine.State.CROUCH, "встать некуда — остаёмся в приседе")
+	assert_eq(blocked, OttoStateMachine.State.CROUCH, "nowhere to stand up — stay crouched")
 
 
 func test_stands_up_once_headroom_appears() -> void:

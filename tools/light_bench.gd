@@ -67,7 +67,7 @@ func _ready() -> void:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
 	if level == null:
-		push_error("сцена уровня не собралась — проверьте импорт проекта")
+		push_error("the level scene did not build — check the project import")
 		get_tree().quit(1)
 		return
 	level.rules = BuildingRules.new()
@@ -180,8 +180,8 @@ func _run_whole(level: GreyboxLevel) -> void:
 		print(
 			(
 				(
-					"  уровень %d: GPU %.2f мс в среднем, худший %.2f на этаже %s, крыша %.2f,"
-					+ " бюджет %.1f"
+					"  level %d: GPU %.2f ms on average, worst %.2f on floor %s, roof %.2f,"
+					+ " budget %.1f"
 				)
 				% [
 					quality,
@@ -217,8 +217,8 @@ func _run_floors(level: GreyboxLevel) -> void:
 	for _frame in 60:
 		await get_tree().process_frame
 	var rules := level.rules
-	print("  окно %s, уровень %d" % [str(get_viewport().get_visible_rect().size), quality])
-	print("  этаж  GPU мс  CPU мс  кадр мс  светит  с тенью  вызовов")
+	print("  window %s, level %d" % [str(get_viewport().get_visible_rect().size), quality])
+	print("  floor  GPU ms  CPU ms  frame ms  lit  shadowed  calls")
 	for index in range(BuildingRules.ROOF, rules.floors):
 		level.otto.global_position = WorldSpace.to_scene(
 			Vector2(level.plan().safe_x(rules, index), rules.floor_surface(index))
@@ -310,7 +310,7 @@ func _run_probe(level: GreyboxLevel) -> void:
 		environment = (found[0] as WorldEnvironment).environment if not found.is_empty() else null
 	print(
 		(
-			"  этаж %d, окно %s, трупов %d (застыли %d), физика %.2f мс"
+			"  floor %d, window %s, corpses %d (frozen %d), physics %.2f ms"
 			% [
 				number,
 				str(get_viewport().get_visible_rect().size),
@@ -320,9 +320,9 @@ func _run_probe(level: GreyboxLevel) -> void:
 			]
 		)
 	)
-	print("  %-26s  GPU мс  вызовов  физика мс" % "что выключено")
-	await _probe_line(viewport, "ничего", func(_on: bool) -> void: pass)
-	await _probe_line(viewport, "ничего, ещё раз", func(_on: bool) -> void: pass)
+	print("  %-26s  GPU ms  calls  physics ms" % "what is off")
+	await _probe_line(viewport, "nothing", func(_on: bool) -> void: pass)
+	await _probe_line(viewport, "nothing, again", func(_on: bool) -> void: pass)
 	if OS.get_cmdline_user_args().has("--scripts"):
 		var by_script: Dictionary = {}
 		for node: Node in get_tree().root.find_children("*", "Node", true, false):
@@ -333,8 +333,8 @@ func _run_probe(level: GreyboxLevel) -> void:
 			if not by_script.has(key):
 				by_script[key] = []
 			(by_script[key] as Array).append(node)
-		print("  %-30s  узлов  физика мс (цикл 240 кадров)" % "скрипт")
-		print("  %-30s  %5d  %6.2f" % ["всё включено", 0, await _physics_over(240)])
+		print("  %-30s  nodes  physics ms (240-frame cycle)" % "script")
+		print("  %-30s  %5d  %6.2f" % ["all on", 0, await _physics_over(240)])
 		for key: String in by_script:
 			var nodes: Array = by_script[key]
 			for node: Node in nodes:
@@ -344,7 +344,7 @@ func _run_probe(level: GreyboxLevel) -> void:
 				if is_instance_valid(node):
 					node.set_physics_process(true)
 			print("  %-30s  %5d  %6.2f" % [key, nodes.size(), spent])
-		print("  %-30s  %5d  %6.2f" % ["всё включено", 0, await _physics_over(240)])
+		print("  %-30s  %5d  %6.2f" % ["all on", 0, await _physics_over(240)])
 		get_tree().quit(0)
 		return
 	if OS.get_cmdline_user_args().has("--timeline"):
@@ -362,7 +362,7 @@ func _run_probe(level: GreyboxLevel) -> void:
 					moving += 1
 			print(
 				(
-					"  %5.1f с  физика %6.2f  GPU %6.2f  едут %2d из %d  тел %d"
+					"  %5.1f s  physics %6.2f  GPU %6.2f  moving %2d of %d  bodies %d"
 					% [
 						Time.get_ticks_msec() / 1000.0,
 						physics / 30.0,
@@ -380,7 +380,7 @@ func _run_probe(level: GreyboxLevel) -> void:
 		for _pass in 2:
 			await _probe_line(
 				viewport,
-				"зоны кабин",
+				"cab zones",
 				func(on: bool) -> void:
 					for car: Node in cars:
 						for area: Node in car.find_children("*", "Area3D", false, false):
@@ -388,7 +388,7 @@ func _run_probe(level: GreyboxLevel) -> void:
 			)
 			await _probe_line(
 				viewport,
-				"тела кабин",
+				"cab bodies",
 				func(on: bool) -> void:
 					for car: Node in cars:
 						for shape: Node in car.find_children("*", "CollisionShape3D", false, false):
@@ -396,12 +396,12 @@ func _run_probe(level: GreyboxLevel) -> void:
 			)
 			await _probe_line(
 				viewport,
-				"маска кабин 0",
+				"cab mask 0",
 				func(on: bool) -> void:
 					for car: Node in cars:
 						(car as ElevatorCar).collision_mask = 1 if on else 0
 			)
-			await _probe_line(viewport, "ничего", func(_on: bool) -> void: pass)
+			await _probe_line(viewport, "nothing", func(_on: bool) -> void: pass)
 		get_tree().quit(0)
 		return
 	if OS.get_cmdline_user_args().has("--nodes"):
@@ -426,26 +426,24 @@ func _run_probe(level: GreyboxLevel) -> void:
 		return
 	if corpses > 0:
 		await _probe_line(
-			viewport, "шаг кабин", func(on: bool) -> void: _pause(level, "ElevatorCar", on)
+			viewport, "cab step", func(on: bool) -> void: _pause(level, "ElevatorCar", on)
 		)
 		await _probe_line(
-			viewport,
-			"шаг ограничителей трупов",
-			func(on: bool) -> void: _pause(level, "Node", on, true)
+			viewport, "corpse limiter step", func(on: bool) -> void: _pause(level, "Node", on, true)
 		)
-		await _probe_line(viewport, "кости все статичны", func(on: bool) -> void: _still_bones(on))
-	await _probe_line(viewport, "тени ламп", func(on: bool) -> void: _lamp_shadows(level, on))
+		await _probe_line(viewport, "all bones static", func(on: bool) -> void: _still_bones(on))
+	await _probe_line(viewport, "lamp shadows", func(on: bool) -> void: _lamp_shadows(level, on))
 	await _probe_line(
-		viewport, "тени конусов", func(on: bool) -> void: _lamp_shadows(level, on, "SpotLight3D")
+		viewport, "cone shadows", func(on: bool) -> void: _lamp_shadows(level, on, "SpotLight3D")
 	)
 	await _probe_line(
-		viewport, "тени заливки", func(on: bool) -> void: _lamp_shadows(level, on, "OmniLight3D")
+		viewport, "fill shadows", func(on: bool) -> void: _lamp_shadows(level, on, "OmniLight3D")
 	)
 	await _probe_line(
-		viewport, "лампы целиком", func(on: bool) -> void: _lights_of(level, "Lamp", on)
+		viewport, "whole lamps", func(on: bool) -> void: _lights_of(level, "Lamp", on)
 	)
 	await _probe_line(
-		viewport, "свет, кроме ламп", func(on: bool) -> void: _other_lights(level, on)
+		viewport, "light other than lamps", func(on: bool) -> void: _other_lights(level, on)
 	)
 	for part: String in ["Scenery/Props", "Scenery/FloorDetail", "Scenery/City", "Ribs"]:
 		var node := level.get_node_or_null(part) as Node3D
@@ -453,20 +451,18 @@ func _run_probe(level: GreyboxLevel) -> void:
 			await _probe_line(viewport, part, func(on: bool) -> void: node.visible = on)
 	for dressing: Node in level.find_children("*", "BuildingDressing", true, false):
 		await _probe_line(
-			viewport, "обстановка", func(on: bool) -> void: (dressing as Node3D).visible = on
+			viewport, "dressing", func(on: bool) -> void: (dressing as Node3D).visible = on
 		)
 	if environment != null:
 		await _probe_line(
 			viewport,
-			"объёмный туман",
+			"volumetric fog",
 			func(on: bool) -> void: environment.volumetric_fog_enabled = on
 		)
 		await _probe_line(viewport, "SSR", func(on: bool) -> void: environment.ssr_enabled = on)
 		await _probe_line(viewport, "SSIL", func(on: bool) -> void: environment.ssil_enabled = on)
 		await _probe_line(viewport, "SSAO", func(on: bool) -> void: environment.ssao_enabled = on)
-		await _probe_line(
-			viewport, "свечение", func(on: bool) -> void: environment.glow_enabled = on
-		)
+		await _probe_line(viewport, "glow", func(on: bool) -> void: environment.glow_enabled = on)
 	get_tree().quit(0)
 
 
@@ -605,10 +601,10 @@ func _run(level: GreyboxLevel) -> void:
 		cpu += RenderingServer.viewport_get_measured_render_time_cpu(viewport)
 
 	var mean := gpu / float(MEASURE_FRAMES)
-	print("  источников в кадре: %d, живых агентов: %d" % [_lit(level), _alive(level)])
+	print("  sources in frame: %d, live agents: %d" % [_lit(level), _alive(level)])
 	print(
 		(
-			"  GPU %.2f мс/кадр (худший %.2f), CPU рендера %.2f мс, бюджет %.1f"
+			"  GPU %.2f ms/frame (worst %.2f), render CPU %.2f ms, budget %.1f"
 			% [mean, worst, cpu / float(MEASURE_FRAMES), BUDGET_MS]
 		)
 	)

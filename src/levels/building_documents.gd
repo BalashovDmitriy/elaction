@@ -93,7 +93,7 @@ static func lay(
 	if left > 0:
 		left -= _lay_in(plan, rules, rng, taken, 0, rules.floors - 1, left, chosen, routed, spans)
 	if left > 0:
-		push_error("в здании некуда положить %d документ(а)" % left)
+		push_error("no place in the building for %d document(s)" % left)
 	return chosen
 
 

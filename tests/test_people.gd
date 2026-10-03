@@ -21,13 +21,13 @@ func _leg(walker: Node) -> Quaternion:
 ## pedestrian who finished a step froze.
 func test_walkers_keep_walking() -> void:
 	var people := _street(Weather.Kind.CLEAR).people()
-	assert_gt(people.count(), 2, "днём на улице почти никого")
+	assert_gt(people.count(), 2, "almost nobody on the street by day")
 	var walker := people.get_child(0)
 	await wait_seconds(2.0)
 	var before := _leg(walker)
 	await wait_seconds(0.3)
 	var after := _leg(walker)
-	assert_gt(before.angle_to(after), 0.02, "ноги не двигаются: прохожий плывёт")
+	assert_gt(before.angle_to(after), 0.02, "the legs do not move: the passer-by glides")
 
 
 ## Pedestrians walk only while the exit is in the frame, like the traffic: off frame the
@@ -36,19 +36,19 @@ func test_walkers_rest_while_the_street_is_out_of_view() -> void:
 	var street := _street(Weather.Kind.RAIN)
 	var people := street.people()
 	street.show_light(false)
-	assert_false(people.is_active(), "вне кадра прохожие идут")
+	assert_false(people.is_active(), "passers-by walk off-screen")
 	var walker := people.get_child(0) as Node3D
 	var before := walker.position
 	await wait_seconds(0.2)
-	assert_eq(walker.position, before, "вне кадра прохожий сдвинулся")
+	assert_eq(walker.position, before, "the passer-by moved off-screen")
 	var grips := people.find_children("Grip", "", true, false)
-	assert_gt(grips.size(), 0, "в дождь ни одного зонта в руке")
+	assert_gt(grips.size(), 0, "no umbrella in hand in the rain")
 	for node in grips:
-		assert_false((node as UmbrellaGrip).active, "хват зонта считается вне кадра")
+		assert_false((node as UmbrellaGrip).active, "the umbrella grip is processed off-screen")
 	street.show_light(true)
 	await wait_seconds(0.2)
-	assert_true(people.is_active(), "в кадре прохожие стоят")
-	assert_ne(walker.position, before, "в кадре прохожий не идёт")
+	assert_true(people.is_active(), "passers-by stand on screen")
+	assert_ne(walker.position, before, "the passer-by does not walk on screen")
 
 
 ## Pedestrians differ: made of parts of different models and in their own colours.
@@ -63,7 +63,7 @@ func test_walkers_differ() -> void:
 				var look := shape.get_surface_override_material(0) as BaseMaterial3D
 				signature += "%s%s" % [shape.mesh.resource_name, look.albedo_color if look else ""]
 		looks[signature] = true
-	assert_eq(looks.size(), people.count(), "среди прохожих есть одинаковые")
+	assert_eq(looks.size(), people.count(), "some passers-by look identical")
 
 
 ## There are fewer pedestrians at night than in the daytime; in bad weather many have
@@ -71,17 +71,19 @@ func test_walkers_differ() -> void:
 func test_crowd_follows_time_and_weather() -> void:
 	var day := _street(Weather.Kind.CLEAR, TimeOfDay.Kind.DAY).people().count()
 	var night := _street(Weather.Kind.CLEAR, TimeOfDay.Kind.NIGHT).people().count()
-	assert_lt(night, day, "ночью на улице людней, чем днём")
+	assert_lt(night, day, "the street is busier at night than by day")
 	var rainy := _street(Weather.Kind.RAIN).people()
 	var umbrellas := rainy.find_children("Umbrella", "Node3D", true, false).size()
-	assert_gt(umbrellas, 0, "в дождь ни одного зонта")
+	assert_gt(umbrellas, 0, "no umbrella in the rain")
 	for weather: int in [Weather.Kind.CLEAR, Weather.Kind.RAIN, Weather.Kind.SNOW]:
 		for walker in _street(weather as Weather.Kind).people().get_children():
 			assert_not_null(
-				walker.find_child("Shelter", true, false), "дождь идёт сквозь прохожего"
+				walker.find_child("Shelter", true, false), "rain falls through the passer-by"
 			)
 			assert_eq(
-				walker.find_children("*Pistol*", "", true, false).size(), 0, "прохожий с пистолетом"
+				walker.find_children("*Pistol*", "", true, false).size(),
+				0,
+				"a passer-by with a pistol"
 			)
 
 
@@ -94,13 +96,15 @@ func test_walkers_dress_for_the_weather() -> void:
 	var cold := _street(Weather.Kind.SNOW).people()
 	var knits := cold.find_children("Hat", "BoneAttachment3D", true, false).size()
 	knits += cold.find_children("Scarf", "BoneAttachment3D", true, false).size()
-	assert_gt(knits, 0, "в снег ни шапки, ни шарфа")
+	assert_gt(knits, 0, "no hat or scarf in the snow")
 
 
 ## Nobody walks under umbrellas in snow: umbrellas — only in rain.
 func test_no_umbrellas_in_the_snow() -> void:
 	var snowy := _street(Weather.Kind.SNOW).people()
-	assert_eq(snowy.find_children("Umbrella", "Node3D", true, false).size(), 0, "зонт в снег")
+	assert_eq(
+		snowy.find_children("Umbrella", "Node3D", true, false).size(), 0, "umbrella in the snow"
+	)
 
 
 ## A review over all sixteen combinations of time and weather (the user's request):
@@ -117,7 +121,7 @@ func test_no_bare_skin_unless_its_light_weather() -> void:
 					continue
 				assert_true(
 					bare.is_empty(),
-					"время %d, погода %d: открыто %s" % [time, weather, ", ".join(bare)]
+					"time %d, weather %d: exposed %s" % [time, weather, ", ".join(bare)]
 				)
 			street.queue_free()
 	assert_eq(Passerby.dress_for(Weather.Kind.CLEAR, TimeOfDay.Kind.DAY), Passerby.Dress.LIGHT)
@@ -156,11 +160,13 @@ func test_umbrella_keeps_the_column_under_it_dry() -> void:
 	var checked := 0
 	for umbrella in rainy.find_children("Umbrella", "Node3D", true, false):
 		var dry := umbrella.get_node_or_null("Shelter") as GPUParticlesCollisionBox3D
-		assert_not_null(dry, "под зонтом мокро")
+		assert_not_null(dry, "wet under the umbrella")
 		if dry == null:
 			continue
-		assert_almost_eq(dry.size.x, StreetPeople.CANOPY.x * 2.0, 0.01, "сухо не во весь купол")
+		assert_almost_eq(
+			dry.size.x, StreetPeople.CANOPY.x * 2.0, 0.01, "dry area does not span the whole canopy"
+		)
 		var bottom := (umbrella as Node3D).position.y + dry.position.y - dry.size.y * 0.5
-		assert_lt(bottom, 0.2, "под зонтом сухо не до земли")
+		assert_lt(bottom, 0.2, "dry area under the umbrella does not reach the ground")
 		checked += 1
-	assert_gt(checked, 0, "в дождь ни одного зонта")
+	assert_gt(checked, 0, "no umbrella in the rain")

@@ -6,13 +6,13 @@ end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
 
-# GDScript: официальный стиль — табы, как и требует gdformat
+# GDScript: the official style — tabs, as gdformat requires
 [*.gd]
 indent_style = tab
 indent_size = 4
 max_line_length = 100
 
-# Файлы, которые генерирует сам Godot — не трогаем форматированием
+# Files Godot generates itself — not touched by formatting
 [*.{tscn,tres,godot,import}]
 indent_style = tab
 trim_trailing_whitespace = false

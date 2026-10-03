@@ -63,7 +63,7 @@ func test_an_agent_rides_down_to_otto() -> void:
 
 	var rules := level.rules
 	var shaft := _a_shaft_to_ride(level)
-	assert_not_null(shaft, "на сиде 1 есть шахта стилобата, по которой ездят")
+	assert_not_null(shaft, "seed 1 has a podium shaft that is ridden")
 	if shaft == null:
 		return
 	var from_index := shaft.top + 1
@@ -83,7 +83,7 @@ func test_an_agent_rides_down_to_otto() -> void:
 			standing = true
 			break
 		await wait_physics_frames(1)
-	assert_true(standing, "кабина шахты %.1f встала на этаже %d" % [shaft.x, from_index])
+	assert_true(standing, "the cab of shaft %.1f stopped on floor %d" % [shaft.x, from_index])
 
 	var agent := ENEMY_SCENE.instantiate() as Enemy
 	level.add_child(agent)
@@ -109,9 +109,9 @@ func test_an_agent_rides_down_to_otto() -> void:
 	assert_gte(
 		lowest,
 		from_index + 2,
-		"агент с этажа %d так и не уехал вниз к Otto на %d" % [from_index, to_index]
+		"the agent from floor %d never rode down to Otto on %d" % [from_index, to_index]
 	)
-	assert_false(agent.is_dead(), "ехал, а не падал в шахту")
+	assert_false(agent.is_dead(), "rode, did not fall down the shaft")
 
 
 ## An agent in a cab does not control it: it runs on its own schedule, like an empty one.
@@ -124,7 +124,7 @@ func test_an_agent_aboard_does_not_drive() -> void:
 
 	var rules := level.rules
 	var shaft := _a_shaft_to_ride(level)
-	assert_not_null(shaft, "на сиде 1 есть шахта стилобата, по которой ездят")
+	assert_not_null(shaft, "seed 1 has a podium shaft that is ridden")
 	if shaft == null:
 		return
 	var index := shaft.top
@@ -141,7 +141,7 @@ func test_an_agent_aboard_does_not_drive() -> void:
 	await wait_physics_frames(SETTLE_FRAMES)
 
 	var car := _car_in_column(level, shaft.x)
-	assert_not_null(car, "в шахте %.1f стоит кабина" % shaft.x)
+	assert_not_null(car, "there is a cab in shaft %.1f" % shaft.x)
 	if car == null:
 		return
 	# An empty cab goes from floor to floor with a pause on each. An agent inside
@@ -161,8 +161,12 @@ func test_an_agent_aboard_does_not_drive() -> void:
 		# from "walked off along the floor", not catch his steps.
 		if absf(WorldSpace.to_plane(agent.global_position).x - shaft.x) <= rules.shaft_width:
 			aboard += 1
-	assert_gt(moved, 0, "кабина с агентом внутри продолжает ходить сама")
-	assert_eq(aboard, 240, "агент все эти кадры ехал в кабине, а не ушёл по этажу")
+	assert_gt(moved, 0, "a cab with an agent inside keeps running on its own")
+	assert_eq(
+		aboard,
+		240,
+		"the agent rode in the cab for all these frames, did not walk off along the floor"
+	)
 
 
 ## Whether a cab stands level with floor [param index] in shaft [param x].

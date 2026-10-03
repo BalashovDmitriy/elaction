@@ -56,7 +56,7 @@ func _run() -> void:
 
 	var menu := main.get_node_or_null("Menu") as Menu
 	if menu == null:
-		push_error("в главной сцене нет меню — проверьте импорт проекта")
+		push_error("no menu in the main scene — check the project import")
 		get_tree().quit(1)
 		return
 

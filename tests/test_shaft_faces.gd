@@ -26,12 +26,12 @@ func test_no_two_materials_share_a_face_in_any_shaft() -> void:
 		add_child_autofree(shafts)
 		shafts.dress(rules, plan)
 		var boxes := _boxes(shafts)
-		assert_gt(boxes.size(), 10, "сид %d: у шахт нет деталей" % building_seed)
+		assert_gt(boxes.size(), 10, "seed %d: the shafts have no details" % building_seed)
 		var clashes := _clashes(boxes)
 		assert_eq(
 			clashes,
 			[] as Array[String],
-			"сид %d: грани в одной плоскости — %s" % [building_seed, clashes]
+			"seed %d: faces in one plane: %s" % [building_seed, clashes]
 		)
 
 
@@ -61,7 +61,7 @@ func _clashes(boxes: Array[Array]) -> Array[String]:
 			var b := boxes[j][0] as AABB
 			for axis: int in [Vector3.AXIS_Y, Vector3.AXIS_Z]:
 				if _share_face(a, b, axis):
-					clashes.append("%s и %s" % [a, b])
+					clashes.append("%s and %s" % [a, b])
 					if clashes.size() > 5:
 						return clashes
 	return clashes

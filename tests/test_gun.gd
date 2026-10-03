@@ -15,7 +15,7 @@ func test_three_bullets_empty_the_gun() -> void:
 	for _shot: int in Gun.MAX_LIVE_BULLETS:
 		assert_true(gun.can_fire())
 		gun.fired()
-	assert_false(gun.can_fire(), "четвёртой пули на экране не бывает")
+	assert_false(gun.can_fire(), "there is no fourth bullet on screen")
 
 
 func test_spent_bullet_frees_a_shot() -> void:

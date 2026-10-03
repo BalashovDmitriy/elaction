@@ -60,7 +60,7 @@ func _run() -> void:
 
 	var car := _pick_car()
 	if car == null:
-		push_error("нет кабины без пары")
+		push_error("no cab without a pair")
 		get_tree().quit(1)
 		return
 	await _escalator()
@@ -79,10 +79,10 @@ func _red_door() -> void:
 			door = node as Door
 			break
 	if door == null:
-		print("нет красной двери")
+		print("no red door")
 		return
 	await _put_otto(WorldSpace.to_scene(door.mat_position()))
-	print("у двери: ", _level.otto.global_position, " открыта ", door.openness())
+	print("at the door: ", _level.otto.global_position, " open ", door.openness())
 	Input.action_press(&"move_up")
 	await _until(func() -> bool: return door.openness() > 0.55)
 	Input.action_release(&"move_up")
@@ -245,7 +245,7 @@ func _until(done: Callable) -> bool:
 		if done.call():
 			return true
 		await get_tree().physics_frame
-	push_error("не дождался события за %d кадров" % PATIENCE)
+	push_error("event not reached within %d frames" % PATIENCE)
 	return false
 
 

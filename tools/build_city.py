@@ -291,7 +291,7 @@ def _bake_row(style: str, row: str, height: float, modules: list[str]) -> None:
         path = BAKE / f"{style}_{row}_{name}.png"
         bpy.context.scene.render.filepath = str(path)
         bpy.ops.render.render(write_still=True)
-        print(f"снят {path.name}")
+        print(f"shot {path.name}")
 
 
 def inside_blender() -> int:
@@ -337,7 +337,7 @@ def _compose() -> None:
         "rows": [{"name": name, "height": h} for name, h in ROWS],
     }
     (TARGET / "facade_layout.json").write_text(json.dumps(layout, indent=2) + chr(10), encoding="utf-8")
-    print(f"записан атлас {stride * len(names)}×{height} в {TARGET}")
+    print(f"wrote atlas {stride * len(names)}×{height} to {TARGET}")
 
 
 def outside() -> int:
@@ -345,12 +345,12 @@ def outside() -> int:
 
     use_utf8_output()
     if not PACK.exists():
-        print(f"нет пака {PACK}: скачайте Downtown Standard (см. начало файла)")
+        print(f"no pack {PACK}: download Downtown Standard (see the top of the file)")
         return 1
     blender = require_blender()
     code, output = run_script(blender, Path(__file__), timeout=1800)
     for line in output.splitlines():
-        if "снят" in line or "Error" in line or "Traceback" in line or "rror:" in line:
+        if "shot" in line or "Error" in line or "Traceback" in line or "rror:" in line:
             print(line)
     if code != 0:
         return code

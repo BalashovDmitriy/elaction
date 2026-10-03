@@ -83,10 +83,10 @@ func test_reset_returns_to_idle() -> void:
 func test_just_entered_fires_only_once() -> void:
 	var machine := OttoStateMachine.new()
 	machine.update(_snapshot(0.0, false, true), true, 0.0)
-	assert_true(machine.just_entered(OttoStateMachine.State.JUMP), "первый кадр прыжка")
+	assert_true(machine.just_entered(OttoStateMachine.State.JUMP), "the first frame of the jump")
 
 	machine.update(_snapshot(), false, -120.0)
-	assert_false(machine.just_entered(OttoStateMachine.State.JUMP), "второй кадр прыжка")
+	assert_false(machine.just_entered(OttoStateMachine.State.JUMP), "the second frame of the jump")
 
 
 func test_state_name_matches_enum() -> void:

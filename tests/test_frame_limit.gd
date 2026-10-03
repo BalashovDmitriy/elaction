@@ -30,32 +30,36 @@ func test_the_frame_limit_and_vsync_survive_a_restart() -> void:
 	old.set_value(GameSettings.SECTION, "blood", false)
 	old.save(TEMP)
 	var fresh := GameSettings.load_from(TEMP)
-	assert_eq(fresh.frame_limit, DisplayModes.FRAME_MONITOR, "без ключа — по монитору")
-	assert_true(fresh.vsync, "без ключа — синхронизация включена")
+	assert_eq(fresh.frame_limit, DisplayModes.FRAME_MONITOR, "no key - follows the monitor")
+	assert_true(fresh.vsync, "no key - vsync is on")
 
 	old.set_value(GameSettings.SECTION, "frame_limit", 77)
 	old.save(TEMP)
 	assert_eq(
 		GameSettings.load_from(TEMP).frame_limit,
 		DisplayModes.FRAME_MONITOR,
-		"предела не из списка не бывает"
+		"a limit outside the list does not occur"
 	)
 
 
 ## What the limit and the flag mean for the engine and the window.
 func test_the_frame_limit_maps_to_the_engine() -> void:
+	assert_eq(DisplayModes.max_fps(DisplayModes.FRAME_MONITOR, true, 144.0), 0, "vsync holds it")
 	assert_eq(
-		DisplayModes.max_fps(DisplayModes.FRAME_MONITOR, true, 144.0), 0, "держит синхронизация"
+		DisplayModes.max_fps(DisplayModes.FRAME_MONITOR, false, 143.9),
+		144,
+		"the screen refresh rate"
 	)
-	assert_eq(DisplayModes.max_fps(DisplayModes.FRAME_MONITOR, false, 143.9), 144, "частота экрана")
 	assert_eq(
-		DisplayModes.max_fps(DisplayModes.FRAME_MONITOR, false, -1.0), 0, "частота неизвестна"
+		DisplayModes.max_fps(DisplayModes.FRAME_MONITOR, false, -1.0), 0, "refresh rate unknown"
 	)
 	assert_eq(DisplayModes.max_fps(120, true, 60.0), 120)
 	assert_eq(DisplayModes.max_fps(DisplayModes.FRAME_UNLIMITED, false, 60.0), 0)
 	assert_eq(DisplayModes.vsync_mode(true), DisplayServer.VSYNC_ENABLED)
 	assert_eq(DisplayModes.vsync_mode(false), DisplayServer.VSYNC_DISABLED)
-	assert_eq(DisplayModes.FRAME_LIMITS[0], DisplayModes.FRAME_MONITOR, "первым — по монитору")
+	assert_eq(
+		DisplayModes.FRAME_LIMITS[0], DisplayModes.FRAME_MONITOR, "first - follows the monitor"
+	)
 
 
 ## The settings set the engine limit; by default there is none, as before the setting.

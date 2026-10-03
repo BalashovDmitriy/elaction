@@ -143,7 +143,7 @@ static func make(prop_name: String, full_depth: bool = false) -> Node3D:
 	if scene == null:
 		var path := "%s/%s.glb" % [DIR, prop_name]
 		if not ResourceLoader.exists(path):
-			push_error("нет модели обстановки: %s" % path)
+			push_error("no furniture model: %s" % path)
 			return null
 		scene = load(path) as PackedScene
 		_scenes[prop_name] = scene

@@ -1,5 +1,5 @@
-# Единые переводы строк во всём репозитории: LF везде, включая рабочую копию
-# на Windows. Godot и CI одинаково работают с LF, а diff'ы не шумят.
+# One line ending across the repository: LF everywhere, including the working copy
+# on Windows. Godot and CI handle LF the same way, and diffs stay quiet.
 * text=auto eol=lf
 
 *.gd      text eol=lf
@@ -11,7 +11,7 @@
 *.md      text eol=lf
 *.yml     text eol=lf
 
-# Бинарные ассеты
+# Binary assets
 *.png    binary
 *.jpg    binary
 *.webp   binary

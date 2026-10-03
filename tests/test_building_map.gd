@@ -36,12 +36,12 @@ func test_doors_follow_the_map_on_any_building() -> void:
 			for index: int in rules.levels():
 				var placed := _doors_on(plan, index)
 				var wanted := rules.doors_on(index)
-				var where := "навык %d, сид %d, этаж %d" % [skill, building_seed, index]
-				assert_lte(placed, wanted, where + ": дверей больше, чем по карте")
+				var where := "skill %d, seed %d, floor %d" % [skill, building_seed, index]
+				assert_lte(placed, wanted, where + ": more doors than the map has")
 				if wanted > 0:
-					assert_gte(placed, 1, where + ": ни одной двери")
+					assert_gte(placed, 1, where + ": no doors at all")
 				else:
-					assert_eq(placed, 0, where + ": двери там, где карта их не ставит")
+					assert_eq(placed, 0, where + ": doors where the map puts none")
 
 
 ## A floor in the frame is not emptier than the original: doors stand by the map while room remains.
@@ -67,7 +67,7 @@ func test_floors_hold_their_map_doors_while_there_is_room() -> void:
 				assert_eq(
 					_doors_on(plan, index),
 					mini(rules.doors_on(index), maxi(room, 0)),
-					"навык %d, сид %d, этаж %d" % [skill, building_seed, index]
+					"skill %d, seed %d, floor %d" % [skill, building_seed, index]
 				)
 
 
@@ -85,7 +85,10 @@ func test_wide_floors_are_not_emptier_than_a_screen_of_the_original() -> void:
 			assert_gte(
 				_doors_on(plan, index),
 				Arcade.doors_on_floor(rom),
-				"сид %d: широкий этаж %d пустее экрана оригинала" % [building_seed, index]
+				(
+					"seed %d: wide floor %d is emptier than the original screen"
+					% [building_seed, index]
+				)
 			)
 
 
@@ -127,15 +130,15 @@ func test_documents_follow_the_rom_bands() -> void:
 		for building_seed: int in SEEDS:
 			var plan := BuildingPlan.generate(rules, building_seed)
 			var floors := plan.document_floors()
-			var where := "навык %d, сид %d" % [skill, building_seed]
+			var where := "skill %d, seed %d" % [skill, building_seed]
 			var wanted := BuildingDocuments.count(rules, building_seed)
 			var column := BuildingDocuments.column(rules, building_seed)
-			assert_eq(floors.size(), wanted, where + ": документов")
-			assert_eq(Arcade.red_doors(column), wanted, where + ": столбец ROM с тем же числом")
+			assert_eq(floors.size(), wanted, where + ": documents")
+			assert_eq(Arcade.red_doors(column), wanted, where + ": ROM column with the same count")
 			var per_band: Dictionary = {}
 			var seen: Dictionary = {}
 			for index: int in floors:
-				assert_false(seen.has(index), where + ": две красные на этаже %d" % index)
+				assert_false(seen.has(index), where + ": two red doors on floor %d" % index)
 				seen[index] = true
 				var rom := Arcade.rom_floor(index, rules.floors)
 				for band: int in Arcade.RED_DOOR_BANDS.size():
@@ -146,7 +149,7 @@ func test_documents_follow_the_rom_bands() -> void:
 				assert_eq(
 					int(per_band.get(band, 0)),
 					Arcade.red_doors_in_band(band, column),
-					where + ": полоса %d" % band
+					where + ": band %d" % band
 				)
 
 
@@ -158,7 +161,7 @@ func test_every_building_can_be_finished_on_any_skill() -> void:
 			var plan := BuildingPlan.generate(rules, building_seed)
 			assert_true(
 				BuildingRoute.is_winnable(plan, rules),
-				"навык %d, сид %d: здание не пройти" % [skill, building_seed]
+				"skill %d, seed %d: the building cannot be completed" % [skill, building_seed]
 			)
 
 
@@ -169,7 +172,7 @@ func test_dark_floors_carry_no_lamps() -> void:
 	for index: int in rules.floors:
 		if rules.is_unlit(index):
 			dark += 1
-	assert_eq(dark, 5, "тёмных этажей пять, как в оригинале")
+	assert_eq(dark, 5, "five dark floors, as in the original")
 	for building_seed: int in SEEDS:
 		var plan := BuildingPlan.generate(rules, building_seed)
 		var lamps: Dictionary = {}
@@ -179,7 +182,7 @@ func test_dark_floors_carry_no_lamps() -> void:
 			assert_eq(
 				lamps.has(index),
 				not rules.is_unlit(index),
-				"сид %d, этаж %d: лампа не по карте" % [building_seed, index]
+				"seed %d, floor %d: lamp is not per the map" % [building_seed, index]
 			)
 
 
@@ -189,17 +192,17 @@ func test_salt_changes_the_building_and_zero_keeps_it() -> void:
 	var game: GameState = autofree(GameState.new())
 	game.building = 3
 	game.salt = 0
-	assert_eq(game.building_seed(), 3, "без соли сид — номер здания")
+	assert_eq(game.building_seed(), 3, "without salt the seed is the building number")
 	game.salt = 12345
 	var salted := game.building_seed()
-	assert_ne(salted, 3, "соль меняет сид")
+	assert_ne(salted, 3, "salt changes the seed")
 	game.salt = 54321
-	assert_ne(game.building_seed(), salted, "другая соль — другой сид")
+	assert_ne(game.building_seed(), salted, "different salt - different seed")
 
 	var rules := _rules(0)
 	var plain := BuildingPlan.generate(rules, 3)
 	var other := BuildingPlan.generate(rules, salted)
-	assert_ne(plain.document_floors(), other.document_floors(), "другое здание")
+	assert_ne(plain.document_floors(), other.document_floors(), "a different building")
 
 
 ## Dense doors do not crowd out walls: walls are placed before doors beyond the
@@ -219,7 +222,7 @@ func test_dense_doors_leave_room_for_walls_in_the_tower() -> void:
 			for wall in plan.walls:
 				if not rules.is_wide(wall.floor_index):
 					tower += 1
-	assert_gte(tower, 100, "стен на башне %d — двери их вытеснили" % tower)
+	assert_gte(tower, 100, "walls on the tower %d - doors pushed them out" % tower)
 
 
 ## Documents 5–10 by draw from the seed, from the first building (ADR-0037, decision 8):
@@ -231,7 +234,9 @@ func test_the_document_count_is_drawn_per_building() -> void:
 		for building_seed: int in 200:
 			var wanted := BuildingDocuments.count(rules, building_seed)
 			assert_between(wanted, BuildingDocuments.FEWEST, BuildingDocuments.MOST)
-			assert_eq(wanted, BuildingDocuments.count(rules, building_seed), "сид повторяет число")
+			assert_eq(
+				wanted, BuildingDocuments.count(rules, building_seed), "the seed repeats the count"
+			)
 			seen[wanted] = true
 		for wanted: int in range(BuildingDocuments.FEWEST, BuildingDocuments.MOST + 1):
-			assert_true(seen.has(wanted), "навык %d: выпадает и %d" % [skill, wanted])
+			assert_true(seen.has(wanted), "skill %d: %d also comes up" % [skill, wanted])

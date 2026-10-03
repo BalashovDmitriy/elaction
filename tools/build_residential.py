@@ -134,7 +134,7 @@ class Part:
         bpy.context.scene.collection.objects.link(obj)
         path = TARGET / f"{self.name}.glb"
         bpy.ops.export_scene.gltf(filepath=str(path), export_format="GLB", export_yup=True)
-        print(f"записан {path}")
+        print(f"wrote {path}")
 
 
 def build_mailboxes() -> None:

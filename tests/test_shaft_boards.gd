@@ -32,11 +32,11 @@ func _shafts(level: GreyboxLevel) -> BuildingShafts:
 func test_the_button_lights_where_the_car_is_heading() -> void:
 	var down := Intent.DOWN
 	var up := Intent.UP
-	assert_eq(BuildingShafts.coming(down, 5, 9), down, "едет вниз к этажу ниже")
-	assert_eq(BuildingShafts.coming(down, 5, 2), 0.0, "уехала вниз от этажа выше")
-	assert_eq(BuildingShafts.coming(up, 5, 2), up, "едет вверх к этажу выше")
-	assert_eq(BuildingShafts.coming(up, 5, 9), 0.0, "уехала вверх от этажа ниже")
-	assert_eq(BuildingShafts.coming(0.0, 5, 9), 0.0, "стоит — не зовёт никого")
+	assert_eq(BuildingShafts.coming(down, 5, 9), down, "goes down to a lower floor")
+	assert_eq(BuildingShafts.coming(down, 5, 2), 0.0, "went down away from a higher floor")
+	assert_eq(BuildingShafts.coming(up, 5, 2), up, "goes up to a higher floor")
+	assert_eq(BuildingShafts.coming(up, 5, 9), 0.0, "went up away from a lower floor")
+	assert_eq(BuildingShafts.coming(0.0, 5, 9), 0.0, "standing — calls nobody")
 
 
 ## The board's direction is taken from the cab's real velocity. Its y grows downward, and until the
@@ -46,11 +46,11 @@ func test_the_heading_follows_the_real_speed_of_the_car() -> void:
 	var motion := ElevatorMotion.new()
 	motion.setup(PackedFloat32Array([10.0, 13.6, 17.2]), 1)
 	motion.update(0.1, ElevatorMotion.DOWN, true)
-	assert_eq(BuildingShafts.heading_of(motion.velocity), Intent.DOWN, "едет вниз")
+	assert_eq(BuildingShafts.heading_of(motion.velocity), Intent.DOWN, "goes down")
 	motion.setup(PackedFloat32Array([10.0, 13.6, 17.2]), 1)
 	motion.update(0.1, ElevatorMotion.UP, true)
-	assert_eq(BuildingShafts.heading_of(motion.velocity), Intent.UP, "едет вверх")
-	assert_eq(BuildingShafts.heading_of(0.0), 0.0, "стоит")
+	assert_eq(BuildingShafts.heading_of(motion.velocity), Intent.UP, "goes up")
+	assert_eq(BuildingShafts.heading_of(0.0), 0.0, "stands")
 
 
 ## The boards on all portals of a shaft show the floor where its cab is — the floor plate number,
@@ -63,7 +63,7 @@ func test_the_heading_follows_the_real_speed_of_the_car() -> void:
 func test_every_board_of_a_shaft_shows_where_its_car_is() -> void:
 	var level := _level()
 	var shafts := _shafts(level)
-	assert_not_null(shafts, "шахт нет")
+	assert_not_null(shafts, "no shafts")
 	if shafts == null:
 		return
 	await wait_physics_frames(3)
@@ -80,17 +80,17 @@ func test_every_board_of_a_shaft_shows_where_its_car_is() -> void:
 			shared += 1
 		var where := shafts._nearest_floor(car)
 		var height := WorldSpace.to_plane(car.global_position).y
-		assert_eq(where, level.rules.floor_index_near(height), "кабина не на своём этаже")
+		assert_eq(where, level.rules.floor_index_near(height), "cab is not on its own floor")
 		var label := BuildingShafts.floor_label(level.rules, where)
 		for index in range(maxi(shaft.top, 0), shaft.bottom + 1):
 			var text := shafts.board_text(shaft.x, index)
 			assert_true(
 				text.ends_with(label),
-				"шахта x=%.1f, этаж %d: «%s» вместо %s" % [shaft.x, index, text, label]
+				"shaft x=%.1f, floor %d: '%s' instead of %s" % [shaft.x, index, text, label]
 			)
 			checked += 1
-	assert_gt(checked, 0, "ни одного табло")
-	assert_gt(shared, 0, "на сиде 1 нет шахт в общем столбце — тест ничего не ловит")
+	assert_gt(checked, 0, "no boards at all")
+	assert_gt(shared, 0, "seed 1 has no shafts in a shared column — the test catches nothing")
 	remove_child(level)
 
 
@@ -108,7 +108,7 @@ func test_the_parking_is_p_on_the_boards() -> void:
 	var bottom := rules.floors - 1
 	assert_eq(BuildingShafts.floor_label(rules, bottom), "P")
 	assert_eq(BuildingShafts.floor_label(rules, bottom - 1), "2")
-	assert_eq(Garage.LEVEL_MARK, "P", "колонны паркинга — P-01, P-02…")
+	assert_eq(Garage.LEVEL_MARK, "P", "parking columns are P-01, P-02...")
 
 
 ## Everything the board writes as text exists in the game's font: a glyph missing from Exo 2 is
@@ -122,7 +122,7 @@ func test_every_board_label_is_in_the_game_font() -> void:
 		for at in label.length():
 			assert_true(
 				font.has_char(label.unicode_at(at)),
-				"этаж %d: знака «%s» нет в шрифте" % [index, label[at]]
+				"floor %d: glyph '%s' is not in the font" % [index, label[at]]
 			)
 
 
@@ -131,22 +131,22 @@ func test_every_board_label_is_in_the_game_font() -> void:
 func test_the_heading_arrow_is_geometry() -> void:
 	var level := _level()
 	var shafts := _shafts(level)
-	assert_not_null(shafts, "шахт нет")
+	assert_not_null(shafts, "no shafts")
 	if shafts == null:
 		return
 	var column := shafts._boards.values()[0] as Dictionary
 	var board := column.values()[0] as BuildingShafts.ShaftBoard
-	assert_not_null(board.arrow, "у табло нет стрелки")
+	assert_not_null(board.arrow, "board has no arrow")
 	shafts._show(board, "7", Intent.UP, 0.0)
-	assert_true(board.arrow.visible, "едет вверх — стрелка видна")
-	assert_almost_eq(board.arrow.rotation.z, 0.0, 0.001, "вверх — остриём вверх")
-	assert_eq(board.digits.text, "7", "в тексте только этаж")
-	assert_gt(board.digits.position.x, board.center.x, "цифры уступили место стрелке")
+	assert_true(board.arrow.visible, "going up — arrow is visible")
+	assert_almost_eq(board.arrow.rotation.z, 0.0, 0.001, "up — tip pointing up")
+	assert_eq(board.digits.text, "7", "the text is only the floor")
+	assert_gt(board.digits.position.x, board.center.x, "digits made room for the arrow")
 	shafts._show(board, "7", Intent.DOWN, 0.0)
-	assert_almost_eq(board.arrow.rotation.z, PI, 0.001, "вниз — остриём вниз")
+	assert_almost_eq(board.arrow.rotation.z, PI, 0.001, "down — tip pointing down")
 	shafts._show(board, "7", 0.0, 0.0)
-	assert_false(board.arrow.visible, "стоит — стрелки нет")
-	assert_almost_eq(board.digits.position.x, board.center.x, 0.001, "цифры посередине")
+	assert_false(board.arrow.visible, "standing — no arrow")
+	assert_almost_eq(board.digits.position.x, board.center.x, 0.001, "digits in the middle")
 	remove_child(level)
 
 
@@ -176,11 +176,11 @@ func test_the_call_panel_keeps_off_doors() -> void:
 						assert_true(
 							panel.y <= zone.x or panel.x >= zone.y,
 							(
-								"сид %d, этаж %d: панель %s на двери %s"
+								"seed %d, floor %d: panel %s on door %s"
 								% [building_seed, index, panel, zone]
 							)
 						)
-	assert_gt(panels, 0, "ни одной панели — проверять нечего")
+	assert_gt(panels, 0, "no panels — nothing to check")
 
 
 func _column_is_shared(level: GreyboxLevel, shaft: BuildingPlan.ShaftSpot) -> bool:
@@ -195,15 +195,15 @@ func test_the_sign_spells_the_building_and_hangs_outside() -> void:
 	for building: int in [1, 2, 3, 4]:
 		var level := _level(building)
 		var sign_board := level.get_node_or_null("Scenery/VerticalSign") as VerticalSign
-		assert_not_null(sign_board, "вывески нет")
+		assert_not_null(sign_board, "no sign")
 		if sign_board == null:
 			remove_child(level)
 			continue
 		var identity := BuildingIdentity.of(building, 1)
-		assert_eq(sign_board.text(), "".join(identity.sign_lines()), "здание %d" % building)
+		assert_eq(sign_board.text(), "".join(identity.sign_lines()), "building %d" % building)
 		var outer := level.rules.floor_span(0).y
 		for label in sign_board.find_children("*", "Label3D", true, false):
-			assert_gt((label as Node3D).global_position.x, outer, "буква внутри здания")
+			assert_gt((label as Node3D).global_position.x, outer, "letter inside the building")
 		remove_child(level)
 
 
@@ -212,6 +212,6 @@ func test_the_sign_spells_the_building_and_hangs_outside() -> void:
 func test_scene_text_has_mipmaps_and_the_hud_does_not() -> void:
 	var scene := NeonStyle.scene_font(700).base_font as FontFile
 	var hud := NeonStyle.font(700).base_font as FontFile
-	assert_true(scene.generate_mipmaps, "у надписей в сцене нет мипмапов")
-	assert_false(hud.generate_mipmaps, "мипмапы проросли в HUD")
-	assert_ne(scene, hud, "сцена и HUD делят один шрифт")
+	assert_true(scene.generate_mipmaps, "scene lettering has no mipmaps")
+	assert_false(hud.generate_mipmaps, "mipmaps leaked into the HUD")
+	assert_ne(scene, hud, "scene and HUD share one font")

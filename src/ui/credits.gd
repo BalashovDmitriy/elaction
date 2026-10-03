@@ -41,7 +41,7 @@ static func load_sections(path: String = PATH) -> Array[Section]:
 	var found: Array[Section] = []
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
-		push_error("нет списка авторов: %s" % path)
+		push_error("no credits list: %s" % path)
 		return found
 	var data: Variant = JSON.parse_string(file.get_as_text())
 	if not data is Dictionary:

@@ -68,7 +68,7 @@ def import_resources(godot: str) -> tuple[int, str]:
     if not find_errors(output):
         return code, output
 
-    print("  ..   первый импорт с ошибками — повторяю на готовых ресурсах")
+    print("  ..   first import had errors — repeating on the ready resources")
     return run(godot, ["--headless", "--import"])
 
 
@@ -121,13 +121,13 @@ def check_scripts(godot: str) -> bool:
                 continue
             ok = False
             for path in missing:
-                print(f"  FAIL разбор {path.removeprefix('res://')}")
+                print(f"  FAIL parse {path.removeprefix('res://')}")
             if not missing:
-                print(f"  FAIL разбор пачки из {len(pile)} скриптов (код возврата {code})")
+                print(f"  FAIL parse of a batch of {len(pile)} scripts (exit code {code})")
             for line in errors[:20]:
                 print(f"       {line}")
     if ok:
-        print(f"  OK   разбор {checked} скриптов")
+        print(f"  OK   parsed {checked} scripts")
     return ok
 
 
@@ -138,7 +138,7 @@ def report(step: str, code: int, output: str) -> bool:
         print(f"  OK   {step}")
         return True
 
-    print(f"  FAIL {step} (код возврата {code})")
+    print(f"  FAIL {step} (exit code {code})")
     for line in errors[:20]:
         print(f"       {line}")
     if not errors and output.strip():
@@ -154,12 +154,12 @@ def main(argv: list[str]) -> int:
     ok = True
 
     code, output = import_resources(godot)
-    ok &= report("импорт ресурсов (--import)", code, output)
+    ok &= report("resource import (--import)", code, output)
 
     if "--no-scripts" not in argv:
         ok &= check_scripts(godot)
 
-    print("Проверка пройдена." if ok else "Проверка провалена.")
+    print("Check passed." if ok else "Check failed.")
     return 0 if ok else 1
 
 

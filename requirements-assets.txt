@@ -1,9 +1,9 @@
-# Только для перерисовки ассетов: tools/build_audio.py (ADR-0036),
-# tools/render_icon.py (ADR-0013) и tools/build_textures.py (ADR-0033), — и для tools/compare_original.py, кадра
-# вехи рядом с оригиналом (ADR-0026). Модели актёров собирает Blender
-# (tools/build_actors.py, ADR-0022), pip ему не нужен.
-# В CI не ставится и на запуск игры не влияет — готовые WAV, OGG и ICO
-# лежат в репозитории.
+# Only for rebuilding assets: tools/build_audio.py (ADR-0036),
+# tools/render_icon.py (ADR-0013) and tools/build_textures.py (ADR-0033) — and for
+# tools/compare_original.py, the milestone frame next to the original (ADR-0026). Actor
+# models are built by Blender (tools/build_actors.py, ADR-0022), it needs no pip.
+# Not installed in CI and does not affect running the game — the ready WAV, OGG and ICO
+# files are in the repository.
 #   .venv/Scripts/pip install -r requirements-assets.txt   # Windows
 Pillow==12.1.0
 numpy==2.4.1

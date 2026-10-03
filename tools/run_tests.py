@@ -195,7 +195,7 @@ class Job:
     def label(self) -> str:
         if len(self.units) == 1:
             return self.units[0].label()
-        return f"{self.units[0].label()} и ещё {len(self.units) - 1}"
+        return f"{self.units[0].label()} and {len(self.units) - 1} more"
 
     def arguments(self) -> list[str]:
         def path(unit: Unit) -> str:
@@ -253,7 +253,7 @@ def split_units(units: list[Unit], piles: int) -> list[list[Unit]]:
 def part_of(units: list[Unit], part: str) -> list[Unit]:
     """Units of part `K/N`: the suite is split into N piles, the K-th is taken, from one."""
     number, _, total = part.partition("/")
-    wrong = f"часть {part}: ждём K/N, где 1 ≤ K ≤ N"
+    wrong = f"part {part}: expected K/N where 1 ≤ K ≤ N"
     if not (number.isdigit() and total.isdigit()):
         raise ValueError(wrong)
     k, n = int(number), int(total)
@@ -320,18 +320,18 @@ def run_job_once_more(
 def verdict(code: int, output: str, where: str) -> str:
     """What is wrong with a job, or an empty string if everything is fine."""
     if code != 0 and SUCCESS_MARKER in output:
-        return f"{where}: провал, код возврата {code}."
+        return f"{where}: failed, exit code {code}."
     broken = [marker for marker in BROKEN_SCRIPT_MARKERS if marker in output]
     if broken:
         return (
-            f"{where}: в выводе есть {', '.join(broken)} — какой-то скрипт не разобрался. "
-            "Такой файл выпадает из прогона незаметно, поэтому это провал."
+            f"{where}: the output contains {', '.join(broken)} — some script failed to parse. "
+            "Such a file silently drops out of the run, so this is a failure."
         )
     # GUT returns 0 even when no tests were found, so we check against the summary.
     if SUCCESS_MARKER not in output:
-        return f'{where}: в выводе GUT нет строки "{SUCCESS_MARKER}" — тесты не прошли.'
+        return f'{where}: the GUT output has no line "{SUCCESS_MARKER}" — the tests did not pass.'
     if code != 0:
-        return f"{where}: провал, код возврата {code}."
+        return f"{where}: failed, exit code {code}."
     return ""
 
 
@@ -349,30 +349,30 @@ def passing(output: str) -> int:
 
 def main() -> int:
     use_utf8_output()
-    parser = argparse.ArgumentParser(description="Прогон тестов GUT")
+    parser = argparse.ArgumentParser(description="Run of the GUT tests")
     parser.add_argument(
         "--jobs",
         type=int,
         default=min(os.cpu_count() or 1, JOBS_MAX),
-        help="сколько процессов Godot запускать разом",
+        help="how many Godot processes to run at once",
     )
-    parser.add_argument("--part", default="", help="какую часть набора гнать, K/N — для CI")
+    parser.add_argument("--part", default="", help="which part of the suite to run, K/N — for CI")
     parser.add_argument(
-        "--real-time", action="store_true", help="без --fixed-fps: кадры по настоящим часам"
+        "--real-time", action="store_true", help="without --fixed-fps: frames by the real clock"
     )
     parser.add_argument(
         "--batch-cost",
         type=float,
         default=BATCH_COST,
-        help="вес пачки мелких файлов, с; 0 — каждый файл своим процессом (замер весов)",
+        help="weight of a batch of small files, s; 0 — each file in its own process (weight measurement)",
     )
-    parser.add_argument("--slowest", type=int, default=SLOWEST_SHOWN, help="сколько долгих печатать")
+    parser.add_argument("--slowest", type=int, default=SLOWEST_SHOWN, help="how many slow ones to print")
     args = parser.parse_args()
 
     godot = require_godot()
     scripts = sorted((PROJECT_ROOT / "tests").glob("test_*.gd"))
     if not scripts:
-        print("В tests/ нет ни одного test_*.gd — прогонять нечего.")
+        print("No test_*.gd in tests/ — nothing to run.")
         return 1
 
     units = units_of(scripts)
@@ -383,16 +383,16 @@ def main() -> int:
             units = part_of(units, args.part)
         except ValueError as error:
             parser.error(str(error))
-        scope = f" Часть {args.part}: единиц {len(units)} из {everything}."
+        scope = f" Part {args.part}: units {len(units)} of {everything}."
         if not units:
-            print(f"Тестовых файлов {len(scripts)}.{scope} Этой машине гнать нечего.")
+            print(f"Test files {len(scripts)}.{scope} Nothing for this machine to run.")
             return 0
     jobs = jobs_of(units, args.batch_cost)
     workers = max(1, min(args.jobs, len(jobs)))
-    pace = "по настоящим часам" if args.real_time else f"--fixed-fps {FIXED_FPS}"
+    pace = "by the real clock" if args.real_time else f"--fixed-fps {FIXED_FPS}"
     print(
-        f"Тестовых файлов {len(scripts)}, единиц {len(units)}, заданий {len(jobs)}, "
-        f"процессов {workers}, {pace}.{scope}",
+        f"Test files {len(scripts)}, units {len(units)}, jobs {len(jobs)}, "
+        f"processes {workers}, {pace}.{scope}",
         flush=True,
     )
 
@@ -412,7 +412,7 @@ def main() -> int:
                 job = running[done]
                 code, output, took, retried = done.result()
                 if retried:
-                    print(f"  {job.label()}: у Jolt кончилась очередь задач — повтор", flush=True)
+                    print(f"  {job.label()}: Jolt ran out of its job queue — retrying", flush=True)
                 timings.append((took, job.label()))
                 tests += passing(output)
                 trouble = verdict(code, output, job.label())
@@ -422,12 +422,12 @@ def main() -> int:
                     # lines with nothing to look for.
                     print(output.strip(), flush=True)
                 if took > TEST_TIMEOUT * CROWDED_RATIO:
-                    print(f"  {job.label()}: {took:.0f} с — запас до лимита меньше половины")
+                    print(f"  {job.label()}: {took:.0f} s — less than half the limit is left")
 
     spent = time.monotonic() - started
-    print(f"\nНабор шёл {spent:.0f} с, тестов прошло {tests}. Самые долгие задания:")
+    print(f"\nThe suite took {spent:.0f} s, tests passed {tests}. Slowest jobs:")
     for took, label in sorted(timings, reverse=True)[: args.slowest]:
-        print(f"  {took:5.1f} с  {label}")
+        print(f"  {took:5.1f} s  {label}")
 
     if failures:
         print()
@@ -435,7 +435,7 @@ def main() -> int:
             print(trouble)
         return 1
 
-    print("\nТесты пройдены.")
+    print("\nTests passed.")
     return 0
 
 

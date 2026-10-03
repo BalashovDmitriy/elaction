@@ -106,7 +106,7 @@ func _start() -> void:
 	GameState.instance().building = _building
 	# Building kind goes into the car draw, as in the level ([method GreyboxLevel._spawn_car]).
 	var car := CarModel.choose(_building, _seed, BuildingIdentity.of(_building, _seed).kind)
-	print("машина: модель %d, краска %d" % [car.model, car.paint])
+	print("car: model %d, paint %d" % [car.model, car.paint])
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	_level.rules = BuildingRules.new()
 	_level.building_seed = _seed
@@ -123,7 +123,7 @@ func _start() -> void:
 func _door() -> void:
 	var door := _red_door()
 	if door == null:
-		push_error("в здании нет красной двери")
+		push_error("no red door in the building")
 		return
 	var mat := door.mat_position()
 	_place(mat.x, mat.y)
@@ -147,7 +147,7 @@ func _door() -> void:
 	if _level.otto.is_hidden() and door.openness() <= 0.0:
 		await _shoot("door_02_inside_closed")
 	else:
-		push_error("Otto вышел раньше, чем агент встал у двери")
+		push_error("Otto left before an agent stood at the door")
 	await _until(func() -> bool: return not _level.otto.is_hidden())
 	await _frames(2)
 	await _shoot("door_03_out")
@@ -165,7 +165,7 @@ func _basement() -> void:
 	var lock := _level.find_child("BasementLock", false, false) as BasementLock
 	var shaft := _basement_shaft()
 	if shaft == null or lock == null:
-		push_error("нет шахты в подвал или замка")
+		push_error("no shaft to the basement or no lock")
 		return
 	var aside := rules.shaft_width * 0.5 + Proportions.BODY_WIDTH * 0.5 + SHAFT_GAP
 	_place(_clear_side(above, shaft.x, aside), rules.floor_surface(above))
@@ -185,7 +185,7 @@ func _basement() -> void:
 	if lock.is_locked():
 		await _shoot("basement_01_locked")
 	else:
-		push_error("подвал уже открыт — документов в здании нет?")
+		push_error("the basement is already open — no documents in the building?")
 	var game := GameState.instance()
 	while not game.all_documents_collected():
 		game.collect_document()
@@ -220,7 +220,7 @@ func _exit() -> void:
 	if car.door_openness() > 0.5:
 		await _shoot("exit_02_boarding")
 	else:
-		push_error("дверца машины не открыта на посадке")
+		push_error("the car door is not open at boarding")
 	await _until(func() -> bool: return boarding.phase == ExitBoarding.Phase.STARTING)
 	await _seconds(0.8)
 	await _shoot("exit_03_lights_gate")
@@ -259,7 +259,7 @@ func _drive_sequence(car: ExitCar) -> void:
 		var camera := get_viewport().get_camera_3d()
 		print(
 			(
-				"  drive_%02d машина %s стадия %d наклон %.1f° фары %s камера %s затемнение %.2f"
+				"  drive_%02d car %s stage %d tilt %.1f° lights %s camera %s dimming %.2f"
 				% [
 					index,
 					WorldSpace.to_plane(car.global_position),
@@ -310,7 +310,7 @@ func _post_agent(door: Door) -> Enemy:
 			return agent
 		agent.queue_free()
 		await _frames(1)
-	push_error("ни один агент не пошёл ждать у двери")
+	push_error("no agent went to wait at the door")
 	return null
 
 
@@ -381,7 +381,7 @@ func _until(done: Callable) -> bool:
 		if done.call():
 			return true
 		await get_tree().physics_frame
-	push_error("не дождался события за %d кадров" % PATIENCE)
+	push_error("event not reached within %d frames" % PATIENCE)
 	return false
 
 

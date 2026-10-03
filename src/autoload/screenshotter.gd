@@ -540,7 +540,9 @@ func capture(label: String, folder: String = "") -> void:
 	var absolute_folder := absolute_root.path_join(target)
 	var error := DirAccess.make_dir_recursive_absolute(absolute_folder)
 	if error != OK and error != ERR_ALREADY_EXISTS:
-		push_error("Не удалось создать папку для снимков: %s (код %d)" % [absolute_folder, error])
+		push_error(
+			"Could not create the screenshot folder: %s (code %d)" % [absolute_folder, error]
+		)
 		return
 	mark_ignored_by_engine(absolute_root)
 
@@ -548,7 +550,7 @@ func capture(label: String, folder: String = "") -> void:
 	var image := get_viewport().get_texture().get_image()
 	error = image.save_jpg(absolute_path, JPEG_QUALITY)
 	if error != OK:
-		push_error("Не удалось сохранить снимок %s (код %d)" % [absolute_path, error])
+		push_error("Could not save screenshot %s (code %d)" % [absolute_path, error])
 		return
 
 	print("[screenshot] %s" % absolute_path)
@@ -587,7 +589,7 @@ func _wait_for_the_player() -> void:
 		return
 
 	if not await level.wait_for_the_landing():
-		push_warning("Otto не встал на крышу, сценарий идёт как есть")
+		push_warning("Otto did not land on the roof, the script goes on as is")
 
 
 ## The building being captured. It sits directly in the current scene: [Main] puts it
@@ -612,7 +614,7 @@ func _plan_for(milestone: String) -> Array:
 	var key := milestone.to_upper()
 	if AUTO_PLANS.has(key):
 		return AUTO_PLANS[key]
-	push_warning("Нет плана съёмки для вехи «%s», снимается %s" % [milestone, DEFAULT_PLAN])
+	push_warning("No shot plan for milestone '%s', shooting %s" % [milestone, DEFAULT_PLAN])
 	return AUTO_PLANS[DEFAULT_PLAN]
 
 
@@ -657,7 +659,7 @@ static func mark_ignored_by_engine(root_folder: String) -> void:
 		return
 	var file := FileAccess.open(marker, FileAccess.WRITE)
 	if file == null:
-		push_error("Не удалось создать %s (код %d)" % [marker, FileAccess.get_open_error()])
+		push_error("Could not create %s (code %d)" % [marker, FileAccess.get_open_error()])
 		return
 	file.close()
 

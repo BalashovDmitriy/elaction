@@ -67,22 +67,22 @@ def is_fresh() -> bool:
 
 def run(command: list[str]) -> int:
     if is_fresh():
-        print(f"Пропуск: {' '.join(command)} — это дерево уже проверено check.ps1.")
+        print(f"Skipped: {' '.join(command)} — this tree has already been checked by check.ps1.")
         return 0
     return subprocess.run(command, cwd=PROJECT_ROOT).returncode
 
 
 def main() -> int:
     use_utf8_output()
-    parser = argparse.ArgumentParser(description="Отпечаток дерева, прошедшего check.ps1.")
+    parser = argparse.ArgumentParser(description="Stamp of a tree that passed check.ps1.")
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--write", action="store_true", help="записать отпечаток текущего дерева")
-    group.add_argument("--run", nargs=argparse.REMAINDER, help="команда, которую пропустить на проверенном дереве")
+    group.add_argument("--write", action="store_true", help="write the stamp of the current tree")
+    group.add_argument("--run", nargs=argparse.REMAINDER, help="command to skip on a checked tree")
     args = parser.parse_args()
     if args.write:
         return write()
     if not args.run:
-        parser.error("--run требует команду")
+        parser.error("--run needs a command")
     return run(args.run)
 
 

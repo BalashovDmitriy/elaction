@@ -84,7 +84,7 @@ func _ledge_over(depth: float) -> Otto:
 func _standing_otto() -> Otto:
 	var otto := _otto_at(LEDGE_X - 1.0, 0.05)
 	await wait_physics_frames(4)
-	assert_true(otto.is_grounded(), "Otto встал на верхнюю плиту")
+	assert_true(otto.is_grounded(), "Otto stood on the upper slab")
 	return otto
 
 
@@ -110,7 +110,7 @@ func _over_a_car(stop: float) -> Otto:
 ## Landed exactly on the cab's roof and did not fly past.
 func _assert_on_the_roof(otto: Otto, stop: float) -> void:
 	var roof := -stop + Proportions.CLEARANCE
-	assert_almost_eq(otto.global_position.y, roof, 0.1, "Otto на крыше кабины")
+	assert_almost_eq(otto.global_position.y, roof, 0.1, "Otto on the cab roof")
 
 
 ## Steps right off the edge and waits until Otto stands again — lower than he stood.
@@ -128,13 +128,13 @@ func _step_off(otto: Otto, jump: bool = false) -> void:
 		if fell and (otto.is_grounded() or otto.is_dead()):
 			break
 	_release()
-	assert_true(fell, "Otto сошёл с края")
+	assert_true(fell, "Otto stepped off the edge")
 
 
 func test_falling_one_floor_is_survivable() -> void:
 	var otto := await _ledge_over(FLOOR)
 	await _step_off(otto)
-	assert_false(otto.is_dead(), "на этаж ниже спрыгнуть можно")
+	assert_false(otto.is_dead(), "you can jump down one floor")
 
 
 func test_jumping_down_one_floor_is_survivable() -> void:
@@ -142,13 +142,13 @@ func test_jumping_down_one_floor_is_survivable() -> void:
 	# top of the flight.
 	var otto := await _ledge_over(FLOOR)
 	await _step_off(otto, true)
-	assert_false(otto.is_dead(), "с прыжка на этаж ниже — тоже")
+	assert_false(otto.is_dead(), "from a jump one floor down too")
 
 
 func test_falling_two_floors_is_deadly() -> void:
 	var otto := await _ledge_over(FLOOR * 2.0)
 	await _step_off(otto)
-	assert_true(otto.is_dead(), "с двух этажей — смерть")
+	assert_true(otto.is_dead(), "two floors is death")
 
 
 func test_own_jump_on_the_spot_is_not_a_fall() -> void:
@@ -158,8 +158,8 @@ func test_own_jump_on_the_spot_is_not_a_fall() -> void:
 	await wait_physics_frames(2)
 	Input.action_release(&"jump")
 	await wait_physics_frames(60)
-	assert_true(otto.is_grounded(), "приземлился")
-	assert_false(otto.is_dead(), "свой прыжок — не падение")
+	assert_true(otto.is_grounded(), "landed")
+	assert_false(otto.is_dead(), "his own jump is not a fall")
 
 
 func test_a_teleport_down_is_not_a_fall() -> void:
@@ -169,8 +169,8 @@ func test_a_teleport_down_is_not_a_fall() -> void:
 	var otto := await _standing_otto()
 	otto.global_position = Vector3(0.0, -FLOOR * 3.0 + 0.5, WorldSpace.PLAY_Z)
 	await wait_physics_frames(30)
-	assert_true(otto.is_grounded(), "встал на нижнюю плиту")
-	assert_false(otto.is_dead(), "переставленный не разбивается")
+	assert_true(otto.is_grounded(), "stood on the lower slab")
+	assert_false(otto.is_dead(), "a repositioned one does not die")
 
 
 func test_landing_on_a_car_roof_one_floor_down_is_survivable() -> void:
@@ -178,14 +178,14 @@ func test_landing_on_a_car_roof_one_floor_down_is_survivable() -> void:
 	var otto := await _over_a_car(FLOOR * 2.0)
 	await _step_off(otto)
 	_assert_on_the_roof(otto, FLOOR * 2.0)
-	assert_false(otto.is_dead(), "на кабину этажом ниже спрыгнуть можно")
+	assert_false(otto.is_dead(), "you can jump onto a cab one floor down")
 
 
 func test_landing_on_a_car_roof_two_floors_down_is_deadly() -> void:
 	var otto := await _over_a_car(FLOOR * 3.0)
 	await _step_off(otto)
 	_assert_on_the_roof(otto, FLOOR * 3.0)
-	assert_true(otto.is_dead(), "крыша кабины с двух этажей не спасает")
+	assert_true(otto.is_dead(), "the cab roof does not save from two floors")
 
 
 func test_riding_a_car_down_is_not_a_fall() -> void:
@@ -194,7 +194,7 @@ func test_riding_a_car_down_is_not_a_fall() -> void:
 	car.setup(PackedFloat32Array([0.0, FLOOR, FLOOR * 2.0, FLOOR * 3.0]), 0)
 	var otto := _otto_at(0.0, 0.02)
 	await wait_physics_frames(4)
-	assert_true(otto.is_riding(), "Otto в кабине")
+	assert_true(otto.is_riding(), "Otto in the cab")
 
 	Input.action_press(&"move_down")
 	var left := RIDE_FRAMES
@@ -204,9 +204,9 @@ func test_riding_a_car_down_is_not_a_fall() -> void:
 	Input.action_release(&"move_down")
 	await wait_physics_frames(10)
 	assert_almost_eq(
-		WorldSpace.to_plane(car.global_position).y, FLOOR * 3.0, 0.05, "доехал до низа"
+		WorldSpace.to_plane(car.global_position).y, FLOOR * 3.0, 0.05, "rode to the bottom"
 	)
-	assert_false(otto.is_dead(), "спуск в кабине — не падение")
+	assert_false(otto.is_dead(), "a ride down in the cab is not a fall")
 
 
 func test_riding_a_car_roof_down_is_not_a_fall() -> void:
@@ -216,14 +216,14 @@ func test_riding_a_car_roof_down_is_not_a_fall() -> void:
 	car.setup(PackedFloat32Array([0.0, FLOOR, FLOOR * 2.0, FLOOR * 3.0]), 0)
 	var otto := _otto_at(0.0, Proportions.CLEARANCE + 0.05)
 	await wait_physics_frames(4)
-	assert_true(otto.is_grounded(), "Otto стоит на крыше")
-	assert_false(otto.is_riding(), "с крыши кабиной не управляют")
+	assert_true(otto.is_grounded(), "Otto stands on the roof")
+	assert_false(otto.is_riding(), "the cab is not controlled from the roof")
 
 	var left := ROOF_RIDE_FRAMES
 	while left > 0 and WorldSpace.to_plane(car.global_position).y < FLOOR * 3.0 - 0.01:
 		await wait_physics_frames(1)
 		left -= 1
 	assert_almost_eq(
-		WorldSpace.to_plane(car.global_position).y, FLOOR * 3.0, 0.05, "кабина доехала до низа"
+		WorldSpace.to_plane(car.global_position).y, FLOOR * 3.0, 0.05, "the cab rode to the bottom"
 	)
-	assert_false(otto.is_dead(), "спуск на крыше — не падение")
+	assert_false(otto.is_dead(), "a ride down on the roof is not a fall")

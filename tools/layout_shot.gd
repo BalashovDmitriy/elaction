@@ -161,7 +161,7 @@ func _run() -> void:
 
 	var walled := _floor_with_a_wall()
 	if walled == BuildingRules.ROOF:
-		push_error("на сиде %d стен не выпало — кадр стены снять не с чего" % _seed)
+		push_error("no walls on seed %d — nothing to shoot" % _seed)
 		get_tree().quit(1)
 		return
 	await _shoot_the_wall("04_inner_wall", walled)
@@ -170,7 +170,7 @@ func _run() -> void:
 	await _shoot_garage("07_garage")
 	await _shoot_effects("08_effects", 2)
 
-	print("  кадры раскладки в %s" % _folder)
+	print("  layout shots in %s" % _folder)
 	get_tree().quit(0)
 
 
@@ -203,7 +203,7 @@ func _shoot_garage(label: String) -> void:
 func _shoot_floor(label: String, index: int) -> void:
 	var spots := _level.plan().safe_spots(_level.rules, index)
 	if spots.is_empty():
-		push_error("этаж %d: вставать некуда" % index)
+		push_error("floor %d: nowhere to stand" % index)
 		return
 	_place(spots[spots.size() / 2], index)
 	await _shoot(label, index)
@@ -215,7 +215,7 @@ func _shoot_the_wall(label: String, index: int) -> void:
 	var wall_x := _wall_x(index)
 	var spots := _level.plan().safe_spots(_level.rules, index)
 	if spots.is_empty():
-		push_error("этаж %d: вставать некуда" % index)
+		push_error("floor %d: nowhere to stand" % index)
 		return
 	# A grid step, not a slot coordinate: [method BuildingRules.slot_x] returns "where",
 	# and here we need "how far to the side".
@@ -235,7 +235,7 @@ func _shoot(label: String, index: int) -> void:
 	var path := "%s/%s.png" % [_folder, label]
 	image.save_png(path)
 	var rules := _level.rules
-	print("  %s — этаж %d, ширина %.1f м" % [path, index, rules.floor_width(index)])
+	print("  %s — floor %d, width %.1f m" % [path, index, rules.floor_width(index)])
 
 
 ## The first floor from the top on which the layout placed a wall. [constant
@@ -272,7 +272,7 @@ func _shoot_effects(label: String, index: int) -> void:
 	var image := get_viewport().get_texture().get_image()
 	var path := "%s/%s.png" % [_folder, label]
 	image.save_png(path)
-	print("  %s — искры и кровь, этаж %d" % [path, index])
+	print("  %s — sparks and blood, floor %d" % [path, index])
 
 
 ## The first dark floor of the map from the top (ADR-0028, decision 4).

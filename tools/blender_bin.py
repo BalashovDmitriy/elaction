@@ -79,7 +79,7 @@ def require_blender() -> str:
     """Like find_blender, but prints a hint and exits the process if Blender is missing."""
     blender = find_blender()
     if blender is None:
-        print("Blender не найден. Установите его или задайте BLENDER_BIN=<путь к blender>.")
+        print("Blender not found. Install it or set BLENDER_BIN=<path to blender>.")
         print("Windows: winget install --id BlenderFoundation.Blender")
         raise SystemExit(127)
     return blender
@@ -106,7 +106,7 @@ def run_script(blender: str, script: Path, args: list[str] | None = None, timeou
         )
     except subprocess.TimeoutExpired as expired:
         output = as_text(expired.stdout) + as_text(expired.stderr)
-        return TIMEOUT_EXIT_CODE, f"{output}\nBlender не ответил за {timeout} с и был снят."
+        return TIMEOUT_EXIT_CODE, f"{output}\nBlender did not respond within {timeout} s and was killed."
     return completed.returncode, (completed.stdout or "") + (completed.stderr or "")
 
 

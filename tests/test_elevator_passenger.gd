@@ -33,9 +33,9 @@ func _run(motion: ElevatorMotion, seconds: float, command: float, occupied: bool
 func test_car_boarded_on_the_way_carries_on_to_its_floor() -> void:
 	var motion := _shaft(2)
 	_run(motion, 1.5, 0.0, false)
-	assert_between(motion.position, MIDDLE + 20.0, BOTTOM - 20.0, "пустая кабина на пути вверх")
+	assert_between(motion.position, MIDDLE + 20.0, BOTTOM - 20.0, "the empty car on its way up")
 	assert_almost_eq(_run(motion, 1.0, 0.0, true), MIDDLE, 0.01)
-	assert_true(motion.is_aligned(), "доехала до этажа, куда шла")
+	assert_true(motion.is_aligned(), "reached the floor it was heading to")
 
 
 func test_car_boarded_on_the_way_obeys_and_then_runs_on_to_a_floor() -> void:
@@ -46,8 +46,10 @@ func test_car_boarded_on_the_way_obeys_and_then_runs_on_to_a_floor() -> void:
 	_run(motion, 0.3, ElevatorMotion.UP, true)
 	# Released between the bottom and the middle while moving up: it carries on to the
 	# middle instead of going back to the bottom it left.
-	assert_almost_eq(_run(motion, 2.0, 0.0, true), MIDDLE, 0.01, "доехала не до этажа по ходу")
-	assert_true(motion.is_aligned(), "отпущенная пассажиром — на этаже")
+	assert_almost_eq(
+		_run(motion, 2.0, 0.0, true), MIDDLE, 0.01, "did not reach the floor along the way"
+	)
+	assert_true(motion.is_aligned(), "released by the passenger - on a floor")
 
 
 func test_the_next_passenger_rides_on_to_a_floor() -> void:
@@ -57,6 +59,6 @@ func test_the_next_passenger_rides_on_to_a_floor() -> void:
 	_run(motion, 0.6, ElevatorMotion.UP, true)
 	_run(motion, 0.8, 0.0, true)
 	_run(motion, 1.2, 0.0, false)
-	assert_false(motion.is_aligned(), "пустая кабина снова в пути")
+	assert_false(motion.is_aligned(), "the empty car is on its way again")
 	_run(motion, 1.0, 0.0, true)
-	assert_true(motion.is_aligned(), "вошедший на ходу — доехала")
+	assert_true(motion.is_aligned(), "someone boarded on the move - it arrived")

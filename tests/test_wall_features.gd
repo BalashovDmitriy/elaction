@@ -29,17 +29,25 @@ func test_each_kind_lines_its_own_wall() -> void:
 				kinds[feature.kind] = true
 		match kind:
 			BuildingIdentity.Kind.HOTEL:
-				assert_eq(kinds.keys().size(), WallFeatures.HOTEL.size(), "у отеля ниши и зеркала")
-				for name: String in kinds:
-					assert_has(WallFeatures.HOTEL, name, "у отеля только своё")
-			BuildingIdentity.Kind.RESIDENTIAL:
 				assert_eq(
-					kinds.keys().size(), WallFeatures.RESIDENTIAL.size(), "у жилого дома всё своё"
+					kinds.keys().size(),
+					WallFeatures.HOTEL.size(),
+					"the hotel has niches and mirrors"
 				)
 				for name: String in kinds:
-					assert_has(WallFeatures.RESIDENTIAL, name, "у жилого дома только своё")
+					assert_has(WallFeatures.HOTEL, name, "the hotel has only its own")
+			BuildingIdentity.Kind.RESIDENTIAL:
+				assert_eq(
+					kinds.keys().size(),
+					WallFeatures.RESIDENTIAL.size(),
+					"the residential building has all its own"
+				)
+				for name: String in kinds:
+					assert_has(
+						WallFeatures.RESIDENTIAL, name, "the residential building has only its own"
+					)
 			_:
-				assert_eq(kinds.size(), 0, "у офиса на стекле ничего")
+				assert_eq(kinds.size(), 0, "the office has nothing on the glass")
 
 
 ## An element does not hide behind furniture: behind a tall piece — none, like a painting, and in
@@ -58,18 +66,20 @@ func test_features_keep_off_openings_pictures_and_furniture() -> void:
 					rules, plan, building_seed, identity, dressing
 				):
 					var where := (
-						"тип %d, навык %d, сид %d, этаж %d: %s"
+						"kind %d, skill %d, seed %d, floor %d: %s"
 						% [kind, skill, building_seed, feature.floor_index, feature.kind]
 					)
 					var zones := BuildingDressing.blocked_zones(rules, plan, feature.floor_index)
-					assert_false(WallFeatures.clashes(zones, feature), where + " на занятом")
-					assert_lt(feature.floor_index, rules.floors - 1, where + " в гараже")
+					assert_false(
+						WallFeatures.clashes(zones, feature), where + " on an occupied spot"
+					)
+					assert_lt(feature.floor_index, rules.floors - 1, where + " in the garage")
 					for hung: BuildingDressing.PropSpot in dressing.decor:
 						if hung.floor_index == feature.floor_index:
 							assert_gte(
 								absf(hung.x - feature.x),
 								WallFeatures.DECOR_CLEAR,
-								where + " на картине"
+								where + " on a painting"
 							)
 					var half: float = WallFeatures.HALF[feature.kind]
 					for prop: BuildingDressing.PropSpot in dressing.props:
@@ -77,11 +87,11 @@ func test_features_keep_off_openings_pictures_and_furniture() -> void:
 							continue
 						if absf(prop.x - feature.x) >= prop.width * 0.5 + half:
 							continue
-						assert_ne(feature.kind, "stairs", where + " за " + prop.name)
+						assert_ne(feature.kind, "stairs", where + " behind " + prop.name)
 						assert_lte(
 							PropCatalog.footprint(prop.name).y,
 							BuildingDressing.TALL,
-							where + " за высоким " + prop.name
+							where + " behind a tall " + prop.name
 						)
 
 
@@ -118,8 +128,8 @@ func test_features_clear_the_wainscot() -> void:
 					# as behind a skirting in real life, — this does not apply to them.
 					if low < rail_top - 0.001 and what != "risers":
 						low_parts += 1
-						assert_gte(face, front, "тип %d: %s за панелью низа" % [kind, what])
-	assert_gt(low_parts, 0, "дверь на лестницу до пола проверена")
+						assert_gte(face, front, "kind %d: %s behind the lower panel" % [kind, what])
+	assert_gt(low_parts, 0, "the stairs door down to the floor is checked")
 
 
 ## On a dark floor the niche does not glow: the light is off by the ROM rules.
@@ -131,14 +141,14 @@ func test_a_niche_on_a_dark_floor_stays_dark() -> void:
 	var dark := WallFeatures.Feature.new()
 	dark.kind = "niche"
 	dark.floor_index = _floor(rules, true)
-	assert_gte(dark.floor_index, 0, "тёмный этаж по карте есть")
+	assert_gte(dark.floor_index, 0, "there is a dark floor on the map")
 	var features := WallFeatures.new()
 	add_child_autofree(features)
 	features.build(rules, [lit, dark] as Array[WallFeatures.Feature])
 	var glow := features.find_child("Glow", false, false) as MultiMeshInstance3D
 	var off := features.find_child("Glow Off", false, false) as MultiMeshInstance3D
-	assert_not_null(glow, "на светлом — подсветка")
-	assert_not_null(off, "на тёмном — погашенная")
+	assert_not_null(glow, "on a lit one: backlight")
+	assert_not_null(off, "on a dark one: switched off")
 
 
 ## The first floor that is dark by the map, or a lit one.

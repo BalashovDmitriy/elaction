@@ -410,7 +410,7 @@ def _keep_clips(armature) -> None:
             bpy.data.actions.remove(action)
     missing = set(CLIPS.values()) - {action.name for action in bpy.data.actions}
     if missing:
-        raise RuntimeError("в паке нет клипов: " + ", ".join(sorted(missing)))
+        raise RuntimeError("no clips in the pack: " + ", ".join(sorted(missing)))
 
 
 def _stage_clips(armature) -> None:
@@ -437,7 +437,7 @@ def _strip_ual(full: Path) -> str:
         None,
     )
     if kind is None:
-        raise RuntimeError("не узнаю библиотеку по скелету: " + full.name)
+        raise RuntimeError("cannot recognise the library by its skeleton: " + full.name)
     wanted = UAL_LIBRARIES[kind]["clips"]
     for obj in list(bpy.context.scene.objects):
         if obj is not rig:
@@ -451,7 +451,7 @@ def _strip_ual(full: Path) -> str:
             bpy.data.actions.remove(action)
     missing = set(wanted) - {action.name for action in bpy.data.actions}
     if missing:
-        raise RuntimeError(f"в {kind} нет клипов: " + ", ".join(sorted(missing)))
+        raise RuntimeError(f"no clips in {kind}: " + ", ".join(sorted(missing)))
     _stage_clips(rig)
     _export(UAL_LIBRARIES[kind]["source"])
     return kind
@@ -899,7 +899,7 @@ def _material_box(meshes, material_name: str):
                 low = Vector(map(min, low, world))
                 high = Vector(map(max, high, world))
     if low.x == float("inf"):
-        raise RuntimeError("в модели нет материала " + material_name)
+        raise RuntimeError("no such material in the model: " + material_name)
     return low, high
 
 
@@ -1001,7 +1001,7 @@ def _car(name: str) -> None:
             low = Vector(map(min, low, world))
             high = Vector(map(max, high, world))
     if count == 0:
-        raise RuntimeError(name + ": у машины нет фар — не понять, где перед")
+        raise RuntimeError(name + ": the car has no headlights — cannot tell which end is the front")
     lights /= count
     size = high - low
     centre = (low + high) * 0.5
@@ -1116,7 +1116,7 @@ def _cabin_box(body):
         low = Vector(map(min, low, centre))
         high = Vector(map(max, high, centre))
     if low.x == float("inf"):
-        raise RuntimeError(body.name + ": нет стёкол — не понять, где салон")
+        raise RuntimeError(body.name + ": no glass — cannot tell where the cabin is")
     sill = body_low + DOOR_SILL_LIFT
     return Vector((low.x, -0.27, sill)), Vector((high.x, 0.27, high.z + 0.02))
 
@@ -1153,7 +1153,7 @@ def _cut_the_door(body, cabin, kind: dict) -> None:
         and face.normal.y > 0.45
     ]
     if not door_faces:
-        raise RuntimeError(body.name + ": у борта нет граней под дверь")
+        raise RuntimeError(body.name + ": the side has no faces for a door")
     chosen = set(door_faces)
     rim = [edge for edge in {e for f in door_faces for e in f.edges} if any(f not in chosen for f in edge.link_faces)]
 
@@ -1469,10 +1469,10 @@ def _names() -> list[str]:
 def _parser() -> argparse.ArgumentParser:
     """One parser for both halves: outside — the whole command line, inside
     Blender — what remains after `--`."""
-    parser = argparse.ArgumentParser(description="Сборка моделей актёров через Blender.")
-    parser.add_argument("names", nargs="*", help="кого собирать; по умолчанию всех")
-    parser.add_argument("--list", action="store_true", help="перечислить и выйти")
-    parser.add_argument("--out", type=Path, default=OUT_DIR, help="куда писать .glb")
+    parser = argparse.ArgumentParser(description="Build actor models through Blender.")
+    parser.add_argument("names", nargs="*", help="whom to build; all by default")
+    parser.add_argument("--list", action="store_true", help="list and exit")
+    parser.add_argument("--out", type=Path, default=OUT_DIR, help="where to write .glb")
     return parser
 
 
@@ -1492,12 +1492,12 @@ def main() -> int:
     if wanted[0] == "ual":
         if len(wanted) != 2 or not Path(wanted[1]).is_file():
             urls = ", ".join(library["url"] for library in UAL_LIBRARIES.values())
-            print(f"Нужен путь к .glb библиотеки для Godot — архивы на {urls}")
+            print(f"A path to the library .glb for Godot is needed — archives at {urls}")
             return 2
         wanted = ["ual", str(Path(wanted[1]).resolve())]
     unknown = [name for name in wanted if name not in _names() and wanted[0] != "ual"]
     if unknown:
-        print("Не знаю таких актёров: " + ", ".join(unknown))
+        print("Unknown actors: " + ", ".join(unknown))
         return 2
 
     blender = require_blender()
@@ -1508,7 +1508,7 @@ def main() -> int:
         if line.strip().endswith(".glb") or "Error" in line or "Traceback" in line or "rror:" in line:
             print(line)
     if code != 0:
-        print(f"Blender завершился с кодом {code}")
+        print(f"Blender exited with code {code}")
         return 1
     # A folder outside the project (`--out` in temp) is printed as is: relative_to fails on it.
     shown = (
@@ -1516,7 +1516,7 @@ def main() -> int:
         if out_dir.is_relative_to(PROJECT_ROOT)
         else str(out_dir)
     )
-    print(f"Модели в {shown}/")
+    print(f"Models in {shown}/")
     return 0
 
 

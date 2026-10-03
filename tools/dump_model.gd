@@ -25,7 +25,7 @@ func _run() -> void:
 
 	var packed := load(path) as PackedScene
 	if packed == null:
-		print("не грузится: %s" % path)
+		print("failed to load: %s" % path)
 		quit(1)
 		return
 	var model := packed.instantiate()
@@ -37,7 +37,7 @@ func _run() -> void:
 
 	var skeleton := _skeleton_of(model)
 	if skeleton == null:
-		print("скелета нет")
+		print("no skeleton")
 	else:
 		_dump_bones(skeleton)
 		_probe_axes(skeleton)
@@ -61,14 +61,14 @@ func _skeleton_of(model: Node) -> Skeleton3D:
 
 
 func _dump_bones(skeleton: Skeleton3D) -> void:
-	print("--- кости (%d) ---" % skeleton.get_bone_count())
+	print("--- bones (%d) ---" % skeleton.get_bone_count())
 	for index in skeleton.get_bone_count():
 		var rest := skeleton.get_bone_rest(index)
 		var parent := skeleton.get_bone_parent(index)
 		var parent_name := skeleton.get_bone_name(parent) if parent >= 0 else "-"
 		print(
 			(
-				"%-8s родитель %-8s покой %s  оси X %s Y %s Z %s"
+				"%-8s parent %-8s rest %s  axes X %s Y %s Z %s"
 				% [
 					skeleton.get_bone_name(index),
 					parent_name,
@@ -85,7 +85,7 @@ func _dump_bones(skeleton: Skeleton3D) -> void:
 ## its end moved relative to rest. The end is a point ten centimetres
 ## along the bone axis; the direction of the shift along Z is the sign of "forward".
 func _probe_axes(skeleton: Skeleton3D) -> void:
-	print("--- проба: +%.0f° вокруг локальной X ---" % PROBE_ANGLE)
+	print("--- probe: +%.0f° around local X ---" % PROBE_ANGLE)
 	for index in skeleton.get_bone_count():
 		skeleton.reset_bone_poses()
 		var rest_tip := _tip(skeleton, index)
@@ -96,7 +96,7 @@ func _probe_axes(skeleton: Skeleton3D) -> void:
 		)
 		skeleton.set_bone_pose_rotation(index, turned)
 		var moved := _tip(skeleton, index) - rest_tip
-		print("%-8s конец сдвинулся на %s" % [skeleton.get_bone_name(index), moved])
+		print("%-8s tip moved by %s" % [skeleton.get_bone_name(index), moved])
 	skeleton.reset_bone_poses()
 
 
@@ -113,11 +113,11 @@ func _dump_meshes(model: Node) -> void:
 		var skinned := mesh_instance.skin != null
 		print(
 			(
-				"--- меш %s: поверхностей %d, AABB %s, скин %s ---"
+				"--- mesh %s: surfaces %d, AABB %s, skin %s ---"
 				% [mesh_instance.name, mesh.get_surface_count(), mesh.get_aabb(), skinned]
 			)
 		)
 		for surface in mesh.get_surface_count():
 			var material := mesh.surface_get_material(surface) as BaseMaterial3D
 			var colour := material.albedo_color if material != null else Color.MAGENTA
-			print("    поверхность %d: %s" % [surface, colour])
+			print("    surface %d: %s" % [surface, colour])

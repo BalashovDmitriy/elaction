@@ -50,8 +50,8 @@ func test_the_view_is_the_frame_around_the_centre() -> void:
 
 func test_smoothing_moves_towards_the_target_without_passing_it() -> void:
 	var moved := CameraBounds.smoothed(Vector2.ZERO, Vector2(10.0, 0.0), 8.0, 1.0 / 60.0)
-	assert_gt(moved.x, 0.0, "камера обязана двинуться")
-	assert_lt(moved.x, 10.0, "и не обязана долетать за один кадр")
+	assert_gt(moved.x, 0.0, "the camera must move")
+	assert_lt(moved.x, 10.0, "and need not arrive in one frame")
 
 
 func test_smoothing_off_snaps_to_the_target() -> void:
@@ -76,5 +76,5 @@ func test_the_camera_comes_to_rest() -> void:
 	var target := Vector2(3.0, -2.0)
 	for _frame in 240:
 		at = CameraBounds.smoothed(at, target, 8.0, 1.0 / 60.0)
-	assert_eq(at, target, "за четыре секунды камера встала в цель")
-	assert_eq(CameraBounds.smoothed(at, target, 8.0, 1.0 / 60.0), target, "и больше не сдвигается")
+	assert_eq(at, target, "in four seconds the camera reached the target")
+	assert_eq(CameraBounds.smoothed(at, target, 8.0, 1.0 / 60.0), target, "and no longer moves")

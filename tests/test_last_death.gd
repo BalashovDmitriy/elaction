@@ -26,31 +26,33 @@ func _play() -> LastDeath:
 
 func test_the_world_slows_down_and_comes_back() -> void:
 	var scene := _play()
-	assert_almost_eq(Engine.time_scale, LastDeath.SLOW, 0.001, "мир замедлен")
+	assert_almost_eq(Engine.time_scale, LastDeath.SLOW, 0.001, "world is slowed")
 	scene.advance(LastDeath.DURATION * 0.5)
-	assert_false(_finished, "на середине сцена ещё идёт")
+	assert_false(_finished, "mid-way the scene is still running")
 	scene.advance(LastDeath.DURATION)
-	assert_true(_finished, "потом — конец партии")
-	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "и мир в своём темпе")
+	assert_true(_finished, "then — game over")
+	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "and the world is at its own pace")
 
 
 ## Tests run the world sped up: the slowdown is relative to that tempo, not to one.
 func test_the_slowdown_is_relative() -> void:
 	Engine.time_scale = 4.0
 	var scene := _play()
-	assert_almost_eq(Engine.time_scale, 4.0 * LastDeath.SLOW, 0.001, "втрое медленнее прежнего")
+	assert_almost_eq(
+		Engine.time_scale, 4.0 * LastDeath.SLOW, 0.001, "three times slower than before"
+	)
 	scene.advance(LastDeath.DURATION)
-	assert_almost_eq(Engine.time_scale, 4.0, 0.001, "и прежний темп вернулся")
+	assert_almost_eq(Engine.time_scale, 4.0, 0.001, "and the former pace is back")
 
 
 func test_a_dropped_scene_does_not_leave_the_world_slow() -> void:
 	var scene := _play()
 	scene.free()
-	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "выброшенная сцена темп вернула")
+	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "a discarded scene restored the pace")
 
 
 ## The scene runs by the real clock: in a slowed world it does not stretch.
 func test_the_scene_runs_on_real_time() -> void:
 	_play()
-	await wait_seconds(LastDeath.DURATION + 0.5, "сцена по настоящим часам")
-	assert_true(_finished, "кончилась в свой срок")
+	await wait_seconds(LastDeath.DURATION + 0.5, "scene by the real clock")
+	assert_true(_finished, "ended on time")

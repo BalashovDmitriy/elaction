@@ -260,7 +260,7 @@ func step() -> void:
 		_press(&"shoot")
 	elif shoots_lamps and _lamp_in_line() != null and _press(&"shoot"):
 		lamp_shots += 1
-		_decision = "сбиваю лампу"
+		_decision = "shooting the lamp"
 
 
 ## The lamp the bullet will hit if fired now, or null: Otto rides in a cab, the gun is at lamp
@@ -306,7 +306,7 @@ func _log_the_decision() -> void:
 ## against the wall until the end of the run.
 func _advance(floor_index: int) -> void:
 	if _riding_further():
-		_decision = "едем к этажу %d %s" % [_ride_to, "вниз" if _riding_down else "вверх"]
+		_decision = "riding to floor %d %s" % [_ride_to, "down" if _riding_down else "up"]
 		_ride_on()
 		return
 	if _otto.is_riding() and not _car_aligned_under_otto():
@@ -314,7 +314,7 @@ func _advance(floor_index: int) -> void:
 		# along its direction by itself (ADR-0053, decision 1), but the bot drives it to the nearest one:
 		# that one can also be behind.
 		var nearest := _rules.floor_surface(floor_index)
-		_decision = "довожу кабину до этажа %d" % floor_index
+		_decision = "bringing the cab to floor %d" % floor_index
 		# Near a floor the cab finishes the way by itself, you only need to release it: holding a
 		# direction means rocking it around the floor.
 		if absf(_at(_otto).y - nearest) > SETTLE_BY_ITSELF:
@@ -333,18 +333,18 @@ func _advance(floor_index: int) -> void:
 		# it, and the previous — successful — decision would send the investigation exactly where
 		# everything is fine.
 		_decision = (
-			"хода нет: цель %s на %d"
-			% ["документ" if bool(goal["enter"]) else "выход", int(goal["floor"])]
+			"no way: goal %s on %d"
+			% ["document" if bool(goal["enter"]) else "exit", int(goal["floor"])]
 		)
 		return
 
 	_decision = (
-		"%s к x=%.1f → этаж %d, цель %s на %d"
+		"%s to x=%.1f → floor %d, goal %s on %d"
 		% [
 			move["kind"],
 			float(move["x"]),
 			int(move["floor"]),
-			"документ" if bool(goal["enter"]) else "выход",
+			"document" if bool(goal["enter"]) else "exit",
 			int(goal["floor"])
 		]
 	)
@@ -511,7 +511,7 @@ func _dodge(bullet_height: float, threat: Enemy = null) -> void:
 	if pounce != 0.0 and _otto.is_grounded():
 		_press(&"move_right" if pounce > 0.0 else &"move_left")
 		if _press(&"jump"):
-			_decision = "прыгаю на лежачего"
+			_decision = "pouncing on a prone agent"
 			return
 	if _otto.is_grounded() and _press(&"jump"):
 		return
@@ -565,10 +565,10 @@ func _close_in(threat: Enemy) -> void:
 	var gap := absf(threat.global_position.x - _otto.global_position.x)
 	var facing_it := is_equal_approx(_otto.facing(), side) or is_zero_approx(side)
 	if facing_it and gap <= Takedown.REACH * 0.85:
-		_decision = "добиваю"
+		_decision = "taking down"
 		_press(&"shoot")
 		return
-	_decision = "иду добивать"
+	_decision = "going for a takedown"
 	_press(&"move_right" if side > 0.0 else &"move_left")
 
 

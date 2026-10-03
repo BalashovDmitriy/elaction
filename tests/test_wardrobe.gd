@@ -11,12 +11,12 @@ const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 
 func test_every_kind_of_building_has_its_agent() -> void:
 	assert_eq(
-		AgentWardrobe.MODELS.size(), BuildingIdentity.Kind.size(), "у каждого типа свой агент"
+		AgentWardrobe.MODELS.size(), BuildingIdentity.Kind.size(), "each kind has its own agent"
 	)
 	var paths := {}
 	for model: PackedScene in AgentWardrobe.MODELS:
 		paths[model.resource_path] = true
-	assert_eq(paths.size(), AgentWardrobe.MODELS.size(), "модели разные")
+	assert_eq(paths.size(), AgentWardrobe.MODELS.size(), "models differ")
 
 
 ## The hat is its own `hat` mesh: it flies off on a takedown (ADR-0050). The office agent
@@ -31,10 +31,12 @@ func test_hats_are_where_the_wardrobe_says() -> void:
 		var model := AgentWardrobe.MODELS[kind].instantiate()
 		autofree(model)
 		var hat := model.find_child("hat", true, false)
-		assert_eq(hat != null, hatted[kind], "тип %d: шляпа" % kind)
-		assert_not_null(model.find_child("*", true, false), "тип %d: модель не пустая" % kind)
+		assert_eq(hat != null, hatted[kind], "kind %d: hat" % kind)
+		assert_not_null(model.find_child("*", true, false), "kind %d: model is not empty" % kind)
 		assert_eq(
-			model.find_children("*", "Skeleton3D", true, false).size(), 1, "тип %d: скелет" % kind
+			model.find_children("*", "Skeleton3D", true, false).size(),
+			1,
+			"kind %d: skeleton" % kind
 		)
 
 
@@ -47,5 +49,7 @@ func test_a_dressed_agent_builds_its_body() -> void:
 		add_child_autofree(agent)
 		await wait_physics_frames(2)
 		var body := agent.get_node("Body") as FigureRig
-		assert_eq(body.model, AgentWardrobe.MODELS[kind], "тип %d: модель своего здания" % kind)
-		assert_not_null(body.skeleton(), "тип %d: скелет собран" % kind)
+		assert_eq(
+			body.model, AgentWardrobe.MODELS[kind], "kind %d: the model of its own building" % kind
+		)
+		assert_not_null(body.skeleton(), "kind %d: skeleton is built" % kind)

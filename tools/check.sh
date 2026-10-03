@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Полный прогон проверок проекта elaction (тот же набор, что и в CI).
+# Full run of the elaction project checks (the same set as in CI).
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -24,7 +24,7 @@ echo "== gdlint =="
 echo "== godot --headless --import =="
 python tools/godot_check.py
 
-echo "== тесты GUT =="
+echo "== GUT tests =="
 python tools/run_tests.py
 
-echo "Все проверки пройдены."
+echo "All checks passed."

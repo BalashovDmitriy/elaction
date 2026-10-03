@@ -34,7 +34,7 @@ func test_a_mean_agent_mostly_fires_lying() -> void:
 		brain.update(STEP, IN_FRONT, true)
 		if brain.stance == EnemyBrain.Stance.PRONE:
 			prone += 1
-	assert_gt(prone, 20, "злость 14 — лёжа в трёх случаях из четырёх")
+	assert_gt(prone, 20, "anger 14 — prone in three cases out of four")
 
 
 func test_a_calm_agent_never_fires_lying() -> void:
@@ -52,7 +52,7 @@ func test_a_crouching_target_is_shot_from_a_crouch() -> void:
 	brain.rng.seed = 1
 	_run(brain, 0.4, FAR_ABOVE)
 	brain.update(STEP, IN_FRONT, true, -1.0, true, true, true)
-	assert_ne(brain.stance, EnemyBrain.Stance.STAND, "по присевшему — не стоя")
+	assert_ne(brain.stance, EnemyBrain.Stance.STAND, "after a crouched one — not standing")
 
 
 ## Dodge by the ROM: from a high bullet onto a knee, from a low one — lying (@05F5).
@@ -69,12 +69,12 @@ func test_dodge_depends_on_anger() -> void:
 	_run(calm, 0.4, FAR_ABOVE)
 	for _frame: int in 60:
 		calm.update(STEP, FAR_ABOVE, true, 1.1)
-	assert_true(calm.is_standing(), "злость 0 — шанса нет")
+	assert_true(calm.is_standing(), "anger 0 — no chance")
 
 	var mean := _brain(15)
 	_run(mean, 0.4, FAR_ABOVE)
 	mean.update(STEP, FAR_ABOVE, true, 1.1)
-	assert_eq(mean.stance, EnemyBrain.Stance.KNEEL, "злость 15 — на колено с первого тика")
+	assert_eq(mean.stance, EnemyBrain.Stance.KNEEL, "anger 15 — to a knee from the first tick")
 
 
 ## A dodge is an action: the agent stands up when it has finished.
@@ -96,7 +96,7 @@ func test_height_follows_the_stance() -> void:
 	assert_eq(brain.height(), brain.kneel_height)
 	brain.stance = EnemyBrain.Stance.PRONE
 	assert_eq(brain.height(), brain.prone_height)
-	assert_false(brain.is_standing(), "лёжа агент не ходит")
+	assert_false(brain.is_standing(), "a prone agent does not walk")
 
 
 func test_the_dead_do_not_dodge() -> void:
@@ -117,5 +117,5 @@ func test_agent_strolls_and_pauses() -> void:
 			walked = true
 		else:
 			stood = true
-	assert_true(walked, "ходит")
-	assert_true(stood, "и стоит между переходами")
+	assert_true(walked, "walks")
+	assert_true(stood, "and stands between the moves")

@@ -3,7 +3,7 @@
 /android/
 *.translation
 
-# Сборки и экспорт
+# Builds and export
 /build/
 /dist/
 /export/
@@ -14,22 +14,22 @@
 *.apk
 *.aab
 
-# Секреты экспорта — никогда в репозиторий
+# Export secrets — never in the repository
 export_credentials.cfg
 *.keystore
 *.jks
 
-# Снимки экрана: локальный материал для анализа, в репозиторий не идут
+# Screenshots: local material for analysis, not committed
 /screens/
 
-# Локальные оверрайды настроек
+# Local settings overrides
 override.cfg
 
-# --- Python-тулинг (gdlint / gdformat / pre-commit) ---
+# --- Python tooling (gdlint / gdformat / pre-commit) ---
 .venv/
 venv/
 __pycache__/
-# Скачанные исходники звука (tools/build_audio.py)
+# Downloaded sound sources (tools/build_audio.py)
 /.cache/
 *.py[cod]
 
@@ -38,12 +38,12 @@ __pycache__/
 .vscode/
 *.swp
 
-# --- ОС ---
+# --- OS ---
 .DS_Store
 Thumbs.db
 
-# Рабочие копии агентов Claude Code
+# Claude Code agent worktrees
 /.claude/worktrees/
 
-# Журналы прогонов (RunLog): пишут тесты прохождения и инструменты
+# Run logs (RunLog): written by playthrough tests and tools
 /logs/

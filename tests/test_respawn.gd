@@ -17,12 +17,12 @@ func test_the_respawn_floor_is_never_below_the_fifth() -> void:
 			var rom := Arcade.rom_floor(back, floors)
 			assert_true(
 				rom >= Arcade.RESPAWN_FROM_FLOOR or back == BuildingRules.ROOF,
-				"этажей %d: с %d — на %d, этаж ROM %d" % [floors, index, back, rom]
+				"floors %d: from %d to %d, ROM floor %d" % [floors, index, back, rom]
 			)
 			if Arcade.rom_floor(index, floors) >= Arcade.RESPAWN_FROM_FLOOR:
-				assert_eq(back, index, "этажей %d: с %d увело зря" % [floors, index])
+				assert_eq(back, index, "floors %d: from %d moved needlessly" % [floors, index])
 			else:
-				assert_lt(back, index, "этажей %d: с %d не подняло" % [floors, index])
+				assert_lt(back, index, "floors %d: from %d did not move up" % [floors, index])
 
 
 ## On any floor of any building the return point is a place where one can stand, and
@@ -38,11 +38,11 @@ func test_the_respawn_spot_is_safe_on_any_building() -> void:
 				if spots.is_empty():
 					continue
 				var x := RespawnSpot.choose(plan, rules, index, NAN)
-				var where := "навык %d, сид %d, этаж %d" % [skill, building_seed, index]
-				assert_true(spots.has(x), "%s: x=%.2f не место" % [where, x])
+				var where := "skill %d, seed %d, floor %d" % [skill, building_seed, index]
+				assert_true(spots.has(x), "%s: x=%.2f is not a slot" % [where, x])
 				var open := RespawnSpot._off_pockets(plan, rules, index, spots)
 				if not open.is_empty():
-					assert_true(open.has(x), "%s: x=%.2f в кармане" % [where, x])
+					assert_true(open.has(x), "%s: x=%.2f in a pocket" % [where, x])
 
 
 ## If the floor has a red door with a document, Otto stands by it (@2FAA).
@@ -64,10 +64,10 @@ func test_otto_comes_back_at_the_red_door() -> void:
 					absf(x - door.x),
 					nearest,
 					0.001,
-					"навык %d, сид %d: не у красной двери" % [skill, building_seed]
+					"skill %d, seed %d: not at a red door" % [skill, building_seed]
 				)
 				checked += 1
-	assert_gt(checked, 0, "красных дверей не нашлось — тест ничего не проверил")
+	assert_gt(checked, 0, "no red doors found - the test checked nothing")
 
 
 ## After death the slots are free and release in turn: 10, 25, 40, 55 ticks.
@@ -85,19 +85,23 @@ func test_the_slots_come_back_one_after_another() -> void:
 		if slot >= 0:
 			opened.append(elapsed)
 			spawn.take(slot)
-	assert_eq(opened.size(), AgentSpawn.SLOTS, "открылись не все ячейки")
+	assert_eq(opened.size(), AgentSpawn.SLOTS, "not all slots opened")
 	for index in opened.size():
 		var due := Arcade.seconds(Arcade.RESPAWN_WAIT_TICKS[index])
-		assert_almost_eq(opened[index], due, Arcade.TICK, "ячейка %d" % index)
+		assert_almost_eq(opened[index], due, Arcade.TICK, "slot %d" % index)
 
 
 ## Crowd: from three agents on a floor the extra ones leave, two stay; below the ROM's
 ## eighth floor — nobody.
 func test_the_crowd_sends_the_extra_agents_away() -> void:
-	assert_eq(Arcade.crowd_leavers(20, 2), 0, "двое — не толпа")
-	assert_eq(Arcade.crowd_leavers(20, 3), 1, "из трёх уходит один")
-	assert_eq(Arcade.crowd_leavers(20, 4), 2, "из четырёх — двое")
-	assert_eq(Arcade.crowd_leavers(Arcade.LEAVE_FROM_FLOOR - 1, 4), 0, "низ здания не в счёт")
+	assert_eq(Arcade.crowd_leavers(20, 2), 0, "two is not a crowd")
+	assert_eq(Arcade.crowd_leavers(20, 3), 1, "one of three leaves")
+	assert_eq(Arcade.crowd_leavers(20, 4), 2, "of four - two")
+	assert_eq(
+		Arcade.crowd_leavers(Arcade.LEAVE_FROM_FLOOR - 1, 4),
+		0,
+		"the bottom of the building does not count"
+	)
 
 
 ## Crowd in a scene: of three agents on Otto's floor the farthest leaves, the two
@@ -118,18 +122,18 @@ func test_the_farthest_of_a_crowd_goes_to_a_door() -> void:
 		crowd.append(agent)
 	await wait_physics_frames(2)
 	for agent in crowd:
-		assert_false(agent.is_emerging(), "агент так и не вышел из проёма")
+		assert_false(agent.is_emerging(), "the agent never came out of the opening")
 	var otto_x := WorldSpace.to_scene(Vector2(1.0, surface)).x
 	var extras := AgentCrowd.extras(crowd, rules, here, otto_x)
-	assert_eq(extras.size(), 1, "уходит один из трёх")
-	assert_true(extras.has(crowd[2]), "уходит дальний от Otto")
-	assert_true(AgentCrowd.extras(crowd, rules, here + 2, otto_x).is_empty(), "не у Otto")
+	assert_eq(extras.size(), 1, "one of three leaves")
+	assert_true(extras.has(crowd[2]), "the one farthest from Otto leaves")
+	assert_true(AgentCrowd.extras(crowd, rules, here + 2, otto_x).is_empty(), "not next to Otto")
 	# A leaving agent stays leaving even if it becomes one of the nearest on the way:
 	# otherwise leaving would pass from agent to agent every frame, and the crowd would
 	# not thin out.
 	var still := AgentCrowd.extras(crowd, rules, here, otto_x, {crowd[0]: true})
-	assert_eq(still.size(), 1, "уходит всё так же один")
-	assert_true(still.has(crowd[0]), "уходящего отозвали ради дальнего")
+	assert_eq(still.size(), 1, "still just one leaves")
+	assert_true(still.has(crowd[0]), "the leaver was recalled in favour of the farther one")
 
 
 ## Just after Otto's return a door on his floor does not release an agent closer than

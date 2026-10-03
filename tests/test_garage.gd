@@ -43,17 +43,17 @@ func test_parked_cars_keep_clear_on_any_building() -> void:
 			for car in Garage.parked(rules, plan, building_seed):
 				total += 1
 				var span := Vector2(car.x - Garage.CAR_WIDTH * 0.5, car.x + Garage.CAR_WIDTH * 0.5)
-				var tag := "навык %d, сид %d, машина у %.2f" % [skill, building_seed, car.x]
+				var tag := "skill %d, seed %d, car at %.2f" % [skill, building_seed, car.x]
 				assert_between(span.x, inner.x, inner.y, tag)
 				assert_between(span.y, inner.x, inner.y, tag)
 				for zone in banned:
-					assert_true(span.y <= zone.x or span.x >= zone.y, "%s в %s" % [tag, zone])
+					assert_true(span.y <= zone.x or span.x >= zone.y, "%s in %s" % [tag, zone])
 				for x in Garage.column_xs(rules, plan):
 					assert_true(
 						absf(car.x - x) >= Garage.CAR_WIDTH * 0.5 + Garage.COLUMN * 0.5,
-						"%s на колонне %.2f" % [tag, x]
+						"%s on a column %.2f" % [tag, x]
 					)
-	assert_gt(total, SEEDS.size(), "машин почти нет — паркинг пуст")
+	assert_gt(total, SEEDS.size(), "almost no cars - the garage is empty")
 
 
 ## The garage is the same on the same seed and different on different ones.
@@ -61,9 +61,9 @@ func test_parked_cars_follow_the_seed() -> void:
 	var rules := _rules(0)
 	var plan := BuildingPlan.generate(rules, 3)
 	var first := _signature(Garage.parked(rules, plan, 3))
-	assert_eq(first, _signature(Garage.parked(rules, plan, 3)), "жребий не повторился")
+	assert_eq(first, _signature(Garage.parked(rules, plan, 3)), "the draw did not repeat")
 	var other := BuildingPlan.generate(rules, 4)
-	assert_ne(first, _signature(Garage.parked(rules, other, 4)), "два здания — один паркинг")
+	assert_ne(first, _signature(Garage.parked(rules, other, 4)), "two buildings - one garage")
 
 
 ## Bays do not overlap each other or the columns, columns do not overlap shaft cores.
@@ -72,25 +72,25 @@ func test_bays_and_columns_do_not_overlap() -> void:
 		var rules := _rules(skill)
 		for building_seed: int in SEEDS:
 			var plan := BuildingPlan.generate(rules, building_seed)
-			var tag := "навык %d, сид %d" % [skill, building_seed]
+			var tag := "skill %d, seed %d" % [skill, building_seed]
 			var bays := Garage.bays(rules, plan)
-			assert_gt(bays.size(), 3, "%s: мест почти нет" % tag)
+			assert_gt(bays.size(), 3, "%s: almost no bays" % tag)
 			for index in bays.size():
 				var bay := bays[index]
-				assert_gte(bay.y - bay.x, Garage.BAY_MIN - 0.001, "%s: узкое место" % tag)
+				assert_gte(bay.y - bay.x, Garage.BAY_MIN - 0.001, "%s: narrow bay" % tag)
 				if index > 0:
-					assert_gte(bay.x, bays[index - 1].y - 0.001, "%s: места внахлёст" % tag)
+					assert_gte(bay.x, bays[index - 1].y - 0.001, "%s: overlapping bays" % tag)
 				for x in Garage.column_xs(rules, plan):
 					var reach := Garage.COLUMN * 0.5
 					assert_true(
 						bay.y <= x - reach + 0.001 or bay.x >= x + reach - 0.001,
-						"%s: место %s на колонне %.2f" % [tag, bay, x]
+						"%s: bay %s on a column %.2f" % [tag, bay, x]
 					)
 			for x in Garage.column_xs(rules, plan):
 				for core in Garage.cores(rules, plan):
 					assert_true(
 						x + Garage.COLUMN * 0.5 <= core.x or x - Garage.COLUMN * 0.5 >= core.y,
-						"%s: колонна %.2f в ядре шахты %s" % [tag, x, core]
+						"%s: column %.2f in the shaft core %s" % [tag, x, core]
 					)
 
 
@@ -100,7 +100,7 @@ func test_the_gate_is_at_the_left_end() -> void:
 		var rules := _rules(skill)
 		var left := rules.floor_span(rules.floors - 1).x
 		var gate := Garage.gate_x(rules)
-		assert_between(gate, left, left + BuildingShell.WALL_WIDTH, "навык %d" % skill)
+		assert_between(gate, left, left + BuildingShell.WALL_WIDTH, "skill %d" % skill)
 
 
 ## The garage is built on every seed: the hall, cars behind the play plane, the gate at the
@@ -109,48 +109,48 @@ func test_the_garage_builds_on_every_seed() -> void:
 	for building_seed: int in BUILT_SEEDS:
 		var level := _build(building_seed)
 		var garage := level.garage()
-		assert_not_null(garage, "сид %d: паркинга нет" % building_seed)
+		assert_not_null(garage, "seed %d: no garage" % building_seed)
 		if garage == null:
 			remove_child(level)
 			continue
 		var rules := level.rules
-		var tag := "сид %d" % building_seed
-		assert_gt(garage.get_child_count(), 50, "%s: паркинг почти пуст" % tag)
+		var tag := "seed %d" % building_seed
+		assert_gt(garage.get_child_count(), 50, "%s: the garage is almost empty" % tag)
 		assert_eq(
 			garage.find_children("*", "CollisionObject3D", true, false).size(),
 			0,
-			"%s: у паркинга есть тела" % tag
+			"%s: the garage has bodies" % tag
 		)
 
 		var cars := garage.get_node("ParkedCars")
 		assert_eq(
 			cars.get_child_count(),
 			Garage.parked(rules, level.plan(), building_seed).size(),
-			"%s: машин не столько, сколько по жребию" % tag
+			"%s: the car count differs from the draw" % tag
 		)
 		for car: Node in cars.get_children():
 			var box := _bounds_of(car as Node3D)
 			assert_lt(
 				box.end.z,
 				-WorldSpace.BODY_DEPTH * 0.5,
-				"%s: машина у %.2f в плоскости игры" % [tag, box.get_center().x]
+				"%s: car at %.2f is in the play plane" % [tag, box.get_center().x]
 			)
-			assert_gt(box.size.x, 1.0, "%s: машина сплющена" % tag)
+			assert_gt(box.size.x, 1.0, "%s: the car is flattened" % tag)
 
 		var sign_node := garage.gate.get_node_or_null("ExitSign") as Node3D
-		assert_not_null(sign_node, "%s: над воротами нет вывески" % tag)
+		assert_not_null(sign_node, "%s: no sign above the gate" % tag)
 		if sign_node != null:
 			var at := WorldSpace.to_plane(sign_node.global_position)
 			var left := rules.floor_span(rules.floors - 1).x
-			assert_between(at.x, left, left + 1.0, "%s: вывеска не у ворот" % tag)
+			assert_between(at.x, left, left + 1.0, "%s: the sign is not at the gate" % tag)
 			assert_between(
 				at.y,
 				rules.story_top(rules.floors - 1),
 				rules.floor_surface(rules.floors - 1),
-				"%s: вывеска не на нижнем этаже" % tag
+				"%s: the sign is not on the bottom floor" % tag
 			)
 		for light in garage.lights():
-			assert_false(light.shadow_enabled, "%s: свет трубки кладёт тень" % tag)
+			assert_false(light.shadow_enabled, "%s: the tube light casts a shadow" % tag)
 		remove_child(level)
 
 
@@ -159,15 +159,15 @@ func test_the_garage_builds_on_every_seed() -> void:
 func test_the_gate_opens() -> void:
 	var level := _build(1)
 	var garage := level.garage()
-	assert_false(garage.is_gate_open(), "ворота открыты с начала")
+	assert_false(garage.is_gate_open(), "the gate is open from the start")
 	var tween := garage.open_gate(0.2)
 	await wait_physics_frames(30)
-	assert_false(tween.is_running(), "штора всё ещё едет")
-	assert_true(garage.is_gate_open(), "ворота не открылись")
+	assert_false(tween.is_running(), "the shutter is still moving")
+	assert_true(garage.is_gate_open(), "the gate did not open")
 	var voice := garage.gate.find_children("*", "AudioStreamPlayer3D", true, false)
-	assert_eq(voice.size(), 1, "у ворот нет мотора")
+	assert_eq(voice.size(), 1, "the gate has no motor")
 	if voice.size() == 1:
-		assert_not_null((voice[0] as AudioStreamPlayer3D).stream, "мотор ворот без записи")
+		assert_not_null((voice[0] as AudioStreamPlayer3D).stream, "the gate motor has no recording")
 	remove_child(level)
 
 
@@ -182,20 +182,22 @@ func test_a_fallen_lamp_puts_out_its_tubes() -> void:
 		if spot.floor_index == bottom:
 			lamps.append(spot.x)
 	if lamps.size() < 2 or rules.is_unlit(bottom):
-		pending("на этом сиде у паркинга меньше двух ламп")
+		pending("on this seed the garage has fewer than two lamps")
 		remove_child(level)
 		return
 	var tubes := _tube_xs(garage)
-	assert_gt(tubes.size(), 1, "светильников почти нет")
+	assert_gt(tubes.size(), 1, "almost no light fixtures")
 	for x in tubes:
-		assert_true(garage.tube_lit_at(x), "трубка у %.2f не горит" % x)
+		assert_true(garage.tube_lit_at(x), "the tube at %.2f is not lit" % x)
 	garage.darken(lamps[0])
 	for x in tubes:
 		var nearest := lamps[0]
 		for lamp_x in lamps:
 			if absf(lamp_x - x) < absf(nearest - x):
 				nearest = lamp_x
-		assert_eq(garage.tube_lit_at(x), nearest != lamps[0], "трубка у %.2f после лампы" % x)
+		assert_eq(
+			garage.tube_lit_at(x), nearest != lamps[0], "the tube at %.2f is lit after the lamp" % x
+		)
 	remove_child(level)
 
 
@@ -209,7 +211,7 @@ func test_no_two_materials_share_a_face_in_the_garage() -> void:
 		var level := _build(building_seed, kind)
 		var garage := level.garage()
 		var own := _boxes(garage, garage)
-		assert_gt(own.size(), 50, "сид %d: у паркинга нет деталей" % building_seed)
+		assert_gt(own.size(), 50, "seed %d: the garage has no parts" % building_seed)
 		var region := _bottom_region(level.rules)
 		var others: Array[Array] = []
 		for root: Node in level.get_children():
@@ -223,7 +225,7 @@ func test_no_two_materials_share_a_face_in_the_garage() -> void:
 		assert_eq(
 			clashes,
 			[] as Array[String],
-			"сид %d: грани в одной плоскости — %s" % [building_seed, clashes]
+			"seed %d: faces in one plane - %s" % [building_seed, clashes]
 		)
 		remove_child(level)
 
@@ -314,7 +316,7 @@ func _clashes(a: Array[Array], b: Array[Array], same: bool) -> Array[String]:
 			var two := b[j][0] as AABB
 			for axis: int in [Vector3.AXIS_Y, Vector3.AXIS_Z]:
 				if _share_face(one, two, axis):
-					clashes.append("%s и %s" % [one, two])
+					clashes.append("%s and %s" % [one, two])
 					if clashes.size() > 5:
 						return clashes
 	return clashes

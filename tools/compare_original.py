@@ -71,15 +71,15 @@ def our_shot(milestone: str, label: str | None) -> Path:
         shots = [p for p in shots if pattern.search(p.stem)]
     shots.sort(key=lambda p: p.stat().st_mtime)
     if not shots:
-        raise SystemExit(f"В {folder} нет кадров{f' шага {label}' if label else ''}: сначала capture.py")
+        raise SystemExit(f"No shots in {folder}{f' for step {label}' if label else ''}: run capture.py first")
     return shots[-1]
 
 
 def main() -> int:
     use_utf8_output()
-    parser = argparse.ArgumentParser(description="Кадр вехи рядом с оригиналом.")
-    parser.add_argument("milestone", help="веха, как у capture.py, например M18C")
-    parser.add_argument("--shot", help="метка шага сценария, например stopped")
+    parser = argparse.ArgumentParser(description="A milestone shot next to the original.")
+    parser.add_argument("milestone", help="milestone, as in capture.py, e.g. M18C")
+    parser.add_argument("--shot", help="scenario step label, e.g. stopped")
     parser.add_argument("--original", choices=sorted(SOURCES), default="elevatorb")
     args = parser.parse_args()
 
