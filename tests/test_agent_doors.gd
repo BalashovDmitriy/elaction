@@ -327,7 +327,7 @@ func test_an_open_leaf_stays_inside_its_doorway() -> void:
 func _first_out(level: GreyboxLevel) -> Enemy:
 	for _frame: int in CROWD_FRAMES * 4:
 		await wait_physics_frames(1)
-		for agent in _live_agents(level):
+		for agent: Enemy in _live_agents(level):
 			if not agent.is_emerging():
 				return agent
 	return null
@@ -346,7 +346,7 @@ func test_an_agent_far_from_his_door_is_kept_next_to_otto() -> void:
 	var home := level.rules.floor_index_near(level.door_of(agent).mat_position().y)
 	var far := GreyboxLevel.AGENT_KEEP_MARGIN + 4
 	var spot := Vector2.INF
-	for door in level.doors():
+	for door: Door in level.doors():
 		var mat := door.mat_position()
 		if absi(level.rules.floor_index_near(mat.y) - home) >= far:
 			spot = mat

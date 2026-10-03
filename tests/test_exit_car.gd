@@ -261,15 +261,15 @@ func test_the_seated_otto_is_locked_and_out_of_reach() -> void:
 func test_the_alarm_does_not_go_off_once_otto_is_in_the_car() -> void:
 	var level := await _building()
 	var game := GameState.instance()
-	var rang := [0]
-	game.alarm_raised.connect(func() -> void: rang[0] += 1)
+	# Watched, not connected: a lambda on the autoload would outlive the test.
+	watch_signals(game)
 	_stand_at_the_door(level)
 	assert_true(await _wait_for_the_start(level), "Otto got in, the car started")
 	# The time runs out right now, with Otto in the car.
 	game.alarm._left = 0.05
 	await wait_physics_frames(30)
 	assert_false(game.alarm.raised, "no alarm after boarding")
-	assert_eq(rang[0], 0, "no siren")
+	assert_signal_not_emitted(game, "alarm_raised", "no siren")
 
 
 ## The car drives off in its own direction and accelerates, with headlights on.

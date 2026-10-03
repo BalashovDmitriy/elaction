@@ -203,5 +203,5 @@ static func window_grid(block: Block) -> Vector2i:
 ## ADR-0060), but drawn so the houses after it stay the same by seed.
 static func _skip_lit_windows(rng: RandomNumberGenerator, block: Block) -> void:
 	var grid := window_grid(block)
-	for _window in grid.x * grid.y:
+	for _window: int in grid.x * grid.y:
 		rng.randf()

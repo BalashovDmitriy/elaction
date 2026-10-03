@@ -181,17 +181,6 @@ func _notification(what: int) -> void:
 	probe.target_position = Vector3(0.0, -width, 0.0)
 
 
-## The agent leaves the tree (went into a door, was cleared away) while his bullet is still
-## in flight. The bullet flies on and still kills: the hit is handed over to
-## [method _strike], which does not need the agent. Otherwise the connection would go
-## with him, and the bullet would spray blood on Otto without killing him (ADR-0060).
-func _exit_tree() -> void:
-	if not is_instance_valid(_bullet) or not _bullet.hit_target.is_connected(_on_bullet_hit):
-		return
-	_bullet.hit_target.disconnect(_on_bullet_hit)
-	_bullet.hit_target.connect(Enemy._strike.bind(RunLog.at(self), _brain.stance))
-
-
 func _ready() -> void:
 	add_to_group(GROUP)
 	# Rain and snow die on the hat and shoulders (ADR-0054).
@@ -776,7 +765,11 @@ func _fire() -> void:
 	bullet.direction = _brain.facing
 	bullet.speed = _shot_speed()
 	bullet.collision_mask = Bullet.FROM_ENEMY
-	bullet.hit_target.connect(_on_bullet_hit)
+	# The hit does not go through the agent: one who leaves the tree (into a door, cleared
+	# away) while his bullet flies would take the connection with him, and the bullet would
+	# spray blood on Otto without killing him (ADR-0060). Who fired, from where and in which
+	# stance is fixed at the shot.
+	bullet.hit_target.connect(Enemy._strike.bind(RunLog.at(self), _brain.stance))
 	get_parent().add_child(bullet)
 	var from := global_position + Vector3(0.0, _shot_height(), 0.0)
 	var muzzle := from + Vector3(_brain.facing * _muzzle_reach(), 0.0, 0.0)
@@ -785,19 +778,17 @@ func _fire() -> void:
 	_bullet = bullet
 
 
-## Hit by his own bullet. Nobody gets points for Otto — he simply dies.
-func _on_bullet_hit(target: Node3D) -> void:
-	_strike(target, RunLog.at(self), _brain.stance)
-
-
-## The agent's bullet reached [param target]: Otto dies. Static, so that a bullet whose
-## shooter has already left the tree still kills ([method _exit_tree]); [param shooter]
-## and [param stance] are only for the run log.
+## The agent's bullet reached [param target]: Otto dies. Nobody gets points for Otto — he
+## simply dies. Static, so that a bullet whose shooter has already left the tree still kills
+## ([method _fire]); [param shooter] and [param stance] are only for the run log.
 static func _strike(target: Node3D, shooter: Array, stance: EnemyBrain.Stance) -> void:
 	var victim := target as Otto
 	if victim == null:
 		return
-	if not victim.is_dead() and not victim.invulnerable:
+	# Marked as shot only when the shot kills: a door or an escalator that took Otto in this
+	# same step keeps him alive ([method Otto.kill]), and a mark left on a living one would
+	# log his next fall as this bullet.
+	if victim.hittable:
 		# Who fired and from where — for the run log.
 		victim.set_meta(&"shooter", shooter)
 		victim.set_meta(&"death_cause", "bullet")

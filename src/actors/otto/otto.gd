@@ -814,8 +814,10 @@ func _apply_pose(state: OttoStateMachine.State) -> void:
 	# the floor (and rides a cab roof) the level counts his return from (ADR-0060).
 	# Killed inside a cab, he stays on the layer: the cab knows its passenger by it, and
 	# an emptied cab would drive off with the body, moving his return to another floor.
-	var off_the_layer := state == OttoStateMachine.State.DEAD and _car == null
-	set_deferred(&"collision_layer", 0 if off_the_layer else _layer)
+	# Only death and the return touch the layer: no deferred call on every step and crouch.
+	var dying := state == OttoStateMachine.State.DEAD
+	if dying or was == OttoStateMachine.State.DEAD:
+		set_deferred(&"collision_layer", 0 if dying and _car == null else _layer)
 	_body.visible = not hidden
 
 

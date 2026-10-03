@@ -186,6 +186,13 @@ func test_a_hopeless_card_still_ends_the_measurement() -> void:
 	assert_lte(float(result[1]), QualityProbe.TIMEOUT + 0.5, "the overall cap holds")
 
 
+## The overall time can run out on the first frame of a level, a shader compile stall: one
+## frame says nothing about the card, and the level steps down one, not to low.
+func test_a_level_cut_off_at_its_first_frame_steps_down_once() -> void:
+	var middling: Array[float] = [5.0, 8.0, 11.0, 20.0]
+	assert_eq(_trial(middling, 1.0, 4, 2.0)[0], Graphics.Quality.MEDIUM)
+
+
 ## A card that never reports GPU time: one step down, as before, and not on down to low.
 func test_a_card_without_gpu_time_steps_down_once() -> void:
 	var mute: Array[float] = [0.0, 0.0, 0.0, 0.0]

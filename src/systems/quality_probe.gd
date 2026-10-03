@@ -39,6 +39,9 @@ const STALL: float = 0.1
 ## How much cheaper each level down makes the frame, roughly: a level that ran out of time far
 ## over [constant TARGET_MS] drops as many levels as the excess calls for, not one.
 const STEP_GAIN: float = 1.5
+## Fewer frames than this say nothing about the card: right after a level change they are
+## shader compiles. A level the overall time cut off this early steps down one, as unproven.
+const JUDGE_FRAMES: int = 10
 
 var _settings: GameSettings = null
 var _trial := Trial.new()
@@ -87,7 +90,7 @@ func _process(delta: float) -> void:
 		_switch(_trial.level)
 		return
 	var gpu := 0.0
-	for view in _views:
+	for view: RID in _views:
 		gpu += RenderingServer.viewport_get_measured_render_time_gpu(view)
 	var was := _trial.level
 	_trial.feed(delta, gpu)
@@ -209,9 +212,12 @@ class Trial:
 
 	## The level when its time ran out. Measured — by the GPU median. The warm-up did not even
 	## pass — by the frame length: frames many times over the budget drop the level as far as
-	## they call for, rather than one step at a time (ADR-0060).
+	## they call for, rather than one step at a time (ADR-0060). A handful of frames is
+	## compile stalls, not the card's speed ([constant JUDGE_FRAMES]): one step down.
 	func _judge() -> Graphics.Quality:
 		if _samples.is_empty() and _frames <= QualityProbe.WARMUP_FRAMES:
+			if _times.size() < QualityProbe.JUDGE_FRAMES:
+				return QualityProbe.step(level, INF)
 			return QualityProbe.settle(level, _times)
 		return QualityProbe.settle(level, _samples)
 

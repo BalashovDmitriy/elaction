@@ -459,6 +459,9 @@ the indicator board arrows; lamp swinging and weakening darkness were dropped by
   softlock or state leak; generation gives a winnable building for any seed. The fixes are
   in `fix/review-sweep`; bot deaths after them are 3, 5, 3. Splitting hall furniture by
   floor did not change the frame time on the test machine — it keeps the cost from growing.
+  Left for later from the review of the fixes: a falling lamp loses its fill shadow while it
+  still shines if the camera band changes mid-fall, and the knocked-off hat repeats
+  `Ragdoll`'s resting logic without riding a moving cab — both small, both outside the sweep.
 
 - **Ray tracing** — check with every engine update (user's
   question, 2026-09-24). Godot 4.7 has only low-level Vulkan RT in

@@ -120,6 +120,14 @@ func test_a_zero_score_is_no_record() -> void:
 	assert_eq(records.submit(-50), -1, "nor below")
 	assert_eq(records.rows.size(), 0, "the table stays empty")
 
+	# A zero saved before this rule is not shown as a record either.
+	var file := FileAccess.open(TEMP, FileAccess.WRITE)
+	file.store_string('[{"score": 500}, {"score": 0}, {"score": -20}]')
+	file.close()
+	var loaded := Records.load_from(TEMP)
+	assert_eq(loaded.rows.size(), 1, "an old zero is dropped on reading")
+	assert_eq(loaded.best(), 500)
+
 
 ## An equal score goes after the ones already in the table: the older one keeps its place.
 ## Placed before them by an unstable sort, the new row could even push out its own place.

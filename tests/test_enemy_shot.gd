@@ -113,3 +113,17 @@ func test_a_bullet_kills_after_its_shooter_is_gone() -> void:
 	agent.free()
 	await wait_physics_frames(SHOT_FRAMES)
 	assert_true(otto.is_dead(), "the bullet of a freed agent still kills")
+
+
+## A bullet that reaches an Otto the world is carrying (a door or an escalator took him in this
+## step) neither kills him nor marks him as shot: the mark would log his next fall as this
+## bullet (ADR-0060).
+func test_a_bullet_on_a_carried_otto_leaves_no_mark() -> void:
+	var otto := OTTO_SCENE.instantiate() as Otto
+	add_child_autofree(otto)
+	await wait_physics_frames(2)
+	otto.ride(true)
+	Enemy._strike(otto, [0.0, 0.0], EnemyBrain.Stance.STAND)
+	assert_false(otto.is_dead(), "carried, he is not killed")
+	assert_false(otto.has_meta(&"shooter"), "nor marked as shot")
+	otto.ride(false)

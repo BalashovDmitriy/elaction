@@ -911,10 +911,11 @@ func _on_agent_died(agent: Enemy, post: AgentPost) -> void:
 
 
 ## The agent reached a door and went into it (@55B0): the body is removed, the slot is free.
+## The body goes whoever's he is — one left standing would report it every step.
 func _on_agent_left(agent: Enemy, post: AgentPost) -> void:
+	_dismiss(agent)
 	if post.agent != agent:
 		return
-	_dismiss(agent)
 	post.agent = null
 	_free_slot(post)
 

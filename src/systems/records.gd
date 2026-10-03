@@ -48,11 +48,12 @@ static func load_from(path: String = PATH) -> Records:
 	for entry: Variant in parsed as Array:
 		# Every value is checked for its type: a hand-edited [code]{"score": null}[/code] is
 		# skipped as a row, not a failed conversion that stops the game at game over
-		# (ADR-0060). JSON numbers come as floats.
+		# (ADR-0060). JSON numbers come as floats. A zero, saved before zero stopped being a
+		# record ([method submit]), is dropped too.
 		if entry is not Dictionary:
 			continue
 		var score: Variant = (entry as Dictionary).get(SCORE)
-		if score is not float and score is not int:
+		if (score is not float and score is not int) or int(score) <= 0:
 			continue
 		var date: Variant = (entry as Dictionary).get(DATE, "")
 		records.rows.append({SCORE: int(score), DATE: date if date is String else ""})
