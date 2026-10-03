@@ -56,6 +56,9 @@ const PARAPET_HEIGHT: float = 1.05
 const COPING_HEIGHT: float = 0.08
 const COPING_OVERHANG: float = 0.06
 
+## Залы особых этажей (ADR-0057): их свет гасит уровень по кадру.
+var halls: FloorHall = null
+
 var _rules: BuildingRules = null
 var _plan: BuildingPlan = null
 var _ribs: BuildingRibs = null
@@ -215,6 +218,10 @@ func _build_room() -> void:
 		var hall := OpenSpace.new()
 		add_child(hall)
 		hall.build(_rules, _plan)
+	# Залы особых этажей (ADR-0057, решение 3): за коридором вместо стены.
+	halls = FloorHall.new()
+	add_child(halls)
+	halls.build(_rules, _plan)
 
 	for index: int in _rules.levels():
 		if index == BuildingRules.ROOF or index == _rules.floors - 1:
@@ -227,7 +234,13 @@ func _build_room() -> void:
 
 		var openings := _openings_on(index)
 		var lintel_top := surface - Door.LEAF_SIZE.y
+		var role := FloorRole.at(_rules, index)
 		for span in BuildingPlan.spans_between(openings, inner):
+			if FloorRole.is_hall(role):
+				_build_screen(
+					FloorRole.screen_of(role, _rules.kind), span, top, lintel_top, surface, back
+				)
+				continue
 			if glazed:
 				# Офис (ADR-0056, решение 4): стекло в рост двери, над ним —
 				# сплошная полоса до потолка, за стеклом — зал [OpenSpace].
@@ -309,6 +322,46 @@ func _build_block(rect: Rect2, material: StandardMaterial3D, depth: float) -> vo
 	block.position = WorldSpace.to_scene(rect.get_center())
 	block.position.z = WorldSpace.CORRIDOR_DEPTH * 0.5 - depth * 0.5
 	_panels.add_child(block)
+
+
+## Чем зал особого этажа отделён от коридора на простенке [param span]
+## (ADR-0057, решение 3): над проёмом в рост двери — полоса стены до потолка, в
+## проёме — стекло, сетка-рабица на стойках или ничего: колонны ставят рёбра
+## ([method BuildingRibs.line_the_wall]).
+func _build_screen(
+	screen: FloorRole.Screen,
+	span: Vector2,
+	top: float,
+	lintel_top: float,
+	surface: float,
+	wall: StandardMaterial3D
+) -> void:
+	var back_z := WorldSpace.BACK_WALL_Z - PANEL_THICKNESS * 0.5
+	_build_panel(Rect2(span.x, top, span.y - span.x, lintel_top - top), wall, back_z)
+	var opening := Rect2(span.x, lintel_top, span.y - span.x, surface - lintel_top)
+	match screen:
+		FloorRole.Screen.GLASS:
+			_build_glass(opening)
+		FloorRole.Screen.MESH:
+			_build_mesh(opening)
+
+
+## Сетка-рабица технического этажа на стальных стойках, без тел — как стена.
+func _build_mesh(rect: Rect2) -> void:
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return
+	var z := WorldSpace.BACK_WALL_Z - PANEL_THICKNESS * 0.5
+	var net := GreyboxLook.box(Vector3(rect.size.x, rect.size.y, 0.02), HallLook.chain_link())
+	net.position = WorldSpace.to_scene(rect.get_center())
+	net.position.z = z
+	net.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_panels.add_child(net)
+	var post := GreyboxLook.metal(FloorHall.MESH_POST)
+	var count := maxi(1, roundi(rect.size.x / FloorHall.MESH_POST_STEP))
+	for step: int in count + 1:
+		var x := rect.position.x + rect.size.x * step / count
+		_build_panel(Rect2(x - 0.03, rect.position.y, 0.06, rect.size.y), post, z + 0.03)
+	_build_panel(Rect2(rect.position.x, rect.position.y, rect.size.x, 0.05), post, z + 0.03)
 
 
 ## Стеклянная перегородка офиса в задней стене: стекло и алюминиевые стойки

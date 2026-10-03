@@ -47,6 +47,11 @@ const MIN_SHAFT_FLOORS: int = 4
 ## По умолчанию ночь — здание, собранное тестом без жребия, темнеет, как и до M24j.
 @export var time_of_day: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT
 
+## Тип здания ([BuildingIdentity]): ставит уровень по жребию здания. От него
+## зависят роли этажей ([method FloorRole.at], ADR-0057). По умолчанию — отель,
+## как первое здание партии.
+@export var kind: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL
+
 ## Погода, поставленная руками ([enum Weather.Kind]), или -1 — жребий по сиду
 ## ([method Weather.of_building]). Ставят инструменты кадров и тесты: сочетание
 ## времени суток и погоды снимается без подбора сида. Живёт в правилах здания,

@@ -150,6 +150,13 @@ func _ready() -> void:
 ## пропорциями собирают тесты. Ширина пришла сюда в M18c: шахта выросла
 ## до 1.8 м, а кабина из сцены осталась бы в 1.2 и болталась бы в ней
 ## (ADR-0026, решение 3).
+## Одевает кабину по типу здания (ADR-0057, решение 6). Звать до
+## [method fit_to_story]: тот собирает одежду.
+func dress_as(kind: BuildingIdentity.Kind) -> void:
+	if _detail != null:
+		_detail.dress_as(kind)
+
+
 func fit_to_story(clear_height: float, car_width: float) -> void:
 	_width = car_width
 	if _detail != null:
@@ -206,6 +213,8 @@ static func _resize(shape: CollisionShape3D, box_width: float, box_height: float
 
 func _physics_process(delta: float) -> void:
 	_admit_riders()
+	# Решётка грузовой кабины — вид окна выхода ROM (ADR-0057, решение 6).
+	_detail.tend_gate(can_step_out(), delta)
 	if _leader != null:
 		_ride_along()
 		return

@@ -125,13 +125,27 @@ def _track(title: str) -> Source:
 
 SOUNDS: dict[str, list[Source]] = {
     # --- Музыка: свой трек на экран, трек здания и тревоги — жребием по зданию.
-    "theme": [_track("Spy Glass"), _track("Hard Boiled"), _track("Covert Affair"),
-              _track("Dances and Dames")],
-    # Утро, день и вечер — свои треки; ночь — "theme" (ADR-0052, решение 1).
+    # Тема — по типу здания и времени суток (ADR-0057, решение 7; ADR-0052,
+    # решение 1): ночь — "theme", утро, день и вечер — с суффиксом. Отель —
+    # свинг, лаунж и саксофон; офис — холодный синти-нуар, днём лифтовая
+    # музыка; жилой дом — блюз и фанк. С середины здания играет следующий трек
+    # набора, если он есть. Тревога — своя у типа. Треки выбраны пользователем
+    # на слух со страницы прослушивания (2026-10-03).
+    "theme": [_track("Covert Affair"), _track("Dances and Dames"), _track("Spy Glass"), _track("Hard Boiled")],
     "theme_morning": [_track("Shades of Spring"), _track("Walking Along")],
-    "theme_day": [_track("George Street Shuffle"), _track("Opportunity Walks")],
+    "theme_day": [_track("Lobby Time"), _track("George Street Shuffle"), _track("Fig Leaf Rag")],
     "theme_evening": [_track("Apero Hour"), _track("Backbay Lounge")],
-    "alarm_theme": [_track("Fast Talkin"), _track("Private Eye"), _track("On the Cool Side")],
+    "alarm_theme": [_track("Fast Talkin"), _track("Hot Swing"), _track("Private Eye")],
+    "theme_office": [_track("Spy Glass"), _track("Chill Wave"), _track("Lightless Dawn")],
+    "theme_office_morning": [_track("Clean Soul")],
+    "theme_office_day": [_track("Local Forecast - Elevator")],
+    "theme_office_evening": [_track("Ice Flow"), _track("Chill Wave")],
+    "alarm_office": [_track("Hiding Your Reality"), _track("Voltaic"), _track("Movement Proposition")],
+    "theme_residential": [_track("Hard Boiled"), _track("Bass Walker")],
+    "theme_residential_morning": [_track("Walking Along"), _track("Groove Grove")],
+    "theme_residential_day": [_track("George Street Shuffle"), _track("Groove Grove"), _track("Rollin at 5")],
+    "theme_residential_evening": [_track("Backed Vibes Clean"), _track("Bass Vibes")],
+    "alarm_residential": [_track("Private Eye"), _track("Faster Does It")],
     "menu_theme": [_track("Cool Vibes")],
     "game_over_theme": [_track("Just As Soon")],
     # --- Джинглы.
@@ -308,7 +322,10 @@ SOUNDS: dict[str, list[Source]] = {
 }
 
 # Что звучит петлёй: сшивка нужна им, а форматом — OGG.
-LONG = {"winch", "car_pass", "car_pass_slush", "wind_snow", "alarm", "city_morning", "city_day", "city_evening", "theme", "theme_morning", "theme_day", "theme_evening", "alarm_theme", "menu_theme", "game_over_theme", "city", "rain",
+LONG = {"winch", "car_pass", "car_pass_slush", "wind_snow", "alarm", "city_morning", "city_day", "city_evening", "theme", "theme_morning", "theme_day", "theme_evening", "alarm_theme",
+        "theme_office", "theme_office_morning", "theme_office_day", "theme_office_evening",
+        "alarm_office", "theme_residential", "theme_residential_morning",
+        "theme_residential_day", "theme_residential_evening", "alarm_residential", "menu_theme", "game_over_theme", "city", "rain",
         "rain_window", "wind", "room_tone", "room_tone_office", "room_tone_residential",
         "door_tv", "door_dog", "door_argue", "shaft_hum", "elevator_hum", "escalator_hum",
         "car_away", "helicopter", "helicopter_pass", "garage_gate", "thunder_near", "thunder_far", "neon_buzz", "building_bonus", "game_over"}

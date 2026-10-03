@@ -152,10 +152,13 @@ func test_floors_are_not_bare() -> void:
 		var floors := 0
 		var furniture := 0
 		var decor := 0
+		rules.kind = identity.kind
 		for building_seed: int in range(1, 41):
 			var plan := BuildingPlan.generate(rules, building_seed)
 			var dressing := BuildingDressing.lay(rules, plan, building_seed, identity)
-			floors += rules.floors - 1
+			# Особые этажи обставлены залом, а не коридором (ADR-0057).
+			for index: int in rules.floors - 1:
+				floors += 0 if FloorRole.hall_at(rules, index) else 1
 			furniture += dressing.props.size()
 			decor += dressing.decor.size()
 			# С M24n часть стены — ниши, зеркала, окна, щитки (ADR-0056): стена не

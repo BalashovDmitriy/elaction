@@ -14,8 +14,9 @@ extends RefCounted
 
 ## Где предмет: стоит на полу у стены, висит на стене, стоит на крыше, стоит
 ## только поверх другого (лампа на комоде — в жребий сама не идёт), стоит в
-## комнате за дверью ([DoorRoom]) — в коридор не идёт.
-enum Place { FLOOR, WALL, ROOF, TOP, ROOM }
+## комнате за дверью ([DoorRoom]) — в коридор не идёт; стоит в зале особого
+## этажа ([FloorHall], ADR-0057) — в жребий коридора не идёт.
+enum Place { FLOOR, WALL, ROOF, TOP, ROOM, HALL }
 
 ## Для какого здания: отель, офис, жилой дом, любое.
 enum Fit { HOTEL, OFFICE, RESIDENTIAL, ANY }
@@ -165,7 +166,8 @@ static func make(prop_name: String, full_depth: bool = false) -> Node3D:
 	var squeeze := minf(1.0, MAX_DEPTH / maxf(box.size.z * factor, 0.001))
 	# Крыше и комнате за дверью глубины хватает: сжимается только то, что
 	# стоит в коридоре между стеной и актёрами.
-	if full_depth or (item != null and (item.place == Place.ROOF or item.place == Place.ROOM)):
+	var deep := [Place.ROOF, Place.ROOM, Place.HALL]
+	if full_depth or (item != null and item.place in deep):
 		squeeze = 1.0
 	var sized := Node3D.new()
 	sized.add_child(turned)
@@ -326,6 +328,35 @@ static func _build() -> Dictionary:
 		Entry.of("tv_old", Place.ROOM, Fit.RESIDENTIAL, 0.9, 180.0),
 		Entry.of("sofa", Place.ROOM, Fit.RESIDENTIAL, 0.78),
 		Entry.of("paper_bag", Place.TOP, Fit.RESIDENTIAL, 0.38, 90.0),
+		# Залы особых этажей (ADR-0057, решение 5): Kenney Furniture Kit, цвет —
+		# по типу здания ([HallLook]). Фасадом к камере пришли все, кроме
+		# стеллажа — тот спиной.
+		Entry.of("washer", Place.HALL, Fit.ANY, 0.85),
+		Entry.of("dryer", Place.HALL, Fit.ANY, 0.85),
+		Entry.of("washer_dryer", Place.HALL, Fit.ANY, 1.8),
+		Entry.of("bar_stool", Place.HALL, Fit.ANY, 0.78),
+		Entry.of("bar_counter", Place.HALL, Fit.ANY, 1.1),
+		Entry.of("bar_counter_end", Place.HALL, Fit.ANY, 1.1),
+		Entry.of("dining_table", Place.HALL, Fit.ANY, 0.76),
+		Entry.of("round_table", Place.HALL, Fit.ANY, 0.74),
+		Entry.of("dining_chair", Place.HALL, Fit.ANY, 0.95),
+		Entry.of("kitchen_stove", Place.HALL, Fit.ANY, 0.9),
+		Entry.of("kitchen_hood", Place.HALL, Fit.ANY, 0.75),
+		Entry.of("kitchen_cabinet", Place.HALL, Fit.ANY, 0.9),
+		Entry.of("kitchen_fridge", Place.HALL, Fit.ANY, 1.9),
+		Entry.of("kitchen_sink", Place.HALL, Fit.ANY, 0.95),
+		Entry.of("lounge_sofa", Place.HALL, Fit.ANY, 0.8),
+		Entry.of("lounge_sofa_long", Place.HALL, Fit.ANY, 0.8),
+		Entry.of("lounge_armchair", Place.HALL, Fit.ANY, 0.85),
+		Entry.of("coffee_table", Place.HALL, Fit.ANY, 0.42),
+		Entry.of("bookcase", Place.HALL, Fit.ANY, 1.9, 180.0),
+		Entry.of("box_closed", Place.HALL, Fit.ANY, 0.4),
+		Entry.of("desk_chair", Place.HALL, Fit.ANY, 1.05),
+		Entry.of("long_table", Place.HALL, Fit.ANY, 0.76),
+		Entry.of("bench_cushion", Place.HALL, Fit.ANY, 0.48),
+		Entry.of("floor_lamp_round", Place.HALL, Fit.ANY, 1.65),
+		Entry.of("tv_modern", Place.HALL, Fit.ANY, 0.75),
+		Entry.of("speaker", Place.HALL, Fit.ANY, 1.1),
 		# Крыша (ADR-0033, решение 8).
 		Entry.of("water_tower", Place.ROOF, Fit.ANY, 4.5),
 		Entry.of("water_tank", Place.ROOF, Fit.ANY, 2.5),

@@ -39,6 +39,12 @@
      ]
     },
     {
+     "name": "Kenney",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
      "name": "Dilan Shah",
      "licences": [
       "CC-BY 3.0"
@@ -72,12 +78,6 @@
      "name": "CMHT Oculus",
      "licences": [
       "CC-BY 3.0"
-     ]
-    },
-    {
-     "name": "Kenney",
-     "licences": [
-      "CC0 1.0"
      ]
     },
     {
@@ -444,24 +444,6 @@
      ]
     },
     {
-     "name": "loganzsound",
-     "licences": [
-      "CC0 1.0"
-     ]
-    },
-    {
-     "name": "Shuhmi",
-     "licences": [
-      "CC-BY 4.0"
-     ]
-    },
-    {
-     "name": "addiofbaddi",
-     "licences": [
-      "CC0 1.0"
-     ]
-    },
-    {
      "name": "Soup_UnderScore",
      "licences": [
       "CC0 1.0"
@@ -489,6 +471,24 @@
      "name": "roman_gens",
      "licences": [
       "CC-BY 4.0"
+     ]
+    },
+    {
+     "name": "loganzsound",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "Shuhmi",
+     "licences": [
+      "CC-BY 4.0"
+     ]
+    },
+    {
+     "name": "addiofbaddi",
+     "licences": [
+      "CC0 1.0"
      ]
     },
     {

@@ -109,6 +109,14 @@ const THEME_MORNING := "theme_morning"
 const THEME_DAY := "theme_day"
 const THEME_EVENING := "theme_evening"
 const ALARM_THEME := "alarm_theme"
+## Темы офиса и жилого дома (ADR-0057, решение 7): у отеля — прежние имена,
+## у других типов — с именем типа; время суток — суффиксом, как у отеля.
+const THEME_OFFICE := "theme_office"
+const THEME_RESIDENTIAL := "theme_residential"
+const ALARM_OFFICE := "alarm_office"
+const ALARM_RESIDENTIAL := "alarm_residential"
+## Лязг решётки грузовой кабины (ADR-0057, решение 6).
+const CAB_GATE := "cab_gate"
 const MENU_THEME := "menu_theme"
 const GAME_OVER_THEME := "game_over_theme"
 
@@ -402,17 +410,37 @@ static func duck_music(seconds: float) -> void:
 		director.duck(seconds)
 
 
-## Тема здания во время суток [param time]: ночью — нуар [constant THEME],
-## в остальное время — своя (ADR-0052, решение 1).
-static func theme_for(time: TimeOfDay.Kind) -> String:
+## Тема здания типа [param building] во время суток [param time] (ADR-0057,
+## решение 7; ADR-0052, решение 1): набор — по типу, вариант — по времени
+## суток. Ночью у отеля — нуар [constant THEME].
+static func theme_for(
+	time: TimeOfDay.Kind, building: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL
+) -> String:
+	var base := THEME
+	match building:
+		BuildingIdentity.Kind.OFFICE:
+			base = THEME_OFFICE
+		BuildingIdentity.Kind.RESIDENTIAL:
+			base = THEME_RESIDENTIAL
 	match time:
 		TimeOfDay.Kind.MORNING:
-			return THEME_MORNING
+			return base + "_morning"
 		TimeOfDay.Kind.DAY:
-			return THEME_DAY
+			return base + "_day"
 		TimeOfDay.Kind.EVENING:
-			return THEME_EVENING
-	return THEME
+			return base + "_evening"
+	return base
+
+
+## Мотив тревоги здания типа [param building] — свой у типа (ADR-0057,
+## решение 7), на любое время суток.
+static func alarm_for(building: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL) -> String:
+	match building:
+		BuildingIdentity.Kind.OFFICE:
+			return ALARM_OFFICE
+		BuildingIdentity.Kind.RESIDENTIAL:
+			return ALARM_RESIDENTIAL
+	return ALARM_THEME
 
 
 ## Включает музыку, если она ещё не та же самая. [param pick] — какой из
