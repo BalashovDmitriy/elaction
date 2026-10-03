@@ -172,14 +172,20 @@ static func _near_decor(decor: PackedFloat64Array, x: float) -> bool:
 	return false
 
 
-func _commit(image: String, places: Array[Transform3D]) -> void:
-	var quad := QuadMesh.new()
+## Материал следа [param image]: картинка с прозрачностью на шершавом. Им же
+## рисует граффити паркинга жилого дома ([GarageDressing]).
+static func tag_look(image: String) -> StandardMaterial3D:
 	var look := StandardMaterial3D.new()
 	look.albedo_texture = load("%s/%s.png" % [DIR, image]) as Texture2D
 	look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	look.roughness = 0.9
 	look.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	quad.material = look
+	return look
+
+
+func _commit(image: String, places: Array[Transform3D]) -> void:
+	var quad := QuadMesh.new()
+	quad.material = tag_look(image)
 	var many := MultiMesh.new()
 	many.transform_format = MultiMesh.TRANSFORM_3D
 	many.mesh = quad

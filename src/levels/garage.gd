@@ -103,7 +103,6 @@ const CONCRETE := Color(0.72, 0.72, 0.7)
 const PAINT_WHITE := Color(0.72, 0.72, 0.68)
 const PAINT_YELLOW := Color(0.82, 0.62, 0.1)
 const PAINT_BLACK := Color(0.05, 0.05, 0.05)
-const PAINT_BAND := Color(0.62, 0.46, 0.12)
 ## Паркинг по типу здания (ADR-0058, решение 5): тон бетона — чистый светлый у
 ## отеля, холодный у офиса, грязный у жилого дома; полоса краски по дальней
 ## стене — бордовая, синяя, выцветшая охра. По [enum BuildingIdentity.Kind].

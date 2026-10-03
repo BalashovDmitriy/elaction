@@ -59,6 +59,10 @@ const IRON := Color(0.2, 0.2, 0.21)
 var _surface: float = 0.0
 var _lit: bool = true
 var _neon := Color.WHITE
+## Огонь на мачте офиса — мигает, как огонь антенны крыши ([RoofKit]); null у
+## других типов.
+var _beacon: MeshInstance3D = null
+var _clock: float = 0.0
 
 
 ## Ставит корону здания: по типу из [member BuildingRules.kind], по ширине
@@ -79,6 +83,14 @@ func build(rules: BuildingRules) -> void:
 			_residential(middle, width)
 		_:
 			_hotel(middle, width * HOTEL_SHARE)
+	set_process(_beacon != null)
+
+
+## Мигает огнём мачты тем же ритмом, что огонь антенны крыши. Картинка, а не
+## правило: по настенным часам.
+func _process(delta: float) -> void:
+	_clock = fmod(_clock + delta, RoofKit.BEACON_PERIOD)
+	_beacon.visible = _clock < RoofKit.BEACON_PERIOD * RoofKit.BEACON_ON
 
 
 ## Высота верха короны над настилом, м: тестам и кадру вступления.
@@ -180,7 +192,7 @@ func _office(middle: float, width: float) -> void:
 	var tip := SphereMesh.new()
 	tip.radius = 0.14
 	tip.height = 0.28
-	_mesh(tip, GreyboxLook.light(BEACON), mast_x, mast_base + MAST.y, z)
+	_beacon = _mesh(tip, GreyboxLook.light(BEACON), mast_x, mast_base + MAST.y, z)
 
 
 ## Жилой дом: кирпичная будка выхода на крышу, рядом бак на опорах с обручами
@@ -226,7 +238,7 @@ func _residential(middle: float, width: float) -> void:
 		ring.bottom_radius = TANK.x + 0.04
 		ring.height = 0.07
 		ring.radial_segments = 16
-		_mesh(ring, iron, tank_x, LEG_HEIGHT + 0.4 + hoop * 0.6, tank_z)
+		_mesh(ring, GreyboxLook.metal(HOOP), tank_x, LEG_HEIGHT + 0.4 + hoop * 0.6, tank_z)
 	var cap := CylinderMesh.new()
 	cap.top_radius = 0.05
 	cap.bottom_radius = TANK.x * 1.1
@@ -255,13 +267,16 @@ func _box(material: Material, size: Vector3, x: float, rise: float, z: float) ->
 
 ## Меш низом на высоте [param rise]: у цилиндров, конусов и клиньев нуль — в
 ## середине, и он поднимается на половину высоты.
-func _mesh(mesh: PrimitiveMesh, material: Material, x: float, rise: float, z: float) -> void:
+func _mesh(
+	mesh: PrimitiveMesh, material: Material, x: float, rise: float, z: float
+) -> MeshInstance3D:
 	var part := MeshInstance3D.new()
 	part.mesh = mesh
 	part.material_override = material
 	var half := mesh.get_aabb().size.y * 0.5
 	part.position = _at(x, rise + half, z)
 	_add(part)
+	return part
 
 
 func _at(x: float, rise: float, z: float) -> Vector3:

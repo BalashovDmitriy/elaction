@@ -200,10 +200,13 @@ func test_a_fallen_lamp_puts_out_its_tubes() -> void:
 
 
 ## Новые коробки паркинга не делят грань с коробкой другого материала — ни
-## своей, ни оболочки, ни шахт, ни рёбер.
+## своей, ни оболочки, ни шахт, ни рёбер. Сиды сборки — на разных типах
+## здания: отделка паркинга у каждого своя (ADR-0058, решение 5).
 func test_no_two_materials_share_a_face_in_the_garage() -> void:
-	for building_seed: int in BUILT_SEEDS:
-		var level := _build(building_seed)
+	for index: int in BUILT_SEEDS.size():
+		var building_seed := BUILT_SEEDS[index]
+		var kind := (index % BuildingIdentity.Kind.size()) as BuildingIdentity.Kind
+		var level := _build(building_seed, kind)
 		var garage := level.garage()
 		var own := _boxes(garage, garage)
 		assert_gt(own.size(), 50, "сид %d: у паркинга нет деталей" % building_seed)
@@ -225,8 +228,12 @@ func test_no_two_materials_share_a_face_in_the_garage() -> void:
 		remove_child(level)
 
 
-func _build(building_seed: int) -> GreyboxLevel:
+## Здание сида [param building_seed] типа [param kind]: первое такое в партии.
+func _build(
+	building_seed: int, kind: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL
+) -> GreyboxLevel:
 	GameState.instance().start_game()
+	GameState.instance().building = BuildingIdentity.first_of(kind, building_seed)
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
 	level.rules = BuildingRules.new()
 	level.building_seed = building_seed

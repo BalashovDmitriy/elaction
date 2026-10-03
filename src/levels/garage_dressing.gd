@@ -24,20 +24,31 @@ const PLATE_BLUE := Color(0.1, 0.22, 0.48)
 const PLATE_BURGUNDY := Color(0.36, 0.08, 0.1)
 const PAINT_WHITE := Color(0.82, 0.82, 0.78)
 
-## Шлагбаум: стойка, стрела и где он стоит — на площадке за воротами, м.
+## Шлагбаум: стойка, сечение стрелы и где он стоит — на площадке за воротами, м.
+## Стойка — перед полосой машины Otto ([constant ExitCar.Z]) на столько от её
+## середины; стрела — от стойки поперёк полосы до стены тоннеля ([constant
+## GarageRamp.WIDTH]). До авторевью M24p шлагбаум стоял на глубине мест паркинга
+## — за стеной тоннеля, и его не было видно ни опущенным, ни поднятым.
 const POST := Vector3(0.24, 1.0, 0.24)
-const ARM_LENGTH: float = 2.6
+const POST_OFF_LANE: float = 0.62
 const ARM := Vector2(0.08, 0.1)
 const BARRIER_OFF_GATE: float = 1.1
 const STRIPE_RED := Color(0.62, 0.1, 0.08)
 const STRIPE_WHITE := Color(0.86, 0.86, 0.82)
 const BOOTH := Color(0.55, 0.57, 0.6)
 
-## Граффити жилого дома: сколько меток на дальней стене и их размер, м.
+## Граффити жилого дома: сколько меток на дальней стене и их размер, м. Метки —
+## перед полосой краски по стене ([method Garage._build_walls], толщиной 1 см):
+## на её грани или за ней они мерцали бы и пропадали.
 const TAGS: int = 4
 const TAG_SIZE := Vector2(1.3, 0.7)
+const TAG_OFF_WALL: float = 0.016
 const DUMPSTER := Vector3(1.6, 1.2, 1.0)
 const DUMPSTER_GREEN := Color(0.16, 0.3, 0.2)
+## Бак и велосипеды — перед дальней стеной, на столько от её лица, м; второй
+## велосипед ещё на столько ближе: оба влезают до колёсного упора места.
+const CLUTTER_OFF_WALL := Vector2(0.05, 0.25)
+const BIKE_STAGGER: float = 0.65
 
 var _rules: BuildingRules = null
 var _surface: float = 0.0
@@ -102,7 +113,8 @@ func _plates(columns: PackedFloat64Array, text: String, colour: Color) -> void:
 func _valet_sign() -> void:
 	var x := Garage.inner_span(_rules).x + 2.4
 	var z := WorldSpace.BACK_WALL_Z + 0.4
-	var rise := _surface - _rules.story_top(_rules.floors - 1) - 0.55
+	var ceiling := _rules.story_top(_rules.floors - 1)
+	var rise := _surface - ceiling - 0.55
 	var board := GreyboxLook.box(Vector3(2.4, 0.42, 0.04), GreyboxLook.surface(PLATE_BURGUNDY))
 	board.position = Garage.scene_point(x, _surface - rise, z)
 	board.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -110,28 +122,37 @@ func _valet_sign() -> void:
 	var word := Garage.label("VALET PARKING", 800, 0.22, PAINT_WHITE)
 	word.position = board.position + Vector3(0.0, 0.0, 0.025)
 	add_child(word)
+	# Подвесы до потолка: верх — на 4 мм ниже него, не в плоскости плиты.
+	var hang := (_surface - rise - 0.21) - ceiling - 0.004
+	for side: float in [-0.9, 0.9]:
+		var rod := GreyboxLook.box(Vector3(0.03, hang, 0.03), GreyboxLook.metal(BOOTH))
+		rod.position = Garage.scene_point(x + side, ceiling + 0.004 + hang * 0.5, z)
+		rod.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(rod)
 
 
-## Шлагбаум офиса на площадке за воротами: стойка с будкой у переднего края
-## проезда и полосатая стрела поперёк него. На кадре закрытая стрела уходит в
-## глубину и почти не видна, поднятая — встаёт полосатым столбом.
+## Шлагбаум офиса на площадке за воротами: стойка у переднего края полосы
+## машины Otto и полосатая стрела поперёк полосы. На кадре закрытая стрела
+## уходит в глубину и почти не видна, поднятая — встаёт полосатым столбом.
 func _barrier() -> void:
 	var gate := Garage.gate_x(_rules) - BuildingShell.WALL_WIDTH * 0.5 - BARRIER_OFF_GATE
-	var lane_front := Garage.CAR_Z + Garage.CAR_WIDTH * 0.5 + 0.35
+	var lane_front := ExitCar.Z + POST_OFF_LANE
+	var arm_length := lane_front + GarageRamp.WIDTH * 0.5 - 0.05
 	var post := GreyboxLook.box(POST, GreyboxLook.metal(BOOTH))
 	post.position = Garage.scene_point(gate, _surface - POST.y * 0.5, lane_front)
 	add_child(post)
+	# Ось стрелы ниже верха стойки: верх стрелы не ложится в плоскость её верха.
 	var pivot := Node3D.new()
 	pivot.name = "Barrier"
-	pivot.position = Garage.scene_point(gate, _surface - POST.y + 0.05, lane_front)
+	pivot.position = Garage.scene_point(gate, _surface - POST.y + ARM.y, lane_front)
 	add_child(pivot)
 	var stripes := 6
 	for stripe: int in stripes:
 		var piece := GreyboxLook.box(
-			Vector3(ARM.x, ARM.y, ARM_LENGTH / stripes),
+			Vector3(ARM.x, ARM.y, arm_length / stripes),
 			GreyboxLook.surface(STRIPE_RED if stripe % 2 == 0 else STRIPE_WHITE)
 		)
-		piece.position.z = -ARM_LENGTH / stripes * (stripe + 0.5)
+		piece.position.z = -arm_length / stripes * (stripe + 0.5)
 		piece.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		pivot.add_child(piece)
 	_arm = pivot
@@ -148,18 +169,13 @@ func _graffiti(bays: Array[Vector2], building_seed: int) -> void:
 		var low := rng.randf_range(0.45, 0.75)
 		var quad := QuadMesh.new()
 		quad.size = TAG_SIZE
-		var look := StandardMaterial3D.new()
-		var tag := WallWear.TAGS[index % WallWear.TAGS.size()]
-		look.albedo_texture = load("%s/%s.png" % [WallWear.DIR, tag]) as Texture2D
-		look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		look.roughness = 0.9
-		quad.material = look
+		quad.material = WallWear.tag_look(WallWear.TAGS[index % WallWear.TAGS.size()])
 		var mark := MeshInstance3D.new()
 		mark.mesh = quad
 		var x := rng.randf_range(
 			bay.x + TAG_SIZE.x * 0.5, maxf(bay.y - TAG_SIZE.x * 0.5, bay.x + TAG_SIZE.x * 0.5)
 		)
-		mark.position = Garage.scene_point(x, _surface - low, _far + 0.008 + index * 0.002)
+		mark.position = Garage.scene_point(x, _surface - low, _far + TAG_OFF_WALL + index * 0.003)
 		mark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(mark)
 
@@ -186,8 +202,11 @@ func _clutter(
 		return
 	var bin := free[0]
 	var dumpster := GreyboxLook.box(DUMPSTER, GreyboxLook.metal(DUMPSTER_GREEN))
+	# Перед стеной, а не в ней: глубина бака — к камере от лица стены.
 	dumpster.position = Garage.scene_point(
-		(bin.x + bin.y) * 0.5, _surface - DUMPSTER.y * 0.5, _far - DUMPSTER.z * 0.5 + 0.1
+		(bin.x + bin.y) * 0.5,
+		_surface - DUMPSTER.y * 0.5,
+		_far + CLUTTER_OFF_WALL.x + DUMPSTER.z * 0.5
 	)
 	add_child(dumpster)
 	var lid := GreyboxLook.box(
@@ -199,9 +218,15 @@ func _clutter(
 	if free.size() < 2:
 		return
 	var rack := free[1]
-	for offset: float in [-0.45, 0.35]:
+	# Сдвиг по x и отступ от стены: велосипеды в ряд один за другим — рядом в
+	# одной глубине они вошли бы друг в друга.
+	for offset: Vector2 in [Vector2(-0.45, 0.0), Vector2(0.35, BIKE_STAGGER)]:
 		var bike := PropCatalog.make("bicycle", true)
 		if bike == null:
 			continue
-		bike.position = Garage.scene_point((rack.x + rack.y) * 0.5 + offset, _surface, _far - 0.9)
+		# Нуль модели каталога — её задняя грань ([method PropCatalog.make]):
+		# велосипед встаёт перед стеной, а не целиком за ней.
+		bike.position = Garage.scene_point(
+			(rack.x + rack.y) * 0.5 + offset.x, _surface, _far + CLUTTER_OFF_WALL.y + offset.y
+		)
 		add_child(bike)

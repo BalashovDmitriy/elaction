@@ -40,6 +40,8 @@ const STEP := Vector2(0.32, 0.17)
 ## Парковщик отеля; null у других типов. Тестам и кадрам.
 var valet: Node3D = null
 
+## Скелет парковщика: дышит, только пока выезд в кадре ([method set_active]).
+var _valet_player: AnimationPlayer = null
 var _left: float = 0.0
 var _floor: float = 0.0
 var _lit: bool = true
@@ -119,7 +121,16 @@ func _valet(building_seed: int, weather: Weather.Kind, time: TimeOfDay.Kind) -> 
 	if player != null and player.has_animation(&"Idle"):
 		player.get_animation(&"Idle").loop_mode = Animation.LOOP_LINEAR
 		player.play(&"Idle")
+		_valet_player = player
 	valet = person
+
+
+## Скелет парковщика — работа на каждый кадр, а улицу видно только у выезда:
+## он дышит, пока выезд в кадре, как идут прохожие ([method
+## StreetPeople.set_active]). Зовёт пандус каждый кадр.
+func set_active(on: bool) -> void:
+	if _valet_player != null and _valet_player.active != on:
+		_valet_player.active = on
 
 
 ## Офис: стеклянный тамбур на всю глубину тротуара, переплёт, свет изнутри и
@@ -170,7 +181,9 @@ func _stoop() -> void:
 	for side: float in [z - 1.05, z + 0.45]:
 		var run := Vector2(STEP.x * STEPS, top).length()
 		var bar := GreyboxLook.box(Vector3(run, 0.04, 0.04), rail)
-		bar.rotation.z = -atan2(top, STEP.x * STEPS)
+		# Крыльцо поднимается к двери в торце, вправо: туда же и перила, и их
+		# нижний конец ложится на стойку у тротуара.
+		bar.rotation.z = atan2(top, STEP.x * STEPS)
 		bar.position = _at(_left - STEP.x * STEPS * 0.5 - 0.06, top * 0.5 + 0.9, side)
 		_add(bar)
 		_box(rail, Vector3(0.04, 0.9, 0.04), _left - STEP.x * STEPS - 0.06, 0.004, side)

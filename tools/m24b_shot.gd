@@ -104,7 +104,8 @@ func _start() -> void:
 	_curtain = _main.get(&"_curtain") as FadeCurtain
 	GameState.instance().start_game()
 	GameState.instance().building = _building
-	var car := CarModel.choose(_building, _seed)
+	# Тип здания — в жребий машины, как у уровня ([method GreyboxLevel._spawn_car]).
+	var car := CarModel.choose(_building, _seed, BuildingIdentity.of(_building, _seed).kind)
 	print("машина: модель %d, краска %d" % [car.model, car.paint])
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	_level.rules = BuildingRules.new()

@@ -105,8 +105,10 @@ func _snow(rules: BuildingRules, deck: float, time: TimeOfDay.Kind) -> void:
 	var bounds := rules.floor_span(BuildingRules.ROOF)
 	var fall := HEIGHT + 0.3
 	var slant := SnowLook.slant(FALL, WIND)
-	var from := bounds.x - BuildingShell.COPING_OVERHANG - fall * slant.x
-	var to := bounds.y + BuildingShell.COPING_OVERHANG - fall * slant.y
+	# Вынос карниза — своего здания (ADR-0058), как у дождя ([RoofRain]).
+	var overhang := BuildingShell.coping_overhang(rules.kind)
+	var from := bounds.x - overhang - fall * slant.x
+	var to := bounds.y + overhang - fall * slant.y
 	# Жизнь — до настила и самому косому хлопку; хлопьев — на тот же поток, что
 	# при жизни по одной скорости падения: дольше живущий дольше лежит погасшим.
 	var slowest := SnowLook.slowest_fall(FALL, WIND)

@@ -170,8 +170,11 @@ func _rain(rules: BuildingRules, deck: float) -> void:
 	# выносится за парапет и не падает мимо крыши вниз по фасаду.
 	var fall := HEIGHT + 0.3
 	var spread := fall * tan(deg_to_rad(RainLook.SPREAD))
-	var from := bounds.x - BuildingShell.COPING_OVERHANG + spread
-	var to := bounds.y + BuildingShell.COPING_OVERHANG - fall * SLANT - spread
+	# Вынос карниза — своего здания (ADR-0058): у офиса отлив узкий, и по
+	# выносу отеля капли сыпались бы мимо него.
+	var overhang := BuildingShell.coping_overhang(rules.kind)
+	var from := bounds.x - overhang + spread
+	var to := bounds.y + overhang - fall * SLANT - spread
 	_drops = RainLook.streaks(
 		DROPS,
 		(HEIGHT + 1.0) / SPEED.x,
@@ -277,10 +280,13 @@ func _ripple(rules: BuildingRules, deck: float) -> void:
 func _drip(rules: BuildingRules, plan: BuildingPlan, deck: float) -> void:
 	var bounds := rules.floor_span(BuildingRules.ROOF)
 	var coping := deck + BuildingShell.PARAPET_HEIGHT
+	# Кромка — по выносу карниза своего здания: по наибольшему капель у офиса
+	# висела бы в воздухе в 14 см от отлива.
+	var overhang := BuildingShell.coping_overhang(rules.kind)
 	var edges: Array[PackedVector3Array] = []
 	for x: float in [
-		bounds.x + BuildingShell.WALL_WIDTH + BuildingShell.COPING_OVERHANG,
-		bounds.y - BuildingShell.WALL_WIDTH - BuildingShell.COPING_OVERHANG,
+		bounds.x + BuildingShell.WALL_WIDTH + overhang,
+		bounds.y - BuildingShell.WALL_WIDTH - overhang,
 	]:
 		edges.append(PackedVector3Array([Vector3(x, coping, BACK_Z), Vector3(x, coping, FRONT_Z)]))
 	var shaft := plan.roof_shaft()

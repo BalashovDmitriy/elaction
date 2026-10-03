@@ -62,6 +62,8 @@ var _glow: OmniLight3D = null
 var _halo: MeshInstance3D = null
 ## Высота щита, м: по ней ореол в дожде.
 var _height: float = 0.0
+## Верх щита в плоскости правил.
+var _top: float = 0.0
 var _flicker: Label3D = null
 var _clock: float = 0.0
 var _lit: bool = true
@@ -89,6 +91,7 @@ func hang(rules: BuildingRules, identity: BuildingIdentity) -> void:
 	var height := (count + LINE_GAP * (lines.size() - 1)) * LETTER_STEP + MARGIN * 2.0
 	_height = height
 	var top := rules.floor_surface(BuildingRules.ROOF) - RISE
+	_top = top
 	var x := rules.floor_span(0).y + STANDOFF
 
 	var panel := GreyboxLook.box(
@@ -154,6 +157,13 @@ func hang(rules: BuildingRules, identity: BuildingIdentity) -> void:
 	glow.position.z = Z + 1.2
 	add_child(glow)
 	apply_graphics()
+
+
+## Где по высоте висит щит: верх и низ в плоскости правил. Перед ним на
+## правом торце башни не встают флаги и ламели ([BuildingFlanks]) — закрыли бы
+## буквы.
+func span() -> Vector2:
+	return Vector2(_top, _top + _height)
 
 
 ## Ореол неона в дожде (ADR-0037, решение 3, дополнение): дождь у вывески

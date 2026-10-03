@@ -38,8 +38,9 @@ func test_cars_follow_the_kind_weights() -> void:
 
 
 ## У каждого типа своя корона: стоит за плоскостью игры дальше размаха винта,
-## без тел; торцы и уступ — снаружи стен башни и над уступом; новых источников
-## света нет — у окружения их по-прежнему два.
+## без тел; торцы и уступ — снаружи стен башни и над уступом и не закрывают
+## вывеску у правого торца; новых источников света нет — у окружения их
+## по-прежнему два.
 func test_crown_and_flanks_of_every_kind() -> void:
 	var tops := {}
 	for kind: BuildingIdentity.Kind in KINDS:
@@ -76,20 +77,44 @@ func test_crown_and_flanks_of_every_kind() -> void:
 				"тип %d: деталь в %.2f — внутри башни" % [kind, at.x]
 			)
 			assert_lt(at.y, ledge + 0.1, "тип %d: деталь ниже уступа" % kind)
+		var signs := level.find_children("VerticalSign", "VerticalSign", true, false)
+		assert_eq(signs.size(), 1, "тип %d: вывеска есть" % kind)
+		if signs.is_empty():
+			continue
+		var board := (signs[0] as VerticalSign).span()
+		var near := tower.y + VerticalSign.STANDOFF - VerticalSign.PANEL_WIDTH * 0.5
+		var blocking: Array[String] = []
+		for place: Transform3D in places:
+			var at := WorldSpace.to_plane(place.origin)
+			var before := at.x > near and at.x < near + VerticalSign.PANEL_WIDTH
+			if before and at.y > board.x and at.y < board.y:
+				blocking.append("%.2f, %.2f" % [at.x, at.y])
+		assert_eq(blocking, [] as Array[String], "тип %d: детали перед вывеской" % kind)
 	assert_eq(tops.size(), KINDS.size())
 
 
-## Паркинг: у офиса шлагбаум, и он поднимается вместе с воротами; у других
-## шлагбаума нет. Вход с улицы: парковщик только у отеля.
+## Паркинг: отделка — перед дальней стеной и полосой краски на ней, а не за
+## ними; у офиса шлагбаум поперёк полосы машины Otto, и он поднимается вместе
+## с воротами; у других шлагбаума нет. Вход с улицы: парковщик только у отеля.
 func test_garage_and_street_front_by_kind() -> void:
+	# Лицо дальней стены и полосы краски на ней (1 см): за ним отделку не видно.
+	var band_face := Garage.FAR_Z + Garage.FAR_THICKNESS * 0.5 + 0.01
 	for kind: BuildingIdentity.Kind in KINDS:
 		var level := await _level(kind)
 		var garage := level.garage()
 		assert_not_null(garage.dressing, "тип %d: отделка паркинга" % kind)
+		for node: Node in garage.dressing.find_children("*", "MeshInstance3D", true, false):
+			var mesh := node as MeshInstance3D
+			var box := mesh.global_transform * mesh.mesh.get_aabb()
+			assert_gt(box.end.z, band_face + 0.002, "тип %d: %s за стеной" % [kind, mesh.name])
 		var office := kind == BuildingIdentity.Kind.OFFICE
 		assert_eq(garage.dressing.has_barrier(), office, "тип %d: шлагбаум" % kind)
 		if office:
 			assert_false(garage.dressing.barrier_raised(), "стрела опущена")
+			var reach := _reach(garage.dressing.find_child("Barrier", true, false) as Node3D)
+			assert_lt(reach.position.z, ExitCar.Z, "стрела — поперёк полосы машины")
+			assert_gt(reach.end.z, ExitCar.Z, "стойка — перед полосой машины")
+			assert_gt(reach.position.z, -GarageRamp.WIDTH * 0.5, "стрела — до стены тоннеля")
 			garage.open_gate(0.05)
 			await wait_seconds(0.2)
 			assert_true(garage.dressing.barrier_raised(), "стрела поднялась с воротами")
@@ -98,6 +123,18 @@ func test_garage_and_street_front_by_kind() -> void:
 		var hotel := kind == BuildingIdentity.Kind.HOTEL
 		assert_eq(front.valet != null, hotel, "тип %d: парковщик только у отеля" % kind)
 		assert_eq(front.find_children("*", "PhysicsBody3D", true, false).size(), 0, "без тел")
+
+
+## Габарит мешей под [param root] в координатах сцены.
+func _reach(root: Node3D) -> AABB:
+	var box := AABB()
+	var first := true
+	for node: Node in root.find_children("*", "MeshInstance3D", true, false):
+		var mesh := node as MeshInstance3D
+		var part := mesh.global_transform * mesh.mesh.get_aabb()
+		box = part if first else box.merge(part)
+		first = false
+	return box
 
 
 func _level(kind: BuildingIdentity.Kind, building_seed: int = 1) -> GreyboxLevel:

@@ -50,12 +50,20 @@ var _lit: bool = true
 var _placed: Array[Transform3D] = []
 ## Марш пожарной лестницы: один меш на все марши — один мультимеш.
 var _stair: BoxMesh = null
+## Купола зонтиков террасы — по мешу на цвет [constant CANVAS]: меш на каждый
+## зонтик сдавался бы своим мультимешем на одну копию.
+var _canopies: Array[CylinderMesh] = []
+## Где по высоте у правого торца висит вывеска ([method VerticalSign.span]):
+## флаги и ламели перед ней не встают — закрыли бы буквы.
+var _sign := Vector2.ZERO
 
 
 ## Ставит торцы и уступ здания по типу из [member BuildingRules.kind].
-func build(rules: BuildingRules, building_seed: int = 1) -> void:
+## [param sign_span] — верх и низ вывески у правого торца в плоскости правил.
+func build(rules: BuildingRules, building_seed: int = 1, sign_span: Vector2 = Vector2.ZERO) -> void:
 	name = "Flanks"
 	_rules = rules
+	_sign = sign_span
 	_lit = TimeOfDay.sign_lit(rules.time_of_day)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([building_seed, 0xF1A2])
@@ -122,6 +130,8 @@ func _flags(wall: float, side: float) -> void:
 	var turn := 0
 	for index: int in range(1, mini(_rules.wide_from, _rules.floors - 1), 4):
 		var y := _rules.story_top(index) + 0.4
+		if _before_sign(side, y - 0.05, y + 1.4):
+			continue
 		var root := Vector3(wall + side * 0.05, y, FRONT_Z - 0.6)
 		_batch.box(pole, Vector3(1.6, 0.04, 0.04), root + Vector3(side * 0.8, 0.0, 0.0))
 		var cloth := GreyboxLook.surface(FLAGS[turn % FLAGS.size()])
@@ -140,12 +150,20 @@ func _louvres(wall: float, side: float, top: float, bottom: float) -> void:
 	)
 	for index: int in range(0, mini(_rules.wide_from, _rules.floors - 1)):
 		var head := _rules.story_top(index) + 0.35
+		if _before_sign(side, head - 0.05, head + 0.55):
+			continue
 		for shelf: float in [0.0, 0.5]:
 			_batch.box(
 				metal,
 				Vector3(0.7, 0.04, 0.9),
 				Vector3(wall + side * 0.35, head + shelf, FRONT_Z - 0.45)
 			)
+
+
+## Встала бы деталь торца [param side] от [param from] до [param to] по
+## высоте (плоскость правил) перед вывеской: та висит у правого торца.
+func _before_sign(side: float, from: float, to: float) -> bool:
+	return side > 0.0 and to > _sign.x and from < _sign.y
 
 
 ## Пожарная лестница жилого дома: площадка с перилами на каждом этаже башни,
@@ -221,14 +239,9 @@ func _terrace(span: Vector2, surface: float, side: float, rng: RandomNumberGener
 		var x := span.x + 0.8 + (length - 1.6) * (float(index) + 0.5) / float(count)
 		var z := -1.2 - rng.randf_range(0.0, 3.0)
 		_batch.cylinder_on(pole, 0.03, 2.2, surface, Vector3(x, 0.0, z))
-		var canopy := CylinderMesh.new()
-		canopy.top_radius = 0.02
-		canopy.bottom_radius = 1.1
-		canopy.height = 0.45
-		canopy.radial_segments = 10
-		canopy.material = GreyboxLook.surface(CANVAS[index % CANVAS.size()])
 		_batch.mesh(
-			canopy, Transform3D(Basis.IDENTITY, MeshBatch.scene_of(Vector3(x, surface - 2.3, z)))
+			_canopy(index % CANVAS.size()),
+			Transform3D(Basis.IDENTITY, MeshBatch.scene_of(Vector3(x, surface - 2.3, z)))
 		)
 		_batch.cylinder_on(
 			GreyboxLook.surface(DECK.lightened(0.3)), 0.4, 0.05, surface, Vector3(x, 0.72, z)
@@ -245,6 +258,19 @@ func _terrace(span: Vector2, surface: float, side: float, rng: RandomNumberGener
 			var sag := sin(share * PI) * 0.35
 			var at := from.lerp(to, share) + Vector3(0.0, sag, 0.0)
 			_batch.sphere(bulb, 0.07, at)
+
+
+## Купол зонтика цвета [param tone] из [constant CANVAS]: один меш на цвет.
+func _canopy(tone: int) -> CylinderMesh:
+	while _canopies.size() <= tone:
+		var canopy := CylinderMesh.new()
+		canopy.top_radius = 0.02
+		canopy.bottom_radius = 1.1
+		canopy.height = 0.45
+		canopy.radial_segments = 10
+		canopy.material = GreyboxLook.surface(CANVAS[_canopies.size()])
+		_canopies.append(canopy)
+	return _canopies[tone]
 
 
 ## Плаза офиса: плитка, ряды зенитных фонарей — светятся ночью, — и
