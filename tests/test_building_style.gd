@@ -144,24 +144,29 @@ func test_wall_decor_hangs_above_the_wainscot() -> void:
 	for kind: BuildingIdentity.Kind in [
 		BuildingIdentity.Kind.HOTEL, BuildingIdentity.Kind.RESIDENTIAL
 	]:
-		var level := await _level(kind)
-		var rules := level.rules
-		var style := BuildingStyle.of(level.identity)
-		var rail_top := style.wainscot_height + BuildingRibs.RAIL_HEIGHT
+		# Особые этажи (ADR-0057) без стены: в маленьком здании коридоров
+		# мало, и на одном сиде стены бывают пусты — сидов несколько.
 		var hung := 0
-		for item: Node in level.get_node("Scenery/Props").get_children():
-			var entry := PropCatalog.entry(String(item.name))
-			if entry == null or entry.place != PropCatalog.Place.WALL:
-				continue
-			var bottom := WorldSpace.to_plane((item as Node3D).position).y
-			# Этаж, над полом которого висит предмет: ближайший пол снизу.
-			var index := int(ceilf((bottom - rules.sky_height) / rules.floor_height)) - 1
-			assert_gte(
-				rules.floor_surface(index) - bottom,
-				rail_top - 0.001,
-				"тип %d: %s за поручнем" % [kind, item.name]
-			)
-			hung += 1
+		for building_seed: int in [1, 2, 3]:
+			var level := await _level(kind, building_seed)
+			var rules := level.rules
+			var style := BuildingStyle.of(level.identity)
+			var rail_top := style.wainscot_height + BuildingRibs.RAIL_HEIGHT
+			for item: Node in level.get_node("Scenery/Props").get_children():
+				var entry := PropCatalog.entry(String(item.name))
+				if entry == null or entry.place != PropCatalog.Place.WALL:
+					continue
+				var bottom := WorldSpace.to_plane((item as Node3D).position).y
+				# Этаж, над полом которого висит предмет: ближайший пол снизу.
+				var index := int(ceilf((bottom - rules.sky_height) / rules.floor_height)) - 1
+				assert_gte(
+					rules.floor_surface(index) - bottom,
+					rail_top - 0.001,
+					"тип %d: %s за поручнем" % [kind, item.name]
+				)
+				hung += 1
+			level.queue_free()
+			await get_tree().process_frame
 		assert_gt(hung, 0, "тип %d: на стенах ничего" % kind)
 
 

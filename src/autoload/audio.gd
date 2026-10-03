@@ -96,6 +96,8 @@ var _outdoors: bool = true
 var _weather: Weather.Kind = Weather.Kind.CLEAR
 var _time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT
 var _building: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL
+## Фон зала особого этажа, у которого Otto ([method set_hall]); пусто — нет.
+var _hall: String = ""
 ## Какой по счёту город звучит. Гром назначается городу, и к следующему — в
 ## меню, в другое здание — он уже не приходит (авторевью M23).
 var _city: int = 0
@@ -302,15 +304,18 @@ func set_weather(weather: Weather.Kind, time: TimeOfDay.Kind = TimeOfDay.Kind.NI
 	_weather = weather
 	_time = time
 	_city += 1
-	set_ambience(Sounds.weather_loops(_weather, _outdoors, _time, _building))
+	set_ambience(Sounds.weather_loops(_weather, _outdoors, _time, _building, _hall))
 
 
-## Тип здания: по нему тишина коридора (ADR-0055, решение 8).
-func set_building(building: BuildingIdentity.Kind) -> void:
-	if _building == building:
+## Тип здания: по нему тишина коридора (ADR-0055, решение 8). [param hall] —
+## фон зала особого этажа, у которого Otto (ADR-0057, решение 4): входит
+## наплывом поверх тишины коридора и уходит, когда Otto ушёл с этажа.
+func set_building(building: BuildingIdentity.Kind, hall: String = "") -> void:
+	if _building == building and _hall == hall:
 		return
 	_building = building
-	set_ambience(Sounds.weather_loops(_weather, _outdoors, _time, _building))
+	_hall = hall
+	set_ambience(Sounds.weather_loops(_weather, _outdoors, _time, _building, _hall))
 
 
 ## Какие петли фона звучат. Нужно тестам.
@@ -324,7 +329,7 @@ func set_outdoors(on: bool) -> void:
 	if _outdoors == on:
 		return
 	_outdoors = on
-	set_ambience(Sounds.weather_loops(_weather, _outdoors, _time, _building))
+	set_ambience(Sounds.weather_loops(_weather, _outdoors, _time, _building, _hall))
 	# Гром на этажах глухой: петли внутри и так записаны из-за стекла, а
 	# фильтр шины приглушает то, что приходит снаружи.
 	_sweep(Sounds.AMBIENCE_BUS, OPEN_HZ if on else AMBIENCE_MUFFLED_HZ)
@@ -404,6 +409,7 @@ func reset() -> void:
 	_outdoors = true
 	_weather = Weather.Kind.CLEAR
 	_building = BuildingIdentity.Kind.HOTEL
+	_hall = ""
 	_duck_until = 0.0
 	_city += 1
 	_ambience_shot.stop()

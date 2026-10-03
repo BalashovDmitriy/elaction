@@ -691,6 +691,7 @@ func music(alarm: bool) -> void:
 func _listen_where_otto_is() -> void:
 	var index := _floor_of(otto)
 	soundtrack.follow(index, GameState.instance().alarm.raised or _arrival.is_playing())
+	Sounds.set_building(rules.kind, Sounds.hall_tone_of(FloorRole.at(rules, index)))
 	var at := WorldSpace.to_plane(otto.global_position)
 	Sounds.set_outdoors(PlaceSound.hears_street(rules, index, at.x, Garage.gate_x(rules)))
 	var on_concrete := index == BuildingRules.ROOF or index == rules.floors - 1

@@ -95,6 +95,12 @@
   "licence": "CC-BY 4.0",
   "url": "https://freesound.org/people/Benboncan/sounds/78092/"
  },
+ "cab_gate": {
+  "title": "Elevator_OldApartmentBuilding",
+  "author": "exuberate",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/exuberate/sounds/140896/"
+ },
  "car_away": {
   "title": "car drive away",
   "author": "soundmary",
@@ -262,6 +268,60 @@
   "author": "freesoundjon01",
   "licence": "CC0 1.0",
   "url": "https://freesound.org/people/freesoundjon01/sounds/202666/"
+ },
+ "hall_bar": {
+  "title": "room tone - small hotel bar",
+  "author": "oliwoli",
+  "licence": "CC-BY 4.0",
+  "url": "https://freesound.org/people/oliwoli/sounds/666292/"
+ },
+ "hall_boiler": {
+  "title": "boiler room",
+  "author": "rucisko",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/rucisko/sounds/164746/"
+ },
+ "hall_dining": {
+  "title": "20231229 - Hotel restaurant breakfast 7",
+  "author": "LG",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/LG/sounds/718019/"
+ },
+ "hall_gym": {
+  "title": "gym ambience",
+  "author": "waweee",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/waweee/sounds/370967/"
+ },
+ "hall_kitchen": {
+  "title": "restaurant kitchen.wav",
+  "author": "cognito perceptu",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/cognito perceptu/sounds/162662/"
+ },
+ "hall_laundry": {
+  "title": "laundromat washers washing machines rattle vibrate4.flac",
+  "author": "kyles",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/kyles/sounds/454465/"
+ },
+ "hall_mechanical": {
+  "title": "Hilton Basement Ambience - Plant Room.wav",
+  "author": "lolamadeus",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/lolamadeus/sounds/161224/"
+ },
+ "hall_pool": {
+  "title": "Public Swimming Pool Atmosphere.wav",
+  "author": "tosha73",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/tosha73/sounds/495399/"
+ },
+ "hall_server": {
+  "title": "Object_Fan_Server_Room.wav",
+  "author": "Nox_Sound",
+  "licence": "CC0 1.0",
+  "url": "https://freesound.org/people/Nox_Sound/sounds/465613/"
  },
  "heli_door": {
   "title": "Van sliding door open",

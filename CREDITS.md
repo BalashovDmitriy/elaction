@@ -288,6 +288,16 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `step_lino.2` | Footsteps Boots_Linoleum | roman_gens | CC-BY 4.0 | [freesound.org](https://freesound.org/people/roman_gens/sounds/475080/) |
 | `step_lino.3` | Footsteps Boots_Linoleum | roman_gens | CC-BY 4.0 | [freesound.org](https://freesound.org/people/roman_gens/sounds/475080/) |
 | `step_lino.4` | Footsteps Boots_Linoleum | roman_gens | CC-BY 4.0 | [freesound.org](https://freesound.org/people/roman_gens/sounds/475080/) |
+| `hall_pool` | Public Swimming Pool Atmosphere.wav | tosha73 | CC0 1.0 | [freesound.org](https://freesound.org/people/tosha73/sounds/495399/) |
+| `hall_server` | Object_Fan_Server_Room.wav | Nox_Sound | CC0 1.0 | [freesound.org](https://freesound.org/people/Nox_Sound/sounds/465613/) |
+| `hall_boiler` | boiler room | rucisko | CC0 1.0 | [freesound.org](https://freesound.org/people/rucisko/sounds/164746/) |
+| `hall_laundry` | laundromat washers washing machines rattle vibrate4.flac | kyles | CC0 1.0 | [freesound.org](https://freesound.org/people/kyles/sounds/454465/) |
+| `hall_dining` | 20231229 - Hotel restaurant breakfast 7 | LG | CC0 1.0 | [freesound.org](https://freesound.org/people/LG/sounds/718019/) |
+| `hall_kitchen` | restaurant kitchen.wav | cognito perceptu | CC0 1.0 | [freesound.org](https://freesound.org/people/cognito perceptu/sounds/162662/) |
+| `hall_gym` | gym ambience | waweee | CC0 1.0 | [freesound.org](https://freesound.org/people/waweee/sounds/370967/) |
+| `hall_bar` | room tone - small hotel bar | oliwoli | CC-BY 4.0 | [freesound.org](https://freesound.org/people/oliwoli/sounds/666292/) |
+| `hall_mechanical` | Hilton Basement Ambience - Plant Room.wav | lolamadeus | CC0 1.0 | [freesound.org](https://freesound.org/people/lolamadeus/sounds/161224/) |
+| `cab_gate` | Elevator_OldApartmentBuilding | exuberate | CC0 1.0 | [freesound.org](https://freesound.org/people/exuberate/sounds/140896/) |
 | `thunder_near` | close-up thunder strike | loganzsound | CC0 1.0 | [freesound.org](https://freesound.org/people/loganzsound/sounds/840628/) |
 | `thunder_far` | distant dry thunderclap | Shuhmi | CC-BY 4.0 | [freesound.org](https://freesound.org/people/Shuhmi/sounds/855569/) |
 | `room_tone` | hotel corridor | addiofbaddi | CC0 1.0 | [freesound.org](https://freesound.org/people/addiofbaddi/sounds/241659/) |

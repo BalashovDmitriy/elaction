@@ -156,3 +156,24 @@
 | тревога | Fast Talkin, Hot Swing, Private Eye | Hiding Your Reality, Voltaic, Movement Proposition | Private Eye, Faster Does It |
 
 Утро и день офиса — по одному треку: там смены темы с середины здания нет.
+
+## Звуки, выбранные на слух
+
+Вторая страница прослушивания, 2026-10-03; кандидатов по описаниям нашёл
+поиск по freesound, слушал и выбирал пользователь. Фон зала звучит поверх
+тишины коридора, пока Otto на этаже зала; у лобби, бального и конференц-зала,
+переговорных, общей комнаты, кладовых, архива, склада и мастерской своего
+звука нет.
+
+| Слот | Запись | Лицензия |
+|---|---|---|
+| бассейн | tosha73 495399, Public Swimming Pool Atmosphere | CC0 |
+| серверная | Nox_Sound 465613, Object_Fan_Server_Room | CC0 |
+| котельная | rucisko 164746, boiler room | CC0 |
+| прачечная | kyles 454465, laundromat washers rattle vibrate | CC0 |
+| ресторан и столовая | LG 718019, Hotel restaurant breakfast 7 | CC0 |
+| кухня | cognito perceptu 162662, restaurant kitchen, с 9 с | CC0 |
+| спортзал | waweee 370967, gym ambience | CC0 |
+| бар | oliwoli 666292, room tone - small hotel bar | CC-BY 4.0 |
+| вентиляция и насосы | lolamadeus 161224, Hilton Basement Ambience - Plant Room | CC0 |
+| решётка кабины | exuberate 140896, Elevator_OldApartmentBuilding, 7.2–9.6 с | CC0 |

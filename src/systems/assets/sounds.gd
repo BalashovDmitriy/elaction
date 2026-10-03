@@ -117,6 +117,19 @@ const ALARM_OFFICE := "alarm_office"
 const ALARM_RESIDENTIAL := "alarm_residential"
 ## Лязг решётки грузовой кабины (ADR-0057, решение 6).
 const CAB_GATE := "cab_gate"
+## Фон залов особых этажей (ADR-0057, решение 4): звучит поверх тишины
+## коридора, пока Otto на этаже зала. У залов без своего звука — только тишина.
+const HALL_TONES := {
+	FloorRole.Role.POOL: "hall_pool",
+	FloorRole.Role.SERVER: "hall_server",
+	FloorRole.Role.BOILER: "hall_boiler",
+	FloorRole.Role.LAUNDRY: "hall_laundry",
+	FloorRole.Role.DINING: "hall_dining",
+	FloorRole.Role.KITCHEN: "hall_kitchen",
+	FloorRole.Role.GYM: "hall_gym",
+	FloorRole.Role.BAR: "hall_bar",
+	FloorRole.Role.MECHANICAL: "hall_mechanical",
+}
 const MENU_THEME := "menu_theme"
 const GAME_OVER_THEME := "game_over_theme"
 
@@ -205,9 +218,26 @@ const EFFECTS: PackedStringArray = [
 	NEON_FLICKER,
 	BONUS_TICK,
 	RECORD,
+	CAB_GATE,
 ]
 const MUSIC: PackedStringArray = [
-	THEME, THEME_MORNING, THEME_DAY, THEME_EVENING, ALARM_THEME, MENU_THEME, GAME_OVER_THEME
+	THEME,
+	THEME_MORNING,
+	THEME_DAY,
+	THEME_EVENING,
+	ALARM_THEME,
+	THEME_OFFICE,
+	THEME_OFFICE + "_morning",
+	THEME_OFFICE + "_day",
+	THEME_OFFICE + "_evening",
+	ALARM_OFFICE,
+	THEME_RESIDENTIAL,
+	THEME_RESIDENTIAL + "_morning",
+	THEME_RESIDENTIAL + "_day",
+	THEME_RESIDENTIAL + "_evening",
+	ALARM_RESIDENTIAL,
+	MENU_THEME,
+	GAME_OVER_THEME,
 ]
 const AMBIENCE: PackedStringArray = [
 	CITY,
@@ -227,7 +257,16 @@ const AMBIENCE: PackedStringArray = [
 	THUNDER_NEAR,
 	THUNDER_FAR,
 	SHAFT_HUM,
-	NEON_BUZZ
+	NEON_BUZZ,
+	"hall_pool",
+	"hall_server",
+	"hall_boiler",
+	"hall_laundry",
+	"hall_dining",
+	"hall_kitchen",
+	"hall_gym",
+	"hall_bar",
+	"hall_mechanical",
 ]
 
 ## Джинглы: на время звучания приглушают трек (ADR-0036, решение 6).
@@ -489,15 +528,25 @@ static func weather_loops(
 	weather: Weather.Kind,
 	outdoors: bool,
 	time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT,
-	building: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL
+	building: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL,
+	hall: String = ""
 ) -> PackedStringArray:
 	var raining := Weather.is_raining(weather)
 	if outdoors:
 		var outside := WIND_SNOW if Weather.is_snowing(weather) else WIND
 		return PackedStringArray([city_for(time), RAIN if raining else outside])
+	var inside := PackedStringArray([room_tone_of(building)])
 	if raining:
-		return PackedStringArray([room_tone_of(building), RAIN_WINDOW])
-	return PackedStringArray([room_tone_of(building)])
+		inside.append(RAIN_WINDOW)
+	# Фон зала особого этажа — только внутри (ADR-0057, решение 4).
+	if not hall.is_empty():
+		inside.append(hall)
+	return inside
+
+
+## Фон зала роли [param role] или пусто, если своего звука у зала нет.
+static func hall_tone_of(role: FloorRole.Role) -> String:
+	return String(HALL_TONES.get(role, ""))
 
 
 ## Тишина коридора здания типа [param building].
@@ -510,11 +559,12 @@ static func room_tone_of(building: BuildingIdentity.Kind) -> String:
 	return ROOM_TONE
 
 
-## Тип здания, в котором партия: по нему тишина коридора.
-static func set_building(building: BuildingIdentity.Kind) -> void:
+## Тип здания, в котором партия: по нему тишина коридора. [param hall] — фон
+## зала особого этажа, у которого Otto ([method hall_tone_of]).
+static func set_building(building: BuildingIdentity.Kind, hall: String = "") -> void:
 	var director := AudioDirector.instance()
 	if director != null:
-		director.set_building(building)
+		director.set_building(building, hall)
 
 
 ## Улица во время суток [param time]: утром птицы, днём плотный гул, вечером

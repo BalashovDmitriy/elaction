@@ -164,7 +164,9 @@ func test_floors_are_not_bare() -> void:
 			# С M24n часть стены — ниши, зеркала, окна, щитки (ADR-0056): стена не
 			# пустая и без картины.
 			decor += WallFeatures.lay(rules, plan, building_seed, identity, dressing).size()
-		assert_gt(float(furniture) / floors, 0.66, "мебели меньше двух предметов на три этажа")
+		# Широкие этажи стилобата с M24o — залы (ADR-0057): коридоры остались
+		# в узкой башне, и предмет на три этажа — уже не мало.
+		assert_gt(float(furniture) / floors, 0.3, "мебели меньше предмета на три этажа")
 		if identity.kind == BuildingIdentity.Kind.OFFICE:
 			# У офиса стена — стекло (ADR-0056): на нём не висит ничего.
 			assert_eq(decor, 0, "на стекле офиса что-то висит")
