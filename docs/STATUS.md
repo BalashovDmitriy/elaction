@@ -350,7 +350,7 @@ of the kind's own style with a freight elevator gate, music and hall ambience ch
 
 - **M24q — animation, frame by frame** (user's request, 2026-10-03): every animation
   reviewed frame by frame and finished — Otto leaving the helicopter, agents opening doors
-  and stepping out instead of appearing, Otto opening and closing doors himself, the missing
+  and stepping out instead of appearing and hittable as soon as they are out, Otto opening and closing doors himself, the missing
   frames of takedowns, deaths in unnatural poses (clip or ragdoll), shots that should leave
   from the pistol's muzzle; also buildings flickering behind the menu in night fog. A big
   milestone. Plan in [EPIC.md](EPIC.md).

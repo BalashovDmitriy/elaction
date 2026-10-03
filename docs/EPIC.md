@@ -1193,6 +1193,10 @@ Before the code: a check against the original and questions, as for any mileston
 - [ ] Otto leaving the helicopter: today it looks unnatural
 - [ ] Agents coming out of doors: the door opens and the agent just appears — he should
       open it and step out
+- [ ] An agent is hittable as soon as he has stepped out into Otto's plane: today he is
+      shielded for the whole 0.6 s `EMERGING` phase (ADR-0020), and bullets pass through an
+      agent already standing on the floor. Check against the ROM how long the original
+      shields an agent in a doorway
 - [ ] Otto entering a door: he vanishes instead of going in and closing the door behind him
 - [ ] Otto coming out of a door: the door opens and he is already there — he should open
       it himself and step out
