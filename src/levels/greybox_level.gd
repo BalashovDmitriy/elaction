@@ -98,6 +98,8 @@ class AgentPost:
 
 ## Что за здание: отель или офис и его имя (ADR-0033, решение 1).
 var identity: BuildingIdentity = null
+## Музыка здания: тема по типу и половине здания, тревога (ADR-0057).
+var soundtrack: BuildingMusic = null
 
 ## Полное вступление — в первом здании партии, 10–12 с; в остальных и в тестах
 ## — короткое (ADR-0052, решение 6). Ставит [Main] до входа в дерево.
@@ -166,6 +168,8 @@ func _ready() -> void:
 	# Тип здания: отделка, обстановка, вывеска (ADR-0033) и палитра его семейства (ADR-0056).
 	identity = BuildingIdentity.of(GameState.instance().building, building_seed)
 	rules.palette = BuildingPalette.of_kind(rules.palette, identity.kind)
+	rules.kind = identity.kind
+	soundtrack = BuildingMusic.new(rules, building_seed)
 	_ribs = BuildingRibs.new()
 	_ribs.name = "Ribs"
 	_ribs.setup(rules, _plan, identity)
@@ -239,52 +243,23 @@ func _process(_delta: float) -> void:
 		)
 	var in_frame := VisibleFloors.seen(rules, seen)
 	var strip := VisibleFloors.band(seen)
-	var shade := VisibleFloors.band(seen, VisibleFloors.SHADOW_REACH)
 	if span == _lit_span and in_frame == _shadowed_span and strip == _lit_band:
 		return
 
 	_lit_span = span
 	_shadowed_span = in_frame
 	_lit_band = strip
-	# Свет лампы кладёт тени, то есть стоит дорого, и горит только в кадре; на
-	# запасных этажах — без тени (ADR-0042, решение 2).
-	var filled := FloorLighting.nearest(
-		_lamps, seen.get_center(), Lamp.FILL_SHADOW_CAP, shade, in_frame
-	)
-	for lamp: Lamp in _lamps:
-		if not is_instance_valid(lamp):
-			continue
-		var x := lamp.global_position.x
-		lamp.set_light_visible(
-			VisibleFloors.in_band(strip, x) and VisibleFloors.covers(span, lamp.floor_index),
-			VisibleFloors.in_band(shade, x) and VisibleFloors.covers(in_frame, lamp.floor_index),
-			filled.has(lamp)
-		)
-	# Бра красных дверей — тем же правилом (ADR-0042, решение 8).
-	for door: Door in _doors:
-		if is_instance_valid(door):
-			var index := rules.floor_index_near(WorldSpace.to_plane(door.position).y)
-			door.set_light_in_view(
-				VisibleFloors.covers(span, index) and VisibleFloors.in_band(strip, door.position.x)
-			)
+	FloorLighting.show_in_frame(rules, seen, _lamps, _doors)
 	# Столбы шахт — тем же правилом: их в здании втрое больше, чем ламп.
 	if _shafts != null:
 		_shafts.light_span(span, strip)
+	# Свет залов особых этажей — тоже (ADR-0057).
+	if _shell != null and _shell.halls != null:
+		_shell.halls.light_span(span, strip)
 	# Свет трубок паркинга — тоже.
 	if _garage != null:
 		_garage.show_lights(VisibleFloors.covers(span, rules.floors - 1))
-	# Эскалатор светит в проём между двумя этажами: горит, пока в кадре хоть
-	# один из них.
-	for escalator: Escalator in _escalators:
-		escalator.set_light_visible(
-			(
-				VisibleFloors.in_band(strip, escalator.global_position.x)
-				and (
-					VisibleFloors.covers(span, escalator.floor_index)
-					or VisibleFloors.covers(span, escalator.floor_index + 1)
-				)
-			)
-		)
+	FloorLighting.show_escalators(span, strip, _escalators)
 
 
 ## Раскладка, по которой собрано здание.
@@ -404,6 +379,7 @@ func _spawn_shafts() -> void:
 		add_child(car)
 		# Кабина занимает просвет этажа целиком, как в оригинале: высоту она
 		# берёт из правил, а не из своей сцены (ADR-0025, решение 10).
+		car.dress_as(rules.kind)
 		car.fit_to_story(rules.floor_height - rules.slab_height, rules.shaft_width)
 		car.setup(stops)
 		car.set_shaft_top(_shafts.top_of(shaft))
@@ -457,6 +433,7 @@ func _spawn_lower_deck(leader: ElevatorCar, shaft: BuildingPlan.ShaftSpot) -> vo
 	var deck := CAR_SCENE.instantiate() as ElevatorCar
 	deck.position.x = shaft.x
 	add_child(deck)
+	deck.dress_as(rules.kind)
 	deck.fit_to_story(rules.floor_height - rules.slab_height, rules.shaft_width)
 	deck.serve_as_deck(leader, rules.floor_height)
 	# Ярус идёт в общий список наравне с ведущим: агент садится в тот, что стоит
@@ -500,6 +477,7 @@ func _spawn_doors() -> void:
 		var span := rules.floor_span(spot.floor_index) - Vector2(spot.x, spot.x)
 		var unlit := rules.is_unlit(spot.floor_index)
 		door.furnish(identity, room_seed, span, unlit, rules.time_of_day, sky)
+		door.opens_into_hall = FloorRole.hall_at(rules, spot.floor_index)
 		add_child(door)
 		_doors.append(door)
 		door.otto_hid.connect(_on_otto_hid.bind(door))
@@ -704,10 +682,23 @@ func agents() -> Array[Enemy]:
 	return found
 
 
+## Музыка здания по типу ([BuildingMusic], ADR-0057, решение 7): тема
+## половины здания, где Otto, или тревога [param alarm].
+func music(alarm: bool) -> void:
+	soundtrack.play(alarm, _floor_of(otto))
+
+
 ## Звук по месту Otto — правила в [PlaceSound]: на крыше и у ворот паркинга
 ## улица в полную силу, на этажах — из-за стекла; шаг по полу здания.
 func _listen_where_otto_is() -> void:
 	var index := _floor_of(otto)
+	# Тему не трогают тревога, вступление и гибель Otto: под последней смертью
+	# партии уже играет трек конца, и тело, уехавшее через середину здания, не
+	# должно вернуть тему здания (авторевью M24o).
+	soundtrack.follow(
+		index, GameState.instance().alarm.raised or _arrival.is_playing() or otto.is_dead()
+	)
+	Sounds.set_building(rules.kind, Sounds.hall_tone_of(FloorRole.at(rules, index)))
 	var at := WorldSpace.to_plane(otto.global_position)
 	Sounds.set_outdoors(PlaceSound.hears_street(rules, index, at.x, Garage.gate_x(rules)))
 	var on_concrete := index == BuildingRules.ROOF or index == rules.floors - 1
@@ -912,7 +903,7 @@ func _release_agent(post: AgentPost) -> Enemy:
 func _on_alarm_raised(ring: bool = true) -> void:
 	# Сирена работает с M5b, а звучать ей было нечем: теперь вместо темы здания
 	# идёт мотив тревоги, и снять его можно только новым зданием.
-	Sounds.play_music(Sounds.ALARM_THEME, building_seed)
+	music(true)
 	# Сама сирена — в миг тревоги, поверх смены трека (ADR-0052, решение 7).
 	if ring:
 		Sounds.play(Sounds.ALARM)

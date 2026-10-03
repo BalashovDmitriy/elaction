@@ -106,8 +106,18 @@ func line_the_wall(index: int, inner: Vector2, openings: Array[Vector2]) -> void
 	# Бра — на пилястрах отеля (ADR-0048); на тёмном этаже свет погашен
 	# по правилам ROM, и светящееся бра спорило бы с темнотой.
 	var sconces := _style.sconces and not _rules.is_unlit(index)
+	# Особый этаж (ADR-0057, решение 3): панели низа нет — стены нет; пилястры
+	# остаются колоннами между коридором и залом, а перед стеклом и сеткой не
+	# нужны и они.
+	var hall := FloorRole.at(_rules, index)
+	if (
+		FloorRole.is_hall(hall)
+		and FloorRole.screen_of(hall, _rules.kind) != FloorRole.Screen.COLUMNS
+	):
+		return
 	for span in BuildingPlan.spans_between(gaps, inner):
-		_skirting(span, surface)
+		if not FloorRole.is_hall(hall):
+			_skirting(span, surface)
 		_pilasters(span, top, surface, sconces)
 
 

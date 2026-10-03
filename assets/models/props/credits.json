@@ -430,5 +430,143 @@
   "author": "elaction",
   "licence": "MIT",
   "url": "tools/build_residential.py"
+ },
+ "washer": {
+  "title": "Furniture Kit: washer",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "dryer": {
+  "title": "Furniture Kit: dryer",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "washer_dryer": {
+  "title": "Furniture Kit: washerDryerStacked",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "bar_stool": {
+  "title": "Furniture Kit: stoolBar",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "bar_counter": {
+  "title": "Furniture Kit: kitchenBar",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "dining_table": {
+  "title": "Furniture Kit: tableCloth",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "round_table": {
+  "title": "Furniture Kit: tableRound",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "dining_chair": {
+  "title": "Furniture Kit: chairCushion",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "kitchen_stove": {
+  "title": "Furniture Kit: kitchenStove",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "kitchen_hood": {
+  "title": "Furniture Kit: hoodLarge",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "kitchen_cabinet": {
+  "title": "Furniture Kit: kitchenCabinet",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "kitchen_fridge": {
+  "title": "Furniture Kit: kitchenFridgeLarge",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "kitchen_sink": {
+  "title": "Furniture Kit: kitchenSink",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "lounge_sofa": {
+  "title": "Furniture Kit: loungeSofa",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "lounge_armchair": {
+  "title": "Furniture Kit: loungeChair",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "coffee_table": {
+  "title": "Furniture Kit: tableCoffee",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "box_closed": {
+  "title": "Furniture Kit: cardboardBoxClosed",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "desk_chair": {
+  "title": "Furniture Kit: chairDesk",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "long_table": {
+  "title": "Furniture Kit: table",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "bench_cushion": {
+  "title": "Furniture Kit: benchCushion",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "floor_lamp_round": {
+  "title": "Furniture Kit: lampRoundFloor",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "tv_modern": {
+  "title": "Furniture Kit: televisionModern",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
+ },
+ "speaker": {
+  "title": "Furniture Kit: speaker",
+  "author": "Kenney",
+  "licence": "CC0 1.0",
+  "url": "https://kenney.nl/assets/furniture-kit"
  }
 }

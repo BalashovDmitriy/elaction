@@ -39,6 +39,12 @@
      ]
     },
     {
+     "name": "Kenney",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
      "name": "Dilan Shah",
      "licences": [
       "CC-BY 3.0"
@@ -72,12 +78,6 @@
      "name": "CMHT Oculus",
      "licences": [
       "CC-BY 3.0"
-     ]
-    },
-    {
-     "name": "Kenney",
-     "licences": [
-      "CC0 1.0"
      ]
     },
     {
@@ -444,24 +444,6 @@
      ]
     },
     {
-     "name": "loganzsound",
-     "licences": [
-      "CC0 1.0"
-     ]
-    },
-    {
-     "name": "Shuhmi",
-     "licences": [
-      "CC-BY 4.0"
-     ]
-    },
-    {
-     "name": "addiofbaddi",
-     "licences": [
-      "CC0 1.0"
-     ]
-    },
-    {
      "name": "Soup_UnderScore",
      "licences": [
       "CC0 1.0"
@@ -492,13 +474,79 @@
      ]
     },
     {
-     "name": "gchase",
+     "name": "tosha73",
      "licences": [
       "CC0 1.0"
      ]
     },
     {
      "name": "Nox_Sound",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "rucisko",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "LG",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "cognito perceptu",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "waweee",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "oliwoli",
+     "licences": [
+      "CC-BY 4.0"
+     ]
+    },
+    {
+     "name": "lolamadeus",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "exuberate",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "loganzsound",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "Shuhmi",
+     "licences": [
+      "CC-BY 4.0"
+     ]
+    },
+    {
+     "name": "addiofbaddi",
+     "licences": [
+      "CC0 1.0"
+     ]
+    },
+    {
+     "name": "gchase",
      "licences": [
       "CC0 1.0"
      ]

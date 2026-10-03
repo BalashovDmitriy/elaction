@@ -131,6 +131,13 @@ func _ready() -> void:
 	fit_to_story(DEFAULT_CLEAR_HEIGHT, DEFAULT_WIDTH)
 
 
+## Одевает кабину по типу здания (ADR-0057, решение 6). Звать до
+## [method fit_to_story]: тот собирает одежду.
+func dress_as(kind: BuildingIdentity.Kind) -> void:
+	if _detail != null:
+		_detail.dress_as(kind)
+
+
 ## Растягивает кабину на просвет этажа и ширину шахты: пол на полу этажа, крыша
 ## у низа плиты, борта у стенок шахты.
 ##
@@ -206,6 +213,9 @@ static func _resize(shape: CollisionShape3D, box_width: float, box_height: float
 
 func _physics_process(delta: float) -> void:
 	_admit_riders()
+	# Решётка грузовой кабины — вид окна выхода ROM (ADR-0057, решение 6);
+	# лязгает только кабина с Otto, как и пуск с остановкой.
+	_detail.tend_gate(can_step_out(), delta, _carries_otto())
 	if _leader != null:
 		_ride_along()
 		return

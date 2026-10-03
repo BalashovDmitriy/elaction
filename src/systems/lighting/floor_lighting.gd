@@ -151,3 +151,47 @@ static func nearest(
 			)
 	)
 	return alive.slice(0, count)
+
+
+## Свет кадра [param seen]: лампы и бра красных дверей горят только на этажах
+## в кадре и рядом (ADR-0010, пункт 8). Свет лампы кладёт тени, то есть стоит
+## дорого, и горит только в кадре; на запасных этажах — без тени (ADR-0042,
+## решение 2). Бра — тем же правилом (ADR-0042, решение 8).
+static func show_in_frame(
+	rules: BuildingRules, seen: Rect2, lamps: Array[Lamp], doors: Array[Door]
+) -> void:
+	var span := VisibleFloors.around(rules, seen)
+	var in_frame := VisibleFloors.seen(rules, seen)
+	var strip := VisibleFloors.band(seen)
+	var shade := VisibleFloors.band(seen, VisibleFloors.SHADOW_REACH)
+	var filled := nearest(lamps, seen.get_center(), Lamp.FILL_SHADOW_CAP, shade, in_frame)
+	for lamp: Lamp in lamps:
+		if not is_instance_valid(lamp):
+			continue
+		var x := lamp.global_position.x
+		lamp.set_light_visible(
+			VisibleFloors.in_band(strip, x) and VisibleFloors.covers(span, lamp.floor_index),
+			VisibleFloors.in_band(shade, x) and VisibleFloors.covers(in_frame, lamp.floor_index),
+			filled.has(lamp)
+		)
+	for door: Door in doors:
+		if is_instance_valid(door):
+			var index := rules.floor_index_near(WorldSpace.to_plane(door.position).y)
+			door.set_light_in_view(
+				VisibleFloors.covers(span, index) and VisibleFloors.in_band(strip, door.position.x)
+			)
+
+
+## Эскалатор светит в проём между двумя этажами: горит, пока в кадре хоть
+## один из них.
+static func show_escalators(span: Vector2i, strip: Vector2, escalators: Array[Escalator]) -> void:
+	for escalator: Escalator in escalators:
+		escalator.set_light_visible(
+			(
+				VisibleFloors.in_band(strip, escalator.global_position.x)
+				and (
+					VisibleFloors.covers(span, escalator.floor_index)
+					or VisibleFloors.covers(span, escalator.floor_index + 1)
+				)
+			)
+		)

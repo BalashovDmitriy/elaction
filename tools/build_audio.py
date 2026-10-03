@@ -125,13 +125,27 @@ def _track(title: str) -> Source:
 
 SOUNDS: dict[str, list[Source]] = {
     # --- Музыка: свой трек на экран, трек здания и тревоги — жребием по зданию.
-    "theme": [_track("Spy Glass"), _track("Hard Boiled"), _track("Covert Affair"),
-              _track("Dances and Dames")],
-    # Утро, день и вечер — свои треки; ночь — "theme" (ADR-0052, решение 1).
+    # Тема — по типу здания и времени суток (ADR-0057, решение 7; ADR-0052,
+    # решение 1): ночь — "theme", утро, день и вечер — с суффиксом. Отель —
+    # свинг, лаунж и саксофон; офис — холодный синти-нуар, днём лифтовая
+    # музыка; жилой дом — блюз и фанк. С середины здания играет следующий трек
+    # набора, если он есть. Тревога — своя у типа. Треки выбраны пользователем
+    # на слух со страницы прослушивания (2026-10-03).
+    "theme": [_track("Covert Affair"), _track("Dances and Dames"), _track("Spy Glass"), _track("Hard Boiled")],
     "theme_morning": [_track("Shades of Spring"), _track("Walking Along")],
-    "theme_day": [_track("George Street Shuffle"), _track("Opportunity Walks")],
+    "theme_day": [_track("Lobby Time"), _track("George Street Shuffle"), _track("Fig Leaf Rag")],
     "theme_evening": [_track("Apero Hour"), _track("Backbay Lounge")],
-    "alarm_theme": [_track("Fast Talkin"), _track("Private Eye"), _track("On the Cool Side")],
+    "alarm_theme": [_track("Fast Talkin"), _track("Hot Swing"), _track("Private Eye")],
+    "theme_office": [_track("Spy Glass"), _track("Chill Wave"), _track("Lightless Dawn")],
+    "theme_office_morning": [_track("Clean Soul")],
+    "theme_office_day": [_track("Local Forecast - Elevator")],
+    "theme_office_evening": [_track("Ice Flow"), _track("Chill Wave")],
+    "alarm_office": [_track("Hiding Your Reality"), _track("Voltaic"), _track("Movement Proposition")],
+    "theme_residential": [_track("Hard Boiled"), _track("Bass Walker")],
+    "theme_residential_morning": [_track("Walking Along"), _track("Groove Grove")],
+    "theme_residential_day": [_track("George Street Shuffle"), _track("Groove Grove"), _track("Rollin at 5")],
+    "theme_residential_evening": [_track("Backed Vibes Clean"), _track("Bass Vibes")],
+    "alarm_residential": [_track("Private Eye"), _track("Faster Does It")],
     "menu_theme": [_track("Cool Vibes")],
     "game_over_theme": [_track("Just As Soon")],
     # --- Джинглы.
@@ -295,6 +309,30 @@ SOUNDS: dict[str, list[Source]] = {
     "step_lino": [freesound(475080, 6858456, "roman_gens", "Footsteps Boots_Linoleum", BY4,
                             mono=True, start=at, length=0.42, fade_out=0.08, trim=False,
                             gain=-9.0) for at in (16.88, 18.04, 19.29, 22.39)],
+    # Залы особых этажей и решётка грузовой кабины (M24o, ADR-0057, решения 4 и
+    # 6) — выбраны пользователем на слух со страницы прослушивания.
+    "hall_pool": [freesound(495399, 10725617, "tosha73", "Public Swimming Pool Atmosphere.wav",
+                            CC0, start=5.0, end=65.0, loop=2.0, level="ambience", trim=False)],
+    "hall_server": [freesound(465613, 9250976, "Nox_Sound", "Object_Fan_Server_Room.wav", CC0,
+                              start=2.0, end=48.0, loop=2.0, level="ambience", trim=False)],
+    "hall_boiler": [freesound(164746, 2978883, "rucisko", "boiler room", CC0, start=0.5,
+                              end=21.5, loop=1.5, level="ambience", trim=False)],
+    "hall_laundry": [freesound(454465, 612689, "kyles",
+                               "laundromat washers washing machines rattle vibrate4.flac", CC0,
+                               start=10.0, end=70.0, loop=2.0, level="ambience", trim=False)],
+    "hall_dining": [freesound(718019, 36188, "LG", "20231229 - Hotel restaurant breakfast 7", CC0,
+                              start=3.0, end=66.0, loop=2.0, level="ambience", trim=False)],
+    "hall_kitchen": [freesound(162662, 57789, "cognito perceptu", "restaurant kitchen.wav", CC0,
+                               start=9.0, end=55.0, loop=2.0, level="ambience", trim=False)],
+    "hall_gym": [freesound(370967, 5835751, "waweee", "gym ambience", CC0, start=2.0, end=45.0,
+                           loop=2.0, level="ambience", trim=False)],
+    "hall_bar": [freesound(666292, 1472937, "oliwoli", "room tone - small hotel bar", BY4,
+                           start=5.0, end=65.0, loop=2.0, level="ambience", trim=False)],
+    "hall_mechanical": [freesound(161224, 544580, "lolamadeus",
+                                  "Hilton Basement Ambience - Plant Room.wav", CC0, start=1.0,
+                                  end=39.5, loop=2.0, level="ambience", trim=False)],
+    "cab_gate": [freesound(140896, 1810340, "exuberate", "Elevator_OldApartmentBuilding", CC0,
+                           mono=True, start=7.2, end=9.6, fade_out=0.15, trim=False, gain=-3.0)],
     "thunder_near": [freesound(840628, 16682330, "loganzsound", "close-up thunder strike", CC0,
                                end=9.0, fade_out=2.5, level="jingle", gain=2.0)],
     "thunder_far": [freesound(855569, 18648074, "Shuhmi", "distant dry thunderclap", BY4,
@@ -308,9 +346,14 @@ SOUNDS: dict[str, list[Source]] = {
 }
 
 # Что звучит петлёй: сшивка нужна им, а форматом — OGG.
-LONG = {"winch", "car_pass", "car_pass_slush", "wind_snow", "alarm", "city_morning", "city_day", "city_evening", "theme", "theme_morning", "theme_day", "theme_evening", "alarm_theme", "menu_theme", "game_over_theme", "city", "rain",
+LONG = {"winch", "car_pass", "car_pass_slush", "wind_snow", "alarm", "city_morning", "city_day", "city_evening", "theme", "theme_morning", "theme_day", "theme_evening", "alarm_theme",
+        "theme_office", "theme_office_morning", "theme_office_day", "theme_office_evening",
+        "alarm_office", "theme_residential", "theme_residential_morning",
+        "theme_residential_day", "theme_residential_evening", "alarm_residential", "menu_theme", "game_over_theme", "city", "rain",
         "rain_window", "wind", "room_tone", "room_tone_office", "room_tone_residential",
-        "door_tv", "door_dog", "door_argue", "shaft_hum", "elevator_hum", "escalator_hum",
+        "door_tv", "door_dog", "door_argue", "hall_pool", "hall_server", "hall_boiler",
+        "hall_laundry", "hall_dining", "hall_kitchen", "hall_gym", "hall_bar",
+        "hall_mechanical", "shaft_hum", "elevator_hum", "escalator_hum",
         "car_away", "helicopter", "helicopter_pass", "garage_gate", "thunder_near", "thunder_far", "neon_buzz", "building_bonus", "game_over"}
 
 

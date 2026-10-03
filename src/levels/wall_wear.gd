@@ -95,6 +95,9 @@ static func lay(
 		)
 	# Этаж выхода — гараж: там своя отделка (ADR-0038).
 	for index: int in rules.floors - 1:
+		# На особом этаже стены нет — следам лечь не на что (ADR-0057).
+		if FloorRole.hall_at(rules, index):
+			continue
 		var zones := BuildingDressing.blocked_zones(rules, plan, index)
 		zones.append_array(built.get(index, [] as Array[Vector2]))
 		var decor: PackedFloat64Array = hung.get(index, PackedFloat64Array())

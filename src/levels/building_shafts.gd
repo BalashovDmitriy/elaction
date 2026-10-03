@@ -31,9 +31,27 @@ const PORTAL_JAMB: float = 0.07
 const PORTAL_HEAD: float = 0.1
 const PORTAL_SILL: float = 0.03
 const PORTAL_RECESS := Color(0.07, 0.08, 0.1)
-const PORTAL_LEAF := Color(0.5, 0.5, 0.48)
-## Хром наличника: светлый металл, ловит блик лампы коридора.
-const PORTAL_TRIM := Color(0.78, 0.8, 0.83)
+## Портал и табло по типу здания (ADR-0057, решение 6): латунь у отеля, хром
+## у офиса, крашеная сталь грузового лифта у жилого дома; цифры — кремовые у
+## отеля, холодные у офиса, белые у жилого дома. Не янтарь и не красный: это
+## цвета огоньков игры — табло двери и двери с документом (ADR-0023, решение 6).
+## По [enum BuildingIdentity.Kind].
+const KIND_TRIM: Array[Color] = [
+	Color(0.8, 0.62, 0.32), Color(0.78, 0.8, 0.83), Color(0.3, 0.35, 0.31)
+]
+const KIND_LEAF: Array[Color] = [
+	Color(0.52, 0.4, 0.22), Color(0.5, 0.5, 0.48), Color(0.36, 0.41, 0.36)
+]
+const KIND_DIGITS: Array[Color] = [
+	Color(0.98, 0.92, 0.78), Color(0.55, 0.82, 1.0), Color(0.85, 0.88, 0.9)
+]
+## Циферблат отеля над табло: радиус, стрелка и её размах, рад — от нижнего
+## этажа шахты слева до верхнего справа, как у лифтов тридцатых.
+const DIAL_RADIUS: float = 0.15
+const DIAL_FACE := Color(0.92, 0.86, 0.7)
+const NEEDLE := Vector3(0.014, 0.12, 0.01)
+const NEEDLE_SWING: float = deg_to_rad(75.0)
+
 ## Насколько проём и створки портала не доходят до пола и перемычки, м: доля
 ## пикселя, но грани разных материалов больше не в одной плоскости.
 const PORTAL_EPSILON: float = 0.004
@@ -50,7 +68,6 @@ const BRACE_HEIGHT: float = 0.12
 ## вывески двери — знак двери с документом, авторевью M19).
 const BOARD := Vector3(0.7, 0.26, 0.05)
 const BOARD_GAP: float = 0.06
-const BOARD_DIGITS := Color(0.55, 0.82, 1.0)
 ## Стрелка хода на табло — треугольник геометрией, а не знак шрифта: ▲ и ▼ нет
 ## ни в Exo 2, ни в прежнем Pixellari, и их рисовал системный запасной шрифт,
 ## которого на другой машине может не быть. Размер стрелки, на сколько она
@@ -153,6 +170,8 @@ var _span := Vector2i(-1_000_000, 1_000_000)
 var _board_host: Node3D = null
 ## Треугольник стрелки, один на все табло.
 var _arrow_mesh: PrismMesh = null
+## Обод и поле циферблата отеля: одни на все табло здания.
+var _dial_discs: Array[CylinderMesh] = []
 
 
 ## Табло и кнопки одного портала.
@@ -165,6 +184,8 @@ class ShaftBoard:
 	var center: Vector3 = Vector3.ZERO
 	var up_button: MeshInstance3D = null
 	var down_button: MeshInstance3D = null
+	## Стрелка циферблата отеля; у других типов — null.
+	var needle: Node3D = null
 	## Какая кнопка горит: [constant Intent.UP], [constant Intent.DOWN] или 0.
 	var lit: float = 0.0
 
@@ -273,8 +294,8 @@ func _build_portal(x: float, surface: float) -> void:
 	var height := Proportions.DOOR.y
 	var back_z := WorldSpace.BACK_WALL_Z + PANEL_THICKNESS * 0.5 + 0.01
 	var recess := GreyboxLook.metal(PORTAL_RECESS)
-	var leaf := GreyboxLook.metal(PORTAL_LEAF)
-	var trim := GreyboxLook.metal(PORTAL_TRIM)
+	var leaf := GreyboxLook.metal(KIND_LEAF[_rules.kind])
+	var trim := GreyboxLook.metal(KIND_TRIM[_rules.kind])
 
 	# Створки и порог чуть не доходят до пола и перемычки: низ проёма, створок
 	# и порога ложился в одну плоскость (ADR-0037, решение 2). Проём — во всю
@@ -329,7 +350,7 @@ func _build_board(x: float, index: int, surface: float) -> void:
 	board.digits.font = NeonStyle.scene_font(700)
 	board.digits.font_size = 64
 	board.digits.pixel_size = 0.0034
-	board.digits.modulate = BOARD_DIGITS
+	board.digits.modulate = KIND_DIGITS[_rules.kind]
 	board.digits.outline_size = 0
 	board.center = frame.position + Vector3(0.0, 0.0, BOARD.z * 0.5 + 0.003)
 	board.digits.position = board.center
@@ -341,7 +362,7 @@ func _build_board(x: float, index: int, surface: float) -> void:
 		# затеняемая стрелка на тёмном этаже гасла бы, а под лампой — пересвечивала.
 		var ink := StandardMaterial3D.new()
 		ink.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		ink.albedo_color = BOARD_DIGITS
+		ink.albedo_color = KIND_DIGITS[_rules.kind]
 		_arrow_mesh.material = ink
 	board.arrow = MeshInstance3D.new()
 	board.arrow.mesh = _arrow_mesh
@@ -349,11 +370,13 @@ func _build_board(x: float, index: int, surface: float) -> void:
 	board.arrow.position = board.center + Vector3(-ARROW_SHIFT, 0.0, ARROW.z * 0.5)
 	board.arrow.visible = false
 	_board_host.add_child(board.arrow)
+	if _rules.kind == BuildingIdentity.Kind.HOTEL:
+		board.needle = _dial(frame.position + Vector3(0.0, BOARD.y * 0.5 + DIAL_RADIUS + 0.03, 0.0))
 
 	var side := call_side(_rules, _plan, x, index)
 	if side != 0.0:
 		var panel_x := x + side * (_rules.shaft_width * 0.5 + PORTAL_JAMB + CALL_GAP)
-		var panel := GreyboxLook.box(CALL_PANEL, GreyboxLook.metal(PORTAL_TRIM))
+		var panel := GreyboxLook.box(CALL_PANEL, GreyboxLook.metal(KIND_TRIM[_rules.kind]))
 		panel.position = WorldSpace.to_scene(Vector2(panel_x, surface - CALL_RISE))
 		panel.position.z = MOUNT_Z + CALL_PANEL.z * 0.5
 		_board_host.add_child(panel)
@@ -371,6 +394,48 @@ func _build_board(x: float, index: int, surface: float) -> void:
 		_boards[x] = {}
 	(_boards[x] as Dictionary)[index] = board
 	_show(board, floor_label(_rules, index), 0.0, 0.0)
+
+
+## Циферблат отеля с центром в [param centre]: латунный обод, светлое поле,
+## стрелка. Возвращает узел стрелки — его поворачивает [method _paint].
+func _dial(centre: Vector3) -> Node3D:
+	var brass := GreyboxLook.metal(KIND_TRIM[BuildingIdentity.Kind.HOTEL])
+	if _dial_discs.is_empty():
+		for radius: float in [DIAL_RADIUS, DIAL_RADIUS - 0.02]:
+			var made := CylinderMesh.new()
+			made.top_radius = radius
+			made.bottom_radius = radius
+			made.height = 0.02
+			made.radial_segments = 24
+			_dial_discs.append(made)
+	for ring: Array in [[_dial_discs[0], brass, 0.0], [_dial_discs[1], null, 0.012]]:
+		var face := MeshInstance3D.new()
+		face.mesh = ring[0] as CylinderMesh
+		face.material_override = (
+			ring[1] as StandardMaterial3D
+			if ring[1] != null
+			else GreyboxLook.light(DIAL_FACE.darkened(0.35))
+		)
+		face.rotation.x = PI * 0.5
+		face.position = centre + Vector3(0.0, 0.0, float(ring[2]))
+		face.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_board_host.add_child(face)
+	var pivot := Node3D.new()
+	pivot.position = centre + Vector3(0.0, 0.0, 0.03)
+	var hand := GreyboxLook.box(NEEDLE, GreyboxLook.metal(Color(0.08, 0.06, 0.05)))
+	hand.position.y = NEEDLE.y * 0.4
+	hand.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	pivot.add_child(hand)
+	_board_host.add_child(pivot)
+	return pivot
+
+
+## Поворот стрелки циферблата под этаж [param index] шахты [param shaft]:
+## нижний — влево до упора, верхний — вправо.
+static func needle_angle(shaft: BuildingPlan.ShaftSpot, index: int) -> float:
+	var reach := maxi(shaft.bottom - shaft.top, 1)
+	var up := float(shaft.bottom - clampi(index, shaft.top, shaft.bottom)) / float(reach)
+	return lerpf(NEEDLE_SWING, -NEEDLE_SWING, up)
 
 
 ## Что пишет табло про этаж [param index]: подпись таблички этажа — номер, у
@@ -470,6 +535,8 @@ func _paint(car: ElevatorCar, span: Vector2i) -> void:
 		var board := column.get(floor_index) as ShaftBoard
 		if board != null:
 			_show(board, label, heading, coming(heading, index, floor_index))
+			if board.needle != null:
+				board.needle.rotation.z = needle_angle(shaft, index)
 
 
 ## Ход кабины по её скорости: [constant Intent.UP], [constant Intent.DOWN] или

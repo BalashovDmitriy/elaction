@@ -324,8 +324,9 @@ func _enter_building(demo: bool = false) -> void:
 	# а сирена снимается только сменой здания (ADR-0009).
 	# Трек здания и тревоги — жребием по сиду здания (ADR-0036, решение 3), тема
 	# здания — по времени суток (ADR-0052, решение 1).
-	var theme := Sounds.theme_for(_level.rules.time_of_day)
-	Sounds.play_music(Sounds.ALARM_THEME if game.alarm.raised else theme, game.building_seed())
+	# Тема и тревога — по типу здания (ADR-0057, решение 7); Otto начинает с
+	# крыши, и играет трек верхней половины здания ([method GreyboxLevel.music]).
+	_level.music(game.alarm.raised)
 
 
 ## Город за меню. Погода — жребием на каждый выход в меню: ясная ночь, туман

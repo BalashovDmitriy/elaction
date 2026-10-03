@@ -139,7 +139,8 @@ func test_each_building_gets_its_own_things() -> void:
 
 
 ## «Богато, но читаемо»: на стенах в среднем больше предмета на этаж, мебели —
-## не меньше двух на три этажа. Узкий этаж башни с четырьмя дверями, двумя
+## больше предмета на три этажа коридора (особые этажи с M24o обставлены залом,
+## ADR-0057). Узкий этаж башни с четырьмя дверями, двумя
 ## лампами и шахтой держит всего три-четыре свободных места, и больше мебели
 ## на него не встанет.
 ##
@@ -152,16 +153,21 @@ func test_floors_are_not_bare() -> void:
 		var floors := 0
 		var furniture := 0
 		var decor := 0
+		rules.kind = identity.kind
 		for building_seed: int in range(1, 41):
 			var plan := BuildingPlan.generate(rules, building_seed)
 			var dressing := BuildingDressing.lay(rules, plan, building_seed, identity)
-			floors += rules.floors - 1
+			# Особые этажи обставлены залом, а не коридором (ADR-0057).
+			for index: int in rules.floors - 1:
+				floors += 0 if FloorRole.hall_at(rules, index) else 1
 			furniture += dressing.props.size()
 			decor += dressing.decor.size()
 			# С M24n часть стены — ниши, зеркала, окна, щитки (ADR-0056): стена не
 			# пустая и без картины.
 			decor += WallFeatures.lay(rules, plan, building_seed, identity, dressing).size()
-		assert_gt(float(furniture) / floors, 0.66, "мебели меньше двух предметов на три этажа")
+		# Широкие этажи стилобата с M24o — залы (ADR-0057): коридоры остались
+		# в узкой башне, и предмет на три этажа — уже не мало.
+		assert_gt(float(furniture) / floors, 0.3, "мебели меньше предмета на три этажа")
 		if identity.kind == BuildingIdentity.Kind.OFFICE:
 			# У офиса стена — стекло (ADR-0056): на нём не висит ничего.
 			assert_eq(decor, 0, "на стекле офиса что-то висит")

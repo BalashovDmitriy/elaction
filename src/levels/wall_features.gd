@@ -134,6 +134,9 @@ static func lay(
 				stood[prop.floor_index] = [] as Array[BuildingDressing.PropSpot]
 			(stood[prop.floor_index] as Array[BuildingDressing.PropSpot]).append(prop)
 	for index: int in rules.floors - 1:
+		# На особом этаже стены нет — за коридором зал (ADR-0057, решение 3).
+		if FloorRole.hall_at(rules, index):
+			continue
 		var zones := BuildingDressing.blocked_zones(rules, plan, index)
 		var near: Array[float] = hung.get(index, [] as Array[float])
 		var props: Array[BuildingDressing.PropSpot] = stood.get(

@@ -155,9 +155,9 @@ func test_neon_signs_do_not_wear_the_colours_of_game_signs() -> void:
 		VerticalSign.NEON_HOTEL,
 		VerticalSign.NEON_OFFICE,
 		VerticalSign.NEON_RESIDENTIAL,
-		BuildingShafts.BOARD_DIGITS,
 		BuildingShafts.CALL_LIT,
 	]
+	glowing.append_array(BuildingShafts.KIND_DIGITS)
 	for neon: Color in glowing:
 		for sign_colour: Color in reserved:
 			var gap := Vector3(

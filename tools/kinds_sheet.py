@@ -7,8 +7,10 @@
 
     python tools/kinds_sheet.py M24n            # ночь, ясно
     python tools/kinds_sheet.py M24n --time=1   # день
+    python tools/kinds_sheet.py M24o --floors=27,24,18,16   # залы особых этажей
 
-Пишет `screens/<веха>/kinds_t<время>_w<погода>.jpg`.
+Пишет `screens/<веха>/kinds_t<время>_w<погода>.jpg`; со своими этажами —
+`kinds_t<время>_w<погода>_f<этажи>.jpg`.
 """
 
 from __future__ import annotations
@@ -31,12 +33,15 @@ def main() -> int:
     parser.add_argument("milestone")
     parser.add_argument("--time", type=int, default=3)
     parser.add_argument("--weather", type=int, default=0)
+    parser.add_argument("--floors", default=",".join(str(f) for f in FLOORS),
+                        help="этажи через запятую, по номеру сверху")
     args = parser.parse_args()
+    floors = tuple(int(f) for f in args.floors.split(","))
     godot = require_godot()
     tile = (960, 540)
-    sheet = Image.new("RGB", (tile[0] * len(FLOORS), tile[1] * len(KINDS)))
+    sheet = Image.new("RGB", (tile[0] * len(floors), tile[1] * len(KINDS)))
     for row, _name in enumerate(KINDS):
-        for column, floor in enumerate(FLOORS):
+        for column, floor in enumerate(floors):
             # Своя папка на время и погоду: кадр зовётся по ним, и в общей папке
             # «последний по имени» был бы кадром прошлого прогона (3night после 1day).
             folder = f"{args.milestone}/kinds/t{args.time}_w{args.weather}/k{row}_f{floor}"
@@ -51,7 +56,8 @@ def main() -> int:
                 return 1
             frame = Image.open(shots[-1]).convert("RGB").resize(tile)
             sheet.paste(frame, (column * tile[0], row * tile[1]))
-    target = PROJECT_ROOT / "screens" / args.milestone / f"kinds_t{args.time}_w{args.weather}.jpg"
+    suffix = "" if floors == FLOORS else "_f" + "-".join(str(f) for f in floors)
+    target = PROJECT_ROOT / "screens" / args.milestone / f"kinds_t{args.time}_w{args.weather}{suffix}.jpg"
     sheet.save(target, quality=88)
     print(f"  {target.relative_to(PROJECT_ROOT).as_posix()}")
     return 0

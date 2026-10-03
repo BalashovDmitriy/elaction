@@ -45,15 +45,28 @@ const CABINET_COLOUR := Color(0.55, 0.57, 0.6)
 const NIGHT_GLASS := Color(0.06, 0.09, 0.15)
 const FRAME := Color(0.3, 0.32, 0.36)
 
-var _parts: Dictionary = {}
+var _batch := MeshBatch.new()
+var _desk := GreyboxLook.surface(DESK_COLOUR)
+var _fabric := GreyboxLook.surface(FABRIC)
+var _case := GreyboxLook.surface(CASE)
+var _screen := GreyboxLook.light(SCREEN)
+var _screen_off := GreyboxLook.surface(CASE.lightened(0.1))
+var _chair := GreyboxLook.surface(CHAIR_COLOUR)
+var _cabinet := GreyboxLook.metal(CABINET_COLOUR)
+var _frame := GreyboxLook.metal(FRAME)
+var _night: StandardMaterial3D = null
 
 
-## Собирает зал на всех этажах офиса, кроме крыши и паркинга.
+## Собирает зал на всех этажах офиса, кроме крыши, паркинга и особых этажей —
+## там свой зал ([FloorHall], ADR-0057, решение 3).
 func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 	name = "OpenSpace"
+	_night = TimeOfDay.window_look(rules.time_of_day, NIGHT_GLASS)
 	var back := WorldSpace.BACK_WALL_Z
 	var far := back - WorldSpace.ROOM_DEPTH
 	for index: int in range(0, rules.floors - 1):
+		if FloorRole.hall_at(rules, index):
+			continue
 		var surface := rules.floor_surface(index)
 		var bounds := rules.floor_span(index)
 		var inner := Vector2(
@@ -64,15 +77,7 @@ func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 			_windows(span, surface, far)
 			for row: float in ROWS:
 				_row(span, surface, back - row, lit)
-	_commit("desk", GreyboxLook.surface(DESK_COLOUR))
-	_commit("fabric", GreyboxLook.surface(FABRIC))
-	_commit("case", GreyboxLook.surface(CASE))
-	_commit("screen", GreyboxLook.light(SCREEN))
-	_commit("screen_off", GreyboxLook.surface(CASE.lightened(0.1)))
-	_commit("chair", GreyboxLook.surface(CHAIR_COLOUR))
-	_commit("cabinet", GreyboxLook.metal(CABINET_COLOUR))
-	_commit("night", TimeOfDay.window_look(rules.time_of_day, NIGHT_GLASS))
-	_commit("frame", GreyboxLook.metal(FRAME))
+	_batch.commit(self)
 
 
 ## Ряд кубиклов на глубине [param z]: перегородка сзади, стол, монитор лицом к
@@ -85,18 +90,20 @@ func _row(span: Vector2, surface: float, z: float, lit: bool) -> void:
 	var start := (span.x + span.y) * 0.5 - (count - 1) * CUBICLE_STEP * 0.5
 	for cubicle: int in count:
 		var x := start + cubicle * CUBICLE_STEP
-		_add("fabric", PARTITION, Vector3(x, surface - PARTITION.y * 0.5, z - DESK.z * 0.5 - 0.75))
-		_add("desk", DESK, Vector3(x, surface - DESK_HEIGHT, z))
+		_batch.box(
+			_fabric, PARTITION, Vector3(x, surface - PARTITION.y * 0.5, z - DESK.z * 0.5 - 0.75)
+		)
+		_batch.box(_desk, DESK, Vector3(x, surface - DESK_HEIGHT, z))
 		var screen_y := surface - DESK_HEIGHT - MONITOR.y * 0.5 - 0.08
 		var screen_z := z - DESK.z * 0.25
-		_add("case", MONITOR, Vector3(x - 0.2, screen_y, screen_z))
+		_batch.box(_case, MONITOR, Vector3(x - 0.2, screen_y, screen_z))
 		var face := Vector3(MONITOR.x * 0.86, MONITOR.y * 0.8, 0.01)
-		var lit_face := "screen" if lit and (cubicle + int(z)) % 3 != 0 else "screen_off"
-		_add(lit_face, face, Vector3(x - 0.2, screen_y, screen_z + MONITOR.z * 0.5 + 0.005))
-		_add("chair", CHAIR, Vector3(x + 0.1, surface - CHAIR.y * 0.5, z - DESK.z * 0.5 - 0.3))
+		var lit_face := _screen if lit and (cubicle + int(z)) % 3 != 0 else _screen_off
+		_batch.box(lit_face, face, Vector3(x - 0.2, screen_y, screen_z + MONITOR.z * 0.5 + 0.005))
+		_batch.box(_chair, CHAIR, Vector3(x + 0.1, surface - CHAIR.y * 0.5, z - DESK.z * 0.5 - 0.3))
 		if cubicle % 2 == 1:
-			_add(
-				"cabinet",
+			_batch.box(
+				_cabinet,
 				CABINET,
 				Vector3(x + CUBICLE_STEP * 0.5, surface - CABINET.y * 0.5, z - DESK.z * 0.2)
 			)
@@ -105,46 +112,25 @@ func _row(span: Vector2, surface: float, z: float, lit: bool) -> void:
 ## Ленточные окна у дальней стены зала: стекло по времени суток
 ## ([method TimeOfDay.window_look]) и переплёт.
 func _windows(span: Vector2, surface: float, far: float) -> void:
+	OpenSpace.ribbon_windows(_batch, _night, _frame, span, surface, far)
+
+
+## Лента окон у дальней стены зала на пролёте [param span]: её же ставят залы
+## особых этажей ([FloorHall]).
+static func ribbon_windows(
+	batch: MeshBatch, glass: Material, frame: Material, span: Vector2, surface: float, far: float
+) -> void:
 	var length := span.y - span.x
 	var middle := (span.x + span.y) * 0.5
 	var y := surface - WINDOW_BAND.y - WINDOW_BAND.x * 0.5
 	var z := far + 0.06
-	_add("night", Vector3(length, WINDOW_BAND.x, 0.02), Vector3(middle, y, z))
+	batch.box(glass, Vector3(length, WINDOW_BAND.x, 0.02), Vector3(middle, y, z))
 	for edge: float in [-1.0, 1.0]:
-		_add(
-			"frame",
+		batch.box(
+			frame,
 			Vector3(length, 0.06, 0.04),
 			Vector3(middle, y + edge * WINDOW_BAND.x * 0.5, z + 0.02)
 		)
 	for step: int in int(length / MULLION_STEP) + 1:
 		var x := span.x + step * MULLION_STEP
-		_add("frame", Vector3(0.05, WINDOW_BAND.x, 0.04), Vector3(x, y, z + 0.02))
-
-
-## Запоминает коробку: [param at] — x и y в плоскости правил, z сцены.
-func _add(kind: String, size: Vector3, at: Vector3) -> void:
-	if not _parts.has(kind):
-		_parts[kind] = [] as Array[Transform3D]
-	var place := WorldSpace.to_scene(Vector2(at.x, at.y))
-	place.z = at.z
-	(_parts[kind] as Array[Transform3D]).append(Transform3D(Basis.from_scale(size), place))
-
-
-func _commit(kind: String, material: StandardMaterial3D) -> void:
-	if not _parts.has(kind):
-		return
-	var places: Array[Transform3D] = _parts[kind]
-	var box := BoxMesh.new()
-	box.material = material
-	var many := MultiMesh.new()
-	many.transform_format = MultiMesh.TRANSFORM_3D
-	many.mesh = box
-	many.instance_count = places.size()
-	for index: int in places.size():
-		many.set_instance_transform(index, places[index])
-	var node := MultiMeshInstance3D.new()
-	node.name = kind.capitalize()
-	node.multimesh = many
-	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	node.layers = PropCatalog.RENDER_LAYER
-	add_child(node)
+		batch.box(frame, Vector3(0.05, WINDOW_BAND.x, 0.04), Vector3(x, y, z + 0.02))

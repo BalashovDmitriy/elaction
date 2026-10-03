@@ -25,7 +25,7 @@ func _rules(time: TimeOfDay.Kind) -> BuildingRules:
 
 
 ## Тема здания своя у каждого времени суток, ночью — прежний нуар; у каждой
-## темы есть файлы, и у утра, дня и вечера — по два трека на жребий.
+## темы есть файлы, и у утра, дня и вечера — по два трека и больше на жребий.
 func test_each_time_of_day_has_its_own_theme() -> void:
 	var themes: Array[String] = []
 	for time: TimeOfDay.Kind in _times():
@@ -36,7 +36,8 @@ func test_each_time_of_day_has_its_own_theme() -> void:
 		if TimeOfDay.is_night(time):
 			assert_eq(theme, Sounds.THEME, "ночью — прежняя тема")
 		else:
-			assert_eq(tracks, 2, "%s: два трека на жребий" % theme)
+			# Днём у отеля с M24o три трека (ADR-0057, решение 7).
+			assert_gte(tracks, 2, "%s: два трека и больше на жребий" % theme)
 		assert_true(Sounds.LOOPED.has(theme), "%s звучит петлёй" % theme)
 
 

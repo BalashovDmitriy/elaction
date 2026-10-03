@@ -114,12 +114,22 @@ func test_the_weather_sounds_outside_and_behind_the_glass() -> void:
 	assert_eq(_sorted(director.ambience()), _sorted([Sounds.CITY, Sounds.WIND]), "а на крыше ветер")
 
 
+## Любая погода, время суток, тип здания и зал особого этажа: петля фона
+## зациклена. Утро, день и вечер улицы и залы M24o звучали раз и молкли.
 func test_every_weather_sounds_with_existing_loops() -> void:
+	var halls: Array[String] = [""]
+	for tone: String in Sounds.HALL_TONES.values():
+		halls.append(tone)
 	for weather: Weather.Kind in Weather.Kind.values():
 		for outdoors: bool in [true, false]:
-			for name: String in Sounds.weather_loops(weather, outdoors):
-				assert_true(Sounds.LOOPED.has(name), "%s фона зациклен" % name)
-				assert_true(Sounds.AMBIENCE.has(name), "%s — фон" % name)
+			for time: TimeOfDay.Kind in TimeOfDay.Kind.values():
+				for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
+					for hall: String in halls:
+						for name: String in Sounds.weather_loops(
+							weather, outdoors, time, kind, hall
+						):
+							assert_true(Sounds.LOOPED.has(name), "%s фона зациклен" % name)
+							assert_true(Sounds.AMBIENCE.has(name), "%s — фон" % name)
 
 
 func test_thunder_follows_the_flash_by_distance() -> void:

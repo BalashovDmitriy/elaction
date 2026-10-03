@@ -73,6 +73,10 @@ static func lay(
 		wall_items.clear()
 	# Этаж выхода — гараж: пустой, с одной машиной (ADR-0031, решение 4).
 	for index in rules.floors - 1:
+		# Особый этаж обставлен своим залом ([FloorHall], ADR-0057, решение 3):
+		# стены нет, и коридорная мебель стояла бы перед залом в пустоте.
+		if FloorRole.hall_at(rules, index):
+			continue
 		var spots := free_spots(rules, plan, index)
 		var zones := blocked_zones(rules, plan, index)
 		var taken := {}
