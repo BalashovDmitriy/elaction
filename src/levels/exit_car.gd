@@ -79,13 +79,12 @@ const DOME_ENERGY: float = 0.9
 const DOME_RANGE: float = 1.6
 ## Right turn signal (ADR-0046, decision 2): the car merges into the street's near lane
 ## — away from the camera, which is to the right in its travel. Blinks while it waits for a gap
-## and merges, with half-period [constant BLINK_HALF], s. The lamps are on the far side, and the
-## blinking shows by a flash at each: the light falls on the asphalt and the body.
+## and merges, with half-period [constant BLINK_HALF], s. Only the lamps on the far side
+## glow: the amber flashes they used to throw onto the asphalt looked out of place in front
+## of the car and were removed at the user's request.
 const INDICATOR := Color(1.0, 0.55, 0.08)
 const BLINK_HALF: float = 0.36
 const BLINK_GLOW: float = 6.0
-const BLINK_ENERGY: float = 2.6
-const BLINK_RANGE: float = 2.2
 
 ## Where the car drives off: -1 left, +1 right. Since M24b always left — into the gate.
 var towards: float = 1.0
@@ -126,9 +125,9 @@ var _door_open: float = 0.0
 ## Middle of the door from the middle of the car toward the bonnet, m: Otto gets in at it.
 var _door_offset: float = LENGTH * 0.08
 var _dome: OmniLight3D = null
-## Right turn signal: its own lamp material, their flashes and blink progress, s.
+## Right turn signal: its own lamp material, whether it is lit now and blink progress, s.
 var _indicator: StandardMaterial3D = null
-var _flashes: Array[OmniLight3D] = []
+var _indicator_on: bool = false
 var _blink: float = 0.0
 ## The body side nearest the camera, Z in the car's frame: Otto steps to it when boarding.
 var _near_side: float = 0.0
@@ -494,8 +493,7 @@ func _fit_the_cabin(model: Node3D) -> void:
 	set_door(0.0)
 
 
-## The model's right turn signal: its own material instead of the shared one from the cache, and
-## a flash at each lamp — at the edges of its mesh along the car.
+## The model's right turn signal: its own material instead of the shared one from the cache.
 func _hook_the_indicator(model: Node3D) -> void:
 	var lamps := model.find_child("IndicatorRight", true, false) as MeshInstance3D
 	if lamps == null:
@@ -503,16 +501,6 @@ func _hook_the_indicator(model: Node3D) -> void:
 	_indicator = GreyboxLook.light(INDICATOR).duplicate() as StandardMaterial3D
 	_indicator.emission_energy_multiplier = 0.0
 	lamps.material_override = _indicator
-	var span := lamps.mesh.get_aabb()
-	for x: float in [span.position.x, span.end.x]:
-		var flash := OmniLight3D.new()
-		flash.light_color = INDICATOR
-		flash.omni_range = BLINK_RANGE
-		flash.shadow_enabled = false
-		flash.visible = false
-		flash.position = Vector3(x, span.get_center().y, span.get_center().z)
-		lamps.add_child(flash)
-		_flashes.append(flash)
 
 
 ## Whether the right turn signal blinks: approaching the kerb, while the car waits for
@@ -527,7 +515,7 @@ func is_signalling() -> bool:
 
 ## Whether the turn signal lamp is lit at this moment of the blink.
 func indicator_lit() -> bool:
-	return not _flashes.is_empty() and _flashes[0].visible
+	return _indicator_on
 
 
 ## Blink progress: lit for the first half of the period, off for the second.
@@ -544,9 +532,7 @@ func _signal(delta: float) -> void:
 	else:
 		_blink = 0.0
 	_indicator.emission_energy_multiplier = BLINK_GLOW if on else 0.0
-	for flash: OmniLight3D in _flashes:
-		flash.visible = on
-		flash.light_energy = BLINK_ENERGY
+	_indicator_on = on
 
 
 ## Transform of mesh [param mesh] in the frame of model [param model].

@@ -1206,7 +1206,7 @@ code: a check against the original and questions, as for any milestone.
       the city SubViewport, depth precision, LOD) and fix
 - [ ] Shots of every animation, tests, code review, `check.ps1`, README
 
-### M24r · Agent mechanics
+### M24r · Agent mechanics, difficulty, the alarm
 
 Requested by the user on 2026-10-03. The agents' life in the building is reviewed as a
 whole — release, pacing, who keeps a slot, when an agent can be hit — and everything tied
@@ -1228,6 +1228,12 @@ ADR-0025, ADR-0027, ADR-0053, ADR-0059 (the calm after the return) and ADR-0060
       the calm after the return, agents following Otto by cab, the crowd leaving through
       doors, the keep margin, difficulty over time — each checked against the ROM and against
       the two symptoms above
+- [ ] Difficulty: the user sees no difference between easy and very hard. Measure what
+      each of the four levels actually changes (agent speed, reaction, fire rate, release),
+      compare with the cabinet's DIP switch, and make the levels felt
+- [ ] A countdown to the alarm somewhere on screen: today nothing tells the player it is
+      coming. The arcade has no such timer, and the HUD carries no hints (memory rule) —
+      how to show it is a question for the start of the milestone
 - [ ] Tests on any building: agents keep meeting Otto all the way down at a steady rhythm;
       the bot runs measured again; code review, `check.ps1`, README
 
