@@ -418,7 +418,7 @@ func _meeting(span: Vector2) -> void:
 ## стойка гантелей и зеркало во всю дальнюю стену.
 func _gym(span: Vector2) -> void:
 	_floor_cover(span, GreyboxLook.surface(RUBBER))
-	_far_wall(span, GreyboxLook.polished(Color(0.55, 0.6, 0.62)))
+	_far_wall(span, GreyboxLook.metal(Color(0.24, 0.27, 0.29)))
 	var steel := GreyboxLook.metal(DARK_STEEL)
 	var belt := GreyboxLook.surface(Color(0.06, 0.06, 0.06))
 	for x: float in _along(span, 1.4, 0.0):

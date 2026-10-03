@@ -60,7 +60,7 @@ const CABLE_COLOR := Color(0.12, 0.12, 0.13)
 ## решётке и складная решётка-гармошка спереди. Тела у всех одни (ADR-0025).
 const WOOD := Color(0.3, 0.17, 0.1)
 const BRASS := Color(0.78, 0.6, 0.3)
-const MIRROR := Color(0.5, 0.55, 0.58)
+const MIRROR := Color(0.2, 0.22, 0.23)
 const WARM_LIGHT := Color(1.0, 0.8, 0.55)
 const PAINTED := Color(0.34, 0.39, 0.34)
 const BUMPER := Color(0.35, 0.25, 0.15)
@@ -220,7 +220,7 @@ func _dress_by_kind(width: float, inner: float, back_z: float, light_y: float) -
 			_part(
 				Vector3(width * MIRROR_SHARE, MIRROR_HEIGHT, 0.01),
 				Vector3(0.0, MIRROR_RISE + MIRROR_HEIGHT * 0.5, face_z + 0.005),
-				GreyboxLook.polished(MIRROR)
+				GreyboxLook.metal(MIRROR)
 			)
 		BuildingIdentity.Kind.RESIDENTIAL:
 			var dark := GreyboxLook.metal(STEEL_DARK)
