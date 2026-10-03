@@ -75,6 +75,9 @@ const BULKHEAD_GLOW := Color(1.0, 0.8, 0.55)
 const POLE := Color(0.16, 0.17, 0.19)
 const WALL_PAINT := Color(0.78, 0.78, 0.74)
 
+## Вход в здание с улицы по типу ([StreetFront]).
+var front: StreetFront = null
+
 var _rules: BuildingRules = null
 ## Пол подвала и улица, в плоскости правил; торец здания; ширина проезда.
 var _surface: float = 0.0
@@ -98,6 +101,10 @@ func build(rules: BuildingRules, building_seed: int = 1) -> void:
 	_street_node = ExitStreet.new()
 	add_child(_street_node)
 	_street_node.build(_left, _street, building_seed, _weather, rules.time_of_day)
+	# Вход в здание с улицы по типу (ADR-0058, решение 5): на тротуаре у торца.
+	front = StreetFront.new()
+	_street_node.add_child(front)
+	front.build(rules, _left, _street - (ExitStreet.KERB.y - 0.01), building_seed, _weather)
 	# Улица — снаружи: днём на ней солнце здания (ADR-0052, решение 3).
 	Outdoors.mark(_street_node)
 	_build_slabs()

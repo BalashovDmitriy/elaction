@@ -104,6 +104,15 @@ const PAINT_WHITE := Color(0.72, 0.72, 0.68)
 const PAINT_YELLOW := Color(0.82, 0.62, 0.1)
 const PAINT_BLACK := Color(0.05, 0.05, 0.05)
 const PAINT_BAND := Color(0.62, 0.46, 0.12)
+## Паркинг по типу здания (ADR-0058, решение 5): тон бетона — чистый светлый у
+## отеля, холодный у офиса, грязный у жилого дома; полоса краски по дальней
+## стене — бордовая, синяя, выцветшая охра. По [enum BuildingIdentity.Kind].
+const KIND_CONCRETE: Array[Color] = [
+	Color(1.04, 1.0, 0.94), Color(0.96, 1.0, 1.04), Color(0.78, 0.76, 0.7)
+]
+const KIND_BAND: Array[Color] = [
+	Color(0.4, 0.08, 0.1), Color(0.12, 0.25, 0.5), Color(0.5, 0.4, 0.16)
+]
 const SIGN_BLUE := Color(0.08, 0.24, 0.62)
 const OIL := Color(0.025, 0.025, 0.03)
 const DUCT_METAL := Color(0.6, 0.62, 0.64)
@@ -148,6 +157,8 @@ static var _pool: StandardMaterial3D = null
 
 ## Ворота в левом торце: штора, короб, вывеска EXIT и пандус за ними.
 var gate: GarageGate = null
+## Отделка паркинга по типу здания (ADR-0058, решение 5).
+var dressing: GarageDressing = null
 
 var _rules: BuildingRules = null
 var _plan: BuildingPlan = null
@@ -318,7 +329,7 @@ func build(rules: BuildingRules, plan: BuildingPlan, building_seed: int) -> void
 	_surface = rules.floor_surface(_bottom)
 	_top = rules.story_top(_bottom)
 	_inner = inner_span(rules)
-	_concrete = BuildingFinish.shaft_concrete(CONCRETE)
+	_concrete = BuildingFinish.shaft_concrete(CONCRETE * KIND_CONCRETE[rules.kind])
 	for lamp in plan.lamps:
 		if lamp.floor_index == _bottom:
 			_lamp_xs.append(lamp.x)
@@ -338,6 +349,10 @@ func build(rules: BuildingRules, plan: BuildingPlan, building_seed: int) -> void
 	add_child(gate)
 	gate.build(rules, building_seed)
 	_hang_signs()
+	# Паркинг по типу здания (ADR-0058, решение 5).
+	dressing = GarageDressing.new()
+	add_child(dressing)
+	dressing.build(rules, plan, building_seed)
 	# Тёмному этажу ламп не дают вовсе ([method BuildingRules.lamps_on]), и
 	# гасить по зонам ламп там нечего: гаснут все светильники разом.
 	if rules.is_unlit(_bottom):
@@ -396,6 +411,9 @@ func lights() -> Array[SpotLight3D]:
 ## [method GarageGate.open]. Звук ворот играет здесь, сдача здания его не
 ## повторяет.
 func open_gate(duration: float = GarageGate.OPEN_TIME) -> Tween:
+	# Шлагбаум офиса — вместе с воротами (ADR-0058, решение 6).
+	if dressing != null:
+		dressing.raise_barrier(duration)
 	return gate.open(duration)
 
 
@@ -423,7 +441,7 @@ func _build_walls() -> void:
 	)
 	# Полоса краски по дальней стене и номера мест над ней — у пола: верх
 	# стены в глубине закрывает кромка перекрытия.
-	var band := GreyboxLook.surface(PAINT_BAND)
+	var band := GreyboxLook.surface(KIND_BAND[_rules.kind])
 	for span in BuildingPlan.spans_between(_cores, _inner):
 		_box(
 			Vector3(span.y - span.x, 0.5, 0.01),
