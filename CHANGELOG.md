@@ -1,61 +1,62 @@
 # Changelog
 
-Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/), версии —
-[semver](https://semver.org/lang/ru/). Пока игра в `0.x`: единица будет значить
-не «работает», а «сделано всё, что задумано»
-([ADR-0013](docs/adr/0013-release-and-versioning.md), пункт 2).
+Format — [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versions —
+[semver](https://semver.org/). While the game is at `0.x`, 1.0 will mean
+not "it works" but "everything planned is done"
+([ADR-0013](docs/adr/0013-release-and-versioning.md), item 2).
 
-Заметки к релизу на GitHub берутся отсюда: `python tools/changelog.py v0.9.0`.
+GitHub release notes are taken from here: `python tools/changelog.py v0.9.0`.
 
-Релизов пока не было: тег `v0.9.0` ещё не ставился. Его секция описывает то, что
-лежит в `main`, а дата встанет в заголовок в день тега; ссылки внизу заработают
-тогда же.
+There have been no releases yet: the `v0.9.0` tag has not been set. Its section describes
+what is in `main`, and the date goes into the heading on the day of the tag; the links at
+the bottom start working then too.
 
-## [Не выпущено]
+## [Unreleased]
 
-## [0.9.0] — не выпущена
+## [0.9.0] — unreleased
 
-Первая публичная сборка. Игра проходится целиком: от крыши до машины у выхода и дальше, в следующее здание.
+The first public build. The game can be played through completely: from the roof to the car at the exit and on into the next building.
 
-### Добавлено
+### Added
 
-- **Игра.** Otto спускается с крыши тридцатиэтажного здания, собирает документы
-  за красными дверями — пять в первом здании, дальше до десяти, — отбивается от
-  агентов и уезжает на машине. Дальше — следующее здание, где агенты злее.
-  Провозился — включается сирена, и до конца здания её не снять.
-- **Здание генерацией по карте оригинала.** Каждое здание раскладывается по сиду,
-  а двери, красные двери и тёмные этажи 11–15 — по таблицам аркадного ROM. Чем
-  ниже, тем больше путей: шахты пересекаются, эскалаторы стоят полосой. Каждая
-  партия солит раскладку. Проходимость проверяет бот, который ищет путь по графу
-  здания.
-- **Лифты и эскалаторы как в оригинале.** Кабина слушается изнутри, пустая ездит
-  сама; в открытый проём шахты можно упасть, под опускающейся кабиной — погибнуть.
-  Есть двухэтажная кабина, агенты ездят пассажирами. На эскалаторе Otto неуязвим.
-- **Бой по правилам ROM.** Скорости, паузы, замах, позы выстрела и увёртки агентов
-  взяты из дизассемблера аркады. Агенты стреляют стоя, с колена и лёжа.
-- **Свет и темнота.** Зона светла, пока над ней горит лампа; сбитая падает, может
-  убить агента под собой и гасит свою зону насовсем. В темноте агенты видят хуже,
-  а убийства стоят дороже.
-- **Картинка.** Трёхмерная сцена с ортокамерой сбоку: люди и машины из паков
-  Quaternius, мебель, техника на крыше и фактуры из паков CC0 и CC-BY
-  ([CREDITS.md](CREDITS.md)). Свет настоящий — конусы ламп с тенями, отражения
-  в полу; за окнами ночной город с погодой раунда. Четыре уровня качества,
-  на первом запуске уровень выбирается по замеру кадра.
-- **Звук.** 17 эффектов, тема здания и мотив тревоги — синтезированы кодом,
-  без единого сэмпла со стороны.
-- **Интерфейс.** Меню, пауза, настройки (три громкости, язык, сложность, качество
-  графики, режим окна, разрешение, масштаб рендера, кровь), таблица рекордов на
-  десять строк и экран управления. Два языка — русский и английский, по локали
-  системы.
-- **Дополнительная жизнь за 10 000 очков** — порог из мануала Taito.
-- **Сборки под Windows и Linux** в GitHub Releases: один исполняемый файл,
-  ресурсы внутри него.
+- **The game.** Otto descends from the roof of a thirty-floor building, collects documents
+  behind red doors — five in the first building, then up to ten — fights off agents and
+  drives away in a car. Then comes the next building, where the agents are meaner.
+  Take too long and the siren goes on, and it cannot be turned off until the end of the
+  building.
+- **Buildings generated from the original's map.** Each building is laid out from a seed,
+  while the doors, red doors and the dark floors 11–15 follow the arcade ROM tables. The
+  lower you go, the more paths there are: shafts overlap, escalators stand in a row. Each
+  session salts the layout. Traversability is checked by a bot that searches for a path
+  through the building graph.
+- **Elevators and escalators as in the original.** The cab obeys from inside, an empty one
+  rides on its own; you can fall into an open shaft doorway, and die under a descending
+  cab. There is a two-floor cab, agents ride as passengers. Otto is invulnerable on an
+  escalator.
+- **Combat by the ROM rules.** Agents' speeds, pauses, wind-up, shooting poses and dodges
+  are taken from the arcade disassembly. Agents shoot standing, kneeling and lying down.
+- **Light and darkness.** A zone is lit while the lamp above it is on; a shot-down lamp
+  falls, can kill an agent below it and darkens its zone for good. In the dark agents see
+  worse, and kills are worth more.
+- **The picture.** A 3D scene with a side-on orthographic camera: people and cars from
+  Quaternius packs, furniture, roof equipment and textures from CC0 and CC-BY packs
+  ([CREDITS.md](CREDITS.md)). Real lighting — lamp cones with shadows, reflections in the
+  floor; behind the windows a night city with the round's weather. Four quality levels;
+  on first launch the level is chosen by measuring the frame time.
+- **Sound.** 17 effects, the building theme and the alarm motif — synthesized in code,
+  without a single third-party sample.
+- **Interface.** Menu, pause, settings (three volumes, language, difficulty, graphics
+  quality, window mode, resolution, render scale, blood), a ten-row high score table and a
+  controls screen. Two languages — Russian and English, chosen by the system locale.
+- **An extra life at 10,000 points** — the threshold from the Taito manual.
+- **Windows and Linux builds** in GitHub Releases: a single executable with the resources
+  inside it.
 
-### Чего пока нет
+### Not there yet
 
-- Переназначения клавиш: экран управления показывает раскладку, но не меняет её.
-- Демо-режима, который в автомате крутится между партиями.
-- Онлайн-таблицы рекордов.
+- Key remapping: the controls screen shows the layout but does not change it.
+- The demo mode that the arcade cabinet runs between sessions.
+- Online high score tables.
 
-[Не выпущено]: https://github.com/BalashovDmitriy/elaction/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/BalashovDmitriy/elaction/compare/v0.9.0...HEAD
 [0.9.0]: https://github.com/BalashovDmitriy/elaction/releases/tag/v0.9.0

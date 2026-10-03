@@ -1,11 +1,11 @@
 extends GutTest
 
-## Отель и офис — разные коридоры (ADR-0048): по кадрам M24i они читались
-## одинаковыми, и различие держится теперь стилем здания [BuildingStyle].
+## Hotel and office are different corridors (ADR-0048): in the M24i shots they read the
+## same, and the difference is now held by the building style [BuildingStyle].
 ##
-## Здание собирается целиком, и проверяется то, что видно: светильники, двери,
-## бра, дорожка. Тип здания — жребий номера и сида: здание нужного типа тест
-## ищет сам, а не берёт номер наугад.
+## The building is assembled whole, and what is visible is checked: fixtures, doors,
+## sconces, the runner. The building kind is a draw of the number and seed: the test
+## finds a building of the needed kind itself rather than taking a number at random.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const SETTLE_FRAMES: int = 5
@@ -45,8 +45,9 @@ func test_hotel_and_office_styles_differ_in_every_look() -> void:
 	assert_false(hotel.crown.is_equal_approx(office.crown), "карниз разный")
 
 
-## Жилой дом не похож ни на отель, ни на офис (ADR-0055, решение 4): свой
-## светильник, плитка шахматкой, глазок, буквы квартир, коврики у дверей.
+## The residential building looks like neither the hotel nor the office (ADR-0055,
+## decision 4): its own fixture, checkerboard tile, peepholes, apartment letters, mats
+## by the doors.
 func test_a_residential_style_differs_from_both() -> void:
 	var home := BuildingStyle.of(BuildingIdentity.typed(BuildingIdentity.Kind.RESIDENTIAL))
 	for kind: BuildingIdentity.Kind in [BuildingIdentity.Kind.HOTEL, BuildingIdentity.Kind.OFFICE]:
@@ -111,9 +112,10 @@ func test_a_hotel_lights_its_pilasters_but_not_on_dark_floors() -> void:
 		assert_null(door.find_child("VisionGlass", true, false), "у отеля двери без стекла")
 
 
-## Стена офиса — стекло с залом за ним (ADR-0056, решение 4); у отеля и жилого
-## дома зала нет. Зал без тел и без теней, на тёмном этаже экраны не светятся.
-## Стыков панелей стены перед стеклом нет: тёмные полосы висели бы на нём.
+## The office wall is glass with a hall behind it (ADR-0056, decision 4); the hotel and
+## the residential building have no hall. The hall has no bodies and no shadows, on a
+## dark floor the screens do not glow. There are no wall panel joints in front of the
+## glass: dark stripes would hang on it.
 func test_only_an_office_opens_its_hall_behind_glass() -> void:
 	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
 		var level := await _level(kind)
@@ -136,16 +138,16 @@ func test_only_an_office_opens_its_hall_behind_glass() -> void:
 				)
 
 
-## Картина висит над поручнем панели низа стены: у отеля панель высокая
-## (ADR-0056, решение 4), и низ картины в 0.9 м уходил за поручень.
-## Повторные предметы движок переименовывает, и по каталогу узнаётся первый
-## каждого вида — этого хватает: высота у вида одна.
+## A picture hangs above the handrail of the lower wall panel: the hotel's panel is tall
+## (ADR-0056, decision 4), and a picture bottom at 0.9 m went behind the handrail.
+## The engine renames repeated items, and the catalogue recognises the first of each
+## type — that is enough: the height is the same for a type.
 func test_wall_decor_hangs_above_the_wainscot() -> void:
 	for kind: BuildingIdentity.Kind in [
 		BuildingIdentity.Kind.HOTEL, BuildingIdentity.Kind.RESIDENTIAL
 	]:
-		# Особые этажи (ADR-0057) без стены: в маленьком здании коридоров
-		# мало, и на одном сиде стены бывают пусты — сидов несколько.
+		# Special floors (ADR-0057) have no wall: a small building has few corridors, and
+		# on one seed the walls may be empty — so there are several seeds.
 		var hung := 0
 		for building_seed: int in [1, 2, 3]:
 			var level := await _level(kind, building_seed)
@@ -157,7 +159,7 @@ func test_wall_decor_hangs_above_the_wainscot() -> void:
 				if entry == null or entry.place != PropCatalog.Place.WALL:
 					continue
 				var bottom := WorldSpace.to_plane((item as Node3D).position).y
-				# Этаж, над полом которого висит предмет: ближайший пол снизу.
+				# The floor above whose floor the item hangs: the nearest floor below.
 				var index := int(ceilf((bottom - rules.sky_height) / rules.floor_height)) - 1
 				assert_gte(
 					rules.floor_surface(index) - bottom,
@@ -170,7 +172,7 @@ func test_wall_decor_hangs_above_the_wainscot() -> void:
 		assert_gt(hung, 0, "тип %d: на стенах ничего" % kind)
 
 
-## Дверь офиса открывается в зал: своей комнаты за ней нет.
+## An office door opens into the hall: there is no room of its own behind it.
 func test_an_office_door_opens_into_the_hall() -> void:
 	var door := (preload("res://src/systems/doors/door.tscn")).instantiate() as Door
 	door.furnish(BuildingIdentity.typed(BuildingIdentity.Kind.OFFICE), 11)

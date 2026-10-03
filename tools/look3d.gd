@@ -1,28 +1,28 @@
 extends Node3D
 
-## Проба вида: три этажа здания, собранные в 3D и снятые ортокамерой сбоку.
+## Look probe: three floors of a building, assembled in 3D and shot by an orthocamera from the side.
 ##
-## Отвечает на один вопрос — можно ли в Godot подойти к присланному референсу
-## и во что это обойдётся. Ничего из игры здесь не участвует: это макет,
-## который живёт ровно до решения.
+## Answers one question — whether Godot can get close to the reference sent over
+## and what it costs. Nothing from the game takes part here: this is a mock-up
+## that lives exactly until the decision.
 ##
-## Масштаб — метрический: 100 единиц мира игры = 1 метр. Тогда наш этаж (360)
-## это 3.6 м, дверь (171) — 1.71 м, Otto (126) — 1.26 м. Числа взяты из
-## [BuildingRules], чтобы проба меряла нашу геометрию, а не выдуманную.
+## Scale is metric: 100 game world units = 1 metre. Then our floor (360)
+## is 3.6 m, the door (171) — 1.71 m, Otto (126) — 1.26 m. The numbers are taken from
+## [BuildingRules] so that the probe measures our geometry, not a made-up one.
 ##
-## Запуск:
+## Run:
 ##     godot --path . res://tools/look3d.tscn
 ##     godot --path . res://tools/look3d.tscn -- --folder=look3d --dark
 
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 
-## Метр в единицах игры.
+## A metre in game units.
 const UNIT: float = 100.0
 
-## Сколько кадров дать свету и отражениям устояться.
+## How many frames to give light and reflections to settle.
 const SETTLE_FRAMES: int = 30
 
-## Ширина этажа в кадре и глубина комнаты, м.
+## Floor width in the frame and room depth, m.
 const ROOM: float = 21.0
 const DEPTH: float = 7.0
 
@@ -52,8 +52,8 @@ func _read_arguments() -> void:
 			_dark = true
 
 
-## Материал: цвет, шероховатость, металл. Отражения в полу — это roughness,
-## а не отдельный приём.
+## Material: colour, roughness, metal. Floor reflections are roughness,
+## not a separate trick.
 func _material(color: Color, roughness: float, metallic: float = 0.0) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
@@ -87,7 +87,7 @@ func _build() -> void:
 	var floor_height := rules.floor_height / UNIT
 	var slab := rules.slab_height / UNIT
 
-	# Три этажа, как на референсе: один этаж не даёт ни ритма, ни глубины.
+	# Three floors, as in the reference: one floor gives neither rhythm nor depth.
 	for level: int in 3:
 		var base := level * floor_height
 		_shell(base, floor_height, slab)
@@ -99,10 +99,10 @@ func _build() -> void:
 	_camera(floor_height)
 
 
-## Коробка этажа: пол, потолок, задняя стена, панели и плинтус.
+## Floor box: floor, ceiling, back wall, panels and skirting.
 ##
-## Свету нужно на что ложиться: гладкий бокс отдаёт ровную заливку и читается
-## размытым пятном. Пилястры и торцы плит дают ребро, а ребро — это контраст.
+## Light needs something to fall on: a smooth box gives a flat fill and reads as
+## a blurry spot. Pilasters and slab edges give an edge, and an edge is contrast.
 func _shell(base: float, height: float, slab: float) -> void:
 	var floor_material := _material(Color(0.21, 0.21, 0.23), 0.28, 0.2)
 	var wall := _material(Color(0.33, 0.33, 0.35), 0.85)
@@ -112,10 +112,10 @@ func _shell(base: float, height: float, slab: float) -> void:
 	_box(Vector3(ROOM, slab, DEPTH), Vector3(0.0, base + height, -DEPTH * 0.5), wall)
 	_box(Vector3(ROOM, height, 0.3), Vector3(0.0, base + height * 0.5, -DEPTH), wall)
 
-	# Торец плиты: светлая полоса на срезе. Ею этажи и отбиваются друг от друга.
+	# Slab edge: a light strip on the cut. It is what separates floors from each other.
 	_box(Vector3(ROOM, slab * 0.35, 0.12), Vector3(0.0, base - slab * 0.2, 0.06), trim)
 
-	# Пилястры по задней стене — ритм, который ловит свет ламп.
+	# Pilasters along the back wall — a rhythm that catches the lamp light.
 	for step: int in 9:
 		var x := -ROOM * 0.5 + 1.2 + step * 2.4
 		_box(
@@ -124,7 +124,7 @@ func _shell(base: float, height: float, slab: float) -> void:
 			_material(Color(0.40, 0.40, 0.42), 0.7)
 		)
 
-	# Плинтус и панель по низу: тёмный низ держит пол, светлый верх — потолок.
+	# Skirting and panel at the bottom: a dark bottom holds the floor, a light top — the ceiling.
 	_box(
 		Vector3(ROOM, 0.9, 0.16),
 		Vector3(0.0, base + 0.45, -DEPTH + 0.2),
@@ -133,13 +133,13 @@ func _shell(base: float, height: float, slab: float) -> void:
 	_box(Vector3(ROOM, 0.08, 0.2), Vector3(0.0, base + 0.9, -DEPTH + 0.23), trim)
 
 
-## Шахта: створки, стойки, перемычка, табло и свет кабины за щелью.
+## Shaft: doors, posts, lintel, indicator board and the cab light behind the gap.
 func _shaft(rules: BuildingRules, base: float) -> void:
 	var dark_metal := _material(Color(0.26, 0.26, 0.28), 0.3, 0.85)
 	var shaft := rules.shaft_width / UNIT * 2.2
 
-	# Кабина светится изнутри: на референсе тёплый прямоугольник лифта —
-	# главный источник кадра, и от него же идёт отражение в полу.
+	# The cab glows from inside: in the reference the warm rectangle of the lift is
+	# the main light source of the frame, and the floor reflection comes from it too.
 	_box(
 		Vector3(shaft * 0.9, 2.15, 0.1),
 		Vector3(0.0, base + 1.08, -1.75),
@@ -157,7 +157,7 @@ func _shaft(rules: BuildingRules, base: float) -> void:
 	car_light.omni_range = 3.0
 	add_child(car_light)
 	for side: float in [-1.0, 1.0]:
-		# Створки приоткрыты: сквозь щель и виден тёплый свет кабины.
+		# The doors are ajar: the warm cab light shows through the gap.
 		_box(
 			Vector3(shaft * 0.44, 2.2, 0.12),
 			Vector3(side * shaft * 0.28, base + 1.1, -1.0),
@@ -174,7 +174,7 @@ func _shaft(rules: BuildingRules, base: float) -> void:
 	)
 
 
-## Обстановка этажа: дверь, табличка, кадка, автомат и сам Otto.
+## Floor dressing: door, sign, planter, vending machine and Otto himself.
 func _props(base: float) -> void:
 	_box(
 		Vector3(0.95, 1.71, 0.14),
@@ -213,7 +213,7 @@ func _props(base: float) -> void:
 		_glow(Color(0.85, 0.25, 0.55), 0.8)
 	)
 
-	# Otto: рост тот же, что в игре после M13, — 1.26 м.
+	# Otto: the same height as in the game after M13 — 1.26 m.
 	var body := CSGCylinder3D.new()
 	body.radius = 0.24
 	body.height = 1.26
@@ -222,16 +222,16 @@ func _props(base: float) -> void:
 	add_child(body)
 
 
-## Свет этажа.
+## Floor light.
 ##
-## Главный урок пробы: камера ортографическая и смотрит строго вбок, поэтому
-## пол виден только торцом, а его верхняя плоскость — нулевой толщины полоска.
-## Лампа, светящая вертикально вниз, освещает ровно то, чего в кадре нет.
-## Свет здесь строится как в витрине: скользящий по задней стене сверху и
-## мягкая подсветка передних граней со стороны камеры.
+## The main lesson of the probe: the camera is orthographic and looks strictly sideways, so
+## the floor is seen only edge-on, and its top plane is a zero-thickness strip.
+## A lamp shining straight down lights exactly what is not in the frame.
+## Light here is built as in a shop window: grazing along the back wall from above and
+## a soft fill of the front faces from the camera side.
 func _lights(base: float, height: float) -> void:
 	for x: float in [-8.4, -4.8, -1.2, 2.4, 6.0, 9.0]:
-		# Корпус светильника: без него лампа висит светящейся полоской в воздухе.
+		# Fixture housing: without it the lamp hangs as a glowing strip in the air.
 		_box(
 			Vector3(1.1, 0.14, 0.5),
 			Vector3(x, base + height - 0.55, -2.2),
@@ -243,7 +243,7 @@ func _lights(base: float, height: float) -> void:
 			_glow(Color(1.0, 0.94, 0.86), 1.2)
 		)
 
-		# Наклон назад: конус ложится на заднюю стену, а не в невидимый пол.
+		# Tilted back: the cone falls on the back wall, not into the invisible floor.
 		var spot := SpotLight3D.new()
 		spot.position = Vector3(x, base + height - 0.7, -2.2)
 		spot.rotation_degrees = Vector3(-52.0, 0.0, 0.0)
@@ -255,7 +255,7 @@ func _lights(base: float, height: float) -> void:
 		spot.shadow_enabled = true
 		add_child(spot)
 
-		# Подсветка передних граней: без неё всё, что смотрит в камеру, чёрное.
+		# Front face fill: without it everything facing the camera is black.
 		var fill := OmniLight3D.new()
 		fill.position = Vector3(x, base + height * 0.62, 1.6)
 		fill.light_color = Color(0.86, 0.88, 1.0)
@@ -264,7 +264,7 @@ func _lights(base: float, height: float) -> void:
 		fill.omni_attenuation = 1.2
 		add_child(fill)
 
-	# Свет из шахты: он не гаснет вместе с этажом — как и в игре.
+	# Light from the shaft: it does not go out together with the floor — as in the game.
 	var shaft_light := OmniLight3D.new()
 	shaft_light.position = Vector3(0.0, base + 1.5, -0.7)
 	shaft_light.light_color = Color(0.8, 0.9, 1.0)
@@ -274,12 +274,12 @@ func _lights(base: float, height: float) -> void:
 	add_child(shaft_light)
 
 
-## Воздух пробы — тот же [Atmosphere], что и в здании: отражения, SSAO, туман,
-## свечение и тонмаппинг пришли отсюда, и держать их вторым списком значит
-## подбирать числа не на том кадре, на котором они потом работают.
+## The probe's air is the same [Atmosphere] as in the building: reflections, SSAO, fog,
+## glow and tonemapping came from here, and keeping them as a second list means
+## tuning numbers on a frame other than the one they later work on.
 ##
-## Своего у пробы два: чернее небо — здания вокруг нет, и фон не должен спорить
-## со стендом, — и общий тон выше, потому что палитры раунда здесь нет.
+## The probe has two things of its own: a blacker sky — no buildings around, and the background
+## must not compete with the stand — and a higher overall tone, since there is no round palette.
 func _environment() -> void:
 	var air := Atmosphere.environment(Color(0.09, 0.11, 0.16))
 	air.background_color = Color(0.008, 0.01, 0.016)
@@ -293,7 +293,7 @@ func _environment() -> void:
 func _camera(floor_height: float) -> void:
 	var camera := Camera3D.new()
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	# Кадр той же высоты, что и в игре: 1080 единиц мира = 10.8 м, три этажа.
+	# A frame of the same height as in the game: 1080 world units = 10.8 m, three floors.
 	camera.size = 10.8
 	camera.position = Vector3(0.0, floor_height * 1.5, 9.0)
 	camera.near = 0.05
@@ -312,7 +312,7 @@ func _run() -> void:
 	image.save_png(path)
 	print("  %s" % path)
 
-	# Цена кадра: у референса она тоже не бесплатная, и знать её надо до решения.
+	# Frame cost: the reference's is not free either, and it must be known before the decision.
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	Engine.max_fps = 0
 	var spent := 0.0

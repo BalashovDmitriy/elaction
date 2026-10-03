@@ -1,42 +1,45 @@
-# ADR-0050 · M24i: режиссура добиваний
+# ADR-0050 · M24i: takedown direction
 
-- **Статус:** принято
-- **Дата:** 2026-09-30
-- **Дополняет:** [ADR-0045](0045-takedowns-helicopter-dressing.md), решения 1–4,
-  [ADR-0040](0040-takedowns.md) (добивания)
+- **Status:** accepted
+- **Date:** 2026-09-30
+- **Extends:** [ADR-0045](0045-takedowns-helicopter-dressing.md), decisions 1–4,
+  [ADR-0040](0040-takedowns.md) (takedowns)
 
-## Контекст
+## Context
 
-Сценки добивания M24d смотрелись слишком просто: мир ровно замедлен в 0.3,
-камера плавно наезжает и отъезжает, агент ложится готовой позой трупа.
-Решения 1–4 ADR-0045 (пользователя) — режиссура без смены ракурса: ритм со
-стоп-кадром, толчок камеры, свет и звук акцентом, отыгрыш агента и рэгдолл.
+The M24d takedown scenes looked too simple: the world is evenly slowed to 0.3, the
+camera smoothly pushes in and pulls out, the agent lies down in a ready corpse pose.
+Decisions 1–4 of ADR-0045 (the user's) — direction without changing the angle:
+rhythm with a freeze frame, a camera jolt, light and sound as accents, the agent's
+acting and a ragdoll.
 
-## Решения
+## Decisions
 
-1. **Ритм — кривой скорости мира.** Заход — 0.6, к удару плавно до 0.3, на
-   ударе стоп-кадр: 0.14 с настоящего времени мир идёт в 0.03, риги стоят;
-   после удара разгон к обычному ходу к концу сценки. Время сценки считается
-   в настоящих секундах, как и было, — длины сценок и ключевые кадры не
-   меняются.
-2. **Камера на ударе толкается:** сдвиг, крен и короткий добавочный наезд,
-   гаснущие за 0.45 с настоящего времени ([method SideCamera.kick]). Кадр боя
-   толчок не трогает — он считается по середине кадра, а не по камере.
-3. **Свет и звук.** На ударе — тёплая вспышка у лиц двоих, гаснущая за 0.32 с;
-   всю сценку фон бесцветнее и темнее (насыщенность 0.35, яркость 0.8 кадра
-   сцены), и музыка глуше; на ударе она проваливается, а удар звучит дважды —
-   вторым слоем на тон ниже и громче, гулко. Всё возвращается на любом выходе
-   из сценки: конце, обрыве, выгрузке здания.
-4. **Агент отыгрывает.** Спереди он успевает потянуть ствол, сзади — почуять и
-   оглянуться через плечо; на ударе у него слетает шляпа — она теперь своим
-   мешем (`tools/build_actors.py`), игра прячет её и отпускает копию телом от
-   Otto вверх с закруткой. Падает агент рэгдоллом сразу на ударе, отброшенный
-   от Otto, а не готовой позой в конце сценки.
+1. **Rhythm — a curve of world speed.** The approach is 0.6, smoothly down to 0.3
+   toward the blow, on the blow a freeze frame: for 0.14 s of real time the world runs
+   at 0.03, the rigs stand still; after the blow it ramps back to normal speed by the
+   end of the scene. Scene time is counted in real seconds, as before — scene lengths
+   and key frames do not change.
+2. **The camera jolts on the blow:** a shift, a tilt and a short extra push-in,
+   fading over 0.45 s of real time ([method SideCamera.kick]). The jolt does not touch
+   the combat frame — it is computed from the frame center, not from the camera.
+3. **Light and sound.** On the blow — a warm flash at the faces of the two, fading
+   over 0.32 s; for the whole scene the background is less colorful and darker
+   (saturation 0.35, brightness 0.8 of the scene frame), and the music is muffled; on
+   the blow it drops out, and the blow sounds twice — a second layer a tone lower and
+   louder, hollow. Everything returns on any exit from the scene: end, interruption,
+   building unload.
+4. **The agent acts.** From the front he manages to reach for the gun, from behind —
+   to sense it and look over his shoulder; on the blow his hat flies off — it is now
+   its own mesh (`tools/build_actors.py`), the game hides it and releases a copy as a
+   body flying up away from Otto with a spin. The agent falls as a ragdoll right on
+   the blow, thrown away from Otto, not into a ready pose at the end of the scene.
 
-## Последствия
+## Consequences
 
-- `Sounds.play_tuned` и `Sounds.duck_music` — тон, громкость и провал музыки
-  снаружи аудио.
-- Шляпы, как и трупы, лежат до конца здания.
-- Тест добивания проверяет замедление на заходе, стоп-кадр на ударе, смерть и
-  рэгдолл на ударе и слетевшую шляпу; тест камеры — толчок и возврат.
+- `Sounds.play_tuned` and `Sounds.duck_music` — pitch, volume and the music drop from
+  outside the audio code.
+- Hats, like corpses, lie until the end of the building.
+- The takedown test checks the slowdown on the approach, the freeze frame on the blow,
+  death and ragdoll on the blow and the flown-off hat; the camera test — the jolt and
+  the return.

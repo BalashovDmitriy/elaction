@@ -1,7 +1,7 @@
 extends GutTest
 
-## Демо-режим (ADR-0041): точки старта, запуск по бездействию меню, конец любым
-## нажатием и нижняя точка с открытым подвалом.
+## Demo mode (ADR-0041): start points, launch on menu inactivity, end on any press and the bottom
+## point with the basement open.
 
 const MAIN_SCENE := preload("res://src/main.tscn")
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
@@ -13,7 +13,7 @@ func after_each() -> void:
 	Sounds.stop_music()
 
 
-# --- Правило -------------------------------------------------------------------
+# --- Rule ----------------------------------------------------------------------
 
 
 func test_the_points_go_round() -> void:
@@ -27,15 +27,15 @@ func test_the_points_go_round() -> void:
 
 
 func test_the_start_floors_follow_the_rom() -> void:
-	# ROM стартует с 18-го и 5-го этажей снизу (`$802C`); у нас этажи считаются
-	# сверху, и в тридцатиэтажном здании это индексы 12 и 25.
+	# The ROM starts from the 18th and 5th floors from the bottom (`$802C`); our floors are counted
+	# from the top, and in a thirty-floor building these are indices 12 and 25.
 	assert_eq(DemoPlan.floor_of(DemoPlan.Point.ROOF, 30), BuildingRules.ROOF, "верх — крыша")
 	assert_eq(DemoPlan.floor_of(DemoPlan.Point.MIDDLE, 30), 12, "середина")
 	assert_eq(DemoPlan.floor_of(DemoPlan.Point.BOTTOM, 30), 25, "низ")
 	assert_eq(DemoPlan.floor_of(DemoPlan.Point.BOTTOM, 3), 0, "в низком здании — в его пределах")
 
 
-# --- Главное меню ----------------------------------------------------------------
+# --- Main menu -----------------------------------------------------------------
 
 
 func test_idle_in_the_main_menu_starts_the_demo() -> void:
@@ -108,7 +108,7 @@ func test_a_screenshot_does_not_end_the_demo() -> void:
 	main.call("_end_demo")
 
 
-# --- Точки ---------------------------------------------------------------------
+# --- Points --------------------------------------------------------------------
 
 
 func test_the_bottom_point_opens_the_basement() -> void:
@@ -123,14 +123,14 @@ func test_the_bottom_point_opens_the_basement() -> void:
 	await wait_physics_frames(2)
 	var wanted := DemoPlan.floor_of(DemoPlan.Point.BOTTOM, level.rules.floors)
 	var index := level.rules.floor_index_near(WorldSpace.to_plane(level.otto.global_position).y)
-	# Старт — у шахты, чья кабина начинает с этого этажа, возле этажа ROM.
+	# The start is at a shaft whose cab starts from this floor, near the ROM floor.
 	assert_lte(absi(index - wanted), DemoPlan.SHAFT_SEARCH, "Otto внизу, возле этажа ROM")
 	var starts_here := false
 	for shaft: BuildingPlan.ShaftSpot in level.plan().shafts:
 		starts_here = starts_here or shaft.top == index
 	assert_true(starts_here, "на этаже старта начинает кабина")
 	assert_false(level.is_in_the_intro(), "вступление пропущено")
-	# Кадр встаёт на Otto снимком, а не едет к нему с крыши через всё здание.
+	# The view snaps onto Otto rather than travelling to him from the roof through the whole building.
 	var feet := WorldSpace.to_plane(level.otto.global_position)
 	assert_true(level.otto.camera_view().has_point(feet), "Otto в кадре с первого шага")
 	var pending := 0
@@ -142,8 +142,8 @@ func test_the_bottom_point_opens_the_basement() -> void:
 	remove_child(level)
 
 
-## Кабину у старта демо держит и за ярус пары: своего хода у яруса нет, и стоять
-## должен ведущий — иначе пара уезжает по расписанию.
+## The demo holds the cab at the start for the pair's tier too: the tier has no motion of its own,
+## and the leading cab must stand — otherwise the pair leaves on schedule.
 func test_holding_a_deck_holds_its_pair() -> void:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
@@ -162,8 +162,8 @@ func test_holding_a_deck_holds_its_pair() -> void:
 		pending("в здании нет двухэтажной пары")
 		remove_child(level)
 		return
-	# Ведущий — ближайшая сверху кабина того же столбца: в одном столбце бывают и
-	# две шахты на разной высоте.
+	# The leading cab is the nearest cab above in the same column: one column can also have two shafts
+	# at different heights.
 	var closest := INF
 	for child: Node in level.get_children():
 		var car := child as ElevatorCar
@@ -176,7 +176,7 @@ func test_holding_a_deck_holds_its_pair() -> void:
 	assert_not_null(leader, "у яруса есть ведущий")
 	var before := leader.position.y
 	deck.hold(DemoRun.CAR_WAIT)
-	# Дольше обычной стоянки на этаже ([member ElevatorCar.floor_pause]).
+	# Longer than an ordinary stop at a floor ([member ElevatorCar.floor_pause]).
 	await wait_physics_frames(int((leader.floor_pause + 1.0) * Engine.physics_ticks_per_second))
 	assert_almost_eq(leader.position.y, before, 0.01, "пара стоит, пока держат ярус")
 	remove_child(level)
@@ -189,14 +189,14 @@ func _key() -> InputEventKey:
 	return event
 
 
-## Конец партии — не в кадр смерти (ADR-0042, решение 5): сперва замедление и
-## наезд, потом страница, и та пункты отдаёт не сразу.
+## Game over is not in the death frame (ADR-0042, decision 5): first a slow-down and a camera
+## push-in, then the page, and that one does not enable its items at once.
 func test_game_over_waits_for_the_last_death() -> void:
 	var main := MAIN_SCENE.instantiate()
 	add_child_autofree(main)
 	await wait_physics_frames(2)
-	# Таблица полна большими счетами: нулевой в неё не попадёт и файл игрока
-	# не тронет.
+	# The table is full of large scores: a zero one will not get into it and will not touch the
+	# player's file.
 	var records := Records.new()
 	for _row: int in Records.LIMIT:
 		records.rows.append({Records.SCORE: 1000000, Records.DATE: "2026-01-01"})
@@ -209,10 +209,10 @@ func test_game_over_waits_for_the_last_death() -> void:
 	assert_false(menu.visible, "в кадр смерти меню нет")
 	assert_false(get_tree().paused, "мир ещё идёт — медленно")
 	assert_lt(Engine.time_scale, 1.0, "замедлен")
-	# Кадрами дерева: они идут и на паузе, а ожидание GUT под паузой встаёт
-	# вместе со зданием. Время — шагами кадров без замедления, как его считает
-	# [LastDeath], а не по часам: под `--fixed-fps` кадры бегут быстрее часов,
-	# и за две секунды часов пункты успевали разблокироваться (run_tests.py).
+	# By tree frames: they run during pause too, while a GUT wait under pause stops together with the
+	# building. Time is in frame steps without slow-down, as [LastDeath] counts it, not by the clock:
+	# under `--fixed-fps` frames run faster than the clock, and within two seconds of clock time the
+	# items managed to unlock (run_tests.py).
 	var waited := 0.0
 	while waited < LastDeath.DURATION + 0.1:
 		await get_tree().process_frame
@@ -224,9 +224,9 @@ func test_game_over_waits_for_the_last_death() -> void:
 	assert_true(menu.rows()[0].disabled, "пункты пока не нажимаются")
 
 
-## Esc во время последней смерти партию не продолжает (авторевью M24f): закрытое
-## меню помнит страницу паузы, и после паузы в этой партии Esc «продолжал» игру
-## с мёртвым Otto — конец партии так и не показывался.
+## Esc during the last death does not continue the game (M24f code review): the closed menu
+## remembers the pause page, and after a pause in this game Esc "continued" the game with a dead
+## Otto — the game over screen never showed.
 func test_escape_during_the_last_death_does_not_resume() -> void:
 	var main := MAIN_SCENE.instantiate()
 	add_child_autofree(main)

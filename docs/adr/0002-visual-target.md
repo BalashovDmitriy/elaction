@@ -1,81 +1,84 @@
-# ADR-0002 · Визуальный ориентир и настройки рендера
+# ADR-0002 · Visual target and render settings
 
-- **Статус:** отменено — [ADR-0019](0019-3d-pivot.md), решение 7; сцена стала трёхмерной,
-  и настройки пиксель-арта из `project.godot` сняты в M15 ([ADR-0021](0021-3d-greybox.md)).
-  Вьюпорт 640×360 со скейлом 3× отменён ещё раньше — [ADR-0018](0018-native-fullhd.md), решение 3
-- **Дата:** 2026-09-11
+- **Status:** superseded — [ADR-0019](0019-3d-pivot.md), decision 7; the scene became
+  three-dimensional, and the pixel-art settings were removed from `project.godot` in M15
+  ([ADR-0021](0021-3d-greybox.md)). The 640×360 viewport with 3× scale was superseded even
+  earlier — [ADR-0018](0018-native-fullhd.md), decision 3
+- **Date:** 2026-09-11
 
-## Контекст
+## Context
 
-Настройки рендера в `project.godot` (базовое разрешение, фильтрация текстур, привязка к
-пикселю) напрямую зависят от выбранного визуального стиля. Вехи M1–M5 от стиля не зависят:
-там серые коробки. Но M6 и M7 без ответа начинать нельзя.
+The render settings in `project.godot` (base resolution, texture filtering, pixel snapping)
+depend directly on the chosen visual style. Milestones M1–M5 do not depend on style: they are
+grey boxes. But M6 and M7 cannot start without an answer.
 
-Варианты, которые обсуждались:
+Options discussed:
 
-| Стиль | Пример | Что значит для пайплайна |
+| Style | Example | What it means for the pipeline |
 |---|---|---|
-| **A. HD пиксель-арт с динамическим светом** | Katana ZERO, Blasphemous | Спрайты на пиксельной сетке, к ним нужны нормал-мапы |
-| **B. Рисованный / векторный** | Ori, Cuphead | Нужен художник, зато нет ограничений сетки |
-| **C. 3D-рендер в спрайты** | Dead Cells | Модель и анимация в Blender, нормал-мапы бесплатно из рендера |
+| **A. HD pixel art with dynamic lighting** | Katana ZERO, Blasphemous | Sprites on a pixel grid, they need normal maps |
+| **B. Hand-drawn / vector** | Ori, Cuphead | Needs an artist, but no grid constraints |
+| **C. 3D rendered to sprites** | Dead Cells | Model and animation in Blender, normal maps for free from the render |
 
-## Решение
+## Decision
 
-**Вариант A — HD пиксель-арт с динамическим освещением. Ассеты получаем генерацией.**
+**Option A — HD pixel art with dynamic lighting. Assets are obtained by generation.**
 
-Зафиксировано в `project.godot`:
+Fixed in `project.godot`:
 
-| Настройка | Значение | Зачем |
+| Setting | Value | Why |
 |---|---|---|
-| `viewport_width` / `viewport_height` | 640 × 360 | Ровно 1/3 от 1080p, целочисленный скейл 3x |
-| `window_width_override` / `window_height_override` | 1280 × 720 | Комфортное окно при разработке |
-| `stretch/mode` | `canvas_items` | Плавная камера и UI в высоком разрешении |
-| `stretch/aspect` | `keep` | Без искажения пропорций |
-| `default_texture_filter` | 0 (nearest) | Пиксель-арт без замыливания |
-| `snap_2d_transforms_to_pixel` | `true` | Стабильная пиксельная сетка |
-| `rendering_method` | `forward_plus` | Полный набор возможностей рендера на десктопе |
+| `viewport_width` / `viewport_height` | 640 × 360 | Exactly 1/3 of 1080p, integer 3x scale |
+| `window_width_override` / `window_height_override` | 1280 × 720 | Comfortable window during development |
+| `stretch/mode` | `canvas_items` | Smooth camera and UI at high resolution |
+| `stretch/aspect` | `keep` | No aspect distortion |
+| `default_texture_filter` | 0 (nearest) | Pixel art without blurring |
+| `snap_2d_transforms_to_pixel` | `true` | Stable pixel grid |
+| `rendering_method` | `forward_plus` | Full set of desktop rendering features |
 
-## Про генерацию ассетов
+## On asset generation
 
-Генерация закрывает разные задачи с очень разным качеством, и это стоит понимать заранее.
+Generation covers different tasks with very different quality, and this is worth understanding
+up front.
 
-**Работает хорошо:** тайлсеты, фоны, предметы обстановки, иконки, элементы интерфейса,
-отдельные ключевые позы персонажа. Всё, что существует в одном экземпляре.
+**Works well:** tilesets, backgrounds, props, icons, interface elements, individual key poses
+of a character. Everything that exists in a single instance.
 
-**Работает плохо:** покадровая анимация персонажа. Модель не держит одного и того же
-персонажа между кадрами — в пиксель-арте на 28 пикселей высотой расхождение в пару
-пикселей уже читается как дрожание. Это главный риск M7.
+**Works poorly:** frame-by-frame character animation. The model does not hold the same
+character between frames — in 28-pixel-tall pixel art a couple of pixels of drift already
+reads as jitter. This is the main risk of M7.
 
-**Как обходим** (детали решаются в M7):
+**How we work around it** (details are decided in M7):
 
-1. Генерируем ключевые позы, а промежуточные кадры получаем из них, а не генерируем заново.
-2. Либо генерируем персонажа в высоком разрешении, а на пиксельную сетку сводим уже
-   детерминированно — уменьшением и квантованием палитры.
-3. Итоговую вычистку кадров делаем руками в Aseprite. Считаем это частью работы, а не
-   признаком неудачи.
+1. Generate key poses and derive the in-between frames from them instead of generating them
+   anew.
+2. Or generate the character at high resolution and bring it onto the pixel grid
+   deterministically — by downscaling and palette quantization.
+3. Do the final cleanup of frames by hand in Aseprite. We count this as part of the work, not
+   as a sign of failure.
 
-**Нормал-мапы не генерируем моделью.** Их выводят из готового спрайта детерминированным
-инструментом (Laigter или свой скрипт). Это даёт согласованность между кадрами, которой
-генерация как раз и не даёт.
+**Normal maps are not generated by a model.** They are derived from the finished sprite with a
+deterministic tool (Laigter or our own script). This gives the consistency between frames that
+generation precisely does not give.
 
-## Последствия
+## Consequences
 
-- Все ассеты живут на пиксельной сетке; спрайты, не попадающие в неё, будут видны.
-- В M7 закладываем время на ручную доводку кадров анимации — это не опция.
-- Если вариант A окажется тупиковым по анимации, запасной путь — вариант C: Blender даёт
-  идеальную согласованность кадров и нормал-мапы из коробки. Переход стоит переделки
-  ассетов, но не кода.
+- All assets live on the pixel grid; sprites that do not fit it will be visible.
+- In M7 we budget time for manual polishing of animation frames — this is not optional.
+- If option A turns out to be a dead end for animation, the fallback is option C: Blender gives
+  perfect frame consistency and normal maps out of the box. The switch costs reworking the
+  assets, but not the code.
 
-## Дополнение 2026-09-23 · настройки рендера после отмены
+## Addendum 2026-09-23 · render settings after supersession
 
-ADR отменён, но правило проекта держит его точкой учёта настроек рендера в
-`project.godot`. Действующие с 3D-сборки:
+The ADR is superseded, but the project rule keeps it as the record of render settings in
+`project.godot`. Those in force since the 3D build:
 
-- `rendering/anti_aliasing/quality/use_debanding = true` — дизеринг против полос
-  на градиентах тумана и неба ([ADR-0030](0030-grading-and-quality.md), решение 4).
-  Записан здесь в M20, а в `project.godot` включён только в M22 — до того
-  строка была обещанием без настройки.
-- Сглаживание 3D (MSAA, FXAA, TAA), атлас теней и сетка объёмного тумана в
-  `project.godot` не задаются: их ставит `Graphics` по уровню качества —
-  сглаживание и атлас на корневом окне, сетку тумана через `RenderingServer`
-  ([ADR-0034](0034-ultra-and-auto-quality.md), решения 1 и 2).
+- `rendering/anti_aliasing/quality/use_debanding = true` — dithering against banding
+  on fog and sky gradients ([ADR-0030](0030-grading-and-quality.md), decision 4).
+  Recorded here in M20, but enabled in `project.godot` only in M22 — until then
+  the line was a promise without a setting.
+- 3D anti-aliasing (MSAA, FXAA, TAA), the shadow atlas and the volumetric fog grid are not set
+  in `project.godot`: `Graphics` sets them by quality level — anti-aliasing and the atlas on
+  the root window, the fog grid via `RenderingServer`
+  ([ADR-0034](0034-ultra-and-auto-quality.md), decisions 1 and 2).

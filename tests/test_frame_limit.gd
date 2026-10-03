@@ -1,10 +1,10 @@
 extends GutTest
 
-## Тесты предела кадров и вертикальной синхронизации (просьба пользователя, M24b).
+## Tests of the frame limit and vertical sync (the user's request, M24b).
 ##
-## Синхронизацию в headless не спросить — окна нет, поэтому проверяется решение:
-## что предел и флажок значат для движка и окна. Предел у движка ставится и без
-## окна — его настройки ставят по-настоящему.
+## Sync cannot be queried in headless — there is no window, so the decision is checked:
+## what the limit and the flag mean for the engine and the window. The engine limit is set
+## even without a window — the settings set it for real.
 
 const TEMP := "user://test_frame_limit.cfg"
 
@@ -15,8 +15,8 @@ func after_each() -> void:
 	Engine.max_fps = 0
 
 
-## Предел кадров и синхронизация переживают перезапуск; в старом файле их нет —
-## остаётся как было до настройки: по монитору и с синхронизацией.
+## The frame limit and sync survive a restart; an old file does not have them —
+## it stays as it was before the setting: by the monitor and with sync.
 func test_the_frame_limit_and_vsync_survive_a_restart() -> void:
 	var settings := GameSettings.new()
 	settings.frame_limit = 144
@@ -42,7 +42,7 @@ func test_the_frame_limit_and_vsync_survive_a_restart() -> void:
 	)
 
 
-## Что предел и флажок значат для движка и окна.
+## What the limit and the flag mean for the engine and the window.
 func test_the_frame_limit_maps_to_the_engine() -> void:
 	assert_eq(
 		DisplayModes.max_fps(DisplayModes.FRAME_MONITOR, true, 144.0), 0, "держит синхронизация"
@@ -58,7 +58,7 @@ func test_the_frame_limit_maps_to_the_engine() -> void:
 	assert_eq(DisplayModes.FRAME_LIMITS[0], DisplayModes.FRAME_MONITOR, "первым — по монитору")
 
 
-## Настройки ставят предел движку; по умолчанию его нет, как до настройки.
+## The settings set the engine limit; by default there is none, as before the setting.
 func test_applying_settings_sets_the_frame_limit() -> void:
 	var settings := GameSettings.new()
 	settings.locale = TranslationServer.get_locale()

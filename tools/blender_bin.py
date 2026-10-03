@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Поиск и запуск Blender для сборки моделей актёров.
+"""Finding and running Blender to build actor models.
 
-Парный модуль к `godot_bin.py`: тот же порядок поиска, тот же способ ругаться,
-когда инструмента нет. Нужен только `build_actors.py` (ADR-0022, решение 1):
-всё остальное в игре — геометрия кодом и материалы, Blender им не требуется.
+A companion module to `godot_bin.py`: the same search order, the same way of
+complaining when the tool is missing. Only `build_actors.py` needs it (ADR-0022,
+decision 1): everything else in the game is geometry in code and materials, Blender is
+not needed for them.
 
-Порядок поиска: $BLENDER_BIN -> PATH -> Program Files -> пути winget.
+Search order: $BLENDER_BIN -> PATH -> Program Files -> winget paths.
 """
 
 from __future__ import annotations
@@ -15,17 +16,17 @@ import shutil
 import subprocess
 from pathlib import Path
 
-# Общее с поиском Godot не переписывается: код возврата таймаута, приведение
-# вывода к тексту и UTF-8 на выходе одинаковы для обоих инструментов, и свои
-# копии этих трёх разошлись бы с оригиналом при первой же правке.
+# What is shared with finding Godot is not rewritten: the timeout return code, converting
+# output to text and UTF-8 on output are the same for both tools, and separate copies of
+# these three would drift from the original at the very first change.
 from godot_bin import TIMEOUT_EXIT_CODE, as_text, use_utf8_output
 
-# Версия, на которой пайплайн собран и проверен (ADR-0011).
+# The version the pipeline was built and checked on (ADR-0011).
 EXPECTED_VERSION = "5.2"
 
 
 def _program_files_candidates() -> list[Path]:
-    """Установка msi-пакетом: winget не кладёт blender.exe в свои Links."""
+    """Installed as an msi package: winget does not put blender.exe into its Links."""
     roots: list[Path] = []
     for variable in ("ProgramFiles", "ProgramFiles(x86)"):
         value = os.environ.get(variable)
@@ -36,8 +37,8 @@ def _program_files_candidates() -> list[Path]:
 
     found: list[Path] = []
     for root in roots:
-        # Сначала ожидаемая версия, потом всё остальное по убыванию имени:
-        # так 5.2 выигрывает у 4.x, даже если стоят обе.
+        # The expected version first, then everything else by descending name:
+        # so 5.2 wins over 4.x even if both are installed.
         blender_root = root / "Blender Foundation"
         preferred = blender_root / f"Blender {EXPECTED_VERSION}" / "blender.exe"
         if preferred.exists():
@@ -49,7 +50,7 @@ def _program_files_candidates() -> list[Path]:
 
 
 def find_blender() -> str | None:
-    """Возвращает путь к исполняемому файлу Blender или None, если он не найден."""
+    """Returns the path to the Blender executable, or None if it is not found."""
     from_env = os.environ.get("BLENDER_BIN")
     if from_env and Path(from_env).exists():
         return from_env
@@ -75,7 +76,7 @@ def find_blender() -> str | None:
 
 
 def require_blender() -> str:
-    """Как find_blender, но печатает подсказку и завершает процесс, если Blender нет."""
+    """Like find_blender, but prints a hint and exits the process if Blender is missing."""
     blender = find_blender()
     if blender is None:
         print("Blender не найден. Установите его или задайте BLENDER_BIN=<путь к blender>.")
@@ -85,10 +86,10 @@ def require_blender() -> str:
 
 
 def run_script(blender: str, script: Path, args: list[str] | None = None, timeout: int = 600) -> tuple[int, str]:
-    """Прогоняет скрипт в Blender без окна и возвращает (код возврата, вывод).
+    """Runs a script in Blender without a window and returns (return code, output).
 
-    Аргументы после `--` достаются скрипту: Blender до этого разделителя разбирает
-    командную строку сам.
+    Arguments after `--` go to the script: Blender parses the command line up to this
+    separator itself.
     """
     command = [blender, "--background", "--factory-startup", "--python", str(script)]
     if args:
@@ -110,7 +111,7 @@ def run_script(blender: str, script: Path, args: list[str] | None = None, timeou
 
 
 def version_of(blender: str) -> str:
-    """Первая строка `blender --version`, например «Blender 5.2.1 LTS»."""
+    """The first line of `blender --version`, for example "Blender 5.2.1 LTS"."""
     completed = subprocess.run(
         [blender, "--version"],
         capture_output=True,
@@ -124,7 +125,7 @@ def version_of(blender: str) -> str:
 
 
 def main() -> int:
-    """`python tools/blender_bin.py` печатает найденный Blender и его версию."""
+    """`python tools/blender_bin.py` prints the Blender found and its version."""
     use_utf8_output()
     blender = require_blender()
     print(blender)

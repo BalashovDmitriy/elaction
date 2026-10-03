@@ -1,26 +1,26 @@
 class_name CarModel
 extends RefCounted
 
-## Машина у выхода — модель Cars Pack Quaternius (ADR-0032, решение 7).
+## The car at the exit: a model from the Quaternius Cars Pack (ADR-0032, decision 7).
 ##
-## В каждом здании своя: какая машина и какого цвета — жребий по сиду здания.
-## Первое здание партии — красная спортивная, как в 1983 году. Такси и полиции в
-## жребии нет: шпион, уезжающий на патрульной машине, странен.
+## Every building has its own: which car and what color is a draw by the building seed.
+## The first building of a game gets the red sports car, as in 1983. Taxis and police
+## cars are not in the draw: a spy driving off in a patrol car is strange.
 ##
-## Модели собирает `tools/build_actors.py cars`: капот в +X, нуль — между
-## колёсами на земле, длина — [constant Proportions.CAR_LENGTH], глубина —
-## сколько влезает между задней стеной и телом Otto. Кузов у каждой — материал
-## `Paint` (у двухцветной ещё `PaintShade`), его и перекрашивает жребий. Фары и
-## стоп-сигналы светятся эмиссией — источников машина не добавляет. С M24i у
-## каждой — проём водительской двери, дверь `DriverDoor` на петле, салон
-## `CarInterior`, точка плафона `DomeLight` и поворотники (ADR-0046, решение 1).
+## Models are built by `tools/build_actors.py cars`: hood toward +X, origin between
+## the wheels on the ground, length [constant Proportions.CAR_LENGTH], depth as much as
+## fits between the back wall and Otto's body. Each body has the material
+## `Paint` (the two-tone one also has `PaintShade`), and that is what the draw repaints.
+## Headlights and brake lights glow by emission: the car adds no light sources. Since
+## M24i each has a driver door opening, a hinged door `DriverDoor`, an interior
+## `CarInterior`, a dome light point `DomeLight` and turn signals (ADR-0046, decision 1).
 
-## Снег на кузове в снегопад ([method snow_on]).
+## Snow on the body in a snowfall ([method snow_on]).
 const SNOW_CAP := preload("res://src/levels/snow_cap.gdshader")
-## Длина по бамперам, м — та же, по которой [ExitCar] ставит машину у выхода.
+## Length over the bumpers, m: the same by which [ExitCar] places the car at the exit.
 const LENGTH: float = Proportions.CAR_LENGTH
 
-## Модели в жребии. Первая — спортивная, её берёт первое здание.
+## Models in the draw. The first one is the sports car, taken by the first building.
 const MODELS: Array[PackedScene] = [
 	preload("res://assets/models/cars/sports_car_2.glb"),
 	preload("res://assets/models/cars/sports_car_1.glb"),
@@ -29,34 +29,35 @@ const MODELS: Array[PackedScene] = [
 	preload("res://assets/models/cars/suv.glb"),
 ]
 
-## Краски кузова. Первая — красная первого здания. Тона глубокие, но не чёрные:
-## машина стоит в гараже под одной лампой, и тёмная пропала бы в кадре.
+## Body paints. The first is the red of the first building. The tones are deep but not
+## black: the car stands in a garage under a single lamp, and a dark one would vanish in
+## the frame.
 const PAINTS: Array[Color] = [
 	Color(0.62, 0.08, 0.07),
 	Color(0.08, 0.2, 0.45),
 	Color(0.85, 0.82, 0.74),
 	Color(0.12, 0.35, 0.2),
-	# Не жёлтая: жёлтая машина любой модели читается такси, а такси в жребии нет.
+	# Not yellow: a yellow car of any model reads as a taxi, and taxis are not in the draw.
 	Color(0.55, 0.62, 0.7),
 	Color(0.45, 0.46, 0.5),
 	Color(0.35, 0.12, 0.4),
 	Color(0.05, 0.05, 0.06),
 ]
 
-## Насколько темнее вторая краска двухцветного кузова.
+## How much darker the second paint of a two-tone body is.
 const SHADE: float = 0.55
 
 const HEADLIGHT := Color(1.0, 0.95, 0.8)
 const TAILLIGHT := Color(1.0, 0.1, 0.08)
 const INDICATOR_GLASS := Color(0.55, 0.3, 0.05)
 
-## Соль жребия машины: своя, чтобы машина не ходила в ногу с раскладкой.
+## Salt of the car draw: its own, so that the car does not move in step with the layout.
 const SALT: int = 0x0CA2_5EED
 
-## Жребий по типу здания (ADR-0058, решение 4): веса моделей [constant MODELS]
-## и красок [constant PAINTS] — у отеля спорткары и чёрный седан, у офиса тёмные
-## представительские седаны и SUV, у жилого дома простые седаны и SUV
-## выцветших цветов. По [enum BuildingIdentity.Kind].
+## Draw by building kind (ADR-0058, decision 4): weights of the models [constant MODELS]
+## and paints [constant PAINTS]: the hotel has sports cars and a black sedan, the office
+## dark executive sedans and SUVs, the residential building plain sedans and SUVs in
+## faded colors. By [enum BuildingIdentity.Kind].
 const MODEL_WEIGHTS: Array[Array] = [
 	[3, 3, 2, 1, 0],
 	[1, 0, 3, 3, 2],
@@ -67,25 +68,25 @@ const PAINT_WEIGHTS: Array[Array] = [
 	[0, 2, 0, 0, 2, 3, 0, 3],
 	[0, 1, 2, 3, 2, 1, 1, 0],
 ]
-## Насколько краска жилого дома выцвела к серому: старые машины небогатых
-## жильцов. По [enum BuildingIdentity.Kind].
+## How much the residential building paint has faded toward gray: old cars of
+## not-so-rich residents. By [enum BuildingIdentity.Kind].
 const FADE: Array[float] = [0.0, 0.0, 0.3]
 const FADED := Color(0.5, 0.5, 0.48)
 
 
-## Жребий здания: какая модель и какая краска. [param building] — номер здания в
-## партии, [param building_seed] — его сид.
+## The building's draw: which model and which paint. [param building] is the building's
+## number in the game, [param building_seed] its seed.
 class Choice:
 	extends RefCounted
 
 	var model: int = 0
 	var paint: int = 0
-	## Насколько краска выцвела к серому ([constant FADE]).
+	## How much the paint has faded toward gray ([constant FADE]).
 	var fade: float = 0.0
 
 
-## Что стоит у выхода здания типа [param kind]. Первое здание партии — красная
-## спортивная, какого бы типа оно ни было.
+## What stands at the exit of a building of kind [param kind]. The first building of a
+## game gets the red sports car, whatever its kind.
 static func choose(
 	building: int, building_seed: int, kind: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL
 ) -> Choice:
@@ -93,15 +94,15 @@ static func choose(
 	if building <= 1:
 		return choice
 	var rng := RandomNumberGenerator.new()
-	# Номер здания — в жребий вместе с сидом: без соли партии сид и есть номер,
-	# а инструменты снимают разные здания на одном сиде.
+	# The building number goes into the draw together with the seed: without the game salt
+	# the seed is the number, and tools shoot different buildings on the same seed.
 	rng.seed = hash([building_seed, building, SALT])
 	return draw(rng, kind)
 
 
-## Машина здания типа [param kind] жребием [param rng] по весам типа. Краски
-## [param banned] не выпадают: красная — машина Otto первого здания, чёрная
-## пропадает в темноте у бордюра.
+## The car of a building of kind [param kind] by draw [param rng] using the kind's
+## weights. The paints [param banned] do not come up: red is Otto's car in the first
+## building, black vanishes in the darkness by the curb.
 static func draw(
 	rng: RandomNumberGenerator, kind: BuildingIdentity.Kind, banned: Array[int] = []
 ) -> Choice:
@@ -112,8 +113,8 @@ static func draw(
 	return choice
 
 
-## Номер по весам [param weights] без запрещённых [param banned]. Остались
-## одни нули — жребий поровну по разрешённым.
+## An index by weights [param weights] excluding the banned [param banned]. If only zeros
+## are left, the draw is even across the allowed ones.
 static func _weighted(rng: RandomNumberGenerator, weights: Array, banned: Array[int]) -> int:
 	var total := 0
 	for index: int in weights.size():
@@ -135,7 +136,7 @@ static func _weighted(rng: RandomNumberGenerator, weights: Array, banned: Array[
 	return weights.size() - 1
 
 
-## Собирает машину узлом без тел.
+## Assembles the car as a node without bodies.
 static func build(choice: Choice = Choice.new()) -> Node3D:
 	var car := (MODELS[choice.model] as PackedScene).instantiate() as Node3D
 	car.name = "Car"
@@ -147,16 +148,16 @@ static func build(choice: Choice = Choice.new()) -> Node3D:
 			var wanted := _material_for(material.resource_name if material else "", paint)
 			if wanted != null:
 				mesh_instance.set_surface_override_material(surface, wanted)
-	# Дождь и снег гаснут о кузов, а не идут сквозь машину (ADR-0054).
+	# Rain and snow die on the body instead of going through the car (ADR-0054).
 	Shelter.over_meshes(car)
 	return car
 
 
-## Снег на кузове ([code]snow_cap.gdshader[/code]) — накладным материалом на
-## его части, поверх своей краски (ADR-0054). [param amount] — сколько
-## снега: 1 — шапка, меньше — налёт. Колёса и салон — без снега: катящееся
-## колесо несло бы белую полосу по верху шины, а сиденья под стеклом белели бы
-## сугробом в салоне.
+## Snow on the body ([code]snow_cap.gdshader[/code]) as an overlay material on
+## its parts, on top of its own paint (ADR-0054). [param amount] is how much
+## snow: 1 is a cap, less is a dusting. Wheels and interior get no snow: a rolling
+## wheel would carry a white stripe over the top of the tire, and the seats under the
+## glass would show white as a snowdrift in the interior.
 static func snow_on(car: Node3D, amount: float = 1.0) -> void:
 	var cap := ShaderMaterial.new()
 	cap.shader = SNOW_CAP
@@ -167,7 +168,7 @@ static func snow_on(car: Node3D, amount: float = 1.0) -> void:
 		(node as MeshInstance3D).material_overlay = cap
 
 
-## Колёса машины: узлы, которые крутятся, когда она едет.
+## The car's wheels: nodes that spin when it drives.
 static func wheels(car: Node3D) -> Array[Node3D]:
 	var found: Array[Node3D] = []
 	for node in car.find_children("Wheel*", "Node3D", true, false):
@@ -175,9 +176,10 @@ static func wheels(car: Node3D) -> Array[Node3D]:
 	return found
 
 
-## Середина каждого колеса [param wheels] в его собственных координатах: вокруг
-## неё оно и крутится. Начало узла колеса у пака не на оси, а в нуле машины, и
-## поворот вокруг начала носил бы колёса кругом по кузову (авторевью M21).
+## The middle of each wheel [param wheels] in its own coordinates: it spins around
+## that. The pack's wheel node origin is not on the axle but at the car origin, and
+## rotating around the origin would carry the wheels in a circle around the body
+## (M21 code review).
 static func hubs(wheels: Array[Node3D]) -> PackedVector3Array:
 	var found := PackedVector3Array()
 	for wheel: Node3D in wheels:
@@ -186,7 +188,7 @@ static func hubs(wheels: Array[Node3D]) -> PackedVector3Array:
 	return found
 
 
-## Радиус колеса по габариту его сетки, м; [param fallback] — если сеток нет.
+## Wheel radius from its mesh bounds, m; [param fallback] if there are no meshes.
 static func wheel_radius(wheels: Array[Node3D], fallback: float) -> float:
 	var radius := fallback
 	for wheel: Node3D in wheels:
@@ -196,10 +198,11 @@ static func wheel_radius(wheels: Array[Node3D], fallback: float) -> float:
 	return radius
 
 
-## Катит колёса [param wheels] вокруг осей [param hubs] на путь [param travel], м:
-## угол — путь, делённый на радиус [param radius]. Капот в +X, и колесо,
-## катящееся вперёд, идёт по часовой, если смотреть с +Z, — это минус вокруг +Z.
-## Модель, развёрнутая назад, катит их в своей системе вперёд, поэтому знак один.
+## Rolls the wheels [param wheels] around the axles [param hubs] over a path of
+## [param travel], m: the angle is the path divided by the radius [param radius]. The
+## hood points to +X, and a wheel rolling forward turns clockwise as seen from +Z, which
+## is minus around +Z. A model turned backward rolls them forward in its own frame, so
+## the sign is the same.
 static func roll(
 	wheels: Array[Node3D], hubs_of: PackedVector3Array, travel: float, radius: float
 ) -> void:
@@ -209,7 +212,7 @@ static func roll(
 		wheels[index].transform *= Transform3D(spin, hub - spin * hub)
 
 
-## Замена материала пака на игровой: краска, свет. Остальное — как у пака.
+## Replacing a pack material with a game one: paint, light. The rest is as in the pack.
 static func _material_for(name: String, paint: Color) -> StandardMaterial3D:
 	match name:
 		"Paint":
@@ -220,8 +223,8 @@ static func _material_for(name: String, paint: Color) -> StandardMaterial3D:
 			return GreyboxLook.light(HEADLIGHT)
 		"TailLights":
 			return GreyboxLook.light(TAILLIGHT)
-		# Поворотники без огня — янтарный пластик; мигает только правый у машины
-		# Otto, своим материалом ([ExitCar]).
+		# Turn signals without light are amber plastic; only the right one on Otto's car
+		# blinks, with its own material ([ExitCar]).
 		"IndicatorLeft", "IndicatorRight":
 			return GreyboxLook.polished(INDICATOR_GLASS)
 	return null

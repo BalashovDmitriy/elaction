@@ -1,289 +1,275 @@
-# ADR-0024 · Геометрия здания: сетка мест, силуэт порогом, перехлёст шахт
+# ADR-0024 · Building geometry: slot grid, threshold silhouette, overlapping shafts
 
-- **Статус:** принято; решение 6 изменено [ADR-0025](0025-shafts-escalators-and-riders.md)
-  (решение 1: пар до двух, в каждом здании, где есть куда), решения 7 и 8
-  уточнены там же. Шаг места 2.1 → 1.8 м и ширина здания 38.4 → 33.6 м из
-  решений 1–2, потолок шахт на уровне в решении 3 — [ADR-0026](0026-proportions.md),
-  решение 3
-- **Дата:** 2026-09-21
+- **Status:** accepted; decision 6 changed by [ADR-0025](0025-shafts-escalators-and-riders.md)
+  (decision 1: up to two pairs, in every building where there is room), decisions 7 and 8
+  refined there too. The slot step 2.1 → 1.8 m and building width 38.4 → 33.6 m from
+  decisions 1–2, the cap on shafts per level in decision 3 — [ADR-0026](0026-proportions.md),
+  decision 3
+- **Date:** 2026-09-21
 
-## Контекст
+## Context
 
-M18 — веха геометрии здания. До неё здание собиралось так: девять мест по
-ширине, силуэт равными ступенями, шахты равной длины встык, на каждом стыке
-эскалатор. Свет, материалы и актёры к этому моменту готовы ([ADR-0023](0023-light-and-readability.md),
-[ADR-0022](0022-actors-rig.md)) — переделывать осталось само здание.
+M18 is the building geometry milestone. Before it the building was assembled like this: nine slots
+across, a silhouette of equal steps, shafts of equal length end to end, an escalator at every
+junction. Light, materials and actors are ready by this point ([ADR-0023](0023-light-and-readability.md),
+[ADR-0022](0022-actors-rig.md)) — what remains to be redone is the building itself.
 
-### Что показала сверка
+### What the check showed
 
-[Elevator World](https://elevatorworld.com/article/elevator-action/) разобрал
-здание оригинала как настоящее. Шахты там неравные и **пересекающиеся**:
+[Elevator World](https://elevatorworld.com/article/elevator-action/) analysed the original's
+building as a real one. The shafts there are unequal and **overlapping**:
 
-> 1–5, 1–6, 1–7, 1–7, 1–7, 7–11, 7–13, 10–12, 13–15, 15–17, 19–30 с крышей.
+> 1–5, 1–6, 1–7, 1–7, 1–7, 7–11, 7–13, 10–12, 13–15, 15–17, 19–30 with the roof.
 
-Если посчитать, сколько шахт обслуживает этаж, выходит правило, которого у нас
-нет вовсе:
+If you count how many shafts serve a floor, a rule emerges that we do not have at all:
 
-| Этажи оригинала | Наши этажи | Шахт |
+| Original's floors | Our floors | Shafts |
 |---|---|---|
 | 1–7 | 23–29 | 3–5 |
 | 8–15 | 14–22 | 1–3 |
 | 16–17, 19–30 | 0–13 | 1 |
-| 18 | 12 | **ноль** |
+| 18 | 12 | **zero** |
 
-Седьмой — sky lobby: на нём сходятся пять шахт. Верхняя треть здания — одна
-шахта на двенадцать этажей, и спуск там безальтернативен.
+The seventh is a sky lobby: five shafts meet on it. The upper third of the building is one shaft
+for twelve floors, and the descent there has no alternative.
 
-**Эскалаторы стоят наверху, а не внизу.** По одному источнику (не перепроверен):
-на этажах 17–20 эскалатор и слева и справа, на 16 — только справа. То есть
-эскалаторы заполняют ровно ту полосу, где шахт нет или они не перехлёстываются.
-Ниже шестнадцатого пересадка идёт **перехлёстом**: 7–13 и 10–12 делят этажи
-10–12, 13–15 и 15–17 делят пятнадцатый.
+**Escalators are at the top, not the bottom.** According to one source (not double-checked): on
+floors 17–20 there is an escalator both on the left and on the right, on 16 — only on the right.
+That is, escalators fill exactly the band where there are no shafts or they do not overlap. Below
+the sixteenth the transfer goes by **overlap**: 7–13 and 10–12 share floors 10–12, 13–15 and 15–17
+share the fifteenth.
 
-План вехи в `EPIC.md` обещал обратное — «на стыках полос внизу по два
-эскалатора». Сверка развернула веху: внизу не эскалаторы, а много шахт до самой
-земли; эскалаторы — верхняя полоса.
+The milestone plan in `EPIC.md` promised the opposite — "two escalators at band junctions at the
+bottom". The check turned the milestone around: at the bottom there are not escalators but many
+shafts down to the ground; escalators are the upper band.
 
-Прочее из сверки: в одной шахте ходит двухэтажная кабина, двери кабины
-открываются на две стороны, по горизонтали оригинал не скроллится — здание
-ровно в ширину экрана.
+Other things from the check: one shaft has a double-deck cab, the cab doors open on two sides, the
+original does not scroll horizontally — the building is exactly the width of the screen.
 
-### Что показал код
+### What the code showed
 
-- **Граф достижимости перехлёст уже тянет.** `BuildingRoute._links` соединяет
-  все этажи шахты между собой, поэтому пересекающиеся шахты дают просто больше
-  рёбер. Опасение EPIC «неравные и пересекающиеся тянут за собой весь граф
-  достижимости» не подтвердилось: работа не в графе, а в `_lay_shafts`.
-- **Ни один этаж не влезает в кадр.** Кадр 19.2 м (`SideCamera`: половина
-  высоты 5.4 м при 16∶9), самый узкий этаж — 21.6 м, самый широкий — 38.4.
-  Обещание «верхние этажи влезают целиком» не выполнено ни для одного.
-- **Эскалатор — уже не `Line2D`.** В 3D это две коробки полотна
-  (`Escalator._lay_belt`); формулировка в EPIC осталась от 2D-плана. Чего нет
-  на самом деле — балюстрады, ступеней, обрамления проёма.
+- **The reachability graph already handles overlap.** `BuildingRoute._links` connects all floors of
+  a shaft with each other, so overlapping shafts just give more edges. The EPIC's fear that "unequal
+  and overlapping ones drag the whole reachability graph along" was not confirmed: the work is not
+  in the graph but in `_lay_shafts`.
+- **Not a single floor fits in the frame.** The frame is 19.2 m (`SideCamera`: half-height 5.4 m at
+  16∶9), the narrowest floor is 21.6 m, the widest 38.4. The promise "the upper floors fit
+  entirely" is not met for any of them.
+- **The escalator is no longer a `Line2D`.** In 3D it is two belt boxes
+  (`Escalator._lay_belt`); the wording in the EPIC is left over from the 2D plan. What is actually
+  missing is the balustrade, the steps, the framing of the opening.
 
-## Решения
+## Decisions
 
-### 1. Сетка мест мельче: семнадцать мест с шагом 2.1 м
+### 1. A finer slot grid: seventeen slots at a 2.1 m step
 
-Было девять мест шагом 4.2 м. Становится семнадцать шагом 2.1 — ширина здания
-(38.4 м) и отступ от стен (2.4 м) не меняются, меняется только дробность.
+There were nine slots at a 4.2 m step. Now there are seventeen at 2.1 — the building width
+(38.4 m) and the margin from the walls (2.4 m) do not change, only the granularity does.
 
-Мельче сетка выбрана вместо двух других способов уложить верхний этаж в кадр.
-Сузить верх до трёх мест — на этаже остаётся ровно шахта, дверь и лампа, и
-эскалатору, который по сверке живёт именно наверху, встать некуда. Расширить
-кадр — актёры мельчают, а весь подбор света и материалов M17 делался под
-нынешний масштаб.
+A finer grid was chosen over two other ways of fitting the top floor into the frame. Narrowing the
+top to three slots leaves exactly a shaft, a door and a lamp on the floor, and the escalator, which
+according to the check lives precisely at the top, has nowhere to go. Widening the frame makes the
+actors smaller, and all the tuning of light and materials in M17 was done for the current scale.
 
-Шаг 2.1 м держит всё, что встаёт на место: створка двери 0.84 м уезжает на свою
-ширину (1.68 м), шахта 1.2 м, выход 1.92 м.
+The 2.1 m step holds everything that occupies a slot: a 0.84 m door leaf slides by its own width
+(1.68 m), a 1.2 m shaft, a 1.92 m exit.
 
-**Эскалатор занимает два места** — своё и следующее по ходу спуска. Проём
-уходит от оси на 2.28 м, а нижняя площадка — на 2.88 м, и в один шаг сетки это
-не укладывается. Раньше не укладывалось тоже, но занималось одно место, и на
-площадку могла встать дверь; теперь занимаются оба места и на обоих этажах.
+**The escalator takes two slots** — its own and the next one in the direction of descent. The
+opening goes 2.28 m from the axis and the lower pad 2.88 m, and this does not fit into one grid
+step. It did not fit before either, but one slot was taken, and a door could stand on the pad; now
+both slots are taken, on both floors.
 
-### 2. Силуэт задаётся порогом: узкая башня на широком стилобате
+### 2. The silhouette is set by a threshold: a narrow tower on a wide podium
 
-Ступени равной высоты уходят. Остаются две ширины и порог между ними —
-`wide_from`, по умолчанию двадцатый этаж:
+Equal-height steps go away. Two widths remain with a threshold between them — `wide_from`, the
+twentieth floor by default:
 
-| | Мест | Ширина | Кадр 19.2 м |
+| | Slots | Width | 19.2 m frame |
 |---|---|---|---|
-| Крыша … 19 этаж | 7 | 17.4 м | влезает с запасом 1.8 м |
-| 20 … 29 этаж | 17 | 38.4 м | вдвое шире кадра |
+| Roof … floor 19 | 7 | 17.4 m | fits with 1.8 m to spare |
+| Floor 20 … 29 | 17 | 38.4 m | twice the frame width |
 
-Это то, о чём просил игрок: верх виден целиком, нижние десять — шире экрана.
-Оригинал не скроллится по горизонтали вовсе, так что расхождение сознательное
-и записано здесь как выбор.
+This is what the player asked for: the top is visible in full, the bottom ten are wider than the
+screen. The original does not scroll horizontally at all, so the divergence is deliberate and
+recorded here as a choice.
 
-**Ламп на этаже считаем по ширине, а не по числу мест.** Правило M17 «одна
-лампа на три места» ([ADR-0023](0023-light-and-readability.md), решение 2) на
-мелкой сетке даёт наверху две лампы вместо одной: мест стало больше, а этаж
-той же ширины. Расстояние между светильниками — свойство метрическое, и считать
-его надо шириной. Считается долей: этаж во всю ширину здания получает
-`lamps_per_floor`, узкий верх — одну. Не метрами: абсолютный шаг между лампами
-не пережил бы здание других размеров, а такие собирают тесты. Числа M17 при
-этом сохраняются — наверху одна, внизу три.
+**Lamps per floor are counted by width, not by the number of slots.** The M17 rule "one lamp per
+three slots" ([ADR-0023](0023-light-and-readability.md), decision 2) on the finer grid gives two
+lamps at the top instead of one: there are more slots, but the floor is the same width. The spacing
+between fixtures is a metric property, and it must be counted by width. It is counted as a
+fraction: a floor across the full building width gets `lamps_per_floor`, the narrow top gets one.
+Not in metres: an absolute spacing between lamps would not survive a building of other dimensions,
+and the tests assemble such buildings. The M17 numbers are kept — one at the top, three at the
+bottom.
 
-### 3. Шахты перехлёстываются, и число путей растёт книзу
+### 3. Shafts overlap, and the number of paths grows toward the bottom
 
-Полосы встык уходят. Раскладка идёт сверху вниз развёрткой: на каждом уровне
-известно, сколько шахт его должны обслуживать; те, что выбрали свой `shaft_span`,
-закрываются, недостающие открываются.
+End-to-end bands go away. The layout runs top to bottom as a sweep: at each level it is known how
+many shafts should serve it; those that have used up their `shaft_span` close, the missing ones
+open.
 
-Перехлёст получается сам и получается неравным: шахты, открытые на разных
-этажах, закрываются на разных. Шахты, открытые у самого дна, обрезаются нижним
-этажом — и доходят до земли все разом, как 1–5, 1–6 и три 1–7 в оригинале.
+Overlap arises by itself and comes out unequal: shafts opened on different floors close on
+different ones. Shafts opened at the very bottom are cut off by the bottom floor — and all reach the
+ground at once, like 1–5, 1–6 and three 1–7 in the original.
 
-Сколько шахт обслуживает уровень:
+How many shafts serve a level:
 
-- крыша и этажи до `single_shaft_until` (по умолчанию 11) — **одна**; это верхняя
-  треть оригинала, его шахта 19–30;
-- ниже — растёт от двух до `shafts_max` (по умолчанию **пять**, как в оригинале)
-  к нижнему этажу.
+- the roof and floors down to `single_shaft_until` (11 by default) — **one**; this is the upper
+  third of the original, its 19–30 shaft;
+- below — grows from two to `shafts_max` (**five** by default, as in the original) toward the bottom
+  floor.
 
-Нижний этаж при этом занят на две трети: пять шахт, две двери, три лампы и
-выход — одиннадцать мест из семнадцати. Шесть остаётся обстановке M19.
+The bottom floor is then two-thirds occupied: five shafts, two doors, three lamps and the exit —
+eleven slots of seventeen. Six remain for the M19 dressing.
 
-### 4. Эскалаторы — полосой у порога, плюс гарантия на разрыве
+### 4. Escalators — a band at the threshold, plus a guarantee at a break
 
-Два правила, и второе страхует первое.
+Two rules, and the second backs up the first.
 
-**Полоса.** Эскалаторы живут там, где спуск безальтернативен, — в нижней части
-однашахтной зоны, у самого порога силуэта. Архитектурно это читается: шахта
-башни кончается над стилобатом, и вниз ведёт эскалатор. Это и есть sky lobby
-оригинала.
+**The band.** Escalators live where the descent has no alternative — in the lower part of the
+single-shaft zone, right at the silhouette threshold. Architecturally this reads: the tower's shaft
+ends above the podium, and an escalator leads down. This is the original's sky lobby.
 
-**Гарантия.** Везде, где соседние шахты не перехлестнулись, генератор обязан
-поставить эскалатор — иначе полоса ниже недостижима. Правило одно на всю
-высоту, и тест проходимости остаётся прежним.
+**The guarantee.** Wherever neighbouring shafts do not overlap, the generator must place an
+escalator — otherwise the band below is unreachable. One rule for the whole height, and the
+traversability test stays the same.
 
-**Два эскалатора на этаже — где помещается, иначе один.** Оригинал даёт по два
-(слева и справа) на 17–20 и один на 16. У нас полоса приходится на узкую часть
-в семь мест, где два эскалатора съедают четыре из них: с двумя шахтами, дверью
-и лампой это девять мест из семи. Вырождение до одного — следствие ступенчатого
-силуэта, которого у оригинала нет.
+**Two escalators per floor where they fit, otherwise one.** The original has two each (left and
+right) on 17–20 and one on 16. Our band falls on the narrow part of seven slots, where two
+escalators eat four of them: with two shafts, a door and a lamp that is nine slots out of seven.
+Degenerating to one is a consequence of the stepped silhouette, which the original does not have.
 
-### 5. Внутренняя стена глухая, но проходимость проверяется после неё
+### 5. The interior wall is solid, but traversability is checked after it
 
-Этаж делится надвое стеной от пола до потолка. Сквозь неё не проходят ни люди,
-ни пули; агент за стеной не стреляет. Перейти можно только через другой этаж —
-лифтом или эскалатором.
+A floor is divided in two by a floor-to-ceiling wall. Neither people nor bullets pass through it; an
+agent behind the wall does not shoot. Crossing is possible only via another floor — by elevator or
+escalator.
 
-Стена стоит **на границе между местами, а не на месте**: даже метровая, она уже
-шага сетки, и отнимать под неё целое место незачем.
+The wall stands **on the boundary between slots, not on a slot**: even a metre thick, it is narrower
+than the grid step, and there is no reason to take a whole slot for it.
 
-Резать этаж она обязана только для ходьбы, но не для перекрытия. Сегодня куски
-этажа считаются одним счётом — по проёмам (`BuildingPlan.spans_between`), и из
-него же берётся геометрия плиты. Счёта становится два: **плита режется
-проёмами, проходимость — проёмами и стенами.** Разъехаться им нельзя, поэтому
-оба остаются в `BuildingPlan`, рядом.
+It must cut the floor only for walking, not for the slab. Today floor pieces are counted with one
+count — by openings (`BuildingPlan.spans_between`), and the slab geometry is taken from it too. There
+become two counts: **the slab is cut by openings, traversability by openings and walls.** They must
+not diverge, so both stay in `BuildingPlan`, side by side.
 
-**Стена, запирающая игрока, снимается.** Генератор ставит стены, считает
-достижимость и убирает те, из-за которых документ или выход стали недостижимы.
-Проверять заранее дешевле нельзя: достижимость зависит от всех стен разом, а не
-от каждой по отдельности.
+**A wall that locks the player in is removed.** The generator places walls, computes reachability
+and removes those that made a document or the exit unreachable. Checking in advance more cheaply is
+not possible: reachability depends on all walls at once, not on each separately.
 
-**Стена держит зазор в полшага сетки** от проёмов, площадок эскалатора, дверей
-и выхода. Толщина у неё почти метр (см. ниже), и вставшая вплотную к проёму она
-не оставляет места, чтобы стоять; на эскалаторе это ломалось дважды — площадкой
-сверху и площадкой приземления этажом ниже, — и граф достижимости терял связь.
+**The wall keeps a clearance of half a grid step** from openings, escalator pads, doors and the
+exit. It is almost a metre thick (see below), and placed right against an opening it leaves no room
+to stand; at an escalator this broke twice — with the upper pad and with the landing pad a floor
+below — and the reachability graph lost a connection.
 
-**Толщина — почти метр, а не толщина наружной стены.** На первых кадрах вехи
-стена в 0.48 м не отличалась от пилястры в 0.45: «здесь не пройти» читалось
-украшением. Читаемость аркады важнее правдоподобия
-([ADR-0019](0019-3d-pivot.md)), а мест это не стоит — стена стоит на границе
-между местами.
+**Thickness — almost a metre, not the thickness of the outer wall.** In the milestone's first frames
+a 0.48 m wall was indistinguishable from a 0.45 m pilaster: "you cannot pass here" read as
+decoration. Arcade readability matters more than plausibility ([ADR-0019](0019-3d-pivot.md)), and it
+costs no slots — the wall stands on the boundary between slots.
 
-### 6. Двухэтажная кабина — жёсткая пара, редкая и только при живой альтернативе
+### 6. The double-deck cab is a rigid pair, rare and only with a live alternative
 
-Два яруса скреплены и едут вместе, обслуживая два этажа разом. Otto входит в
-любой; в соседнем может ехать агент. Это настоящий double-deck, а не две
-независимые кабины в одной шахте: независимая вторая кабина — подвижная граница
-шахты, и граф достижимости перестал бы быть статическим.
+Two decks are fastened together and ride together, serving two floors at once. Otto enters either;
+an agent may ride in the other. This is a real double-deck, not two independent cabs in one shaft:
+an independent second cab is a moving boundary of the shaft, and the reachability graph would stop
+being static.
 
-`ElevatorMotion` не меняется — это одно движение и два тела. Меняются границы,
-которые ему передают: пара выше одиночной кабины на высоту этажа, и снизу
-диапазон хода укорачивается, иначе нижний ярус ушёл бы под дно шахты.
+`ElevatorMotion` does not change — it is one movement and two bodies. What changes are the bounds
+passed to it: the pair is taller than a single cab by a floor height, and the travel range is
+shortened at the bottom, otherwise the lower deck would go below the shaft bottom.
 
-**Встречается она редко.** В оригинале такая шахта одна на здание, и это
-диковина, а не норма. Правила:
+**It occurs rarely.** In the original there is one such shaft per building, and it is a curiosity,
+not the norm. Rules:
 
-- не больше одной двухэтажной шахты на здание;
-- не в каждом здании — примерно в одном из трёх, по сиду;
-- только в шахте, у которой на всех её этажах есть параллельная соседка.
+- no more than one double-deck shaft per building;
+- not in every building — about one in three, by seed;
+- only in a shaft that has a parallel neighbour on all of its floors.
 
-Последнее условие важнее первых двух. Пара занимает на этаж больше и ходит по
-укороченному диапазону; будь такая шахта единственной на своих этажах, спуск
-мог бы упереться. Ставим её только туда, где есть чем воспользоваться взамен, —
-то есть в стилобат, где шахт несколько. В оригинале двухэтажная кабина стояла
-там же, в нижних загруженных шахтах.
+The last condition matters more than the first two. The pair takes one more floor and travels a
+shortened range; were such a shaft the only one on its floors, the descent could get stuck. We put
+it only where there is something to use instead — that is, in the podium, where there are several
+shafts. In the original the double-deck cab stood there too, in the busy lower shafts.
 
-Одно из трёх — число выбранное, не замеренное и оригиналом не подтверждённое.
+One in three is a chosen number, not measured and not confirmed by the original.
 
-### 7. В шахте стоит столб света
+### 7. A light column stands in the shaft
 
-Долг с M12: в 2D столб света в шахте был единственным, что показывало путь на
-погашенном здании. В греев-боксе его нет, и шахту держат только индикаторы
-кабины.
+A debt from M12: in 2D the light column in the shaft was the only thing showing the way in a
+darkened building. The greybox has none, and the shaft is held only by the cab indicators.
 
-Источник шахты — не лампа этажа: он не гаснет от выстрела и не участвует в
-зонах темноты ([ADR-0023](0023-light-and-readability.md), решение 2). Темнота
-решает, видят ли агенты Otto; шахта же должна читаться всегда, иначе погашенное
-здание перестаёт быть проходимым на глаз.
+The shaft's source is not a floor lamp: it does not go out from a shot and does not take part in the
+darkness zones ([ADR-0023](0023-light-and-readability.md), decision 2). Darkness decides whether
+agents see Otto; the shaft must always read, otherwise a darkened building stops being traversable
+by eye.
 
-Бюджет кадра — прежний: 16.6 мс, сейчас занято 2.0.
+The frame budget is the same: 16.6 ms, 2.0 currently used.
 
-### 8. Эскалатор строится конструкцией
+### 8. The escalator is built as a structure
 
-Две коробки полотна заменяются балюстрадой, ступенями, площадками сверху и
-снизу и обрамлением проёма. Ступени — рельеф, а не анимация: свет M17 кладётся
-на геометрию, и ради этого пивот и затевался
-([ADR-0019](0019-3d-pivot.md)).
+The two belt boxes are replaced by a balustrade, steps, upper and lower pads and a framing of the
+opening. The steps are relief, not animation: the M17 light falls on geometry, and that is what the
+pivot was undertaken for ([ADR-0019](0019-3d-pivot.md)).
 
-### 9. Бот ищет путь по графу здания, а не спускается жадно
+### 9. The bot finds its way over the building graph rather than descending greedily
 
-До M18 здание гарантировало жадный спуск: шахты шли встык, на каждом стыке
-стоял эскалатор, и «ехать вниз ближайшей шахтой» работало всегда. Перехлёст это
-правило отменяет. Теперь шахт на этаже до пяти, первая может на нём же и
-кончаться, эскалатор ходит в обе стороны, а глухая стена делит этаж надвое.
+Until M18 the building guaranteed a greedy descent: shafts went end to end, an escalator stood at
+every junction, and "ride down the nearest shaft" always worked. Overlap cancels that rule. Now there
+are up to five shafts per floor, the first may end on that very floor, the escalator goes both ways,
+and a solid wall divides the floor in two.
 
-Отдельно всплыло свойство, которого раньше не было: **кусок этажа, с которого
-нет хода вниз**. Шахта кончилась, рядом только проём эскалатора — и спускаться
-надо, уехав обратно наверх. Здание при этом проходимо: связи двусторонние, и
-граф достижимости это знает. Заставлять генератор такого не выпускать оказалось
-дороже пользы — продление шахт рушило заданное число путей на этаже, а
-обязательный эскалатор съедал места под лампы и двери.
+A property surfaced separately that did not exist before: **a floor piece from which there is no way
+down**. The shaft has ended, there is only an escalator opening nearby — and to descend you have to
+ride back up first. The building is still traversable: the links are two-way, and the reachability
+graph knows it. Forcing the generator not to produce this turned out to cost more than it was worth —
+extending shafts broke the set number of paths per floor, and a mandatory escalator ate slots for
+lamps and doors.
 
-**Шахта делит этаж, и половины сообщаются через стоящую кабину.** Проём режет
-этаж на куски, и перейти из куска в кусок можно, только пока кабина перекрывает
-проём собой, — как в оригинале. До перехлёста это почти не встречалось: шахта
-на этаже была одна, и обходить её было незачем. Теперь это полноправный ход
-графа, и бот им пользуется: дожидается кабины и проходит насквозь.
+**A shaft divides a floor, and the halves connect through a standing cab.** The opening cuts the
+floor into pieces, and crossing from piece to piece is possible only while the cab covers the
+opening with itself — as in the original. Before overlap this almost never occurred: there was one
+shaft per floor, and there was no reason to get around it. Now it is a full-fledged move of the
+graph, and the bot uses it: it waits for the cab and walks straight through.
 
-Поэтому путь ищет бот, а не гарантирует генератор. `BuildingRoute` отдаёт
-подписанный граф — куски этажей и переходы между ними с указанием, чем
-воспользоваться, — и первый ход к цели. Считается граф один раз на здание,
-решение принимается каждый кадр: идущий промахивается мимо кабины, дерётся и
-падает, и запомненный маршрут устарел бы к следующему кадру.
+So the path is found by the bot, not guaranteed by the generator. `BuildingRoute` returns a labelled
+graph — floor pieces and the transitions between them with what to use — and the first move toward
+the goal. The graph is computed once per building, the decision is made every frame: a walker misses
+the cab, fights and falls, and a remembered route would be stale by the next frame.
 
-Это не только про бота. Бот — единственная наша проверка здания целиком
-([`docs/testing.md`](../testing.md)), и он обязан уметь то же, что умеет игрок.
-Игрок, доехавший в тупик, тоже поедет назад.
+This is not only about the bot. The bot is our only check of the building as a whole
+([`docs/testing.md`](../testing.md)), and it must be able to do what the player can. A player who has
+ridden into a dead end will ride back too.
 
-### 10. Веха делится на M18a и M18b
+### 10. The milestone splits into M18a and M18b
 
-Семь вещей разом, три из которых меняют раскладку. Если проходимость сломается,
-искать причину среди семи правок дороже, чем среди трёх.
+Seven things at once, three of which change the layout. If traversability breaks, finding the cause
+among seven changes costs more than among three.
 
-- **M18a — раскладка:** сетка мест, силуэт порогом, перехлёст шахт, эскалаторы
-  полосой, внутренние стены. Всё, что трогает граф достижимости, — одним куском
-  и под одним прогоном бота.
-- **M18b — геометрия и вид:** эскалатор конструкцией, столб света в шахте,
-  двухэтажная кабина.
+- **M18a — layout:** slot grid, threshold silhouette, overlapping shafts, escalators as a band,
+  interior walls. Everything that touches the reachability graph — in one piece and under one bot run.
+- **M18b — geometry and look:** escalator as a structure, light column in the shaft, double-deck cab.
 
-Обе половины кончаются играбельной сборкой — правило пивота
-([ADR-0019](0019-3d-pivot.md)).
+Both halves end with a playable build — the pivot rule ([ADR-0019](0019-3d-pivot.md)).
 
-## Чего в вехе нет
+## What is not in the milestone
 
-- **Неравных шахт по буквальной раскладке оригинала.** Берём правило («чем ниже,
-  тем больше путей», перехлёст, пять шахт внизу), а не список 1–5, 1–6, 1–7.
-  Здание у нас генерируется, и списком его не задать.
-- **Дверей кабины на две стороны.** Сверка их называет, но у нашей кабины дверей
-  нет вовсе: Otto входит сбоку.
-- **Ступеней, которые едут.** Рельеф — да, анимация полотна — нет.
-- **Обстановки этажа.** Мебель, трубы, таблички — M19.
-- **Роста числа шахт от здания к зданию.** Число путей — свойство здания, а не
-  сложности; сложность растёт злостью агентов ([ADR-0016](0016-combat-balance.md)).
+- **Unequal shafts by the original's literal layout.** We take the rule ("the lower, the more paths",
+  overlap, five shafts at the bottom), not the list 1–5, 1–6, 1–7. Our building is generated, and it
+  cannot be set by a list.
+- **Cab doors on two sides.** The check names them, but our cab has no doors at all: Otto enters
+  from the side.
+- **Steps that move.** Relief — yes, belt animation — no.
+- **Floor dressing.** Furniture, pipes, signs — M19.
+- **Growth of the number of shafts from building to building.** The number of paths is a property of
+  the building, not of difficulty; difficulty grows by agent anger ([ADR-0016](0016-combat-balance.md)).
 
-## Как проверяем
+## How we check
 
-- На любом сиде уровни выше порога влезают в кадр целиком, ниже — не влезают.
-- Число шахт, обслуживающих этаж, не убывает сверху вниз и доходит до пяти.
-- Соседние шахты либо перехлёстываются, либо их стык закрыт эскалатором.
-- Стена не запирает ни документ, ни выход: на сотнях сидов достижимость цела.
-- Двухэтажная шахта, если она выпала, имеет параллельную соседку на всех своих
-  этажах, и её диапазон хода держит оба яруса внутри шахты.
-- Бот проходит любое здание на трёх жизнях — прежний тест, новая раскладка и новый способ искать путь.
-- Бюджет кадра со столбами света в шахтах остаётся под 16.6 мс.
+- On any seed, levels above the threshold fit in the frame entirely, those below do not.
+- The number of shafts serving a floor does not decrease from top to bottom and reaches five.
+- Neighbouring shafts either overlap or their junction is closed by an escalator.
+- A wall locks neither a document nor the exit: on hundreds of seeds reachability is intact.
+- A double-deck shaft, if it came up, has a parallel neighbour on all its floors, and its travel range
+  keeps both decks inside the shaft.
+- The bot completes any building on three lives — the same test, a new layout and a new way of
+  finding the path.
+- The frame budget with light columns in the shafts stays under 16.6 ms.

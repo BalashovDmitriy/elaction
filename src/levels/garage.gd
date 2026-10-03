@@ -1,111 +1,113 @@
 class_name Garage
 extends Node3D
 
-## Подземный паркинг — нижний этаж здания (ADR-0038, решение 3).
+## Underground garage — the bottom floor of the building (ADR-0038, decision 3).
 ##
-## До M24b нижний этаж был коридором с бетонной стеной и полосами на полу. Здесь
-## он — паркинг: задней стены нет, за плоскостью игры открывается зал глубиной
-## в комнату, в нём — места с чужими машинами носом к дальней стене, колонны по
-## передней линии мест, балки, короб вентиляции и люминесцентные светильники,
-## разметка, пятна масла, номера на колоннах и знаки. Коридор — проезд: по нему
-## и уезжает машина Otto — в ворота в левом торце, за которыми пандус наверх.
+## Until M24b the bottom floor was a corridor with a concrete wall and stripes on the floor.
+## Here it is a garage: there is no back wall, behind the play plane opens a hall as deep
+## as a room, with bays holding other people's cars nose to the far wall, columns along
+## the front line of the bays, beams, a ventilation duct and fluorescent fixtures,
+## markings, oil stains, numbers on the columns and signs. The corridor is the driveway:
+## Otto's car leaves along it — through the gate in the left end wall, with a ramp up behind it.
 ##
-## Только вид, тел здесь нет: всё стоит за плоскостью игры или над головой.
-## Настоящего света паркинг не добавляет — светят лампы этажа, как везде; трубки
-## светильников — эмиссия и гаснут вместе с зоной своей лампы ([method darken]).
+## Looks only, there are no bodies here: everything stands behind the play plane or overhead.
+## The garage adds no real light — the floor lamps shine, as everywhere; the fixture
+## tubes are emissive and go dark together with their lamp's zone ([method darken]).
 ##
-## Раскладка — статическими функциями: где колонны, места и чужие машины, тесты
-## проверяют без сцены, на любом сиде.
+## Layout is done by static functions: tests check where the columns, bays and other cars
+## are without a scene, on any seed.
 ##
-## Ворота в левом торце — [GarageGate], узел [member gate]; поднимает их
-## сдача здания через [method open_gate].
+## The gate in the left end wall is [GarageGate], node [member gate]; finishing
+## the building raises it via [method open_gate].
 
-## Стенка у ворот: от левой стены до первой колонны зал закрыт — угол, на
-## котором висят вывеска и стрелка, м.
+## Wall by the gate: from the left wall to the first column the hall is closed — the corner
+## where the sign and the arrow hang, m.
 const GATE_BAY: float = 0.8
-## Колонна: сечение и середина по глубине — сразу за линией бывшей задней
-## стены, передняя грань за спиной Otto с запасом.
+## Column: cross-section and middle in depth — right behind the line of the former back
+## wall, the front face behind Otto's back with a margin.
 const COLUMN: float = 0.5
 const COLUMN_Z: float = WorldSpace.BACK_WALL_Z - 0.35
-## Шаг колонн — два места по полтора шага сетки; колонна не встаёт ближе
-## этого к ядру шахты или стене, м.
+## Column pitch — two bays of one and a half grid steps; a column does not stand closer
+## than this to a shaft core or a wall, m.
 const COLUMN_PITCH: float = Proportions.SLOT * 3.0
 const COLUMN_CLEARANCE: float = 0.15
-## Место: не уже этого, м. Между колоннами выходит два места по 2.45.
+## Bay: not narrower than this, m. Between the columns there are two bays of 2.45.
 const BAY_MIN: float = 2.4
-## Места по глубине: от передней линии до колёсного упора, м.
+## Bays in depth: from the front line to the wheel stop, m.
 const BAY_FRONT_Z: float = WorldSpace.BACK_WALL_Z - 0.25
 const BAY_BACK_Z: float = -5.6
-## Дальняя стена зала: середина и толщина, м.
+## Far wall of the hall: middle and thickness, m.
 const FAR_Z: float = -7.2
 const FAR_THICKNESS: float = 0.2
 
-## Машина на месте: ширина, до которой раздаётся модель пака (у пака она сжата
-## до зазора между стеной и Otto, [CarModel]), и середина по глубине.
+## Car in a bay: the width the pack model is stretched to (in the pack it is squeezed
+## to the gap between the wall and Otto, [CarModel]), and the middle in depth.
 const CAR_WIDTH: float = 1.62
 const CAR_Z: float = -3.35
-## Доля занятых мест.
+## Share of occupied bays.
 const PARKED_SHARE: float = 0.65
 
-## Балка: ширина, насколько опущена под перекрытие, м.
+## Beam: width, how far it hangs below the slab, m.
 const BEAM := Vector2(0.4, 0.4)
-## Балка через проезд не идёт ближе этого к лампе: шнур лампы прошёл бы сквозь.
+## A beam across the driveway does not come closer than this to a lamp: the lamp cord would
+## pass through it.
 const BEAM_LAMP_CLEARANCE: float = 0.7
-## Под потолком всё видно только ниже полосы, которую закрывает кромка
-## перекрытия ([method FloorSigns.hidden_band]), и полоса эта тем шире, чем
-## глубже вещь. Поэтому ряды идут не по высоте, а по отступу от кромки на
-## экране: светильники — у передней линии, сразу под кромкой; трубы — за ними
-## чуть ниже; короб вентиляции — в глубине ещё ниже. Поставь их всех «сразу
-## под кромкой своей глубины» — и на экране они легли бы в одну линию, а
-## передний закрыл бы остальные (первый кадр вехи: трубка светильника целиком
-## за красной трубой).
+## Under the ceiling everything is visible only below the band hidden by the slab
+## edge ([method FloorSigns.hidden_band]), and this band is wider the
+## deeper the thing is. So the rows go not by height but by offset from the edge on
+## screen: fixtures — at the front line, right under the edge; pipes — behind them
+## slightly lower; the ventilation duct — deeper and lower still. Put them all "right
+## under the edge of their depth" — and on screen they would line up in one row, with
+## the front one covering the rest (the milestone's first shot: a fixture tube entirely
+## behind the red pipe).
 ##
-## Светильник: корпус, рассеиватель, глубина ряда, м.
+## Fixture: housing, diffuser, row depth, m.
 const FIXTURE := Vector3(1.3, 0.07, 0.16)
 const DIFFUSER := Vector3(1.22, 0.05, 0.1)
 const FIXTURE_Z: float = WorldSpace.BACK_WALL_Z + 0.06
-## Светильник не встаёт перед лампой этажа ближе этого, м: абажур закрыл бы его.
+## A fixture does not stand in front of a floor lamp closer than this, m: the shade would
+## cover it.
 const FIXTURE_LAMP_CLEARANCE: float = 1.0
-## Пятно света от трубки на полу места: ширина и глубина, м, и яркость.
+## Light pool of a tube on the bay floor: width and depth, m, and brightness.
 const POOL := Vector2(2.3, 2.6)
 const POOL_ENERGY: float = 0.22
-## Свет трубки: конус вниз и в зал, на машину места. Только над занятым
-## местом — светить в пустое место незачем, а источников в кадре и так много
-## (бюджет — ADR-0010, пункт 1). Без тени — теней в здании кладут только лампы
-## (ADR-0023, решение 3), — слабый и короткий: до перекрытия сверху он не
-## достаёт. Гаснет с зоной своей лампы и вне кадра, как лампы. Без него зал за
-## проездом оставался синей чернотой, и машины в нём не читались.
+## Tube light: a cone down and into the hall, onto the bay's car. Only above an occupied
+## bay — there is no point lighting an empty one, and there are already many sources in
+## the frame (budget — ADR-0010, item 1). No shadow — only lamps cast shadows in the
+## building (ADR-0023, decision 3) — weak and short: it does not reach the slab
+## above. Goes dark with its lamp's zone and off-frame, like the lamps. Without it the hall
+## behind the driveway stayed blue blackness, and the cars in it did not read.
 const TUBE_LIGHT_ENERGY: float = 1.6
 const TUBE_LIGHT_RANGE: float = 4.6
 const TUBE_LIGHT_ANGLE: float = 62.0
-## Наклон конуса от вертикали в глубину зала, градусы.
+## Tilt of the cone from vertical into the depth of the hall, degrees.
 const TUBE_LIGHT_TILT: float = 38.0
-## Над машиной Otto у ворот светильник светит не в зал, а на проезд: машина
-## стоит перед ним, и в темноте у торца её было не разглядеть.
+## Above Otto's car at the gate the fixture shines not into the hall but onto the driveway:
+## the car stands in front of it, and in the dark by the end wall it could not be made out.
 const EXIT_CAR_TILT: float = -24.0
-## Трубы вдоль зала: радиус, середина по глубине и отступ от кромки на
-## экране, м. Идут сквозь колонны — там их закрывает бетон.
+## Pipes along the hall: radius, middle in depth and offset from the edge on
+## screen, m. They run through the columns — there the concrete covers them.
 const PIPE_RADIUS: float = 0.06
 const PIPE_Z: float = COLUMN_Z + 0.1
 const PIPE_DROP: float = 0.12
-## Короб вентиляции: сечение, середина по глубине, отступ от кромки, м.
+## Ventilation duct: cross-section, middle in depth, offset from the edge, m.
 const DUCT := Vector2(0.5, 0.28)
 const DUCT_Z: float = -2.4
 const DUCT_DROP: float = 0.14
 
-## Ядро шахты — бетонная стена вокруг портала и кнопок, м сверх них.
+## Shaft core — a concrete wall around the portal and buttons, m beyond them.
 const CORE_MARGIN: float = 0.15
-## Простенок под табличкой этажа: насколько шире таблички влево, м.
+## Pier under the floor sign: how much wider than the sign to the left, m.
 const PIER_MARGIN: float = 0.35
 
-## Цвета: бетон, краска разметки, упоры, пятна, светильники.
+## Colours: concrete, marking paint, wheel stops, stains, fixtures.
 const CONCRETE := Color(0.72, 0.72, 0.7)
 const PAINT_WHITE := Color(0.72, 0.72, 0.68)
 const PAINT_YELLOW := Color(0.82, 0.62, 0.1)
 const PAINT_BLACK := Color(0.05, 0.05, 0.05)
-## Паркинг по типу здания (ADR-0058, решение 5): тон бетона — чистый светлый у
-## отеля, холодный у офиса, грязный у жилого дома; полоса краски по дальней
-## стене — бордовая, синяя, выцветшая охра. По [enum BuildingIdentity.Kind].
+## Garage by building kind (ADR-0058, decision 5): concrete tone — clean light for the
+## hotel, cold for the office, dirty for the residential building; the paint band on the far
+## wall — burgundy, blue, faded ochre. By [enum BuildingIdentity.Kind].
 const KIND_CONCRETE: Array[Color] = [
 	Color(1.04, 1.0, 0.94), Color(0.96, 1.0, 1.04), Color(0.78, 0.76, 0.7)
 ]
@@ -123,15 +125,15 @@ const FIXTURE_BODY := Color(0.7, 0.71, 0.72)
 const HEADLIGHT_OFF := Color(0.6, 0.6, 0.56)
 const TAILLIGHT_OFF := Color(0.32, 0.04, 0.03)
 
-## Надпись уровня паркинга на простенке у таблички этажа: та же «P», что на
-## табличке этажа, табло шахт и в HUD.
+## Garage level label on the pier by the floor sign: the same "P" as on the
+## floor sign, the shaft indicator boards and in the HUD.
 const LEVEL_MARK := FloorSigns.PARKING_MARK
 
-## Соль жребия машин: своя, чтобы паркинг не ходил в ногу с раскладкой.
+## Salt of the car draw: its own, so the garage does not move in step with the layout.
 const SALT: int = 0x6A2A_6E00
 
 
-## Светильник над местом: трубка, пятно на полу и, над занятым местом, свет.
+## Fixture above a bay: tube, floor light pool and, above an occupied bay, light.
 class Fixture:
 	extends RefCounted
 
@@ -141,22 +143,22 @@ class Fixture:
 	var lit: bool = true
 
 
-## Чужая машина на месте: где, какая и каким концом к проезду.
+## Someone else's car in a bay: where, which one and which end faces the driveway.
 class Parked:
 	extends RefCounted
 
 	var x: float = 0.0
 	var choice: CarModel.Choice = CarModel.Choice.new()
-	## Носом к дальней стене — к проезду смотрит багажник.
+	## Nose to the far wall — the boot faces the driveway.
 	var nose_in: bool = true
 
 
-## Материал пятна света — один на все пятна.
+## Light pool material — one for all pools.
 static var _pool: StandardMaterial3D = null
 
-## Ворота в левом торце: штора, короб, вывеска EXIT и пандус за ними.
+## The gate in the left end wall: shutter, housing, EXIT sign and the ramp behind them.
 var gate: GarageGate = null
-## Отделка паркинга по типу здания (ADR-0058, решение 5).
+## Garage finish by building kind (ADR-0058, decision 5).
 var dressing: GarageDressing = null
 
 var _rules: BuildingRules = null
@@ -166,32 +168,32 @@ var _surface: float = 0.0
 var _top: float = 0.0
 var _inner := Vector2.ZERO
 var _concrete: StandardMaterial3D = null
-## Светильники по лампам этажа: x лампы → [Fixture] её зоны.
+## Fixtures by floor lamps: lamp x → [Fixture] of its zone.
 var _tubes: Dictionary = {}
-## Все светильники — для [method tube_lit_at] и отбора света по кадру.
+## All fixtures — for [method tube_lit_at] and picking light by frame.
 var _fixtures: Array[Fixture] = []
-## В кадре ли этаж: свет трубок горит только тогда ([method show_lights]).
+## Whether the floor is in frame: tube light is on only then ([method show_lights]).
 var _in_view: bool = true
 var _lamp_xs := PackedFloat64Array()
-## Раскладка зала, посчитанная один раз на сборку: её спрашивает каждая часть.
+## Hall layout computed once per build: every part asks for it.
 var _cores: Array[Vector2] = []
 var _columns := PackedFloat64Array()
 var _bays: Array[Vector2] = []
 var _parked: Array[Parked] = []
 
 
-## Середина ворот по горизонтали: в толще левой стены нижнего этажа.
+## Horizontal middle of the gate: inside the left wall of the bottom floor.
 static func gate_x(rules: BuildingRules) -> float:
 	return rules.floor_span(rules.floors - 1).x + BuildingShell.WALL_WIDTH * 0.5
 
 
-## Внутренний пролёт нижнего этажа — от стены до стены.
+## Inner span of the bottom floor — from wall to wall.
 static func inner_span(rules: BuildingRules) -> Vector2:
 	var bounds := rules.floor_span(rules.floors - 1)
 	return Vector2(bounds.x + BuildingShell.WALL_WIDTH, bounds.y - BuildingShell.WALL_WIDTH)
 
 
-## Ядра шахт, спускающихся в подвал: портал с наличником и панель кнопок.
+## Cores of the shafts that go down to the basement: portal with a casing and a button panel.
 static func cores(rules: BuildingRules, plan: BuildingPlan) -> Array[Vector2]:
 	var bottom := rules.floors - 1
 	var found: Array[Vector2] = []
@@ -208,17 +210,17 @@ static func cores(rules: BuildingRules, plan: BuildingPlan) -> Array[Vector2]:
 	return found
 
 
-## Простенок под табличкой этажа: она висит у задней стены, и в открытом зале
-## ей нужна стена позади.
+## Pier under the floor sign: the sign hangs at the back wall, and in the open hall
+## it needs a wall behind it.
 static func pier(rules: BuildingRules) -> Vector2:
 	var sign_x := FloorSigns.centre_on(rules, rules.floors - 1).x
 	var left := sign_x - Proportions.FLOOR_SIGN.x * 0.5 - PIER_MARGIN
 	return Vector2(left, inner_span(rules).y)
 
 
-## Всё, что закрывает зал с передней линии: стенка у ворот, ядра шахт,
-## простенок таблички, внутренние стены и пролёты эскалаторов. Колонн и мест
-## здесь нет.
+## Everything that closes the hall from the front line: the wall by the gate, shaft cores,
+## the sign pier, inner walls and escalator spans. Columns and bays are
+## not here.
 static func busy_spans(rules: BuildingRules, plan: BuildingPlan) -> Array[Vector2]:
 	var bottom := rules.floors - 1
 	var inner := inner_span(rules)
@@ -234,8 +236,8 @@ static func busy_spans(rules: BuildingRules, plan: BuildingPlan) -> Array[Vector
 	return busy
 
 
-## Колонны передней линии: по сетке с шагом [constant COLUMN_PITCH], кроме
-## тех, что встали бы в ядро шахты, в стену или у ворот.
+## Front line columns: on a grid with pitch [constant COLUMN_PITCH], except
+## those that would stand in a shaft core, in a wall or by the gate.
 static func column_xs(rules: BuildingRules, plan: BuildingPlan) -> PackedFloat64Array:
 	var inner := inner_span(rules)
 	var busy := busy_spans(rules, plan)
@@ -253,8 +255,8 @@ static func column_xs(rules: BuildingRules, plan: BuildingPlan) -> PackedFloat64
 	return found
 
 
-## Места паркинга: пары «левый край, правый край» между колоннами и стенами,
-## не уже [constant BAY_MIN].
+## Garage bays: "left edge, right edge" pairs between columns and walls,
+## not narrower than [constant BAY_MIN].
 static func bays(rules: BuildingRules, plan: BuildingPlan) -> Array[Vector2]:
 	var blocks := busy_spans(rules, plan)
 	for x in column_xs(rules, plan):
@@ -270,10 +272,10 @@ static func bays(rules: BuildingRules, plan: BuildingPlan) -> Array[Vector2]:
 	return found
 
 
-## Куда чужой машине нельзя: к выходу и к машине Otto — к её месту
-## ([method ExitCar.spot]) и полосе у ворот ([method ExitCar.parked_span]), с
-## зазором. Машина Otto стоит в проезде, чужие — в зале, но в кадре они одна
-## над другой, и место Otto должно читаться свободным.
+## Where another car may not go: near the exit and Otto's car — its spot
+## ([method ExitCar.spot]) and the strip by the gate ([method ExitCar.parked_span]), with
+## a clearance. Otto's car stands in the driveway, the others in the hall, but in the frame
+## they are one above the other, and Otto's spot must read as free.
 static func keep_out(rules: BuildingRules, plan: BuildingPlan) -> Array[Vector2]:
 	var exit_half := Proportions.EXIT_WIDTH * 0.5
 	var spot := ExitCar.spot(plan.exit_x, rules, plan)
@@ -289,7 +291,7 @@ static func keep_out(rules: BuildingRules, plan: BuildingPlan) -> Array[Vector2]
 	)
 
 
-## Чужие машины здания: жребий по сиду, на местах [method bays], мимо
+## The building's other cars: a draw by seed, in bays [method bays], avoiding
 ## [method keep_out].
 static func parked(rules: BuildingRules, plan: BuildingPlan, building_seed: int) -> Array[Parked]:
 	var rng := RandomNumberGenerator.new()
@@ -297,11 +299,11 @@ static func parked(rules: BuildingRules, plan: BuildingPlan, building_seed: int)
 	var banned := keep_out(rules, plan)
 	var found: Array[Parked] = []
 	for bay in bays(rules, plan):
-		# Жребий тянется на каждое место, занятое или нет: иначе правка
-		# запретной зоны переставила бы машины по всему паркингу.
+		# The draw is taken for every bay, occupied or not: otherwise a change
+		# of the keep-out zone would rearrange cars throughout the garage.
 		var roll := rng.randf()
-		# Красная — машина Otto в первом здании: чужие её не повторяют. Модель и
-		# краска — по типу здания (ADR-0058, решение 4).
+		# Red is Otto's car in the first building: the others do not repeat it. Model and
+		# paint — by building kind (ADR-0058, decision 4).
 		var drawn := CarModel.draw(rng, rules.kind, [0])
 		var nose_in := rng.randf() < 0.75
 		if roll > PARKED_SHARE or bay.y - bay.x < CAR_WIDTH + 0.4:
@@ -320,7 +322,7 @@ static func parked(rules: BuildingRules, plan: BuildingPlan, building_seed: int)
 	return found
 
 
-## Собирает паркинг на нижнем этаже.
+## Builds the garage on the bottom floor.
 func build(rules: BuildingRules, plan: BuildingPlan, building_seed: int) -> void:
 	_rules = rules
 	_plan = plan
@@ -348,20 +350,20 @@ func build(rules: BuildingRules, plan: BuildingPlan, building_seed: int) -> void
 	add_child(gate)
 	gate.build(rules, building_seed)
 	_hang_signs()
-	# Паркинг по типу здания (ADR-0058, решение 5).
+	# Garage by building kind (ADR-0058, decision 5).
 	dressing = GarageDressing.new()
 	add_child(dressing)
 	dressing.build(rules, plan, building_seed)
-	# Тёмному этажу ламп не дают вовсе ([method BuildingRules.lamps_on]), и
-	# гасить по зонам ламп там нечего: гаснут все светильники разом.
+	# A dark floor gets no lamps at all ([method BuildingRules.lamps_on]), and
+	# there is nothing to darken by lamp zones: all fixtures go dark at once.
 	if rules.is_unlit(_bottom):
 		for fixture in _fixtures:
 			_put_out(fixture)
 
 
-## Гасит трубки в зоне лампы, ближайшей к [param x] — туда, где она висела.
-## Зовёт уровень, когда лампа нижнего этажа упала: зона темна, и светильник
-## над ней гореть не должен.
+## Darkens the tubes in the zone of the lamp closest to [param x] — where it hung.
+## Called by the level when a bottom floor lamp has fallen: the zone is dark, and the fixture
+## above it must not be lit.
 func darken(x: float) -> void:
 	var nearest := _nearest_lamp(x)
 	if is_nan(nearest):
@@ -378,7 +380,7 @@ func _put_out(fixture: Fixture) -> void:
 		fixture.light.visible = false
 
 
-## Горит ли трубка светильника над [param x]; false — светильника там нет.
+## Whether the fixture tube above [param x] is lit; false — there is no fixture there.
 func tube_lit_at(x: float) -> bool:
 	for fixture in _fixtures:
 		if absf(fixture.tube.position.x - x) <= FIXTURE.x * 0.5:
@@ -386,8 +388,8 @@ func tube_lit_at(x: float) -> bool:
 	return false
 
 
-## Свет трубок горит, только пока нижний этаж в кадре — тем же правилом, что
-## лампы ([VisibleFloors]); зовёт уровень.
+## Tube light is on only while the bottom floor is in frame — by the same rule as
+## the lamps ([VisibleFloors]); called by the level.
 func show_lights(in_view: bool) -> void:
 	if in_view == _in_view:
 		return
@@ -397,7 +399,7 @@ func show_lights(in_view: bool) -> void:
 			fixture.light.visible = in_view and fixture.lit
 
 
-## Сколько светильников светят по-настоящему — для тестов бюджета.
+## How many fixtures cast real light — for budget tests.
 func lights() -> Array[SpotLight3D]:
 	var found: Array[SpotLight3D] = []
 	for fixture in _fixtures:
@@ -406,17 +408,17 @@ func lights() -> Array[SpotLight3D]:
 	return found
 
 
-## Поднимает штору ворот за [param duration] секунд под мотор ворот — см.
-## [method GarageGate.open]. Звук ворот играет здесь, сдача здания его не
-## повторяет.
+## Raises the gate shutter over [param duration] seconds to the gate motor sound — see
+## [method GarageGate.open]. The gate sound plays here, finishing the building does not
+## repeat it.
 func open_gate(duration: float = GarageGate.OPEN_TIME) -> Tween:
-	# Шлагбаум офиса — вместе с воротами (ADR-0058, решение 6).
+	# The office barrier — together with the gate (ADR-0058, decision 6).
 	if dressing != null:
 		dressing.raise_barrier(duration)
 	return gate.open(duration)
 
 
-## Открыты ли ворота целиком.
+## Whether the gate is fully open.
 func is_gate_open() -> bool:
 	return gate.is_open()
 
@@ -429,7 +431,7 @@ func _nearest_lamp(x: float) -> float:
 	return best
 
 
-## Дальняя стена, ядра шахт, стенка у ворот и простенок таблички.
+## Far wall, shaft cores, the wall by the gate and the sign pier.
 func _build_walls() -> void:
 	var height := _surface - _top
 	var far_front := FAR_Z + FAR_THICKNESS * 0.5
@@ -438,8 +440,8 @@ func _build_walls() -> void:
 		_concrete,
 		_at((_inner.x + _inner.y) * 0.5, _top + height * 0.5, FAR_Z)
 	)
-	# Полоса краски по дальней стене и номера мест над ней — у пола: верх
-	# стены в глубине закрывает кромка перекрытия.
+	# The paint band along the far wall and the bay numbers above it are near the floor: the
+	# top of the wall in the depth is hidden by the slab edge.
 	var band := GreyboxLook.surface(KIND_BAND[_rules.kind])
 	for span in BuildingPlan.spans_between(_cores, _inner):
 		_box(
@@ -455,8 +457,8 @@ func _build_walls() -> void:
 		digits.position = _at((bay.x + bay.y) * 0.5, _surface - 1.1, far_front + 0.004)
 		add_child(digits)
 
-	# Ядро шахты — бетон от передней линии до дальней стены: портал, лист и
-	# кнопки шахты висят на его передней грани, как висели на задней стене.
+	# Shaft core — concrete from the front line to the far wall: the portal, plate and
+	# shaft buttons hang on its front face, as they hung on the back wall.
 	var core_depth := WorldSpace.BACK_WALL_Z - far_front
 	for core in _cores:
 		_box(
@@ -471,8 +473,8 @@ func _build_walls() -> void:
 	var wall_depth := 0.5
 	var walls: Array[Vector2] = [Vector2(_inner.x, _inner.x + GATE_BAY), pier(_rules)]
 	for wall in walls:
-		# Простенок таблички чуть выступает: табличка висит перед задней
-		# стеной на [constant FloorSigns.STANDOFF], и без опоры она парила бы.
+		# The sign pier sticks out slightly: the sign hangs in front of the back
+		# wall by [constant FloorSigns.STANDOFF], and without support it would float.
 		var front := WorldSpace.BACK_WALL_Z
 		if wall == walls[1]:
 			front = WorldSpace.BACK_WALL_Z + FloorSigns.STANDOFF - 0.03
@@ -491,7 +493,7 @@ func _build_walls() -> void:
 	add_child(mark)
 
 
-## Колонны передней линии: бетон, полосы краски понизу, номер и знак «P».
+## Front line columns: concrete, paint bands at the bottom, number and "P" sign.
 func _build_columns() -> void:
 	var height := _surface - _top
 	var yellow := GreyboxLook.surface(PAINT_YELLOW)
@@ -503,8 +505,8 @@ func _build_columns() -> void:
 	for x in _columns:
 		number += 1
 		_box(Vector3(COLUMN, height, COLUMN), _concrete, _at(x, _top + height * 0.5, COLUMN_Z))
-		# Краска обёрткой чуть шире колонны и чуть выше пола — ни одна грань
-		# не в плоскости бетона.
+		# Paint as a wrap slightly wider than the column and slightly above the floor — no face
+		# lies in the plane of the concrete.
 		_box(
 			Vector3(COLUMN + 0.02, 0.9, COLUMN + 0.02),
 			yellow,
@@ -529,11 +531,11 @@ func _build_columns() -> void:
 			add_child(letter)
 
 
-## Балки поперёк зала над колоннами, короб вентиляции и трубы.
+## Beams across the hall above the columns, the ventilation duct and pipes.
 func _build_ceiling() -> void:
 	var far_front := FAR_Z + FAR_THICKNESS * 0.5
-	# Торцы балок — зубцами под кромкой перекрытия: через проезд, над
-	# колонной. Над лампой балка начинается за передней линией.
+	# Beam ends — as teeth under the slab edge: across the driveway, above
+	# a column. Above a lamp a beam starts behind the front line.
 	for x in _columns:
 		var front := WorldSpace.CORRIDOR_DEPTH * 0.5 - 0.02
 		for lamp_x in _lamp_xs:
@@ -546,7 +548,7 @@ func _build_ceiling() -> void:
 			_at(x, _top + BEAM.y * 0.5, front - depth * 0.5)
 		)
 
-	# Оцинковка шершавая, а не зеркальная: зеркало отражало бы синеву зала.
+	# Galvanised steel is rough, not mirror-like: a mirror would reflect the blue of the hall.
 	var duct := GreyboxLook.surface(DUCT_METAL)
 	var duct_front := DUCT_Z + DUCT.x * 0.5
 	var duct_top := _top + FloorSigns.hidden_band(duct_front) + DUCT_DROP
@@ -558,7 +560,7 @@ func _build_ceiling() -> void:
 			duct,
 			_at((span.x + span.y) * 0.5, duct_top + DUCT.y * 0.5, DUCT_Z)
 		)
-		# Фланцы стыков: коробка чуть больше сечения через каждые 1.5 м.
+		# Joint flanges: a box slightly larger than the cross-section every 1.5 m.
 		var flange_x := span.x + 0.75
 		while flange_x < span.y - 0.3:
 			_box(
@@ -569,8 +571,8 @@ func _build_ceiling() -> void:
 			)
 			flange_x += 1.5
 
-	# Трубы вдоль зала: красная спринклерная и серая под ней. Разрывы — у
-	# ядер шахт и простенка таблички: трубы уходят в бетон.
+	# Pipes along the hall: a red sprinkler one and a grey one below it. Breaks — at
+	# the shaft cores and the sign pier: the pipes go into the concrete.
 	var cuts: Array[Vector2] = [pier(_rules)]
 	cuts.append_array(_cores)
 	var pipe_top := _top + FloorSigns.hidden_band(PIPE_Z + PIPE_RADIUS) + PIPE_DROP
@@ -596,9 +598,9 @@ func _build_ceiling() -> void:
 			add_child(part)
 
 
-## Люминесцентные светильники над местами: корпус на подвесах, трубка —
-## эмиссия, под ней на полу — пятно света, над занятым местом — слабый свет
-## без тени. Всё это гаснет вместе с зоной ближайшей лампы.
+## Fluorescent fixtures above the bays: housing on hangers, the tube is
+## emissive, below it on the floor a light pool, above an occupied bay a weak light
+## without shadow. All of it goes dark together with the zone of the nearest lamp.
 func _build_fixtures() -> void:
 	var taken := PackedFloat64Array()
 	for car in _parked:
@@ -646,8 +648,8 @@ func _build_fixtures() -> void:
 		_tubes[owner] = list
 
 
-## Свет трубки над занятым местом или машиной Otto: конус без тени вниз,
-## наклонённый на [param tilt] градусов.
+## Tube light above an occupied bay or Otto's car: a shadowless cone downwards,
+## tilted by [param tilt] degrees.
 static func _tube_light(tilt: float) -> SpotLight3D:
 	var light := SpotLight3D.new()
 	light.light_color = TUBE
@@ -656,14 +658,14 @@ static func _tube_light(tilt: float) -> SpotLight3D:
 	light.spot_angle = TUBE_LIGHT_ANGLE
 	light.shadow_enabled = false
 	light.light_volumetric_fog_energy = 0.0
-	# Конус светит вдоль своей -Z: поворот вокруг X опускает его вниз и
-	# наклоняет — плюс в глубину зала, минус к проезду.
+	# The cone shines along its -Z: a rotation around X points it down and
+	# tilts it — plus into the depth of the hall, minus towards the driveway.
 	light.rotation.x = deg_to_rad(tilt - 90.0)
 	return light
 
 
-## Где в месте [param bay] висит светильник: посередине или сдвинутым от
-## лампы этажа. NAN — места нет: абажур лампы закрыл бы его.
+## Where in bay [param bay] the fixture hangs: in the middle or shifted away from the
+## floor lamp. NAN — no room: the lamp shade would cover it.
 func _fixture_x(bay: Vector2) -> float:
 	var middle := (bay.x + bay.y) * 0.5
 	var x := middle
@@ -678,8 +680,8 @@ func _fixture_x(bay: Vector2) -> float:
 	return x
 
 
-## Пятно света на полу: плоскость с круглым градиентом, складывается с полом.
-## Не источник — картинка света, как у огоньков читаемости.
+## Light pool on the floor: a plane with a radial gradient, added to the floor.
+## Not a source — a picture of light, like the readability indicator lights.
 static func _light_pool() -> MeshInstance3D:
 	var mesh := PlaneMesh.new()
 	mesh.size = POOL
@@ -712,7 +714,7 @@ static func _pool_material() -> StandardMaterial3D:
 	return _pool
 
 
-## Разметка: полосы мест, упоры, край проезда, стрелки к воротам, пятна масла.
+## Markings: bay lines, wheel stops, driveway edge, arrows to the gate, oil stains.
 func _mark_the_floor(building_seed: int) -> void:
 	var white := GreyboxLook.surface(PAINT_WHITE)
 	var yellow := GreyboxLook.surface(PAINT_YELLOW)
@@ -729,8 +731,8 @@ func _mark_the_floor(building_seed: int) -> void:
 			stop,
 			_at((bay.x + bay.y) * 0.5, _surface - 0.05, BAY_BACK_Z + 0.2)
 		)
-	# Краска — на два миллиметра над полом: полоса уходит под колонну и
-	# стену, и низ её иначе лёг бы в одну плоскость с их низом.
+	# Paint is two millimetres above the floor: a line goes under a column and a
+	# wall, and otherwise its bottom would lie in one plane with theirs.
 	for edge in edges:
 		_box(
 			Vector3(0.1, 0.005, depth),
@@ -739,7 +741,7 @@ func _mark_the_floor(building_seed: int) -> void:
 			false
 		)
 
-	# Край проезда — жёлтая линия вдоль передней линии мест.
+	# Driveway edge — a yellow line along the front line of the bays.
 	for span in BuildingPlan.spans_between(busy_spans(_rules, _plan), _inner):
 		_box(
 			Vector3(span.y - span.x, 0.005, 0.1),
@@ -748,8 +750,8 @@ func _mark_the_floor(building_seed: int) -> void:
 			false
 		)
 
-	# Стрелки к воротам по проезду: одна у ворот, дальше — через пролёт.
-	# Первая — сразу за машиной Otto у ворот: под ней стрелку не видно.
+	# Arrows to the gate along the driveway: one by the gate, then every other span.
+	# The first is right behind Otto's car at the gate: under it the arrow is not visible.
 	var arrow_x := ExitCar.parked_span(_rules).y + 1.2
 	while arrow_x < _inner.y - 1.0:
 		_paint_arrow(arrow_x, white)
@@ -767,7 +769,7 @@ func _mark_the_floor(building_seed: int) -> void:
 		_stain_at(x, rng.randf_range(-0.8, 0.8), rng.randf_range(0.12, 0.3), oil)
 
 
-## Стрелка на полу проезда остриём к воротам: древко и наконечник.
+## An arrow on the driveway floor pointing to the gate: shaft and head.
 func _paint_arrow(x: float, paint: StandardMaterial3D) -> void:
 	var z := WorldSpace.CORRIDOR_DEPTH * 0.25
 	_box(Vector3(0.9, 0.005, 0.16), paint, _at(x + 0.35, _surface - 0.0045, z), false)
@@ -777,14 +779,14 @@ func _paint_arrow(x: float, paint: StandardMaterial3D) -> void:
 	part.mesh = head
 	part.material_override = paint
 	part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	# Треугольник призмы — в плоскости XY остриём вверх; лечь на пол остриём
-	# влево — поворот вокруг X на пол, затем вокруг Y.
+	# The prism triangle is in the XY plane pointing up; to lie on the floor pointing
+	# left — a rotation around X onto the floor, then around Y.
 	part.basis = Basis(Vector3.UP, PI * 0.5) * Basis(Vector3.RIGHT, -PI * 0.5)
 	part.position = _at(x - 0.3, _surface - 0.0045, z)
 	add_child(part)
 
 
-## Пятно масла: тёмный блестящий овал на полу.
+## Oil stain: a dark glossy oval on the floor.
 func _stain_at(x: float, z: float, radius: float, material: StandardMaterial3D) -> void:
 	var mesh := CylinderMesh.new()
 	mesh.top_radius = radius
@@ -801,8 +803,9 @@ func _stain_at(x: float, z: float, radius: float, material: StandardMaterial3D) 
 	add_child(part)
 
 
-## Чужие машины: модели паков, раздвинутые до настоящей ширины и повёрнутые
-## носом в зал или к проезду. Фары и стоп-сигналы не горят: машины стоят.
+## Other cars: pack models, widened to real width and turned
+## nose into the hall or towards the driveway. Headlights and brake lights are off: the cars
+## are parked.
 func _park_cars() -> void:
 	var cars := Node3D.new()
 	cars.name = "ParkedCars"
@@ -811,14 +814,14 @@ func _park_cars() -> void:
 		var model := CarModel.build(spot.choice)
 		model.name = "Parked"
 		model.scale = Vector3(1.0, 1.0, CAR_WIDTH / depth_of(model))
-		# Капот модели — в +X; поворот на четверть вокруг Y уводит его в -Z.
+		# The model's hood is at +X; a quarter turn around Y takes it to -Z.
 		model.rotation.y = PI * 0.5 if spot.nose_in else -PI * 0.5
 		model.position = _at(spot.x, _surface, CAR_Z)
 		switch_lights_off(model)
 		cars.add_child(model)
 
 
-## Глубина модели пака по её мешам, м. Ею же ставит машину улица за выездом.
+## Depth of the pack model by its meshes, m. The street behind the exit places the car by it.
 static func depth_of(model: Node3D) -> float:
 	var low := INF
 	var high := -INF
@@ -842,13 +845,13 @@ static func switch_lights_off(model: Node3D) -> void:
 				mesh.set_surface_override_material(surface, GreyboxLook.polished(TAILLIGHT_OFF))
 
 
-## Стрелка к воротам и полосы опасности на стенке у ворот.
+## Arrow to the gate and hazard stripes on the wall by the gate.
 func _hang_signs() -> void:
 	var inner_x := _inner.x
 	var arrow := label("◀", 800, 0.5, PAINT_WHITE)
 	arrow.position = _at(inner_x + GATE_BAY * 0.5, _surface - 1.2, WorldSpace.BACK_WALL_Z + 0.004)
 	add_child(arrow)
-	# Полосы опасности по низу стенки у ворот — угол, о который бьются бамперы.
+	# Hazard stripes along the bottom of the wall by the gate — the corner bumpers hit.
 	var yellow := GreyboxLook.surface(PAINT_YELLOW)
 	var black := GreyboxLook.surface(PAINT_BLACK)
 	for index in 4:
@@ -864,8 +867,8 @@ func _hang_signs() -> void:
 		)
 
 
-## Надпись краской или светом шрифтом игры.
-## Статическая: ею же подписаны ворота ([GarageGate]).
+## Lettering in paint or light in the game font.
+## Static: the gate is labelled with it too ([GarageGate]).
 static func label(text: String, weight: int, height: float, color: Color) -> Label3D:
 	var painted := Label3D.new()
 	painted.text = text
@@ -879,7 +882,7 @@ static func label(text: String, weight: int, height: float, color: Color) -> Lab
 	return painted
 
 
-## Точка сцены: x и высота в координатах правил, глубина — как есть.
+## Scene point: x and height in rules coordinates, depth as is.
 static func scene_point(x: float, y: float, z: float) -> Vector3:
 	var point := WorldSpace.to_scene(Vector2(x, y))
 	point.z = z
@@ -890,9 +893,9 @@ static func _at(x: float, y: float, z: float) -> Vector3:
 	return scene_point(x, y, z)
 
 
-## Коробка без тела в точке [param centre] под [param parent]. Мелочь — разметка,
-## краска, таблички — теней не кладёт: теней в кадре она не прибавляет, а
-## проходов теней стоит. Статическая: так же собираются ворота ([GarageGate]).
+## A bodiless box at point [param centre] under [param parent]. Small things — markings,
+## paint, signs — cast no shadows: they add no shadows to the frame, but
+## shadow passes cost. Static: the gate is built the same way ([GarageGate]).
 static func put_box(
 	parent: Node, size: Vector3, material: StandardMaterial3D, centre: Vector3, shadow: bool
 ) -> MeshInstance3D:

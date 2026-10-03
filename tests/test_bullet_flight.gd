@@ -1,33 +1,35 @@
 extends GutTest
 
-## Пуля не проскакивает сквозь то, во что должна попасть, — и проходит сквозь
-## труп (ADR-0037, решения 5 и 6).
+## A bullet does not slip through what it must hit, and it passes through a corpse
+## (ADR-0037, decisions 5 and 6).
 ##
-## С M24a пуля втрое быстрее ROM и за кадр физики проходит почти толщину стены;
-## под [member Engine.time_scale] тестов — вчетверо больше. Здесь она ещё
-## быстрее, чем бывает в игре: путь за кадр в разы длиннее и стены, и тела, —
-## проскочить мимо значит, что путь не проверяется целиком.
+## Since M24a a bullet is three times faster than in the ROM and covers almost a wall's
+## thickness per physics frame; under the tests' [member Engine.time_scale], four times
+## more. Here it is even faster than it ever is in the game: its path per frame is many
+## times longer than both the wall and the body, so slipping past means the path is not
+## checked in full.
 
 const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 
-## Скорость пули в тесте, м/с: 5 м за кадр при 60 кадрах в секунду.
+## Bullet speed in the test, m/s: 5 m per frame at 60 frames per second.
 const TOO_FAST: float = 300.0
 
-## Где стоит стена и какой она толщины, м: тоньше пути пули за кадр вдесятеро.
+## Where the wall stands and how thick it is, m: ten times thinner than the bullet's
+## path per frame.
 const WALL_X: float = 6.0
 const WALL_THICKNESS: float = 0.1
 
-## Высота полёта над полом, м: в грудь стоящему агенту.
+## Flight height above the floor, m: into the chest of a standing agent.
 const SHOT_HEIGHT: float = 1.1
 
 
-## Пол под всей сценой: агенту есть на чём стоять и на что лечь.
+## A floor under the whole scene: the agent has something to stand and lie on.
 func _ground() -> void:
 	_box(Vector3(0.0, -0.2, 0.0), Vector3(40.0, 0.4, WorldSpace.CORRIDOR_DEPTH))
 
 
-## Тонкая стена поперёк полёта.
+## A thin wall across the flight.
 func _wall() -> StaticBody3D:
 	return _box(Vector3(WALL_X, 1.5, 0.0), Vector3(WALL_THICKNESS, 3.0, WorldSpace.CORRIDOR_DEPTH))
 
@@ -44,7 +46,7 @@ func _box(at: Vector3, size: Vector3) -> StaticBody3D:
 	return body
 
 
-## Пуля Otto из точки [param x], летящая вправо. Что она задела, пишется в
+## Otto's bullet from point [param x], flying right. What it hit is written into
 ## [param hits].
 func _fire(x: float, hits: Array[Node3D]) -> Bullet:
 	var bullet := BULLET_SCENE.instantiate() as Bullet
@@ -57,8 +59,8 @@ func _fire(x: float, hits: Array[Node3D]) -> Bullet:
 	return bullet
 
 
-## Агент, вышедший из проёма: выходящий неуязвим, и пуля прошла бы сквозь него
-## и без всякого трупа.
+## An agent who has come out of a doorway: one coming out is invulnerable, and the
+## bullet would pass through him even without any corpse.
 func _agent_at(x: float) -> Enemy:
 	var agent := ENEMY_SCENE.instantiate() as Enemy
 	agent.walk_speed = 0.0
@@ -90,8 +92,8 @@ func test_a_fast_bullet_hits_the_agent_in_its_way() -> void:
 	assert_true(hits.size() == 1 and hits[0] == agent, "пуля встретила агента, а не стену за ним")
 
 
-## Труп лежит до конца здания, но мишенью не служит: пуля летит сквозь него в
-## то, что за ним (ADR-0037, решение 6).
+## A corpse stays until the end of the building but is not a target: the bullet flies
+## through it into whatever is behind it (ADR-0037, decision 6).
 func test_bullets_pass_through_a_corpse() -> void:
 	_ground()
 	var wall := _wall()
@@ -103,8 +105,8 @@ func test_bullets_pass_through_a_corpse() -> void:
 	assert_true(hits.size() == 1 and hits[0] == wall, "сквозь труп — в стену")
 
 
-## Пуля в стене оставляет след, но следов в здании не больше потолка: старые
-## уходят первыми.
+## A bullet in a wall leaves a mark, but there are no more marks in the building than
+## the cap: the old ones go first.
 func test_bullet_holes_are_left_and_capped() -> void:
 	_wall()
 	var hits: Array[Node3D] = []
@@ -113,3 +115,22 @@ func test_bullet_holes_are_left_and_capped() -> void:
 		await wait_physics_frames(2)
 	assert_eq(hits.size(), ShotFx.HOLES_KEPT + 5, "каждая пуля дошла до стены")
 	assert_eq(ShotFx.holes(), ShotFx.HOLES_KEPT, "следов — не больше потолка")
+
+
+## A bullet born inside a body hits it at once, by a direct query, and the engine's
+## overlap events are off: Jolt reported such an overlap only on some runs, and the
+## bot's run on one seed ended differently every time (fix/bot-determinism).
+func test_a_point_blank_bullet_hits_at_once_and_by_query() -> void:
+	_ground()
+	var target := _box(Vector3(2.0, SHOT_HEIGHT, 0.0), Vector3(0.6, 0.6, 0.6))
+	target.collision_layer = 4
+	await wait_physics_frames(1)
+	var hits: Array[Node3D] = []
+	var bullet := _fire(2.0, hits)
+	assert_false(bullet.monitoring, "no engine overlap events")
+	bullet.strike_point_blank()
+	assert_eq(hits.size(), 1, "hit in the same frame it is fired")
+	if hits.size() == 1:
+		assert_eq(hits[0], target)
+	bullet.strike_point_blank()
+	assert_eq(hits.size(), 1, "one bullet hits once")

@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Разбор журнала прогона (`RunLog`): что происходило, без перезапуска.
+"""Analysis of a run log (`RunLog`): what happened, without rerunning.
 
-Журнал пишут тесты прохождения (`logs/playthrough_seed<N>.jsonl`) и инструменты с
-флагом `--log=путь`. По строке JSON на событие: кадр, игровое время, вид и
-подробности.
+The log is written by playthrough tests (`logs/playthrough_seed<N>.jsonl`) and by tools with
+the `--log=path` flag. One JSON line per event: frame, game time, kind and
+details.
 
-    python tools/run_log.py logs/playthrough_seed3.jsonl            # сводка
-    python tools/run_log.py logs/playthrough_seed3.jsonl --deaths   # каждая смерть
-    python tools/run_log.py FILE --kind hit --floor 25              # фильтр
-    python tools/run_log.py FILE --from 120 --to 140                # окно времени, с
-    python tools/run_log.py FILE --kind bot --around 3440 --span 30 # вокруг кадра
+    python tools/run_log.py logs/playthrough_seed3.jsonl            # summary
+    python tools/run_log.py logs/playthrough_seed3.jsonl --deaths   # every death
+    python tools/run_log.py FILE --kind hit --floor 25              # filter
+    python tools/run_log.py FILE --from 120 --to 140                # time window, s
+    python tools/run_log.py FILE --kind bot --around 3440 --span 30 # around a frame
 
-Сводка: сколько каких событий, смерти Otto по этажам и причинам, кто стрелял.
+Summary: how many events of each kind, Otto's deaths by floor and cause, who fired.
 """
 
 from __future__ import annotations

@@ -1,9 +1,9 @@
 extends GutTest
 
-## Новый город M24j (ADR-0051, решения 10–12): фасады из запечённого атласа
-## пака, небо — HDRI-панорама по времени и погоде, солнце неба там же, где свет.
+## The new M24j city (ADR-0051, decisions 10–12): facades from the pack's baked atlas, the sky is an
+## HDRI panorama by time and weather, the sky's sun is where the light is.
 ##
-## Правила — без сцены и на любом сиде; сцена — город на каждом сочетании.
+## Rules — without a scene and on any seed; the scene — the city on every combination.
 
 const LAYOUT := "res://assets/textures/city/facade_layout.json"
 
@@ -12,7 +12,7 @@ func after_all() -> void:
 	GameState.instance().reset()
 
 
-## Каждое сочетание времени и погоды получает панораму, и она на месте.
+## Every combination of time and weather gets a panorama, and it is in place.
 func test_every_time_and_weather_has_a_sky() -> void:
 	for time: int in TimeOfDay.Kind.size():
 		for weather: int in Weather.Kind.size():
@@ -21,7 +21,7 @@ func test_every_time_and_weather_has_a_sky() -> void:
 			assert_gt(CitySky.energy(time as TimeOfDay.Kind, weather as Weather.Kind), 0.0)
 
 
-## Ночь темнее дня: небо и луна слабее солнца.
+## Night is darker than day: the sky and the moon are weaker than the sun.
 func test_night_is_darker_than_day() -> void:
 	for weather: int in Weather.Kind.size():
 		var kind := weather as Weather.Kind
@@ -37,8 +37,8 @@ func test_night_is_darker_than_day() -> void:
 		sun.free()
 
 
-## Солнце панорамы встаёт туда, откуда светит свет города: в направлении к
-## солнцу шейдер неба читает панораму ровно на азимуте её солнца.
+## The panorama's sun rises where the city light comes from: in the direction toward the sun the sky
+## shader reads the panorama exactly at the azimuth of its sun.
 func test_the_sky_sun_sits_where_the_light_comes_from() -> void:
 	for time: int in TimeOfDay.Kind.size():
 		for weather: int in Weather.Kind.size():
@@ -51,7 +51,7 @@ func test_the_sky_sun_sits_where_the_light_comes_from() -> void:
 			assert_almost_eq(u, look.azimuth / 360.0, 0.001, "время %d: солнце не на месте" % time)
 
 
-## Свет города смотрит от солнца: он идёт туда, куда смотрит минус z лампы.
+## The city light looks away from the sun: it goes where the lamp's minus z looks.
 func test_the_city_light_points_away_from_the_sun() -> void:
 	for time: int in TimeOfDay.Kind.size():
 		var kind := time as TimeOfDay.Kind
@@ -61,7 +61,7 @@ func test_the_city_light_points_away_from_the_sun() -> void:
 		light.free()
 
 
-## Стиль фасада — из стилей своего типа дома, на любом сиде.
+## The facade style is from the styles of its own house kind, on any seed.
 func test_houses_take_styles_of_their_kind() -> void:
 	for building_seed: int in [1, 2, 3, 5, 8]:
 		for block in CityPlan.generate(building_seed, 0.0, 40.0):
@@ -71,7 +71,7 @@ func test_houses_take_styles_of_their_kind() -> void:
 			assert_between(custom.g, 0.0, 1.0, "сид дома вне 0–1")
 
 
-## Атлас, которым рисует игра, совпадает с тем, что собрал `build_city.py`.
+## The atlas the game draws with matches what `build_city.py` assembled.
 func test_the_atlas_matches_its_build() -> void:
 	var layout: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(LAYOUT))
 	assert_eq((layout["styles"] as Array).size(), CityLook.Style.size(), "стилей не столько")
@@ -85,8 +85,8 @@ func test_the_atlas_matches_its_build() -> void:
 		total += heights[index]
 	var albedo := load("res://assets/textures/city/facade_albedo.png") as Texture2D
 	assert_eq(float(albedo.get_width()), CityLook.ATLAS_SIZE.x, "ширина атласа")
-	# Столбец стиля — плитка и поля по бокам: без полей дальний мип смешивал
-	# соседние стили и рисовал черту каждые 4 м (авторевью M24j).
+	# A style column is a tile plus margins on the sides: without margins the distant mip mixed
+	# neighbouring styles and drew a line every 4 m (M24j code review).
 	assert_eq(float(layout["gutter"]), CityLook.GUTTER, "поле столбца")
 	assert_gt(CityLook.GUTTER, 0.0, "атлас без полей")
 	var column := (CityLook.TILE_WIDTH + CityLook.GUTTER * 2.0) * CityLook.ATLAS_DENSITY
@@ -94,8 +94,8 @@ func test_the_atlas_matches_its_build() -> void:
 	assert_eq(float(albedo.get_height()), total * CityLook.ATLAS_DENSITY, "высота атласа")
 
 
-## Город собирается на каждом сочетании: дома одним мультимешем на весь план,
-## свет города в своём мире, днём горит меньше окон, чем ночью.
+## The city is assembled on every combination: houses as one multimesh for the whole plan, the city
+## light in its own world, by day fewer windows are lit than at night.
 func test_the_city_builds_at_every_time() -> void:
 	var rules := BuildingRules.new()
 	var lit: Array[float] = []

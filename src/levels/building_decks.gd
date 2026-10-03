@@ -1,38 +1,37 @@
 class_name BuildingDecks
 extends RefCounted
 
-## Кто в здании ходит двухэтажной парой.
+## Who in the building runs as a double-deck pair.
 ##
-## Правило одно, но условий у него три, и каждое стоило вехе отдельной находки —
-## поэтому своим файлом, а не строкой в [BuildingPlan]: тот и без того упёрся
-## в потолок в тысячу строк.
+## The rule is one, but it has three conditions, and each cost the milestone a separate finding — so
+## it is its own file, not a line in [BuildingPlan]: that one has already hit the thousand-line
+## ceiling.
 ##
-## Устройство самой пары — в [ADR-0025](../../docs/adr/0025-shafts-escalators-and-riders.md),
-## решение 1. Здесь только выбор шахты; всё, что пара меняет в ходе кабины,
-## знает [method BuildingPlan.ShaftSpot.ride_span].
+## The pair's own design is in [ADR-0025](../../docs/adr/0025-shafts-escalators-and-riders.md),
+## decision 1. Here is only the choice of shaft; everything the pair changes in the cab's motion is
+## known to [method BuildingPlan.ShaftSpot.ride_span].
 
-## Сколько пар ставится в здание самое большее.
+## The largest number of pairs placed in a building.
 ##
-## Две — столько их в оригинале: «two shafts featured a kind of double-decker
-## elevator». Меньше выпадет там, где столько шахт с живой альтернативой
-## не набралось; здание без пары — не поломка.
+## Two — that is how many the original has: "two shafts featured a kind of double-decker elevator".
+## Fewer come up where not enough shafts with a live alternative were found; a building without a
+## pair is not a breakage.
 const MOST: int = 2
 
 
-## Отмечает шахты, в которых ходит пара.
+## Marks the shafts in which a pair runs.
 ##
-## Кандидаты пересчитываются после каждого выбора: поставленная пара сама
-## становится путём похуже — на крайних своих этажах она не возит, — и второй
-## паре опираться на неё нельзя.
+## Candidates are recomputed after each choice: a placed pair itself becomes a worse path — it does
+## not carry to its extreme floors — and a second pair must not rely on it.
 static func lay(plan: BuildingPlan, rules: BuildingRules, rng: RandomNumberGenerator) -> void:
-	# Считается один раз до всего: пара обязана оставить достижимым ровно то же,
-	# что было достижимо без неё.
+	# Computed once before everything: the pair must leave reachable exactly what was reachable without
+	# it.
 	var whole := BuildingRoute.reachable(plan, rules).size()
 
 	for _left in MOST:
-		# Копятся места в массиве шахт, а не сами шахты: выбор из набора идёт
-		# одной строкой на весь проект ([method BuildingPlan.pick_any]), потому
-		# что счёт сида зависит от порядка обращений к генератору.
+		# Places in the shaft array are accumulated, not the shafts themselves: picking from a set is one
+		# line for the whole project ([method BuildingPlan.pick_any]), because the seed count depends on
+		# the order of calls to the generator.
 		var fitting: Array[int] = []
 		for index in plan.shafts.size():
 			if not plan.shafts[index].double_deck and _takes_a_pair(plan, index):
@@ -48,40 +47,41 @@ static func lay(plan: BuildingPlan, rules: BuildingRules, rng: RandomNumberGener
 				break
 			plan.shafts[index].double_deck = false
 
-		# Ни одна из подошедших шахт не взяла пару — второй заход перебрал бы
-		# ровно тот же набор с тем же исходом, а счёт графа не бесплатный.
+		# None of the fitting shafts took a pair — a second pass would go over exactly the same set with
+		# the same outcome, and computing the graph is not free.
 		if not placed:
 			return
 
 
-## Влезает ли в шахту пара и не запрёт ли она собой спуск.
+## Whether a pair fits in the shaft and whether it would block the descent.
 ##
-## Условие структурное и грубое: оно смотрит на этаж целиком, а ходят по кускам
-## этажа, и соседняя шахта может стоять за проёмом. Настоящий сторож — счёт
-## достижимых узлов в [method lay]; это же условие отсеивает заведомо негодные
-## шахты, не считая граф.
+## The condition is structural and coarse: it looks at the floor as a whole, while movement goes by
+## floor pieces, and the neighbouring shaft may stand beyond an opening. The real guard is the count
+## of reachable nodes in [method lay]; this condition just weeds out obviously unfit shafts without
+## computing the graph.
 ##
-## **Порог достижимости здесь строже, чем у стены.** Стене довольно
-## [method BuildingRoute.is_winnable] — та следит за документами и выходом.
-## Паре этого мало: на сиде 3 она отняла у двух кусков девятнадцатого этажа
-## единственный ход, шахта была там одна, и куски стали карманом. Документа
-## в них нет, проходимость здания не пострадала — а бот, зайдя туда, встал
-## до конца прогона.
+## **The reachability threshold here is stricter than for a wall.** For a wall [method
+## BuildingRoute.is_winnable] is enough — it watches the documents and the exit. For a pair that is
+## too little: on seed 3 it took away the only way out from two pieces of the nineteenth floor,
+## there was one shaft there, and the pieces became a pocket. There is no document in them, the
+## building's traversability did not suffer — but the bot, having walked in there, stood until the
+## end of the run.
 static func _takes_a_pair(plan: BuildingPlan, index: int) -> bool:
 	var shaft := plan.shafts[index]
 	if shaft.height() < BuildingRules.MIN_SHAFT_FLOORS:
 		return false
-	# Шахта башни одна на верхнюю треть здания, и другого пути там нет вовсе,
-	# но проверять это отдельно незачем — условие ниже её и не пропустит.
+	# The tower shaft is the only one for the top third of the building, and there is no other way
+	# there at all, but there is no need to check this separately — the condition below will not let it
+	# through anyway.
 	for floor_index in range(shaft.top, shaft.bottom + 1):
 		if not _another_way_off(plan, shaft, floor_index):
 			return false
 	return true
 
 
-## Есть ли с этажа ход помимо этой шахты: соседняя шахта или эскалатор. Годится
-## и эскалатор этажом выше: он ведёт вниз, но подняться по нему тоже можно,
-## встав на нижнюю площадку (ADR-0004, пункт 8).
+## Whether there is a way off the floor besides this shaft: a neighbouring shaft or an escalator. An
+## escalator one floor above also fits: it leads down, but you can also go up it by standing on the
+## lower landing (ADR-0004, item 8).
 static func _another_way_off(
 	plan: BuildingPlan, besides: BuildingPlan.ShaftSpot, floor_index: int
 ) -> bool:

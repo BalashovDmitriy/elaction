@@ -1,10 +1,10 @@
 extends GutTest
 
-## Тесты проходимости здания.
+## Building passability tests.
 ##
-## Здание — чистая функция от сида, поэтому проверять надо не «этот уровень
-## работает», а «любое здание, которое сгенерируется, работает». Три бага M5a
-## вылезли не на всех сидах — на сиде 1 их было не видно.
+## The building is a pure function of the seed, so what needs checking is not "this level
+## works" but "any building that gets generated works". The three M5a bugs did not show
+## up on all seeds — on seed 1 they were not visible.
 
 const SEEDS: int = 40
 
@@ -38,11 +38,11 @@ func test_route_reaches_every_floor() -> void:
 	assert_eq(floors_seen.size(), rules.floors + 1, "до каждого уровня можно добраться")
 
 
-## Проходимость должна ловиться, а не подтверждаться всегда.
+## Passability must be caught, not always confirmed.
 ##
-## До M18 здание ломали, убрав эскалаторы: полосы шахт шли встык и без них не
-## соединялись. Теперь шахты перехлёстываются (ADR-0024, решение 3), и без
-## эскалаторов спуск остаётся — ломать надо иначе.
+## Before M18 the building was broken by removing the escalators: shaft bands met end to
+## end and did not connect without them. Now the shafts overlap (ADR-0024, decision 3),
+## and without escalators the descent remains — it has to be broken differently.
 func test_an_isolated_bottom_floor_is_not_winnable() -> void:
 	var rules := _rules()
 	var plan := BuildingPlan.generate(rules, 3)
@@ -58,9 +58,9 @@ func test_an_isolated_bottom_floor_is_not_winnable() -> void:
 	assert_false(BuildingRoute.is_winnable(plan, rules), "до отрезанного низа не добраться")
 
 
-## Стена режет ходьбу, но не перекрытие (ADR-0024, решение 5). Счёта два, и
-## разъехаться им нельзя: этаж со стеной остаётся цельной плитой, по которой
-## насквозь всё равно не пройти.
+## A wall cuts walking but not the slab (ADR-0024, decision 5). There are two
+## computations, and they must not diverge: a floor with a wall stays a whole slab, which
+## still cannot be crossed.
 func test_a_wall_cuts_walking_but_not_the_slab() -> void:
 	var rules := _rules()
 	var plan := BuildingPlan.generate(rules, 4)
@@ -79,16 +79,16 @@ func test_a_wall_cuts_walking_but_not_the_slab() -> void:
 	assert_eq(walk.size(), before.size() + 1, "а ходьба разрезана ею надвое")
 
 
-## Граф не обещает поездки, которой пара не сделает.
+## The graph does not promise a ride the pair will not make.
 ##
-## Ярусы скреплены через этаж, и вошедший не выбирает, какой из них его
-## встретит: верхний не спускается на нижний этаж шахты, нижний не поднимается
-## на верхний (ADR-0025, решение 1). Обещать можно только то, что довезёт любой
-## из двух, — иначе бот, задумав такую поездку, будет держать «вниз» до конца
-## бюджета, а игрок решит, что лифт сломан.
+## The decks are joined a floor apart, and whoever enters does not choose which of them
+## meets him: the upper one does not go down to the shaft's bottom floor, the lower one
+## does not go up to the top (ADR-0025, decision 1). Only what either of the two will
+## deliver can be promised — otherwise the bot, planning such a ride, will hold "down"
+## until its budget runs out, and the player will decide the elevator is broken.
 ##
-## Переход через проём при этом остаётся на всех этажах шахты: кабина на них
-## встаёт, и сквозь неё проходят с одного края на другой.
+## Crossing through the opening remains on all of the shaft's floors: the cab stops on
+## them, and people pass through it from one edge to the other.
 func test_a_pair_promises_only_what_both_decks_reach() -> void:
 	var rules := _rules()
 	var found := 0
@@ -108,9 +108,9 @@ func test_a_pair_promises_only_what_both_decks_reach() -> void:
 					var to_floor := int(move["floor"])
 					if to_floor == from_floor:
 						continue
-					# Столбец сам по себе шахту не опознаёт: полосы не
-					# перекрываются по этажам, но одно и то же место сетки
-					# занимают разные шахты на разной высоте.
+					# The column alone does not identify a shaft: bands do not overlap by
+					# floor, but the same grid slot is taken by different shafts at
+					# different heights.
 					if not _inside(shaft, from_floor) or not _inside(shaft, to_floor):
 						continue
 					assert_true(
@@ -123,6 +123,6 @@ func test_a_pair_promises_only_what_both_decks_reach() -> void:
 	assert_gt(found, 0, "на двадцати сидах хоть одна пара обязана выпасть")
 
 
-## Лежит ли этаж в полосе шахты.
+## Whether the floor lies in the shaft's band.
 func _inside(shaft: BuildingPlan.ShaftSpot, floor_index: int) -> bool:
 	return floor_index >= shaft.top and floor_index <= shaft.bottom

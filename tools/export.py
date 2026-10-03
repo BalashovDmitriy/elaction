@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Сборка: экспорт пресета и проверка, что получилось что-то живое.
+"""Build: export a preset and check that something alive came out.
 
-Godot умеет вернуть 0, ничего не собрав: об ошибках экспорта он пишет в вывод,
-а код возврата оставляет нулевым. Поэтому судим по трём признакам сразу — код
-возврата, маркеры ошибок в выводе и файл на диске.
+Godot can return 0 having built nothing: it writes export errors to the output
+and leaves the return code at zero. So we judge by three signs at once: the return
+code, error markers in the output and the file on disk.
 
-Перед экспортом проект импортируется: без готовой папки `.godot` экспорт
-подвисает или собирает ресурсы, которых в исходниках уже нет (godot#69511,
-[ADR-0013](../docs/adr/0013-release-and-versioning.md), пункт 5).
+The project is imported before export: without a ready `.godot` folder, export
+hangs or packs resources that are no longer in the sources (godot#69511,
+[ADR-0013](../docs/adr/0013-release-and-versioning.md), item 5).
 
-Пресеты и пути берутся из `export_presets.cfg` — второй список платформ
-разъехался бы с первым.
+Presets and paths are taken from `export_presets.cfg`: a second list of platforms
+would drift from the first.
 
     python tools/export.py windows
     python tools/export.py linux
@@ -27,28 +27,28 @@ from godot_bin import PROJECT_ROOT, require_godot, run, use_utf8_output
 from godot_check import find_errors, import_resources
 from version import PRESETS_FILE, PROJECT_FILE
 
-# Сборка с вшитыми ресурсами весит десятки мегабайт. Всё, что заметно меньше, —
-# не игра, а огрызок, и до архива ему ехать незачем.
+# A build with embedded resources weighs tens of megabytes. Anything noticeably smaller
+# is not the game but a stub, and there is no point in it going into the archive.
 MIN_SIZE_MB: int = 5
 
-# О провале экспорта Godot говорит своими словами, и ни один общий маркер
-# из godot_check.py их не ловит. Без этого списка второй признак успеха —
-# «маркеры ошибок в выводе» — на экспорте не работал бы вовсе.
+# Godot reports an export failure in its own words, and none of the shared markers
+# from godot_check.py catches them. Without this list the second sign of success,
+# "error markers in the output", would not work for export at all.
 EXPORT_FAILURE_MARKERS: tuple[str, ...] = (
     "Cannot export project",
     "Project export for preset",
     "No export template found",
 )
 
-# Экспорт и импорт движок гоняет в режиме редактора, а редактор на выходе
-# переписывает свои конфиги целиком: комментарии из них пропадают, а вместе
-# с ними — решения, на которые ссылаются ADR-0002 и ADR-0013 (пункт 8).
-# Сборка конфиги менять не должна, поэтому возвращаем их как были.
+# The engine runs export and import in editor mode, and on exit the editor
+# rewrites its configs entirely: the comments in them disappear, and with them
+# the decisions ADR-0002 and ADR-0013 (item 8) refer to.
+# A build must not change the configs, so we restore them as they were.
 GUARDED_FILES: tuple[Path, ...] = (PROJECT_FILE, PRESETS_FILE)
 
 
 class Preset:
-    """Пресет из export_presets.cfg: как его зовут и куда он кладёт результат."""
+    """A preset from export_presets.cfg: what it is called and where it puts the result."""
 
     def __init__(self, name: str, platform: str, export_path: str) -> None:
         self.name = name
@@ -57,17 +57,17 @@ class Preset:
 
     @property
     def alias(self) -> str:
-        """Короткое имя для командной строки: `windows`, `linux`."""
+        """Short name for the command line: `windows`, `linux`."""
         return self.platform.split()[0].lower()
 
 
 def snapshot() -> dict[Path, bytes]:
-    """Содержимое конфигов, которые движок норовит переписать под себя."""
+    """Contents of the configs the engine tends to rewrite its own way."""
     return {path: path.read_bytes() for path in GUARDED_FILES if path.exists()}
 
 
 def restore(saved: dict[Path, bytes]) -> None:
-    """Возвращает переписанные движком конфиги как были."""
+    """Restores the configs rewritten by the engine as they were."""
     for path, before in saved.items():
         if path.exists() and path.read_bytes() != before:
             path.write_bytes(before)
@@ -75,9 +75,9 @@ def restore(saved: dict[Path, bytes]) -> None:
 
 
 def read_presets() -> list[Preset]:
-    """Разбирает export_presets.cfg. Значения там в кавычках, как в ini от Godot."""
-    # interpolation=None: в значениях пресета попадается «%», а ConfigParser
-    # по умолчанию принял бы его за подстановку и упал на разборе.
+    """Parses export_presets.cfg. Values there are quoted, as in Godot's ini."""
+    # interpolation=None: preset values contain "%", and ConfigParser
+    # by default would take it for interpolation and fail while parsing.
     config = configparser.ConfigParser(interpolation=None)
     config.read(PRESETS_FILE, encoding="utf-8")
 
@@ -99,7 +99,7 @@ def read_presets() -> list[Preset]:
 
 
 def pick(presets: list[Preset], wanted: str) -> Preset | None:
-    """Ищет пресет по короткому имени или по полному названию."""
+    """Finds a preset by short name or by full name."""
     lowered = wanted.lower()
     for preset in presets:
         if lowered in (preset.alias, preset.name.lower()):
@@ -108,7 +108,7 @@ def pick(presets: list[Preset], wanted: str) -> Preset | None:
 
 
 def export_failures(output: str) -> list[str]:
-    """Строки, которыми Godot сообщает о провале экспорта."""
+    """Lines with which Godot reports an export failure."""
     return [
         line.strip()
         for line in output.splitlines()
@@ -117,7 +117,7 @@ def export_failures(output: str) -> list[str]:
 
 
 def export(preset: Preset) -> int:
-    """Собирает пресет. Возвращает код возврата для процесса."""
+    """Builds a preset. Returns the return code for the process."""
     saved = snapshot()
     try:
         return _build(preset)
@@ -126,7 +126,7 @@ def export(preset: Preset) -> int:
 
 
 def _build(preset: Preset) -> int:
-    """Импорт и экспорт как есть, без присмотра за конфигами."""
+    """Import and export as they are, without watching the configs."""
     godot = require_godot()
 
     print("== импорт ресурсов перед сборкой ==", flush=True)
@@ -140,12 +140,12 @@ def _build(preset: Preset) -> int:
 
     preset.path.parent.mkdir(parents=True, exist_ok=True)
     if preset.path.exists():
-        # Иначе старый файл сойдёт за свежесобранный, если экспорт молча не удался.
+        # Otherwise an old file would pass for a freshly built one if export silently failed.
         preset.path.unlink()
 
     print(f"== экспорт «{preset.name}» -> {preset.path.name} ==", flush=True)
-    # --headless обязателен: без него экспорт поднимает окно и рендерер целиком,
-    # а на runner'е нет ни дисплея, ни GPU — сборка падает на DisplayServer.
+    # --headless is required: without it export brings up a window and the whole renderer,
+    # and the runner has neither a display nor a GPU, so the build fails on DisplayServer.
     code, output = run(godot, ["--headless", "--export-release", preset.name, str(preset.path)])
     print(output.strip())
 

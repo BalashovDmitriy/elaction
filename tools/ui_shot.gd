@@ -1,26 +1,26 @@
 extends Node
 
-## Снимки интерфейса — по состоянию, а не по выдержке.
+## Interface shots — by state, not by delay.
 ##
-## Игровой сценарий съёмки (`capture.py`) водит Otto игровыми действиями и до
-## меню не добирается вовсе: кнопки он нажимать не умеет. Поэтому экраны снимает
-## этот инструмент — он берёт живое меню и просит его показать нужную страницу.
+## The game shooting scenario (`capture.py`) drives Otto with game actions and never reaches the
+## menu: it cannot press buttons. So the screens are shot by this tool — it takes the live menu and
+## asks it to show the needed page.
 ##
-## Запуск:
+## Run:
 ##     godot --path . res://tools/ui_shot.tscn
 ##     godot --path . res://tools/ui_shot.tscn -- --folder=M8b --locale=en
 ##
-## Кадры ложатся в screens/<веха>/. Папка локальная, в репозиторий не идёт.
+## Shots go to screens/<milestone>/. The folder is local, it does not go into the repository.
 
 const MAIN_SCENE := preload("res://src/main.tscn")
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 
 const DEFAULT_FOLDER := "M8b"
 
-## Сколько кадров дать сцене собраться и странице перерисоваться.
+## How many frames to give the scene to assemble and the page to redraw.
 const SETTLE_FRAMES: int = 20
 const PAGE_FRAMES: int = 6
-## Запас сверх въезда страницы, с: пункты загораются чуть позже, чем она встаёт.
+## Margin on top of the page slide-in, s: the items light up slightly later than it settles.
 const PAGE_MARGIN: float = 0.2
 
 var _folder: String = DEFAULT_FOLDER
@@ -63,10 +63,10 @@ func _run() -> void:
 	if not _locale.is_empty():
 		TranslationServer.set_locale(_locale)
 
-	# Экран конца партии показывает счёт и место, поэтому ему их надо задать:
-	# иначе он снимется пустым и соврёт про то, как выглядит на деле.
+	# The game over screen shows the score and the place, so they have to be set for it: otherwise it
+	# is shot empty and lies about how it really looks.
 	menu.remember(24500, 0)
-	# Вывеска мигает по жребию: без этого буква на снимке то горит, то нет.
+	# The sign blinks by a draw: without this a letter in the shot is sometimes lit and sometimes not.
 	menu.title().flicker_letter = -1
 
 	var pages: Array[Array] = [
@@ -80,9 +80,8 @@ func _run() -> void:
 	]
 	for page: Array in pages:
 		menu.show_page(page[0] as Menu.Page)
-		# Страница въезжает [constant Menu.PAGE_TIME] по часам, а не по кадрам:
-		# шесть кадров — это десятая доля секунды, и колонка снималась бы
-		# полупрозрачной и сдвинутой.
+		# The page slides in over [constant Menu.PAGE_TIME] by the clock, not by frames: six frames are a
+		# tenth of a second, and the column would be shot semi-transparent and shifted.
 		await get_tree().create_timer(Menu.PAGE_TIME + PAGE_MARGIN).timeout
 		for _frame: int in PAGE_FRAMES:
 			await get_tree().process_frame

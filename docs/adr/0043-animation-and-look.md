@@ -1,150 +1,163 @@
-# ADR-0043 · M24g: анимация и вид
+# ADR-0043 · M24g: animation and look
 
-- **Статус:** принято
-- **Дата:** 2026-09-28
-- **Дополняет:** [ADR-0025](0025-shafts-escalators-and-riders.md) (эскалатор),
-  [ADR-0038](0038-building-start-and-end.md) (вертолёт, красная дверь, выход)
+- **Status:** accepted
+- **Date:** 2026-09-28
+- **Extends:** [ADR-0025](0025-shafts-escalators-and-riders.md) (escalator),
+  [ADR-0038](0038-building-start-and-end.md) (helicopter, red door, exit)
 
-## Контекст
+## Context
 
-Вторая половина замечаний пользователя после M24e (2026-09-28); первая — M24f,
+The second half of the user's remarks after M24e (2026-09-28); the first is M24f,
 [ADR-0042](0042-bugs-and-settings.md).
 
-### Что показала сверка
+### What the check showed
 
-- На тросе, на эскалаторе и в двери Otto стоит в позе с пистолетом: у этих
-  состояний своей позы нет. В дверь он не входит, а переносится на коврик и
-  пропадает за один кадр. В ROM Otto 7 тиков идёт в дверь по 2 px и только
-  потом пропадает (@3BDA–3C25).
-- Клипа «висит на тросе» в наших клипах UAL нет.
-- Фары машины на выезде — один узкий луч на 9 м без следа в воздухе; улица
-  почти без света.
-- Эскалатор собран кодом из коробок; готовой модели в ассетах нет.
+- On the rope, on the escalator and in the door Otto stands in the pistol pose:
+  these states have no pose of their own. He does not walk into the door but is
+  moved onto the mat and vanishes in one frame. In the ROM Otto walks into the
+  door for 7 ticks at 2 px and only then vanishes (@3BDA–3C25).
+- Our UAL clips have no "hanging on a rope" clip.
+- The car headlights at the exit are one narrow beam 9 m long with no trace in the
+  air; the street has almost no light.
+- The escalator is assembled in code from boxes; there is no ready model in the
+  assets.
 
-## Решения
+## Decisions
 
-Все решения — пользователя.
+All decisions are the user's.
 
-1. **Трос — поза кодом:** руки вверх на тросе, ноги вместе, лёгкое
-   покачивание; внизу клип приземления.
-2. **На эскалаторе Otto идёт по ступеням** клипом ходьбы, лицом по ходу.
-3. **Эскалатор — модель своим скриптом в Blender:** ферма, стеклянная
-   балюстрада, нержавейка, гребёнка ступеней — под наши размеры.
-4. **Красная дверь — вход в глубину:** поворот к двери, пара шагов вглубь
-   проёма, дверь закрывается за спиной; выход — шаг к камере и поворот.
-5. **Фары светят путь:** луч виден в воздухе и ложится на пандус и улицу до
-   самого затемнения.
-6. **Окна города не только мигают:** случайные окна включаются и выключаются.
+1. **Rope — a code pose:** arms up on the rope, legs together, a slight sway; at
+   the bottom the landing clip.
+2. **On the escalator Otto walks up the steps** with the walk clip, facing the
+   direction of travel.
+3. **The escalator — a model from our own Blender script:** truss, glass
+   balustrade, stainless steel, step comb — to our dimensions.
+4. **The red door — entry into depth:** a turn to the door, a couple of steps
+   into the opening, the door closes behind him; exit — a step toward the camera
+   and a turn.
+5. **Headlights light the way:** the beam is visible in the air and falls on the
+   ramp and the street right until the fade.
+6. **City windows do not only blink:** random windows turn on and off.
 
-## Добавлено по ходу M24f
+## Added during M24f
 
-- **Расчленёнка** (просьба пользователя, 2026-09-28): кабина, проходя днищем по
-  трупу, отрывает ту часть тела, что под ней, с брызгами крови; выключается
-  вместе с кровью. Сверка и вопросы — перед началом вехи.
-- **Трупы друг на друге** (просьба пользователя, 2026-09-28): убитый рядом с
-  лежащим падает на него и лежит сверху. Сейчас трупы на слое 0 и друг друга не
-  видят — нужен свой слой трупов, который сталкивается сам с собой.
+- **Dismemberment** (the user's request, 2026-09-28): a cab passing with its floor
+  over a corpse tears off the part of the body under it, with blood splashes; it is
+  turned off together with blood. Check and questions — before the milestone
+  starts.
+- **Corpses on top of each other** (the user's request, 2026-09-28): one killed
+  next to a lying one falls on it and lies on top. Currently corpses are on layer 0
+  and do not see each other — a separate corpse layer that collides with itself is
+  needed.
 
-## Сверка и решения по расчленёнке и трупам (начало M24g)
+## Check and decisions on dismemberment and corpses (start of M24g)
 
-В ROM ни того, ни другого нет: убитый агент падает и исчезает. Оба пункта —
-сознательное расхождение, как трупы до конца здания в M24a.
+The ROM has neither: a killed agent falls and disappears. Both items are a
+deliberate divergence, like corpses until the end of the building in M24a.
 
-Кабина проходит днищем по телу только на нижнем этаже своей шахты: там под
-створом пол, туда падают трупы из шахты и там кабина давит живых. На остальных
-этажах под створом пустота, и лежащий с краю труп съезжает на площадку сам.
-Частично под днищем оказывается тело, лежащее поперёк края створа. До M24g
-труп под опустившейся кабиной исчезал целиком за кадр — зажат между полом и
-днищем.
+A cab passes with its floor over a body only on the bottom floor of its shaft:
+there is a floor under the opening there, corpses from the shaft fall there and
+the cab crushes the living there. On other floors there is a void under the
+opening, and a corpse lying at the edge slides onto the landing by itself. A body
+lying across the edge of the opening ends up partially under the cab floor. Before
+M24g a corpse under a descending cab disappeared entirely in one frame — pinched
+between the floor and the cab floor.
 
-Решения пользователя:
+The user's decisions:
 
-7. **Часть под днищем исчезает с брызгами, на полу остаётся пятно** крови до
-   конца здания. Кусков тела не остаётся.
-8. **Разрез — ровно по краю кабины,** а не по суставу: фигура срезается
-   плоскостью стенки кабины во всех своих материалах.
-9. **Рвёт всех, кто под днищем:** лежащие трупы, агента, которого кабина
-   давит (300 очков, как раньше), и Otto. Без крови — как до M24g: труп
-   исчезает, живые гибнут позой «раздавлен».
-10. **Трупы ложатся друг на друга физикой, без предела высоты:** убитый падает
-    на лежащего и лежит сверху, свисающий серединой съезжает на пол. Живые
-    и Otto проходят сквозь трупы, как раньше.
-11. **Тело поперёк порога рвётся по стенке тронувшейся кабины** (вопрос
-    пользователя по ходу вехи): часть в кабине уезжает с ней отдельным куском,
-    часть на площадке лежит где лежала; вверх и вниз одинаково. Без крови тело
-    не рвётся и съезжает на опору середины. Попутно поправлено правило M24f:
-    тело, лежащее концами на полу кабины и на площадке вровень, больше не
-    съезжает само — пока кабина стоит, оно лежит спокойно.
+7. **The part under the cab floor disappears with splashes, a blood stain stays on
+   the floor** until the end of the building. No body pieces remain.
+8. **The cut is exactly along the cab edge,** not at a joint: the figure is cut by
+   the plane of the cab wall in all its materials.
+9. **It tears everyone under the cab floor:** lying corpses, an agent the cab
+   crushes (300 points, as before), and Otto. Without blood — as before M24g: a
+   corpse disappears, the living die in the "crushed" pose.
+10. **Corpses stack on each other with physics, with no height limit:** one killed
+    falls on a lying one and lies on top, one hanging by its middle slides to the
+    floor. The living and Otto pass through corpses, as before.
+11. **A body across the threshold is torn along the wall of a cab that starts
+    moving** (the user's question during the milestone): the part in the cab rides
+    off with it as a separate piece, the part on the landing lies where it lay; up
+    and down the same. Without blood the body does not tear and slides onto the
+    support of its middle. Along the way the M24f rule was fixed: a body lying with
+    its ends on the cab floor and on a level landing no longer slides by itself —
+    while the cab stands still, it lies calmly.
 
-### Как устроено
+### How it works
 
-- Тело — [`Corpse`](../../src/systems/combat/corpse.gd) поверх рэгдолла
-  [`Ragdoll`](../../src/systems/combat/ragdoll.gd): тринадцать
-  [PhysicalBone3D] на скелете пака, собираются с рождения актёра и ждут
-  выключенными (слои пусты), в миг смерти включаются на слое 5 `corpses`.
-  Суставы — как у человека: колено гнётся только назад, бедро и спина вперёд
-  сильнее, чем назад; оси — модели, а не костей. Стопы пака висят на корне
-  скелета, и к голени их крепит отдельный шарнир. Части заперты по глубине:
-  пол кабины в метр глубиной, и без запрета их выдавливало бы из него вбок.
-  Лежащая на полу едущей кабины часть берёт её ход по вертикали — иначе тело
-  падало бы на уходящий пол раз за разом и сползало с него.
-- Оторванный кусок — [`CorpsePiece`](../../src/systems/combat/corpse_piece.gd):
-  копия фигуры, у которой физические только части этого куска, остальное
-  спрятано; части встают туда, где были в теле, с его скоростями. Рвёт тело
-  только тогда, когда наружная часть лежит на неподвижном: свесившаяся над
-  шахтой рука — не порог. Стопа уходит туда же, куда её голень.
-- Срез — шейдер фигуры `carve.gdshader`: материалы пака (цвет, цвет вершин,
-  шероховатость) повторены в нём. Днищем режет по мировой координате, ровно по
-  стенке; оторванное и отрезанное прячет по костям скина. Изнанка в срезе —
-  цвета мяса. Меш не режется: он скиннут, пересчитывать его на ходу дорого.
-- Днище режет [`CarCut`](../../src/systems/combat/car_cut.gd): срез идёт вниз
-  вместе с кабиной, из тела брызжет кровь, у пола остаётся пятно — `Decal`;
-  части, по которым днище прошло до середины, пропадают, и кабина сквозь них
-  не толкает.
-12. **Трупы — рэгдоллом** (просьба пользователя по ходу вехи, 2026-09-29):
-    брусок вместо тела ложился на другой труп доской, «как в невидимых
-    коробках». Каждая часть тела — своё физическое тело на суставах с
-    пределами. Физика начинается сразу от удара — тело обмякает и летит от
-    толчка пули; клип смерти уходит, сценка добивания доигрывается и отпускает
-    тело в физику. Так падают и агенты, и Otto; воскресший Otto снова на
-    ногах. Срез днищем и разрыв стенкой работают по частям тела.
-13. **Физика — Jolt вместо встроенного движка Godot** (по ходу вехи): на
-    рэгдолле встроенный движок проталкивал тонкие части — предплечье — сквозь
-    плиту перекрытия при ударе о пол и не давал частям уснуть: тело мелко
-    дрожало, пока лежит. Jolt, второй движок из поставки Godot 4.7, держит
-    суставы и усыпляет улёгшиеся тела. Переключение — строка
-    `physics/3d/physics_engine` в `project.godot` и нулевой запас на
-    скругление форм (`collision_margin_fraction`): с запасом персонажи стояли
-    на полу на сантиметр выше. Проверено всем набором тестов, в том числе
-    ботом, который проходит здание.
-14. **Толчок пули — в ту часть тела, куда она попала** (вопрос пользователя):
-    в голову — голову запрокидывает, в ноги — их выбивает, в корпус —
-    отбрасывает тело. Высоты выстрела в игре по ROM разные — стоя, из приседа,
-    лёжа, — и разные смерти получаются сами. Без пули тело толкает назад, от
-    взгляда.
-15. **Эскалаторы — у края этажа, под 30°, зигзагом** (просьба пользователя по
-    ходу вехи): посередине этажа эскалатор выглядит нелепо. Спускается он к
-    краю, а не от края: верхняя площадка ближе к середине, нижняя — у самого
-    края этажа ниже, и дыра в перекрытии уходит за площадку к краю, мимо
-    прохода. К площадке доходят пешком, прыгать через провал не нужно.
-    Несколько подряд — зигзагом: к левому краю, к правому, снова к левому.
-    Пролёт под 30° на этаж в 3,6 м — около 6,2 м по горизонтали; в кадре он
-    вышел слишком пологим, и пользователь поправил наклон на 45°: пролёт —
-    3,6 м, два места.
-16. **Пуля вылетает из дула** (замечание пользователя): высоты выстрела
-    остаются по ROM, бой не меняется; в позе выстрела рука с пистолетом
-    наводится так, чтобы дуло стояло там, откуда пуля вылетает.
-17. **Выезд из паркинга — плавной кривой** (замечание пользователя): прямой
-    пандус ломался углами у пола и у улицы, и машина на них переламывалась.
-    Подъём — сглаженная ступень: касательная горизонтальна на обоих концах,
-    круче к середине. По одной кривой строится плита пандуса (отрезками), клин
-    грунта под ней и ход машины — высота и наклон по касательной.
-18. **Фары — мягкий свет, а не конус** (замечания пользователя): видимый конус
-    геометрией читался треугольником. Фар две; у стекла — мягкий ореол, в
-    воздухе луч виден только в объёмном тумане. На улице свет не ложился на
-    асфальт по двум причинам, найденным покадровым разбором
-    (`tools/m24b_shot.tscn -- --sequence`): камера останавливалась у края
-    кадра здания, и машина последние метры ехала за краем; асфальт был почти
-    абсолютно чёрным (0,004 в линейных единицах), а мокрый — зеркалом, и косой
-    луч уходил мимо камеры. Кадр теперь обгоняет машину и держит под ней
-    полосу улицы, асфальт — около 0,2 sRGB, мокрый блестит, но берёт свет.
+- The body is [`Corpse`](../../src/systems/combat/corpse.gd) on top of the ragdoll
+  [`Ragdoll`](../../src/systems/combat/ragdoll.gd): thirteen
+  [PhysicalBone3D] on the pack skeleton, built when the actor is born and waiting
+  disabled (empty layers), at the moment of death turned on on layer 5 `corpses`.
+  Joints are like a human's: the knee bends only backward, the hip and back bend
+  more forward than backward; the axes are the model's, not the bones'. The pack's
+  feet hang from the skeleton root, and a separate hinge attaches them to the shin.
+  The parts are locked in depth: the cab floor is a meter deep, and without the lock
+  they would be squeezed out of it sideways. A part lying on the floor of a moving
+  cab takes its vertical motion — otherwise the body would fall onto the receding
+  floor again and again and slide off it.
+- A torn-off piece is [`CorpsePiece`](../../src/systems/combat/corpse_piece.gd):
+  a copy of the figure in which only the parts of this piece are physical, the rest
+  hidden; the parts take the places they had in the body, with its velocities. The
+  body tears only when the outer part lies on something stationary: an arm hanging
+  over the shaft is not a threshold. The foot goes wherever its shin goes.
+- The cut is the figure shader `carve.gdshader`: the pack materials (color, vertex
+  color, roughness) are replicated in it. The cab floor cuts by world coordinate,
+  exactly along the wall; torn-off and cut-off parts are hidden by skin bones. The
+  back faces in the cut are flesh-colored. The mesh is not cut: it is skinned, and
+  recomputing it on the fly is expensive.
+- The cab floor cuts via [`CarCut`](../../src/systems/combat/car_cut.gd): the cut
+  moves down together with the cab, blood sprays from the body, a stain stays at the
+  floor — a `Decal`; parts the cab floor has passed through to the middle
+  disappear, and the cab does not push through them.
+12. **Corpses — as a ragdoll** (the user's request during the milestone,
+    2026-09-29): a bar instead of a body lay on another corpse like a plank, "as if
+    in invisible boxes". Each body part is its own physical body on joints with
+    limits. Physics starts right from the hit — the body goes limp and flies from
+    the bullet's push; the death clip goes away, a takedown scene plays out and
+    releases the body into physics. Both agents and Otto fall this way; a revived
+    Otto is back on his feet. The cut by the cab floor and tearing by the wall work
+    per body part.
+13. **Physics — Jolt instead of Godot's built-in engine** (during the milestone):
+    on the ragdoll the built-in engine pushed thin parts — the forearm — through
+    the floor slab on hitting the floor and did not let parts sleep: the body
+    jittered finely while lying. Jolt, the second engine shipped with Godot 4.7,
+    holds joints and puts settled bodies to sleep. Switching is the line
+    `physics/3d/physics_engine` in `project.godot` and a zero margin for shape
+    rounding (`collision_margin_fraction`): with a margin characters stood a
+    centimeter above the floor. Verified by the whole test suite, including the bot
+    that passes a building.
+14. **The bullet's push goes into the body part it hit** (the user's question):
+    in the head — the head snaps back, in the legs — they are knocked out, in the
+    torso — the body is thrown back. Shot heights in the game per the ROM differ —
+    standing, crouched, prone — and different deaths come out by themselves.
+    Without a bullet the body is pushed backward, away from its facing.
+15. **Escalators — at the floor edge, at 30°, in a zigzag** (the user's request
+    during the milestone): in the middle of a floor an escalator looks absurd. It
+    descends toward the edge, not away from it: the upper landing is closer to the
+    middle, the lower one is at the very edge of the floor below, and the hole in
+    the slab extends past the landing toward the edge, away from the walkway. One
+    reaches the landing on foot, there is no need to jump over the gap. Several in a
+    row — in a zigzag: to the left edge, to the right, again to the left. A 30°
+    flight over a 3.6 m floor is about 6.2 m horizontally; in the frame it came out
+    too shallow, and the user corrected the slope to 45°: the flight is 3.6 m, two
+    places.
+16. **The bullet leaves from the muzzle** (the user's remark): shot heights stay
+    per the ROM, combat does not change; in the shooting pose the arm with the
+    pistol is aimed so that the muzzle is where the bullet comes out.
+17. **The exit from the garage — a smooth curve** (the user's remark): the straight
+    ramp broke into corners at the floor and at the street, and the car bent on
+    them. The rise is a smoothed step: the tangent is horizontal at both ends,
+    steeper toward the middle. From one curve are built the ramp slab (in
+    segments), the soil wedge under it and the car's motion — height and tilt along
+    the tangent.
+18. **Headlights — soft light, not a cone** (the user's remarks): a visible
+    geometric cone read as a triangle. There are two headlights; at the glass — a
+    soft halo, in the air the beam is visible only in volumetric fog. On the street
+    the light did not fall on the asphalt for two reasons found by frame-by-frame
+    analysis (`tools/m24b_shot.tscn -- --sequence`): the camera stopped at the edge
+    of the building frame, and the car drove its last meters beyond the edge; the
+    asphalt was almost absolutely black (0.004 in linear units), and the wet one a
+    mirror, so the oblique beam went past the camera. The frame now overtakes the
+    car and keeps a strip of street under it, asphalt is about 0.2 sRGB, the wet one
+    shines but takes light.

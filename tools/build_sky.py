@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Небо города: HDRI-панорамы Poly Haven (CC0) по времени суток и погоде (ADR-0051).
+"""City sky: Poly Haven HDRI panoramas (CC0) by time of day and weather (ADR-0051).
 
-Панорамы выбраны пользователем по картинкам (2026-10-01). Берутся в 1k: город
-за ними размыт глубиной резкости, и 2k весило бы втрое больше без разницы в кадре.
+The panoramas were chosen by the user from pictures (2026-10-01). Taken at 1k: the city
+in front of them is blurred by depth of field, and 2k would weigh three times more with no
+difference in the frame.
 
-Скрипт качает панорамы в `assets/sky/` и печатает, где на каждой солнце —
-азимут и высоту самой яркой точки: игра поворачивает панораму так, чтобы её
-солнце стояло там же, где свет солнца города ([CitySky]).
+The script downloads the panoramas into `assets/sky/` and prints where the sun is on each —
+azimuth and elevation of the brightest point: the game rotates the panorama so that its
+sun stands where the city sunlight is ([CitySky]).
 
     python tools/build_sky.py
 """
@@ -38,7 +39,7 @@ URL = "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/{id}_1k.hdr"
 
 
 def read_hdr(path: Path) -> np.ndarray:
-    """Radiance .hdr с RLE-строками в массив высота×ширина×3, линейный свет."""
+    """Radiance .hdr with RLE lines into a height×width×3 array, linear light."""
     data = path.read_bytes()
     header_end = data.index(b"\n\n") + 2
     line_end = data.index(b"\n", header_end)
@@ -69,10 +70,10 @@ def read_hdr(path: Path) -> np.ndarray:
 
 
 def sun_of(image: np.ndarray) -> tuple[float, float, float]:
-    """Азимут и высота самой яркой точки, градусы, и её яркость."""
+    """Azimuth and elevation of the brightest point, degrees, and its brightness."""
     height, width, _ = image.shape
     light = image.sum(axis=2)
-    # Только верхняя половина: низ pure sky — отражение неба.
+    # Only the upper half: the bottom of a pure sky is a reflection of the sky.
     light[height // 2:, :] = 0.0
     row, column = np.unravel_index(np.argmax(light), light.shape)
     azimuth = (column + 0.5) / width * 360.0

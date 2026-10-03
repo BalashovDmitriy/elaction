@@ -1,79 +1,79 @@
 class_name BuildingProps
 extends Node3D
 
-## Обстановка этажей, таблички у дверей и трубы под потолком
-## (ADR-0029, решение 3; с M21b — модели паков, ADR-0033, решение 3).
+## Floor dressing, door plaques and pipes under the ceiling
+## (ADR-0029, decision 3; since M21b — pack models, ADR-0033, decision 3).
 ##
-## Всё без тел: предмет — декор, а не укрытие. Где что стоит, решает
-## [BuildingDressing], чем он выглядит — [PropCatalog]. Светится лишь то, что и
-## в жизни светится, — табло, лампа на комоде: предмет за спиной актёра не
-## должен спорить с его силуэтом (обводка — ADR-0022).
+## All without bodies: an item is decor, not cover. Where things stand is decided by
+## [BuildingDressing], what they look like — by [PropCatalog]. Only what glows in real
+## life glows — the display, the lamp on the dresser: an item behind an actor must not
+## compete with his silhouette (outline — ADR-0022).
 
-## Насколько предмет на стене отстоит от неё, м: вплотную он мерцал бы с ней.
+## How far an item on the wall stands off it, m: flush, it would flicker with it.
 const STANDOFF: float = 0.04
 
-## Табличка у двери: размер, на какой высоте середина, м, и насколько она
-## правее края двери.
+## Door plaque: size, the height of its middle, m, and how far it is right of the door's
+## edge.
 const PLATE := Vector3(0.16, 0.1, 0.015)
 const PLATE_RISE: float = 1.5
 const PLATE_GAP: float = 0.14
-## Табличка висит перед пилястрами, как табличка этажа
-## ([constant FloorSigns.STANDOFF]): у края простенка рядом с дверью стоит
-## пилястра, и табличка на самой стене тонула в ней целиком (авторевью M21b).
+## The plaque hangs in front of the pilasters, like the floor plaque
+## ([constant FloorSigns.STANDOFF]): at the edge of the pier next to the door stands a
+## pilaster, and a plaque on the wall itself sank into it entirely (code review M21b).
 const PLATE_Z: float = WorldSpace.BACK_WALL_Z + BuildingRibs.PILASTER_DEPTH + 0.01
-## У стекла офиса пилястр нет (ADR-0056, решение 4): табличка — на стекле,
-## перед наличником двери и стойками перегородки, а не в воздухе перед ними.
+## The office glass has no pilasters (ADR-0056, decision 4): the plaque is on the glass,
+## in front of the door casing and the partition posts, not in the air in front of them.
 const GLASS_PLATE_Z: float = WorldSpace.BACK_WALL_Z + Door.FRAME_DEPTH + 0.01
-## Зазор предмета на стене над поручнем панели низа, м.
+## Gap of a wall item above the lower panel's handrail, m.
 const PANEL_CLEAR: float = 0.02
-## Таблички: латунь с тёмными цифрами в отеле, сталь в офисе, тусклый
-## алюминий в жилом доме.
+## Plaques: brass with dark numbers in the hotel, steel in the office, dull aluminium in
+## the residential building.
 const PLATE_HOTEL := Color(0.62, 0.48, 0.22)
 const PLATE_OFFICE := Color(0.55, 0.57, 0.6)
 const PLATE_RESIDENTIAL := Color(0.46, 0.46, 0.44)
 const PLATE_INK := Color(0.08, 0.07, 0.06)
 
-## Труба под потолком: толщина, м. Висит перед пилястрами — они выступают из
-## стены на [constant BuildingRibs.PILASTER_DEPTH] — и сразу под полосой, которую
-## от наклонённой камеры закрывает кромка перекрытия
-## ([method FloorSigns.hidden_band]). До авторевью M19 она шла в 7 см под
-## потолком и целиком пряталась за кромкой: в кадре труб не было ни одной.
+## Pipe under the ceiling: thickness, m. It hangs in front of the pilasters — they stick
+## out of the wall by [constant BuildingRibs.PILASTER_DEPTH] — and right under the strip
+## that the slab's edge hides from the tilted camera
+## ([method FloorSigns.hidden_band]). Before code review M19 it ran 7 cm under the
+## ceiling and hid entirely behind the edge: not a single pipe was in the frame.
 const PIPE_THICKNESS: float = 0.14
-## Зазор трубы от пилястр и от полосы под кромкой, м.
+## Pipe gap from the pilasters and from the strip under the edge, m.
 const PIPE_GAP: float = 0.03
-## Насколько труба не доходит до таблички этажа, м: перед ней она закрыла бы
-## её верх.
+## How far short of the floor plaque the pipe stops, m: in front of it, it would cover
+## the plaque's top.
 const PIPE_CLEARANCE: float = 0.1
-## Короче этого кусок трубы не ставится, м: обрубок у стены читается мусором.
+## A pipe piece shorter than this is not placed, m: a stub at the wall reads as garbage.
 const PIPE_MIN_LENGTH: float = 0.3
 
 const PIPE := Color(0.22, 0.22, 0.24)
 
 var _rules: BuildingRules = null
-## Ниже этого над полом предмет на стене не висит, м: верх панели низа стены с
-## поручнем. У отеля она в рост картины (ADR-0056, решение 4), и низ картины
-## уходил за поручень.
+## A wall item does not hang lower than this above the floor, m: the top of the lower
+## wall panel with the handrail. In the hotel it is picture height (ADR-0056,
+## decision 4), and the bottom of a picture went behind the handrail.
 var _panel_top: float = 0.0
 
 
-## Середина трубы по глубине: перед пилястрами, с зазором.
+## Middle of the pipe in depth: in front of the pilasters, with a gap.
 static func pipe_z() -> float:
 	return WorldSpace.BACK_WALL_Z + BuildingRibs.PILASTER_DEPTH + PIPE_GAP + PIPE_THICKNESS * 0.5
 
 
-## Верх трубы на этаже, в координатах правил: сразу под полосой, которую на
-## глубине её передней грани закрывает кромка перекрытия.
+## Top of the pipe on the floor, in rules coordinates: right under the strip that the
+## slab's edge hides at the depth of its front face.
 static func pipe_top(rules: BuildingRules, floor_index: int) -> float:
 	var front := pipe_z() + PIPE_THICKNESS * 0.5
 	return rules.story_top(floor_index) + FloorSigns.hidden_band(front) + PIPE_GAP
 
 
-## Куски трубы этажа: пары «левый край, правый край».
+## Pieces of a floor's pipe: "left edge, right edge" pairs.
 ##
-## Разрывы — там, где труба прошла бы сквозь что-то или закрыла бы его: шахта
-## (ходит кабина), проём эскалатора с этажа выше (сквозь потолок идёт полотно)
-## и табличка номера этажа. Статический: раскладку труб
-## проверяют без сцены.
+## Breaks are where the pipe would pass through something or cover it: a shaft (the cab
+## travels), an escalator opening from the floor above (the belt goes through the
+## ceiling) and the floor number plaque. Static: the pipe layout is checked without a
+## scene.
 static func pipe_spans(
 	rules: BuildingRules, plan: BuildingPlan, floor_index: int
 ) -> Array[Vector2]:
@@ -98,7 +98,7 @@ static func pipe_spans(
 	return spans
 
 
-## Ставит обстановку по раскладке и таблички у дверей.
+## Places the dressing by the layout and the door plaques.
 func build(
 	rules: BuildingRules,
 	plan: BuildingPlan,
@@ -116,7 +116,7 @@ func build(
 		_lay_pipe(plan, index)
 
 
-## Мебель у стены: перед пилястрами, на полу этажа.
+## Furniture by the wall: in front of the pilasters, on the floor.
 func _stand(prop: BuildingDressing.PropSpot) -> void:
 	var item := PropCatalog.make(prop.name)
 	if item == null:
@@ -126,8 +126,8 @@ func _stand(prop: BuildingDressing.PropSpot) -> void:
 	add_child(item)
 
 
-## Предмет на стене: серединой на высоте из каталога, но не ниже верха панели
-## низа стены ([member _panel_top]).
+## A wall item: its middle at the height from the catalogue, but no lower than the top
+## of the lower wall panel ([member _panel_top]).
 func _hang(prop: BuildingDressing.PropSpot) -> void:
 	var item := PropCatalog.make(prop.name)
 	if item == null:
@@ -141,8 +141,8 @@ func _hang(prop: BuildingDressing.PropSpot) -> void:
 	add_child(item)
 
 
-## Таблички у дверей: номер комнаты — этаж и порядковый номер двери слева
-## направо, как в гостинице: 2904 — четвёртая дверь двадцать девятого этажа.
+## Door plaques: the room number is the floor and the door's ordinal from left to right,
+## as in a hotel: 2904 — the fourth door of the twenty-ninth floor.
 func _plate_the_doors(plan: BuildingPlan, identity: BuildingIdentity) -> void:
 	var counted := {}
 	var plate_tone := PLATE_OFFICE
@@ -164,10 +164,10 @@ func _plate_the_doors(plan: BuildingPlan, identity: BuildingIdentity) -> void:
 		var x := door.x + Door.LEAF_SIZE.x * 0.5 + PLATE_GAP
 		var y := _rules.floor_surface(door.floor_index) - PLATE_RISE
 		var room := "%d%02d" % [number, counted[door.floor_index]]
-		# У офиса табличка шире: отдел над номером кабинета (ADR-0048).
+		# In the office the plaque is wider: the department above the office number (ADR-0048).
 		var size := PLATE
 		var text := room
-		# У квартиры — этаж и буква по порядку двери, как 12C (ADR-0055).
+		# An apartment gets the floor and a letter in door order, like 12C (ADR-0055).
 		if style.apartment_letters:
 			text = "%d%s" % [number, String.chr(64 + int(counted[door.floor_index]))]
 		if style.departments:
@@ -191,7 +191,7 @@ func _plate_the_doors(plan: BuildingPlan, identity: BuildingIdentity) -> void:
 		add_child(label)
 
 
-## Труба под потолком вдоль задней стены, кусками [method pipe_spans].
+## Pipe under the ceiling along the back wall, in [method pipe_spans] pieces.
 func _lay_pipe(plan: BuildingPlan, floor_index: int) -> void:
 	var y := pipe_top(_rules, floor_index) + PIPE_THICKNESS * 0.5
 	for span in pipe_spans(_rules, plan, floor_index):

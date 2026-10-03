@@ -1,15 +1,14 @@
 extends GutTest
 
-## Подвал на плане: одна шахта вниз, без эскалаторов, машина у ворот слева
-## (ADR-0038, решение 3).
+## The basement on the plan: one shaft down, no escalators, the car at the gate on the left
+## (ADR-0038, decision 3).
 ##
-## Шахта в подвал — жребий здания, и путь к машине зависит от того, какая
-## выпала. Поэтому проверяется не одно здание, а любое, которое сгенерируется
-## (`docs/testing.md`): на сотне сидов, на разных навыках и на маленьких
-## зданиях из тестов сборки и бота.
+## The shaft into the basement is a draw of the building, and the path to the car depends on which
+## one came up. So not one building is checked but any that gets generated (`docs/testing.md`): on a
+## hundred seeds, at different skills and on the small buildings from the assembly and bot tests.
 
 
-## Здание на проверку: правила, сид и собранный план.
+## A building to check: rules, seed and the assembled plan.
 class Case:
 	extends RefCounted
 	var rules: BuildingRules
@@ -20,16 +19,16 @@ class Case:
 		return "этажей %d, навык %d, сид %d" % [rules.floors, rules.skill, building_seed]
 
 
-## Сидов больше, чем в соседних проверках плана: шахта в подвал выбирается из
-## пяти, а запертый спуск, который лечит перекладка шахт, выпадал на сидах 65
-## и 79 — в первых десятках его не видно.
+## More seeds than in the neighbouring plan checks: the shaft into the basement is chosen out of
+## five, and a locked descent, which the shaft re-layout cures, came up on seeds 65 and 79 — it is
+## not visible in the first tens.
 const SEEDS: int = 100
 
-## Навыки: первое здание, середина и тот, где квоты красных уже не растут.
+## Skills: the first building, the middle and the one where the red door quotas no longer grow.
 const SKILLS: Array[int] = [0, 3, 8]
 
-## Планы собираются один раз на файл: пятьсот зданий на каждый тест заново
-## стоили бы полминуты прогона, а план между тестами не меняется.
+## Plans are assembled once per file: five hundred buildings anew for each test would cost half a
+## minute of the run, and the plan does not change between tests.
 var _cases: Array[Case] = []
 
 
@@ -43,8 +42,8 @@ func before_all() -> void:
 			_cases.append(case)
 
 
-## Здания, на которых проверяется подвал: настоящие на трёх навыках и
-## маленькие — такие собирают тесты машины, сборки и бота.
+## Buildings on which the basement is checked: real ones at three skills and small ones — the car,
+## assembly and bot tests assemble those.
 func _buildings() -> Array[BuildingRules]:
 	var all: Array[BuildingRules] = []
 	for skill: int in SKILLS:
@@ -60,8 +59,8 @@ func _buildings() -> Array[BuildingRules]:
 	return all
 
 
-## В подвал спускается ровно одна шахта, и та, что доходит до этажа над ним;
-## остальные кончаются выше, как в ROM ($802D).
+## Exactly one shaft goes down into the basement, and it is the one that reaches the floor above it;
+## the others end higher, as in the ROM ($802D).
 func test_exactly_one_shaft_goes_down_to_the_basement() -> void:
 	for case in _cases:
 		var basement := case.rules.floors - 1
@@ -83,7 +82,7 @@ func test_exactly_one_shaft_goes_down_to_the_basement() -> void:
 		)
 
 
-## Эскалаторы в подвал не спускаются: туда ведёт только шахта.
+## Escalators do not go down into the basement: only a shaft leads there.
 func test_no_escalator_lands_in_the_basement() -> void:
 	for case in _cases:
 		for escalator in case.plan.escalators:
@@ -94,8 +93,8 @@ func test_no_escalator_lands_in_the_basement() -> void:
 			)
 
 
-## Выход — крайнее левое место подвала, на машине у ворот; шахта в подвал
-## машину не задевает, и машина встаёт именно у ворот.
+## The exit is the leftmost place of the basement, at the car by the gate; the shaft into the
+## basement does not touch the car, and the car stands exactly at the gate.
 func test_the_exit_is_at_the_left_gate_clear_of_the_shaft() -> void:
 	for case in _cases:
 		var rules := case.rules
@@ -130,8 +129,8 @@ func test_the_exit_is_at_the_left_gate_clear_of_the_shaft() -> void:
 		)
 
 
-## Здание проходится до машины: с крыши — шахтой в подвал, а из неё пешком —
-## до выхода, без стены и проёма между ними.
+## The building can be traversed to the car: from the roof — by the shaft into the basement, and
+## from it on foot — to the exit, with no wall or opening between them.
 func test_the_car_is_reachable_through_the_basement_shaft() -> void:
 	for case in _cases:
 		var rules := case.rules
@@ -144,7 +143,8 @@ func test_the_car_is_reachable_through_the_basement_shaft() -> void:
 			continue
 		var floors := BuildingRoute.segments(plan, rules)
 		var seen := BuildingRoute.reachable_in(plan, rules, floors)
-		# В подвале под шахтой проёма нет — там дно, и кусок у кабины один.
+		# In the basement there is no opening under the shaft — it is the bottom, and there is one piece
+		# at the cab.
 		var landing := BuildingRoute.node_in(floors, basement, shaft.x)
 		assert_true(seen.has(landing), "%s: шахтой в подвал не спуститься" % label)
 		var exit := BuildingRoute.node_in(floors, basement, plan.exit_x)
@@ -154,8 +154,8 @@ func test_the_car_is_reachable_through_the_basement_shaft() -> void:
 			[] as Array[String],
 			"%s: здание не проходится" % label
 		)
-		# Тот же путь — графом, по которому ходит бот: он обязан найти шаг
-		# к машине прямо с крыши.
+		# The same path through the graph the bot walks by: it must find a step toward the car right from
+		# the roof.
 		var graph := BuildingRoute.walkable(plan, rules)
 		var roof_x := plan.safe_x(rules, BuildingRules.ROOF)
 		var step := BuildingRoute.step_toward(

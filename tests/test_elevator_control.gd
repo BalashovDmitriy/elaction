@@ -1,28 +1,28 @@
 extends GutTest
 
-## Каждая кабина здания слушается игрока.
+## Every cab of the building obeys the player.
 ##
-## Отзыв после игры: «на некоторых лифтах не работало управление — кабина
-## не слушалась команд и стояла, а стоило сойти, как она уезжала». Проверка
-## поэтому не про одну кабину из сцены, а про все, какие соберёт генератор:
-## баг был не у всех.
+## Feedback after playing: "on some elevators the controls did not work — the cab
+## did not obey commands and stood still, and once you stepped off, it drove away". So the
+## check is not about one cab from a scene but about all that the generator builds:
+## not all of them had the bug.
 ##
-## Высоты сравниваются в плоскости правил, где вниз — это рост Y: так считала
-## кабина в 2D, и так утверждения ниже остались нетронутыми при переезде.
+## Heights are compared in the rules plane, where down is growing Y: this is how the cab
+## computed in 2D, and this way the assertions below stayed untouched in the move.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
-## Сколько кадров даётся зданию, чтобы встать на места.
+## How many frames the building gets to settle into place.
 const SETTLE_FRAMES: int = 4
 
-## Сколько кадров держать команду. Кабина идёт 1.8 м/с, этаж — 3.6 м:
-## за полсекунды она обязана сдвинуться заметно.
+## How many frames to hold a command. The cab goes 1.8 m/s, a floor is 3.6 m:
+## in half a second it must move noticeably.
 const DRIVE_FRAMES: int = 30
 
-## Насколько кабина должна уехать, чтобы это считалось «слушается», м.
+## How far the cab must move for it to count as "obeys", m.
 const MOVED: float = 0.2
 
-## Допуск на совпадение координат, м: на дробную арифметику, и только на неё.
+## Coordinate match tolerance, m: for floating-point arithmetic, and only for it.
 const TOLERANCE: float = 0.01
 
 
@@ -44,12 +44,12 @@ func _build(building_seed: int) -> GreyboxLevel:
 	return level
 
 
-## Кабины со своим ходом — по одной на шахту, в порядке шахт.
+## Cabs with their own drive — one per shaft, in shaft order.
 ##
-## Ярусы двухэтажных пар ([method ElevatorCar.is_deck]) сюда не идут: у них
-## своего хода нет, они держатся за ведущим, и ставить их на остановки руками
-## бессмысленно. С M18b их в дереве на одну-две больше, чем шахт, и счёт
-## по порядку без этого отбора разъезжался (ADR-0025, решение 1).
+## Decks of two-floor pairs ([method ElevatorCar.is_deck]) are not included: they have
+## no drive of their own, they hold on to the leading one, and putting them on stops by hand
+## is pointless. Since M18b there are one or two more of them in the tree than shafts, and
+## the count by order fell apart without this filter (ADR-0025, decision 1).
 func _cars(level: GreyboxLevel) -> Array[ElevatorCar]:
 	var found: Array[ElevatorCar] = []
 	for child: Node in level.get_children():
@@ -59,7 +59,7 @@ func _cars(level: GreyboxLevel) -> Array[ElevatorCar]:
 	return found
 
 
-## Ярусы пар: по одному на двухэтажную шахту.
+## Pair decks: one per two-floor shaft.
 func _decks(level: GreyboxLevel) -> Array[ElevatorCar]:
 	var found: Array[ElevatorCar] = []
 	for child: Node in level.get_children():
@@ -69,27 +69,27 @@ func _decks(level: GreyboxLevel) -> Array[ElevatorCar]:
 	return found
 
 
-## Высота кабины в плоскости правил.
+## Cab height in the rules plane.
 func _height(car: ElevatorCar) -> float:
 	return WorldSpace.to_plane(car.global_position).y
 
 
-## Насколько виден указатель: коробка гасится прозрачностью.
+## How visible the indicator is: the box is dimmed by transparency.
 func _alpha(arrow: MeshInstance3D) -> float:
 	return 1.0 - arrow.transparency
 
 
-## Ставит Otto внутрь кабины и ждёт, пока она его заметит.
+## Puts Otto inside the cab and waits until it notices him.
 func _get_in(level: GreyboxLevel, car: ElevatorCar) -> void:
 	level.otto.global_position = car.global_position
 	level.otto.velocity = Vector3.ZERO
 	await wait_physics_frames(SETTLE_FRAMES)
 
 
-## Ставит кабину на нужный этаж её полосы.
+## Puts the cab on the needed floor of its band.
 ##
-## Через [method ElevatorCar.setup], а не через координату: у хода кабины своё
-## состояние, и переставленная руками она возвращается туда, где себя считает.
+## Via [method ElevatorCar.setup], not via the coordinate: the cab drive has its own
+## state, and moved by hand it returns to where it thinks it is.
 func _park(
 	level: GreyboxLevel, car: ElevatorCar, shaft: BuildingPlan.ShaftSpot, index: int
 ) -> void:
@@ -97,8 +97,8 @@ func _park(
 	for floor_index: int in range(shaft.top, shaft.bottom + 1):
 		stops.append(level.rules.floor_surface(floor_index))
 	car.setup(stops, index - shaft.top)
-	# Кабина переносит себя в координату своим кадром: пока он не прошёл, она
-	# стоит там, где стояла, и вошедший в неё оказался бы у прежнего места.
+	# The cab moves itself to the coordinate on its own frame: until it has passed, it
+	# stands where it stood, and someone entering it would end up at the old place.
 	await wait_physics_frames(1)
 
 
@@ -116,10 +116,10 @@ func test_every_car_obeys_the_player() -> void:
 
 		var shafts := level.plan().shafts
 		var cars := _cars(level)
-		# Кабины стоят в дереве в порядке шахт — уровень их так и ставит. Порядок
-		# нигде не обещан, а тест на нём держится: перепутанная пара молча
-		# поставила бы кабину на чужие остановки, и проверка стала бы зелёной,
-		# ничего не проверяя.
+		# Cabs stand in the tree in shaft order — the level places them that way. The order
+		# is promised nowhere, but the test relies on it: a mixed-up pair would silently
+		# put a cab on someone else's stops, and the check would turn green
+		# without checking anything.
 		assert_eq(
 			cars.size(), shafts.size(), "сид %d: кабин не столько, сколько шахт" % building_seed
 		)
@@ -141,11 +141,11 @@ func test_every_car_obeys_the_player() -> void:
 				TOLERANCE,
 				"сид %d, кабина %d: встала не в своей шахте" % [building_seed, number]
 			)
-			# Кабина ставится на верх своей полосы, а не берётся там, где её
-			# застал прогон. Пустая кабина катается сама, и застать её можно
-			# на нижнем упоре — тогда «не поехала вниз по команде» означало бы
-			# «ехать было некуда», то есть тест падал бы по очереди на разных
-			# сидах без всякой поломки.
+			# The cab is put at the top of its band rather than taken where the run
+			# found it. An empty cab rides on its own, and it can be found
+			# at the bottom stop — then "did not go down on command" would mean
+			# "there was nowhere to go", i.e. the test would fail now and then on different
+			# seeds without any breakage.
 			var car: ElevatorCar = cars[index]
 			await _park(level, car, shaft, shaft.top)
 			await _get_in(level, car)
@@ -175,19 +175,19 @@ func _drop(level: GreyboxLevel) -> void:
 	remove_child(level)
 
 
-## Кабина у края своей полосы дальше не едет — и это не поломка, а устройство
-## шахт: они не сквозные (ADR-0008). Но вверх она обязана пойти.
+## A cab at the edge of its band goes no further — and this is not a breakage but how
+## the shafts work: they do not go through (ADR-0008). But it must go up.
 ##
-## Отзыв после игры выглядел именно так: «не слушается и стоит, сошёл — уехала».
-## Стоящая у предела кабина ведёт себя ровно так, и тест держит это поведение
-## описанным, чтобы в следующий раз его не чинили как баг.
+## The feedback after playing looked exactly like this: "does not obey and stands, stepped
+## off — it drove away". A cab standing at its limit behaves exactly so, and the test keeps
+## this behaviour described, so that next time it is not fixed as a bug.
 func test_car_at_the_end_of_its_band_still_goes_the_other_way() -> void:
 	var level := _build(1)
 	await wait_physics_frames(SETTLE_FRAMES)
 
 	var shaft := level.plan().shafts[0]
 	var car := _cars(level)[0]
-	# Ставим кабину на нижний этаж её полосы и Otto в неё.
+	# We put the cab on the bottom floor of its band and Otto into it.
 	await _park(level, car, shaft, shaft.bottom)
 	await _get_in(level, car)
 
@@ -200,10 +200,10 @@ func test_car_at_the_end_of_its_band_still_goes_the_other_way() -> void:
 	_drop(level)
 
 
-## Otto входит в кабину шагом, как игрок, а не появляется в ней.
+## Otto enters the cab by a step, like a player, rather than appearing in it.
 ##
-## Вход шагом — единственный, какой бывает в игре, и именно на нём кабина
-## однажды переставала слушаться: занятой она себя считала, а команд не получала.
+## Entering by a step is the only way it happens in the game, and it is on it that the cab
+## once stopped obeying: it considered itself occupied but received no commands.
 func test_car_obeys_after_otto_walks_in() -> void:
 	var level := _build(1)
 	await wait_physics_frames(SETTLE_FRAMES)
@@ -211,14 +211,14 @@ func test_car_obeys_after_otto_walks_in() -> void:
 	var rules := level.rules
 	var shaft := level.plan().shafts[0]
 	var car := _cars(level)[0]
-	# Кабина встаёт на верхний этаж полосы, Otto — рядом с проёмом на том же полу.
+	# The cab stands on the top floor of the band, Otto next to the opening on the same floor.
 	var index := maxi(shaft.top, 0)
 	var surface := rules.floor_surface(index)
 	await _park(level, car, shaft, index)
 	level.otto.global_position = WorldSpace.to_scene(Vector2(shaft.x - rules.shaft_width, surface))
 	await wait_physics_frames(SETTLE_FRAMES)
 
-	# Идём вправо, пока не окажемся в кабине.
+	# We walk right until we end up in the cab.
 	Input.action_press(&"move_right")
 	var left := 120
 	while not level.otto.is_riding() and left > 0:
@@ -234,10 +234,11 @@ func test_car_obeys_after_otto_walks_in() -> void:
 	_drop(level)
 
 
-## Указатель в кабине гаснет там, где полоса кончается.
+## The indicator in the cab goes dark where the band ends.
 ##
-## Это вторая половина ответа на «лифт не слушается»: упор в шахте показывает
-## предел снаружи, стрелка — изнутри кабины, где упора не видно.
+## This is the second half of the answer to "the elevator does not obey": a stop in the
+## shaft shows the limit from outside, the arrow — from inside the cab, where the stop is
+## not visible.
 func test_car_arrow_goes_dark_at_the_end_of_the_band() -> void:
 	var level := _build(1)
 	await wait_physics_frames(SETTLE_FRAMES)

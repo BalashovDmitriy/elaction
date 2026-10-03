@@ -1,13 +1,13 @@
 extends GutTest
 
-## Переназначение клавиш (ADR-0039, решение 7).
+## Key rebinding (ADR-0039, decision 7).
 
 var _saved: Dictionary = {}
 
 
 func before_each() -> void:
-	# [method KeyBindings.apply] меняет [InputMap] всего процесса: после теста
-	# он обязан вернуться, иначе соседние тесты жали бы не те клавиши.
+	# [method KeyBindings.apply] changes the [InputMap] of the whole process: after the test
+	# it must be restored, otherwise neighbouring tests would press the wrong keys.
 	_saved.clear()
 	for action: StringName in KeyBindings.ACTIONS:
 		_saved[action] = InputMap.action_get_events(action)
@@ -21,8 +21,8 @@ func after_each() -> void:
 
 
 func test_defaults_match_the_first_keys_of_the_project() -> void:
-	# Схема по умолчанию — не своя придумка, а то, что уже стоит в project.godot:
-	# иначе игрок без файла настроек и с ним играл бы разными клавишами.
+	# The default scheme is not our own invention but what is already in project.godot:
+	# otherwise a player without a settings file and with one would play with different keys.
 	for action: StringName in KeyBindings.ACTIONS:
 		var key := -1
 		var pad := -1
@@ -60,8 +60,8 @@ func test_a_taken_pad_button_swaps_places() -> void:
 
 
 func test_no_action_is_ever_left_without_a_key() -> void:
-	# Цепочка обменов — всё равно перестановка: сколько бы игрок ни назначал,
-	# у шести действий шесть разных клавиш.
+	# A chain of swaps is still a permutation: however much the player reassigns,
+	# six actions have six different keys.
 	var bindings := KeyBindings.new()
 	var keys: Array[Key] = [KEY_X, KEY_LEFT, KEY_A, KEY_SPACE, KEY_UP, KEY_A, KEY_DOWN]
 	for step: int in keys.size():
@@ -108,7 +108,7 @@ func test_the_scheme_survives_a_save_and_load() -> void:
 func test_a_broken_file_falls_back_to_defaults() -> void:
 	var file := ConfigFile.new()
 	KeyBindings.new().write_to(file)
-	# Две клавиши на одно место: так файл не пишет, но руками поправить можно.
+	# Two keys in one slot: the file does not write it that way, but it can be edited by hand.
 	file.set_value(KeyBindings.SECTION, "key_jump", KEY_X)
 	assert_true(KeyBindings.read_from(file).is_default(), "дубль — схема по умолчанию")
 	file.set_value(KeyBindings.SECTION, "key_jump", KEY_ESCAPE)

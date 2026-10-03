@@ -1,64 +1,64 @@
 class_name DoorVisit
 extends RefCounted
 
-## Правила посещения двери: кого пускать, когда спрятать и когда выпустить.
+## Door visit rules: whom to let in, when to hide and when to let out.
 ##
-## Ни узлов, ни физики: узел двери подставляет факты о госте и створке и исполняет
-## решение, а решает этот класс. Поэтому правила проверяются без сцены — тем же
-## приёмом, что [OttoStateMachine] и [ElevatorMotion]. Основания — ADR-0005,
-## пункты 2-3, и ADR-0038, решение 2.
+## No nodes, no physics: the door node supplies facts about the guest and the leaf and
+## carries out the decision, while this class decides. So the rules are checked without a
+## scene — by the same technique as [OttoStateMachine] and [ElevatorMotion]. Grounds —
+## ADR-0005, items 2-3, and ADR-0038, decision 2.
 ##
-## Створку он не ведёт: это дело [DoorCycle]. Раньше оба жили здесь и делили один
-## таймер, из-за чего дверь агента нельзя было открыть, не заведя гостя
-## (ADR-0020, решение 1). Визит только говорит, когда створке пора пойти.
+## It does not drive the leaf: that is [DoorCycle]'s job. Before, both lived here and shared
+## one timer, because of which an agent's door could not be opened without bringing a guest
+## in (ADR-0020, decision 1). The visit only says when it is time for the leaf to move.
 ##
-## Ход визита как в ROM (@3BDA, `update_in_room_timer_3c3e`): створка открывается,
-## гость уходит внутрь, она закрывается за ним; через [member hide_time] от стука
-## она открывается снова и выпускает его. Раньше не выйти — решение пользователя
-## (ADR-0038, решение 2): в ROM можно, толкнув от двери.
+## The visit goes as in the ROM (@3BDA, `update_in_room_timer_3c3e`): the leaf opens,
+## the guest goes inside, it closes behind him; [member hide_time] after the knock
+## it opens again and lets him out. One cannot leave earlier — the user's decision
+## (ADR-0038, decision 2): in the ROM one can, by pushing away from the door.
 
-## Что визит велит двери в этом кадре.
-## [code]HIDE[/code] — створка открылась, гость ушёл внутрь: спрятать и закрыть;
-## [code]LET_OUT[/code] — время почти вышло: открывать, чтобы к сроку проём был;
-## [code]OUT[/code] — срок, и створка открыта: гость снаружи.
+## What the visit tells the door to do this frame.
+## [code]HIDE[/code] — the leaf has opened, the guest went inside: hide and close;
+## [code]LET_OUT[/code] — time is almost up: open, so the opening is there by the deadline;
+## [code]OUT[/code] — deadline, and the leaf is open: the guest is outside.
 enum Cue { NONE, HIDE, LET_OUT, OUT }
 
 enum Phase { OUTSIDE, ENTERING, INSIDE, LEAVING }
 
-## Сколько гость проводит внутри, считая от стука, с: 70 тиков ROM.
+## How long the guest spends inside, counting from the knock, s: 70 ROM ticks.
 var hide_time: float = Arcade.seconds(Arcade.ROOM_TICKS)
 
-## Ход створки, с. Выпускать начинают заранее на столько, чтобы к концу
-## [member hide_time] проём уже был открыт: срок — это выход, а не начало выхода.
+## Leaf travel, s. Letting out starts this much in advance so that by the end of
+## [member hide_time] the opening is already open: the deadline is the exit, not its start.
 var leaf_time: float = 0.25
 
 var phase: Phase = Phase.OUTSIDE
 
-## Сколько гость уже у двери, с: от стука.
+## How long the guest has been at the door, s: from the knock.
 var _elapsed: float = 0.0
-## Отпустил ли гость «вверх» после того, как дверь его выпустила. Без этого та же
-## зажатая кнопка втягивала бы его обратно раз за разом: выставили — и сразу взяли.
+## Whether the guest released "up" after the door let him out. Without this the same
+## held button would pull him back in again and again: put out — and taken right back.
 var _entry_armed: bool = true
 
 
-## Просится ли гость внутрь. Спрашивают только про того, кто стоит на коврике.
+## Whether the guest asks to go in. Asked only about someone standing on the mat.
 func knock(grounded: bool, vertical: float) -> bool:
 	if vertical > -Intent.PRESS:
-		# «Вверх» отпустили: следующее нажатие снова считается просьбой войти.
+		# "Up" was released: the next press again counts as a request to enter.
 		_entry_armed = true
 		return false
 	return _entry_armed and grounded
 
 
-## Впускает гостя: с этой минуты идёт срок, и ввод его больше не слушают.
+## Lets the guest in: from this moment the deadline runs, and his input is no longer heeded.
 func admit() -> void:
 	_elapsed = 0.0
 	phase = Phase.ENTERING
 
 
-## Шаг визита. [param leaf_open] — открыта ли створка настежь.
+## Visit step. [param leaf_open] — whether the leaf is wide open.
 ##
-## Ввода гостя здесь нет нарочно: выйти раньше срока нельзя ничем.
+## There is no guest input here on purpose: nothing lets one leave before the deadline.
 func tick(delta: float, leaf_open: bool) -> Cue:
 	if phase == Phase.OUTSIDE:
 		return Cue.NONE
@@ -73,23 +73,24 @@ func tick(delta: float, leaf_open: bool) -> Cue:
 				phase = Phase.LEAVING
 				return Cue.LET_OUT
 		Phase.LEAVING:
-			# Створка в срок не успела — гость ждёт её: сквозь закрытую не выходят.
+			# The leaf did not make it by the deadline — the guest waits for it: nobody
+			# walks through a closed one.
 			if _elapsed >= hide_time and leaf_open:
 				return Cue.OUT
 	return Cue.NONE
 
 
-## Выпускает гостя наружу.
+## Lets the guest out.
 func release() -> void:
 	phase = Phase.OUTSIDE
 	_entry_armed = false
 
 
-## Спрятан ли гость: ушёл внутрь и ещё не вышел.
+## Whether the guest is hidden: went inside and has not come out yet.
 func is_hiding() -> bool:
 	return phase == Phase.INSIDE or phase == Phase.LEAVING
 
 
-## Сколько гость уже у двери, с. Нужно тестам.
+## How long the guest has been at the door, s. Needed by tests.
 func elapsed() -> float:
 	return _elapsed

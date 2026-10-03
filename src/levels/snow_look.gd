@@ -1,49 +1,49 @@
 class_name SnowLook
 extends RefCounted
 
-## Вид снега: хлопья над крышей ([RoofSnow]) и снегопад города
-## ([CityBackdrop]) (ADR-0054). Одно место на оба, как у дождя ([RainLook]):
-## разведи их — и хлопья крыши и города разошлись бы при первой правке.
+## The look of snow: flakes above the roof ([RoofSnow]) and the city snowfall
+## ([CityBackdrop]) (ADR-0054). One place for both, as with rain ([RainLook]):
+## split them, and the roof and city flakes would diverge at the first change.
 ##
-## Хлопок — мягкое пятно, повёрнутое к камере. Падает медленно и со сносом
-## ветра, с разбросом направления и скорости: снег, который летит строем,
-## читается помехой экрана, а не снегом.
+## A flake is a soft spot turned to the camera. It falls slowly and drifts with the
+## wind, with a spread of direction and speed: snow that flies in formation reads as
+## screen noise, not as snow.
 
 const FLAKE_SHADER := preload("res://src/levels/snow_flake.gdshader")
 
-## Цвет снега: чуть холодный белый.
+## Snow color: a slightly cold white.
 const TINT := Color(0.84, 0.9, 1.0)
 
-## Яркость хлопьев ночью и днём: ночью снег виден светом города и ламп, сам
-## по себе он серый.
+## Flake brightness at night and by day: at night snow is visible by the light of the
+## city and lamps; by itself it is gray.
 const NIGHT_BRIGHTNESS: float = 0.42
 const DAY_BRIGHTNESS: float = 1.0
-## Какая доля яркости — свет неба; остальное хлопку дают лампы и солнце.
+## What share of the brightness is sky light; lamps and the sun give the flake the rest.
 const AMBIENT_SHARE: float = 0.75
 
-## Разброс направления хлопьев, градусы. Шума частиц ([member
-## ParticleProcessMaterial.turbulence_enabled]) у снега нет: в Godot он
-## подмешивается к скорости каждый шаг, и даже полпроцента за шаг стирали
-## падение — хлопья висели у неба кучей (замер M24l).
+## Spread of flake direction, degrees. Snow has no particle noise ([member
+## ParticleProcessMaterial.turbulence_enabled]): in Godot it is mixed into the velocity
+## every step, and even half a percent per step erased the fall: the flakes hung in a
+## heap by the sky (M24l measurement).
 const SPREAD: float = 10.0
 
-## Слои снегопада в городе, от камеры города вглубь — как у дождя
-## ([constant RainLook.CITY_LAYERS]): сколько хлопьев, насколько дальше камеры
-## середина слоя и полуглубина, м, размер хлопка. Ближние — крупные, дальние
-## — мельче и тонут в дымке.
+## Layers of the city snowfall, from the city camera inward, as with rain
+## ([constant RainLook.CITY_LAYERS]): how many flakes, how far past the camera the
+## layer middle is and the half-depth, m, the flake size. Near ones are large, far ones
+## smaller and sink into the haze.
 const CITY_LAYERS: Array[Dictionary] = [
 	{"flakes": 900, "depth": 22.0, "reach": 10.0, "size": 0.22},
 	{"flakes": 1800, "depth": 52.0, "reach": 18.0, "size": 0.32},
 	{"flakes": 1600, "depth": 110.0, "reach": 30.0, "size": 0.5},
 ]
-## Скорость падения в городе, м/с, и ветер вбок, м/с.
+## Fall speed in the city, m/s, and sideways wind, m/s.
 const CITY_FALL := Vector2(1.6, 2.6)
 const CITY_WIND: float = 1.1
 
 
-## Хлопья: [param amount] штук из коробки [param extents] падают со скоростью
-## [param fall] и ветром [param wind] вбок и живут [param lifetime].
-## [param size] — размер хлопка, [param brightness] — его яркость.
+## Flakes: [param amount] of them from the box [param extents] fall at speed
+## [param fall] with sideways wind [param wind] and live for [param lifetime].
+## [param size] is the flake size, [param brightness] its brightness.
 static func flakes(
 	amount: int,
 	lifetime: float,
@@ -74,34 +74,34 @@ static func flakes(
 	snow.process_material = process
 	snow.draw_pass_1 = flake_mesh(size, brightness)
 	snow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	# Солнце светит только на слой снаружи ([Outdoors]): без него днём хлопья
-	# были бы плоскими пятнами без света.
+	# The sun shines only on the outdoor layer ([Outdoors]): without it, by day the flakes
+	# would be flat spots with no light.
 	snow.layers |= Outdoors.LAYER
 	return snow
 
 
-## Снос хлопка на метр падения при падении [param fall] и ветре [param wind]:
-## наименьший и наибольший. Хлопок летит под средним углом [method flakes] с
-## разбросом [constant SPREAD] в обе стороны, и сносит его от 2 до 6 м на
-## восьми метрах, а не на одно число.
+## Flake drift per meter of fall at fall [param fall] and wind [param wind]: the
+## smallest and the largest. A flake flies at the mean angle of [method flakes] with
+## a spread of [constant SPREAD] both ways, and drifts from 2 to 6 m over
+## eight meters rather than by a single number.
 static func slant(fall: Vector2, wind: float) -> Vector2:
 	var mean := atan(wind / ((fall.x + fall.y) * 0.5))
 	var spread := deg_to_rad(SPREAD)
 	return Vector2(tan(mean - spread), tan(mean + spread))
 
 
-## Скорость по высоте самого медленного и самого косого хлопка, м/с: по ней
-## считается жизнь хлопьев. По одной скорости падения [param fall].x жизнь
-## кончалась раньше, чем косой хлопок долетал, и он гас в воздухе — над
-## крышей на метр, над тротуаром на два (авторевью M24l).
+## Vertical speed of the slowest and most slanted flake, m/s: the flakes' lifetime is
+## computed from it. With the fall speed [param fall].x alone, the lifetime ended before
+## a slanted flake arrived, and it went out in the air, a meter above the roof and two
+## above the sidewalk (M24l code review).
 static func slowest_fall(fall: Vector2, wind: float) -> float:
 	var steepest := atan(wind / ((fall.x + fall.y) * 0.5)) + deg_to_rad(SPREAD)
 	return fall.x * cos(steepest)
 
 
-## Квад хлопка: рыхлый комок из мягких сгустков, к камере, крутится и
-## покачивается ([code]snow_flake.gdshader[/code]). [param brightness] — свет
-## неба на нём без ламп.
+## Flake quad: a loose clump of soft blobs, facing the camera, spinning and
+## swaying ([code]snow_flake.gdshader[/code]). [param brightness] is the sky light on
+## it without lamps.
 static func flake_mesh(size: float, brightness: float) -> QuadMesh:
 	var look := ShaderMaterial.new()
 	look.shader = FLAKE_SHADER
@@ -113,14 +113,14 @@ static func flake_mesh(size: float, brightness: float) -> QuadMesh:
 	return quad
 
 
-## Яркость хлопьев во время суток [param time].
+## Flake brightness at time of day [param time].
 static func brightness(time: TimeOfDay.Kind) -> float:
 	return lerpf(NIGHT_BRIGHTNESS, DAY_BRIGHTNESS, TimeOfDay.daylight(time))
 
 
-## Снегопад города: слои хлопьев у камеры. Слои — детьми [param camera]: едут
-## с ней, а хлопья падают в мире. Отдаёт слои: их число хлопьев город
-## пересчитывает по уровню качества, как струи дождя.
+## City snowfall: flake layers at the camera. The layers are children of [param camera]:
+## they ride with it, while the flakes fall in the world. Returns the layers: the city
+## recalculates their flake counts by quality level, like the rain streaks.
 static func city(camera: Camera3D, time: TimeOfDay.Kind) -> Array[GPUParticles3D]:
 	var made: Array[GPUParticles3D] = []
 	for index in CITY_LAYERS.size():

@@ -1,34 +1,33 @@
 extends GutTest
 
-## Тесты машины у выхода. С M21 это модели Cars Pack и жребий по зданию
-## (ADR-0032, решение 7); где машина встаёт у выхода на любом сиде, проверяет
+## Tests of the car at the exit. Since M21 these are Cars Pack models and a per-building draw
+## (ADR-0032, decision 7); where the car stands at the exit on any seed is checked by
 ## [code]test_building_scenery[/code].
 ##
-## В оригинале здание заканчивается тем, что Otto уезжает на красной машине
-## (ADR-0011, пункт 14). Отсюда правило, которое легко потерять при правках:
-## здание считается сданным **после** отъезда, а не в момент выхода. Иначе
-## следующее здание соберётся поверх уезжающей машины, и кадра не будет.
+## In the original a building ends with Otto driving away in a red car (ADR-0011, item 14). Hence a
+## rule that is easy to lose during edits: the building counts as cleared **after** the departure,
+## not at the moment of exit. Otherwise the next building would be assembled on top of the departing
+## car, and there would be no shot.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
-## Сколько кадров дать зданию собраться и сколько ждать отъезда. Машина с M24b
-## трогается с места и разгоняется, а не уходит сразу на полном ходу; с M24g
-## кадр обгоняет её, чтобы дорога под фарами была видна (ADR-0043, решение 18),
-## и из кадра она уезжает секунд за шесть. С M24h она ещё встаёт у края
-## мостовой и ждёт просвета в потоке — до [method StreetTraffic.wait_limit] и
-## сколько-то сверх, пока просвет доедет (ADR-0044, решение 2): запас на
-## пятнадцать секунд.
+## How many frames to give the building to assemble and how long to wait for the departure. Since
+## M24b the car pulls away and accelerates rather than leaving at full speed at once; since M24g the
+## view overtakes it so that the road under the headlights is visible (ADR-0043, decision 18), and
+## it leaves the frame in about six seconds. Since M24h it also stops at the edge of the roadway and
+## waits for a gap in traffic — up to [method StreetTraffic.wait_limit] and somewhat more while the
+## gap arrives (ADR-0044, decision 2): a margin of fifteen seconds.
 const SETTLE_FRAMES: int = 5
 const PATIENCE: int = 1800
-## Сколько шагов физики ждать, пока Otto сядет и машина тронется: шаг к двери,
-## посадка с дверцей ([constant ExitBoarding.GET_IN_TIME], 0.85 с), полсекунды
-## в машине ([constant ExitBoarding.SEAT_TIME]) и две секунды стартера
-## ([constant ExitBoarding.START_TIME]) — около 200 шагов, остальное запас.
+## How many physics steps to wait until Otto gets in and the car pulls away: a step to the door,
+## getting in with the door ([constant ExitBoarding.GET_IN_TIME], 0.85 s), half a second in the car
+## ([constant ExitBoarding.SEAT_TIME]) and two seconds of the starter ([constant
+## ExitBoarding.START_TIME]) — about 200 steps, the rest is margin.
 const BOARDING_PATIENCE: int = 300
 
-## Допуск на положение машины, м: полсантиметра. Машина стоит колёсами ровно на
-## полу и ровно в зазоре от проёма; широкий допуск пропускал бы и машину,
-## утонувшую в перекрытии по крышу.
+## Tolerance on the car position, m: half a centimetre. The car stands with its wheels exactly on
+## the floor and exactly at the gap from the opening; a wide tolerance would also let through a car
+## sunk into the slab up to its roof.
 const TOLERANCE: float = 0.005
 
 
@@ -43,8 +42,8 @@ func after_each() -> void:
 func _building(documents: int = 0) -> GreyboxLevel:
 	var rules := BuildingRules.new()
 	rules.floors = 4
-	# Без красных дверей здание сдано сразу, как только Otto дошёл до выхода:
-	# документы здесь не проверяются, проверяется машина.
+	# Without red doors the building is cleared as soon as Otto reaches the exit: documents are not
+	# checked here, the car is.
 	rules.documents_cap = documents
 
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
@@ -57,7 +56,7 @@ func _building(documents: int = 0) -> GreyboxLevel:
 	return level
 
 
-## Машина у выхода — модель под своим именем среди детей уровня.
+## The car at the exit is a model under its own name among the level's children.
 func _car_of(level: GreyboxLevel) -> Node3D:
 	return level.get_node_or_null("ExitCar") as Node3D
 
@@ -69,22 +68,21 @@ func test_the_exit_has_a_car() -> void:
 	if car == null:
 		return
 
-	# Числа берутся у здания, а не выписываются в тест. Машина стоит в сцене, а
-	# выход задан в плоскости правил — сравниваем в плоскости правил.
+	# Numbers are taken from the building, not written into the test. The car stands in the scene, and
+	# the exit is set in the rules plane — we compare in the rules plane.
 	var exit_x := level.plan().exit_x
 	var surface := level.rules.floor_surface(level.rules.floors - 1)
 	var at := WorldSpace.to_plane(car.global_position)
 	assert_almost_eq(at.y, surface, TOLERANCE, "колёсами на полу")
 
-	# Место — у ворот в левом торце, капотом к ним (ADR-0038, решение 3).
+	# Its place is at the gate in the left end wall, bonnet toward it (ADR-0038, decision 3).
 	var expected := ExitCar.spot(exit_x, level.rules, level.plan())
 	assert_almost_eq(at.x, expected, TOLERANCE, "машина стоит на своём месте")
 	var parked := ExitCar.parked_span(level.rules)
 	assert_almost_eq(at.x, (parked.x + parked.y) * 0.5, TOLERANCE, "машина у ворот")
 	assert_eq((car as ExitCar).towards, -1.0, "капотом к воротам")
 
-	# Выход — водительская дверь: туда идёт бот и там Otto садится
-	# (ADR-0038, решение 4).
+	# The exit is the driver's door: the bot goes there and Otto gets in there (ADR-0038, decision 4).
 	var door := level.exit_position()
 	assert_almost_eq(door.x, (car as ExitCar).door_x(), TOLERANCE, "выход — у двери машины")
 	assert_almost_eq(door.y + GreyboxLevel.EXIT_HEIGHT * 0.5, surface, TOLERANCE)
@@ -103,9 +101,8 @@ func test_the_building_is_cleared_only_after_the_car_leaves() -> void:
 
 	var parked_at := car.position.x
 	_stand_at_the_door(level)
-	# Ждём не выдержку, а состояние: посадку уровень замечает на своём шаге
-	# физики, и ждать «один кадр» здесь — та же ошибка, что водить съёмку
-	# секундомером (docs/testing.md).
+	# We wait for a state, not a delay: the level notices boarding on its own physics step, and waiting
+	# "one frame" here is the same mistake as driving a shot with a stopwatch (docs/testing.md).
 	var started := 0
 	while is_equal_approx(car.position.x, parked_at) and started < BOARDING_PATIENCE:
 		await get_tree().physics_frame
@@ -121,10 +118,10 @@ func test_the_building_is_cleared_only_after_the_car_leaves() -> void:
 	assert_true(cleared[0], "здание сдано, когда машина уехала")
 
 
-## Полоса занята — машина встаёт у края мостовой, ждёт просвета с правым
-## поворотником и вливается в ближнюю полосу (ADR-0044, решения 1–2; ADR-0046,
-## решения 2–3). Занята она тестом: ближняя машина потока держится вплотную за
-## местом въезда, пока машина Otto не встала.
+## The lane is busy — the car stops at the edge of the roadway, waits for a gap with the right
+## indicator on and merges into the near lane (ADR-0044, decisions 1–2; ADR-0046, decisions 2–3).
+## The test keeps it busy: the nearest car of the traffic stays right behind the merge point until
+## Otto's car has stopped.
 func test_a_busy_lane_makes_the_car_wait_with_the_indicator_on() -> void:
 	var level := await _building()
 	var car := _car_of(level) as ExitCar
@@ -158,9 +155,9 @@ func test_a_busy_lane_makes_the_car_wait_with_the_indicator_on() -> void:
 	assert_false(car.indicator_lit())
 
 
-## Полоса свободна — машина не встаёт у края мостовой, а съезжает с ходу, с
-## поворотником (ADR-0046, решение 3). Свободна она тестом: ближняя полоса
-## пуста, и въезд на неё придержан.
+## The lane is free — the car does not stop at the edge of the roadway but pulls out on the move,
+## with the indicator on (ADR-0046, decision 3). The test keeps it free: the near lane is empty, and
+## entry onto it is held back.
 func test_a_clear_lane_lets_the_car_merge_without_stopping() -> void:
 	var level := await _building()
 	var car := _car_of(level) as ExitCar
@@ -190,8 +187,8 @@ func test_a_clear_lane_lets_the_car_merge_without_stopping() -> void:
 	assert_true(signalled, "поворотник мигал на съезде")
 
 
-## Держит машину потока [param blocker] вплотную за местом въезда [param x]:
-## сзади, в пяти метрах по бамперам, стоя.
+## Holds the traffic car [param blocker] right behind the merge point [param x]: behind, five metres
+## bumper to bumper, standing.
 func _hold_behind(blocker: StreetTraffic.Car, x: float) -> void:
 	if not is_instance_valid(blocker.node):
 		return
@@ -200,14 +197,14 @@ func _hold_behind(blocker: StreetTraffic.Car, x: float) -> void:
 	blocker.node.position.x = blocker.x
 
 
-## Ставит Otto на пол подвала у водительской двери.
+## Puts Otto on the basement floor at the driver's door.
 func _stand_at_the_door(level: GreyboxLevel) -> void:
 	var door := level.exit_position()
 	var feet := Vector2(door.x, door.y + GreyboxLevel.EXIT_HEIGHT * 0.5)
 	level.otto.global_position = WorldSpace.to_scene(feet)
 
 
-## Ждёт, пока машина тронется; true — тронулась.
+## Waits until the car pulls away; true — it pulled away.
 func _wait_for_the_start(level: GreyboxLevel) -> bool:
 	var car := _car_of(level) as ExitCar
 	for _frame: int in BOARDING_PATIENCE:
@@ -217,9 +214,9 @@ func _wait_for_the_start(level: GreyboxLevel) -> bool:
 	return car.is_leaving()
 
 
-## Без всех документов у двери ничего не происходит: машина не ждёт, Otto свой.
-## Попасть в подвал без документов нельзя вовсе ([BasementLock]), но правило
-## выхода от этого не зависит — Otto здесь ставит тест.
+## Without all documents nothing happens at the door: the car does not wait, Otto is in control.
+## Getting into the basement without documents is impossible anyway ([BasementLock]), but the exit
+## rule does not depend on that — here the test places Otto.
 func test_the_car_does_not_take_otto_without_every_document() -> void:
 	var level := await _building(1)
 	assert_false(GameState.instance().all_documents_collected(), "документ ещё за дверью")
@@ -232,7 +229,7 @@ func test_the_car_does_not_take_otto_without_every_document() -> void:
 	assert_false(level.otto.is_hidden())
 
 
-## Севший Otto заперт и недосягаем: ввода нет, тела нет, агентам его не видно.
+## An Otto who got in is locked and unreachable: no input, no body, agents cannot see him.
 func test_the_seated_otto_is_locked_and_out_of_reach() -> void:
 	var level := await _building()
 	var started := [false]
@@ -245,7 +242,7 @@ func test_the_seated_otto_is_locked_and_out_of_reach() -> void:
 	assert_true(otto.is_hidden(), "Otto в машине: снаружи его нет")
 	assert_false(otto.is_on_foot(), "управление забрано")
 	assert_eq(otto.vertical_intent(), 0.0, "ввод не доходит")
-	# Формы тела выключаются отложенно — к отъезду машины они давно выключены.
+	# Body shapes are disabled deferred — by the car's departure they have long been disabled.
 	var standing := otto.get_node("StandingShape") as CollisionShape3D
 	var crouching := otto.get_node("CrouchingShape") as CollisionShape3D
 	assert_true(standing.disabled and crouching.disabled, "пуле попасть не во что")
@@ -255,7 +252,7 @@ func test_the_seated_otto_is_locked_and_out_of_reach() -> void:
 	)
 
 
-## Машина уезжает в свою сторону и разгоняется, с зажжёнными фарами.
+## The car drives off in its own direction and accelerates, with headlights on.
 func test_the_car_leaves_accelerating_with_its_lights_on() -> void:
 	var level := await _building()
 	var car := _car_of(level) as ExitCar
@@ -276,7 +273,7 @@ func test_the_car_leaves_accelerating_with_its_lights_on() -> void:
 	assert_gt(later, first, "разгоняется")
 
 
-## Ворота паркинга открываются, когда Otto садится: машина уезжает в них.
+## The garage gate opens when Otto gets in: the car drives out through it.
 func test_the_garage_gate_opens_for_the_car() -> void:
 	var level := await _building()
 	var garage := level.garage()
@@ -289,7 +286,7 @@ func test_the_garage_gate_opens_for_the_car() -> void:
 	assert_true(garage.is_gate_open(), "машина тронулась — ворота открыты")
 
 
-## Габарит машины по всем её мешам, в системе самой машины.
+## The car's bounds over all its meshes, in the car's own space.
 func _car_box(car: Node3D) -> AABB:
 	var box := AABB()
 	var first := true
@@ -302,10 +299,10 @@ func _car_box(car: Node3D) -> AABB:
 	return box
 
 
-## Любая машина жребия стоит между задней стеной и телом Otto: в стену не входит
-## и в плоскость игры не выходит, поэтому Otto проходит перед машиной, а не
-## сквозь неё. Седан в полтора метра шириной заходил в обе стороны (авторевью
-## M18c и M20), а машины пака в 1.8 м — тем более, пока их не сжали.
+## Any car of the draw stands between the back wall and Otto's body: it does not enter the wall and
+## does not stick out into the play plane, so Otto walks in front of the car, not through it. A
+## sedan one and a half metres wide went in both directions (M18c and M20 code review), and the
+## pack's 1.8 m cars all the more, until they were narrowed.
 func test_every_car_fits_between_the_wall_and_otto() -> void:
 	for index in CarModel.MODELS.size():
 		var choice := CarModel.Choice.new()
@@ -320,16 +317,17 @@ func test_every_car_fits_between_the_wall_and_otto() -> void:
 			WorldSpace.PLAY_Z - WorldSpace.BODY_DEPTH * 0.5,
 			"%s выходит в плоскость игры — Otto пройдёт сквозь неё" % label
 		)
-		# По длине машина ставится в зазор у выхода: длиннее — и заденет проём.
+		# Lengthwise the car is placed into the gap at the exit: any longer and it would hit the opening.
 		assert_almost_eq(box.size.x, CarModel.LENGTH, 0.02, "%s: длина по бамперам" % label)
 		assert_almost_eq(box.position.y, 0.0, 0.02, "%s: колёса на земле" % label)
 		assert_lt(box.size.y, Proportions.BODY, "%s ниже Otto" % label)
 		assert_gt(CarModel.wheels(car).size(), 0, "%s: колёса крутятся" % label)
 
 
-## Колёса на отъезде крутятся вокруг своих осей и катятся вперёд: середина колеса
-## стоит на месте, а низ уходит назад по ходу. Начало узла колеса у пака — в нуле
-## машины, и поворот вокруг него носил колёса кругом по кузову (авторевью M21).
+## Wheels on departure spin around their own axles and roll forward: the middle of the wheel stays
+## in place, and the bottom moves backward along the travel. The origin of a wheel node in the pack
+## is at the car's zero, and rotating around it carried the wheels in a circle around the body (M21
+## code review).
 func test_the_wheels_roll_about_their_axles() -> void:
 	var rules := BuildingRules.new()
 	var plan := BuildingPlan.generate(rules, 1)
@@ -364,7 +362,7 @@ func test_the_wheels_roll_about_their_axles() -> void:
 		)
 
 
-## Первое здание — красная спортивная, как в 1983 году (ADR-0032, решение 7).
+## The first building is a red sports car, as in 1983 (ADR-0032, decision 7).
 func test_the_first_building_parks_the_red_sports_car() -> void:
 	for building_seed: int in [1, 7, 12345]:
 		var choice := CarModel.choose(1, building_seed)
@@ -385,7 +383,7 @@ func test_the_car_is_a_draw_of_the_building_and_stays_the_same() -> void:
 	assert_gt(seen.size(), 2, "в зданиях стоят разные машины")
 
 
-## Кузов перекрашен краской жребия: материал `Paint` пака подменён.
+## The body is repainted in the draw's paint: the pack's `Paint` material is replaced.
 func test_the_body_takes_the_drawn_paint() -> void:
 	var choice := CarModel.Choice.new()
 	choice.model = 2
@@ -402,10 +400,10 @@ func test_the_body_takes_the_drawn_paint() -> void:
 	assert_true(painted, "кузов в краске жребия")
 
 
-## У каждой машины жребия — проём водительской двери с дверью на петле, салон,
-## плафон под крышей и поворотники (ADR-0046, решение 1): посадка толковая в
-## любую, не только в красную первого здания. Дверь у борта к камере, в
-## пределах машины по длине, и салон внутри кузова, а не под ним или над ним.
+## Every car of the draw has a driver's door opening with a hinged door, an interior, a dome light
+## under the roof and indicators (ADR-0046, decision 1): boarding works in any of them, not only in
+## the red one of the first building. The door is on the side facing the camera, within the car's
+## length, and the interior is inside the body, not under or above it.
 func test_every_car_has_a_door_a_cabin_and_indicators() -> void:
 	for index: int in CarModel.MODELS.size():
 		var choice := CarModel.Choice.new()
@@ -434,9 +432,9 @@ func test_every_car_has_a_door_a_cabin_and_indicators() -> void:
 		assert_lt(inside.end.y, 1.4, "модель %d: салон не над крышей" % index)
 
 
-## Посадку видно (ADR-0038, решение 4): Otto поворачивается к машине, дверца
-## распахивается, он шагает в глубину к борту и скрывается, дверца захлопывается.
-## Раньше он пропадал перед кузовом, шагнув к двери.
+## Boarding is visible (ADR-0038, decision 4): Otto turns to the car, the door swings open, he steps
+## deeper toward the side and disappears, the door slams shut. Before, he vanished in front of the
+## body after stepping to the door.
 func test_otto_gets_in_through_the_open_driver_door() -> void:
 	var level := await _building()
 	var car := _car_of(level) as ExitCar
@@ -467,9 +465,9 @@ func test_otto_gets_in_through_the_open_driver_door() -> void:
 	assert_almost_eq(door.rotation.y, 0.0, 0.001)
 
 
-## С посадки кадр раздвигается влево за торец: ворота, площадка и тоннель в
-## кадре. Машина трогается — кадр едет за ней вверх по пандусу до улицы, и
-## уходит она из кадра уже по улице, а не с середины подъёма.
+## From boarding the view widens to the left past the end wall: gate, landing and tunnel are in the
+## frame. The car pulls away — the view follows it up the ramp to the street, and it leaves the
+## frame already along the street, not from the middle of the climb.
 func test_the_car_drives_up_the_ramp_in_the_widened_frame() -> void:
 	var level := await _building()
 	var car := _car_of(level) as ExitCar
@@ -495,7 +493,7 @@ func test_the_car_drives_up_the_ramp_in_the_widened_frame() -> void:
 	assert_true(cleared[0], "машина ушла из кадра")
 	var top := gate - GarageGate.RAMP_APRON - GarageGate.RAMP_RUN
 	assert_lt(last.position.x, top, "кадр доехал за машиной до улицы")
-	# Под машиной кадр держит полосу улицы: поднимается на этаж без неё.
+	# Under the car the view keeps the street strip: without it, it would rise by a floor.
 	var rise := rules.floor_height - ExitBoarding.STREET_VIEW
 	assert_lt(last.end.y, bottom - rise * 0.9, "и поднялся вместе с ней")
 	assert_gt(car.position.y, floor_y + rules.floor_height * 0.99, "уходит по улице")

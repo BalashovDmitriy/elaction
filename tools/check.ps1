@@ -16,10 +16,10 @@ try {
     }
 
     Write-Host '== gdformat --check и gdlint ==' -ForegroundColor Cyan
-    # Модулями, а не gdformat.exe и gdlint.exe: неподписанные обёртки pip
-    # блокирует управление приложениями Windows (WinError 4551), см.
-    # .pre-commit-config.yaml. Оба разом и кусками по потокам процессора:
-    # подряд они шли одиннадцать секунд на одном потоке (tools/gd_tools.py).
+    # As modules, not gdformat.exe and gdlint.exe: unsigned pip wrappers are blocked
+    # by Windows application control (WinError 4551), see
+    # .pre-commit-config.yaml. Both at once and in chunks across processor threads:
+    # in sequence they took eleven seconds on one thread (tools/gd_tools.py).
     & (Join-Path $bin 'python.exe') (Join-Path $root 'tools\gd_tools.py')
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -31,8 +31,8 @@ try {
     & python (Join-Path $root 'tools\run_tests.py')
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    # Отпечаток зелёного дерева: хук на push по нему не гоняет то же самое
-    # второй раз (tools/check_stamp.py).
+    # Fingerprint of a green tree: the push hook uses it to avoid running the same
+    # thing a second time (tools/check_stamp.py).
     & python (Join-Path $root 'tools\check_stamp.py') --write
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

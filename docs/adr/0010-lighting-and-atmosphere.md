@@ -1,195 +1,197 @@
-# ADR-0010 · Свет и атмосфера
+# ADR-0010 · Lighting and atmosphere
 
-- **Статус:** принято; реализация на 2D-свете отменена [ADR-0019](0019-3d-pivot.md),
-  решение 7, правила в силе. Пункты 3 и 5 изменены [ADR-0023](0023-light-and-readability.md):
-  ламп на этаже несколько и темнота ходит зонами (решение 2), видит ли агент Otto,
-  решает зона Otto (решение 8). Пункт 10 — город 3D-кварталами,
-  [ADR-0029](0029-city-weather-dressing.md), решение 1
-- **Дата:** 2026-09-12
+- **Status:** accepted; the 2D-light implementation is superseded by [ADR-0019](0019-3d-pivot.md),
+  decision 7, the rules stay in force. Items 3 and 5 are changed by
+  [ADR-0023](0023-light-and-readability.md): there are several lamps per floor and darkness
+  comes in zones (decision 2), whether an agent sees Otto is decided by Otto's zone
+  (decision 8). Item 10 — the city as 3D blocks,
+  [ADR-0029](0029-city-weather-dressing.md), decision 1
+- **Date:** 2026-09-12
 
-## Контекст
+## Context
 
-M6 — та веха, ради которой в [ADR-0001](0001-tech-stack.md) и выбран Godot, а в
-[ADR-0002](0002-visual-target.md) — HD пиксель-арт с динамическим светом. До неё игра
-выглядит как серые коробки, и это было сознательно: механика важнее картинки.
+M6 is the milestone for which Godot was chosen in [ADR-0001](0001-tech-stack.md), and HD pixel
+art with dynamic lighting in [ADR-0002](0002-visual-target.md). Before it the game looks like
+grey boxes, and that was deliberate: mechanics matter more than the picture.
 
-В оригинале динамического света нет вовсе — 1983 год, плоские цвета. Поэтому сверять
-здесь почти нечего: ориентир задаёт не оригинал, а ADR-0002. Сверка перед вехой всё же
-нашла два расхождения по правилам, и они ниже, в пунктах 6 и 7.
+The original has no dynamic lighting at all — it is 1983, flat colours. So there is almost
+nothing to check here: the target is set not by the original but by ADR-0002. Still, the check
+before the milestone found two rule divergences, and they are below, in items 6 and 7.
 
-## Решения
+## Decisions
 
-### 1. Бюджет света — не ограничение. Измерено, а не угадано
+### 1. The light budget is not a constraint. Measured, not guessed
 
-Долг «потолок 2D-источников в Godot не проверен» висел с M0. Закрыт замером
-(`tools/light_bench.gd`), окно 1280×720, RTX 5060 Ti:
+The debt "Godot's ceiling on 2D sources is unverified" had hung since M0. Closed by measurement
+(`tools/light_bench.gd`), 1280×720 window, RTX 5060 Ti:
 
-| Источников | Тени | Bloom | мс/кадр |
+| Sources | Shadows | Bloom | ms/frame |
 |---|---|---|---|
-| 0 | нет | нет | 0.34 |
-| 12 | да | нет | 0.42 |
-| 48 | да | нет | 0.49 |
-| 24 | да | да | 0.59 |
+| 0 | no | no | 0.34 |
+| 12 | yes | no | 0.42 |
+| 48 | yes | no | 0.49 |
+| 24 | yes | yes | 0.59 |
 
-Бюджет кадра при 60 FPS — 16.6 мс. Даже 48 источников с тенями и пост-обработкой
-съедают 4 % его. Запас двадцатипятикратный.
+The frame budget at 60 FPS is 16.6 ms. Even 48 sources with shadows and post-processing eat
+4 % of it. A twenty-five-fold margin.
 
-Числа перемерены после авторевью: в первой версии стенда все источники малого
-замера сваливались на один этаж поверх одного окклюдера, то есть мерили не то,
-что бывает в игре. Вывод от этого не изменился — изменились только сами числа.
+The numbers were re-measured after code review: in the first version of the bench all sources of
+the small measurement piled onto one floor over one occluder, that is, it measured something
+that does not happen in the game. The conclusion did not change — only the numbers did.
 
-Отсюда два следствия. Первое: **лимит «не более ~12 источников», записанный в эпике,
-остаётся, но как художественное ограничение, а не техническое** — больше дюжины пятен
-света в кадре превращаются в кашу раньше, чем в просадку FPS. Второе: замер сделан на
-быстрой видеокарте, и абсолютные числа с целевого железа не переносятся; переносится
-вывод, что свет здесь дешевле всего остального в кадре.
+Two consequences follow. First: **the "no more than ~12 sources" limit recorded in the epic
+stays, but as an artistic constraint rather than a technical one** — more than a dozen light
+spots in the frame turn into mush before they turn into an FPS drop. Second: the measurement was
+made on a fast graphics card, and the absolute numbers do not transfer to the target hardware;
+what transfers is the conclusion that light here is cheaper than anything else in the frame.
 
-**Чего замер не покрывает.** Сцена замера лёгкая — дюжина прямоугольников. В Godot
-источник перерисовывает попавшие в него элементы холста, то есть цена растёт как
-«источники × элементы под ними». Настоящее здание плотнее. Поэтому DoD вехи меряется
-ещё раз, уже на собранном здании с настоящим светом.
+**What the measurement does not cover.** The bench scene is light — a dozen rectangles. In Godot
+a source redraws the canvas items that fall into it, so the cost grows as
+"sources × items under them". The real building is denser. So the milestone DoD is measured
+again, on the assembled building with real lighting.
 
-### 2. Свет ложится на серые коробки. Нормал-мапы уезжают в M7
+### 2. Light falls on grey boxes. Normal maps move to M7
 
-В эпике у M6 записаны «нормал-мапы и specular на спрайтах через `CanvasTexture`», но
-спрайтов в проекте нет ни одного: всё рисуется `ColorRect`. Текстуры приходят в M7.
+The epic lists for M6 "normal maps and specular on sprites via `CanvasTexture`", but there is
+not a single sprite in the project: everything is drawn with `ColorRect`. Textures come in M7.
 
-Поэтому веха делится по-живому: **M6 — вся светотехника** (ambient, источники,
-окклюдеры, пост-обработка, фон), **M7 — материалы**, на которые этот свет ляжет.
-Порядок именно такой, потому что светотехника настраивается один раз и переживает
-замену коробки на спрайт, а обратный порядок заставил бы настраивать свет дважды.
+So the milestone is split where it stands: **M6 — all the lighting** (ambient, sources,
+occluders, post-processing, background), **M7 — materials** that this light will fall on.
+The order is this way because lighting is tuned once and survives replacing a box with a sprite,
+while the reverse order would force tuning the light twice.
 
-### 3. Этаж светел, потому что на нём горит лампа
+### 3. A floor is lit because a lamp is on there
 
-Ключевое решение вехи, из которого следует всё остальное.
+The key decision of the milestone, from which everything else follows.
 
-`CanvasModulate` задаёт общий тон здания — и это тон **погашенного** этажа. Светлым
-этаж делает не отсутствие темноты, а собственный источник света. Сбили лампу — источник
-гаснет, и этаж падает до общего тона.
+`CanvasModulate` sets the overall tone of the building — and that is the tone of a **darkened**
+floor. A floor is made bright not by the absence of darkness but by its own light source. Shoot
+the lamp down — the source goes out, and the floor falls to the overall tone.
 
-Так темнота перестаёт быть полупрозрачной полосой поверх картинки (заглушка из
-[ADR-0007](0007-lamps-and-darkness.md), пункт 6) и становится тем, чем она является в
-игре: этажом без света.
+This way darkness stops being a semi-transparent band on top of the picture (the placeholder
+from [ADR-0007](0007-lamps-and-darkness.md), item 6) and becomes what it is in the game: a floor
+without light.
 
-**У этажа два источника, а не один.** Лампа одна на этаж, её пятно — радиусом с высоту
-этажа, а этаж шириной 1280 px. Одним пятном его не осветить, и «светлый этаж» вышел бы
-светлым только под лампой. Поэтому:
+**A floor has two sources, not one.** There is one lamp per floor, its spot has a radius the
+height of a floor, and a floor is 1280 px wide. One spot cannot light it, and a "lit floor"
+would be lit only under the lamp. Therefore:
 
-- **заливка этажа** — широкий мягкий источник во всю ширину этажа, ровный свет, тени
-  выключены. Это «на этаже горит свет»;
-- **пятно лампы** — маленький яркий источник под самой лампой, тени включены. Это
-  красиво и показывает, откуда свет берётся.
+- **floor fill** — a wide soft source across the full width of the floor, even light, shadows
+  off. This is "the light is on on the floor";
+- **lamp spot** — a small bright source right under the lamp, shadows on. This looks good and
+  shows where the light comes from.
 
-Гаснут оба разом, потому что лампа в здании одна на этаж и контур один.
+Both go out at once, because the building has one lamp per floor and one circuit.
 
-### 4. Погашенный этаж остаётся читаемым
+### 4. A darkened floor stays readable
 
-Из двух крайностей — «атмосферно, но врагов не видно» и «видно всё, но не страшно» —
-выбрана читаемость. Погашенный этаж заметно темнее и холоднее по тону, но силуэты Otto
-и агентов на нём различимы всегда.
+Of two extremes — "atmospheric, but enemies cannot be seen" and "everything is visible, but not
+scary" — readability is chosen. A darkened floor is noticeably darker and colder in tone, but
+the silhouettes of Otto and agents on it are always distinguishable.
 
-Причина не в эстетике, а в правилах: в темноте агенты **продолжают стрелять**, у них
-лишь падает дальность ([ADR-0007](0007-lamps-and-darkness.md), пункт 4). Этаж, на
-котором врага не видно, а он стреляет, — это смерть по независящим от игрока причинам.
-Темнота должна оставаться тактикой, а не лотереей.
+The reason is not aesthetics but the rules: in the dark agents **keep shooting**, only their
+range drops ([ADR-0007](0007-lamps-and-darkness.md), item 4). A floor where the enemy cannot be
+seen but shoots is death for reasons outside the player's control. Darkness must stay a tactic,
+not a lottery.
 
-### 5. Свет — картинка, а не правило
+### 5. Light is a picture, not a rule
 
-Соблазн был: раз есть настоящие пятна света, пусть агент видит Otto дальше, когда тот
-стоит в свете, и хуже — когда в тени. Отказались намеренно.
+There was a temptation: since there are real light spots, let an agent see Otto farther when
+he stands in the light and worse when in shadow. Rejected on purpose.
 
-- В оригинале этого нет: там гаснет всё здание разом, и прятаться в тенях негде.
-- Правила пришлось бы переписать с «этаж тёмный» на «точка освещена», то есть завести
-  логику света в физику и в `EnemyBrain`. Сейчас темнота — один флаг на этаж, и он
-  проверяется без сцены; после такой правки самые важные тесты потребовали бы
-  отрисованного кадра.
+- The original does not have it: there the whole building goes dark at once, and there is
+  nowhere to hide in the shadows.
+- The rules would have to be rewritten from "the floor is dark" to "the point is lit", that is,
+  bring lighting logic into physics and `EnemyBrain`. Now darkness is one flag per floor, and
+  it is tested without a scene; after such a change the most important tests would require a
+  rendered frame.
 
-`FloorLighting` остаётся источником правды о том, где темно. Картинка следует за ним,
-а не наоборот.
+`FloorLighting` stays the source of truth about where it is dark. The picture follows it,
+not the other way round.
 
-### 6. Надбавка за убийство в темноте — +50, а не удвоение
+### 6. The bonus for a kill in the dark is +50, not doubling
 
-[ADR-0007](0007-lamps-and-darkness.md), пункт 5, взял удвоение «как самое простое
-правило» и честно пометил его несверенным. Сверка перед M6 его закрыла:
+[ADR-0007](0007-lamps-and-darkness.md), item 5, took doubling "as the simplest rule" and
+honestly marked it unchecked. The check before M6 closed it:
 
 > You score 100 points for shooting an agent, 150 for dropkicking them or shooting one
 > in the dark — dropkicking an agent in the dark is 200 points — and 300 for defeating
 > one via shot lamp.
 
-То есть надбавка плоская, +50, и совпадает у обоих способов. Наши базовые числа
-(100 / 150 / 300) совпадают с этой таблицей один в один, что и заставляет верить
-надбавке из неё же.
+That is, the bonus is flat, +50, and the same for both methods. Our base numbers
+(100 / 150 / 300) match this table one to one, which is what makes the bonus from it credible.
 
-Заодно это чинит то, на что мы сами жаловались в ADR-0007, пункт 3: при вечной темноте
-удвоение — прямой стимул погасить этаж и фармить очки на респавнящихся агентах. Плоская
-надбавка такого стимула не даёт.
+This also fixes what we ourselves complained about in ADR-0007, item 3: with permanent darkness
+doubling is a direct incentive to darken the floor and farm points on respawning agents. A flat
+bonus gives no such incentive.
 
-Надбавка за лампу не начисляется: лампа гасит этаж, падая, и убивает по дороге —
-в момент удара этаж ещё горит.
+The bonus is not awarded for the lamp: the lamp darkens the floor as it falls and kills on the
+way — at the moment of impact the floor is still lit.
 
-### 7. Темнота в поздних зданиях пока не слабеет
+### 7. Darkness in later buildings does not weaken yet
 
-Сверка нашла и второе:
+The check found a second thing:
 
 > In later levels, it doesn't work as well or at all.
 
-То есть в поздних зданиях темнота помогает хуже. [ADR-0007](0007-lamps-and-darkness.md),
-пункт 4, это предвидел: «его же удобно будет ослаблять в поздних зданиях». Решено
-**не делать в M6**: это правило сложности, а не картинка, и место ему рядом с
-`agent_menace` из [ADR-0009](0009-game-loop-and-alarm.md). Заведено долгом.
+That is, in later buildings darkness helps less. [ADR-0007](0007-lamps-and-darkness.md),
+item 4, anticipated this: "it will also be convenient to weaken in later buildings". Decided
+**not to do it in M6**: it is a difficulty rule, not a picture, and its place is next to
+`agent_menace` from [ADR-0009](0009-game-loop-and-alarm.md). Filed as debt.
 
-### 8. Источники гасятся за пределами кадра
+### 8. Sources are turned off outside the frame
 
-В здании 30 этажей и два источника на этаж — шестьдесят. В кадр влезает два с половиной
-этажа. Гореть должны только они.
+The building has 30 floors and two sources per floor — sixty. Two and a half floors fit in the
+frame. Only those should be lit.
 
-Отбор идёт по номерам этажей, а не по прямоугольнику камеры: у этажа известна высота,
-а номер видимого этажа — это деление. Получается чистая функция, которая проверяется
-без сцены и без кадра, — тем же приёмом, что `OttoStateMachine` и `ElevatorMotion`.
+Selection goes by floor numbers, not by the camera rectangle: a floor's height is known, and the
+number of the visible floor is a division. The result is a pure function, tested without a scene
+and without a frame — the same technique as `OttoStateMachine` and `ElevatorMotion`.
 
-Замер из пункта 1 говорит, что шестьдесят источников выдержал бы и так. Отбор всё равно
-нужен: цена растёт как «источники × элементы под ними», а к M7 элементы станут тяжелее.
+The measurement in item 1 says sixty sources would hold anyway. The selection is needed
+regardless: the cost grows as "sources × items under them", and by M7 the items will get
+heavier.
 
-### 9. Пост-обработка: свечение и виньетка, больше ничего
+### 9. Post-processing: glow and vignette, nothing more
 
-- **Bloom** — `WorldEnvironment` с `BG_CANVAS` и порогом по яркости. Светятся лампы
-  и вспышки выстрелов, а не весь кадр.
-- **Виньетка** — шейдер на полноэкранном слое поверх игры.
+- **Bloom** — `WorldEnvironment` with `BG_CANVAS` and a brightness threshold. Lamps and muzzle
+  flashes glow, not the whole frame.
+- **Vignette** — a shader on a full-screen layer on top of the game.
 
-Цветокоррекция и зерно в веху не берутся: их место — после M7, когда появятся настоящие
-цвета, а на серых коробках настраивать общий тон бессмысленно.
+Colour correction and grain are not taken into the milestone: their place is after M7, when
+real colours appear, and tuning the overall tone on grey boxes is pointless.
 
-### 10. Фон города генерируется из сида здания
+### 10. The city background is generated from the building seed
 
-Параллакс-фон нужен, чтобы за проёмами было не пусто. Художника нет до M7, поэтому
-силуэт города выкладывается кодом из сида — теми же правилами, что и само здание
-([ADR-0008](0008-building-generation.md)). Значит, фон повторяем и проверяем тестом.
+A parallax background is needed so that it is not empty behind the openings. There is no
+artist until M7, so the city silhouette is laid out by code from the seed — by the same rules
+as the building itself ([ADR-0008](0008-building-generation.md)). So the background is
+reproducible and tested.
 
-В M7 его заменит рисованный, и это будет замена одного узла.
+In M7 it will be replaced by a drawn one, and that will be the replacement of one node.
 
-## Что осталось несверенным
+## What remains unchecked
 
-| Вопрос | Как закрыть |
+| Question | How to close it |
 |---|---|
-| Насколько именно темнота слабеет в поздних зданиях | MAME |
-| Начисляется ли надбавка за темноту при убийстве лампой | MAME |
+| How much exactly darkness weakens in later buildings | MAME |
+| Whether the dark bonus is awarded for a lamp kill | MAME |
 
-## Что осталось несделанным
+## What remains not done
 
-- **Темнота не слабеет в поздних зданиях** (пункт 7) — долг.
-- **Нормал-мапы и specular** (пункт 2) — переехали в M7.
+- **Darkness does not weaken in later buildings** (item 7) — debt.
+- **Normal maps and specular** (item 2) — moved to M7.
 
-## Последствия
+## Consequences
 
-- **`FloorLighting` перестаёт быть только моделью и обзаводится картинкой.** Класс
-  по-прежнему не знает про узлы, но уровень теперь по нему не полосу кладёт,
-  а гасит источники.
-- **Появляется отбор источников по кадру** — первая система, которой важно, где
-  камера. До сих пор уровень про камеру не знал.
-- **`DARKNESS_COLOR` и затемняющая полоса выбрасываются.** Заглушка из ADR-0007
-  прожила ровно столько, сколько обещала.
+- **`FloorLighting` stops being only a model and gets a picture.** The class still does not
+  know about nodes, but the level now uses it not to lay a band but to turn sources off.
+- **Per-frame source selection appears** — the first system that cares where the camera is.
+  Until now the level did not know about the camera.
+- **`DARKNESS_COLOR` and the darkening band are thrown out.** The placeholder from ADR-0007
+  lived exactly as long as it promised.
 
-## Источники
+## Sources
 
 - [Elevator Action — StrategyWiki](https://strategywiki.org/wiki/Elevator_Action)
 - [XP Arcade: Elevator Action](https://retroxp.beehiiv.com/p/xp-arcade-elevator-action)

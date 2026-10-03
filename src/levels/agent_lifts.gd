@@ -1,38 +1,38 @@
 class_name AgentLifts
 extends RefCounted
 
-## Куда агенту идти, чтобы уехать к Otto.
+## Where an agent should go to ride to Otto.
 ##
-## Правило одно — «иди к той кабине, что уже стоит вровень с твоим этажом», — но
-## условий у него четыре, и каждое стоило вехе отдельной находки. Поэтому своим
-## файлом, а не четырьмя методами в [GreyboxLevel]: тот и без того упёрся
-## в потолок в тысячу строк.
+## There is one rule — "go to the cab already standing level with your floor" — but
+## it has four conditions, and each cost the milestone a separate finding. Hence its own
+## file rather than four methods in [GreyboxLevel]: that one has already hit
+## the thousand-line ceiling.
 ##
-## Устройство поездки — в [ADR-0025](../../docs/adr/0025-shafts-escalators-and-riders.md),
-## решение 6. Что агент делает с ответом, знает [method Enemy.set_lift_at]:
-## выбранную кабину он держит, пока ему вообще предлагают ехать.
+## The ride design is in [ADR-0025](../../docs/adr/0025-shafts-escalators-and-riders.md),
+## decision 6. What the agent does with the answer is known to [method Enemy.set_lift_at]:
+## he keeps the chosen cab as long as he is offered a ride at all.
 
 
-## Ось кабины, в которую агенту стоит войти, чтобы стать ближе к Otto, или NAN.
+## The axis of the cab the agent should enter to get closer to Otto, or NAN.
 ##
-## [param where] — этаж агента, [param x] — где он стоит, [param here] — этаж
+## [param where] — the agent's floor, [param x] — where he stands, [param here] — Otto's
 ## Otto.
 ##
-## Предлагается только стоящая вровень с его этажом: вызова кабины в оригинале
-## нет ни у кого, а ждать её у проёма агенту нечем — он бы топтался на кромке,
-## разворачиваясь на каждом кадре.
+## Only one standing level with his floor is offered: nobody in the original has a cab call, and the
+## agent has no way to wait for it at the opening — he would shuffle on the edge, turning around
+## every frame.
 ##
-## **Из подходящих берётся ближайшая.** На этаже стилобата шахт до пяти, и
-## какая-нибудь кабина стоит вровень почти всегда; предложение прыгало с одной
-## на другую, и агент метался между ними, не дойдя ни до одной за полминуты.
+## **Of the suitable ones the nearest is taken.** A podium floor has up to five shafts, and
+## some cab stands level almost always; the offer jumped from one
+## to another, and the agent darted between them, reaching none in half a minute.
 ##
-## На этаже Otto кабина не предлагается вовсе: приехали. Поэтому едущий агент
-## выходит там, где Otto, а не на первом попавшемся этаже — пока кабина идёт,
-## вровень она ни с чем не стоит, и предложение само пропадает.
+## On Otto's floor no cab is offered at all: arrived. So a riding agent
+## gets out where Otto is, not on the first floor that comes along — while the cab is moving,
+## it is level with nothing, and the offer disappears by itself.
 ##
-## **Предлагается только та, до которой агент дойдёт.** Разворачиваться перед
-## преградой он не станет — кабина за глухой стеной или за чужим проёмом
-## означала бы агента, замершего у преграды до конца здания вместо патруля.
+## **Only one the agent can reach is offered.** He will not turn around in front of
+## an obstacle — a cab behind a solid wall or behind another opening
+## would mean an agent frozen at the obstacle until the end of the building instead of patrolling.
 static func offer(
 	plan: BuildingPlan,
 	rules: BuildingRules,
@@ -44,8 +44,8 @@ static func offer(
 	if where == here:
 		return NAN
 
-	# Кабины, стоящие вровень с этажом агента: только они и возят, и они же
-	# перекрывают собой свои проёмы.
+	# Cabs standing level with the agent's floor: only they carry, and they also
+	# cover their openings.
 	var standing := _standing_at(rules, cars, where)
 	if standing.is_empty():
 		return NAN
@@ -57,7 +57,7 @@ static func offer(
 		var shaft := _shaft_in_column(plan, rules, axis, where)
 		if shaft == null:
 			continue
-		# Шахта обязана вести в сторону Otto: иначе агент уезжает от него.
+		# The shaft must lead toward Otto: otherwise the agent rides away from him.
 		if not _leads_towards(shaft, where, towards):
 			continue
 		if not _reaches(blocks, x, axis):
@@ -67,12 +67,12 @@ static func offer(
 	return best
 
 
-## Есть ли у агента на этаже [param where] шахта, которая везёт в сторону Otto и
-## до которой он дойдёт, — стоит ли там сейчас кабина или нет.
+## Whether the agent's floor [param where] has a shaft that carries toward Otto and
+## that he can reach — whether a cab stands there now or not.
 ##
-## Такой агент ждёт кабину, а не уходит в дверь: иначе отставший на пару этажей
-## агент уходил бы раньше, чем кабина успевала за ним прийти, и поездок
-## агентов (ADR-0025, решение 6) не осталось бы вовсе.
+## Such an agent waits for the cab rather than leaving through a door: otherwise an agent a couple
+## of floors behind would leave before the cab managed to come for him, and agent rides (ADR-0025,
+## decision 6) would not remain at all.
 static func can_ride(
 	plan: BuildingPlan, rules: BuildingRules, where: int, x: float, here: int
 ) -> bool:
@@ -90,9 +90,9 @@ static func can_ride(
 	return false
 
 
-## Ближайшая дверь этажа [param where], до которой агент от [param x] дойдёт,
-## или NAN. Туда уходит отставший агент (ADR-0027, решение 3а); как и кабина,
-## предлагается только достижимая — за стеной или проёмом он замер бы у преграды.
+## The nearest door of floor [param where] that the agent can reach from [param x],
+## or NAN. A lagging agent leaves there (ADR-0027, decision 3a); like a cab,
+## only a reachable one is offered — behind a wall or an opening he would freeze at the obstacle.
 static func nearest_door(
 	plan: BuildingPlan, rules: BuildingRules, cars: Array[ElevatorCar], where: int, x: float
 ) -> float:
@@ -106,7 +106,7 @@ static func nearest_door(
 	return best
 
 
-## Оси кабин, стоящих вровень с этажом [param where].
+## Axes of the cabs standing level with floor [param where].
 static func _standing_at(
 	rules: BuildingRules, cars: Array[ElevatorCar], where: int
 ) -> PackedFloat64Array:
@@ -117,18 +117,18 @@ static func _standing_at(
 	return standing
 
 
-## Везёт ли шахта с этажа [param where] в сторону [param towards]: вверх — −1,
-## вниз — +1, как растут номера этажей.
+## Whether the shaft carries from floor [param where] toward [param towards]: up — −1,
+## down — +1, the way floor numbers grow.
 static func _leads_towards(shaft: BuildingPlan.ShaftSpot, where: int, towards: int) -> bool:
 	var span := shaft.ride_span()
 	return (towards > 0 and span.y > where) or (towards < 0 and span.x < where)
 
 
-## Что режет агенту ходьбу по этажу: проёмы и глухие стены, кроме тех проёмов,
-## где стоит кабина.
+## What cuts the agent's walk along the floor: openings and solid walls, except the openings
+## where a cab stands.
 ##
-## Сквозь стоящую кабину проходят насквозь — этим живёт и граф здания
-## ([BuildingRoute]), и половина этажа, разрезанного шахтой.
+## A standing cab is walked straight through — both the building graph lives by this
+## ([BuildingRoute]) and half of a floor cut by a shaft.
 static func _walk_blocks(
 	plan: BuildingPlan, rules: BuildingRules, where: int, standing: PackedFloat64Array
 ) -> Array[Vector2]:
@@ -144,8 +144,8 @@ static func _walk_blocks(
 	return blocks
 
 
-## Дойдёт ли идущий по этажу от [param from_x] до [param to_x], не упёршись
-## ни в одну из преград [param blocks].
+## Whether one walking along the floor gets from [param from_x] to [param to_x] without hitting
+## any of the obstacles [param blocks].
 static func _reaches(blocks: Array[Vector2], from_x: float, to_x: float) -> bool:
 	var low := minf(from_x, to_x)
 	var high := maxf(from_x, to_x)
@@ -155,10 +155,10 @@ static func _reaches(blocks: Array[Vector2], from_x: float, to_x: float) -> bool
 	return true
 
 
-## Шахта, стоящая в этом столбце и обслуживающая этот этаж.
+## The shaft standing in this column and serving this floor.
 ##
-## Столбец сам по себе шахту не опознаёт: полосы не перекрываются по этажам,
-## но одно и то же место сетки занимают разные шахты на разной высоте.
+## A column alone does not identify a shaft: runs do not overlap by floors,
+## but the same grid slot is taken by different shafts at different heights.
 static func _shaft_in_column(
 	plan: BuildingPlan, rules: BuildingRules, x: float, index: int
 ) -> BuildingPlan.ShaftSpot:
@@ -170,6 +170,6 @@ static func _shaft_in_column(
 	return null
 
 
-## Высота узла в координатах правил: там, где Y растёт вниз.
+## Node height in rule coordinates: where Y grows downward.
 static func _height_of(node: Node3D) -> float:
 	return WorldSpace.to_plane(node.global_position).y

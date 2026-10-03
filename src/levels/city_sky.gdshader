@@ -1,20 +1,20 @@
 shader_type sky;
 
-// Небо города — HDRI-панорама Poly Haven (ADR-0051, решение 11), повёрнутая
-// так, чтобы её солнце стояло там же, где свет солнца города ([CitySky]).
-// Своим шейдером, а не панорамой движка: так поворот задаётся одной долей
-// оборота от известного направления, без угадывания, куда смотрит шов.
+// The city sky is a Poly Haven HDRI panorama (ADR-0051, decision 11), rotated so that
+// its sun stands where the city's sunlight is ([CitySky]). As its own shader rather than
+// the engine's panorama: that way the rotation is set by one fraction of a turn from a
+// known direction, without guessing where the seam faces.
 
 uniform sampler2D panorama : filter_linear, repeat_enable;
 uniform float energy = 1.0;
-// Сдвиг панорамы по кругу, доля оборота.
+// Panorama shift around the circle, fraction of a turn.
 uniform float shift = 0.0;
-// Вспышка молнии: небо светлеет целиком.
+// Lightning flash: the whole sky brightens.
 uniform float flash = 0.0;
 
 void sky() {
 	vec3 dir = normalize(EYEDIR);
-	// Азимут от «прямо в город» (минус z) направо, к плюс x.
+	// Azimuth from "straight into the city" (minus z) to the right, toward plus x.
 	float azimuth = atan(dir.x, -dir.z);
 	float u = fract(azimuth / TAU + shift);
 	float v = acos(clamp(dir.y, -1.0, 1.0)) / PI;

@@ -1,23 +1,23 @@
 extends Node
 
-## Демо-режим кадрами (ADR-0041): настоящая главная сцена, демо с каждой из трёх
-## точек, по кадру каждые несколько секунд.
+## Demo mode in shots (ADR-0041): the real main scene, the demo from each of the three
+## points, a shot every few seconds.
 ##
-## Ждать 45 с бездействия меню незачем: демо запускается сразу, как его запустил
-## бы отсчёт. Бот играет сам, и кадр показывает, что увидит тот, кто отошёл от
-## экрана.
+## There is no need to wait 45 s of menu idleness: the demo starts at once, as the countdown would
+## start it. The bot plays by itself, and the shot shows what someone who stepped away from
+## the screen will see.
 ##
-## Запуск:
+## Run:
 ##     godot --path . res://tools/demo_shot.tscn
 ##     godot --path . res://tools/demo_shot.tscn -- --folder=M24E
 ##
-## Кадры ложатся в screens/<папка>/demo_<точка>_<секунда>.jpg. Папка локальная.
+## Shots go to screens/<folder>/demo_<point>_<second>.jpg. The folder is local.
 
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 const MAIN_SCENE := preload("res://src/main.tscn")
 
 const DEFAULT_FOLDER := "M24E"
-## Когда снимать кадры демо, с от его начала.
+## When to take demo shots, s from its start.
 const MOMENTS: Array[float] = [3.0, 8.0, 14.0, 20.0, 27.0]
 const POINT_NAMES: Array[String] = ["roof", "middle", "bottom"]
 

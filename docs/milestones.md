@@ -1,3910 +1,3960 @@
-# Итоги вех
+# Milestone history
 
-Архив: что было сделано в каждой вехе, что изменила сверка с оригиналом и что
-нашло авторевью. Пополняется, когда веха закрывается, и дальше не правится.
+Archive: what was done in each milestone, what the check against the original changed and
+what the code review found. Appended when a milestone closes and not edited afterwards.
 
-Текущее состояние проекта — в [`STATUS.md`](STATUS.md), план целиком —
-в [`EPIC.md`](EPIC.md).
+The current state of the project is in [`STATUS.md`](STATUS.md), the whole plan is
+in [`EPIC.md`](EPIC.md).
 
-## Веха M4b · Лампы и темнота
+## Milestone M4b · Lamps and darkness
 
-Вторая половина разделённой вехи M4. Механику сверяли вместе с боем, поэтому здесь
-принимались решения, а не искались источники — все они в
+The second half of the split milestone M4. The mechanics were checked together with combat, so
+here decisions were made rather than sources searched — all of them are in
 [ADR-0007](adr/0007-lamps-and-darkness.md).
 
-1. Лампа сбивается выстрелом, падает и убивает агента под собой — 300 очков, самый
-   дорогой способ убийства в оригинале.
-2. Otto падающая лампа не трогает: источники говорят только об агентах.
-3. Сбитая лампа гасит свой этаж насовсем.
-4. Темнота до M6 — затемняющий прямоугольник поверх этажа.
-5. В темноте у агентов падает дальность стрельбы: не слепота, а меньше огня.
-6. Двойные очки за убийство в темноте; размер надбавки оригинала не найден.
-7. Неуязвимость Otto на эскалаторе — закрывает долг, заведённый ещё в M2.
+1. A lamp is knocked down by a shot, falls and kills the agent under it — 300 points, the most
+   expensive way to kill in the original.
+2. A falling lamp does not touch Otto: the sources speak only about agents.
+3. A knocked-down lamp darkens its floor for good.
+4. Until M6 darkness is a dimming rectangle over the floor.
+5. In darkness agents' firing range drops: not blindness, but less fire.
+6. Double points for a kill in darkness; the original's bonus size was not found.
+7. Otto is invulnerable on an escalator — closes a debt opened back in M2.
 
-**DoD:** лампы гасятся, на тёмном этаже враги ведут себя иначе.
+**DoD:** lamps go out, enemies behave differently on a dark floor.
 
-### Сделано в вехе
+### Done in the milestone
 
-- `Lamp` — подвес под потолком, 24 px высотой. Висит так, что стоя в неё не попасть:
-  выстрел стоя идёт в 20 px над полом, а низ подвеса — в 48. Сбить её можно в прыжке,
-  и высота подвеса выбрана из этого: пуля летит на высоте, на которой её выпустили,
-  так что окно попадания — это время, за которое прыжок проходит высоту лампы.
-- `FloorLighting` — какие этажи погашены, отдельным классом с тестами.
-- Погашенный этаж накрывается тёмной полосой поверх всего. Это заглушка до M6,
-  и она честно выбрасывается, когда придёт настоящий свет.
-- Агент на тёмном этаже видит втрое с лишним ближе: 60 px вместо 200. Это одно число
-  в `Enemy` (`dark_fire_range`), и его же будет удобно ослаблять в поздних зданиях.
-- Двойные очки за убийство в темноте — правило вынесено в `GameState.kill_score`.
-- Otto неуязвим на эскалаторе: формы коллизии выключаются на время поездки, как
-  за дверью, но видимым он остаётся.
+- `Lamp` — a pendant under the ceiling, 24 px tall. It hangs so that it cannot be hit standing:
+  a standing shot goes 20 px above the floor, and the bottom of the pendant is at 48. It can be
+  knocked down in a jump, and the pendant height is chosen from that: a bullet flies at the
+  height it was fired at, so the hit window is the time the jump takes to pass the lamp's height.
+- `FloorLighting` — which floors are dark, as a separate class with tests.
+- A dark floor is covered by a dark band over everything. This is a stub until M6,
+  and it is honestly thrown away when real lighting arrives.
+- An agent on a dark floor sees more than three times closer: 60 px instead of 200. This is one
+  number in `Enemy` (`dark_fire_range`), and it will also be handy to weaken in later buildings.
+- Double points for a kill in darkness — the rule lives in `GameState.kill_score`.
+- Otto is invulnerable on an escalator: collision shapes are disabled for the ride, as
+  behind a door, but he stays visible.
 
-Проверено кадрами: выстрел по лампе в прыжке и погасший после её падения этаж.
+Verified with shots: a shot at a lamp in a jump and the floor gone dark after its fall.
 
-Не проверено кадрами: падение лампы на агента, дальность агента в темноте и сама
-неуязвимость на эскалаторе. Первое требует подгонки момента выстрела под идущего
-агента и снимается вручную; второе проверено тестом на уровне правил; третье следует
-из того, что у выключенных форм пуле не во что попадать.
+Not verified with shots: a lamp falling on an agent, agent range in darkness and the
+escalator invulnerability itself. The first requires timing the shot to a walking agent
+and is captured by hand; the second is checked by a rules-level test; the third follows
+from the fact that a bullet has nothing to hit when the shapes are disabled.
 
-### Правки авторевью
+### Code review fixes
 
-- **Лампа была почти непростреливаемой.** В коммит уехала лампа 8 px высотой вместо
-  задуманного подвеса: команда, переписывавшая сцену, не разобралась `bash` и не
-  выполнилась, а константы уровня я посчитал уже под несуществующий размер. Окно
-  попадания вышло шириной в два кадра — сценарий съёмки попадал в него чудом.
-  Высота поднята до 24 px, окно стало шестикадровым.
-- **Лампа нижнего этажа висела прямо в шахте**, и кабина проезжала сквозь неё.
-  Перевешена в сторону.
-- **Лампа зависала в 16 px над полом**: дальность падения считалась по константе
-  уровня, не совпадавшей с размером сцены. Теперь лампа считает её по своей же форме.
-- **Этаж выводился из координаты упавшей лампы**, хотя был известен в момент развески.
-  Работало только потому, что этажи ровно в 120 px друг от друга.
-- **Повторное попадание поднимало упавшую лампу обратно**: `queue_free` убирает узел
-  лишь в конце кадра, и до тех пор она ловит пули.
-- **`set_in_the_dark` зависел от порядка вызовов** относительно `add_child`.
+- **The lamp was almost impossible to hit.** An 8 px tall lamp went into the commit instead of
+  the intended pendant: the command rewriting the scene was not parsed by `bash` and did not
+  run, and I computed the level constants for a size that did not exist. The hit window came
+  out two frames wide — the capture script hit it by a miracle.
+  The height is raised to 24 px, the window became six frames.
+- **The lowest floor's lamp hung right in the shaft**, and the cab drove through it.
+  Moved aside.
+- **The lamp hung 16 px above the floor**: the fall distance was computed from a level
+  constant that did not match the scene size. Now the lamp computes it from its own shape.
+- **The floor was derived from the fallen lamp's coordinate**, although it was known at hanging
+  time. It worked only because floors are exactly 120 px apart.
+- **A repeated hit lifted the fallen lamp back up**: `queue_free` removes the node
+  only at the end of the frame, and until then it catches bullets.
+- **`set_in_the_dark` depended on the call order** relative to `add_child`.
 
-Сверх находок закрыто то, что ревью оставило автору:
+Beyond the findings, what the review left to the author is closed too:
 
-- **Лампы получили свой слой физики.** Они сидели на слое врагов, из-за чего удар
-  ногой находил лампы, а собственная зона лампы — другие лампы и саму себя. Каждому
-  будущему потребителю слоя врагов пришлось бы помнить про это исключение.
-- **Падение вынесено в `LampFall`** и покрыто пятью тестами: соглашения требуют теста
-  вместе с механикой, а ревью отложило это как отдельную работу.
-- **`Lamp` стал `AnimatableBody2D`** — узел двигает себя сам, и для этого в проекте
-  уже есть прецедент с кабиной лифта.
-- **`story_top` принимает список этажей**, как соседний `floor_index_near`, и покрыт
-  тестом: от него зависит геометрия затемняющей полосы.
+- **Lamps got their own physics layer.** They sat on the enemy layer, so the kick
+  found lamps, and the lamp's own area found other lamps and itself. Every
+  future consumer of the enemy layer would have had to remember this exception.
+- **The fall is moved into `LampFall`** and covered by five tests: the conventions require a test
+  along with the mechanic, and the review postponed it as separate work.
+- **`Lamp` became `AnimatableBody2D`** — the node moves itself, and the project
+  already has a precedent for that with the elevator cab.
+- **`story_top` takes a list of floors**, like the neighbouring `floor_index_near`, and is
+  covered by a test: the dimming band's geometry depends on it.
 
-### Чего в оригинале нет
+### What the original does not have
 
-Постоянная темнота — наше решение, принятое в ADR-0006. Из него следует то, чего в
-оригинале не бывает: погашенный этаж становится **постоянным** преимуществом, а не
-окном на пять секунд. Вместе с двойными очками и респавном агентов это даёт ферму
-очков — стой на тёмном этаже и стреляй. Ограничить её сможет только тревога по
-таймеру из M5.
+Permanent darkness is our decision, made in ADR-0006. It leads to something that never happens
+in the original: a dark floor becomes a **permanent** advantage rather than a
+five-second window. Together with double points and agent respawn this gives a points
+farm — stand on a dark floor and shoot. Only the timer alarm from M5 will be able to
+limit it.
 
-## Веха M4a · Бой и враги
+## Milestone M4a · Combat and enemies
 
-Веха M4 из эпика оказалась вдвое больше M2 и M3, поэтому разделена надвое: **M4a** —
-бой и враги, **M4b** — лампы и темнота. Номера остальных вех не сдвигаются: иначе
-пришлось бы переписывать их в уже принятых ADR, а те фиксируют решение на момент
-принятия. Всё это, вместе со сверкой механики, — в [ADR-0006](adr/0006-combat-and-enemies.md).
+Milestone M4 from the epic turned out twice the size of M2 and M3, so it is split in two:
+**M4a** — combat and enemies, **M4b** — lamps and darkness. The numbers of the other milestones
+do not shift: otherwise they would have to be rewritten in already accepted ADRs, and those record a
+decision as of its acceptance. All of this, along with the check of the mechanics, is in
+[ADR-0006](adr/0006-combat-and-enemies.md).
 
-1. Стрельба Otto стоя, приседая и в прыжке; не больше трёх пуль на экране разом.
-2. Удар ногой в прыжке.
-3. Пули с высотой полёта: от высокой приседают, низкую перепрыгивают.
-4. Враг-агент: выход из обычной двери, ход по этажу, выстрел по линии.
-5. Три жизни; жизнь снимает только выстрел.
-6. Смерть, респавн, Game Over.
-7. Очки: 100 за выстрел, 150 за удар ногой.
-8. Тесты: попадания, уклонение, жизни, поведение агента.
+1. Otto shoots standing, crouching and in a jump; no more than three bullets on screen at once.
+2. Kick in a jump.
+3. Bullets with a flight height: you crouch under a high one, jump over a low one.
+4. Enemy agent: comes out of an ordinary door, walks along the floor, shoots along the line.
+5. Three lives; only a shot takes a life.
+6. Death, respawn, Game Over.
+7. Points: 100 for a shot, 150 for a kick.
+8. Tests: hits, dodging, lives, agent behaviour.
 
-**DoD:** этаж с врагами проходится с боем; кончились жизни — Game Over.
+**DoD:** a floor with enemies can be passed with a fight; out of lives — Game Over.
 
-### Сделано в вехе
+### Done in the milestone
 
-- `Gun` — правило трёх пуль отдельным классом. `Bullet` — пуля с высотой полёта;
-  уклонение отдельного правила не потребовало, его целиком решают формы коллизии:
-  выстрел агента идёт на высоте 20 px, а присевший Otto ростом 18 px под ним проходит.
-- `EnemyBrain` — решения агента без узлов и физики: вылезти из двери, дойти, выстрелить
-  по линии, выдержать паузу между выстрелами. Девять тестов.
-- `Enemy` — сам агент. Телом не вредит: слои Otto и врагов разведены, они проходят
-  сквозь друг друга, как в оригинале.
-- Жизни, смерть от пули, респавн на этаже гибели, Game Over — в `GameState`.
-- Удар ногой в прыжке, очки 100 за выстрел и 150 за удар.
+- `Gun` — the three-bullet rule as a separate class. `Bullet` — a bullet with a flight height;
+  dodging needed no separate rule, the collision shapes solve it entirely:
+  an agent's shot goes at 20 px height, and a crouching Otto 18 px tall passes under it.
+- `EnemyBrain` — agent decisions without nodes or physics: come out of a door, walk up, shoot
+  along the line, keep a pause between shots. Nine tests.
+- `Enemy` — the agent itself. Its body does no harm: Otto's and enemies' layers are separated,
+  they pass through each other, as in the original.
+- Lives, death from a bullet, respawn on the floor of death, Game Over — in `GameState`.
+- Kick in a jump, 100 points for a shot and 150 for a kick.
 
-Проверено кадрами: убийство агента выстрелом, убийство ударом ногой, гибель Otto от
-вражеской пули и возвращение в игру с потерей жизни. Ограничение в три пули, уклонение
-и Game Over проверены тестами, но не кадрами: первое и третье в кадр не попадают, а
-уклонение вытекает из размеров форм.
+Verified with shots: killing an agent with a shot, killing with a kick, Otto dying from an
+enemy bullet and returning to the game with a life lost. The three-bullet limit, dodging
+and Game Over are verified by tests, not shots: the first and third do not fit in a shot, and
+dodging follows from the shape sizes.
 
-### Правки авторевью
+### Code review fixes
 
-- **Пуля гасла только в конце кадра.** За один кадр она успевала задеть несколько тел,
-  и один выстрел убивал двоих сразу, начисляя очки за каждого. Теперь пуля помечается
-  израсходованной в момент первого попадания.
-- **`game_over` приходил повторно** при каждом новом `lose_life()` на нуле жизней.
-  Сигнал сообщает о переходе, а не о состоянии, — добавлен выход на нуле и тест на это.
-- **Респавн не сбрасывал верхнюю точку полёта.** Упавший в шахту возвращался в игру
-  с чужой глубиной падения за спиной; `revive()` теперь берёт её от нового места.
-- **Труп агента зависал в воздухе**, если его доставали в прыжке: мёртвому не считалась
-  гравитация. Теперь тело доезжает до пола и лежит уже там.
-- Настройки решений агента (дальность, пауза, линия) подняты в `@export` узла и
-  отдаются `EnemyBrain` — как дверь отдаёт свои `DoorVisit`.
-- **`python tools/capture.py M4a` снимал план M1:** ключ в `AUTO_PLANS` был `M4A`, и
-  незнакомая веха молча подменялась на M1. Регистр больше не важен, а подмена
-  сопровождается предупреждением.
+- **A bullet went out only at the end of the frame.** Within one frame it managed to touch
+  several bodies, and one shot killed two at once, scoring points for each. Now the bullet is
+  marked spent at the moment of the first hit.
+- **`game_over` came again** on every new `lose_life()` at zero lives.
+  The signal reports a transition, not a state — an exit at zero and a test for it are added.
+- **Respawn did not reset the top point of the flight.** Someone who fell into a shaft came back
+  into the game with someone else's fall depth behind them; `revive()` now takes it from the new
+  place.
+- **An agent's corpse hung in the air** if it was hit in a jump: gravity was not applied to the
+  dead. Now the body drops to the floor and lies there.
+- Agent decision settings (range, pause, line) are raised into the node's `@export` and
+  handed to `EnemyBrain` — the way a door hands over its `DoorVisit`.
+- **`python tools/capture.py M4a` captured the M1 plan:** the key in `AUTO_PLANS` was `M4A`, and
+  an unknown milestone was silently replaced with M1. Case no longer matters, and the substitution
+  comes with a warning.
 
-- **Агент уходил с собственного этажа** в проём шахты или эскалатора: маска у него
-  только на геометрию, и дыра в перекрытии ничем не отличалась от продолжения пола.
-  По ADR-0006 (пункт 6) он должен ходить по своему этажу, поэтому перед ногами
-  появился щуп пола: дальше нет опоры — агент останавливается у края. Ревью оставило
-  это как ограничение вехи, но правка оказалась в три строки и проверена кадром.
+- **An agent left its own floor** into a shaft or escalator opening: its mask covers
+  only geometry, and a hole in the slab was no different from more floor.
+  Per ADR-0006 (item 6) it must walk its own floor, so a floor probe appeared
+  in front of its feet: no support ahead — the agent stops at the edge. The review left
+  this as a milestone limitation, but the fix turned out to be three lines and verified with a
+  shot.
 
-### Что изменила сверка
+### What the check changed
 
-**Столкновение с врагом безвредно.** Жизнь снимает только попадание пули — Wikipedia
-пишет об этом прямо. Агент опасен оружием, а не телом, и пробежать сквозь него —
-законный приём.
+**Colliding with an enemy is harmless.** Only a bullet hit takes a life — Wikipedia
+says so directly. An agent is dangerous with its weapon, not its body, and running through it
+is a legitimate move.
 
-**Тревога по таймеру.** Механики не было ни в одной вехе эпика: если возиться со
-зданием слишком долго, враги становятся агрессивнее, а лифт начинает хуже слушаться
-джойстика. Заведена в M5, к нарастающей сложности.
+**Timer alarm.** The mechanic was in no milestone of the epic: if you dawdle in a
+building too long, enemies become more aggressive, and the elevator starts obeying the
+joystick worse. Added in M5, alongside rising difficulty.
 
-**Лампы будут гаситься не по-оригинальному.** В оригинале лампы на одном контуре и
-гаснет всё здание секунд на пять; у нас лампа погасит свой этаж насовсем. Это первый
-сознательный отход от механики оригинала в проекте — основания в ADR-0006, пункт 7.
+**Lamps will go out not as in the original.** In the original lamps are on one circuit and
+the whole building goes dark for about five seconds; ours will darken its floor for good. This
+is the project's first deliberate departure from the original's mechanics — the grounds are in
+ADR-0006, item 7.
 
-## Веха M3 · Двери и документы
+## Milestone M3 · Doors and documents
 
-Механика сверена до начала работы. Сверка подтвердила большую часть плана, но изменила
-один пункт и добавила механику, которой в эпике не было. Решения и цитаты —
-в [ADR-0005](adr/0005-doors-and-documents.md).
+The mechanics were checked before work began. The check confirmed most of the plan, but changed
+one item and added a mechanic that the epic did not have. Decisions and quotes —
+in [ADR-0005](adr/0005-doors-and-documents.md).
 
-1. Дверь как сцена: закрыта / открывается / открыта, коврик перед входом.
-2. Вход с коврика по нажатию «вверх»; внутри Otto прячется до пяти секунд.
-3. Красные двери: документ при первом входе, +500 очков, дверь перестаёт быть красной.
-4. Обычные двери: сцена и состояния; враги из них — в M4.
-5. Автолоад `GameState`: очки и собранные документы, связь сигналами.
-6. Счётчик документов и очки в HUD.
-7. Выход открыт всегда, но без всех документов переносит к верхней несобранной двери.
-8. Тесты: сбор, счёт, выбор двери для переноса, условие настоящего выхода.
+1. Door as a scene: closed / opening / open, a mat in front of the entrance.
+2. Entering from the mat by pressing "up"; inside Otto hides for up to five seconds.
+3. Red doors: a document on the first entry, +500 points, the door stops being red.
+4. Ordinary doors: the scene and states; enemies from them — in M4.
+5. `GameState` autoload: points and collected documents, connected by signals.
+6. Document counter and points in the HUD.
+7. The exit is always open, but without all documents it moves you to the top uncollected door.
+8. Tests: collection, score, choosing the door to move to, the condition for a real exit.
 
-**DoD:** на тестовом здании из трёх этажей можно собрать все документы и выйти; попытка
-выйти раньше возвращает к несобранной двери.
+**DoD:** in a three-floor test building you can collect all documents and leave; an attempt
+to leave earlier returns you to an uncollected door.
 
-### Сделано в вехе
+### Done in the milestone
 
-- `Door` — сцена двери с состояниями «закрыта / открывается / открыта», ковриком и
-  пятисекундным укрытием внутри. Выйти раньше можно нажатием в сторону, но нажатие
-  должно быть свежим: иначе тот же зажатый «влево», которым Otto пришёл к двери,
-  выталкивал бы его в первом же кадре.
-- `GameState` — синглтон счёта и документов с сигналами. У скрипта есть `class_name`,
-  а автолоад назван иначе (`Game`), и код ходит через `GameState.instance()`: имя
-  автолоада не идентификатор, `--check-only` его не знает, и проверка движком падала
-  бы на каждом обращении. Побочная выгода — тесты создают свой экземпляр.
-- `DocumentRoute` — выбор двери для возврата, отдельно от узлов и с тестами.
-- `Otto` получил состояние `INDOORS`: за дверью его не видно и не задеть.
-- HUD: очки и счётчик документов, «здание пройдено» на выходе.
-- `Intent` — общие направления и порог нажатия. Их разводило по трём классам,
-  на это ругалось авторевью M2; перед добавлением четвёртой копии свёл в одно место.
+- `Door` — a door scene with "closed / opening / open" states, a mat and
+  a five-second hiding place inside. You can leave earlier by pressing sideways, but the press
+  must be fresh: otherwise the same held "left" with which Otto came to the door
+  would push him out on the very first frame.
+- `GameState` — a score and documents singleton with signals. The script has a `class_name`,
+  while the autoload is named differently (`Game`), and code goes through `GameState.instance()`:
+  the autoload name is not an identifier, `--check-only` does not know it, and the engine check
+  would fail on every access. A side benefit — tests create their own instance.
+- `DocumentRoute` — choosing the door to return to, separate from nodes and with tests.
+- `Otto` got the `INDOORS` state: behind a door he cannot be seen or touched.
+- HUD: points and the document counter, "building cleared" at the exit.
+- `Intent` — shared directions and the press threshold. They had spread over three classes,
+  the M2 code review complained about it; before adding a fourth copy I merged them in one place.
 
-Проверено кадрами: сбор документа с красной двери, укрытие внутри и выход из него,
-возврат к верхней несобранной двери при попытке уйти раньше, и настоящий выход.
+Verified with shots: collecting a document from a red door, hiding inside and coming out,
+returning to the top uncollected door when trying to leave early, and the real exit.
 
-### Главное, что изменила сверка
+### The main thing the check changed
 
-**Выход не блокируется.** В эпике было «блокировка финального выхода, пока документы не
-собраны». В оригинале выход открыт всегда, а Otto переносит на самый верхний этаж
-с несобранной красной дверью — и игроки пользуются этим нарочно, чтобы попасть к двери,
-до которой иначе тяжело добраться.
+**The exit is not blocked.** The epic said "block the final exit until the documents are
+collected". In the original the exit is always open, and Otto is moved to the topmost floor
+with an uncollected red door — and players use this on purpose to get to a door
+that is otherwise hard to reach.
 
-**Дверь — это укрытие.** Внутри можно пересидеть до пяти секунд. В M4 это станет частью
-боя, но само поведение двери делается сразу.
+**A door is a hiding place.** You can sit inside for up to five seconds. In M4 this becomes part
+of combat, but the door behaviour itself is done right away.
 
-## Авторевью M3
+## Code review M3
 
-`/code-review xhigh --fix` нашло 14 проблем, 12 исправлено. Существенное:
+`/code-review xhigh --fix` found 14 problems, 12 fixed. The significant ones:
 
-- **Дверь-ловушка.** Защита стояла только на выход. Если держать «вверх», дверь
-  выпускала Otto через пять секунд и тут же забирала обратно — управление не
-  возвращалось никогда. Добавлен симметричный взвод на вход.
-- **Первый кадр после двери Otto проводил бестелесным.** Формы коллизии включаются
-  отложенно, а дверь снимает состояние посреди кадра, поэтому `move_and_slide`
-  не находил под ним пола и ронял в `FALL` на ровном месте.
-- **Уровень стирал счёт** при загрузке: в M5 переход во второе здание обнулял бы
-  накопленные очки. Обнулять партию — дело игрового цикла, а не уровня.
-- **Кадр «у красной двери» снимал пустой проём**: Otto входил в дверь раньше, чем
-  делался снимок, и кадр повторял следующий. Шаги сценария разведены.
-- **Нажатие на выход во время открывания терялось** — взвод поднят выше ветвления.
-- **Мёртвый и спрятанный продолжали бы вести кабину**: `vertical_intent()` молчал
-  только в `DEAD`, теперь — в любом состоянии, которым распоряжается мир.
+- **Trap door.** The guard was only on the exit. If you held "up", the door
+  released Otto after five seconds and immediately took him back — control never
+  returned. A symmetric arming on entry is added.
+- **Otto spent the first frame after a door bodiless.** Collision shapes are enabled
+  deferred, and the door clears the state mid-frame, so `move_and_slide`
+  found no floor under him and dropped him into `FALL` on level ground.
+- **The level erased the score** on load: in M5 moving into the second building would reset
+  the accumulated points. Resetting the game is the game loop's job, not the level's.
+- **The "at the red door" shot captured an empty doorway**: Otto entered the door before
+  the snapshot was taken, and the shot repeated the next one. The script steps are separated.
+- **Pressing exit while opening was lost** — the arming is moved above the branching.
+- **The dead and the hidden would keep driving the cab**: `vertical_intent()` was silent
+  only in `DEAD`, now — in any state the world controls.
 
-Сверх находок ревью закрыт его же пункт про **отсутствие тестов у двери**: правила
-вынесены в чистый класс `DoorVisit` — кого впускать, когда выпускать, оба взвода —
-и покрыты девятью тестами. Ревью его отложило как «отдельную работу», но соглашения
-проекта требуют теста вместе с механикой, а обе найденные регрессии двери тесты бы
-поймали.
+Beyond the review findings, its own item about **the door having no tests** is closed: the rules
+are moved into the pure class `DoorVisit` — whom to let in, when to let out, both armings —
+and covered by nine tests. The review postponed it as "separate work", but the project's
+conventions require a test along with the mechanic, and tests would have caught both door
+regressions found.
 
-Оставлено осознанно:
+Left deliberately:
 
-- **`GameState.instance()` разыменовывается без проверки на null.** В игре автолоад
-  есть всегда; проверки понадобятся, если уровень начнут инстанцировать отдельно.
-- **`GameState.reset()` больше не зовётся из продакшен-кода.** Это верный слой:
-  обнулять партию будет игровой цикл в M5, до тех пор счёт живёт от запуска.
+- **`GameState.instance()` is dereferenced without a null check.** In the game the autoload
+  is always there; checks will be needed if the level starts being instantiated separately.
+- **`GameState.reset()` is no longer called from production code.** This is the right layer:
+  the game loop in M5 will reset the game, until then the score lives from launch.
 
-## Веха M2 · Лифты и эскалаторы
+## Milestone M2 · Elevators and escalators
 
-Самая рискованная веха эпика закрыта. Перед работой механика была сверена с оригиналом
-по доступным источникам: сверка изменила три предположения, с которыми веха планировалась,
-и добавила механику, которой в эпике не было — автономное движение кабин. Все решения
-и цитаты — в [ADR-0004](adr/0004-elevator-mechanics.md).
+The riskiest milestone of the epic is closed. Before work the mechanics were checked against the
+original from the available sources: the check changed three assumptions the milestone was planned
+with, and added a mechanic the epic did not have — autonomous cab movement. All decisions
+and quotes — in [ADR-0004](adr/0004-elevator-mechanics.md).
 
-Каждая механика проверена не только тестами, но и кадрами: вход в кабину, спуск на
-нижний этаж, подъём эскалатором, падение в пустую шахту и гибель под кабиной сняты
-и просмотрены.
+Each mechanic is verified not only by tests but also by shots: entering a cab, going down to
+the lower floor, going up an escalator, falling into an empty shaft and dying under a cab are
+captured and reviewed.
 
-### Что осталось за рамками
+### What stayed out of scope
 
-- **Сдавливание работает в одну сторону** — кабина давит того, кто стоит под её днищем.
-  Обратное направление, когда едущего на крыше прижимает к перекрытию, не реализовано:
-  проём шахты равен ширине кабины, и попасть в него сбоку почти невозможно.
-- **Трос не мешает прыжку через шахту.** В оригинале, когда кабина ниже, трос блокирует
-  прыжок и роняет Otto вниз. В списке решений вехи этого пункта не было; сейчас прыжок
-  в шахту над кабиной просто роняет на крышу.
-- **Шахта не стала `Resource`.** Она описана константами уровня; данными станет в M5
-  вместе с остальным зданием.
+- **Crushing works in one direction** — the cab crushes whoever stands under its bottom.
+  The reverse direction, when someone riding on the roof is pressed against the slab, is not
+  implemented: the shaft opening equals the cab width, and getting into it from the side is
+  almost impossible.
+- **The rope does not hinder a jump across the shaft.** In the original, when the cab is lower,
+  the rope blocks the jump and drops Otto down. This item was not in the milestone's list of
+  decisions; now a jump into the shaft above the cab simply drops him onto the roof.
+- **The shaft did not become a `Resource`.** It is described by level constants; it will become
+  data in M5 together with the rest of the building.
 
-### Требует сверки в MAME
+### Needs checking in MAME
 
-Одно решение вехи источниками не подтверждено: **останавливается ли кабина игрока между
-этажами**. Реализована свободная остановка, поведение вынесено в `stops_between_floors` —
-переключить после сверки будет одной строкой. Там же ждут сверки скорость кабины,
-длительность паузы на этаже и ширина проёма шахты.
+One milestone decision is not confirmed by sources: **does the player's cab stop between
+floors**. A free stop is implemented, the behaviour lives in `stops_between_floors` —
+switching after the check will be one line. The cab speed, the length of the pause at a floor
+and the shaft opening width also await checking.
 
-## Авторевью M2
+## Code review M2
 
-`/code-review xhigh --fix` нашло 11 проблем, 8 исправлено на месте. Существенное:
+`/code-review xhigh --fix` found 11 problems, 8 fixed in place. The significant ones:
 
-- **Прыжок над шахтой на нижнем этаже убивал.** Нижний этаж сплошной, а зона дна
-  шахты лежит прямо над ним: любой прыжок в столбе шахты приземлялся в неё уже
-  в воздухе, и `is_deadly_fall` считал это падением. Теперь правило смотрит ещё и
-  на глубину — падение глубже собственного прыжка Otto (`v² / 2g`) не спутать с
-  прыжком. Otto считает её сам (`fall_height()`), от верхней точки полёта.
-- **Эскалатор воскрешал мёртвого.** `OttoStateMachine.ride()` ставил `RIDE` поверх
-  `DEAD`, хотя `DEAD` описан как терминальный. Добавлена проверка и тест.
-- **Пункт 6 ADR-0004 не был реализован.** «Выйти на этаж можно только когда пол
-  кабины совпал с полом этажа» — `ElevatorCar.is_aligned()` был написан, но никем
-  не вызывался, и из вставшей между этажами кабины Otto выходил в пустоту.
-  Теперь пока кабина не выровнена, горизонтального движения внутри неё нет.
-- **Мёртвый продолжал вести кабину** и мог сесть на эскалатор: `vertical_intent()`
-  отдавал ввод независимо от состояния. Теперь в `DEAD` он отдаёт ноль.
-- **Пустая кабина не выдерживала паузу после выхода пассажира** (ADR-0004, пункт 4)
-  и трогалась с этажа в тот же кадр. `_drive` держит счётчик паузы полным.
-- Мелочи: убраны мёртвые `is_occupied()`, `motion_speed()`, `is_busy()`; слоям
-  физики даны имена в `project.godot`; поправлена устаревшая докстрока `capture.py`.
+- **A jump over a shaft on the bottom floor killed.** The bottom floor is solid, and the shaft
+  bottom area lies right above it: any jump in the shaft column landed in it while still
+  in the air, and `is_deadly_fall` counted that as a fall. Now the rule also looks at
+  depth — a fall deeper than Otto's own jump (`v² / 2g`) cannot be confused with a
+  jump. Otto computes it himself (`fall_height()`), from the top point of the flight.
+- **The escalator resurrected the dead.** `OttoStateMachine.ride()` set `RIDE` over
+  `DEAD`, although `DEAD` is described as terminal. A check and a test are added.
+- **Item 6 of ADR-0004 was not implemented.** "You can step out onto a floor only when the cab
+  floor matches the floor level" — `ElevatorCar.is_aligned()` was written but never
+  called, and Otto stepped out into the void from a cab stopped between floors.
+  Now, until the cab is aligned, there is no horizontal movement inside it.
+- **The dead kept driving the cab** and could get on an escalator: `vertical_intent()`
+  gave input regardless of state. Now in `DEAD` it gives zero.
+- **An empty cab did not keep the pause after a passenger left** (ADR-0004, item 4)
+  and moved off the floor in the same frame. `_drive` keeps the pause counter full.
+- Small things: dead `is_occupied()`, `motion_speed()`, `is_busy()` removed; physics layers
+  are given names in `project.godot`; an outdated docstring in `capture.py` is fixed.
 
-### Как проверялись гибели
+### How deaths were verified
 
-В сценарий `capture.py M2` они не вошли: упасть на дно шахты можно только со среднего
-этажа и только пока кабина выше, а где она окажется к этому моменту — зависит от её
-расписания, которое сдвигается от любой правки пауз. Такой шаг снимал бы не то, что
-обещает подпись, — ровно та ошибка, на которую ругалось авторевью M1.
+They are not in the `capture.py M2` script: you can fall to the shaft bottom only from the middle
+floor and only while the cab is higher, and where it will be by then depends on its
+schedule, which shifts with any change to the pauses. Such a step would capture something other
+than its caption promises — exactly the mistake the M1 code review complained about.
 
-Обе гибели сняты отдельными разовыми прогонами и просмотрены:
+Both deaths are captured in separate one-off runs and reviewed:
 
-- **Падение.** Кабина временно не создаётся, Otto делает шаг в проём на верхнем этаже
-  и отпускает ход, чтобы падать отвесно. Кадр: DEAD на дне шахты.
-- **Сдавливание.** Otto временно стартует под шахтой на нижнем этаже и ждёт кабину.
-  Кадр: DEAD под опустившейся кабиной.
+- **Fall.** The cab is temporarily not created, Otto steps into the opening on the top floor
+  and releases movement to fall straight down. Shot: DEAD at the shaft bottom.
+- **Crush.** Otto temporarily starts under the shaft on the bottom floor and waits for the cab.
+  Shot: DEAD under the lowered cab.
 
-Осталось незакрытым (осознанно, до M5):
+Left open (deliberately, until M5):
 
-- **Полотно эскалатора пересекает перекрытие мимо проёма.** `ESCALATOR_TOP_X` (448)
-  правее правого края проёма (440), поэтому первые ~0.2 с поездки коробка Otto
-  проходит сквозь плиту. Аккуратная правка требует развязать площадку посадки и
-  верхнюю точку полотна — это переделка сцены эскалатора, а не подбор констант.
-- **Посадка подтягивает Otto к центру площадки** (до 12 px рывком), потому что
-  поездка считается от `pad.global_position`, а не от места, где он стоял.
+- **The escalator belt crosses the slab outside the opening.** `ESCALATOR_TOP_X` (448)
+  is to the right of the opening's right edge (440), so for the first ~0.2 s of the ride Otto's
+  box passes through the slab. A clean fix requires decoupling the boarding pad from the
+  belt's top point — this is a rework of the escalator scene, not tuning constants.
+- **Boarding pulls Otto to the centre of the pad** (up to 12 px in a jerk), because
+  the ride is computed from `pad.global_position`, not from where he stood.
 
-## Веха M1 · Otto ходит
+## Milestone M1 · Otto walks
 
-Вертикальный срез движения — первое, во что можно играть. Графика — цветные
-прямоугольники, и на этом этапе так и задумано. Своего ADR у вехи нет: стек и отказ
-от Docker решены ещё в M0 ([ADR-0001](adr/0001-tech-stack.md),
-[ADR-0003](adr/0003-no-docker.md)), а в этой же ветке принят визуальный стиль —
-HD пиксель-арт с динамическим светом и ассетами генерацией
+A vertical slice of movement — the first thing you can play. The graphics are coloured
+rectangles, and at this stage that is intended. The milestone has no ADR of its own: the stack
+and the rejection of Docker were decided back in M0 ([ADR-0001](adr/0001-tech-stack.md),
+[ADR-0003](adr/0003-no-docker.md)), and the visual style is accepted in this same branch —
+HD pixel art with dynamic lighting and generated assets
 ([ADR-0002](adr/0002-visual-target.md)).
 
-1. `CharacterBody2D` и машина состояний: idle / walk / crouch / jump / fall / dead.
-2. Гравитация, коллизии, пол этажа, стены по краям уровня.
-3. Камера: следование за игроком, привязка к границам уровня.
-4. Grey-box уровень одного этажа с площадками для прыжков.
-5. Ввод: клавиатура и геймпад.
-6. Тесты машины состояний.
-7. Снятие скриншотов вехи (`tools/capture.py M1`).
+1. `CharacterBody2D` and a state machine: idle / walk / crouch / jump / fall / dead.
+2. Gravity, collisions, floor, walls at the level edges.
+3. Camera: following the player, clamped to the level bounds.
+4. A grey-box level of one floor with platforms for jumping.
+5. Input: keyboard and gamepad.
+6. State machine tests.
+7. Milestone screenshot capture (`tools/capture.py M1`).
 
-**DoD:** Otto бегает, приседает и прыгает по одному этажу; тесты зелёные.
+**DoD:** Otto runs, crouches and jumps on one floor; tests are green.
 
-### Сделано в вехе
+### Done in the milestone
 
-- `OttoStateMachine` вынесена из узла в отдельный класс: принимает снимок ввода и факты
-  о теле, возвращает состояние. Поэтому тестируется без сцены и физики — 14 тестов.
-- `Otto` (`CharacterBody2D`) — гравитация, дискретное аркадное движение, смена формы
-  коллизии при приседании (28 px стоя, 18 px сидя), камера с границами уровня.
-  Приседание останавливает ход, как в оригинале; прыжок из приседа запрещён.
-- `GreyboxLevel` — геометрия из прямоугольников, собирается в рантайме: пол, стены
-  и три площадки на уровне 1280×360.
-- Ввод с клавиатуры и геймпада. Клавиши читаются по `physical_keycode`, поэтому WASD
-  работает и на кириллической раскладке.
-- Отладочный оверлей: состояние, скорость, контакт с полом, FPS.
-- `Screenshotter` — снимки вехи в `screens/<веха>/` и F12 вручную, только в отладочных
-  сборках. Вокруг него `tools/capture.py`, `tools/run_tests.py` и общий
+- `OttoStateMachine` is moved out of the node into a separate class: it takes an input snapshot
+  and facts about the body, returns a state. So it is tested without a scene or physics — 14
+  tests.
+- `Otto` (`CharacterBody2D`) — gravity, discrete arcade movement, switching the collision
+  shape when crouching (28 px standing, 18 px crouching), a camera with level bounds.
+  Crouching stops movement, as in the original; jumping from a crouch is forbidden.
+- `GreyboxLevel` — geometry from rectangles, built at runtime: floor, walls
+  and three platforms on a 1280×360 level.
+- Keyboard and gamepad input. Keys are read by `physical_keycode`, so WASD
+  also works on a Cyrillic layout.
+- Debug overlay: state, speed, floor contact, FPS.
+- `Screenshotter` — milestone shots into `screens/<milestone>/` and F12 by hand, only in debug
+  builds. Around it are `tools/capture.py`, `tools/run_tests.py` and the shared
   `tools/godot_bin.py`.
-- GUT 9.6.1 вендорен в `addons/gut`. Хук `status-updated` не пускает коммит в `src/`,
-  `tests/` или `project.godot` без правки `docs/STATUS.md`, хук `gut-tests` гоняет
-  тесты на push.
+- GUT 9.6.1 is vendored in `addons/gut`. The `status-updated` hook does not let a commit into
+  `src/`, `tests/` or `project.godot` through without editing `docs/STATUS.md`, the `gut-tests`
+  hook runs tests on push.
 
-Осталось долгом на M2: **вставание из приседа не проверяло место над головой.** На одном
-этаже это безобидно, но с низкими проёмами Otto вытолкнуло бы сквозь геометрию.
+Left as a debt for M2: **standing up from a crouch did not check the space overhead.** On one
+floor this is harmless, but with low openings Otto would be pushed through geometry.
 
-## Авторевью M1
+## Code review M1
 
-`/code-review xhigh --fix` нашло 15 проблем, 13 исправлено на месте. Существенное:
+`/code-review xhigh --fix` found 15 problems, 13 fixed in place. The significant ones:
 
-- **Прыжок не доставал до площадок.** При `jump_speed` 215 и гравитации 900 апекс
-  равен 26 px, а площадки стоят на 70 px над полом — веха физически не выполнялась.
-  `jump_speed` поднят до 380 (~80 px), площадки стали двухступенчатым подъёмом.
-- **Снимки засоряли импорт.** Godot импортировал каждый JPEG как ресурс проекта.
-  Теперь `Screenshotter` кладёт `.gdignore` в `screens/` при первом снимке.
-- **Тесты не гонялись на push**, хотя документация это обещала: добавлен хук `gut-tests`.
-- **Зависший Godot ронял тулинг с traceback** — `godot_bin.run()` отдаёт код 124.
-- **Выдержки автосценария молча зависели от времени полёта**: после правки прыжка кадр
-  «crouch» снимал стоящего Otto. Выдержки пересчитаны, зависимость описана комментарием.
-- Мелочи: два снимка в одну секунду затирали друг друга; `capture.py` возвращал успех
-  при падении игры посреди сценария; поза пересобиралась каждый физический кадр;
-  выделялся объект ввода на кадр; геометрия Otto дублировалась в трёх местах;
-  тела уровня рисовались поверх игрока.
+- **The jump did not reach the platforms.** With `jump_speed` 215 and gravity 900 the apex
+  is 26 px, and the platforms are 70 px above the floor — the milestone was physically
+  impossible. `jump_speed` is raised to 380 (~80 px), the platforms became a two-step climb.
+- **Shots cluttered the import.** Godot imported every JPEG as a project resource.
+  Now `Screenshotter` puts `.gdignore` into `screens/` on the first shot.
+- **Tests did not run on push**, although the documentation promised it: the `gut-tests` hook is
+  added.
+- **A hung Godot crashed the tooling with a traceback** — `godot_bin.run()` returns code 124.
+- **The auto-script's delays silently depended on flight time**: after the jump fix the "crouch"
+  shot captured a standing Otto. The delays are recomputed, the dependency is described in a
+  comment.
+- Small things: two shots in the same second overwrote each other; `capture.py` reported success
+  when the game crashed mid-script; the pose was rebuilt every physics frame;
+  an input object was allocated per frame; Otto's geometry was duplicated in three places;
+  level bodies were drawn over the player.
 
-Исправлено после ревью вручную: `Screenshotter` отключается в неотладочных сборках
-и переведён в `PROCESS_MODE_ALWAYS`; отладочный оверлей ходит через `Otto.motion()`
-и `Otto.is_grounded()`, а не в потроха `CharacterBody2D`.
+Fixed by hand after the review: `Screenshotter` is disabled in non-debug builds
+and switched to `PROCESS_MODE_ALWAYS`; the debug overlay goes through `Otto.motion()`
+and `Otto.is_grounded()`, not into the guts of `CharacterBody2D`.
 
-## Веха M5a · Здание
+## Milestone M5a · Building
 
-Веха M5 из эпика разделена надвое: **M5a** — здание, **M5b** — игровой цикл. Номера
-остальных вех не сдвигаются. Решения и цитаты — в
+Milestone M5 from the epic is split in two: **M5a** — the building, **M5b** — the game loop. The
+numbers of the other milestones do not shift. Decisions and quotes — in
 [ADR-0008](adr/0008-building-generation.md).
 
-1. Здание описывается правилами, а не списком этажей.
-2. Раскладка по сиду: в оригинале здания различаются расположением красных дверей,
-   то есть он сам устроен как генерация.
-3. Сборка 30 этажей из этого описания.
-4. Шахта и эскалатор переезжают в данные — долг с M2.
-5. Площадка эскалатора развязана с полотном — долг авторевью M2.
-6. Замер FPS; стриминг этажей делается, только если 60 кадров не держатся.
-7. Тесты: правила раскладки и повторяемость по сиду.
-
-**DoD:** здание на 30 этажей собирается из данных и проходится сверху донизу, 60 FPS.
-
-### Сделано в вехе
-
-- `BuildingRules` — правила здания как `Resource`: этажей, участок на шахту, сколько
-  документов, дверей и ламп. Меняя их от здания к зданию, в M5b получим сложность.
-  Сюда же переехала вертикальная арифметика — поверхность и потолок этажа.
-- `BuildingPlan` — раскладка по сиду. Узлов не знает, проверяется тестами. Стережётся
-  прежде всего проходимость: на каждом стыке полос обязан стоять эскалатор, иначе
-  спуститься нельзя. Документы разнесены по высоте, чтобы здание приходилось проходить
-  целиком, а не только верх.
-- Уровень собирается из раскладки: пять шахт по шесть этажей в разных столбцах,
-  эскалатор на каждом стыке, 60 дверей, по лампе на этаж, выход внизу. Otto начинает
-  с крыши.
-- Эскалатор развязан: поездка идёт по той же ломаной, что нарисована полотном, и
-  начинается с того места, где пассажир стоял. Закрыты оба долга авторевью M2 —
-  и рывок при посадке, и полотно, резавшее перекрытие мимо проёма.
-- `tools/dump_plan.gd` печатает раскладку: в кадр влезает меньше трети этажа, и
-  глазами сгенерированное здание не проверить.
-
-**Стриминг не понадобился.** Замер на полном здании со всеми агентами — 60 FPS,
-и по решению вехи этого достаточно, чтобы его не делать.
-
-### Что нашло авторевью M5a
-
-- **Эскалатор было не сесть.** Направление спуска выбиралось безотносительно
-  шахты, и на половине стыков проём ложился между лифтом и площадкой: Otto шёл
-  к эскалатору и проваливался мимо него. Теперь место под эскалатор выбирается
-  так, чтобы площадка стояла между шахтой и проёмом; тест проверяет это на
-  одиннадцати сидах.
-- **Выход стоял ровно там, куда Otto возвращается после смерти.** Погибнув на
-  нижнем этаже с последним документом, он сдавал здание, не сделав ни шага.
-  Выход занял в раскладке своё место, и `safe_x` его обходит.
-- **Геометрия проёма под эскалатор была записана дважды** — в уровне и в
-  раскладке, причём по-разному: `safe_x` стерегла площадку, а дыра была сбоку.
-  Переехала в `BuildingRules`, обе стороны читают одно.
-- Лампы больше не вешаются на крышу: там нет потолка, и подвес висел в небе
-  над зданием. Ламп в здании стало 29 — по одной на каждый этаж ниже крыши.
-- `shaft_span = 0` в инспекторе вешал генерацию намертво; стык полос без
-  эскалатора пропускался молча — теперь `push_error`.
-
-Сверх находок закрыто то, что ревью оставило автору: **документ мог молча пропасть.**
-Если красной двери не хватало места на этаже, здание оказывалось с четырьмя документами
-вместо пяти — и собрать его становилось нельзя. Красные двери теперь кладутся первыми,
-на почти пустой этаж, а если места всё же нет — в лог идёт ошибка.
-
-### Что дала сверка
-
-**Тревога жёстче, чем казалось.** Смерть её не снимает — сбрасывает только смена
-здания. Это наказание на всё прохождение, а не на попытку. Делается в M5b.
-
-**Бонус за здание источники называют по-разному:** плоская 1000 или 1000 × номер.
-Взят второй вариант, помечен как несверенный.
-
-**Нашлась механика, которой нет в эпике:** в поздних зданиях агенты ложатся на пол,
-и попасть в них почти невозможно. Пока только записана.
-
-## Веха M5b · Игровой цикл
-
-Вторая половина разделённой вехи M5. Здание уже собирается генерацией; здесь появляется
-то, что связывает здания в партию. Решения — в [ADR-0009](adr/0009-game-loop-and-alarm.md).
-
-1. Выход с собранными документами даёт бонус и ведёт в следующее здание.
-2. Бонус — 1000 × номер здания; источники расходятся, помечено как несверенное.
-3. Сложность растёт агентами: чаще стреляют, дальше видят, быстрее приходят на смену.
-4. Тревога по фиксированному времени на здание. Смерть её не снимает.
-5. Пауза по Esc с подсказкой: продолжить, начать заново, выйти.
-6. Тесты: тревога, бонус и номер здания, отклик кабины с задержкой.
-
-**DoD:** игра проходится от первого здания до второго без вылетов.
-
-### Сделано в вехе
-
-- `Alarm` — тревога отдельным классом. Снимает её только смена здания: способа снять
-  смертью просто нет, и это главное, что стерегут тесты.
-- `GameState` держит партию: номер здания, бонус за сданное, тревогу. `main` стал
-  игровым циклом — заводит здание, при сдаче собирает следующее.
-- Сложность растёт через `agent_menace`: дальность, скорострельность и скорость смены
-  агентов. По тревоге тот же множитель добавляется поверх.
-- Кабина по тревоге отвечает с задержкой — `response_delay` в `ElevatorMotion`.
-- Пауза по Esc с подсказкой; на паузе тревога не идёт.
-
-Проверено кадрами: пауза и снятие паузы — их снимает `capture.py M5b`. Переход во
-второе здание с бонусом 1000 и включившаяся сирена сняты отдельным разовым прогоном:
-здание временно ужато до одного этажа без документов, а таймер тревоги — до двух секунд.
-В сценарий вехи это не вошло — тревога ждёт сто секунд, а переход требует собрать пять
-документов на тридцати этажах.
-
-Сверх находок закрыто то, что ревью оставило автору: **рост злости агентов не имел
-потолка.** К двадцатому зданию дальность стрельбы под сиреной обгоняла ширину самого здания, и
-агенты простреливали этаж насквозь откуда угодно. Потолок поставлен, его значение
-оригиналом не подтверждено. Заодно `Alarm.time_left()` перестал быть мёртвым: обратный
-отсчёт показывается в отладочном оверлее — игроку таймер в оригинале не показывают.
-
-### Что нашло авторевью M5b
-
-- **Пауза останавливала не всё.** `SceneTreeTimer` по умолчанию тикает и на паузе:
-  здание замирало, а смена убитого агента и возвращение Otto в игру приходили сквозь
-  паузу. Оба таймера теперь `process_always = false`.
-- **Задержка кабины по тревоге работала только на первую поездку.** Счётчик
-  «обдумывания» обнулялся лишь тогда, когда пассажир отпускал кнопку внутри кабины;
-  вышедший оставлял его полным, и следующий трогался мгновенно. Пустая кабина теперь
-  сбрасывает счётчик сама, на это есть тест.
-- **После «игра окончена» здание продолжало жить:** агенты приходили и стреляли под
-  надписью. Конец партии останавливает дерево так же, как пауза, — снимает это рестарт.
-- **Нажатые в один кадр Esc и R теряли R.** Фронты считались все сразу, но ранний
-  выход после переключения паузы всё равно съедал остальные.
-- **Смена здания оставляла старое в дереве до конца кадра:** два Otto, две кабины и
-  вся геометрия дважды в одном физическом мире. Уровень снимается с дерева сразу.
-- `agent_menace = 0` из инспектора делил на ноль в задержке смены агента и запирал
-  дверь навсегда — нижняя граница теперь общая с `Enemy.set_menace()`.
-- `GameState.reset()` обещал обнулить всё, но не трогал номер здания и тревогу; теперь
-  трогает, и `start_game()` перестал повторять его работу.
-
-**Оставлено автору** и закрыто в той же вехе (см. «Сделано в вехе»): множитель злости
-ничем не был ограничен сверху. Под сиреной к пятнадцатому зданию агенты стреляли дальше
-полезной ширины этажа и почти в шесть раз чаще, а величина потолка — такое же
-несверенное число, как и остальные.
-
-### Чего сознательно не делаем
-
-Источники называют ещё два способа роста сложности, и оба отложены: **шахты в поздних
-зданиях должны становиться запутаннее** (это правила генерации, менять их надо вместе
-с проверкой проходимости) и **агенты должны ложиться на пол**, отчего попасть в них
-почти нельзя (новое поведение и новая поза — работа на отдельную веху).
-
-## Тестирование уровней
-
-Здание — чистая функция от сида, поэтому проверять надо не «этот уровень работает»,
-а «любое здание, которое сгенерируется, работает». Три уровня проверки описаны
-в [`testing.md`](testing.md); добавлены в этот заход:
-
-- **Проходимость** — граф достижимости по раскладке, 40 сидов. Нашёл настоящий баг
-  с первого прогона: на сидах 31 и 38 документ оказывался за проёмом эскалатора,
-  куда маршрут лифтов и эскалаторов не ведёт. Генератор теперь кладёт красные двери
-  только туда, куда ведёт маршрут, а если на этаже места нет — документ переезжает
-  на соседний этаж своей полосы, а не пропадает.
-- **Дымовой тест сборки** — здание строится по-настоящему, и число кабин, дверей и
-  эскалаторов сверяется с раскладкой.
-- **Бот** — водит Otto по зданию: спускается, забирает документы, уходит в выход.
-  Проверено на пяти сидах.
-
-**Бот нашёл проблему геймплея, а не свою.** Кабина по решению M2 встаёт где угодно,
-а «совпала с этажом» считалось с точностью полпикселя. При скорости 60 px/с это
-меньше кадра — попасть в такое окно вручную нельзя, и выйти можно было только на
-крайних этажах шахты. Добавлена доводка: отпустил почти у этажа — кабина дотягивает.
-
-Прогон подорожал с 2 до 48 секунд. Это цена того, что здание теперь проверяется
-целиком, а не по частям.
-
-### Что нашло авторевью тестов
-
-- **Здания в тестах копились друг в друге.** `add_child_autofree` освобождает только
-  после всего теста, а сиды перебираются внутри одного: пять зданий стояли в одном
-  физическом мире. Бот жмёт действия глобально — шли все пять Otto разом, и красные
-  двери прошлых зданий слали документы в общий `GameState`. Проверка «документы
-  собраны» могла пройти чужим трудом. Здание снимается с дерева в конце своей итерации.
-- **Бот считал дверь несобранной по одному x.** Места на этажах общие, и красная дверь
-  в том же столбце этажом выше выдавала бы уже собранную за несобранную — бот ходил бы
-  к ней вечно. Сверяется и этаж.
-- **Маршрут считался дважды.** `reachable()` и `segments()` оба перебирали всю
-  раскладку, хотя комментарий обещал обратное. Куски этажей считаются один раз и
-  отдаются в `reachable_in()`. Заодно они больше не считаются вовсе, когда документов
-  в здании нет: на здании в ноль этажей этот счёт падал.
-- **Esc и R в один кадр всё ещё теряли R** — но теперь при выходе из паузы, а не при
-  входе. Признак «мы на оверлее» снимается до переключения.
-- **Потолок злости обходился тревогой.** `MENACE_CAP` стоял только на росте от здания
-  к зданию, а сирена множила уже обрезанное число: 3.0 × 1.5 = 4.5, то есть дальность
-  выстрела 900 px при полезной ширине этажа 1120 px — агент простреливал этаж почти
-  насквозь. Теперь потолок общий на обе надбавки и считается в
-  `BuildingRules.menace_with()`, а рост от зданий упирается ниже (2.0), чтобы сирене
-  было что добавить.
-- **Тревога не догоняла начатую поездку.** Otto держит «вниз» всю дорогу, счётчик
-  ожидания к моменту сирены давно переполнен — задержка кабины включалась только со
-  следующего нажатия. `ElevatorMotion.forget_command()` сбрасывает счёт.
-
-Плюс уточнены комментарии: `stops_between_floors` больше не обещает, что кабина встаёт
-строго там, где отпустили, — доводка до этажа работает в обоих режимах.
-
-## Веха M6 · Свет и атмосфера
-
-Веха, ради которой в ADR-0001 и выбран Godot. Решения —
-в [ADR-0010](adr/0010-lighting-and-atmosphere.md).
-
-**DoD:** тёмный этаж с перестрелкой держит 60 FPS, замер на собранном здании. ✅
-Смержено в `main` как PR #9.
-
-### Сделано в вехе
-
-- **Бюджет света измерен** — долг, висевший с M0. `tools/light_bench.gd`: 48 источников
-  с тенями стоят 0.49 мс, 24 с тенями и свечением — 0.59 мс при бюджете кадра 16.6 мс. Ограничение «не больше
-  дюжины в кадре» остаётся, но как художественное, а не техническое.
-- **Этаж светел, потому что на нём горит лампа.** `CanvasModulate` задаёт тон
-  погашенного этажа, а светлым его делает собственная заливка. Сбили лампу — заливка
-  гаснет, и этаж падает до общего тона. Затемняющая полоса из M4b выброшена.
-- **Два источника на этаж:** широкая заливка во всю ширину и пятно под самой лампой.
-  Пятно — ребёнок лампы, поэтому падает вместе с ней.
-- **Свет из шахты** — столб на всю её высоту, не гаснет с этажами.
-- **Вспышки выстрелов** — пуля несёт свой свет и гасит его за первые 64 px полёта.
-  Одна на обоих стрелков: пуля у Otto и у агентов одна и та же.
-- **Окна в задней стене**, за ними — город из сида здания (`Skyline`), с параллаксом.
-  Свет здания на него не падает: он снаружи.
-- **Пост-обработка** — свечение и виньетка, общей сценой `src/ui/postprocess.tscn`
-  на игру и на инструмент съёмки.
-- **Отбор по кадру:** из шестидесяти с лишним источников горят только те, чьи этажи
-  в кадре. Считает `VisibleFloors` — чистая функция, проверяется без сцены.
-- **Надбавка за убийство в темноте — +50 вместо удвоения.** Правка по сверке, см. ниже.
-
-**Замер DoD:** здание 1, этаж 7 погашен, агенты стреляют — **0.65 мс/кадр**
-(RTX 5060 Ti). Запас к бюджету 60 FPS — двадцатипятикратный.
-
-### Что нашла сверка перед вехой
-
-- **Надбавка за убийство в темноте оказалась плоской.** Источники дают таблицу:
-  выстрел 100, выстрел в темноте 150, ногой 150, ногой в темноте 200. В ADR-0007
-  стояло удвоение, честно помеченное как несверенное. Теперь `DARK_KILL_BONUS = 50`.
-  Заодно это чинит ферму очков, которую мы сами себе и предсказали.
-- **В поздних зданиях темнота помогает хуже или не помогает вовсе.** Не сделано
-  намеренно: это правило сложности, и место ему рядом с `agent_menace`. Заведено долгом.
-
-### Что нашло авторевью M6
-
-- **Свечения в игре не было вовсе.** В `postprocess.tscn` стояло
-  `background_mode = 4` — это `BG_KEEP`, а не `BG_CANVAS` (он `3`). Стенд мерил
-  свечение, которого игра никогда не включала. Теперь рядом стоит комментарий
-  с обоими числами, чтобы не переехало обратно молча.
-- **Пятна ламп не гасились за кадром.** Отбор касался только заливок, а тридцать
-  пятен — каждое с тенями, то есть дороже заливки — горели по всему зданию.
-  Хуже того, тест считал одни `AreaLight` и потому проходил, не замечая ровно ту
-  половину, что дороже. Сейчас он видит все источники: со снятым отбором
-  показывает 35 горящих при бюджете 12, то есть наконец кусается.
-- **Небо подсвечивалось светом этажа.** У фонового узла осталась маска по
-  умолчанию, и окно читалось как освещённая ниша — та самая ошибка, от которой
-  город уже был защищён.
-- **Над крышей строилась задняя стена комнаты**, которой там нет: полоса в небе
-  с обрезанными окнами прямо над местом, где Otto начинает.
-- **Профиль света брался в углу текселя, а не в середине.** Правый край текстуры
-  оставался светить, и заливка текла на этаж ниже — ровно то, что комментарий
-  в `LightTextures` обещал не допускать.
-- Тест гашения этажа держался на порядке детей: брал первую попавшуюся лампу
-  ниже Otto и ждал, что погаснет один источник. Теперь берёт ближайшую и ждёт
-  двух — заливку и пятно, как и написано в ADR.
-- Мелочи: неиспользованная константа `SKY`; устаревший комментарий про `z_index`
-  фона; `light_shot` не клал `.gdignore` в `screens/`, и Godot импортировал бы
-  каждый кадр как ресурс; три сотни задних стен висели прямо на уровне, и их
-  перебирал каждый обход агентов; в стенде малые замеры сваливали все источники
-  на один этаж.
-
-### Как проверялся свет
-
-Игровой сценарий съёмки водится выдержками, и светом его проверять нельзя: тёмный этаж
-получается только сбитой лампой, а попасть по ней секундомером — ровно тот случай,
-который в этом проекте ломался четырежды.
-
-Поэтому свет снимает `tools/light_shot.tscn` — **по состоянию**: собирает настоящее
-здание, сбивает настоящую лампу и ждёт не выдержку, а исчезновение её узла. Он же
-меряет кадр с `--bench`. Сценарий `capture.py M6` остался для другого — показать
-настоящую игру с HUD, виньеткой и свечением.
-
-## Веха M7a · Арт-пайплайн и окружение
-
-Веха M7 разделена надвое, как раньше M4 и M5: **M7a — пайплайн и окружение**,
-**M7b — актёры**. Нумерация остальных вех не сдвигается. Решения —
-в [ADR-0011](adr/0011-asset-pipeline.md).
-
-**DoD:** серых коробок в кадре не осталось, кроме Otto и агентов; 60 FPS держатся
-на собранном здании. ✅ Смержено в `main` как PR #10.
-
-### Что нашла сверка перед вехой
-
-- **Оригинал: 256×224 @ 59.2 Гц, Taito SJ.** Три независимо скроллящихся тайловых слоя
-  плюс отдельный слой объектов-спрайтов — архитектурно ровно то, что у нас уже есть:
-  тайлсет здания, фон города, спрайты актёров.
-- **Otto нарисован «почти чиби».** Ранний дизайн был реалистичнее по пропорциям, с
-  большим помпадуром; в финале пропорции укоротили. Крупная голова — намеренное решение
-  авторов, а не следствие 16 пикселей. Поэтому чиби и у нас.
-- **Пули и попадания — жёлтое с красным.** Совпадает с тем, что уже стоит в `bullet.tscn`.
-- **Размеров спрайтов источники не называют.** Листы на The Spriters Resource есть, но
-  сайт отдаёт 403 на автоматический запрос. Не блокер: рост Otto задан коллизией из M1,
-  а не оригиналом.
-
-Ещё сверка нашла расхождение внутри проекта: ADR-0002 описывал один пайплайн
-(генерация плюс ручная доводка), а строка M7 в эпике — другой (Blender). ADR-0011
-это закрывает.
-
-### Решения вехи, коротко
-
-- **Пайплайн гибридный.** Актёры — лоу-поли модель в Blender и ортографический рендер
-  скриптом: покадровая согласованность была главным риском ADR-0002, и так он снят
-  насовсем. Окружение — генератор на Python: анимации у него нет, а описать кодом
-  дешевле, чем моделить.
-- **Ассеты коммитятся.** Источник правды — скрипты, но PNG лежат в репозитории: клон
-  без Blender и без Pillow должен запускаться и проходить CI. В CI ни Blender, ни
-  генератор не вызываются.
-- **Нормал-мапы считаются из геометрии, а не угадываются из спрайта.** У актёров это
-  normal pass рендера, у окружения — карта высот того же генератора. Laigter из
-  ADR-0002 из пайплайна выпадает.
-- **Ни одна коллизия не меняется.** Кадр спрайта может быть больше коллизии, привязка
-  идёт по опорной точке. Это условие того, что тюнинг M1–M5 остаётся в силе.
-- **Палитра нуарная, с двумя якорями оригинала:** красная дверь — единственное красное
-  в кадре, светлый костюм Otto — самое светлое среди актёров, чтобы своего было видно
-  и на погашенном этаже.
-- **Анимация по минимуму 1983 года:** ходьба в три кадра, по кадру на состояние. Это M7b.
-
-### Сделано в вехе
-
-- **Blender 5.2.1 LTS поставлен** через winget, проверен headless: `bpy 5.2.1`,
-  внутренний Python 3.13.13. Живёт в `C:\Program Files\Blender Foundation\Blender 5.2` —
-  winget не кладёт его в `Links`, поэтому `tools/blender_bin.py` ищет и там.
-- **ADR-0011 написан**, эпик разделён на M7a и M7b, вопрос «согласованность кадров
-  анимации» из открытых снят.
-- **Пайплайн прошёл весь путь на одном ассете** — перекрытии. Генератор рисует три
-  карты сразу, Godot импортирует их с нужными пресетами, `EnvTextures` собирает из них
-  `CanvasTexture`, уровень кладёт её плиткой, и свет из M6 ложится на рельеф.
-- `tools/palette.py` — палитра в одном месте: приглушённое здание, красная дверь и
-  светлый костюм Otto яркими.
-- `tools/render_env.py` — генератор окружения. Диффуз, нормаль и блик рисуются одними
-  и теми же прямоугольниками, поэтому карты не могут разъехаться. Нормаль считается
-  из карты высот, а не угадывается из яркости спрайта.
-- **Тайл перекрытия** 32×20 замкнут по горизонтали: на шве нормаль не рвётся.
-- `src/systems/assets/env_textures.gd` — сборка и кэш текстур; список ассетов, которые
-  просит игра, лежит там же и служит источником правды для теста.
-- **Задняя стена, боковые стены здания и рамы окон.** Стена — ровная штукатурка без
-  рисунка: высота этажа (120 px) на размер тайла не делится, и любая полоска пошла бы
-  по зданию сеткой. Рама кладётся девятикусочно и наполовину заходит на стену, так что
-  у проёма появился откос, на котором играет свет.
-- **Тесты (186, было 173):** у каждого ассета из списка есть все три карты, они одного
-  размера, тайл собирается с нормалью и бликом, толщина тайла равна толщине перекрытия
-  из правил здания, девятикусочный ассет ровно втрое шире своего поля, собранное здание
-  кладёт ассет, а не заливку, и каждый источник в нём поднят над холстом.
-
-- **Двери, кабина, эскалатор, лампа и выход.** Дверь больше не меняет оттенок одного
-  прямоугольника: у неё четыре картинки — обычная, красная, приоткрытая и проём за
-  открытой. Полотно эскалатора идёт тайлом вдоль наклонной линии, поэтому ступени
-  держат шаг при любой длине пролёта. Сбитая лампа не перекрашивается, а притухает:
-  гаснет свет, а не меняется сама лампа.
-- **Город за окнами** получил зерно на башнях; окна остались заливкой — они источник,
-  а не поверхность, и рельеф им ни к чему.
-- **Замер DoD:** здание 1, этаж 7 погашен, агенты стреляют — **0.64 мс/кадр** при
-  бюджете 16.6 мс (RTX 5060 Ti). В M6 на том же замере было 0.65 мс: ассеты с нормалью
-  и бликом кадр не утяжелили.
-- **Съёмка вехи:** у `capture.py` появился план M7a, а `light_shot` больше не прибит
-  к папке M6 — веха задаётся ключом `--folder=`.
-- **Серых коробок в окружении не осталось.** В кадре ими остаются только Otto, агенты
-  и пули — это M7b. Небо и виньетка заливками и останутся: это не геометрия.
-
-**Свет пришлось поднять над холстом.** Как только у стены появилась нормаль, здание
-ушло в темноту целиком: свет 2D читает нормаль, а при нулевой высоте источника луч
-идёт вдоль стены, и плоскость не получает от него ничего. До ассетов высота не значила
-ничего и потому стояла нулевой у всех троих источников. Теперь она разная по смыслу:
-широкая заливка висит высоко (ровный свет), пятно лампы ниже, вспышка выстрела совсем
-низко — ей и положено выхватывать рельеф резко. Числа — в `LightTextures`, и на нулевую
-высоту теперь падает тест.
-
-**Нормаль проверена на глаз и числом.** Порядок каналов ни в одном источнике не
-подтверждается однозначно, поэтому проверен опытом: в кадр подставлялась проба
-с крышей домиком, и под лампой сверху ярче оказалась та половина, чья нормаль
-смотрит вверх. Соглашение — зелёный вверх, как в OpenGL; переключатель на случай
-обратного оставлен одной константой в генераторе.
-
-### Что нашло авторевью
-
-- **Размер задавала картинка, а не место.** `TextureRect` объявляет минимальным
-  размером размер своей текстуры, и `Control` поднимал до него всё, что меньше:
-  полоса стены над окном — 14 px при тайле 32 px — растягивалась до 32 и закрывала
-  город в верхней трети каждого проёма на каждом этаже. Лечится `EXPAND_IGNORE_SIZE`,
-  на подмену размера падает тест.
-- **Полотно эскалатора красилось в greybox-зелёный.** `Line2D` множит текстуру на
-  `default_color`, а он остался от коробок: металл не мог появиться в принципе.
-- **Тест плит не проверял плиты.** Он считал любые `TextureRect` среди внуков уровня,
-  а под это подходят кабина, дверь и лампа — перекрытия могли целиком уехать в
-  заливку, и тест бы этого не заметил. Теперь текстурой обязан быть закрыт каждый
-  геометрический корпус.
-- **Высота источников доезжала до шейдера не той.** Движок множит
-  [member PointLight2D.height] на средний масштаб узла, а масштаб у наших источников
-  любой: вспышка выстрела висела в пяти пикселях над стеной вместо двадцати четырёх,
-  то есть светила почти вдоль неё. Теперь высоту ставит `LightTextures.raise`, и в
-  константах записаны настоящие пиксели мира; на это есть тест без сцены.
-- **Запасная серая заливка стояла в половине мест.** Уровень подставлял её, если
-  ассета нет, а двери, лампы и кабина в том же случае молча оставались невидимыми.
-  Ни то ни другое не показывает причину, поэтому `EnvTextures.tile` больше не отдаёт
-  `null`: ненарисованный ассет — ядовито-розовый квадрат и ошибка в лог. Заодно ушли
-  три цветовые константы greybox.
-- **Pillow и numpy стояли в `requirements-dev.txt`,** который ставит CI и каждый клон,
-  хотя README обещает, что без них всё работает. Уехали в `requirements-assets.txt`.
-- **Кадр «at_the_door» ничего не обещал:** до двери, стоящей по сиду, выдержкой не
-  дойти, и шаг снимал то же место, что предыдущий. Шаг убран — местами занимается
-  `light_shot`, который ждёт состояние.
-- Мелочи: `--out` вне проекта ронял генератор `ValueError`; argparse печатал справку
-  до перехода на UTF-8; `blender_bin` переписывал четыре вещи из `godot_bin`; подгонка
-  швов в `roughen` была мёртвым кодом с ложным объяснением; `EnvTextures` считал пути
-  карт дважды.
-
-## Веха M7b · Актёры
-
-Вторая половина M7. Пайплайн собран и проверен в M7a на окружении; здесь по нему
-едет то, ради чего он и выбирался, — покадровая анимация. Решения —
-[ADR-0011](adr/0011-asset-pipeline.md), пункты 1–11 и дополнение 12–14.
-
-**DoD:** все grey-box плейсхолдеры заменены финальными ассетами. ✅ Смержено в `main` как PR #11.
-
-### Что нашла сверка перед вехой
-
-- **Спрайты оригинала набраны плитками 16×16.** Лежащий Otto был сложен из двух таких
-  плиток. У нас рост задан коллизией из M1 (28 px), и это тот же порядок величины.
-- **В финальной аркаде есть отдельная поза «раздавлен лифтом»** и отдельный прыжок.
-  Обе добавили поздно, а место под них освободили, выбросив подробное падение агента
-  из прототипа. То есть авторы сами обменяли многокадровую смерть на две позы,
-  показывающие, **как** именно убили.
-- **У Otto помпадур, у агентов шляпы.** Помпадур попал даже на логотип афиши, а ранний,
-  более реалистичный дизайн с большим коком авторы отвергли сами.
-- **Здание в оригинале заканчивается красной машиной** у выхода. У нас выход был
-  проёмом с вывеской: механика есть, точки в ней нет.
-
-### Решения вехи, коротко
-
-- **Смерть — две позы, раздавленный — третья.** Раздавливание работает с M2, а
-  выглядело как обычная смерть. В нашем пайплайне третья поза стоит одного рендера:
-  та же модель, сплющенная по высоте.
-- **Агент отличается силуэтом, а не только цветом.** Шляпа с полями против помпадура.
-  Причина не в верности оригиналу: на погашенном этаже цвета почти нет (ADR-0010,
-  пункт 4), и разница только в палитре означала бы, что игрок не отличает своего от
-  чужого там, где по нему стреляют.
-- **Габариты прежние.** Шляпа и причёска живут в кадре спрайта, а не в коллизии,
-  иначе агент ловил бы пули шляпой.
-- **Машина у выхода уезжает, и только потом собирается следующее здание.**
-  `building_cleared` эмитится в конце отъезда, поэтому `main` не меняется.
-
-### Сделано в вехе
-
-- **`tools/render_actors.py` — рендер актёров.** Скрипт живёт двумя половинами в одном
-  файле: снаружи ищет Blender и собирает карты, внутри Blender строит модель из коробок
-  и снимает по два кадра на позу — цвет и глубину. Кадры не рисуются заново, а снимаются с одной модели,
-  поэтому фигура между кадрами не «дышит» — ради этого Blender и брали.
-- **Нормаль снимается глубиной, а не нормал-пассом.** Композитор в Blender 5.2
-  переписан: `Scene.node_tree` больше нет, узлы `Composite`, `MixRGB`, `Math` и
-  `SeparateXYZ` не регистрируются вовсе. Вытаскивать нормаль через новый композитор
-  оказалось дороже, чем снять вторым проходом глубину обычным шейдером, а нормаль
-  посчитать своим кодом — тем же, что и у окружения. Соглашение о каналах в проекте
-  осталось одно.
-- **Цвет попадает в палитру.** Материалы светятся сами (emission), плёнка — `Standard`
-  вместо `AgX` по умолчанию, фильтр плёнки — коробка шириной 0.01: сглаживания нет,
-  край остаётся краем. Проверено пробой: `#B5322C` дошёл до PNG как `#B6312B`, разница
-  в единицу на округлении.
-- **Otto: 11 поз**, агент: 8 (ему не нужны присед, прыжок и удар — этого не умеет
-  `EnemyBrain`), машина: 1. Ходьба в три кадра на 10 кадрах в секунду.
-- **`ActorPose`** — выбор позы отдельным классом, без узлов и сцены. По нему тест
-  проверяет правило, а не картинку: каждое состояние машины состояний обязано попадать
-  в нарисованную позу, и каждая нарисованная поза обязана быть кому показать.
-- **Смерть знает, как убили.** `kill(crushed)` вместо `kill()`: кабина и упавшая лампа
-  передают признак, и раздавленный показан своей картинкой — находка сверки (пункт 12).
-- **`SpriteTextures`** (бывший `EnvTextures`) раздаёт оба набора: окружение и актёров.
-  Загрузка у них общая, различаются папка и список.
-- **Машина у выхода** стоит рядом с проёмом и уезжает в ближнюю сторону, увозя Otto.
-  Здание сдаётся, когда машина ушла из кадра, а не когда Otto вошёл в выход, — иначе
-  следующее здание собиралось бы поверх уезжающей машины.
-- **Тесты: 201** (было 186). Позы против состояний, три карты у каждой позы, общий кадр
-  у всех поз актёра, привязка спрайта к ногам, машина, которая уезжает раньше сигнала,
-  фаза ходьбы, которая не проскакивает кадр, и папка актёров без лишних картинок.
-- **Замер:** 0.65 мс/кадр на погашенном этаже с перестрелкой при бюджете 16.6 мс.
-
-### Что нашло авторевью
-
-- **Пуля летела влево хвостом вперёд.** Ассет обещал горячую середину, а красил яркую
-  правую половину, и `bullet.gd` нарочно не зеркалит спрайт — направление показывает
-  сам полёт. Половина выстрелов в игре шла налево, и у них яркий конец был сзади.
-  Ассет стал симметричным, обещание и код сошлись.
-- **Труп поворачивался за стрелками.** `_facing` обновлялся без оглядки на состояние,
-  хотя строкой ниже выстрел уже проверял `DEAD`. На цветной коробке это было не видно,
-  а спрайт зеркалится на глазах: тыканье в стрелки крутило тело, пока идёт отсчёт до
-  возвращения в игру.
-- **Габарит машины был записан дважды** — в уровне и в кадре генератора, и ничто их не
-  сводило. Разъехались бы — машина повисла бы над полом или утонула в нём, а «уехала
-  из кадра» считалось бы по чужой ширине. Теперь габарит спрашивается у самого ассета.
-- **`otto_fall` лежал в репозитории мёртвым грузом.** Позы падения в наборе нет нарочно
-  (в воздухе Otto бьёт ногой всегда, ADR-0006, пункт 2), а генератор её рисовал —
-  три карты, которые никто не грузит. Веха честно считала их работой: в статусе стояло
-  «12 поз» вместо одиннадцати. Тест теперь смотрит и обратно: в папке актёров не должно
-  лежать картинки, которой нет в наборе.
-- **Длину цикла ходьбы знали трое.** `WALK_FRAMES` выбирал кадр, а фазу продвигал свой
-  `fmod(..., 3.0)` в Otto и такой же в агенте. Хватило бы поменять число в одном месте,
-  чтобы последний кадр ходьбы не показался никогда, а на глаз это не заметно — шаг
-  просто станет короче. Продвижение фазы уехало в `ActorPose.advance`, на это есть тест.
-- **Сторона отъезда хранилась в `set_meta`** — нетипизированной строкой на узле, рядом
-  с типизированным полем `_car_leaving`, которое про ту же машину.
-- **Мелочи:** словарь поз собирался заново каждый физический кадр на каждом актёре;
-  осиротевший комментарий про размер коробки из формы коллизии остался в `_apply_pose`
-  без кода (и перестал быть правдой — кадр спрайта нарочно крупнее хитбокса);
-  описание `_rot` приклеилось к `_update_look`; план съёмки M7b встал между
-  комментарием и планом M7a, к которому тот комментарий относился; проверка посадки
-  машины в тесте допускала промах на 41 px при точном ответе; в тесте цикла ходьбы
-  цикл ничего не проверял; `--keep` заставлял генератор пересобирать кадры прошлых
-  прогонов; `np.errstate` не глушит предупреждение `nanmean` — оно приходит через
-  `warnings`; неиспользованный `import subprocess`; в двух местах остался `EnvTextures`.
-
-## Веха M8a · Звук
-
-Веха M8 разделена надвое: **M8a — звук**, **M8b — интерфейс**. Порядок такой, потому
-что звук ни от чего не зависит, а меню зависит от шрифта, языка и громкостей, которые
-заводит звук. Решения — в [ADR-0012](adr/0012-sound-and-interface.md).
-
-**DoD:** партия звучит от первого шага до Game Over, и ничто не молчит без причины. ✅ Смержено в `main` как PR #12.
-
-### Что нашла сверка перед вехой
-
-- **Звук оригинала — чистый PSG.** Четыре чипа AY-3-8910 и отдельный Z80 под звук:
-  три голоса на чип, квадратная волна, шум и огибающие. Сэмплов в 1983 году взяться
-  неоткуда, и весь словарь эффектов — это они.
-- **Тему написал Yoshio Imamura:** тревожная, простая, с «дрожащими» нотами. Из
-  эффектов источники называют выстрелы и «динь» лифта; полного списка нет.
-- **Нашёлся мануал Taito** на Internet Archive — тот самый, что отдавал 403 с M5.
-  Он оказался про обслуживание автомата: таблицы очков, числа красных дверей и правил
-  тревоги в нём нет. Зато есть DIP-переключатели.
-- **Дополнительная жизнь за 10 000–25 000 очков** — из этих самых переключателей.
-  У нас её нет вовсе, и очки до сих пор ни на что не влияли.
-- **Жизней на партию 3–6.** Наши три, выбранные в M4a наугад, оказались минимумом
-  из списка — то есть угаданы верно.
-
-### Решения вехи, коротко
-
-- **Звук синтезируется кодом,** как и графика: `tools/render_audio.py` пишет файлы
-  в `assets/audio/`. Детерминированно, без чужих файлов и лицензий. Синтез в рантайме
-  отклонён: звук стал бы кодом на горячем пути, а отлаживать его тяжелее, чем файл,
-  который можно послушать.
-- **Звучит игра 2026 года, а не чип 1983-го.** Подражание PSG не прошло прослушивание:
-  звук на той же стороне формулы, что картинка (ADR-0012, правка пунктов 1 и 2).
-- **Мотив свой.** Тема Taito чужая, поэтому пишем свою. Отдельный мотив на тревогу:
-  сирена работает с M5b, а звучать ей до сих пор нечем.
-- **Три шины:** Master, Music, SFX. Отдельная шина у музыки нужна затем, чтобы её
-  можно было приглушить, не выключая выстрелы.
-- **Дополнительная жизнь за 10 000 очков** — правка по мануалу, но это M8b: там же,
-  где HUD показывает жизни.
-
-### Сделано в вехе
-
-- **Звук переделан после прослушивания.** Первая версия подражала чипу AY-3-8910 и
-  звучала как чип: 22 кГц моно, квадрат и шум. Ошибка была в рассуждении — формула
-  проекта «механика 1983 года, картинка 2026 года», и звук на той же стороне, что
-  картинка. Решение переписано (ADR-0012, правка пунктов 1 и 2).
-- **`tools/audio_dsp.py` — студия на numpy:** осцилляторы без алиасинга (polyBLEP),
-  фильтры в частотной области с резонансом и с движущимся срезом, свёрточный реверб
-  на синтезированных откликах комнат, эхо, насыщение, компрессор, лимитер, стерео.
-- **`tools/render_audio.py` — сами звуки.** Каждый эффект собран как в современных
-  играх: атака, тело и хвост комнаты. Здание бетонное, и хвост у него короткий и
-  тёмный; шахта — труба, и в ней всё гуляет дольше.
-- **17 эффектов и две темы.** Шаги, выстрел, попадание, удар ногой, звон и падение
-  лампы, «динь» лифта и его гул, стрёкот эскалатора, открытие и закрытие двери,
-  документ, две смерти, отъезд машины, бонус за здание, Game Over.
-- **Музыка — тёмный synthwave:** бас, арпеджио с движущимся срезом, пад и барабаны,
-  восемь тактов, ля минор; петля замкнута так, что хвост заворачивается в начало и
-  шва не слышно. Мотив тревоги — то же здание, но быстрее, жёстче и с сиреной.
-- **Баланс проверен спектром, а не на глаз.** В первом сведении бас занимал четыре
-  пятых энергии, и арпеджио с падом были не слышны вовсе; после правки, с поправкой
-  по кривой A, микс держится в середине, где ухо чувствительнее всего.
-- **Формат по назначению:** частое и короткое (шаг, выстрел, удар) — WAV, длинное и
-  редкое (смерть Otto, бонус, машина) и музыка — OGG. Всё вместе 2.5 МБ вместо шести
-  с лишним, если бы всё лежало в WAV, — а шаг при этом не распаковывается по пять
-  раз в секунду.
-- **Три шины: Master, Music, SFX.** Автолоад `Sound` держит пул из двенадцати
-  источников на эффекты и один на музыку; обращаются к нему через `Sounds.play`,
-  как к `GameState` — через `instance()`, потому что иначе разбор одного скрипта
-  в отрыве от проекта не находит имя автолоада.
-- **Гул кабины и эскалатора — позиционные источники** на самих узлах: шахт в здании
-  пять, и слышно должно быть только ту, рядом с которой стоишь.
-- **Тревога меняет музыку.** Сирена работает с M5b, и до сих пор была немой: теперь
-  вместо темы здания идёт мотив тревоги, и снять его можно только новым зданием.
-- **Зацикливание задаётся кодом, а не настройками импорта.** `.import` — вторая копия
-  того же списка, и разъезжается она молча: тема с потерянным циклом играет пять
-  секунд и замолкает до конца партии.
-- **Ссылка на `Otto` и `Enemy` из пули замкнула загрузку в кольцо** — сцена пули
-  переставала читаться вовсе. Попадание в тело определяется слоем коллизии, а не
-  классом; заодно это дешевле.
-- **Тесты: 211** (было 201). У каждого имени есть файл, у каждого файла — имя;
-  зацикленное зациклено, одноразовое не зациклено; шины на месте; музыка включается
-  и выключается; нулевая громкость выключает шину, а не уводит её в минус бесконечность.
-
-**Чего я проверить не могу.** Звук я не слышу. Проверено то, что проверяется числами:
-пики и отсутствие клиппинга, длительности, ширина стерео, спектр по полосам с поправкой
-по кривой A (`screens/M8a/waveforms.png` — картинка волн), запуск игры без единой ошибки
-звука в логе. Слуховую проверку делает только человек — и первая версия вехи ровно на
-ней и не прошла.
-
-### Что нашло авторевью
-
-- **Петля, которую заводили каждый кадр.** `playing = true` на каждом физическом
-  кадре зовёт `play()` заново: от двухсекундного гула кабины и стрёкота эскалатора
-  было слышно первые три миллисекунды — треск на частоте кадров вместо мотора.
-  Проверено замером позиции воспроизведения: 0.003 с вместо 0.28 с.
-- **Барабаны шли только полпетли.** Рисунок задан на четыре такта, а петля длиной
-  восемь: вторая половина и темы, и мотива тревоги шла без барабанов вовсе. Рисунок
-  теперь повторяется до конца петли.
-- **Погашенные края у петли.** `dsp.master` гасит начало и конец, чтобы не было
-  щелчка, — но край петли и есть её шов, и десять миллисекунд тишины там слышны
-  дырой на каждом обороте. Петли сводятся без гашения краёв.
-- **«Динь» звенел на всё здание.** Пустые кабины катаются сами и отбивают этажи;
-  звук был глобальным, то есть пять шахт звенели в ухо независимо от расстояния.
-  Теперь он позиционный, как и гул.
-- **`soundfile` не был записан в `requirements-assets.txt`** — генератор звука не
-  запустился бы на свежем клоне.
-- Мелкое: автолоад звука не отпускал статическую ссылку на себя (как `GameState`),
-  пул голосов заводился позже публикации экземпляра, удар ногой по двум агентам
-  звучал дважды, шаг, начатый в воздухе, терялся насовсем.
-
-## Веха M8b · Интерфейс
-
-Вторая половина M8. Звук завёл громкости и шины, на которые опираются настройки;
-здесь появляется всё остальное, что игрок видит вне игры. Решения —
-[ADR-0012](adr/0012-sound-and-interface.md), пункты 3–5 и дополнение 8–11.
-
-**DoD:** игра запускается из меню и возвращается в него. ✅ Смержено в `main` двумя PR:
-#13 — сама веха, #14 — починка CI на чистом чекауте: переводы `assets/i18n/*.translation`
-делает импорт из `ui.csv`, и на свежем клоне первого прохода их ещё нет. `godot_check.py`
-теперь повторяет импорт, а `tools/clean_check.py` гоняет проверки на чистой копии.
-
-### Что нашла сверка перед вехой
-
-- **Про экранную раскладку оригинала источники молчат.** Ни описания HUD, ни вида
-  таблицы рекордов найти не удалось — мануал Taito, как выяснилось в M8a, про
-  обслуживание автомата. Значит, ориентироваться не на что, и это развязывает руки.
-- **Единственное, что даёт мануал по интерфейсу, уже учтено:** дополнительная жизнь
-  за 10 000 очков. Она здесь и появится — HUD показывает жизни, ему и знать.
-
-### Решения вехи, коротко
-
-- **HUD современный, а не аркадный.** Строка сверху с рекордом и жизнями-иконками —
-  язык автомата; игра ремейк, и интерфейс на той же стороне, что картинка и звук.
-  Только необходимое, по углам, полупрозрачно. Отладочный оверлей уходит из кадра.
-- **Рекорды без инициалов:** десять строк со счётом и датой. Ввод трёх букв стрелками
-  дома превращается в лишний экран между смертью и следующей партией.
-- **Переназначение клавиш отложено.** Экран управления показывает раскладку из
-  `InputMap`, но не меняет её: настоящее переназначение — это ещё и геймпад, и разбор
-  конфликтов, и сохранение схемы. До релиза оно нужнее в M9.
-- **Шрифт — Pixellari (OFL).** Выбран по единственному жёсткому требованию: кириллица.
-  Проверено — все 66 букв на месте, нет только длинного тире, поэтому в интерфейсе
-  оно не используется.
-
-### Сделано в вехе
-
-- **Шрифт Pixellari (OFL)** и тема оформления. Импорт настроен под пиксель: без
-  сглаживания, без хинтинга, без субпиксельных позиций и без системного запасного
-  шрифта — иначе на месте пропущенного глифа молча появляется чужая буква.
-- **Два языка одной таблицей.** `assets/i18n/ui.csv` — ключ и две колонки; Godot сам
-  собирает из неё словари. Язык берётся из локали системы, меняется в настройках
-  и сохраняется. Незнакомый язык системы откатывается на английский: показать
-  понятную латиницу лучше, чем кириллицу наугад.
-- **HUD** вместо отладочного оверлея: очки и документы слева, жизни справа, здание
-  в углу, тревога по центру и мигает. Счёт разбит по три цифры — 12 400 читается
-  с одного взгляда, 12400 нет.
-- **Меню одним узлом на шесть страниц:** главное, пауза, конец партии, настройки,
-  рекорды, управление. Страницы собираются кодом, потому что они данные — список
-  кнопок, список ползунков, список строк; в сцене только рамка вокруг.
-- **Настройки** пишутся в `user://settings.cfg`: три громкости, язык, полный экран.
-  Это первое, что игра сохраняет на диск.
-- **Рекорды** — десять строк со счётом и датой в `user://records.json`. Испорченный
-  файл начинает таблицу заново с предупреждением, а не роняет игру: разбор идёт
-  экземпляром `JSON`, потому что статический помощник сам пишет ошибку в лог движка.
-- **Экран управления** читает раскладку из `InputMap` и показывает её словами:
-  кнопки геймпада названы буквами, а крестовина — словом, потому что стрелок
-  в пиксельном шрифте не оказалось.
-- **Дополнительная жизнь за 10 000 очков** — правка по мануалу Taito. Один раз за
-  партию и только живому: после Game Over очки ещё приходят (бонус за здание
-  отложенный), и мёртвому выдавали бы жизнь, с которой он не оживёт.
-- **Автосъёмка минует меню:** она водит Otto игровыми действиями и кнопки нажимать
-  не умеет. Экраны снимает `tools/ui_shot.tscn` — по состоянию, как свет в M6.
-- **Тесты: 231** (было 211). Настройки и рекорды переживают перезапуск, громкость
-  зажимается, незнакомый язык откатывается, каждая строка есть на обоих языках,
-  счёт разбивается по три цифры, жизнь за очки приходит один раз, повторённый
-  за день счёт не выдаёт себя за рекорд.
-
-### Что нашло авторевью
-
-- **«Назад» угадывало страницу по паузе** — а на паузе стоит и экран конца партии.
-  Из рекордов после проигрыша возвращало в паузу, и «Продолжить» оживляло партию
-  с мёртвым Otto и нулём жизней. Теперь страница возврата запоминается, а не
-  выводится из состояния дерева.
-- **Фокус уезжал на прошлую страницу:** `queue_free` удаляет узлы лишь в конце
-  кадра, а отложенный захват фокуса успевает раньше — и брал кнопку той страницы,
-  которую только что закрыли. Узлы отцепляются от колонки сразу, а фокус ищется
-  вглубь и по любому управляемому элементу, а не только по кнопкам верхнего уровня.
-- **Выход в меню не останавливал партию:** таймер сирены продолжал идти под
-  главным меню. Появился `GameState.stop_game`.
-- **Место нового счёта искалось по паре «счёт и дата»** — тот же счёт в тот же день
-  находил чужую строку, и счёт мимо десятки объявлялся рекордом. Место считается
-  до вставки.
-- **Ползунок громкости писал файл на каждый шаг** — двадцать записей за одно
-  движение мышью. Настройки уезжают на диск при уходе со страницы.
-
-## Веха M9 · Релиз
-
-Игра игралась целиком, не хватало способа её получить: чтобы поиграть, нужно было
-поставить Godot и склонировать репозиторий. Решения —
+1. The building is described by rules, not by a list of floors.
+2. Layout by seed: in the original buildings differ in the placement of red doors,
+   that is, it is itself built like generation.
+3. Building 30 floors from this description.
+4. The shaft and escalator move into data — a debt from M2.
+5. The escalator pad is decoupled from the belt — a debt from the M2 code review.
+6. FPS measurement; floor streaming is done only if 60 frames are not held.
+7. Tests: layout rules and repeatability by seed.
+
+**DoD:** a 30-floor building is built from data and can be passed top to bottom, 60 FPS.
+
+### Done in the milestone
+
+- `BuildingRules` — building rules as a `Resource`: floors, the span per shaft, how many
+  documents, doors and lamps. By changing them from building to building, in M5b we get
+  difficulty. The vertical arithmetic moved here too — a floor's surface and ceiling.
+- `BuildingPlan` — layout by seed. Knows no nodes, checked by tests. It guards
+  passability above all: an escalator must stand at every junction of bands, otherwise
+  you cannot go down. Documents are spread by height, so the building has to be passed
+  in full, not only the top.
+- The level is built from the layout: five shafts of six floors each in different columns,
+  an escalator at every junction, 60 doors, a lamp per floor, the exit at the bottom. Otto starts
+  on the roof.
+- The escalator is decoupled: the ride follows the same polyline the belt is drawn with, and
+  starts from where the passenger stood. Both M2 code review debts are closed —
+  both the jerk on boarding and the belt cutting the slab outside the opening.
+- `tools/dump_plan.gd` prints the layout: less than a third of a floor fits in a shot, and
+  a generated building cannot be checked by eye.
+
+**Streaming was not needed.** A measurement on the full building with all agents gives 60 FPS,
+and per the milestone decision that is enough not to do it.
+
+### What the M5a code review found
+
+- **The escalator could not be boarded.** The descent direction was chosen without regard to the
+  shaft, and at half of the junctions the opening fell between the elevator and the pad: Otto
+  walked to the escalator and fell past it. Now the escalator's place is chosen
+  so that the pad stands between the shaft and the opening; a test checks this on
+  eleven seeds.
+- **The exit stood exactly where Otto returns after death.** Dying on the
+  bottom floor with the last document, he cleared the building without taking a step.
+  The exit took its own place in the layout, and `safe_x` avoids it.
+- **The escalator opening geometry was written down twice** — in the level and in the
+  layout, and differently: `safe_x` guarded the pad, while the hole was to the side.
+  Moved into `BuildingRules`, both sides read the same thing.
+- Lamps are no longer hung on the roof: there is no ceiling there, and the pendant hung in the sky
+  above the building. The building now has 29 lamps — one per floor below the roof.
+- `shaft_span = 0` in the inspector hung generation for good; a band junction without an
+  escalator was skipped silently — now `push_error`.
+
+Beyond the findings, what the review left to the author is closed: **a document could silently
+disappear.** If a red door did not have room on a floor, the building ended up with four
+documents instead of five — and it became impossible to clear. Red doors are now placed first,
+on an almost empty floor, and if there is still no room — an error goes to the log.
+
+### What the check gave
+
+**The alarm is harsher than it seemed.** Death does not clear it — only a change of
+building resets it. It is a penalty for the whole run, not for an attempt. Done in M5b.
+
+**Sources name the building bonus differently:** a flat 1000 or 1000 × number.
+The second option is taken, marked as unchecked.
+
+**A mechanic the epic does not have turned up:** in later buildings agents lie down on the
+floor, and hitting them is almost impossible. Only recorded for now.
+
+## Milestone M5b · Game loop
+
+The second half of the split milestone M5. The building is already built by generation; here
+comes what ties buildings into a game. Decisions — in [ADR-0009](adr/0009-game-loop-and-alarm.md).
+
+1. Exiting with the documents collected gives a bonus and leads to the next building.
+2. The bonus is 1000 × building number; sources disagree, marked as unchecked.
+3. Difficulty grows through agents: they shoot more often, see farther, come as replacements
+   faster.
+4. An alarm after a fixed time per building. Death does not clear it.
+5. Pause on Esc with a hint: continue, start over, quit.
+6. Tests: alarm, bonus and building number, delayed cab response.
+
+**DoD:** the game can be played from the first building to the second without crashes.
+
+### Done in the milestone
+
+- `Alarm` — the alarm as a separate class. Only a change of building clears it: there is simply
+  no way to clear it by death, and that is the main thing the tests guard.
+- `GameState` holds the game: building number, bonus for the cleared one, the alarm. `main`
+  became the game loop — it sets up a building, and on clearing builds the next one.
+- Difficulty grows through `agent_menace`: range, rate of fire and agent replacement speed.
+  On alarm the same multiplier is added on top.
+- On alarm the cab responds with a delay — `response_delay` in `ElevatorMotion`.
+- Pause on Esc with a hint; the alarm does not run while paused.
+
+Verified with shots: pause and unpause — `capture.py M5b` captures them. The move into
+the second building with a 1000 bonus and the siren turning on are captured in a separate
+one-off run: the building is temporarily shrunk to one floor without documents, and the alarm
+timer to two seconds. This did not go into the milestone script — the alarm waits a hundred
+seconds, and the move requires collecting five documents on thirty floors.
+
+Beyond the findings, what the review left to the author is closed: **agent anger growth had no
+ceiling.** By the twentieth building firing range under the siren outgrew the width of the
+building itself, and agents shot through the floor from anywhere. A ceiling is set, its value
+is not confirmed by the original. Along the way `Alarm.time_left()` stopped being dead: the
+countdown is shown in the debug overlay — the original does not show the timer to the player.
+
+### What the M5b code review found
+
+- **Pause did not stop everything.** `SceneTreeTimer` ticks during pause by default:
+  the building froze, but the replacement of a killed agent and Otto's return to the game came
+  through the pause. Both timers are now `process_always = false`.
+- **The alarm cab delay worked only on the first ride.** The "thinking" counter
+  was reset only when the passenger released the button inside the cab;
+  someone stepping out left it full, and the next one started instantly. An empty cab now
+  resets the counter itself, there is a test for it.
+- **After "game over" the building kept living:** agents came and shot under
+  the caption. The end of the game stops the tree the same way pause does — a restart lifts it.
+- **Esc and R pressed in the same frame lost R.** The edges were all computed at once, but the
+  early return after toggling pause still ate the rest.
+- **A building change left the old one in the tree until the end of the frame:** two Ottos, two
+  cabs and all the geometry twice in one physics world. The level is removed from the tree
+  immediately.
+- `agent_menace = 0` from the inspector divided by zero in the agent replacement delay and locked
+  the door forever — the lower bound is now shared with `Enemy.set_menace()`.
+- `GameState.reset()` promised to reset everything, but did not touch the building number and
+  the alarm; now it does, and `start_game()` stopped repeating its work.
+
+**Left to the author** and closed in the same milestone (see "Done in the milestone"): the anger
+multiplier had no upper bound. Under the siren by the fifteenth building agents shot farther
+than the useful floor width and almost six times as often, and the ceiling value is just as
+unchecked a number as the others.
+
+### What we deliberately do not do
+
+Sources name two more ways difficulty grows, and both are postponed: **shafts in later
+buildings should become more tangled** (these are generation rules, and they must be changed
+together with the passability check) and **agents should lie down on the floor**, which makes
+them almost impossible to hit (new behaviour and a new pose — work for a separate milestone).
+
+## Level testing
+
+A building is a pure function of the seed, so what has to be checked is not "this level works"
+but "any building that gets generated works". Three levels of checking are described
+in [`testing.md`](testing.md); added in this pass:
+
+- **Passability** — a reachability graph over the layout, 40 seeds. It found a real bug
+  on the first run: on seeds 31 and 38 a document ended up behind an escalator opening,
+  where the elevator and escalator route does not lead. The generator now places red doors
+  only where the route leads, and if there is no room on a floor, the document moves
+  to a neighbouring floor of its band instead of disappearing.
+- **Build smoke test** — the building is really built, and the number of cabs, doors and
+  escalators is checked against the layout.
+- **Bot** — drives Otto through the building: goes down, picks up documents, goes to the exit.
+  Verified on five seeds.
+
+**The bot found a gameplay problem, not its own.** Per the M2 decision the cab stops anywhere,
+and "matched the floor" was computed to half a pixel. At a speed of 60 px/s that is
+less than a frame — hitting such a window by hand is impossible, and you could step out only on
+the end floors of a shaft. Snapping is added: release almost at a floor — the cab pulls in.
+
+The run became more expensive, from 2 to 48 seconds. This is the price of the building now being
+checked as a whole rather than in parts.
+
+### What the test code review found
+
+- **Buildings in tests piled up inside each other.** `add_child_autofree` frees only
+  after the whole test, and seeds are iterated inside one: five buildings stood in one
+  physics world. The bot presses actions globally — all five Ottos walked at once, and red
+  doors of previous buildings sent documents to the shared `GameState`. The "documents
+  collected" check could pass on someone else's work. The building is removed from the tree at the
+  end of its iteration.
+- **The bot considered a door uncollected by x alone.** Positions on floors are shared, and a red
+  door in the same column a floor higher would pass off an already collected one as uncollected —
+  the bot would walk to it forever. The floor is checked too.
+- **The route was computed twice.** `reachable()` and `segments()` both iterated over the whole
+  layout, although a comment promised the opposite. Floor pieces are computed once and
+  handed to `reachable_in()`. Along the way they are no longer computed at all when there are no
+  documents in the building: on a zero-floor building this computation crashed.
+- **Esc and R in the same frame still lost R** — but now when leaving pause, not when
+  entering. The "we are on the overlay" flag is cleared before toggling.
+- **The anger ceiling was bypassed by the alarm.** `MENACE_CAP` was only on growth from building
+  to building, and the siren multiplied the already clipped number: 3.0 × 1.5 = 4.5, i.e. a firing
+  range of 900 px with a useful floor width of 1120 px — an agent shot through the floor almost
+  end to end. Now the ceiling is shared by both bonuses and computed in
+  `BuildingRules.menace_with()`, and growth from buildings hits a lower limit (2.0), so that the
+  siren has something to add.
+- **The alarm did not catch up with a ride in progress.** Otto holds "down" all the way, the
+  waiting counter has long overflowed by the time of the siren — the cab delay kicked in only
+  from the next press. `ElevatorMotion.forget_command()` resets the count.
+
+Plus comments are clarified: `stops_between_floors` no longer promises that the cab stops
+strictly where it was released — snapping to a floor works in both modes.
+
+## Milestone M6 · Light and atmosphere
+
+The milestone for which Godot was chosen in ADR-0001. Decisions —
+in [ADR-0010](adr/0010-lighting-and-atmosphere.md).
+
+**DoD:** a dark floor with a firefight holds 60 FPS, measured on a built building. ✅
+Merged into `main` as PR #9.
+
+### Done in the milestone
+
+- **The light budget is measured** — a debt hanging since M0. `tools/light_bench.gd`: 48 lights
+  with shadows cost 0.49 ms, 24 with shadows and glow — 0.59 ms with a frame budget of 16.6 ms.
+  The "no more than a dozen in frame" limit stays, but as an artistic one, not a technical one.
+- **A floor is lit because a lamp burns on it.** `CanvasModulate` sets the tone of a
+  dark floor, and its own fill makes it light. Knock the lamp down — the fill
+  goes out, and the floor drops to the common tone. The dimming band from M4b is thrown away.
+- **Two lights per floor:** a wide fill across the whole width and a spot under the lamp itself.
+  The spot is a child of the lamp, so it falls together with it.
+- **Light from the shaft** — a column the whole shaft height, does not go out with floors.
+- **Muzzle flashes** — a bullet carries its own light and dims it over the first 64 px of flight.
+  One for both shooters: the bullet is the same for Otto and for agents.
+- **Windows in the back wall**, behind them — a city from the building's seed (`Skyline`), with
+  parallax. The building's light does not fall on it: it is outside.
+- **Post-processing** — glow and vignette, a shared scene `src/ui/postprocess.tscn`
+  for the game and for the capture tool.
+- **Per-frame culling:** of the sixty-odd lights only those whose floors are in frame
+  burn. `VisibleFloors` computes it — a pure function, checked without a scene.
+- **The bonus for a kill in darkness is +50 instead of doubling.** A fix from the check, see
+  below.
+
+**DoD measurement:** building 1, floor 7 dark, agents shooting — **0.65 ms/frame**
+(RTX 5060 Ti). The headroom to the 60 FPS budget is twenty-fivefold.
+
+### What the check before the milestone found
+
+- **The bonus for a kill in darkness turned out flat.** Sources give a table:
+  shot 100, shot in darkness 150, kick 150, kick in darkness 200. ADR-0007 had
+  doubling, honestly marked as unchecked. Now `DARK_KILL_BONUS = 50`.
+  Along the way this fixes the points farm we predicted for ourselves.
+- **In later buildings darkness helps less or not at all.** Deliberately not
+  done: this is a difficulty rule, and its place is next to `agent_menace`. Recorded as a debt.
+
+### What the M6 code review found
+
+- **There was no glow in the game at all.** `postprocess.tscn` had
+  `background_mode = 4` — that is `BG_KEEP`, not `BG_CANVAS` (which is `3`). The bench measured
+  glow that the game never turned on. Now a comment next to it gives
+  both numbers, so that it does not silently move back.
+- **Lamp spots were not culled off-frame.** Culling touched only the fills, while thirty
+  spots — each with shadows, i.e. more expensive than a fill — burned all over the building.
+  Worse, the test counted only `AreaLight` and so passed, missing exactly the
+  half that is more expensive. Now it sees all lights: with culling removed it
+  shows 35 burning against a budget of 12, i.e. it finally bites.
+- **The sky was lit by floor light.** The background node kept the default
+  mask, and the window read as a lit niche — the very mistake the
+  city was already protected from.
+- **A room back wall was built above the roof**, where there is none: a band in the sky
+  with clipped windows right above where Otto starts.
+- **The light profile was sampled at the texel corner, not the centre.** The right edge of the
+  texture kept shining, and the fill leaked onto the floor below — exactly what the comment
+  in `LightTextures` promised to prevent.
+- The floor darkening test relied on child order: it took the first lamp found
+  below Otto and expected one light to go out. Now it takes the nearest one and expects
+  two — the fill and the spot, as the ADR says.
+- Small things: an unused `SKY` constant; an outdated comment about the background's `z_index`;
+  `light_shot` did not put `.gdignore` into `screens/`, and Godot would import
+  every shot as a resource; three hundred back walls hung directly on the level, and every
+  agent traversal iterated over them; in the bench small measurements dumped all lights
+  onto one floor.
+
+### How the light was verified
+
+The game capture script is driven by delays, and it cannot be used to check light: a dark floor
+comes only from a knocked-down lamp, and hitting it by stopwatch is exactly the case
+that broke four times in this project.
+
+So light is captured by `tools/light_shot.tscn` — **by state**: it builds a real
+building, knocks down a real lamp and waits not for a delay but for its node to disappear. It
+also measures the frame with `--bench`. The `capture.py M6` script remains for something else —
+showing the real game with HUD, vignette and glow.
+
+## Milestone M7a · Art pipeline and environment
+
+Milestone M7 is split in two, as M4 and M5 were before: **M7a — pipeline and environment**,
+**M7b — actors**. The numbering of the other milestones does not shift. Decisions are
+in [ADR-0011](adr/0011-asset-pipeline.md).
+
+**DoD:** no grey boxes are left in the frame except Otto and the agents; 60 FPS holds
+on a built building. ✅ Merged into `main` as PR #10.
+
+### What the check against the original found
+
+- **Original: 256×224 @ 59.2 Hz, Taito SJ.** Three independently scrolling tile layers
+  plus a separate sprite-object layer — architecturally exactly what we already have:
+  the building tileset, the city background, the actor sprites.
+- **Otto is drawn "almost chibi".** The early design had more realistic proportions, with
+  a big pompadour; in the final version the proportions were shortened. The big head is a
+  deliberate choice of the authors, not a consequence of 16 pixels. So we go chibi too.
+- **Bullets and hits are yellow with red.** This matches what is already in `bullet.tscn`.
+- **Sources do not give sprite sizes.** Sheets exist on The Spriters Resource, but the
+  site returns 403 to automated requests. Not a blocker: Otto's height is set by the
+  collision from M1, not by the original.
+
+The check also found a discrepancy inside the project: ADR-0002 described one pipeline
+(generation plus manual touch-up), and the M7 line in the epic another (Blender). ADR-0011
+resolves this.
+
+### Milestone decisions, briefly
+
+- **The pipeline is hybrid.** Actors are a low-poly model in Blender and an orthographic
+  render by script: frame-to-frame consistency was the main risk of ADR-0002, and this
+  removes it for good. The environment is a Python generator: it has no animation, and
+  describing it in code is cheaper than modelling it.
+- **Assets are committed.** The source of truth is the scripts, but the PNGs live in the
+  repository: a clone without Blender and without Pillow must run and pass CI. Neither
+  Blender nor the generator is invoked in CI.
+- **Normal maps are computed from geometry, not guessed from the sprite.** For actors it
+  is the render's normal pass, for the environment the height map of the same generator.
+  Laigter from ADR-0002 drops out of the pipeline.
+- **No collision changes.** A sprite frame may be bigger than the collision; anchoring
+  goes by the pivot point. This is the condition for the M1–M5 tuning to stay valid.
+- **The palette is noir, with two anchors from the original:** the red door is the only
+  red in the frame, Otto's light suit is the lightest among the actors, so that your own
+  man is visible even on a darkened floor.
+- **Animation at the 1983 minimum:** a three-frame walk, one frame per state. That is M7b.
+
+### Done in the milestone
+
+- **Blender 5.2.1 LTS installed** via winget, checked headless: `bpy 5.2.1`,
+  internal Python 3.13.13. It lives in `C:\Program Files\Blender Foundation\Blender 5.2` —
+  winget does not put it in `Links`, so `tools/blender_bin.py` looks there too.
+- **ADR-0011 written**, the epic is split into M7a and M7b, the question "consistency of
+  animation frames" is removed from the open ones.
+- **The pipeline went all the way on one asset** — the floor slab. The generator draws
+  three maps at once, Godot imports them with the right presets, `EnvTextures` assembles a
+  `CanvasTexture` from them, the level lays it as a tile, and the light from M6 falls on
+  the relief.
+- `tools/palette.py` — the palette in one place: a muted building, with the red door and
+  Otto's light suit bright.
+- `tools/render_env.py` — the environment generator. Diffuse, normal and specular are
+  drawn with the very same rectangles, so the maps cannot drift apart. The normal is
+  computed from the height map, not guessed from the sprite's brightness.
+- **The floor slab tile** 32×20 wraps horizontally: the normal does not break at the seam.
+- `src/systems/assets/env_textures.gd` — texture assembly and cache; the list of assets
+  the game requests lives there too and serves as the source of truth for the test.
+- **Back wall, building side walls and window frames.** The wall is flat plaster with no
+  pattern: the floor height (120 px) is not divisible by the tile size, and any stripe
+  would run across the building as a grid. The frame is laid as a nine-slice and overlaps
+  the wall by half, so the opening got a reveal for the light to play on.
+- **Tests (186, was 173):** every asset in the list has all three maps, they are the same
+  size, the tile assembles with normal and specular, the tile thickness equals the floor
+  slab thickness from the building rules, a nine-slice asset is exactly three times wider
+  than its margin, a built building lays the asset rather than a fill, and every light
+  source in it is raised above the canvas.
+
+- **Doors, cab, escalator, lamp and exit.** A door no longer changes the tint of a single
+  rectangle: it has four pictures — normal, red, ajar and the opening behind an open one.
+  The escalator belt runs as a tile along the slanted line, so the steps keep their pitch
+  for any span length. A shot-out lamp is not recoloured but dims: the light goes out,
+  the lamp itself does not change.
+- **The city behind the windows** got grain on the towers; the windows stay a fill — they
+  are a light source, not a surface, and relief is of no use to them.
+- **DoD measurement:** building 1, floor 7 darkened, agents shooting — **0.64 ms/frame**
+  against a 16.6 ms budget (RTX 5060 Ti). In M6 the same measurement gave 0.65 ms: assets
+  with normal and specular did not make the frame heavier.
+- **Milestone shots:** `capture.py` got an M7a plan, and `light_shot` is no longer pinned
+  to the M6 folder — the milestone is set with the `--folder=` key.
+- **No grey boxes are left in the environment.** In the frame only Otto, the agents and
+  bullets remain as such — that is M7b. The sky and the vignette are fills and will stay
+  so: they are not geometry.
+
+**The light had to be raised above the canvas.** As soon as the wall got a normal, the
+whole building went dark: 2D light reads the normal, and with zero source height the ray
+runs along the wall, and the plane gets nothing from it. Before the assets the height
+meant nothing and so was zero for all three sources. Now it differs by meaning: the wide
+fill hangs high (even light), the lamp spot lower, the muzzle flash very low — it is
+supposed to pick out the relief sharply. The numbers are in `LightTextures`, and a test
+now fails on zero height.
+
+**The normal is checked by eye and by number.** No source confirms the channel order
+unambiguously, so it was checked by experiment: a probe with a gable roof was put into the
+frame, and under a lamp from above the brighter half was the one whose normal points up.
+The convention is green up, as in OpenGL; a switch for the opposite case is left as one
+constant in the generator.
+
+### What the code review found
+
+- **The size was set by the picture, not by the space.** `TextureRect` declares the size
+  of its texture as its minimum size, and `Control` grew everything smaller up to it: the
+  wall strip above a window — 14 px with a 32 px tile — stretched to 32 and covered the
+  city in the top third of every opening on every floor. Fixed with `EXPAND_IGNORE_SIZE`;
+  a test fails on the size substitution.
+- **The escalator belt was tinted greybox green.** `Line2D` multiplies the texture by
+  `default_color`, and that was left over from the boxes: metal could not appear at all.
+- **The slab test did not check slabs.** It counted any `TextureRect` among the level's
+  grandchildren, and the cab, door and lamp qualify — the floor slabs could all have gone
+  back to a fill, and the test would not have noticed. Now every geometric body must be
+  covered by a texture.
+- **The source height reached the shader wrong.** The engine multiplies
+  [member PointLight2D.height] by the node's average scale, and our sources have any
+  scale: the muzzle flash hung five pixels above the wall instead of twenty-four, that is,
+  it shone almost along it. Now the height is set by `LightTextures.raise`, and the
+  constants hold true world pixels; there is a scene-less test for it.
+- **The fallback grey fill was used in half the places.** The level substituted it if
+  the asset was missing, while doors, lamps and the cab in the same case silently stayed
+  invisible. Neither shows the cause, so `EnvTextures.tile` no longer returns `null`: an
+  undrawn asset is a toxic pink square and an error in the log. Three greybox colour
+  constants went away along the way.
+- **Pillow and numpy were in `requirements-dev.txt`,** which CI and every clone install,
+  although the README promises everything works without them. Moved to
+  `requirements-assets.txt`.
+- **The "at_the_door" shot promised nothing:** the door, placed by seed, cannot be
+  reached by a fixed delay, and the step shot the same place as the previous one. The
+  step is removed — places are handled by `light_shot`, which waits for a state.
+- Small things: `--out` outside the project crashed the generator with `ValueError`;
+  argparse printed help before switching to UTF-8; `blender_bin` duplicated four things
+  from `godot_bin`; the seam fitting in `roughen` was dead code with a false explanation;
+  `EnvTextures` computed map paths twice.
+
+## Milestone M7b · Actors
+
+The second half of M7. The pipeline was built and checked in M7a on the environment; here
+it carries what it was chosen for — frame-by-frame animation. Decisions:
+[ADR-0011](adr/0011-asset-pipeline.md), items 1–11 and addendum 12–14.
+
+**DoD:** all grey-box placeholders replaced with final assets. ✅ Merged into `main` as PR #11.
+
+### What the check against the original found
+
+- **The original's sprites are built from 16×16 tiles.** Lying Otto was made of two such
+  tiles. Our height is set by the collision from M1 (28 px), and that is the same order of
+  magnitude.
+- **The final arcade has a separate "crushed by elevator" pose** and a separate jump.
+  Both were added late, and the room for them was freed by throwing out the detailed agent
+  fall from the prototype. That is, the authors themselves traded a multi-frame death for
+  two poses that show **how** exactly someone was killed.
+- **Otto has a pompadour, agents have hats.** The pompadour even made it into the poster
+  logo, and the authors themselves rejected the early, more realistic design with a big
+  quiff.
+- **In the original the building ends with a red car** at the exit. Ours had the exit as
+  an opening with a sign: the mechanic is there, the full stop is not.
+
+### Milestone decisions, briefly
+
+- **Death is two poses, crushed is a third.** Crushing has worked since M2, but looked like
+  an ordinary death. In our pipeline a third pose costs one render: the same model,
+  squashed vertically.
+- **An agent differs by silhouette, not only by colour.** A brimmed hat versus a
+  pompadour. The reason is not faithfulness to the original: on a darkened floor there is
+  almost no colour (ADR-0010, item 4), and a palette-only difference would mean the player
+  cannot tell friend from foe exactly where they are being shot at.
+- **Dimensions unchanged.** The hat and hairdo live in the sprite frame, not in the
+  collision, otherwise an agent would catch bullets with his hat.
+- **The car at the exit drives off, and only then is the next building built.**
+  `building_cleared` is emitted at the end of the drive-off, so `main` does not change.
+
+### Done in the milestone
+
+- **`tools/render_actors.py` — the actor renderer.** The script lives as two halves in one
+  file: outside, it finds Blender and assembles the maps; inside Blender, it builds the
+  model from boxes and shoots two frames per pose — colour and depth. Frames are not drawn
+  anew but shot from one model, so the figure does not "breathe" between frames — that is
+  what Blender was chosen for.
+- **The normal is shot as depth, not as a normal pass.** The compositor in Blender 5.2 has
+  been rewritten: `Scene.node_tree` is gone, the `Composite`, `MixRGB`, `Math` and
+  `SeparateXYZ` nodes are not registered at all. Pulling the normal out through the new
+  compositor turned out costlier than shooting depth in a second pass with an ordinary
+  shader and computing the normal in our own code — the same as for the environment. The
+  project keeps a single channel convention.
+- **Colour lands in the palette.** Materials glow by themselves (emission), the film is
+  `Standard` instead of the default `AgX`, the film filter is a box of width 0.01: no
+  anti-aliasing, an edge stays an edge. Checked with a probe: `#B5322C` reached the PNG as
+  `#B6312B`, a difference of one from rounding.
+- **Otto: 11 poses**, agent: 8 (he does not need crouch, jump and kick — `EnemyBrain`
+  cannot do those), car: 1. A three-frame walk at 10 frames per second.
+- **`ActorPose`** — pose selection as a separate class, without nodes or a scene. With it
+  the test checks the rule, not the picture: every state of the state machine must map to
+  a drawn pose, and every drawn pose must have someone to be shown for.
+- **Death knows how it happened.** `kill(crushed)` instead of `kill()`: the cab and a
+  fallen lamp pass the flag, and the crushed one is shown with its own picture — a finding
+  of the check (item 12).
+- **`SpriteTextures`** (formerly `EnvTextures`) serves both sets: environment and actors.
+  Loading is shared; they differ by folder and list.
+- **The car at the exit** stands next to the opening and drives off to the near side,
+  taking Otto away. The building counts as cleared when the car has left the frame, not
+  when Otto entered the exit — otherwise the next building would be built on top of the
+  departing car.
+- **Tests: 201** (was 186). Poses against states, three maps per pose, a shared frame for
+  all of an actor's poses, sprite anchoring to the feet, a car that drives off before the
+  signal, a walk phase that does not skip a frame, and an actors folder without extra
+  pictures.
+- **Measurement:** 0.65 ms/frame on a darkened floor with a firefight, against a 16.6 ms
+  budget.
+
+### What the code review found
+
+- **The bullet flew left tail first.** The asset promised a hot middle but painted the
+  right half bright, and `bullet.gd` deliberately does not mirror the sprite — the flight
+  itself shows the direction. Half the shots in the game went left, and their bright end
+  was at the back. The asset became symmetric; the promise and the code now agree.
+- **A corpse turned after the arrow keys.** `_facing` was updated regardless of state,
+  although one line below the shot already checked `DEAD`. On a coloured box this was
+  invisible, but a sprite mirrors visibly: pressing the arrows spun the body while the
+  countdown to returning to play ran.
+- **The car's dimensions were written down twice** — in the level and in the generator's
+  frame, and nothing reconciled them. Had they drifted, the car would have hovered above
+  the floor or sunk into it, and "left the frame" would have been computed with someone
+  else's width. Now the dimensions are asked from the asset itself.
+- **`otto_fall` sat in the repository as dead weight.** There is deliberately no fall pose
+  in the set (in the air Otto always kicks, ADR-0006, item 2), yet the generator drew it —
+  three maps nobody loads. The milestone honestly counted them as work: the status said
+  "12 poses" instead of eleven. The test now looks the other way too: the actors folder
+  must not hold a picture that is not in the set.
+- **Three places knew the walk cycle length.** `WALK_FRAMES` picked the frame, while the
+  phase was advanced by its own `fmod(..., 3.0)` in Otto and another in the agent.
+  Changing the number in one place would have been enough for the last walk frame never to
+  be shown, and by eye this is not noticeable — the step just gets shorter. Phase
+  advancing moved into `ActorPose.advance`, and there is a test for it.
+- **The drive-off side was stored in `set_meta`** — an untyped string on the node, next to
+  the typed field `_car_leaving`, which is about the same car.
+- **Small things:** the pose dictionary was rebuilt every physics frame on every actor; an
+  orphaned comment about the box size from the collision shape stayed in `_apply_pose`
+  without code (and stopped being true — the sprite frame is deliberately larger than the
+  hitbox); the description of `_rot` got attached to `_update_look`; the M7b shot plan
+  ended up between a comment and the M7a plan that comment referred to; the car placement
+  check in the test allowed a 41 px miss where the answer is exact; in the walk cycle
+  test the loop checked nothing; `--keep` made the generator rebuild frames of past runs;
+  `np.errstate` does not silence the `nanmean` warning — it comes through `warnings`; an
+  unused `import subprocess`; `EnvTextures` remained in two places.
+
+## Milestone M8a · Sound
+
+Milestone M8 is split in two: **M8a — sound**, **M8b — interface**. The order is this
+because sound depends on nothing, while the menu depends on the font, language and volumes
+that sound introduces. Decisions are in [ADR-0012](adr/0012-sound-and-interface.md).
+
+**DoD:** a game sounds from the first step to Game Over, and nothing is silent without a reason. ✅ Merged into `main` as PR #12.
+
+### What the check against the original found
+
+- **The original's sound is pure PSG.** Four AY-3-8910 chips and a separate Z80 for
+  sound: three voices per chip, square wave, noise and envelopes. Samples had nowhere to
+  come from in 1983, and the whole vocabulary of effects is these.
+- **The theme was written by Yoshio Imamura:** anxious, simple, with "trembling" notes. Of
+  the effects, sources name the shots and the elevator "ding"; there is no full list.
+- **The Taito manual turned up** on the Internet Archive — the very one that returned 403
+  since M5. It turned out to be about servicing the cabinet: there is no score table, no
+  number of red doors and no alarm rules in it. But it has the DIP switches.
+- **An extra life at 10,000–25,000 points** — from those very switches. We do not have
+  one at all, and points so far affected nothing.
+- **3–6 lives per game.** Our three, picked at random in M4a, turned out to be the minimum
+  of the list — that is, guessed right.
+
+### Milestone decisions, briefly
+
+- **Sound is synthesized by code,** like the graphics: `tools/render_audio.py` writes
+  files into `assets/audio/`. Deterministic, with no third-party files or licences.
+  Runtime synthesis is rejected: sound would become code on the hot path, and it is harder
+  to debug than a file you can listen to.
+- **It sounds like a 2026 game, not a 1983 chip.** Imitating the PSG did not pass the
+  listening test: sound is on the same side of the formula as the picture (ADR-0012,
+  amendment to items 1 and 2).
+- **Our own motif.** The Taito theme belongs to someone else, so we write our own. A
+  separate motif for the alarm: the siren has worked since M5b, but had nothing to sound
+  with until now.
+- **Three buses:** Master, Music, SFX. Music gets its own bus so that it can be turned
+  down without switching off the shots.
+- **An extra life at 10,000 points** — a correction from the manual, but that is M8b:
+  where the HUD shows lives.
+
+### Done in the milestone
+
+- **Sound was redone after listening.** The first version imitated the AY-3-8910 chip and
+  sounded like a chip: 22 kHz mono, square and noise. The error was in the reasoning — the
+  project formula is "1983 mechanics, 2026 picture", and sound is on the same side as the
+  picture. The decision was rewritten (ADR-0012, amendment to items 1 and 2).
+- **`tools/audio_dsp.py` — a studio on numpy:** alias-free oscillators (polyBLEP),
+  frequency-domain filters with resonance and a moving cutoff, convolution reverb on
+  synthesized room responses, echo, saturation, compressor, limiter, stereo.
+- **`tools/render_audio.py` — the sounds themselves.** Each effect is built as in modern
+  games: attack, body and room tail. The building is concrete, and its tail is short and
+  dark; the shaft is a tube, and everything rings longer in it.
+- **17 effects and two themes.** Footsteps, shot, hit, kick, lamp ring and fall, elevator
+  "ding" and its hum, escalator rattle, door opening and closing, document, two deaths,
+  car drive-off, building bonus, Game Over.
+- **The music is dark synthwave:** bass, an arpeggio with a moving cutoff, a pad and
+  drums, eight bars, A minor; the loop is closed so that the tail wraps into the start and
+  the seam is inaudible. The alarm motif is the same building, but faster, harder and with
+  a siren.
+- **The balance is checked by spectrum, not by ear.** In the first mix the bass took four
+  fifths of the energy, and the arpeggio and pad were not audible at all; after the fix,
+  with A-weighting, the mix sits in the middle, where the ear is most sensitive.
+- **Format by purpose:** frequent and short (step, shot, kick) — WAV; long and rare
+  (Otto's death, bonus, car) and music — OGG. 2.5 MB in total instead of over six if
+  everything were WAV — and a step is not decompressed five times a second.
+- **Three buses: Master, Music, SFX.** The `Sound` autoload keeps a pool of twelve
+  players for effects and one for music; it is accessed via `Sounds.play`, like
+  `GameState` via `instance()`, because otherwise parsing a single script outside the
+  project does not find the autoload name.
+- **The cab and escalator hum are positional sources** on the nodes themselves: there are
+  five shafts in the building, and only the one you stand next to should be audible.
+- **The alarm changes the music.** The siren has worked since M5b and was mute until now:
+  now the alarm motif plays instead of the building theme, and only a new building can
+  lift it.
+- **Looping is set by code, not by import settings.** `.import` is a second copy of the
+  same list, and it drifts silently: a theme that lost its loop plays for five seconds and
+  goes silent for the rest of the game.
+- **Referencing `Otto` and `Enemy` from the bullet made loading circular** — the bullet
+  scene stopped loading at all. A body hit is determined by the collision layer, not the
+  class; it is cheaper too.
+- **Tests: 211** (was 201). Every name has a file, every file a name; looped things are
+  looped, one-shots are not; the buses are in place; music turns on and off; zero volume
+  mutes the bus rather than sending it to minus infinity.
+
+**What I cannot check.** I cannot hear sound. What is checked is what numbers can check:
+peaks and the absence of clipping, durations, stereo width, the per-band spectrum with
+A-weighting (`screens/M8a/waveforms.png` — a waveform picture), the game starting without
+a single sound error in the log. Only a human can do the listening check — and the first
+version of the milestone failed exactly that.
+
+### What the code review found
+
+- **A loop restarted every frame.** `playing = true` on every physics frame calls
+  `play()` again: of the two-second cab hum and escalator rattle only the first three
+  milliseconds were audible — a crackle at the frame rate instead of a motor. Checked by
+  measuring the playback position: 0.003 s instead of 0.28 s.
+- **Drums played for only half the loop.** The pattern is set for four bars, and the loop
+  is eight long: the second half of both the theme and the alarm motif went without drums
+  at all. The pattern now repeats to the end of the loop.
+- **Faded edges on a loop.** `dsp.master` fades the start and end to avoid a click — but
+  the edge of a loop is its seam, and ten milliseconds of silence there are heard as a
+  hole on every cycle. Loops are mixed down without edge fades.
+- **The "ding" rang across the whole building.** Empty cabs ride on their own and chime
+  the floors; the sound was global, so five shafts rang in your ear regardless of
+  distance. Now it is positional, like the hum.
+- **`soundfile` was not listed in `requirements-assets.txt`** — the sound generator would
+  not have run on a fresh clone.
+- Minor: the sound autoload did not release its static reference to itself (like
+  `GameState`), the voice pool was set up after the instance was published, a kick on two
+  agents sounded twice, a step started in the air was lost for good.
+
+## Milestone M8b · Interface
+
+The second half of M8. Sound introduced the volumes and buses the settings rely on;
+here comes everything else the player sees outside the game. Decisions:
+[ADR-0012](adr/0012-sound-and-interface.md), items 3–5 and addendum 8–11.
+
+**DoD:** the game starts from the menu and returns to it. ✅ Merged into `main` in two PRs:
+#13 — the milestone itself, #14 — a CI fix on a clean checkout: the translations
+`assets/i18n/*.translation` are produced by importing `ui.csv`, and on a fresh clone they
+do not exist yet on the first pass. `godot_check.py` now repeats the import, and
+`tools/clean_check.py` runs the checks on a clean copy.
+
+### What the check against the original found
+
+- **Sources are silent about the original's screen layout.** Neither a HUD description
+  nor the look of the high score table could be found — the Taito manual, as found out in
+  M8a, is about servicing the cabinet. So there is nothing to go by, and that frees our
+  hands.
+- **The only thing the manual gives for the interface is already accounted for:** an
+  extra life at 10,000 points. It appears here — the HUD shows lives, so it should know.
+
+### Milestone decisions, briefly
+
+- **The HUD is modern, not arcade.** A top line with the high score and life icons is the
+  cabinet's language; the game is a remake, and the interface is on the same side as the
+  picture and sound. Only what is needed, in the corners, semi-transparent. The debug
+  overlay leaves the frame.
+- **High scores without initials:** ten rows with score and date. Entering three letters
+  with the arrows at home turns into an extra screen between death and the next game.
+- **Key rebinding is postponed.** The controls screen shows the layout from `InputMap`
+  but does not change it: real rebinding also means gamepad, conflict resolution and
+  saving the scheme. Before release it is more needed in M9.
+- **The font is Pixellari (OFL).** Chosen by the only hard requirement: Cyrillic.
+  Checked — all 66 letters are there, only the em dash is missing, so the interface does
+  not use it.
+
+### Done in the milestone
+
+- **The Pixellari font (OFL)** and a UI theme. The import is set up for pixels: no
+  anti-aliasing, no hinting, no subpixel positioning and no system fallback font —
+  otherwise a foreign letter silently appears in place of a missing glyph.
+- **Two languages in one table.** `assets/i18n/ui.csv` — a key and two columns; Godot
+  builds the dictionaries from it by itself. The language is taken from the system locale,
+  changed in the settings and saved. An unknown system language falls back to English:
+  showing readable Latin is better than Cyrillic at random.
+- **HUD** instead of the debug overlay: score and documents on the left, lives on the
+  right, building in the corner, the alarm in the centre, blinking. The score is grouped
+  in threes — 12 400 reads at a glance, 12400 does not.
+- **The menu is one node for six pages:** main, pause, game over, settings, high scores,
+  controls. Pages are built in code, because they are data — a list of buttons, a list of
+  sliders, a list of rows; the scene holds only the frame around them.
+- **Settings** are written to `user://settings.cfg`: three volumes, language, fullscreen.
+  This is the first thing the game saves to disk.
+- **High scores** — ten rows with score and date in `user://records.json`. A corrupted
+  file starts the table anew with a warning instead of crashing the game: parsing goes
+  through a `JSON` instance, because the static helper writes an error to the engine log
+  by itself.
+- **The controls screen** reads the layout from `InputMap` and shows it in words: gamepad
+  buttons are named by letters, and the D-pad by a word, because the pixel font turned out
+  to have no arrows.
+- **An extra life at 10,000 points** — a correction from the Taito manual. Once per game
+  and only to a living player: after Game Over points still come in (the building bonus is
+  deferred), and the dead player would get a life he will not come back with.
+- **Auto-capture bypasses the menu:** it drives Otto with game actions and cannot press
+  buttons. The screens are shot by `tools/ui_shot.tscn` — by state, like the light in M6.
+- **Tests: 231** (was 211). Settings and high scores survive a restart, volume is
+  clamped, an unknown language falls back, every string exists in both languages, the
+  score is grouped in threes, the life for points comes once, a score repeated on the same
+  day does not pass itself off as a high score.
+
+### What the code review found
+
+- **"Back" guessed the page from the pause** — but the game over screen is also paused.
+  From high scores after a loss it returned to the pause page, and "Continue" revived the
+  game with a dead Otto and zero lives. Now the return page is remembered, not derived
+  from the tree state.
+- **Focus went to the previous page:** `queue_free` removes nodes only at the end of the
+  frame, and the deferred focus grab gets in earlier — and took a button of the page that
+  had just been closed. Nodes are detached from the column immediately, and focus is
+  searched in depth and on any focusable control, not only on top-level buttons.
+- **Quitting to the menu did not stop the game:** the siren timer kept running under the
+  main menu. `GameState.stop_game` was added.
+- **The place of a new score was looked up by the "score and date" pair** — the same score
+  on the same day found someone else's row, and a score outside the top ten was announced
+  as a high score. The place is computed before insertion.
+- **The volume slider wrote the file on every step** — twenty writes for one mouse
+  movement. Settings go to disk when leaving the page.
+
+## Milestone M9 · Release
+
+The game was playable end to end; what was missing was a way to get it: to play, you had
+to install Godot and clone the repository. Decisions:
 [ADR-0013](adr/0013-release-and-versioning.md).
 
-**DoD:** скачанный из Releases архив запускается и играется. Обвязка готова, но первый
-тег так и не ставился: прогон ботом перед ним нашёл, что собранное здание неиграбельно,
-и открыл M10. Смержено в `main` тремя PR: #15 — сама веха, #16 — экшены на Node 24,
-#17 — одна папка `elaction` внутри архива вместо тёзки архива.
+**DoD:** an archive downloaded from Releases starts and plays. The tooling is ready, but
+the first tag was never set: a bot run before it found that the built building is
+unplayable, and opened M10. Merged into `main` in three PRs: #15 — the milestone itself,
+#16 — actions on Node 24, #17 — a single `elaction` folder inside the archive instead of
+one named after the archive.
 
-### Что нашла сверка перед вехой
+### What the check against the original found
 
-Сверять с автоматом 1983 года здесь нечего: ни архивов, ни версий у него не было.
-Поэтому сверка шла по инструментам и нашла три ловушки.
+There is nothing to check against the 1983 cabinet here: it had neither archives nor
+versions. So the check went through the tools and found three traps.
 
-- **Экспорт из командной строки требует переимпортированного проекта** — иначе
-  подвисает или собирает старые ресурсы, и то и другое молча.
-- **Иконку и метаданные в `.exe` вписывает `rcedit`**, а не Godot; без него
-  Windows-сборка уезжает с дефолтной иконкой движка.
-- **Пустая версия ломает экспорт под Windows:** с 4.2 `rcedit` падает, если
-  `application/file_version` пуст. Версия — обязательное поле, и сразу в двух
-  местах: `project.godot` и пресет экспорта.
+- **Command-line export requires a re-imported project** — otherwise it hangs or packs
+  stale resources, both silently.
+- **The icon and metadata in the `.exe` are written by `rcedit`**, not Godot; without it
+  the Windows build ships with the engine's default icon.
+- **An empty version breaks the Windows export:** since 4.2 `rcedit` fails if
+  `application/file_version` is empty. The version is a required field, and in two places
+  at once: `project.godot` and the export preset.
 
-### Решения вехи, коротко
+### Milestone decisions, briefly
 
-- **Только GitHub Releases.** Закрывает открытый вопрос №3: itch.io и Steam — про
-  витрину, а сначала нужен архив, который скачивается и работает.
-- **Версии остаются в `0.x`,** первый тег — `v0.9.0`. Единица — это «сделано всё, что
-  задумано», а в бэклоге ещё переназначение клавиш, демо-режим и лидерборд.
-- **Версия живёт в одном месте** — `config/version` в `project.godot`.
-- **Две сборки на своих runner'ах:** Linux на ubuntu, Windows на windows, где `rcedit`
-  работает без wine.
-- **Сборка проверяется прогоном, а не фактом сборки.**
-- **Переназначение клавиш откладывается снова:** геймпад, конфликты и сохранение
-  схемы — это веха после релиза, а не довесок к сборке.
+- **GitHub Releases only.** Closes open question #3: itch.io and Steam are about a
+  storefront, and first we need an archive that downloads and works.
+- **Versions stay at `0.x`,** the first tag is `v0.9.0`. One means "everything planned is
+  done", and the backlog still has key rebinding, demo mode and a leaderboard.
+- **The version lives in one place** — `config/version` in `project.godot`.
+- **Two builds on their own runners:** Linux on ubuntu, Windows on windows, where `rcedit`
+  works without wine.
+- **A build is checked by running it, not by the fact that it built.**
+- **Key rebinding is postponed again:** gamepad, conflicts and saving the scheme are a
+  post-release milestone, not an add-on to the build.
 
-### Сделано в вехе
+### Done in the milestone
 
-- **Версия в одном месте.** `tools/version.py` разносит её в пресеты экспорта, сверяет
-  с тегом и правит одной командой. Игрок видит её дважды: `Release.banner()` печатает
-  `elaction 0.9.0 · Windows` в лог при запуске, `Release.tag()` стоит в углу меню.
-- **`export_presets.cfg` руками, без дампа умолчаний:** ресурсы внутри исполняемого
-  файла, иконка, версии и `exclude_filter`, чтобы игроку не уехали `tests/`, `tools/`
-  и `addons/`.
-- **`icon.ico` рисует `tools/render_icon.py`** — та же геометрия, что в `icon.svg`,
-  семь размеров от 16 до 256.
-- **Обвязка сборки на Python, а не в YAML:** `export.py` (импорт, экспорт и признаки
-  успеха вместо кода возврата — Godot оставляет его нулевым и на провале),
-  `package.py` (архив с лицензиями и правом на запуск внутри zip), `smoke.py`
-  (маркер запуска, заданное число кадров, ни одного `SCRIPT ERROR`), `changelog.py`
-  (заметки к релизу из `CHANGELOG.md`). Всё гоняется локально, workflow остаётся тонким.
-- **`release.yml`:** тег `v*` → сверка версии и заметок → сборка на ubuntu и windows
-  с кэшем шаблонов → прогон Linux-сборки → архивы в Releases. Запуск руками собирает
-  то же самое, но ничего не публикует.
-- **`CHANGELOG.md`** по Keep a Changelog; секция версии и есть описание релиза.
-- **Экшены на Node 24** (PR #16): `checkout@v7`, `setup-python@v7`, `cache@v6`,
-  `upload-artifact@v7`, `download-artifact@v8` — версии сверены по `runs.using`
-  в их `action.yml`.
-- **Тесты: 241** (было 231). Версия — semver и совпадает с пресетами, оба пресета на
-  месте и каждый на своей платформе, ресурсы внутри исполняемого файла, иконка указана
-  и нарисована, `tests/` и `tools/` в экспорт не уезжают, секция версии в changelog есть.
+- **The version in one place.** `tools/version.py` propagates it into the export presets,
+  checks it against the tag and changes it with one command. The player sees it twice:
+  `Release.banner()` prints `elaction 0.9.0 · Windows` to the log at startup,
+  `Release.tag()` sits in the menu corner.
+- **`export_presets.cfg` by hand, without a dump of defaults:** resources embedded in the
+  executable, icon, versions and `exclude_filter`, so that `tests/`, `tools/` and
+  `addons/` do not ship to the player.
+- **`icon.ico` is drawn by `tools/render_icon.py`** — the same geometry as in `icon.svg`,
+  seven sizes from 16 to 256.
+- **Build tooling in Python, not in YAML:** `export.py` (import, export and success markers
+  instead of the exit code — Godot leaves it zero on failure too), `package.py` (an archive
+  with licences and the execute permission inside the zip), `smoke.py` (a startup marker,
+  a set number of frames, not a single `SCRIPT ERROR`), `changelog.py` (release notes from
+  `CHANGELOG.md`). Everything runs locally; the workflow stays thin.
+- **`release.yml`:** tag `v*` → version and notes check → build on ubuntu and windows with
+  a templates cache → run of the Linux build → archives into Releases. A manual run builds
+  the same but publishes nothing.
+- **`CHANGELOG.md`** per Keep a Changelog; the version section is the release description.
+- **Actions on Node 24** (PR #16): `checkout@v7`, `setup-python@v7`, `cache@v6`,
+  `upload-artifact@v7`, `download-artifact@v8` — the versions are checked against
+  `runs.using` in their `action.yml`.
+- **Tests: 241** (was 231). The version is semver and matches the presets, both presets are
+  in place and each on its own platform, resources are embedded in the executable, the
+  icon is set and drawn, `tests/` and `tools/` do not go into the export, the changelog has
+  a version section.
 
-### Что нашло авторевью
+### What the code review found
 
-Обвязка релиза гоняется только в CI, и её ошибки не видно на рабочей машине. Ревью
-нашло три, которые сорвали бы первый же прогон.
+The release tooling runs only in CI, and its errors are not visible on a work machine.
+The review found three that would have broken the very first run.
 
-- **Экспорт шёл без `--headless`** и поднимал окно с Vulkan — на runner'е нет ни
-  дисплея, ни GPU. Заодно выяснилось, что экспорт переписывает `project.godot` своим
-  дампом, без комментариев и ссылок на ADR: `export.py` снимает слепок конфигов и
-  возвращает их как были.
-- **`smoke.py` падал на своём же успешном пути:** снятый по таймауту процесс отдаёт
-  потоки вразнобой — `bytes` и `None`, — и `stdout + stderr` роняло скрипт. Лечится
-  уже существовавшим `godot_bin.as_text`.
-- **Право на запуск в архив не попадало,** если собирать на Windows: `ZipInfo` ставит
-  там `create_system=0`, и распаковщик прав из `external_attr` не смотрит. Система
-  в записи проставляется явно, а CI прогоняет распакованный архив, а не собранный файл.
+- **Export ran without `--headless`** and brought up a Vulkan window — the runner has
+  neither a display nor a GPU. It also turned out that the export rewrites `project.godot`
+  with its own dump, without comments and ADR links: `export.py` snapshots the configs and
+  restores them as they were.
+- **`smoke.py` failed on its own success path:** a process killed on timeout returns its
+  streams inconsistently — `bytes` and `None` — and `stdout + stderr` crashed the script.
+  Fixed with the already existing `godot_bin.as_text`.
+- **The execute permission did not get into the archive** when building on Windows:
+  `ZipInfo` sets `create_system=0` there, and the unpacker then ignores permissions in
+  `external_attr`. The system in the entry is set explicitly, and CI runs the unpacked
+  archive, not the built file.
 
-Мельче: пустая секция changelog проходила за заметки, версия молча не попадала в пресет
-без нужных полей, ошибки экспорта не ловились маркерами, `--frames` без числа валил
-трассировкой, `configparser` разобрал бы `%` в пресете как подстановку.
+Smaller: an empty changelog section passed as notes, the version silently did not get
+into a preset lacking the needed fields, export errors were not caught by markers,
+`--frames` without a number crashed with a traceback, `configparser` would have parsed
+`%` in a preset as interpolation.
 
-## Веха M10 · Архитектура здания
+## Milestone M10 · Building architecture
 
-Открыта после M9: перед первым тегом игру прогнали ботом по настоящему тридцатиэтажному
-зданию, а не по тестовому на четыре этажа, — и собранный архив оказался неиграбельным.
-Решения — [ADR-0014](adr/0014-building-architecture.md).
+Opened after M9: before the first tag the game was run by the bot through a real thirty-floor
+building rather than the four-floor test one, and the packaged build turned out unplayable.
+Decisions: [ADR-0014](adr/0014-building-architecture.md).
 
-**DoD:** бот проходит настоящее тридцатиэтажное здание, и с включёнными агентами игрок
-переживает старт, ничего не делая. ✅ Баланс боя вынесен в M11. Смержено в `main` двумя
-PR: #18 — сама веха, #19 — правки авторевью.
+**DoD:** the bot clears a real thirty-floor building, and with agents enabled the player
+survives the start while doing nothing. ✅ Combat balance moved to M11. Merged into `main` in two
+PRs: #18 is the milestone itself, #19 the code review fixes.
 
-### Что нашёл прогон
+### What the run found
 
-- **Крыша была сплющена в перекрытие.** `floor_surface(0)` возвращала `slab_height`,
-  а `story_top(0)` — ноль: просвет нулевого этажа 20 px против 100 px у остальных.
-  Otto стоял макушкой выше края кадра, а прыжок уводил его туда, куда камера не
-  поднимается.
-- **С агентами здание не проходилось.** `_ready()` выпускал всех 55 разом, и двое
-  стояли на крыше в 131 px при дальности огня 200. Три смерти за 64–113 кадров, ноль
-  документов, ни одного этажа вниз.
-- **Здание было однородным:** пять шахт ровно по шесть этажей, одна ширина сверху
-  донизу, везде две двери и лампа. Оригинал наверху редок, внизу — лабиринт.
-- **Ничего этого не видел ни один тест:** самое большое здание в тестах было на восемь
-  этажей, и все до одного выключали агентов. 241 тест был зелёным.
+- **The roof was squashed into a slab.** `floor_surface(0)` returned `slab_height`,
+  and `story_top(0)` returned zero: the clearance of floor zero was 20 px against 100 px elsewhere.
+  Otto's head was above the top edge of the frame, and a jump took him where the camera does not
+  go.
+- **With agents the building could not be cleared.** `_ready()` released all 55 at once, and two
+  stood on the roof at 131 px with a firing range of 200. Three deaths in 64–113 frames, zero
+  documents, not a single floor down.
+- **The building was uniform:** five shafts of exactly six floors each, one width top to
+  bottom, two doors and a lamp everywhere. The original is sparse at the top and a maze below.
+- **No test saw any of this:** the largest building in the tests had eight
+  floors, and every single test turned agents off. All 241 tests were green.
 
-### Сделано в вехе
+### Done in the milestone
 
-- **Крыша — свой уровень с индексом −1** (`BuildingRules.ROOF`). Координаты считаются
-  одной формулой, просвет у всех уровней одинаковый, над крышей 160 px неба. Дверей,
-  ламп и агентов на ней нет, лифт до неё доходит.
-- **Нулевой этаж стал обычным:** у него появились потолок, задняя стена и лампа.
-- **Силуэт ступенями:** 5 → 7 → 9 мест, 720 → 1000 → 1280 px, наверху и дверей меньше.
-  Места нумеруются глобально, поэтому шахта стоит в одном столбце на всех своих этажах.
-  Границы уровня знают перекрытия, стены, окна, полосы света и граф достижимости.
-- **Агенты выпускаются по `VisibleFloors`** — тому же отбору, по которому гасится свет:
-  дверь отдаёт своего, когда её этаж попал в полосу видимых. В кадре единицы вместо 55.
-- **Возвращение в игру** — полторы секунды неуязвимости (`Otto.RESPAWN_GRACE`) и место
-  подальше от живых агентов.
-- **Индекс уровня стал отрицательным,** и списки, которые им индексировались, переехали
-  на словари: `Array[-1]` в GDScript отдаёт последний элемент и молчит.
-- **`tools/playthrough.gd`** — прогон бота по настоящему зданию с ключами `--agents`
-  и `--endless`. Им веха и найдена.
-- **Бот получил огонь** вдогонку плану спуска. Как выяснилось только в M11, выстрел
-  не срабатывал ни разу: бот отпускал и нажимал действие в одном кадре, и движок фронта
-  не видел.
-- **Тесты: 271** (было 241). Настоящее здание уехало в тест прохождения, добавлены
-  `test_building_architecture.gd` и `test_building_silhouette.gd`.
+- **The roof is a level of its own with index −1** (`BuildingRules.ROOF`). Coordinates use
+  one formula, every level has the same clearance, there is 160 px of sky above the roof. It has no
+  doors, lamps or agents; the elevator reaches it.
+- **Floor zero became ordinary:** it got a ceiling, a back wall and a lamp.
+- **A stepped silhouette:** 5 → 7 → 9 slots, 720 → 1000 → 1280 px, and fewer doors at the top.
+  Slots are numbered globally, so a shaft stands in one column on all of its floors.
+  Slabs, walls, windows, light strips and the reachability graph know the level bounds.
+- **Agents are released by `VisibleFloors`**, the same selection that turns the light off:
+  a door gives up its agent when its floor enters the band of visible ones. A handful in frame
+  instead of 55.
+- **Returning to play** gives a second and a half of invulnerability (`Otto.RESPAWN_GRACE`) and a
+  spot away from living agents.
+- **The level index became negative,** and the lists indexed by it moved
+  to dictionaries: `Array[-1]` in GDScript returns the last element silently.
+- **`tools/playthrough.gd`** runs the bot through a real building with the `--agents`
+  and `--endless` flags. That is how the milestone was found.
+- **The bot got fire** on top of its descent plan. As it turned out only in M11, the shot
+  never fired once: the bot released and pressed the action in the same frame, and the engine
+  never saw the edge.
+- **Tests: 271** (was 241). The real building moved into the playthrough test;
+  `test_building_architecture.gd` and `test_building_silhouette.gd` were added.
 
-### Что нашло авторевью
+### What the code review found
 
-Двенадцать находок, девять исправлено.
+Twelve findings, nine fixed.
 
-- **Перекрытие строилось по ширине своего уровня,** а оно же потолок нижнему, который
-  на ступени силуэта шире: на этажах 10 и 20 крайние места оставались под открытым
-  небом. Появился `BuildingRules.slab_span()` — перекрытие берёт ширину большего из двух
-  уровней, а стены и граф достижимости по-прежнему идут по `floor_span`.
-- **Пауза между агентами шла по настенным часам,** а не по игровому времени: не замирала
-  на паузе и не ускорялась под `time_scale`, поэтому автоматические прогоны видели
-  агентов вчетверо реже, чем игрок. Две параллельные таблицы по двери заменил один
-  `AgentPost` с отсчётом по `delta`.
-- Мельче: четыре копии обхода агентов, пересчёт этажа двери каждый кадр, утечка
-  подписки на `game_over` в прогоне, задвоенный docstring `Otto.kill`.
-- **Оставлено сознательно:** падение в шахту во время передышки Otto переживает — не
-  больше одного раза за смерть. Неуязвимость — правило без исключений (ADR-0014, пункт 6).
+- **A slab was built to the width of its own level,** but it is also the ceiling of the level
+  below, which is wider at a silhouette step: on floors 10 and 20 the outer slots were left open
+  to the sky. `BuildingRules.slab_span()` appeared: a slab takes the width of the larger of the two
+  levels, while walls and the reachability graph still follow `floor_span`.
+- **The pause between agents ran on wall-clock time,** not game time: it did not freeze
+  on pause and did not speed up under `time_scale`, so automated runs saw
+  agents four times less often than the player. Two parallel per-door tables were replaced with
+  one `AgentPost` counting by `delta`.
+- Smaller: four copies of the agent traversal, recomputing the door's floor every frame, a leaked
+  `game_over` subscription in the run, a duplicated `Otto.kill` docstring.
+- **Left on purpose:** Otto survives a fall into a shaft during the respawn grace, but no
+  more than once per death. Invulnerability is a rule without exceptions (ADR-0014, item 6).
 
-Попутно `slots` обязан быть нечётным — на этом держится симметрия силуэта, и это
-стережёт тест.
+Along the way `slots` must be odd: the symmetry of the silhouette rests on it, and a test
+guards this.
 
-## Веха M11 · Баланс боя
+## Milestone M11 · Combat balance
 
-DoD: бот проходит настоящее тридцатиэтажное здание с агентами, не исчерпав трёх
-жизней. Достигнут — сиды 1–6, ноль-две смерти на прогон. Решения — [ADR-0016](adr/0016-combat-balance.md).
-Смержено в `main` двумя PR: #20 — оси роста и уклонение, DoD тогда ещё не был достигнут
-(бот доходил до 6–18 этажа), и #21 — сам DoD.
+DoD: the bot clears a real thirty-floor building with agents without using up three
+lives. Achieved: seeds 1–6, zero to two deaths per run. Decisions: [ADR-0016](adr/0016-combat-balance.md).
+Merged into `main` in two PRs: #20 with the growth axes and dodging, when DoD was not yet met
+(the bot reached floor 6–18), and #21 with the DoD itself.
 
-### Что нашла сверка
+### What the check against the original found
 
-Оригинал растит сложность тремя осями: скорострельность, скорость пули и уклонение
-агентов. Дальности стрельбы среди них нет — а мы растили именно её и не растили две
-другие. Из-за этого и понадобился `MENACE_CAP` (авторевью M5b), а пока тревога обходила этот
-потолок, дальность уходила на 900 px при 1120 px полезного этажа.
+The original grows difficulty along three axes: fire rate, bullet speed and agent
+dodging. Firing range is not among them, yet range was exactly what we grew, and not the other
+two. That is why `MENACE_CAP` was needed (code review M5b), and while the alarm bypassed this
+cap, range went up to 900 px on a floor with 1120 px of usable width.
 
-### Чем веха запомнилась
+### What the milestone is remembered for
 
-- **Бот не выстрелил ни разу за всю веху.** Выстрел и прыжок Otto читает по фронту
-  нажатия, а бот отпускал и нажимал действие в одном кадре — движок такого фронта не
-  видит. Ходьба и присед держатся, поэтому работали, а одиночные действия пропадали
-  целиком. Четыре строки замеров подряд описывали игру, в которой Otto умеет только
-  приседать. Косвенный признак был на виду: ноль убитых агентов в каждой строке.
-- **Уклонение кончалось смертью от той же пули.** «Летит ли она в меня» считалось по
-  стороне: миновав середину тела, пуля переставала считаться опасной, и агент
-  распрямлялся прямо под ней. Нашла это не проверка, а инструмент съёмки поз — он ждал
-  позу «лёжа», а агент вместо неё раз за разом умирал.
-- **Потолок живых агентов.** Внизу здания их набиралось до восемнадцати разом: полоса
-  выпуска — девять этажей, и на каждом по две двери. Без потолка бот теряет три жизни
-  на 10–19 этаже, с потолком проходит здание целиком.
-- **Числа боя переехали в `BuildingRules`** — в сцене агента не осталось ни одного:
-  растить их от здания к зданию было нечем.
+- **The bot did not fire once during the whole milestone.** Otto reads shooting and jumping on
+  the press edge, and the bot released and pressed the action in the same frame, so the engine
+  sees no such edge. Walking and crouching are held, so they worked, while one-shot actions were
+  lost entirely. Four rows of measurements in a row described a game in which Otto can only
+  crouch. An indirect sign was in plain sight: zero agents killed in every row.
+- **Dodging ended in death from the same bullet.** "Is it flying at me" was computed by
+  side: once past the middle of the body, the bullet stopped counting as dangerous, and the agent
+  straightened up right under it. It was found not by a check but by the pose capture tool: it
+  waited for the "prone" pose, and instead the agent died again and again.
+- **A cap on living agents.** At the bottom of the building up to eighteen gathered at once: the
+  release band is nine floors, with two doors on each. Without the cap the bot loses three lives
+  on floors 10–19; with the cap it clears the whole building.
+- **Combat numbers moved into `BuildingRules`**: not one is left in the agent scene,
+  so there was nothing to grow them with from building to building.
 
-Отсюда правило в [`testing.md`](testing.md): у инструмента замера должен быть свой тест,
-и проверять он должен результат, а не намерение.
+Hence the rule in [`testing.md`](testing.md): a measurement tool must have its own test,
+and it must check the result, not the intent.
 
-## Веха M12 · Спектрумовский визуал
+## Milestone M12 · Spectrum-style visuals
 
-Решения — [ADR-0017](adr/0017-spectrum-palette-and-shafts.md), поверх
-[ADR-0015](adr/0015-round-palette-and-roof.md). Веха слита PR #22; PR #23 с той же
-ветки довёз эпик на M13–M16 и пробу FullHD перед M13.
+Decisions: [ADR-0017](adr/0017-spectrum-palette-and-shafts.md), on top of
+[ADR-0015](adr/0015-round-palette-and-roof.md). The milestone was merged in PR #22; PR #23 from
+the same branch brought the epic for M13–M16 and the FullHD probe before M13.
 
-**DoD:** здания подряд отличаются на глаз, погашенный этаж читается в каждом,
-а шахта видна в кадре первой, а не последней.
+**DoD:** consecutive buildings differ at a glance, a darkened floor reads in each one,
+and the shaft is the first thing seen in the frame, not the last.
 
-### Что нашла сверка
+### What the check against the original found
 
-Разобран настоящий игровой кадр порта с World of Spectrum. Цвета считаны с него,
-а не описаны на глаз — это ровно атрибутная палитра Spectrum:
+A real gameplay frame of the port from World of Spectrum was analyzed. Colors were read from it
+rather than described by eye, and they are exactly the Spectrum attribute palette:
 
-| Что в кадре | Цвет |
+| What is in the frame | Color |
 |---|---|
-| Снаружи здания | `#000000` |
-| Внутренности этажей | `#00FFFF` |
-| Кладка по бокам | `#FF0000`, шов белый |
-| Двери | `#FFFF00`, обводка `#0000FF` |
-| Перекрытия | `#FFFFFF` с чёрным пунктиром |
-| Шахта | `#0000FF` во всю высоту, жёлтые перемычки на этажах |
-| Кабина | `#CECECE` |
-| HUD | `#FFFF00`, счётчик `ROUND` |
+| Outside the building | `#000000` |
+| Floor interiors | `#00FFFF` |
+| Brickwork on the sides | `#FF0000`, white mortar |
+| Doors | `#FFFF00`, outline `#0000FF` |
+| Slabs | `#FFFFFF` with a black dashed line |
+| Shaft | `#0000FF` full height, yellow crossbars at floors |
+| Cab | `#CECECE` |
+| HUD | `#FFFF00`, `ROUND` counter |
 
-Главное наблюдение не про цвет: **шахта в порте — самый заметный элемент кадра**.
-У нас это была дыра в перекрытии со столбом света, и спуск по зданию — то есть
-сама игра — шёл по тому, чего в кадре почти нет.
+The main observation is not about color: **in the port the shaft is the most noticeable element
+of the frame**. Ours was a hole in the slab with a column of light, and the descent through the
+building, that is the game itself, went through something almost absent from the frame.
 
-### Сделано
+### Done
 
-- **Палитра раунда — правило здания, а не константа уровня.** `BuildingPalette`
-  задаёт тон этажей, кладки, шахты и обе пары света — горящего этажа и погашенного.
-  `BuildingRules.for_building()` берёт палитру по номеру раунда, набор из четырёх
-  зацикливается.
-- **Ассеты перерисованы спектрумовским языком цвета:** жёлтые двери в синей раме,
-  белые перекрытия. То, что красит палитра, — стены, кладка, шахта, — нарисовано
-  серым: цвет приходит умножением, и нормаль с бликом остаются на месте.
-- **Кладка стала кладкой:** боковые стены получили ряды со смещением и светлый шов.
-  Белым, как в порте, он не остаётся: тон раунда множит весь узел стены разом.
-- **Шахта одета:** направляющие во всю высоту и створки на каждом этаже, который
-  она обслуживает. Верхняя кончается внутри машинного отделения, а не уходит в небо.
-  Сплошную синюю полосу порта не взяли: за шахтой видно этаж, окна и город.
-- **Крыша по порту:** надстройка машинного отделения над верхней шахтой и спуск
-  по тросу в начале раунда. Трос уходит вместе с вступлением — это кадр, а не
-  механика.
-- **Счётчик в HUD — раунд, а не здание:** ключ `UI_ROUND`, «Round» / «Раунд»,
-  как в аркаде и в порте.
-- **Уровень похудел:** дальний план (задние стены, окна, город) уехал в
-  `BuildingBackdrop`, а правила плиток — в `TiledRect`. `greybox_level.gd` перерос
-  тысячу строк, и линтер был прав.
-- **Инструмент `tools/round_shot.tscn`** снимает по кадру на палитру и крышу
-  с тросом — по состоянию, как `light_shot` снимает свет.
-- **Тесты: 304** (было 292): разрыв между горящим и погашенным на каждой палитре,
-  тон шахты против тона стены, набор идёт по кругу, одетая шахта на трёх сидах,
-  надстройка над верхней шахтой, спуск по тросу, который кончается управляемым
-  Otto на крыше, и размеры новых ассетов против констант, под которые они нарисованы.
+- **The round palette is a building rule, not a level constant.** `BuildingPalette`
+  sets the tone of floors, brickwork and shaft, and both light pairs: lit floor and
+  darkened. `BuildingRules.for_building()` picks the palette by round number; the set of four
+  cycles.
+- **Assets were redrawn in the Spectrum color language:** yellow doors in a blue frame,
+  white slabs. What the palette tints (walls, brickwork, shaft) is drawn in
+  grey: color comes by multiplication, and the normal and highlight stay in place.
+- **Brickwork became brickwork:** side walls got offset courses and a light mortar line.
+  It does not stay white as in the port: the round tone multiplies the whole wall node at once.
+- **The shaft is dressed:** full-height guide rails and doors on every floor it
+  serves. The top one ends inside the machine room rather than going into the sky.
+  The port's solid blue strip was not adopted: behind the shaft you see the floor, windows and city.
+- **The roof follows the port:** a machine room structure above the top shaft and a descent
+  by rope at the start of the round. The rope leaves together with the intro: it is a shot, not a
+  mechanic.
+- **The HUD counter is the round, not the building:** key `UI_ROUND`, "Round" (and its Russian
+  counterpart), as in the arcade and the port.
+- **The level slimmed down:** the far background (back walls, windows, city) moved into
+  `BuildingBackdrop`, and tiling rules into `TiledRect`. `greybox_level.gd` had outgrown
+  a thousand lines, and the linter was right.
+- **Tool `tools/round_shot.tscn`** captures a frame per palette and the roof
+  with the rope, by state, the way `light_shot` captures light.
+- **Tests: 304** (was 292): the gap between lit and darkened on each palette,
+  shaft tone versus wall tone, the set cycles, a dressed shaft on three seeds,
+  the structure above the top shaft, a rope descent ending with a controllable
+  Otto on the roof, and sizes of new assets versus the constants they are drawn for.
 
-### Что нашлось по дороге
+### Found along the way
 
-- **Сценарий съёмки терял полсекунды ходьбы.** Шаги в нём отмеряются выдержкой
-  от места появления Otto, а Otto теперь появляется на тросе. Сценарий ждёт конца
-  вступления.
+- **The capture script lost half a second of walking.** Steps in it are measured by delay
+  from the moment Otto appears, and Otto now appears on the rope. The script waits for the end of
+  the intro.
 
-### Авторевью
+### Code review
 
-Первое прошло внутри вехи:
+The first one ran inside the milestone:
 
-- створки и вывеска выхода кладутся целиком, а не плиткой;
-- кладка машинного отделения перестала уезжать за холст;
-- стойка шахты стала симметричной — она одна на оба края проёма;
-- `_physics_process` уровня выключается после вступления;
-- «шахта до крыши» спрашивается у раскладки (`BuildingPlan.roof_shaft()`), а не
-  выводится заново в уровне и в тесте.
+- shaft doors and the exit sign are placed whole, not tiled;
+- the machine room brickwork stopped sliding off the canvas;
+- the shaft post became symmetric: it is one for both edges of the opening;
+- the level's `_physics_process` is turned off after the intro;
+- "shaft up to the roof" is asked of the layout (`BuildingPlan.roof_shaft()`) rather than
+  derived again in the level and in the test.
 
-Второе — общее на M12 и M13, уже на ветке M13 (15 находок, 13 починены). Из
-находок по M12: **верх шахты, доходящей до крыши, считался в трёх местах
-по-разному** — направляющие и упор зажимали его в машинное отделение, а столб
-света начинался от неба. Вынесено в `_shaft_top`. Не взяты, с причинами: шум
-в картах нормалей втрое сильнее задуманного (правка на строку, но инвалидирует
-~150 карт, которые уходят вместе с 2D), пять почти одинаковых ожиданий «пока
-Otto не встанет на ноги» и одежда шахты прямыми детьми уровня — её вынесли
-в `BuildingShafts` на M14.
+The second one was shared by M12 and M13, already on the M13 branch (15 findings, 13 fixed). Of
+the M12 findings: **the top of a shaft reaching the roof was computed in three places
+differently**: guide rails and the stop clamped it into the machine room, while the light column
+started from the sky. Moved into `_shaft_top`. Not taken, with reasons: noise
+in the normal maps three times stronger than intended (a one-line fix, but it invalidates
+~150 maps that go away together with 2D), five nearly identical waits "until
+Otto is on his feet", and shaft dressing as direct children of the level, which was moved
+into `BuildingShafts` in M14.
 
-## Веха M13 · Нативный FullHD и качественные текстуры
+## Milestone M13 · Native FullHD and quality textures
 
-Решения — [ADR-0018](adr/0018-native-fullhd.md).
+Decisions: [ADR-0018](adr/0018-native-fullhd.md).
 
-**DoD:** игра идёт в 1920×1080 без растягивания, и на глаз она детальнее, а не
-просто крупнее: на стоп-кадре видно кирпич, филёнку и патрон лампы.
+**DoD:** the game runs at 1920×1080 without stretching, and to the eye it is more detailed, not
+just larger: on a still frame you see brick, a door panel and a lamp socket.
 
-### Что показала проба
+### What the probe showed
 
-Сделана до вехи, чтобы не перерисовывать вслепую:
+Made before the milestone so as not to redraw blindly:
 
-- Ассеты окружения описаны прямоугольниками в единицах мира, поэтому рендер
-  «втрое крупнее» даёт **пиксель в пиксель то же самое**.
-- Прибавка есть у актёров: они приходят рендером из Blender, и в 3× у них
-  появляется настоящая полутень.
-- Перерисованный с деталью ассет выигрывает сразу.
+- Environment assets are described by rectangles in world units, so a render
+  "three times larger" gives **exactly the same image pixel for pixel**.
+- Actors do gain: they come as Blender renders, and at 3× they
+  get real penumbra.
+- An asset redrawn with detail wins immediately.
 
-Отсюда состав вехи: разрешение — повод, работа — текстуры.
+Hence the milestone's scope: resolution is the occasion, textures are the work.
 
-### Сделано в вехе
+### Done in the milestone
 
-- **Вьюпорт 1920×1080, мир втрое крупнее.** Высота этажа, ширина здания, рост
-  актёров, скорости, прыжок — всё в пикселях и всё ×3. Кадр показывает то же,
-  что и раньше, но втрое плотнее.
-- **Оба генератора умеют масштаб:** `render_env.py --scale` множит холст и
-  каждый прямоугольник, `render_actors.py --scale` — плотность рендера при той
-  же камере.
-- **Ассеты описываются дробными единицами мира.** Фаска в треть единицы, шов,
-  блик на кромке появляются на крупном холсте и исчезают на мелком, где им
-  всё равно не нашлось бы пикселя.
-- **Текстуры перерисованы:** кладка с разнотоном, фаской и сколами; перекрытия
-  с кромкой, желобком и выщербинами; двери с профилем рамы, филёнками, ручкой
-  и порогом; лампа с патроном и кольцом; настил кабины с рифлением и заклёпками;
-  ступень эскалатора с проступью и гребёнкой; створки шахты с утопленной
-  филёнкой; выход с двустворчатой дверью и стрелкой на вывеске.
-- **Пропорции переразмечены** (ADR-0018, решение 5): Otto и агенты выросли
-  в полтора раза, дверь — со 102 до 171, окно уменьшилось до 150×100. Линия
-  огня агента поднята до 105: подросшего Otto она начала доставать в голову
-  прямо в проёме шахты.
-- **Предел шахты виден** (решение 6): упор сверху и снизу полосы и стрелки
-  в кабине, которые гаснут, когда в эту сторону ходу нет.
-- **Тесты: 315** (было 304). Новые: пропорции (Otto проходит в дверь, входит
-  в шахту, присев — ниже пули агента), управление каждой кабиной здания,
-  предел полосы, указатели, упоры.
+- **Viewport 1920×1080, world three times larger.** Floor height, building width, actor
+  height, speeds, jump: all in pixels and all ×3. The frame shows the same
+  as before, but three times denser.
+- **Both generators support scale:** `render_env.py --scale` multiplies the canvas and
+  every rectangle, `render_actors.py --scale` the render density with the same
+  camera.
+- **Assets are described in fractional world units.** A bevel of a third of a unit, a seam,
+  an edge highlight appear on a large canvas and vanish on a small one, where they
+  would not have found a pixel anyway.
+- **Textures were redrawn:** brickwork with tone variation, bevel and chips; slabs
+  with an edge, a groove and dents; doors with a frame profile, panels, a handle
+  and a threshold; a lamp with a socket and a ring; cab flooring with ribs and rivets;
+  an escalator step with tread and comb plate; shaft doors with a recessed
+  panel; the exit with a double door and an arrow on the sign.
+- **Proportions were re-marked** (ADR-0018, decision 5): Otto and agents grew
+  one and a half times, the door from 102 to 171, the window shrank to 150×100. The agent's line
+  of fire was raised to 105: it had started hitting the taller Otto in the head
+  right in the shaft opening.
+- **The shaft limit is visible** (decision 6): a stop at the top and bottom of the band and arrows
+  in the cab that go out when there is no travel in that direction.
+- **Tests: 315** (was 304). New: proportions (Otto passes through a door, enters
+  a shaft, crouched he is below an agent's bullet), control of every cab in the building,
+  band limit, indicators, stops.
 
-### Что нашлось по дороге
+### Found along the way
 
-- **Кабина роняла Otto ниже этажа.** `settle_distance` остался в старом
-  масштабе — 12 единиц при 36 за два кадра под `Engine.time_scale`. Кабина
-  замирала на 24 единицы ниже пола, Otto оказывался внутри перекрытия и
-  переставал двигаться. В ручном прогоне всё проходило, в тестах вставало
-  намертво: GUT ждёт два кадра там, где написан один
-  ([`testing.md`](testing.md), раздел 4).
-- **Otto перестал помещаться в кабину,** когда вырос: просвет кабины был 102
-  при росте 126. Кабина стала выше.
-- **«Лифт не слушается» оказался концом полосы шахты,** а не багом: проверка
-  всех кабин трёх зданий это показала. Лечится не механикой, а указателями.
-- **Нижний упор шахты клался внутрь перекрытия** и не был виден вообще: знак,
-  которым мы объясняли предел полосы, не работал ровно там, где игрок на него
-  и наткнулся. Тест это пропускал — считал упоры и проверял X, но не Y. Нашло
-  авторевью; тест усилен и проверен на старой формуле.
-- **Оба генератора по умолчанию рисовали в масштабе 1,** хотя набор закоммичен
-  в 3 (окружение) и 4.5 (актёры), и нигде в коде этих чисел не было. Команда из
-  README молча переписала бы все ассеты втрое мельче. Теперь масштаб — значение
-  по умолчанию, и регенерация без флагов даёт байт в байт закоммиченные PNG.
+- **The cab dropped Otto below the floor.** `settle_distance` stayed at the old
+  scale: 12 units with 36 per two frames under `Engine.time_scale`. The cab
+  stopped 24 units below the floor, Otto ended up inside the slab and
+  stopped moving. In a manual run everything passed, in tests it locked up
+  dead: GUT waits two frames where one is written
+  ([`testing.md`](testing.md), section 4).
+- **Otto no longer fit in the cab** once he grew: cab clearance was 102
+  with a height of 126. The cab became taller.
+- **"The elevator does not respond" turned out to be the end of the shaft band,** not a bug:
+  checking all cabs of three buildings showed it. The cure is not mechanics but indicators.
+- **The bottom shaft stop was placed inside the slab** and was not visible at all: the sign
+  we used to explain the band limit failed exactly where the player
+  ran into it. The test missed it: it counted stops and checked X but not Y. Found by
+  code review; the test was strengthened and verified against the old formula.
+- **Both generators drew at scale 1 by default,** although the set is committed
+  at 3 (environment) and 4.5 (actors), and those numbers were nowhere in the code. The command from
+  README would have silently rewritten all assets three times smaller. Now the scale is the
+  default, and regeneration without flags gives the committed PNGs byte for byte.
 
 
-## Веха M14 · Дверь открывается по-настоящему
+## Milestone M14 · The door really opens
 
-Решения — [ADR-0020](adr/0020-agent-doors.md).
+Decisions: [ADR-0020](adr/0020-agent-doors.md).
 
-**DoD:** ни один агент не появляется поверх закрытой двери, цикл двери
-проверяется тестом без сцены, и цена телеграфа измерена ботом.
+**DoD:** no agent appears on top of a closed door, the door cycle is
+tested without a scene, and the cost of the telegraph is measured by the bot.
 
-### Сделано
+### Done
 
-- **`DoorCycle` — ход створки отдельным классом без узла:** `CLOSED → OPENING →
-  OPEN → CLOSING` и ход в долях. `DoorVisit` отдал ему створку и остался про
-  правила визита. В 3D оба переезжают без правок (ADR-0019, решение 2).
-- **Телеграф 0.7 с:** дверь открывается целиком и только потом отдаёт агента.
-  Уровень просит дверь открыться, а сам агент появляется, когда створка дошла.
-- **Открытая дверь занимает место под потолком живых.** Иначе за время
-  телеграфа успело бы открыться сколько угодно дверей и агенты вывалились бы
-  разом сверх восьми.
-- **Агент выходит из проёма шагом** — `EMERGING` перестал быть «постоять»: он
-  идёт, а раньше эти доли секунды стоял на коврике перед закрытой створкой.
-- **В проёме агента нет на слое врагов:** пуля проходит сквозь, не гаснет и не
-  приносит очков. Это не броня, а отсутствие цели — видно глазом.
-- **Створка идёт обратно, как только агент освободил проём.**
-- **Опустевшая красная дверь становится обычной** и начинает выпускать агентов.
-- **Плавность — перекрёстное затухание трёх кадров.** Новых не рисуем: набор
-  уходит вместе с 2D (ADR-0020, решение 7).
-- **Дверь звучит позиционно,** источник заводится лениво: их полсотни на здание.
-- **Тесты: 334** (было 315). Новые: ход створки без сцены (10), выход агента
-  в собранном здании (8). Плюс `DoorVisit` переписан под пару с `DoorCycle`.
+- **`DoorCycle` is the leaf travel as a separate class without a node:** `CLOSED → OPENING →
+  OPEN → CLOSING` and travel in fractions. `DoorVisit` handed the leaf to it and kept only the
+  visit rules. In 3D both move over without changes (ADR-0019, decision 2).
+- **A 0.7 s telegraph:** the door opens fully and only then gives up the agent.
+  The level asks the door to open, and the agent itself appears when the leaf has finished.
+- **An open door takes a slot under the living-agent cap.** Otherwise during the
+  telegraph any number of doors could open and agents would tumble out at once
+  beyond eight.
+- **The agent steps out of the doorway** walking: `EMERGING` stopped meaning "stand still": he
+  walks, whereas before he stood those fractions of a second on the mat in front of a closed leaf.
+- **In the doorway the agent is not on the enemy layer:** a bullet passes through, does not go out
+  and does not score. This is not armor but the absence of a target, visible to the eye.
+- **The leaf goes back as soon as the agent has cleared the doorway.**
+- **An emptied red door becomes ordinary** and starts releasing agents.
+- **Smoothness is a crossfade of three frames.** We do not draw new ones: the set
+  goes away together with 2D (ADR-0020, decision 7).
+- **The door sounds positional,** its source is created lazily: there are fifty of them per building.
+- **Tests: 334** (was 315). New: leaf travel without a scene (10), agent exit
+  in an assembled building (8). Plus `DoorVisit` was rewritten to pair with `DoorCycle`.
 
-### Цена телеграфа: замер ботом
+### Cost of the telegraph: measured by the bot
 
-Решение 9 требовало измерить, а не решать на глаз. Шесть сидов, настоящее
-здание, три жизни:
+Decision 9 required measuring rather than deciding by eye. Six seeds, a real
+building, three lives:
 
-| | до | после |
+| | before | after |
 |---|---|---|
-| смертей | 8 | **5** |
-| убийств | 95 | **65** |
-| зданий провалено | 0 | 0 |
+| deaths | 8 | **5** |
+| kills | 95 | **65** |
+| buildings failed | 0 | 0 |
 
-Опасность не обнулилась — бот по-прежнему умирает. Но вылезло **побочное:
-убийств стало на треть меньше**, и это не про сложность, а про плотность.
-Телеграф прибавляет 0.7 с к каждому циклу двери, и дверь всё это время занята:
-агентов за то же время выходит меньше. Компенсация напрашивается — начинать
-открывать створку в конце паузы поста, а не после неё, — но это правка баланса,
-и её надо решать числами отдельно, а не заодно.
+Danger did not drop to zero: the bot still dies. But a **side effect showed up:
+a third fewer kills**, and this is not about difficulty but density.
+The telegraph adds 0.7 s to each door cycle, and the door is busy all that time:
+fewer agents come out in the same time. A compensation suggests itself (start
+opening the leaf at the end of the post's pause rather than after it), but that is a balance
+change, and it has to be decided with numbers separately, not in passing.
 
-### Что нашлось по дороге
+### Found along the way
 
-- **Два теста архитектуры молча опустели.** Они смотрят агентов через четыре
-  кадра после сборки, а дверь теперь открывается 0.7 с — агентов в этот момент
-  нет ни одного, и оба теста не делали ни одного утверждения. GUT пометил их
-  Risky, и только поэтому это заметили. Теперь оба ждут первого вышедшего.
-- **`greybox_level.gd` снова перевалил за 1000 строк.** Вынесена одежда шахт
-  (`BuildingShafts`) — заодно закрыта находка авторевью M13: полсотни узлов
-  висели прямыми детьми уровня, и под них попадал каждый обход детей.
+- **Two architecture tests silently went empty.** They look at agents four
+  frames after assembly, and the door now takes 0.7 s to open: at that moment there are
+  no agents at all, and both tests made no assertions. GUT marked them
+  Risky, and that is the only reason it was noticed. Now both wait for the first agent to come out.
+- **`greybox_level.gd` passed 1000 lines again.** Shaft dressing was moved out
+  (`BuildingShafts`), which also closed a finding of code review M13: fifty nodes
+  hung as direct children of the level, and every traversal of children ran into them.
 
-### Авторевью
+### Code review
 
-- **Otto запирался в двери навсегда.** Дверь, открывшаяся под агента, всё ещё
-  пускала к себе гостя: `summon_agent` проверял «внутри никого», а `_admit` про
-  агента не спрашивал. Уровень потом закрывал створку за вышедшим агентом, а
-  отсидка гостя идёт только при открытой двери — и не кончалась никогда.
-  Софтлок, воспроизводится тестом.
-- **Дверь могла остаться открытой навсегда.** Створку закрывает уровень, и
-  делал он это только в ветке живого агента. Убитый в кадре, где на одну
-  отрисовку пришлось два шага физики, до этой ветки не доживает — дверь
-  оставалась и открытой, и занятой: из неё больше не выходил никто. Теперь
-  пустой пост отпускает дверь всегда.
-- **Ближайшая дверь забирала кадр себе.** Выпускается один агент за кадр, у
-  ближайшей двери; занятая отвечала отказом, и кадр пропадал впустую. Уровень
-  спрашивает `Door.can_summon()` до выбора.
-- **Проверка троса опустела.** `_parts` в тестах одежды перевели на узел шахт,
-  а трос — прямой ребёнок уровня: «трос ушёл» проходило, ничего не найдя.
-- **Щит агента ставится в `setup`,** а не первым кадром физики: иначе между
-  постановкой в проём и первым кадром остаётся шаг, где он обычная мишень.
-- **Мелочи:** картинка створки не перерисовывается, пока створка стоит
-  (полсотни дверей на здание); `_agent_doors` убран — посты и так список
-  агентских дверей; параметр `name` у `Door._say` заслонял поле `Node`.
+- **Otto got locked in a door forever.** A door that opened for an agent still
+  let a guest in: `summon_agent` checked "nobody inside", while `_admit` did not ask
+  about the agent. The level then closed the leaf behind the agent that came out, and the guest's
+  stay only runs while the door is open, so it never ended.
+  A softlock, reproduced by a test.
+- **A door could stay open forever.** The leaf is closed by the level, and
+  it did that only in the branch for a living agent. An agent killed in a frame where one
+  draw got two physics steps never reaches that branch, so the door
+  stayed both open and occupied: nobody came out of it again. Now an
+  empty post always releases the door.
+- **The nearest door took the frame for itself.** One agent is released per frame, at the
+  nearest door; a busy one refused, and the frame was wasted. The level
+  asks `Door.can_summon()` before choosing.
+- **The rope check went empty.** `_parts` in the dressing tests was switched to the shafts node,
+  while the rope is a direct child of the level: "the rope is gone" passed having found nothing.
+- **The agent's shield is set in `setup`,** not on the first physics frame: otherwise between
+  being placed in the doorway and the first frame there is a step where he is an ordinary target.
+- **Small things:** the leaf image is not redrawn while the leaf is still
+  (fifty doors per building); `_agent_doors` was removed, since the posts already are the list of
+  agent doors; the `name` parameter of `Door._say` shadowed the `Node` field.
 
-## Веха M15 · 3D-greybox: здание, лифты, Otto
+## Milestone M15 · 3D greybox: building, elevators, Otto
 
-Решения — [ADR-0021](adr/0021-3d-greybox.md). Первая веха пивота в 3D (ADR-0019).
+Decisions: [ADR-0021](adr/0021-3d-greybox.md). The first milestone of the 3D pivot (ADR-0019).
 
-**DoD:** бот проходит тридцатиэтажное здание в 3D-сцене из серых коробок, и ни
-один тест правил при этом не правился.
+**DoD:** the bot clears a thirty-floor building in a 3D scene made of grey boxes, and not
+a single rule test was changed along the way.
 
-### Сделано
+### Done
 
-- **Слой узлов переехал целиком:** `Otto` и `Enemy` на `CharacterBody3D`, пуля на
-  `Area3D`, кабина и лампа на `AnimatableBody3D`, дверь, эскалатор, уровень и одежда
-  шахт на `Node3D`. Z у игровых тел заперт и возвращается на место после каждого
-  `move_and_slide`: физика умеет вытолкнуть тело по глубине, а в боковом кадре этого
-  не видно вовсе.
-- **`WorldSpace` — единственное место перевода** между плоскостью правил (Y вниз) и
-  сценой (Y вверх). Слой правил остался на `Vector2`; узлы, бот и прогон переводят
-  через него. Покрыт тестом без сцены.
-- **`CameraBounds` + `SideCamera`:** границы и сглаживание, которые `Camera2D` давал
-  даром, у `Camera3D` нет — правило кадрирования отдельным классом с тестом, узел
-  поверх. Камера строго боковая; наклон — вопрос M17.
-- **Метрический мир:** длины в `BuildingRules`, `ElevatorMotion` и `EnemyBrain`
-  поделены на сто, пропорции не тронуты; `test_proportions.gd` зелёный без правок
-  в утверждениях, как и обещал ADR-0021.
-- **Плоскость игры одна.** Коридор глубиной 2 м вокруг неё, задняя стена с проёмами
-  дверей (режутся тем же `spans_between`, что и перекрытия) и комната глубиной 7 м
-  за ней — глубина кадра, в которую не зайти.
-- **Свет по решению 4:** лампа — единственный источник этажа (`OmniLight3D` с тенью),
-  общий тон — `WorldEnvironment` с цветом палитры, над крышей один источник вместо
-  города. Правило темноты живо: сбитая лампа уходит вместе со своим светом, и это
-  проверяется по числу горящих источников.
-- **Греев-бокс читается:** `GreyboxLook` красит окружение шершавыми поверхностями, а
-  всё игровое — светящимися маркерами (ADR-0019, решение 5). `ActorBox` отыгрывает
-  позу коробкой: присевший ниже, мёртвый лежит; выбирает позу тот же `ActorPose`,
-  что выбирал спрайт, и списки поз переехали к нему.
-- **Выброшено по мере замены:** `TiledRect`, `SpriteTextures`, `AreaLight`,
-  `LightTextures`, `BuildingBackdrop`, `Skyline`, `postprocess.tscn` с виньеткой;
-  инструменты `light_shot`, `round_shot`, `light_bench`; их тесты. Спрайты и их
-  генераторы лежат до M16/M20 — игра их не читает.
-- **Тесты: 323** (было 334). Девять сценовых переписаны на 3D, три ушли вместе с
-  системами, новые — `WorldSpace` (7), `CameraBounds` (10), позы (4), плоскость тел,
-  прибытие кабины. Бот проходит тридцатиэтажку за 5015 кадров без смертей.
-- **`playthrough.gd` научился трассе:** `--trace`, `--trace-every`, `--budget` —
-  положение Otto, нажатые клавиши и ближайшая кабина раз в N кадров.
+- **The node layer moved over entirely:** `Otto` and `Enemy` on `CharacterBody3D`, the bullet on
+  `Area3D`, the cab and lamp on `AnimatableBody3D`, the door, escalator, level and shaft
+  dressing on `Node3D`. Z of gameplay bodies is locked and restored after every
+  `move_and_slide`: physics can push a body out along depth, and in a side view this
+  is not visible at all.
+- **`WorldSpace` is the only place of conversion** between the rules plane (Y down) and
+  the scene (Y up). The rules layer stayed on `Vector2`; nodes, the bot and the run convert
+  through it. Covered by a test without a scene.
+- **`CameraBounds` + `SideCamera`:** the bounds and smoothing that `Camera2D` gave
+  for free are absent in `Camera3D`, so the framing rule is a separate class with a test, and the
+  node sits on top. The camera is strictly side-on; tilt is a question for M17.
+- **A metric world:** lengths in `BuildingRules`, `ElevatorMotion` and `EnemyBrain`
+  are divided by a hundred, proportions untouched; `test_proportions.gd` is green without changes
+  to its assertions, as ADR-0021 promised.
+- **There is one play plane.** A corridor 2 m deep around it, a back wall with door openings
+  (cut by the same `spans_between` as the slabs) and a room 7 m deep
+  behind it: depth of the frame that cannot be entered.
+- **Light per decision 4:** the lamp is the only source on a floor (`OmniLight3D` with shadow),
+  the overall tone is `WorldEnvironment` with the palette color, above the roof one source instead
+  of the city. The darkness rule is alive: a shot-down lamp goes away with its light, and this
+  is checked by the number of lit sources.
+- **The greybox reads:** `GreyboxLook` paints the environment with rough surfaces, and
+  everything gameplay-related with glowing markers (ADR-0019, decision 5). `ActorBox` acts out
+  the pose with a box: a crouching one is lower, a dead one lies down; the pose is chosen by the
+  same `ActorPose` that chose the sprite, and the pose lists moved to it.
+- **Thrown out as replaced:** `TiledRect`, `SpriteTextures`, `AreaLight`,
+  `LightTextures`, `BuildingBackdrop`, `Skyline`, `postprocess.tscn` with the vignette;
+  the tools `light_shot`, `round_shot`, `light_bench`; their tests. Sprites and their
+  generators stay until M16/M20: the game does not read them.
+- **Tests: 323** (was 334). Nine scene tests were rewritten for 3D, three went away together with
+  their systems, new ones: `WorldSpace` (7), `CameraBounds` (10), poses (4), body plane,
+  cab arrival. The bot clears the thirty-floor building in 5015 frames without deaths.
+- **`playthrough.gd` learned to trace:** `--trace`, `--trace-every`, `--budget`:
+  Otto's position, pressed keys and the nearest cab every N frames.
 
-### Что нашлось по дороге
+### Found along the way
 
-- **Проба разносила игровые объекты по Z** — дверь у дальней стены, шахта у камеры.
-  С запертой Z так нельзя; отсюда решение 1 ADR-0021.
-- **Правила считают Y вниз, сцена вверх.** Разворачивать знак по месту в каждом узле —
-  верный способ потерять веху тихо: ошибка в знаке не падает, а ставит этаж вверх
-  ногами. Отсюда `WorldSpace`.
-- **Один пропущенный скрипт валит каскад.** `Body` в `otto.tscn` остался без
-  `ActorBox`; инициализаторы `@onready` идут одной функцией, и после ошибки типа в
-  `_body` пустыми остались `_camera` и `_kick_zone` — 120 тысяч ошибок в логе от
-  одной строки сцены.
-- **Лампа висит ровно на середине пролёта,** и `floor_index_near` на этой середине
-  решает по последнему биту дроби: на пикселях падал на один этаж, на метрах — на
-  другой. Этаж лампы теперь записывает уровень, когда вешает её.
-- **Кабина касалась крыши на один кадр и уезжала.** `_move_towards` засчитывал
-  прибытие сравнением остатка с шагом без допуска; на float32-остановках остаток
-  вышел больше шага на миллионную. Единственная правка логики в правилах за веху,
-  записана в ADR-0021 и покрыта тестом. Нашёл её бот — простоял на крыше сутки
-  игрового времени.
-- **Тесты правил зависели от умолчаний,** которые не задавали: `sky_height`,
-  `width`, `margin`. Пока умолчания были 480 и 3840, точные равенства сходились;
-  на 4.8 и 38.4 поплыли. Теперь тесты задают все длины сами.
-- **Полный набор идёт 546 с при лимите раннера 600 с.** Запас десять процентов;
-  первый прогон вехи в него не уложился и был снят на боте. Записано в долг.
+- **The probe spread gameplay objects along Z**: a door at the far wall, a shaft near the camera.
+  With Z locked that is not possible; hence decision 1 of ADR-0021.
+- **Rules count Y down, the scene up.** Flipping the sign locally in every node is
+  a sure way to lose a milestone quietly: a sign error does not crash, it puts a floor upside
+  down. Hence `WorldSpace`.
+- **One missing script brings down a cascade.** `Body` in `otto.tscn` was left without
+  `ActorBox`; `@onready` initializers run as one function, and after a type error in
+  `_body` both `_camera` and `_kick_zone` stayed empty: 120 thousand errors in the log from
+  one scene line.
+- **The lamp hangs exactly at mid-span,** and `floor_index_near` at that midpoint
+  decides by the last bit of the fraction: in pixels it fell on one floor, in meters on
+  another. The lamp's floor is now recorded by the level when it hangs the lamp.
+- **The cab touched the roof for one frame and left.** `_move_towards` counted
+  arrival by comparing the remainder with the step without tolerance; at float32 stops the remainder
+  came out larger than the step by a millionth. The only logic change in the rules during the
+  milestone, recorded in ADR-0021 and covered by a test. The bot found it: it stood on the roof
+  for a day of game time.
+- **Rule tests depended on defaults** they did not set: `sky_height`,
+  `width`, `margin`. While the defaults were 480 and 3840, exact equalities held;
+  at 4.8 and 38.4 they drifted. Now the tests set all lengths themselves.
+- **The full suite takes 546 s with a runner limit of 600 s.** A ten percent margin;
+  the milestone's first run did not fit and was removed from the bot. Recorded as debt.
 
-### Авторевью
+### Code review
 
-- **Позиционный звук молчал целиком.** `AudioStreamPlayer3D` меряет расстояние до
-  слушателя, а слушателем по умолчанию служит камера — она стоит в 20 м от
-  плоскости игры, дальше любого `*_REACH` (9–19,2 м): гул и «динь» кабины, стрёкот
-  эскалатора, створки дверей были глухи. У `SideCamera` теперь свой
-  `AudioListener3D` в плоскости игры, под серединой кадра — там же, где слушал
-  2D-кадр.
-- **Камера ехала вбок на старте здания.** `apply_bounds` вставал на прежнюю
-  середину, снятую в `_ready` Otto ещё в начале координат; `Camera2D` вставал на
-  место первым кадром. Теперь границы ставят камеру на цель.
-- **Коробка агента не следовала за ростами из правил:** снималась один раз в
-  `_ready`, до `apply_rules`, а лёжа брала ширину стоячего (0,54 м) при форме
-  0,36 м — низкая пуля проходила сквозь нарисованное тело. Ростá теперь
-  переносятся в `ActorBox` из `_refresh_brain`, у лежащего свой габарит.
-- **Машинное отделение доходило до плоскости игры,** и Otto проходил сквозь его
-  стену. Глубина домика 0,7 м — до спины Otto.
-- **Семь копий «BoxMesh + MeshInstance3D + материал»** в уровне, шахтах и
-  эскалаторе собраны в `GreyboxLook.box`. Створка двери собирается из `LEAF_SIZE`,
-  а не из второй копии числа в сцене. ADR-0002 помечен отменённым — рендерные
-  настройки в `project.godot` менялись без правки его статуса.
+- **Positional sound was entirely silent.** `AudioStreamPlayer3D` measures the distance to
+  the listener, and by default the listener is the camera, which stands 20 m from the
+  play plane, farther than any `*_REACH` (9–19.2 m): the hum and "ding" of the cab, the clatter
+  of the escalator, door leaves were all mute. `SideCamera` now has its own
+  `AudioListener3D` in the play plane, under the middle of the frame, where the
+  2D frame listened.
+- **The camera slid sideways at the start of a building.** `apply_bounds` settled on the old
+  center, taken in Otto's `_ready` while still at the origin; `Camera2D` snapped into
+  place on the first frame. Now the bounds put the camera on the target.
+- **The agent's box did not follow the heights from the rules:** it was taken once in
+  `_ready`, before `apply_rules`, and lying down it used the standing width (0.54 m) with a shape
+  of 0.36 m, so a low bullet passed through the drawn body. Heights are now
+  passed to `ActorBox` from `_refresh_brain`, and a lying agent has its own size.
+- **The machine room reached the play plane,** and Otto walked through its
+  wall. The structure is 0.7 m deep, up to Otto's back.
+- **Seven copies of "BoxMesh + MeshInstance3D + material"** in the level, shafts and
+  escalator were gathered into `GreyboxLook.box`. The door leaf is built from `LEAF_SIZE`,
+  not from a second copy of the number in the scene. ADR-0002 is marked superseded: render
+  settings in `project.godot` had been changed without updating its status.
 
-## Веха M16 · Актёры: модели и анимации
+## Milestone M16 · Actors: models and animations
 
-Решения — [ADR-0022](adr/0022-actors-rig.md).
+Decisions: [ADR-0022](adr/0022-actors-rig.md).
 
-**DoD:** на стоп-кадре ходьбы видно, что это шаг, а не подмена картинки, и Otto
-в приседе по-прежнему ниже пули агента.
+**DoD:** on a still frame of walking you can see it is a step, not a swapped picture, and Otto
+crouching is still below an agent's bullet.
 
-### Что показала сверка
+### What the check against the original showed
 
-- Набор поз полный ещё с M7b: у Taito на прыжок и раздавленного место нашли,
-  урезав кадры падения агента, — новых поз веха не заводит.
-- Фигура уже описана кодом: `render_actors.py` строил актёра из коробок с
-  таблицей поз углами конечностей. Веха переносит этот риг на скелет.
+- The pose set has been complete since M7b: Taito found room for the jump and the crushed pose
+  by cutting frames of the agent's fall, so the milestone adds no new poses.
+- The figure is already described in code: `render_actors.py` built an actor from boxes with
+  a table of poses as limb angles. The milestone moves this rig onto a skeleton.
 
-### Сделано
+### Done
 
-- **`tools/build_actors.py`** строит в Blender фигуру из коробок на арматуре —
-  бёдра, корпус, голова, две руки, две ноги, каждая коробка весами на одной
-  кости — сливает в один меш и пишет `assets/models/{otto,agent,car}.glb`.
-  Пропорции те же чиби в долях роста; рост — коллизия актёра. Материалы из
-  палитры едут внутри `.glb`.
-- **`FigurePoses`** — таблица поз углами конечностей: ноги, руки, наклон
-  корпуса и головы, наклон тела вокруг пяток, просадка бёдер, сжатие. Ходьба —
-  непрерывный синусный цикл по фазе `ActorPose`, а не три кадра.
-- **`FigureRig`** находит кости по имени, каждый кадр ведёт их к позе с
-  экспоненциальным сглаживанием и **заземляет фигуру по её скиннутому
-  габариту**: у лежащего на спине, залёгшего и присевшего своя глубина, и
-  константой на всех её не подобрать. Знак «вперёд» берётся из покоя кости —
-  у ног и рук локальная ось развёрнута.
-- **Обводка** вместо свечения: инвертированная оболочка вторым проходом
-  (`material_overlay`), свету не подчиняется. `grow`, не `grow_enabled` — имя
-  с `_enabled` осталось от Godot 3.
-- **`tools/dump_model.gd`** — разбор импортированной модели: дерево, кости,
-  покой, проба «куда уходит конец кости при +30°».
-- **Машина у выхода** — модель, узел `ExitCar`; тест находит её по имени.
-- **Ушли:** `render_actors.py`, `render_env.py`, `assets/sprites/` целиком,
-  `ActorBox`. `requirements-assets.txt` остаётся: Pillow, numpy и soundfile
-  нужны генераторам звука и иконки.
-- **Тесты:** `test_figure_poses` (12, без сцены), `test_figure_rig` (11, со
-  сценой: кости на месте, присед Otto под пулей агента, агент на колене и лёжа
-  под пулями Otto, удар вперёд, лежащий длинный и низкий, ни одна поза не под
-  полом, переход — движение, а не подмена).
+- **`tools/build_actors.py`** builds in Blender a figure of boxes on an armature
+  (hips, torso, head, two arms, two legs, each box weighted to one
+  bone), merges it into one mesh and writes `assets/models/{otto,agent,car}.glb`.
+  The proportions are the same chibi ones in fractions of height; height is the actor's collision.
+  Palette materials ride inside the `.glb`.
+- **`FigurePoses`** is a table of poses as limb angles: legs, arms, torso and head
+  tilt, body tilt around the heels, hip drop, squash. Walking is
+  a continuous sine cycle driven by the `ActorPose` phase, not three frames.
+- **`FigureRig`** finds bones by name, every frame drives them toward the pose with
+  exponential smoothing, and **grounds the figure by its skinned
+  bounds**: lying on the back, prone and crouching each have their own depth, and
+  one constant cannot fit them all. The "forward" sign is taken from the bone's rest pose:
+  legs and arms have their local axis flipped.
+- **Outline** instead of glow: an inverted hull as a second pass
+  (`material_overlay`), not affected by light. `grow`, not `grow_enabled`: the name
+  with `_enabled` is left over from Godot 3.
+- **`tools/dump_model.gd`** dissects an imported model: tree, bones,
+  rest pose, a probe "where the bone tip goes at +30°".
+- **The car at the exit** is a model, node `ExitCar`; the test finds it by name.
+- **Removed:** `render_actors.py`, `render_env.py`, `assets/sprites/` entirely,
+  `ActorBox`. `requirements-assets.txt` stays: Pillow, numpy and soundfile
+  are needed by the sound and icon generators.
+- **Tests:** `test_figure_poses` (12, no scene), `test_figure_rig` (11, with a
+  scene: bones in place, Otto's crouch under an agent's bullet, an agent kneeling and prone
+  under Otto's bullets, a forward kick, a lying body long and low, no pose below
+  the floor, a transition is motion, not a swap).
 
-### Что нашлось по дороге
+### Found along the way
 
-- **Знак поворота у конечностей обратный.** Кости, растущие вниз, экспортируются
-  с развёрнутой локальной системой: тот же поворот вокруг X уводит ногу назад,
-  а корпус вперёд. Проба в `dump_model.gd` это показала за один прогон; знак
-  берётся из покоя кости, а не пишется руками.
-- **Зазор над полом не константа.** Лежащий на спине опирается спиной (0.18 м),
-  залёгший — грудью (0.27), присевший — пятками. Первая версия топила труп на
-  13 см; заземление по габариту сняло вопрос для всех поз разом.
-- **Кадр в headless-прогоне не 1/60.** Тест «за кадр не долетает» на
-  `await wait_process_frames(1)` долетал на 95 %: кадр длился 0.18 с. Шаг
-  сглаживания отдан ригу наружу (`advance`), и тест задаёт дельту сам.
-- **`get_aabb()` скиннутого меша — покой, не поза.** Габарит для проверки
-  приседа считается по вершинам через скелет; заодно это и заземление.
+- **The rotation sign of limbs is inverted.** Bones growing downward are exported
+  with a flipped local frame: the same rotation around X takes a leg backward
+  and the torso forward. The probe in `dump_model.gd` showed this in one run; the sign
+  is taken from the bone's rest pose, not written by hand.
+- **The gap above the floor is not a constant.** Lying on the back rests on the back (0.18 m),
+  prone on the chest (0.27), crouching on the heels. The first version sank a corpse by
+  13 cm; grounding by bounds settled the question for all poses at once.
+- **A frame in a headless run is not 1/60.** The test "does not arrive within one frame" on
+  `await wait_process_frames(1)` arrived at 95 %: the frame lasted 0.18 s. The smoothing step
+  was exposed outside the rig (`advance`), and the test sets the delta itself.
+- **`get_aabb()` of a skinned mesh is the rest pose, not the pose.** Bounds for the crouch
+  check are computed from vertices through the skeleton; this is also the grounding.
 
-### Авторевью
+### Code review
 
-- **Залёгший агент стоял на руке почти в метр ростом.** В позе `prone` рука со
-  стволом шла «вперёд» на 90°, а наклон тела на 78° разворачивал её в пол;
-  заземление поднимало на ней всё тело: макушка 0.98 м при коллизии 0.36 и
-  пуле присевшего Otto на 0.45. Руки теперь ложатся вдоль пола (наклон тела
-  плюс 90°), голова вдоль тела — 0.46 м. Ниже не ляжет: лицом вниз поля шляпы
-  встают вертикально, и их диаметр и есть рост залёгшего. Пуля присевшего Otto
-  идёт над телом и задевает кромку полей — решать моделью шляпы, не позой.
-- **Агент на колене подставлял шляпу под пулю стоящего Otto:** 0.88 м против
-  нижнего края пули 0.87. Присед сложен сильнее (`CROUCH_LEAN` 70°) — 0.81 у
-  агента и 0.80 у Otto, и Otto впервые целиком в своей коллизии приседа 0.81.
-  Оба правила под тестами — зеркально к «Otto под пулей агента».
-- **Габарит по вершинам считался каждый кадр у каждого актёра**, включая
-  стоящих: 165 мкс на актёра. Риг замирает, долетев до позы, а массивы
-  поверхностей и матрицы скина снимаются раз на поверхность, не на вершину.
-- `snap()` без скелета падал; `FigurePoses.of()` отдавал общую запись таблицы,
-  которую методы сборки правят на месте, — теперь копию; `requirements-assets.txt`
-  удалён зря — Pillow, numpy и soundfile нужны `render_audio.py` и
-  `render_icon.py`; `CAR_SIZE` обещал габарит модели, которого у неё нет, —
-  осталась одна длина.
+- **A prone agent stood on his arm almost a meter tall.** In the `prone` pose the arm with
+  the gun went "forward" at 90°, and the 78° body tilt turned it into the floor;
+  grounding lifted the whole body onto it: top of the head at 0.98 m with a collision of 0.36 and
+  the crouching Otto's bullet at 0.45. Arms now lie along the floor (body tilt
+  plus 90°), the head along the body: 0.46 m. It will not lie lower: face down the hat brim
+  stands vertical, and its diameter is the prone height. The crouching Otto's bullet
+  passes over the body and grazes the edge of the brim: to be solved with the hat model, not the pose.
+- **A kneeling agent put his hat in the way of a standing Otto's bullet:** 0.88 m against
+  the bullet's lower edge at 0.87. The crouch folds more (`CROUCH_LEAN` 70°): 0.81 for
+  the agent and 0.80 for Otto, and Otto is for the first time fully inside his crouch collision of 0.81.
+  Both rules are under tests, mirroring "Otto under an agent's bullet".
+- **Bounds from vertices were computed every frame for every actor**, including
+  standing ones: 165 µs per actor. The rig freezes once it reaches the pose, and surface arrays
+  and skin matrices are taken once per surface, not per vertex.
+- `snap()` without a skeleton crashed; `FigurePoses.of()` returned a shared table entry
+  that the build methods modify in place, and now returns a copy; `requirements-assets.txt`
+  had been deleted by mistake, since Pillow, numpy and soundfile are needed by `render_audio.py` and
+  `render_icon.py`; `CAR_SIZE` promised model bounds it does not have, so
+  only a length remains.
 
-## Веха M17 · Свет, материалы и читаемость
+## Milestone M17 · Light, materials and readability
 
-Решения — [ADR-0023](adr/0023-light-and-readability.md).
+Decisions: [ADR-0023](adr/0023-light-and-readability.md).
 
-**DoD:** свет выглядит мягким и объёмным, и при этом на тёмном этаже игрок видит,
-во что стреляет.
+**DoD:** the light looks soft and volumetric, and yet on a dark floor the player can see
+what they are shooting at.
 
-### Что показала сверка
+### What the check against the original showed
 
-- Референс — ночной разрез здания: ряд светильников конусами вниз, полированный
-  пол с отражениями, тёплый свет внутри против холодного снаружи, красные
-  индикаторы у лифта. Строго боковая камера ничего из этого не покажет: пол
-  сбоку — полоска нулевой толщины. Отсюда наклон.
-- Одна лампа на тридцатиметровый этаж референсом не читается. Ламп стало
-  несколько, и правило темноты переписано под зоны — второй шаг от оригинала
-  после ADR-0007, записан как выбор.
-- По ходу обсуждения родилась механика: темнота решает **видимость**, а не
-  дальность агента. Записана решением 8 и заодно закрыла долг M14 — Otto за
-  дверью невидим, агенты его теряют.
+- The reference is a night cross-section of a building: a row of fixtures with cones
+  pointing down, a polished floor with reflections, warm light inside against cold light
+  outside, red indicators by the elevator. A strictly side-on camera shows none of this:
+  seen from the side, the floor is a strip of zero thickness. Hence the tilt.
+- One lamp per thirty-metre floor does not read against the reference. There are now
+  several lamps, and the darkness rule is rewritten around zones — the second step away
+  from the original after ADR-0007, recorded as a choice.
+- A mechanic was born during the discussion: darkness decides **visibility**, not the
+  agent's range. It is recorded as decision 8 and also closed an M14 debt — Otto behind
+  a door is invisible, and agents lose him.
 
-### Сделано
+### Done
 
-- **Камера наклонена на десять градусов** (`SideCamera.TILT_DEGREES`): стоит
-  выше цели на `DISTANCE × tg`, ось проходит через точку плоскости игры, кадр
-  по вертикали больше на `1/cos`. Слушатель звука остался в плоскости. Правила
-  и `CameraBounds` не тронуты — четыре теста `test_side_camera`.
-- **Ламп по ширине этажа** — одна наверху, три внизу (`BuildingRules.lamps_on`);
-  раскладка ставит их в середины равных зон, а не в случайные свободные места.
-- **Темнота зонами.** `FloorLighting` помнит лампы и гасит зону ближайшей;
-  `GreyboxLevel.is_dark_at`. Сбитая лампа гасит свою зону, соседние горят.
-- **Видимость по тени Otto** (решение 8): в тёмной зоне агент замечает Otto
-  ближе 1,8 м, за дверью не видит вовсе; освещённого видит с полной дальности,
-  где бы ни стоял сам. Не видит — не цель: идёт, куда шёл, у края этажа и у
-  стены разворачивается. `Enemy._sees`, `EnemyBrain.turn_around`,
-  `Otto.is_hidden` — вместо `take_bullet`: у Otto ровно двадцать публичных методов.
-- **Лампа — конус и заливка** на шнуре до потолка: `SpotLight3D` с мягкой
-  тенью и `OmniLight3D` заливкой, оба её дети (тень заливке включило авторевью). Шнур при падении остаётся на
-  потолке, оборванный.
-- **`Atmosphere`** — воздух здания одной функцией: SSR, SSAO, объёмный туман
-  0.0035, свечение 0.45 с порога 1.0, ACES 1.15. Общий тон поднят до 0.55.
-- **Материалы:** пол полированный (`GreyboxLook.polished`), стены бетон, шахта,
-  кабина и рейки — металл (`metal`), огоньки — `light` с эмиссией выше порога
-  свечения.
-- **`BuildingRibs`** — торцы плит, плинтус с рейкой, пилястры по краям
-  простенков и между местами этажа. Коробки без тел, своим узлом, как шахты.
-- **Огоньки вместо светящихся коробок:** табло над дверью (тёплое, у красной
-  красное), два индикатора на крыше кабины, зелёная вывеска над выходом.
-  Створка и кабина целиком больше не светятся.
-- **`tools/light_bench.gd`** — время GPU на кадр в настоящем здании с восемью
-  агентами и 37 источниками в кадре: **2.0 мс при бюджете 16.6**, худший 2.7.
-- **`tools/dark_shot.gd`** — три кадра, которых не даёт съёмка по времени:
-  широкий этаж горит, его зона погашена, этаж погашен целиком. Лампы стоят по
-  сиду, и выдержкой до них не дойти — кадр ждёт состояния «лампа долетела».
-  Ими же выбрана яркость источников.
-- **Тесты:** `test_floor_lighting` переписан на зоны (9); `test_darkness` (5, со
-  сценой: освещённого бьют издалека, в тени видят только вплотную, из тени видят
-  освещённого, за дверью теряют, слепой доходит до края и разворачивается);
-  `test_side_camera` (4); `test_readability` (6, три сида); мозг агента (+2);
-  правила и раскладка ламп (+4); сборка считает два источника на лампу.
+- **The camera is tilted by ten degrees** (`SideCamera.TILT_DEGREES`): it stands
+  above the target by `DISTANCE × tan`, the axis passes through a point of the play
+  plane, and the frame is taller by `1/cos`. The sound listener stays in the plane. The
+  rules and `CameraBounds` are untouched — four tests in `test_side_camera`.
+- **Lamps by floor width** — one at the top, three at the bottom (`BuildingRules.lamps_on`);
+  the layout puts them in the middles of equal zones, not in random free slots.
+- **Darkness by zones.** `FloorLighting` remembers lamps and darkens the zone of the
+  nearest one; `GreyboxLevel.is_dark_at`. A shot-down lamp darkens its zone, the
+  neighbouring ones stay lit.
+- **Visibility by Otto's shadow** (decision 8): in a dark zone an agent notices Otto
+  closer than 1.8 m and does not see him behind a door at all; a lit Otto is seen from
+  full range, wherever the agent itself stands. Not seen means not a target: the agent
+  keeps going where it was going and turns around at the floor edge and at a wall.
+  `Enemy._sees`, `EnemyBrain.turn_around`, `Otto.is_hidden` — instead of `take_bullet`:
+  Otto has exactly twenty public methods.
+- **A lamp is a cone and a fill** on a cord to the ceiling: a `SpotLight3D` with a soft
+  shadow and an `OmniLight3D` fill, both its children (the code review turned on the
+  fill's shadow). When the lamp falls, the cord stays on the ceiling, torn.
+- **`Atmosphere`** — the building's air in one function: SSR, SSAO, volumetric fog
+  0.0035, glow 0.45 from threshold 1.0, ACES 1.15. The overall exposure is raised to 0.55.
+- **Materials:** the floor is polished (`GreyboxLook.polished`), walls are concrete,
+  the shaft, cab and rails are metal (`metal`), indicator lights are `light` with emission
+  above the glow threshold.
+- **`BuildingRibs`** — slab edges, a skirting board with a rail, pilasters at the edges of
+  wall segments and between floor slots. Boxes without bodies, in their own node, like the
+  shafts.
+- **Indicator lights instead of glowing boxes:** an indicator board above the door (warm,
+  red on a red door), two indicators on the cab roof, a green sign above the exit. The door
+  leaf and the whole cab no longer glow.
+- **`tools/light_bench.gd`** — GPU time per frame in a real building with eight agents
+  and 37 light sources in the frame: **2.0 ms against a budget of 16.6**, worst 2.7.
+- **`tools/dark_shot.gd`** — three shots that timed capture cannot produce: a wide floor
+  lit, its zone darkened, the floor darkened entirely. Lamps are placed by seed and
+  cannot be reached by a time delay — the shot waits for the state "the lamp has landed".
+  The brightness of the light sources was chosen with them as well.
+- **Tests:** `test_floor_lighting` rewritten for zones (9); `test_darkness` (5, with a
+  scene: a lit Otto is shot from afar, in shadow he is seen only up close, from shadow
+  agents see a lit Otto, behind a door they lose him, a blind agent walks to the edge and
+  turns around); `test_side_camera` (4); `test_readability` (6, three seeds); agent brain
+  (+2); rules and lamp layout (+4); the build counts two light sources per lamp.
 
-### Цена механики: замер ботом
+### The cost of the mechanic: measured with the bot
 
-Шесть сидов, настоящее здание, агенты, три жизни — как мерили телеграф двери
-в M14:
+Six seeds, a real building, agents, three lives — the same way the door telegraph was
+measured in M14:
 
-| | `main` (до) | M17 (после) |
+| | `main` (before) | M17 (after) |
 |---|---|---|
-| смертей | 5 | **4** |
-| убийств | 103 | **100** |
-| зданий провалено | 0 | 0 |
+| deaths | 5 | **4** |
+| kills | 103 | **100** |
+| buildings failed | 0 | 0 |
 
-**Замер ничего не доказывает, и это его главный результат.** Бот не стреляет
-по лампам — значит тёмных зон в его партии нет вовсе, и новую механику он
-застаёт только со стороны двери: спрятавшегося Otto агенты теряют. Маршруты
-совпали кадр в кадр, разошлись отдельные дуэли (сид 1: две смерти → ноль, сид
-2: ноль → одна). Чтобы померить темноту, боту нужно научиться её устраивать —
-это отдельная работа, и она записана в долг.
+**The measurement proves nothing, and that is its main result.** The bot does not shoot
+lamps — so there are no dark zones in its game at all, and it meets the new mechanic only
+from the door side: agents lose a hidden Otto. The routes matched frame for frame; some
+individual duels diverged (seed 1: two deaths → zero, seed 2: zero → one). To measure
+darkness, the bot has to learn to create it — that is separate work, and it is recorded
+as debt.
 
-### Что нашлось по дороге
+### What turned up along the way
 
-- **Числа пробы под наше здание не подошли по яркости.** `look3d` светил шестью
-  спотами по 9 с наклоном на стену; у нас конус вниз с 1,8 м. С энергией 3.2 и
-  заливкой 0.45 первый кадр вышел чёрным: пятно под лампой едва читалось, металл
-  рёбер без отражений ушёл в ноль. Конус 9.0 на 6 м и 60°, заливка 1.5 на 7 м,
-  тон 0.55, металл 0.35 — подобраны по кадру, не по пробе. В ADR — как есть.
-- **Слепой агент упирался в стену навсегда.** Разворот сперва был только у
-  проёма (`_floor_ahead`), а этаж заканчивается стеной, под которой пол есть.
-  Разворачивает и `is_on_wall()` с прошлого шага; у стены агент не дёргается,
-  потому что следующий шаг уже от неё.
-- **Бенч без vsync мерил пустое здание:** сто кадров прошли за десятую секунды,
-  двери открыться не успели, агентов в кадре ноль. Ожидание — шагами физики.
-- **«Разнесены» — не «далеко друг от друга».** Лампы встают в ближайшие
-  свободные места к серединам зон, и на тесном этаже две могут стоять рядом.
-  Тест раскладки проверяет середину между ними, а не размах.
-- **Вывеска выхода висит ближе к потолку, чем к полу,** и `floor_index_near`
-  относит её к этажу выше. Тест меряет высоту в пределах этажа, а не округляет.
+- **The numbers from the prototype did not fit our building in brightness.** `look3d` lit
+  with six spots of 9 each, angled at the wall; we have a cone pointing down from 1.8 m.
+  With energy 3.2 and fill 0.45 the first frame came out black: the pool under the lamp
+  barely read, and the rib metal without reflections went to zero. Cone 9.0 over 6 m and
+  60°, fill 1.5 over 7 m, exposure 0.55, metal 0.35 — chosen by the frame, not by the
+  prototype. The ADR records them as they are.
+- **A blind agent was stuck against a wall forever.** At first it turned around only at a
+  gap (`_floor_ahead`), but the floor ends with a wall that has floor under it. Now
+  `is_on_wall()` from the previous step also turns it around; the agent does not jitter at
+  the wall because its next step is already away from it.
+- **The bench without vsync measured an empty building:** a hundred frames passed in a
+  tenth of a second, the doors had no time to open, zero agents in the frame. Waiting is
+  now in physics steps.
+- **"Spread out" is not "far from each other".** Lamps take the free slots nearest to the
+  zone middles, and on a cramped floor two can stand side by side. The layout test checks
+  the midpoint between them, not the spread.
+- **The exit sign hangs closer to the ceiling than to the floor,** and `floor_index_near`
+  assigns it to the floor above. The test measures height within the floor rather than
+  rounding.
 
-### Авторевью
+### Code review
 
-- **Пересортировка ламп переставляла темноту.** `FloorLighting.hang` сортировал
-  список этажа на каждой вставке, а ключ погашенной зоны — номер лампы в этом
-  списке: лампа, повешенная после того, как зона погасла, молча переносила
-  темноту на соседнюю. Сегодня все лампы вешаются до игры, поэтому не стреляло;
-  сортировка убрана, «кто левее» решает сравнение по x.
-- **Заливка светила сквозь перекрытия.** Радиус 7 м при высоте этажа 3,6 м и без
-  тени: на кадре погашенного этажа его пол подсвечивали лампы этажа снизу.
-  Нашлось авторевью, подтвердилось кадром `dark_shot`. Тень включена, кадры
-  пересняты, цена — 0.8 мс на кадр.
-- **Этаж мог остаться без единой лампы.** Лампы кладутся последними, и на
-  тесном этаже свободных мест могло не остаться вовсе. Такой этаж чёрен в
-  кадре, но для правила темноты — вечно горящий: гасить нечего. На 400 сидах
-  (12000 этажей) не встретилось ни разу, но ветка была. Теперь лампа в этом
-  случае делит место с дверью — дверь у стены, лампа под потолком, — и это
-  проверяется отдельным зданием с вырожденно тесными правилами.
-- **`lamps_on(ROOF)` обещал крыше лампу,** которой раскладка ей не даёт, а тест
-  правил это подтверждал. Теперь у крыши ноль.
-- **Тест силуэта мерил ширину крыши, а занятость — нулевого этажа.** Сходилось
-  только потому, что сегодня они на одной ступени.
-- **Дальность в темноте мерилась по прямой,** а дальность огня — по горизонтали:
-  «1.8 — треть от шести» сравнивало разные вещи, и агент этажом ниже считался
-  слепым там, где стоящий на линии видит. Обе меры теперь горизонтальные.
-- **Мелочи:** `set_in_the_dark` пересчитывал мозг, которому темнота больше не
-  нужна; старый шнур не освобождался при перевеске без просвета; `look3d`
-  держал копию чисел `Atmosphere`; три локальные переменные звались `sign` и
-  заслоняли глобальную функцию; `dark_zones()` остался только для тестов —
-  убран; два комментария описывали не то, что делает код (перебор всех детей
-  уровня «не больше восьми», «ламп меньше, но не ноль» там, где выходил ноль).
+- **Re-sorting lamps moved the darkness.** `FloorLighting.hang` sorted the floor's list
+  on every insertion, and the key of a darkened zone is the lamp's index in that list: a
+  lamp hung after a zone went dark silently moved the darkness to the neighbouring zone.
+  Today all lamps are hung before play, so it never fired; the sort is removed, and "which
+  is further left" is decided by comparing x.
+- **The fill shone through the floor slabs.** A 7 m radius with a floor height of 3.6 m
+  and no shadow: in the shot of a darkened floor, its floor was lit by the lamps of the
+  floor below. The code review found it, and the `dark_shot` frame confirmed it. The
+  shadow is on, the shots are retaken, the cost is 0.8 ms per frame.
+- **A floor could end up without a single lamp.** Lamps are placed last, and on a cramped
+  floor there might be no free slots left at all. Such a floor is black in the frame, but
+  for the darkness rule it is permanently lit: there is nothing to put out. Over 400 seeds
+  (12000 floors) it never happened, but the branch existed. Now in this case the lamp
+  shares a slot with a door — the door by the wall, the lamp under the ceiling — and this
+  is checked by a separate building with degenerately cramped rules.
+- **`lamps_on(ROOF)` promised the roof a lamp** that the layout does not give it, and the
+  rules test confirmed this. Now the roof has zero.
+- **The silhouette test measured the roof's width but the occupancy of floor zero.** It
+  matched only because today they are on the same step.
+- **Range in darkness was measured in a straight line,** but firing range horizontally:
+  "1.8 is a third of six" compared different things, and an agent one floor below counted
+  as blind where one standing on the line can see. Both measures are now horizontal.
+- **Small things:** `set_in_the_dark` recomputed the brain, which no longer needs
+  darkness; the old cord was not freed when re-hanging without a gap; `look3d` kept a copy
+  of the `Atmosphere` numbers; three local variables were named `sign` and shadowed the
+  global function; `dark_zones()` remained only for tests — removed; two comments
+  described something other than what the code does (iterating over all level children
+  "no more than eight", "fewer lamps, but not zero" where zero came out).
 
-## Веха M18a · Раскладка здания
+## Milestone M18a · Building layout
 
-Решения — [ADR-0024](adr/0024-building-geometry.md). Веха M18 поделена надвое:
-M18a трогает всё, что влияет на граф достижимости, M18b — вид и геометрию.
+Decisions: [ADR-0024](adr/0024-building-geometry.md). Milestone M18 is split in two:
+M18a touches everything that affects the reachability graph, M18b the look and geometry.
 
-**DoD M18a:** на любом сиде здание проходимо, уровни выше порога влезают в кадр
-целиком, ниже — шире экрана, и на этаже тем больше путей, чем он ниже.
+**DoD M18a:** on any seed the building is passable, floors above the threshold fit in the
+frame entirely, those below are wider than the screen, and the lower a floor, the more
+paths it has.
 
-### Что показала сверка
+### What the check against the original showed
 
-- **Шахты оригинала пересекаются.** 1–5, 1–6, 1–7 ×3, 7–11, 7–13, 10–12, 13–15,
-  15–17, 19–30 с крышей. По этажам: внизу три–пять шахт, в середине одна–три,
-  в верхней трети одна, на восемнадцатом ни одной. Седьмой — sky lobby, на нём
-  сходятся пять.
-- **Эскалаторы стоят наверху, а не внизу** (17–20 по два, 16 один) — ровно там,
-  где перехлёста нет. Ниже пересадка идёт перехлёстом шахт. План вехи обещал
-  обратное, и сверка его развернула.
-- **Граф достижимости перехлёст уже тянет:** `BuildingRoute._links` соединяет все
-  этажи шахты между собой. Опасение «неравные и пересекающиеся тянут за собой
-  весь граф» не подтвердилось — работа в `_lay_shafts`, а не в графе.
-- **Ни один этаж не влезает в кадр:** кадр 19.2 м, самый узкий этаж 21.6,
-  самый широкий 38.4.
-- **Эскалатор давно не `Line2D`** — в 3D это две коробки полотна. Чего нет
-  на самом деле: балюстрады, ступеней, обрамления проёма.
+- **The original's shafts overlap.** 1–5, 1–6, 1–7 ×3, 7–11, 7–13, 10–12, 13–15,
+  15–17, 19–30 with the roof. By floor: at the bottom three to five shafts, in the middle
+  one to three, in the upper third one, on the eighteenth none. The seventh is the sky
+  lobby, where five meet.
+- **Escalators are at the top, not at the bottom** (17–20 two each, 16 one) — exactly
+  where there is no overlap. Lower down, transfers go through overlapping shafts. The
+  milestone plan promised the opposite, and the check reversed it.
+- **The reachability graph already handles overlap:** `BuildingRoute._links` connects all
+  floors of a shaft with each other. The fear that "unequal and overlapping shafts drag the
+  whole graph along" did not come true — the work is in `_lay_shafts`, not in the graph.
+- **No floor fits in the frame:** the frame is 19.2 m, the narrowest floor 21.6, the
+  widest 38.4.
+- **The escalator has long since stopped being a `Line2D`** — in 3D it is two boxes of
+  belt. What is actually missing: balustrades, steps, the opening's trim.
 
-### Сделано
+### Done
 
-- Сверка с оригиналом, [ADR-0024](adr/0024-building-geometry.md) принят,
-  `EPIC.md` переписан под разделённую веху.
-- **Лимит прогона поднят до 1200 с** и переехал из `godot_bin.py` в
-  `run_tests.py`: общий лимит там на один запуск движка, а тут идут сотни
-  тестов. Прогон печатает своё время и предупреждает, когда запас до лимита
-  меньше четверти, — долг M17 закрыт вместе с тем, из-за чего он копился молча.
-- **Сетка мест мельче:** 17 мест шагом 2.1 м вместо 9 шагом 4.2. Шаг держит
-  створку двери с её отъездом (1.68 м), шахту (1.2) и выход (1.92).
-- **Силуэт порогом** (`BuildingRules.wide_from`, `is_wide`): до двадцатого этажа
-  7 мест и 17.4 м — влезает в кадр 19.2; с двадцатого 17 мест и 38.4 м — вдвое
-  шире кадра. Равные ступени (`width_step`, `width_steps`) убраны.
-- **Шахты перехлёстываются.** `_lay_shafts` идёт развёрткой сверху вниз:
-  выбравшие пролёт закрываются, недостающие открываются по `shafts_on`. Пролёт
-  с разбросом ±2 — без него шахты, открытые на одном этаже, закрываются на
-  одном, и перехлёста нет вовсе. Число шахт на этаже совпадает с целью правил на
-  каждом из 30 этажей: одна наверху, пять на дне.
-- **Эскалаторы полосой у порога плюс гарантия на разрыве.** Занимают два места —
-  своё и следующее по ходу спуска: проём уходит на 2.28 м, площадка на 2.88, и
-  в один шаг сетки это не влезает. Второй на этаже уводит в другую сторону, если
-  геометрия позволяет.
-- **Внутренние стены:** глухие, на границе между местами, ставятся примерно на
-  трети этажей. `blocks_on` рядом с `gaps_on` — плита режется проёмами, ходьба
-  проёмами и стенами; `BuildingRoute` считает куски по второму. Стена, из-за
-  которой документ или выход стали недостижимы, снимается сразу при раскладке.
-- **Агент за стеной не стреляет:** `Enemy.set_target_behind_a_wall` разбирается
-  тем же путём, что и темнота M17, — не видит, значит не цель, и патрулирует.
-- **Ламп на этаже — доля ширины здания**, а не мест: на мелкой сетке счёт по
-  местам дал бы наверху две лампы вместо одной. Не метрами: абсолютный шаг не
-  пережил бы здание других размеров, а такие собирают тесты.
-- **Пилястра — раз в два места** (`BuildingRibs.SLOTS_PER_BAY`): ритм стены не
-  обязан следовать сетке раскладки, иначе он удвоился бы вместе с ней.
-- **Otto возвращается на свою сторону стены.** Место после смерти выбиралось по
-  живым агентам на всю ширину этажа, а самое дальнее от них — как раз за стеной,
-  где может не быть ни лифта, ни эскалатора. Теперь выбор идёт по куску этажа,
-  на котором Otto лежит; заодно перестал выбираться кусок за проёмом.
-- **`BuildingShell` — оболочка здания своим узлом:** перекрытия, наружные и
-  внутренние стены, комната за коридором. Уровень перевалил за тысячу строк, и
-  образец в проекте уже был — `BuildingShafts` и `BuildingRibs`. Вместе с кодом
-  туда уехали `WALL_WIDTH`, `PANEL_THICKNESS` и `EXIT_WIDTH`: проём выхода мерит
-  оболочка, а дверь в него ставит уровень, и двух чисел на один проём быть не должно.
-- **Тесты:** шахты и эскалаторы вынесены в `test_building_shafts.gd` (8), стены —
-  в `test_building_walls.gd` (6); силуэт проверяет попадание в кадр камеры;
-  `test_building_route` ломает здание отрезанным низом, а не снятыми
-  эскалаторами — без них спуск теперь остаётся.
-- **Точка ожидания кабины вынесена из её габарита** (`OttoBot.WAIT_ASIDE`,
-  0.96 → 1.26 м). Кабина, поднимаясь снизу, цепляла ждущего крышей и увозила
-  наверх, откуда ею не управляют. Разбор — в «Долге» ниже, правило — в
-  [`docs/testing.md`](testing.md), пункт 4.
-- **Инструмент замера и тест водят Otto одинаково** — два физических кадра на
-  решение. Расходились они молча, и это стоило вехе трёх коммитов ложных
-  объяснений; теперь единицу стережёт `test_a_tick_is_two_physics_frames`.
-- **Сторож простоя обрывает зациклившийся прогон** (`STALL_LIMIT`, 3000 шагов без
-  продвижения) и сообщает, где бот встал и что решал. Прежде такой прогон выжигал
-  весь бюджет и говорил «не уложился за N кадров» — формулировка, из-за которой
-  разбор ушёл в бюджет, хотя бот стоял на месте с 2900-го шага.
-- **Шахта короче трёх этажей больше не выпускается.** `_shaft_length` и раньше
-  не давал короче двух уровней, но дно шахты обрезается по дну
-  здания — и открытая на последнем этаже вырождалась в один уровень. Кабине
-  в такой ехать некуда, игроку она бесполезна. На сиде 2 такая полоса стояла
-  на 29-м этаже. Порог — `BuildingRules.MIN_SHAFT_FLOORS` = 3, а не 2:
-  двухэтажная кабина M18b в шахте на два этажа не сдвинется. Инвариант
-  закреплён `test_no_shaft_is_too_short_to_ride` по всем сидам.
-- **`test_every_car_obeys_the_player` перестал зависеть от случая.** Он брал
-  кабину там, где её застал прогон, и падал, если та стояла на нижнем упоре:
-  ехать вниз оттуда некуда. Раскладка M18a сделала это частым — шахт на дне
-  больше. Теперь кабина ставится на верх своей полосы.
-- **Бой меряется числом смертей**, а не тем, дожил ли бот на трёх жизнях
-  ([ADR-0016](adr/0016-combat-balance.md), пункт 8). Жизни в прогоне не
-  ограничены, порог — `DEATHS_ALLOWED`, числа сидов печатаются всегда.
-- **Время до тревоги — 300 с** вместо 100 ([ADR-0009](adr/0009-game-loop-and-alarm.md),
-  пункт 5). Прежнее значение ставили до M18a, и раскладка вехи его обесценила:
-  чистый проход стоит 89–113 с, то есть сирена успевала включиться до конца
-  безупречной партии и замедляла кабины там, где маршрут и так из пересадок.
-  Число временное, до живой игры.
-- **Шахта режет этаж, и половины сообщаются через стоящую кабину.** Это
-  механика оригинала, которой у нас до вехи не было: с перехлёстом шахт этаж
-  распадается на куски, и перейти из куска в кусок можно, только пока кабина
-  перекрывает проём собой. Теперь это есть и в графе, и у бота — отдельным
-  ходом «перейти сквозь кабину».
-- **Бот ходит по графу, а не жадно.** `BuildingRoute.walkable` собирает куски
-  этажей и подписанные переходы между ними один раз на здание, `step_toward`
-  отдаёт первый ход к цели. Бот ездит и вверх тоже — и лифтом, и эскалатором,
-  который ходит в обе стороны. Жадный спуск на новом здании упирался в тупик:
-  он брал первую шахту этажа, а их теперь до пяти и первая может на этом этаже
-  и кончаться.
-- **Трасса прогона печатает решение бота** — цель и ход к ней. По «жмёт [down]»
-  не видно, куда он собирался и почему передумал, а все пять поломок спуска
-  различались именно этим. `dump_plan` печатает маршрут по графу целиком:
-  документы сверху вниз, затем выход.
-- **Стене нужен зазор.** Почти метровая стена, встав вплотную к проёму, не
-  оставляла места, чтобы стоять, и дважды перекрывала эскалатор — площадкой
-  сверху и площадкой приземления этажом ниже; граф терял связь и печатал
-  «эскалатор упирается в проём». Теперь стена держит полшага сетки от проёмов,
-  эскалаторов, дверей и выхода.
-- **Инструменты:** `tools/layout_shot.gd` снимает четыре кадра вехи — башня,
-  стилобат, полоса эскалаторов, стена; съёмка по времени до двадцатого этажа не
-  доходит. `dump_plan.gd` печатает стены и сверяет число шахт с целью правил.
-- **Хук `gdformat` починен:** вызывается модулем, а не сгенерированной
-  `.exe`-обёрткой, которую блокирует управление приложениями Windows. Причина
-  была описана в самом конфиге, а `gdformat` под неё не подвели — в отличие
-  от `gdlint`.
+- Check against the original, [ADR-0024](adr/0024-building-geometry.md) accepted,
+  `EPIC.md` rewritten for the split milestone.
+- **The run limit is raised to 1200 s** and moved from `godot_bin.py` to
+  `run_tests.py`: the general limit there is per engine launch, while here hundreds of
+  tests run. The run prints its time and warns when the margin to the limit is under a
+  quarter — the M17 debt is closed together with the reason it piled up silently.
+- **A finer slot grid:** 17 slots at a 2.1 m step instead of 9 at 4.2. The step holds a
+  door leaf with its slide-out (1.68 m), a shaft (1.2) and the exit (1.92).
+- **Silhouette by threshold** (`BuildingRules.wide_from`, `is_wide`): up to the twentieth
+  floor 7 slots and 17.4 m — fits in the 19.2 frame; from the twentieth 17 slots and
+  38.4 m — twice as wide as the frame. Equal steps (`width_step`, `width_steps`) are removed.
+- **Shafts overlap.** `_lay_shafts` sweeps from top to bottom: shafts that have used up
+  their span close, missing ones open according to `shafts_on`. The span has a ±2 spread —
+  without it, shafts opened on the same floor close on the same floor, and there is no
+  overlap at all. The number of shafts on a floor matches the rules' target on each of the
+  30 floors: one at the top, five at the bottom.
+- **Escalators as a band at the threshold plus a guarantee at the break.** They take two
+  slots — their own and the next one in the direction of descent: the opening extends
+  2.28 m, the landing 2.88, and that does not fit into one grid step. A second escalator on
+  a floor leads the other way if the geometry allows.
+- **Interior walls:** solid, on the boundary between slots, placed on roughly a third of
+  the floors. `blocks_on` next to `gaps_on` — the slab is cut by gaps, walking by gaps and
+  walls; `BuildingRoute` counts pieces by the latter. A wall that made a document or the
+  exit unreachable is removed right during layout.
+- **An agent behind a wall does not shoot:** `Enemy.set_target_behind_a_wall` is handled
+  the same way as the M17 darkness — not seen means not a target, and it patrols.
+- **Lamps per floor are a fraction of the building width**, not of slots: on the fine
+  grid, counting by slots would give two lamps at the top instead of one. Not in metres:
+  an absolute step would not survive a building of other dimensions, and tests build such
+  buildings.
+- **A pilaster every two slots** (`BuildingRibs.SLOTS_PER_BAY`): the wall rhythm does not
+  have to follow the layout grid, otherwise it would have doubled along with it.
+- **Otto returns to his side of the wall.** The respawn spot was chosen by living agents
+  across the whole floor width, and the spot farthest from them was exactly behind the
+  wall, where there may be neither an elevator nor an escalator. Now the choice is made
+  within the floor piece Otto lies on; as a side effect, the piece beyond a gap is no
+  longer chosen.
+- **`BuildingShell` — the building shell in its own node:** floor slabs, outer and inner
+  walls, the room behind the corridor. The level had passed a thousand lines, and the
+  project already had a model — `BuildingShafts` and `BuildingRibs`. Along with the code,
+  `WALL_WIDTH`, `PANEL_THICKNESS` and `EXIT_WIDTH` moved there: the shell measures the exit
+  opening and the level puts the door into it, and there must not be two numbers for one
+  opening.
+- **Tests:** shafts and escalators moved to `test_building_shafts.gd` (8), walls to
+  `test_building_walls.gd` (6); the silhouette checks that it fits the camera frame;
+  `test_building_route` breaks the building by cutting off the bottom rather than by
+  removing escalators — without them a way down now remains.
+- **The cab waiting point is moved out of its bounding box** (`OttoBot.WAIT_ASIDE`,
+  0.96 → 1.26 m). A cab rising from below caught the waiting bot with its roof and carried
+  it up, where the cab cannot be controlled. The analysis is in "Debt" below, the rule in
+  [`docs/testing.md`](testing.md), item 4.
+- **The measurement tool and the test drive Otto the same way** — two physics frames per
+  decision. They diverged silently, and that cost the milestone three commits of false
+  explanations; now the unit is guarded by `test_a_tick_is_two_physics_frames`.
+- **A stall watchdog cuts off a looping run** (`STALL_LIMIT`, 3000 steps without
+  progress) and reports where the bot got stuck and what it was deciding. Previously such
+  a run burned the whole budget and said "did not finish in N frames" — wording that
+  sent the analysis toward the budget, although the bot had been standing still since
+  step 2900.
+- **A shaft shorter than three floors is no longer produced.** `_shaft_length` already did
+  not allow fewer than two levels, but the shaft bottom is clipped at the building bottom —
+  and a shaft opened on the last floor degenerated into a single level. A cab in such a
+  shaft has nowhere to go, it is useless to the player. On seed 2 such a band stood on the
+  29th floor. The threshold is `BuildingRules.MIN_SHAFT_FLOORS` = 3, not 2: the two-storey
+  cab of M18b will not move in a two-floor shaft. The invariant is pinned by
+  `test_no_shaft_is_too_short_to_ride` across all seeds.
+- **`test_every_car_obeys_the_player` no longer depends on chance.** It took the cab
+  wherever the run found it and failed if the cab was at its bottom stop: there is nowhere
+  to go down from there. The M18a layout made this frequent — there are more shafts at the
+  bottom. Now the cab is placed at the top of its band.
+- **Combat is measured by the number of deaths**, not by whether the bot survived on three
+  lives ([ADR-0016](adr/0016-combat-balance.md), item 8). Lives in the run are unlimited,
+  the threshold is `DEATHS_ALLOWED`, and per-seed numbers are always printed.
+- **Time to alarm is 300 s** instead of 100 ([ADR-0009](adr/0009-game-loop-and-alarm.md),
+  item 5). The old value was set before M18a, and the milestone's layout devalued it: a
+  clean run takes 89–113 s, meaning the siren managed to switch on before the end of a
+  flawless game and slowed down cabs where the route already consists of transfers.
+  The number is temporary, until live play.
+- **A shaft cuts the floor, and the halves connect through a standing cab.** This is a
+  mechanic of the original that we did not have before the milestone: with overlapping
+  shafts the floor breaks into pieces, and you can get from one piece to another only while
+  a cab covers the gap with itself. Now this exists both in the graph and in the bot — as a
+  separate move, "pass through the cab".
+- **The bot walks the graph instead of being greedy.** `BuildingRoute.walkable` collects
+  floor pieces and the labelled transitions between them once per building, `step_toward`
+  returns the first move toward the goal. The bot rides upward too — by elevator and by
+  escalator, which runs both ways. Greedy descent hit a dead end in the new building: it
+  took the floor's first shaft, but there are now up to five and the first one may end on
+  that very floor.
+- **The run trace prints the bot's decision** — the goal and the move toward it. "presses
+  [down]" does not show where it was heading and why it changed its mind, and all five
+  descent breakages differed precisely in that. `dump_plan` prints the whole route through
+  the graph: documents from top to bottom, then the exit.
+- **A wall needs clearance.** A wall almost a metre thick, placed right against a gap,
+  left no room to stand and twice blocked an escalator — with the landing at the top and
+  with the arrival landing on the floor below; the graph lost the connection and printed
+  "escalator runs into a gap". Now a wall keeps half a grid step from gaps, escalators,
+  doors and the exit.
+- **Tools:** `tools/layout_shot.gd` takes four shots of the milestone — tower, podium,
+  escalator band, wall; timed capture does not reach the twentieth floor. `dump_plan.gd`
+  prints walls and checks the number of shafts against the rules' target.
+- **The `gdformat` hook is fixed:** it is called as a module rather than through the
+  generated `.exe` wrapper that Windows application control blocks. The reason was
+  described in the config itself, but `gdformat` had not been adjusted for it — unlike
+  `gdlint`.
 
-### Что нашлось по дороге
+### What turned up along the way
 
-- **Развёртка в локстепе перехлёста не даёт.** Шахты, открытые на одном уровне
-  с одинаковым пролётом, закрываются на одном: пересадка снова оказывалась на
-  одном этаже, как до вехи. Лечится разбросом пролёта — в оригинале длины шахт
-  тоже разные: 5, 6, 7, 3, 12.
-- **Полоса эскалаторов съедала узкий этаж целиком.** Семь мест, из них шахта и
-  четыре под два эскалатора сверху, плюс два своих — девять из семи. Лампа
-  уходила в запасную ветку раскладки и делила место с эскалатором. Теперь
-  необязательный эскалатор уступает: `_room_left` держит места под двери и лампы.
-- **Стык у порога держался на последнем свободном месте.** Шахта башни кончалась
-  ровно там, где начинался стилобат, и весь спуск зависел от того, найдётся ли
-  эскалатору место на самом тесном этаже: на сидах 18 и 29 не находилось, и
-  выход становился недостижим. Шахта башни теперь заходит в стилобат на этаж.
-- **Стена не отличалась от пилястры.** На первых кадрах вехи внутренняя стена
-  шириной 0.48 м читалась украшением, а не «здесь не пройти»: пилястра рядом —
-  0.45. Стена стала почти метровой. Читаемость аркады важнее правдоподобия, и
-  места это не стоит — стена стоит на границе между местами.
-- **Метры не переживают тестовый мир.** Лампы сперва считались «одна на 12 м
-  ширины», и тест правил, который строит здание шириной 3840 своих единиц,
-  получил три лампы вместо одной. Доля ширины от ширины здания безразмерна.
-- **Снятые эскалаторы больше не ломают здание** — тест, который этим проверял,
-  что проходимость вообще ловится, стал подтверждать её всегда.
-- **Спуск ломался пять раз подряд, и каждый раз по-новому.** Все пять — про
-  устройство здания, а не про удобство теста, и ни одно не видно без трассы
-  решений: граф не предлагал переход через проём вовсе, и половины этажа были
-  недостижимы друг для друга; стоящий в кабине приписывался к одному куску из
-  двух; бот, задумав ехать соседней шахтой, ехал в той, в которой стоял, —
-  её пролёт целевой этаж тоже накрывал; остановка «пока не совпало с полом»
-  давала качели, потому что за кадр кабина проходит больше допуска; переход
-  через проём кончался в самой кабине, и «дошёл» наступало, не сходя с места.
-- **Допуск примыкания в метр врал.** Посадка в шахту считалась возможной, если
-  кусок этажа не дальше метра от её столбца, — метровая стена укладывалась
-  в этот допуск целиком. Граф обещал связь, которой нет: генератор принимал
-  стену, отрезавшую выход, тест проходимости это подтверждал, а игрок упирался
-  в стену. Допуск ужат до 0.05 м — на дробную арифметику, и только на неё.
-- **Кусок этажа без хода вниз — не поломка, а крюк.** Шахта кончается на этаже,
-  и если рядом только проём эскалатора, с этого куска вниз хода нет: надо
-  уехать обратно наверх. Здание при этом проходимо — связи двусторонние, — но
-  жадный спуск там встаёт. Починка генератора (продлить шахту, воткнуть
-  эскалатор) обошлась дороже пользы: она растягивала шахты мимо правил и
-  съедала места под лампы. Правильным ответом оказался граф у бота.
+- **A lockstep sweep does not produce overlap.** Shafts opened on the same level with the
+  same span close on the same level: the transfer again ended up on a single floor, as
+  before the milestone. The cure is a spread in span — in the original, shaft lengths also
+  differ: 5, 6, 7, 3, 12.
+- **The escalator band ate a narrow floor entirely.** Seven slots, of which a shaft and
+  four under two escalators from above, plus two of its own — nine out of seven. The lamp
+  fell into the fallback branch of the layout and shared a slot with an escalator. Now an
+  optional escalator gives way: `_room_left` reserves slots for doors and lamps.
+- **The joint at the threshold hung on the last free slot.** The tower shaft ended exactly
+  where the podium began, and the whole descent depended on whether an escalator found
+  room on the most cramped floor: on seeds 18 and 29 it did not, and the exit became
+  unreachable. The tower shaft now extends one floor into the podium.
+- **A wall was indistinguishable from a pilaster.** In the milestone's first shots an
+  interior wall 0.48 m wide read as decoration rather than "no way through here": the
+  pilaster next to it is 0.45. The wall became almost a metre thick. Arcade readability
+  matters more than plausibility, and it costs no slots — the wall stands on the boundary
+  between slots.
+- **Metres do not survive the test world.** Lamps were first counted as "one per 12 m of
+  width", and the rules test, which builds a building 3840 of its own units wide, got
+  three lamps instead of one. A fraction of the building width is dimensionless.
+- **Removed escalators no longer break the building** — the test that used this to check
+  that passability is caught at all started confirming it every time.
+- **The descent broke five times in a row, each time in a new way.** All five were about
+  how the building is built, not about test convenience, and none is visible without a
+  decision trace: the graph did not offer a transition through a gap at all, and the
+  halves of a floor were unreachable from each other; a bot standing in a cab was assigned
+  to one of the two pieces; the bot, intending to ride a neighbouring shaft, rode the one
+  it stood in — its span also covered the target floor; stopping "until it matches the
+  floor" caused oscillation, because in one frame a cab travels more than the tolerance;
+  the transition through a gap ended inside the cab itself, and "arrived" fired without
+  moving.
+- **The one-metre adjacency tolerance lied.** Boarding a shaft was considered possible if
+  the floor piece was no more than a metre from its column — a metre-thick wall fit within
+  that tolerance entirely. The graph promised a connection that did not exist: the
+  generator accepted a wall that cut off the exit, the passability test confirmed it, and
+  the player ran into the wall. The tolerance is tightened to 0.05 m — for fractional
+  arithmetic, and only for that.
+- **A floor piece with no way down is not a breakage but a detour.** A shaft ends on a
+  floor, and if there is only an escalator opening nearby, there is no way down from this
+  piece: you have to ride back up. The building is still passable — the links are
+  two-way — but greedy descent gets stuck there. Fixing the generator (extending the shaft,
+  inserting an escalator) cost more than it gave: it stretched shafts beyond the rules and
+  ate slots meant for lamps. The right answer turned out to be the graph in the bot.
 
-### Бой просел и вернулся: замер и что осталось
+### Combat dropped and came back: the measurement and what remained
 
-> **Развязка — в разделе «Долг» ниже: долг закрыт, проверка боя
-> вернулась к полной.** Ниже описан замер в том виде, в каком он шёл, потому что
-> две версии причины оказались ложными и это стоит помнить. Итог: все три сида
-> с боем проходятся, смертей 3, 2 и 1 при пороге `DEATHS_ALLOWED` = 6.
+> **The resolution is in the "Debt" section below: the debt is closed, the combat check
+> is back to full.** The measurement is described below as it went, because two versions
+> of the cause turned out to be false and that is worth remembering. Result: all three
+> seeds with combat are passed, with 3, 2 and 1 deaths against a `DEATHS_ALLOWED`
+> threshold of 6.
 
-Спуск без агентов бот проходил на всех сидах. С агентами — на одном из трёх,
-а до вехи проходил на трёх. Числа боя при этом не тронуты ни одним значением.
+Without agents the bot passed the descent on all seeds. With agents, on one of three,
+while before the milestone it passed on three. Not a single combat number was touched.
 
-Замер говорит, отчего: **все смерти случаются у шахты или в кабине, с агентом
-в 30–80 см.** Бот не слаб — он убивает по тридцать агентов за партию, — он
-слишком много стоит. Перехлёст шахт добавил пересадок и переходов через проём,
-и каждое ожидание кабины стало стойкой под огнём.
+The measurement says why: **all deaths happen by a shaft or in a cab, with an agent
+30–80 cm away.** The bot is not weak — it kills thirty agents per game — it stands still
+too much. Overlapping shafts added transfers and passages through gaps, and every wait
+for a cab became a stand under fire.
 
-Две правки поведения бот уже получил, и обе замерены:
+The bot has already received two behaviour fixes, and both were measured:
 
-- **садится в кабину, не дожидаясь её приезда.** Правило с M2 стоило дёшево,
-  пока шахта была одна на полосу; переход через проём идёт к уже стоящей
-  кабине, которая приезжать не собирается. Сид 3 с агентами после этого прошёл;
-- **уклонение в стоящей кабине — отвергнуто замером.** На этаже кабина тот же
-  пол, и присед на ней работает, но бот стал приседать вместо того, чтобы идти:
-  на сиде 2 он не собрал ни одного документа за весь прогон. Откатано, причина
-  записана в коде.
+- **it boards a cab without waiting for it to arrive.** The rule from M2 was cheap while
+  there was one shaft per band; a passage through a gap goes to an already standing cab
+  that is not going to arrive. After this, seed 3 with agents passed;
+- **dodging in a standing cab was rejected by measurement.** On a floor, the cab is the
+  same floor and crouching on it works, but the bot started crouching instead of walking:
+  on seed 2 it did not collect a single document in the whole run. Rolled back, the reason
+  is recorded in the code.
 
-Оставшееся — не поведение, а баланс: здание стало теснее (узкий этаж 17.4 м
-вместо 21.6) и заставляет чаще останавливаться. Числа боя живут в
-`BuildingRules` и правятся замером на шести сидах ([ADR-0016](adr/0016-combat-balance.md)) —
-это отдельная работа со своим решением, и делать её молча, чтобы позеленел
-тест, нельзя.
+What remains is not behaviour but balance: the building has become more cramped (narrow
+floor 17.4 m instead of 21.6) and forces more frequent stops. Combat numbers live in
+`BuildingRules` and are tuned by measurement on six seeds ([ADR-0016](adr/0016-combat-balance.md)) —
+that is separate work with its own decision, and it must not be done silently just to
+turn a test green.
 
-**Решено 2026-09-22:** числа перемеряются, но отдельной вехой —
-[M18d](EPIC.md). Раскладка мержится раньше: она готова и проверена, а баланс —
-своя ось.
+**Decided 2026-09-22:** the numbers are re-measured, but as a separate milestone —
+[M18d](EPIC.md). The layout is merged earlier: it is ready and verified, and balance is
+its own axis.
 
-Ослаблять проверку под это в итоге не понадобилось: настоящей причиной оказался
-`WAIT_ASIDE` бота, а не баланс, и после правки проверка не ослаблена, а **усилена** —
-собираются все документы, а число смертей стало мерой вместо «дожил или нет»
-([ADR-0016](adr/0016-combat-balance.md), пункт 8). Разбор — в «Долге» ниже.
+In the end, weakening the check for this was not needed: the real cause turned out to be
+the bot's `WAIT_ASIDE`, not balance, and after the fix the check was not weakened but
+**strengthened** — all documents are collected, and the number of deaths became the
+measure instead of "survived or not" ([ADR-0016](adr/0016-combat-balance.md), item 8).
+The analysis is in "Debt" below.
 
-### Долг: почему сид 2 не проходил здание
+### Debt: why seed 2 did not pass the building
 
-Закрыт 2026-09-22, до слияния вехи. Разбор стоит помнить: две версии причины
-оказались ложными, а настоящая нашлась третьей.
+Closed 2026-09-22, before the milestone was merged. The analysis is worth remembering:
+two versions of the cause turned out to be false, and the real one was found third.
 
-Считалось, что сиду 2 не хватает бюджета: маршрут по графу длиннее жадного
-спуска. Замер это опроверг — бот не опаздывал, он **застревал**, выжигая весь
-бюджет на 21-м этаже.
+It was believed that seed 2 lacked budget: the route through the graph is longer than
+greedy descent. The measurement refuted this — the bot was not late, it was **stuck**,
+burning the whole budget on the 21st floor.
 
-Первое расхождение: тест и `tools/playthrough.gd` водили Otto **с разной
-частотой** — инструмент кадром на решение, тест двумя (`wait_physics_frames(1)`
-ждёт два кадра, это правило M13). Числа обоих назывались «кадрами», но значили
-разное, и бюджет, поставленный по замеру инструмента, в тесте означал вдвое
-меньше. Инструмент переведён на два кадра, единица закреплена тестом
+The first discrepancy: the test and `tools/playthrough.gd` drove Otto **at different
+rates** — the tool with one frame per decision, the test with two (`wait_physics_frames(1)`
+waits two frames, this is the M13 rule). Both sets of numbers were called "frames" but
+meant different things, and a budget set from the tool's measurement meant half as much
+in the test. The tool is switched to two frames, and the unit is pinned by the test
 `test_a_tick_is_two_physics_frames`.
 
-Настоящая причина: **бот ждал кабину внутри её габарита.** `WAIT_ASIDE` был
-0.96 м от оси шахты, бот вставал в 0.81 м, и с полушириной тела 0.27 его край
-оказывался в 0.54 м при полуширине кабины 0.6. Кабина, поднимаясь снизу,
-цепляла его крышей и увозила наверх; крышей управлять нельзя, сойти между
-этажами некуда, кабина уходила, он падал обратно на этаж — и так до конца
-прогона. `WAIT_ASIDE` отодвинут до 1.26 м: габарит кабины плюс полуширина Otto,
-плюс допуск прихода, плюс путь за два кадра. Это ровно то, ради чего правило
-M13 держат: допуск оказался меньше габарита, и поймала это грубая петля
-управления.
+The real cause: **the bot waited for the cab inside its bounding box.** `WAIT_ASIDE` was
+0.96 m from the shaft axis, the bot stopped at 0.81 m, and with a body half-width of 0.27
+its edge ended up at 0.54 m while the cab half-width is 0.6. A cab rising from below
+caught it with its roof and carried it up; the roof cannot be controlled, there is
+nowhere to step off between floors, the cab left, the bot fell back onto the floor — and
+so on until the end of the run. `WAIT_ASIDE` is moved out to 1.26 m: the cab's bounding
+box plus Otto's half-width, plus the arrival tolerance, plus the distance covered in two
+frames. This is exactly why the M13 rule is kept: the tolerance turned out to be smaller
+than the bounding box, and a coarse control loop caught it.
 
-После правки без боя проходят все пять сидов (1992–3176 шагов), с боем — все
-три. Гипотеза «гибнет не от слабости, а оттого, что стоит у шахт под огнём»
-подтвердилась буквально. Бюджеты пересчитаны в шагах петли: `TALL_BUDGET`
-и `GUARDED_BUDGET` по 7000, вдвое от худшего сида.
+After the fix, all five seeds pass without combat (1992–3176 steps), and all three with
+combat. The hypothesis "it dies not from weakness but because it stands by shafts under
+fire" was confirmed literally. Budgets are recalculated in loop steps: `TALL_BUDGET`
+and `GUARDED_BUDGET` are 7000 each, twice the worst seed.
 
-**Обход pre-push (`--no-verify`) от 2026-09-22** был нарушением пункта 5
-«Жёстких правил», и причина его — тот самый красный тест. Причина устранена,
-обходов больше нет.
+**Bypassing pre-push (`--no-verify`) on 2026-09-22** violated item 5 of the "Hard rules",
+and its cause was that very red test. The cause is eliminated, there are no more bypasses.
 
-### Авторевью
+### Code review
 
-- **Стена вырастала сквозь кабину лифта.** Место стене искалось по проёмам
-  (`gaps_on`), а на **дне шахты проёма нет** — плита там целая, кабина на ней
-  стоит. Шахта на своём нижнем этаже для отбора пропадала, и стена вставала
-  вплотную к ней, а то и внутрь: на сиде 6 — на 0.45 м внутрь габарита кабины
-  шахты 15..21, на сиде 7 — сразу двух. Вошедший в такую кабину Otto оказывался
-  в стене, а граф достижимости обещал выход только в одну сторону. Теперь
-  `_wall_blockers` считает столбец шахты целиком, на всех её уровнях, — как это
-  давно делает `_is_clear`. На двенадцати сидах ушло девять таких стен из 81,
-  проходимость не пострадала. Стережёт `test_no_wall_grows_through_a_shaft`
-  на 39 сидах.
-- **Инструмент замера снова мерил не в тех единицах.** `tools/playthrough.gd`
-  перевели на два кадра на шаг, но все его подписи остались «кадров», а
-  `FRAME_BUDGET` = 24000 — числом в кадрах: потолок по часам молча удвоился.
-  Это ровно то расхождение, которое стоило вехе трёх коммитов. Подписи и
-  константа (`STEP_BUDGET` = 12000) переведены в шаги.
-- **Бот молчал о том, что зашёл в тупик.** Когда граф не даёт хода, `_advance`
-  выходил, не тронув `decision()`, — и сторож простоя печатал последнее
-  **удавшееся** решение, уводя разбор туда, где всё в порядке. Теперь пишет
-  «хода нет» и куда шёл.
-- **Тест управления кабинами сопоставлял кабину и шахту по номеру в списке**, ни
-  на чём это не проверяя. Перепутанная пара поставила бы кабину на чужие
-  остановки, и проверка осталась бы зелёной, ничего не проверяя. Пара теперь
-  сверяется по столбцу.
-- **Мелочи:** `_car_was_here` у бота писался и не читался с тех пор, как посадка
-  перестала ждать приезда; `continues` в прогоне остался от убранного подлива
-  жизней и печатался как «партий 1»; `build_solid` в `BuildingShell` был
-  публичным ради вызывающего, которого нет, и при переезде из уровня потерял
-  объяснение своей глубины; выбор места стены шёл мимо `_pick_any` вопреки
-  правилу файла; `layout_shot` брал `slot_x(1)` — координату — за шаг сетки и
-  падал бы на этаже без свободных мест; в арифметике `WAIT_ASIDE` запас на два
-  кадра был посчитан без `Engine.time_scale`; этот раздел статуса противоречил
-  «Долгу» ниже, обещая ослабленную проверку боя.
+- **A wall grew through an elevator cab.** A spot for a wall was searched by gaps
+  (`gaps_on`), but at the **bottom of a shaft there is no gap** — the slab there is whole
+  and the cab stands on it. On its lowest floor the shaft disappeared from the selection,
+  and the wall was placed right against it, or even inside it: on seed 6 — 0.45 m inside
+  the cab bounding box of shaft 15..21, on seed 7 — two at once. Otto entering such a cab
+  ended up inside the wall, and the reachability graph promised an exit in only one
+  direction. Now `_wall_blockers` counts the shaft column as a whole, on all its levels —
+  as `_is_clear` has long done. Over twelve seeds nine such walls out of 81 went away, and
+  passability did not suffer. Guarded by `test_no_wall_grows_through_a_shaft` on 39 seeds.
+- **The measurement tool again measured in the wrong units.** `tools/playthrough.gd` was
+  switched to two frames per step, but all its labels still said "frames", and
+  `FRAME_BUDGET` = 24000 was a number in frames: the wall-clock cap silently doubled.
+  This is exactly the discrepancy that cost the milestone three commits. The labels and
+  the constant (`STEP_BUDGET` = 12000) are converted to steps.
+- **The bot was silent about hitting a dead end.** When the graph gives no move,
+  `_advance` returned without touching `decision()` — and the stall watchdog printed the
+  last **successful** decision, steering the analysis to where everything was fine. Now
+  it writes "no move" and where it was heading.
+- **The cab control test matched a cab with a shaft by list index** without checking it
+  against anything. A mismatched pair would put a cab on someone else's stops, and the
+  check would stay green while checking nothing. The pair is now matched by column.
+- **Small things:** the bot's `_car_was_here` was written and never read since boarding
+  stopped waiting for arrival; `continues` in the run was left over from the removed
+  life top-up and was printed as "games 1"; `build_solid` in `BuildingShell` was public
+  for a caller that does not exist, and in the move out of the level it lost the
+  explanation of its depth; choosing the wall spot bypassed `_pick_any` contrary to the
+  file's rule; `layout_shot` took `slot_x(1)` — a coordinate — as the grid step and would
+  have failed on a floor without free slots; in the `WAIT_ASIDE` arithmetic the two-frame
+  margin was computed without `Engine.time_scale`; this status section contradicted
+  "Debt" below by promising a weakened combat check.
 
-Две находки не взяты, и обе сознательно:
+Two findings were not taken, both deliberately:
 
-- **Ритм пилястр на узкой башне несимметричен — оставлен как есть** (решение
-  пользователя, 2026-09-22). Шаг в два места проходит границы 0–1, 2–3 … 14–15
-  и не доходит до 15–16. Симметричного варианта при 17 местах и шаге в два
-  не существует: шестнадцать границ не делятся так, чтобы середина попала
-  в стык. Выбор был между смещённым ритмом и неровным центральным пролётом.
-  Записано в `BuildingRibs.SLOTS_PER_BAY`.
-- **`_moves` и `_links` в `BuildingRoute` — два счёта одного графа.** Слить их
-  правильно, но `is_winnable` зовётся около десяти раз на здание, а `_moves`
-  заводит словарь на каждое ребро: слияние заметно замедлит генерацию. Не
-  в конце вехи. Пока они расходятся в одном месте — на вырожденном конце
-  эскалатора `_links` ругается, `_moves` молча пропускает. **Взято в M18b:**
-  агенты в кабинах добавляют графу третьего читателя, и расхождение счетов
-  стало бы дороже слияния.
+- **The pilaster rhythm on the narrow tower is asymmetric — left as is** (user's
+  decision, 2026-09-22). A two-slot step passes boundaries 0–1, 2–3 … 14–15 and does not
+  reach 15–16. With 17 slots and a step of two, no symmetric variant exists: sixteen
+  boundaries cannot be divided so that the middle falls on a joint. The choice was between
+  a shifted rhythm and an uneven central bay. Recorded in `BuildingRibs.SLOTS_PER_BAY`.
+- **`_moves` and `_links` in `BuildingRoute` are two counts of one graph.** Merging them
+  is right, but `is_winnable` is called about ten times per building, and `_moves`
+  creates a dictionary for every edge: merging would noticeably slow down generation. Not
+  at the end of a milestone. For now they diverge in one place — at a degenerate escalator
+  end `_links` complains, `_moves` silently skips. **Taken into M18b:** agents in cabs add
+  a third reader of the graph, and the counts diverging would have become more expensive
+  than merging.
+## Milestone M18b · Geometry, look and passengers
 
-## Веха M18b · Геометрия, вид и пассажиры
+Decisions — [ADR-0025](adr/0025-shafts-escalators-and-riders.md). The second half of
+M18: look and movement, not reachability. The layout from M18a is in `main` and is not
+rewritten — but the milestone still moves its numbers, and that is recorded below as a cost,
+not as a surprise.
 
-Решения — [ADR-0025](adr/0025-shafts-escalators-and-riders.md). Вторая половина
-M18: вид и ход, а не достижимость. Раскладка из M18a в `main` и не переписывается —
-но её числа веха всё же двигает, и это записано ниже как цена, а не как сюрприз.
+**DoD:** from the twentieth floor down there is always a choice of where to ride in the frame,
+an escalator looks like an escalator rather than a line between floors, and a cab can carry
+someone other than Otto.
 
-**DoD:** с двадцатого этажа и ниже в кадре всегда есть выбор, куда ехать,
-эскалатор выглядит эскалатором, а не линией между этажами, и в кабине можно
-встретить не только Otto.
+### What the check against the original showed
 
-### Что показала сверка
-
-- **Двухэтажных шахт в оригинале две, а не одна.** Elevator World: «two shafts
-  featured a kind of double-decker elevator». ADR-0024 писал «не больше одной
-  на здание» — исправлено.
-- **Агенты в оригинале ездят в кабинах, но не управляют ими.** «When Otto is not
+- **The original has two double-decker shafts, not one.** Elevator World: "two shafts
+  featured a kind of double-decker elevator". ADR-0024 said "no more than one
+  per building" — corrected.
+- **Agents in the original ride cabs but do not control them.** "When Otto is not
   in an elevator, it will move from floor to floor automatically, even when enemy
-  spies are in it». То есть обещание ADR-0024 «в соседнем ярусе едет агент» —
-  поведение оригинала, и устроено оно дешевле, чем казалось: агент пассажир,
-  а не диспетчер. Вызова кабины в оригинале нет ни у кого.
-- **Эскалаторы 17–20 по два, 16 один** — подтвердилось повторно: полоса,
-  выложенная в M18a, легла верно.
-- **Кабиной в оригинале давят агентов.** У нас давится только Otto. Расхождение
-  записано, в вехе не берётся — это правило счёта, ему место в M18d.
-- **Столб света в шахте оригиналом не подтверждается ничем** — наш долг с M12
-  и наше решение.
+  spies are in it". So ADR-0024's promise "an agent rides in the neighbouring deck" is
+  the original's behaviour, and it is cheaper than it seemed: the agent is a passenger,
+  not a dispatcher. Nobody in the original can call a cab.
+- **Escalators on 17–20 come in pairs, 16 has one** — confirmed again: the band
+  laid out in M18a is correct.
+- **In the original the cab crushes agents.** Ours crushes only Otto. The discrepancy
+  is recorded and not taken into the milestone — it is a scoring rule and belongs in M18d.
+- **The light column in the shaft is not backed by the original at all** — it is our debt
+  from M12 and our decision.
 
-### Что показал код
+### What the code showed
 
-- **Шахт на здание двенадцать** (сид 1, `tools/dump_plan.gd`), длиной от трёх
-  этажей до четырнадцати.
-- **Агенты лифтами не пользуются вовсе:** во всём `src/` `ElevatorCar` знает
-  только Otto, и `EnemyBrain` говорит об этом прямо — долг с ADR-0006.
-- **Эскалатор — две коробки полотна.** Балюстрады, ступеней, площадок и
-  обрамления проёма нет.
-- **В шахте нет источника света:** направляющие, створки и упоры есть, светят
-  только лампы этажей и индикаторы кабины.
+- **Twelve shafts per building** (seed 1, `tools/dump_plan.gd`), from three
+  to fourteen floors long.
+- **Agents do not use elevators at all:** across all of `src/`, `ElevatorCar` knows
+  only Otto, and `EnemyBrain` says so outright — a debt from ADR-0006.
+- **The escalator is two boxes of belt.** There is no balustrade, no steps, no landings and
+  no opening trim.
+- **The shaft has no light source:** guide rails, doors and stops exist; only the floor lamps
+  and the cab indicators give light.
 
-### План вехи
+### Milestone plan
 
-- [x] Эскалатор конструкцией: балюстрада, ступени рельефом, площадки,
-      обрамление проёма
-- [x] Балюстрада несимметрична: у задней стены полная, со стороны камеры низкий
-      борт — иначе она закрывает едущего Otto по грудь
-- [x] Столб света в шахте настоящим источником: не гаснет от выстрела, в зонах
-      темноты не участвует, замер кадра на широком этаже стилобата
-- [x] Двухэтажная пара: до двух на здание, в каждом здании, где есть куда;
-      только в шахте, у которой на каждом её этаже есть другой путь
-- [x] `MIN_SHAFT_FLOORS` с трёх до четырёх — **меняет раскладку всех зданий**,
-      прогон бота перемеряется целиком
-- [x] Агенты ездят в кабинах пассажирами. Идёт последней: перемер прогона должен
-      быть один, а не два
-- [~] Долг: прогон с боем на сиде 1 воспроизводится — **две причины из трёх
-      найдены и убраны, третья опознана** (см. ниже)
-- [x] Долг: `_moves` и `_links` в `BuildingRoute` сливаются в один счёт графа
+- [x] Escalator as a structure: balustrade, relief steps, landings,
+      opening trim
+- [x] The balustrade is asymmetric: full at the back wall, a low rail on the camera
+      side — otherwise it hides a riding Otto up to the chest
+- [x] The light column in the shaft as a real source: not put out by a shot, does not take
+      part in darkness zones, frame measured on a wide podium floor
+- [x] Double-decker pair: up to two per building, in every building where there is room;
+      only in a shaft that has another route on each of its floors
+- [x] `MIN_SHAFT_FLOORS` from three to four — **changes the layout of every building**,
+      the bot run is remeasured in full
+- [x] Agents ride cabs as passengers. Goes last: the run should be remeasured
+      once, not twice
+- [~] Debt: the combat run on seed 1 reproduces — **two causes of three
+      found and removed, the third identified** (see below)
+- [x] Debt: `_moves` and `_links` in `BuildingRoute` merge into one graph count
 
-### Что нашлось по дороге
+### What turned up along the way
 
-- **Ломаная эскалатора читалась жёлобом.** Пологий вход под 25° упирался в обрыв
-  под 63°, а балюстрады двух пролётов расходились на изломе веером. Перегиб
-  переехал к ближнему краю проёма и на уровень пола: до него площадка по этажу,
-  дальше один прямой пролёт. Считает его теперь `EscalatorSpot.bend` — рядом
-  с `gap`, через который он проходит, — и уровень с тестом берут одно число.
-- **Запас в проёме — 15 см, и он не виден глазом.** Сквозь дыру идёт не линия
-  пути, а тело шириной в полкорпуса; отступ перегиба (0.42 м) выставлен по нему.
-  Съесть этот запас можно одним числом правил — шириной проёма или его
-  отступом, — поэтому его стережёт `test_escalator_carries_its_rider_through_the_gap`.
-- **Эскалатор стоит там, где нет лампы.** Замер на 24 сидах: из 120 эскалаторов
-  под пятном лампы только 25, до ближайшей в среднем 5.7 м, в худшем 10.5.
-  Мест на этаже мало, эскалатор занимает два — и встаёт он в стороне от ламп.
-  Без света от всей конструкции оставались две рейки в темноте. Поэтому у
-  пролёта свой источник, а на концах поручня — огоньки, тем же приёмом, что
-  индикаторы кабины (ADR-0023, решение 6).
-- **Столб света в шахте сперва отменял темноту M17.** С радиусом 4.2 м столбы
-  пяти шахт стилобата заливали этаж целиком, и погашенный этаж переставал быть
-  погашенным. Радиус сжат до 1.8 — чуть шире самой шахты: столб светит в шахте,
-  а не вместо ламп.
-- **Кадр не подорожал:** `light_bench` даёт 1.97 мс GPU (худший 2.34) при 71
-  источнике в кадре, бюджет 16.6. На M17 было 2.0. Столбы и свет эскалаторов
-  теней не кладут и гаснут вне кадра — тем же правилом, что лампы.
-- **Пара отняла у куска этажа единственный ход, и `is_winnable` этого не увидел.**
-  На сиде 3 шахта на девятнадцатом этаже была одна, пара перестала возить с его
-  крайних этажей — и два куска стали карманом. Документа в них нет, проходимость
-  здания цела, а бот, зайдя туда, встал: 3001 шаг без продвижения, «хода нет».
-  Порог для пары строже, чем для стены: она обязана оставить достижимым **ровно
-  то же**, что было достижимо без неё, и это считается набором узлов до и после.
-- **Раскладку двухэтажной пары нельзя ставить до дверей.** В первом заходе пара
-  выбиралась сразу после эскалаторов, и укороченный ею граф отнимал места
-  у документов: на 10 сидах из 40 в здание влезало три документа вместо пяти.
-  Теперь пара идёт последней, рядом со стенами, — по той же причине, что и они.
-- **Слияние `_moves` и `_links` вдвое замедлило генерацию, и это чинилось не
-  подписями.** Замер: 12.2 мс на здание до, 24.5 после. Дорог был не словарь
-  на ребро, а словарь на узел и `ride_span()` в квадратном переборе; на
-  параллельных массивах и с вынесенным диапазоном вышло 16.6 мс. Плюс треть
-  к генерации против двух счетов одного графа, которые уже разошлись однажды,
-  — цена принята и записана.
-- **`building_plan.gd` дважды за веху упёрся в потолок в 1000 строк.** Правила
-  пары вынесены в `building_decks.gd`; жребий (`pick_any`) стал публичным, чтобы
-  порядок обращений к генератору по-прежнему считался в одном месте.
-- **`sees_target` — это «Otto не в тени и не за стеной», а не «Otto близко».**
-  Первая версия пускала агента к лифту, только пока он Otto не видит, и лифты
-  не включались почти никогда. Решает уровень: кабина предлагается, когда Otto
-  на другом этаже.
-- **Агента дёргало между двумя кабинами.** На этаже стилобата шахт до пяти,
-  и предложение переезжало с одной кабины на другую по кадрам: за полминуты
-  агент не сдвинулся с места. Теперь берётся ближайшая, и выбор держится,
-  пока ехать вообще есть куда.
-- **Сид 1 не повторялся, потому что здание жило по настенным часам.** Выпуск
-  агентов у дверей и таймер возвращения Otto считались в `_process`, а бот водит
-  Otto шагами физики: за один и тот же шаг бота на быстрой машине из дверей
-  выходило больше агентов, и сид давал то четыре смерти, то пять при том же
-  числе шагов. Ход здания переехал в `_physics_process`, таймер возвращения —
-  на отсчёт в физике; в `_process` осталась только картинка.
+- **The escalator's broken line read as a chute.** The gentle 25° entry ran into a drop
+  at 63°, and the balustrades of the two flights fanned out at the bend. The bend
+  moved to the near edge of the opening and to floor level: up to it, a landing along the floor,
+  past it, one straight flight. It is now computed by `EscalatorSpot.bend` — next
+  to `gap`, which it passes through — and the level and the test take the same number.
+- **The clearance in the opening is 15 cm, and the eye cannot see it.** What goes through the
+  hole is not the path line but a body half a hull wide; the bend offset (0.42 m) is set by it.
+  One rule number can eat that margin — the width of the opening or its
+  offset — so `test_escalator_carries_its_rider_through_the_gap` guards it.
+- **Escalators stand where there is no lamp.** Measured on 24 seeds: of 120 escalators
+  only 25 are under a lamp's pool, the nearest lamp is 5.7 m away on average, 10.5 at worst.
+  There are few places on a floor, an escalator takes two — and it lands away from the lamps.
+  Without light all that remained of the structure were two rails in the dark. So the
+  flight has its own source, and the handrail ends have indicator lights, the same trick
+  as the cab indicators (ADR-0023, decision 6).
+- **The light column in the shaft at first cancelled M17's darkness.** With a 4.2 m radius
+  the columns of the podium's five shafts flooded the whole floor, and a dark floor stopped
+  being dark. The radius is cut to 1.8 — slightly wider than the shaft itself: the column
+  lights the shaft, not in place of the lamps.
+- **The frame did not get more expensive:** `light_bench` gives 1.97 ms GPU (worst 2.34) with 71
+  sources in frame, budget 16.6. M17 had 2.0. The columns and escalator lights
+  cast no shadows and switch off outside the frame — by the same rule as lamps.
+- **The pair took the only route away from a piece of a floor, and `is_winnable` did not see it.**
+  On seed 3 there was one shaft on the nineteenth floor, the pair stopped serving its
+  end floors — and two pieces became a pocket. There is no document in them, the building
+  stays passable, yet the bot, having gone in, got stuck: 3001 steps without progress, "no route".
+  The threshold for a pair is stricter than for a wall: it must leave reachable **exactly
+  the same** set as was reachable without it, and this is counted as the node set before and after.
+- **The double-decker pair layout cannot go before the doors.** In the first attempt the pair
+  was chosen right after the escalators, and the graph it shortened took places away
+  from documents: on 10 seeds of 40 the building fit three documents instead of five.
+  Now the pair goes last, next to the walls — for the same reason as they do.
+- **Merging `_moves` and `_links` doubled generation time, and signatures were not the
+  fix.** Measured: 12.2 ms per building before, 24.5 after. The cost was not a dictionary
+  per edge but a dictionary per node and `ride_span()` in a quadratic loop; with
+  parallel arrays and the span hoisted out it came to 16.6 ms. A third more
+  generation time versus two counts of one graph that had already diverged once
+  — the cost is accepted and recorded.
+- **`building_plan.gd` hit the 1000-line ceiling twice during the milestone.** The pair rules
+  moved to `building_decks.gd`; the draw (`pick_any`) became public so that
+  the order of calls to the generator is still counted in one place.
+- **`sees_target` means "Otto is not in shadow and not behind a wall", not "Otto is close".**
+  The first version sent an agent to an elevator only while he could not see Otto, and elevators
+  almost never got used. The level decides: a cab is offered when Otto
+  is on another floor.
+- **The agent was jerked between two cabs.** A podium floor has up to five shafts,
+  and the offer moved from one cab to another frame by frame: in half a minute
+  the agent did not move. Now the nearest is taken, and the choice holds
+  while there is anywhere to ride at all.
+- **Seed 1 did not repeat because the building ran on the wall clock.** Agent release
+  at the doors and Otto's return timer were counted in `_process`, while the bot drives
+  Otto in physics steps: for the same bot step a fast machine let more agents
+  out of the doors, and the seed gave four deaths one time and five another with the same
+  step count. The building's logic moved to `_physics_process`, the return timer —
+  to a countdown in physics; only the picture stayed in `_process`.
 
-  **Этого не хватило, и второй виновник нашёлся тем же способом.** После правки
-  сид 1 всё ещё давал то четыре смерти, то три — при одном и том же числе шагов,
-  то есть по одному и тому же маршруту. Осталась **сирена**: `GameState` тикал
-  её в `_process`, а от неё зависят злость агентов и задержка кабин. Тревога
-  включалась то раньше, то позже, и одно и то же здание выходило разной
-  трудности. Правило записано в [`testing.md`](testing.md): всё, что решает
-  исход партии, живёт в физике.
+  **That was not enough, and the second culprit was found the same way.** After the fix
+  seed 1 still gave four deaths one time and three another — with the same step count,
+  that is, along the same route. What remained was the **siren**: `GameState` ticked
+  it in `_process`, and agent anger and cab delay depend on it. The alarm
+  switched on earlier or later, and the same building came out with different
+  difficulty. The rule is recorded in [`testing.md`](testing.md): everything that decides
+  the outcome of a game lives in physics.
 
-  **Долг не закрыт: осталась третья причина, и она опознана.** После обеих
-  правок два прогона подряд дали сид 1 — 4 и 3 смерти при одних и тех же 2745
-  шагах, сид 3 — 2499 и 2506 шагов. Разошлись и бой, и навигация, значит дело
-  не в сирене. Остался **кадр камеры**: полосу видимых этажей уровень считает
-  от `otto.camera_view()`, а `SideCamera` сглаживает своё положение в `_process`
-  по настенным часам. По этой же полосе `_tend_agents` решает, каким дверям
-  выпускать агентов, — то есть выпуск снова зависит от частоты кадров, только
-  через камеру.
+  **The debt is not closed: a third cause remains, and it is identified.** After both
+  fixes two consecutive runs gave seed 1 — 4 and 3 deaths at the same 2745
+  steps, seed 3 — 2499 and 2506 steps. Both combat and navigation diverged, so it is
+  not the siren. What remains is the **camera frame**: the level computes the band of visible
+  floors from `otto.camera_view()`, and `SideCamera` smooths its position in `_process`
+  on the wall clock. `_tend_agents` uses the same band to decide which doors
+  release agents — so release again depends on frame rate, only
+  through the camera.
 
-  Чинить это надо не переносом камеры в физику, а развязкой: полоса выпуска
-  должна считаться от Otto, а камера — остаться картинкой. Это меняет поведение
-  выпуска и требует нового замера, поэтому **доделывается вместе с M18d**, где
-  числа боя перемеряются в любом случае.
-- **Кабин в дереве стало больше, чем шахт.** `test_elevator_control` сопоставлял
-  их по порядку, и ярус пары сдвигал счёт: «кабина 10 встала не в своей шахте»
-  на сиде 1. Ярус теперь виден снаружи (`ElevatorCar.is_deck`), тест берёт
-  кабины со своим ходом и отдельно сверяет число ярусов с числом пар.
-- **Карман делала не только пара, но и стена.** На сиде 1 бот встал на 22-м
-  этаже: 3001 шаг «хода нет». Стена отрезала кусок этажа, в котором не лежало
-  ни документа, ни выхода, — `is_winnable` такое пропускает. Теперь стена идёт
-  под тот же порог, что и пара: `BuildingRoute.nothing_is_cut_off` требует, чтобы
-  **все** куски её этажа остались достижимы. Считать это числом узлов, как
-  у пары, нельзя — стена сама заводит новый кусок, и число растёт само по себе;
-  первая попытка так и сделала и развалила раскладку на семнадцати сидах.
-- **Прогон бота после всего:** сиды 1–3 проходятся, смертей 4, 6 и 3 при пороге
-  `DEATHS_ALLOWED` = 6, документы собраны все; шагов 3404, 4468 и 2179. Два
-  прогона подряд: сиды 1 и 2 совпали до шага, сид 3 разошёлся (2 смерти,
-  1928 шагов) — остаточная неповторяемость от камеры, описана выше. До вехи
-  было 3, 2 и 1 — агенты в кабинах достают дальше, и это видно числом. **Сид 2
-  упёрся в порог ровно**, и это довод к M18d, а не повод двигать порог.
-- **Прогон смотрят по ходу, а не после.** Вывод Godot шёл в буфер и появлялся
-  только в конце — набор молчал 763 с, хотя бот печатает «зациклился» на третьей
-  минуте. `tools/godot_bin.run` отдаёт строки потоком, а `run_tests.py` снимает
-  прогон сторожем на первой такой строке. Правило — в [`testing.md`](testing.md).
-  Разброс упал, но до нуля не дошёл: третья причина описана выше.
-- **Тест возвращения в игру мерил совпадение.** Агент в нём ходил, и за 60
-  кадров, пока Otto лежит, успевал уйти; «вернулся не туда, где убили» зависело
-  от того, куда он ушёл. На новой раскладке кусок этажа стал короче, агент
-  развернулся раньше — и тест упал, ничего не сломав. Агент в нём теперь стоит
+  The fix is not moving the camera into physics but decoupling: the release band
+  must be computed from Otto, and the camera must stay a picture. This changes release
+  behaviour and needs a new measurement, so **it is finished together with M18d**, where
+  the combat numbers are remeasured anyway.
+- **The tree had more cabs than shafts.** `test_elevator_control` matched
+  them by order, and the pair's deck shifted the count: "cab 10 stopped in the wrong shaft"
+  on seed 1. The deck is now visible from outside (`ElevatorCar.is_deck`), the test takes
+  cabs with their own drive and separately checks the deck count against the pair count.
+- **Not only the pair made a pocket, the wall did too.** On seed 1 the bot got stuck on the 22nd
+  floor: 3001 steps of "no route". A wall cut off a piece of the floor that held
+  neither a document nor an exit — `is_winnable` lets that through. Now the wall goes
+  under the same threshold as the pair: `BuildingRoute.nothing_is_cut_off` requires that
+  **all** pieces of its floor remain reachable. Counting this by node count, as
+  for the pair, does not work — the wall itself creates a new piece, and the count grows by itself;
+  the first attempt did exactly that and broke the layout on seventeen seeds.
+- **The bot run after all of this:** seeds 1–3 complete, deaths 4, 6 and 3 with the threshold
+  `DEATHS_ALLOWED` = 6, all documents collected; steps 3404, 4468 and 2179. Two
+  consecutive runs: seeds 1 and 2 matched to the step, seed 3 diverged (2 deaths,
+  1928 steps) — the residual non-repeatability from the camera, described above. Before the
+  milestone it was 3, 2 and 1 — agents in cabs reach further, and the number shows it. **Seed 2
+  hit the threshold exactly**, and that is an argument for M18d, not a reason to move the threshold.
+- **A run is watched as it goes, not afterwards.** Godot output went to a buffer and appeared
+  only at the end — the suite was silent for 763 s, although the bot prints "looped" in the third
+  minute. `tools/godot_bin.run` streams lines, and `run_tests.py` kills
+  the run with a watchdog on the first such line. The rule is in [`testing.md`](testing.md).
+  The spread dropped but did not reach zero: the third cause is described above.
+- **The return-to-game test measured a coincidence.** The agent in it walked, and in the 60
+  frames while Otto lies down it managed to leave; "came back somewhere other than where he was killed" depended
+  on where it went. On the new layout the floor piece got shorter, the agent
+  turned around earlier — and the test failed without anything breaking. The agent in it now stands still
   (`walk_speed` = 0).
-- **Прогон тестов шардами — 139 с вместо 755** (тот же PR, `418c8b4`).
-  `tools/test_times.py` померил каждый файл и каждый тяжёлый тест: один
-  тест-метод весил 40% набора (328 с), и резать по файлам было бесполезно —
-  шесть шардов давали 574 с. Оба дорогих теста разрезаны по сидам, набор
-  раскидывается по шести процессам Godot; тестов 394. Устройство и замер —
-  в [`testing.md`](testing.md).
+- **Running tests in shards — 139 s instead of 755** (same PR, `418c8b4`).
+  `tools/test_times.py` measured every file and every heavy test: one
+  test method weighed 40% of the suite (328 s), and splitting by files was useless —
+  six shards gave 574 s. Both expensive tests are split by seed, the suite
+  is spread across six Godot processes; 394 tests. The setup and the measurement are
+  in [`testing.md`](testing.md).
 
-### Авторевью
+### Code review
 
-- **Ветка была красной, и нашло это ревью, а не я.** Источник пролёта
-  эскалатора никто не гасил — в отличие от ламп и новых столбов шахт, — и пяток
-  эскалаторов горел всегда и везде: `test_a_tall_building_lights_only_what_is_in_frame`
-  давал 16 источников при бюджете 12 на сидах 1, 2 и 3. У эскалатора появились
-  `floor_index` и `set_light_visible`, уровень гасит его тем же правилом, что
-  лампы (ADR-0010, пункт 8). От пули источник по-прежнему не гаснет и в зонах
-  темноты не участвует — меняется только отбор по кадру.
-- **Кабину агенту предлагали, не проверив, дойдёт ли он.** Этаж режут глухая
-  стена и чужие проёмы; выбор кабины липкий, а у преграды агент по новому
-  правилу замирает, а не разворачивается — то есть он вставал у стены до конца
-  здания и переставал патрулировать. Теперь предложение считает проходимость:
-  ближайшая **из достижимых**, где достижимость — проёмы и стены минус те
-  проёмы, что перекрыты стоящей кабиной. Вынесено в `src/levels/agent_lifts.gd`:
-  `greybox_level.gd` с этой правкой перевалил за тысячу строк — тем же приёмом,
-  каким веха вынесла `BuildingDecks`.
-- **Ярус пары отчитывался о скорости нулём** (`speed_now` не передавал вопрос
-  ведущему) — этим числом решается сдавливание.
-- **Команда оставалась у ведущего после выхода пассажира из яруса:** ярус гасил
-  свою копию, которую никто не исполняет. Пара могла тронуться по ненажатой
-  команде на кадре посадки следующего.
-- **`tools/geometry_shot.gd`:** ожидание падения ламп проверяло обратное условие
-  и не ждало вовсе; `quit(1)` на сиде без пары затирался общим `quit(0)`, и
-  несъёмка кадра выглядела успехом.
-- **Мелочи:** мёртвая ветка в `_head_for_the_lift`; `_deck_drop`, который
-  ведущий пишет и не читает; провалившийся заход раскладки пары повторялся
-  целиком (до двух десятков лишних обходов графа на здание); комментарий
-  в тесте шахт обещал порог в три этажа после смены на четыре; тест
-  «агент в кабине не управляет ею» сходился и без агента вовсе.
+- **The branch was red, and the review found it, not me.** Nobody switched off the escalator
+  flight's source — unlike the lamps and the new shaft columns — and about five
+  escalators were lit always and everywhere: `test_a_tall_building_lights_only_what_is_in_frame`
+  gave 16 sources against a budget of 12 on seeds 1, 2 and 3. The escalator got
+  `floor_index` and `set_light_visible`, and the level switches it off by the same rule as
+  lamps (ADR-0010, item 8). A bullet still does not put the source out, and it does not take
+  part in darkness zones — only the per-frame selection changes.
+- **A cab was offered to an agent without checking whether he could reach it.** A floor is cut by
+  a solid wall and other openings; the cab choice is sticky, and at an obstacle the agent under
+  the new rule freezes instead of turning around — so he stood by the wall until the end of the
+  building and stopped patrolling. Now the offer accounts for passability:
+  the nearest **of the reachable ones**, where reachability is openings and walls minus those
+  openings blocked by a standing cab. Moved out to `src/levels/agent_lifts.gd`:
+  with this fix `greybox_level.gd` went over a thousand lines — the same trick
+  by which the milestone moved out `BuildingDecks`.
+- **The pair's deck reported its speed as zero** (`speed_now` did not forward the question
+  to the leader) — this number decides crushing.
+- **The command stayed with the leader after a passenger left the deck:** the deck cleared
+  its own copy, which nobody executes. The pair could start moving on an unpressed
+  command on the frame the next one boarded.
+- **`tools/geometry_shot.gd`:** the wait for lamps to drop checked the inverted condition
+  and did not wait at all; `quit(1)` on a seed without a pair was overwritten by the common `quit(0)`, and
+  a failed shot looked like success.
+- **Small things:** a dead branch in `_head_for_the_lift`; `_deck_drop`, which
+  the leader writes and never reads; a failed pair layout attempt was repeated
+  in full (up to two dozen extra graph traversals per building); a comment
+  in the shaft test promised a three-floor threshold after the change to four; the test
+  "an agent in a cab does not control it" passed even with no agent at all.
 
-Две находки не взяты и обе сознательно: `push_error` на вырожденном эскалаторе
-(сигнал настоящий, дедупликация логов — своё решение) и `rides_between`, который
-зовут только из теста (это однострочная формулировка правила, и выкинуть её
-значит вписать то же выражение в тест).
+Two findings were not taken, both deliberately: `push_error` on a degenerate escalator
+(the signal is real, log deduplication is a separate decision) and `rides_between`, which
+is called only from a test (it is a one-line statement of the rule, and dropping it
+means writing the same expression into the test).
 
-## Веха M18c · Пропорции по оригиналу
+## Milestone M18c · Proportions from the original
 
-Решения — [ADR-0026](adr/0026-proportions.md).
+Decisions — [ADR-0026](adr/0026-proportions.md).
 
-**DoD:** доли всех предметов здания к просвету этажа сходятся с оригиналом,
-и расхождения, оставленные сознательно, записаны числом.
+**DoD:** the ratios of every building object to the floor clearance match the original,
+and the discrepancies kept deliberately are recorded as numbers.
 
-### Что показала сверка
+### What the check against the original showed
 
-Повторена по пикселям: два нативных снимка MAME и спрайтшит аркады 1:1. Прежняя,
-по которой писался план, ошиблась в четырёх местах — плита 8 px, просвет 40,
-**агент ростом с Otto**, этажей в кадре 3.67, а не 4.7.
+Repeated pixel by pixel: two native MAME screenshots and the arcade sprite sheet 1:1. The previous
+check, which the plan was written from, was wrong in four places — slab 8 px, clearance 40,
+**the agent is as tall as Otto**, 3.67 floors in frame, not 4.7.
 
-- **Этаж у нас верен.** Плита, кабина и ширина кадра в просветах сходятся
-  с оригиналом до процента.
-- **Мало всё, что стоит на полу, — и в одну сторону, в 1.33 раза.** Otto 42%
-  просвета против 56%, дверь 57% × 28% против 70% × 40%, шахта 40% против 60%.
-- **Лампу в оригинале сбивают из кабины,** а не с пола: она висит от потолка,
-  низ на 82% просвета. Два источника говорят это прямо.
-- **Агент не прыгает** — ни в оригинале, ни у нас. Перепроверено по просьбе.
+- **Our floor is right.** Slab, cab and frame width in clearances match
+  the original to within a percent.
+- **Everything that stands on the floor is too small — and in one direction, by 1.33×.** Otto is 42%
+  of the clearance versus 56%, the door 57% × 28% versus 70% × 40%, the shaft 40% versus 60%.
+- **In the original the lamp is shot down from the cab,** not from the floor: it hangs from the ceiling,
+  its bottom at 82% of the clearance. Two sources say so outright.
+- **The agent does not jump** — neither in the original nor in ours. Rechecked on request.
 
-### План вехи
+### Milestone plan
 
-- [x] ADR: растим содержимое, этаж не трогаем; агент ростом с Otto; 3.67 этажа
-      в кадре; шаг места, лампа и эскалатор — тоже по оригиналу
-- [x] Otto и агент 1.68 м, модели пересобраны
-- [x] Числа роста: выстрелы, колено и лёжа, присед, удар, допуски бота
-- [x] Дверь 2.1×1.2, створка на петлях внутрь комнаты
-- [x] Шахта и кабина 1.8, ширина кабины из правил; шахты не встают рядом
-- [x] Шаг места 1.8, здание 33.6 м
-- [x] Лампа под потолком, сбивается из кабины
-- [x] Эскалатор круче, в свои два места
-- [x] Машина по росту Otto; проём выхода сужен до 1.68
-- [x] Камера на 3.67 этажа
-- [x] Тест долей по таблице оригинала, габариты этажа не налезают друг на друга
-- [x] **Таблица долей — один источник размеров** (решение пользователя,
-      2026-09-23): сцены, модели и числа тела выводятся из пикселей оригинала,
-      а не хранят метры сами — `Proportions`
-- [x] Номер этажа на каждом этаже — найдено сравнением с кадром оригинала
-      (`tools/compare_original.py`, теперь шаг каждой вехи)
-- [x] Перемер бота и кадра: бот проходит все сиды, набор зелёный за 150 с;
-      `light_bench` — 2.25 мс GPU (худший 2.83) при 67 источниках, на M18b
-      было 1.97: в кадре на 0.67 этажа больше
-- [x] Авторевью: 13 находок. Исправлены: полоса пола 0.6 м между шахтой и
-      проёмом эскалатора (новый тест — пол между проёмами либо нет, либо на
-      тело), кадр 3.72 этажа вместо 3.67 (наклон камеры), лишний запрет стены у
-      лампы, машина у выхода упиралась в стену, дальность посадки агента не
-      смотрела на ширину шахты из правил, мелочи инструментов. Отложено в M18d:
-      лампа из прыжка под проёмом — чинится высотой прыжка
-- [x] `check.ps1` зелёный после правок ревью: 48 файлов за 148 с
+- [x] ADR: grow the contents, leave the floor alone; the agent as tall as Otto; 3.67 floors
+      in frame; slot pitch, lamp and escalator — also from the original
+- [x] Otto and the agent 1.68 m, models rebuilt
+- [x] Height numbers: shots, kneeling and prone, crouch, punch, bot tolerances
+- [x] Door 2.1×1.2, leaf hinged into the room
+- [x] Shaft and cab 1.8, cab width from the rules; shafts do not stand side by side
+- [x] Slot pitch 1.8, building 33.6 m
+- [x] Lamp under the ceiling, shot down from the cab
+- [x] Escalator steeper, in its own two slots
+- [x] Car scaled to Otto's height; exit opening narrowed to 1.68
+- [x] Camera at 3.67 floors
+- [x] Ratio test against the original's table, floor dimensions do not overlap each other
+- [x] **The ratio table is the single source of sizes** (user's decision,
+      2026-09-23): scenes, models and body numbers are derived from the original's pixels
+      instead of storing metres themselves — `Proportions`
+- [x] Floor number on every floor — found by comparing with a frame of the original
+      (`tools/compare_original.py`, now a step of every milestone)
+- [x] Bot and frame remeasured: the bot completes all seeds, the suite is green in 150 s;
+      `light_bench` — 2.25 ms GPU (worst 2.83) with 67 sources, M18b
+      had 1.97: 0.67 floors more in frame
+- [x] Code review: 13 findings. Fixed: a 0.6 m floor strip between a shaft and an
+      escalator opening (new test — the floor between openings is either absent or
+      body-wide), frame of 3.72 floors instead of 3.67 (camera tilt), a needless wall ban next
+      to a lamp, the car at the exit ran into a wall, the agent's boarding range ignored
+      the shaft width from the rules, small tool fixes. Deferred to M18d:
+      the lamp shot from a jump under an opening — fixed by jump height
+- [x] `check.ps1` green after the review fixes: 48 files in 148 s
 - [x] PR #32
 
-## Веха M18d · Бой по правилам ROM
+## Milestone M18d · Combat by ROM rules
 
-Решения — [ADR-0027](adr/0027-rom-combat.md), заметки по ROM —
+Decisions — [ADR-0027](adr/0027-rom-combat.md), ROM notes —
 [`reference/arcade-rom.md`](reference/arcade-rom.md).
 
-**DoD:** бой идёт по правилам оригинала, а сложность здания выражена числом —
-смертностью бота на каждом уровне.
+**DoD:** combat follows the original's rules, and a building's difficulty is expressed as a number —
+the bot's death rate at each level.
 
-### Что показала сверка
+### What the check against the original showed
 
-- **Нашёлся дизассемблер аркадного ROM** с комментариями (jotd, перенос на
-  Amiga). Числа боя теперь не из пересказов, а из кода; частота логики —
-  14.8 тика/с, по драйверу MAME. Видео аркады сошлось с ROM до пикселя.
-- **Агентов в здании 3–4, а не 8;** выходят из случайной синей двери на этаже
-  Otto и соседних. Сложность растёт и внутри здания, со временем, потолок 15;
-  у каждого агента своя злость.
-- **Агенты стреляют стоя, присев и лёжа;** пуля лёжа бьёт присевшего, спасает
-  прыжок. Сами агенты не прыгают — ADR-0026 был прав.
-- **Ходьба у Otto и агента одна, 2.2 м/с;** пуля Otto 8.9 м/с, прыжок +1.88 м.
-- **Кабина давит агентов, 300 очков;** тревога — 277 с.
-- **Здание оригинала одно**, меняются только красные двери, пары и выход; полная
-  карта нашлась. Генерация остаётся, плотность дверей и тёмные этажи — в M18e.
-- **Лампа из прыжка под проёмом есть и в оригинале** — долг M18c снят.
+- **An annotated disassembly of the arcade ROM turned up** (jotd, the Amiga
+  port). Combat numbers now come from code, not retellings; the logic rate is
+  14.8 ticks/s, per the MAME driver. Arcade video matched the ROM to the pixel.
+- **A building has 3–4 agents, not 8;** they come out of a random blue door on Otto's
+  floor and the adjacent ones. Difficulty also grows within a building, over time, capped at 15;
+  each agent has its own anger.
+- **Agents shoot standing, crouching and prone;** a prone shot hits a crouching Otto, a jump
+  saves him. Agents themselves do not jump — ADR-0026 was right.
+- **Otto and the agent share one walk speed, 2.2 m/s;** Otto's bullet 8.9 m/s, jump +1.88 m.
+- **The cab crushes agents, 300 points;** alarm — 277 s.
+- **The original has one building**, only red doors, pairs and the exit change; the full
+  map was found. Generation stays; door density and dark floors go to M18e.
+- **The lamp shot from a jump under an opening exists in the original too** — the M18c debt is cleared.
 
-### План вехи
+### Milestone plan
 
-- [x] Сверка, вопросы, ADR-0027; веха поделена на M18d (бой) и M18e (здание)
-- [x] `Arcade` — формулы ROM одной таблицей
-- [x] Сложность и злость агента
-- [x] Выпуск: 3–4 агента, случайная дверь, пределы этажа
-- [x] Выстрел: замах, пауза, позы, высоты пуль, низкий выстрел
-- [x] Увёртка по ROM
-- [x] Скорости и прыжок по ROM
-- [x] Выстрелы Otto будят агентов
-- [x] Кабина давит агентов
-- [x] Тревога 277 с
-- [x] Уровни сложности в настройках
-- [x] Бот и смертность по уровням: навык 0 — 0, 0, 0 (сиды 1–3), 0, 1, 0
-      (сиды 4–6); навык 3 — 1, 3, 5; 6 — 39, 33, 15; 10 — 9, 19, 11. Бот
-      проходит здание на любом; пик на 6 — свойство бота, а не игры
-- [x] Тесты по ROM: `test_arcade`, мозг и стойки, выпуск у этажа Otto, давка кабиной
-- [x] Авторевью: 15 находок. Исправлены: агент сеялся после первого жребия и
-      прогоны не повторялись; «в кадре» считалось по сглаженной камере и
-      размеру окна — теперь по своему кадру правил; ручной потолок агентов
-      упирался в 4; давка кабиной без надбавки за темноту; выстрел после
-      замаха по скрывшемуся Otto; тревога при посадке агента в кабину; порог
-      смертей теста 6 → 3. Соль партии — в M18e
-- [x] `check.ps1` зелёный после правок ревью: 159 с; навык 0 перемерен — 0, 0, 0
+- [x] Check, questions, ADR-0027; the milestone is split into M18d (combat) and M18e (building)
+- [x] `Arcade` — ROM formulas in one table
+- [x] Difficulty and agent anger
+- [x] Release: 3–4 agents, random door, floor limits
+- [x] Shot: wind-up, pause, poses, bullet heights, low shot
+- [x] Dodge by ROM
+- [x] Speeds and jump by ROM
+- [x] Otto's shots wake agents
+- [x] The cab crushes agents
+- [x] Alarm 277 s
+- [x] Difficulty levels in settings
+- [x] Bot and death rate by level: skill 0 — 0, 0, 0 (seeds 1–3), 0, 1, 0
+      (seeds 4–6); skill 3 — 1, 3, 5; 6 — 39, 33, 15; 10 — 9, 19, 11. The bot
+      completes the building on any level; the peak at 6 is a property of the bot, not the game
+- [x] ROM tests: `test_arcade`, brain and stances, release near Otto's floor, cab crush
+- [x] Code review: 15 findings. Fixed: the agent was seeded after the first draw and
+      runs did not repeat; "in frame" was computed from the smoothed camera and
+      the window size — now from its own rule frame; the manual agent cap
+      was stuck at 4; cab crush without the darkness bonus; a shot after the
+      wind-up at an Otto who had hidden; an alarm when an agent boards a cab; the test's
+      death threshold 6 → 3. The game salt goes to M18e
+- [x] `check.ps1` green after the review fixes: 159 s; skill 0 remeasured — 0, 0, 0
 - [x] PR #33
 
-### Закрытый долг
+### Closed debt
 
-- **Сид 1 наконец повторяется.** Третья причина из M18b — полоса выпуска
-  агентов, считавшаяся по сглаженной камере, — закрыта авторевью вехи: «в кадре»
-  теперь считается по кадру правил (`SideCamera.rule_view`, 16:9 и без
-  сглаживания), а не по положению камеры, которое едет по настенным часам.
-  Добивка пришла в M20: переход физики на кадр правил снял падение теста боя
-  в CI через раз.
+- **Seed 1 finally repeats.** The third cause from M18b — the agent release band
+  computed from the smoothed camera — was closed by the milestone's code review: "in frame"
+  is now computed from the rule frame (`SideCamera.rule_view`, 16:9 and without
+  smoothing), not from the camera position, which moves on the wall clock.
+  The finishing touch came in M20: switching physics to the rule frame removed the combat test
+  failing in CI every other run.
 
-## Веха M18e · Здание по карте оригинала
+## Milestone M18e · Building from the original's map
 
-Решения — [ADR-0028](adr/0028-building-by-the-map.md), таблицы ROM —
-[`reference/arcade-rom.md`](reference/arcade-rom.md), раздел «Building».
+Decisions — [ADR-0028](adr/0028-building-by-the-map.md), ROM tables —
+[`reference/arcade-rom.md`](reference/arcade-rom.md), section "Building".
 
-**DoD:** этаж по кадру не пустее оригинала, и заучить здание от партии к партии
-нельзя.
+**DoD:** a floor in frame is no emptier than the original's, and the building cannot be
+memorised from game to game.
 
-### Что показала сверка
+### What the check against the original showed
 
-- **Этажи ROM считаются снизу.** Двери по `table_280E`: 1–6 — по две с краёв,
-  на седьмом нет, 8–18 — от четырёх до семи, башня 19–30 — по четыре. У нас
-  было 1 на башне и 2 внизу.
-- **Тёмные этажи — 11–15:** ламп там нет вовсе, убийство 150/200. Двери на них
-  есть, и это самые плотные этажи. EPIC писал «без ламп и дверей» — ошибка.
-- **Ламп в ROM по две** на 8–10 и 16–30, на 20-м одна; на 1–7 и 11–15 — ни одной.
-- **Красных 5 → 10 по навыку, полосами:** в первом здании документы только на
-  этажах 9–20, десять верхних пусты; с навыком заполняются низ и верх.
+- **ROM floors are counted from the bottom.** Doors per `table_280E`: 1–6 — two at the edges,
+  none on the seventh, 8–18 — four to seven, tower 19–30 — four each. We
+  had 1 on the tower and 2 at the bottom.
+- **Dark floors are 11–15:** there are no lamps at all, a kill is 150/200. They do have
+  doors, and these are the densest floors. EPIC said "no lamps and no doors" — a mistake.
+- **The ROM has two lamps each** on 8–10 and 16–30, one on the 20th; none on 1–7 and 11–15.
+- **Red doors 5 → 10 by skill, in bands:** in the first building documents are only on
+  floors 9–20, the top ten are empty; with skill the bottom and top fill up.
 
-### План вехи
+### Milestone plan
 
-- [x] Сверка, вопросы, ADR-0028
-- [x] `Arcade`: этаж ROM, двери этажа, тёмные этажи, квоты красных дверей
-- [x] Двери по ROM на ширину экрана; обязательна одна на этаж
-- [x] Красные двери полосами ROM по навыку, 5–10
-- [x] Тёмные этажи: без ламп, тёмные в `FloorLighting` с начала здания
-- [x] Соль партии: сид здания из номера и соли, ноль в тестах и у бота
-- [x] Телеграф двери в конце смены (долг M14)
-- [x] Тесты: любое здание — двери, документы, тёмные этажи, соль
-- [x] Перемер бота (после перестановки стен): навык 0 — 0, 1, 0; 3 — 4, 7, 0;
-      6 — 10, 36, 41 (третий сид собрал всё, но не уложился в бюджет); 10 — 22,
-      11, 21. Порог теста боя 3 → 5: на сиде 2 тест насчитал 4. Перемер нашёл давнюю ошибку: погибший в кабине
-      воскресал в кармане за эскалатором, откуда хода нет, — исправлено, тест
-- [x] Кадры вехи и сравнение с оригиналом: башня — четыре двери, как у
-      аркады; тёмный этаж читается по огонькам. На кадре одного тёмного этажа
-      разница со светлыми слабая — вся башня сумрачная; рядом с полосой
-      эскалаторов тёмные темнее заметно. Свет этажа — в M19
-- [x] Авторевью: 10 находок. Исправлены: остаток документов не ограничивался
-      числом этажей (низкое здание сыпало ошибкой), `reset()` не сбрасывал соль,
-      выбор места возврата переехал в `BuildingPlan` и тестируется без сцены,
-      лишний пересчёт дверей, устаревшие комментарии; ADR приведён к коду о
-      документах вне полосы. Оставлены: время створки из константы, а не из
-      двери; `doors_cap = 0` как «по ROM»; возврат над проёмом эскалатора.
-      Внутренних стен стало меньше (507 → 287, на башне 156 → 22): лишние
-      двери вставали раньше стен. По решению пользователя стены встали раньше —
-      474, на башне 168; тест стережёт. Раскладки сменились: бот и кадры сняты
-      заново
-- [x] `check.ps1` зелёный после правок ревью: 53 файла за 160 с
+- [x] Check, questions, ADR-0028
+- [x] `Arcade`: ROM floor, floor doors, dark floors, red door quotas
+- [x] Doors by ROM per screen width; at least one per floor is mandatory
+- [x] Red doors in ROM bands by skill, 5–10
+- [x] Dark floors: no lamps, dark in `FloorLighting` from the start of the building
+- [x] Game salt: building seed from the number and the salt, zero in tests and for the bot
+- [x] Door telegraph at the end of a shift (M14 debt)
+- [x] Tests: any building — doors, documents, dark floors, salt
+- [x] Bot remeasured (after reordering the walls): skill 0 — 0, 1, 0; 3 — 4, 7, 0;
+      6 — 10, 36, 41 (the third seed collected everything but did not fit the budget); 10 — 22,
+      11, 21. Combat test threshold 3 → 5: on seed 2 the test counted 4. The remeasure found an old bug: a player killed in a cab
+      respawned in a pocket behind an escalator with no way out — fixed, tested
+- [x] Milestone frames and comparison with the original: the tower has four doors, like
+      the arcade; a dark floor reads by its indicator lights. In a frame of a single dark floor
+      the difference from lit ones is weak — the whole tower is gloomy; next to the escalator
+      band the dark ones are noticeably darker. Floor lighting goes to M19
+- [x] Code review: 10 findings. Fixed: the remaining documents were not capped by
+      the floor count (a low building spewed errors), `reset()` did not reset the salt,
+      the respawn spot choice moved to `BuildingPlan` and is tested without a scene,
+      a redundant door recount, stale comments; the ADR was brought in line with the code on
+      documents outside the band. Kept: the leaf time from a constant rather than from the
+      door; `doors_cap = 0` as "by ROM"; respawn above an escalator opening.
+      Internal walls became fewer (507 → 287, on the tower 156 → 22): the extra
+      doors went in before the walls. By the user's decision the walls went first —
+      474, 168 on the tower; a test guards it. Layouts changed: the bot and frames were captured
+      again
+- [x] `check.ps1` green after the review fixes: 53 files in 160 s
 - [x] README
 - [x] PR #35
 
-### Закрытый долг
+### Closed debt
 
-- **Соль партии — чтобы здания не заучивались.** До вехи сид здания был его
-  номером, и первое здание партии всегда было одним и тем же, — заучивалась вся
-  игра, а не только выход агентов; генератор агентов M18d сеялся тем же сидом.
-  Теперь сид — номер здания, смешанный с солью партии (`GameState.building_seed`),
-  одна соль на раскладку и бой. В тестах и в `tools/playthrough.gd` соль нулевая,
-  иначе шкала смертей стала бы шумной и порог пришлось бы выводить усреднением
-  многих минутных прогонов; руками её задаёт `-- --salt=N`.
+- **Game salt — so that buildings cannot be memorised.** Before the milestone a building's seed was its
+  number, and the first building of a game was always the same — the whole game
+  was memorised, not just agent exits; M18d's agent generator was seeded with the same seed.
+  Now the seed is the building number mixed with the game salt (`GameState.building_seed`),
+  one salt for layout and combat. In tests and in `tools/playthrough.gd` the salt is zero,
+  otherwise the death scale would become noisy and the threshold would have to be derived by
+  averaging many minute-long runs; it is set by hand with `-- --salt=N`.
 
-## Веха M19 · Наполнение и задний план
+## Milestone M19 · Dressing and background
 
-Решения — [ADR-0029](adr/0029-city-weather-dressing.md).
+Decisions — [ADR-0029](adr/0029-city-weather-dressing.md).
 
-**DoD:** по кадру видно, что это здание ночью в городе, а не схема здания.
+**DoD:** the frame shows a building at night in a city, not a diagram of a building.
 
-### Что показала сверка
+### What the check against the original showed
 
-- **В аркаде нет ни мебели, ни погоды, ни города** — всё это наше, и правило
-  одно: не мешать читаемости.
-- **Крыша оригинала:** скаты ступенями по бокам шахты; у нас плоский настил, а на
-  кадре крыши полэкрана — чёрная пустота.
-- **Камера ортографическая:** город в том же мире параллакса не даст, поэтому
-  у него свой перспективный вид, подложенный фоном.
+- **The arcade has no furniture, no weather, no city** — all of this is ours, and there is one
+  rule: do not hurt readability.
+- **The original's roof:** stepped slopes on both sides of the shaft; ours is a flat deck, and in
+  the roof frame half the screen is black emptiness.
+- **The camera is orthographic:** a city in the same world gives no parallax, so
+  it has its own perspective view, laid underneath as a background.
 
-### План вехи
+### Milestone plan
 
-- [x] Сверка, вопросы, ADR-0029
-- [x] Крыша: скаты ступенями и парапеты силуэтом за игрой
-- [x] Обстановка этажа: `BuildingDressing` по плану и сиду, предметы у задней
-      стены, трубы, табло над шахтами
-- [x] Город: кварталы генерацией в своём перспективном виде, фоном кадра
-- [x] Погода по сиду: дождь, туман, ясно
-- [x] Палитра раунда материалами (свет ламп не красится — см. авторевью)
-- [x] Тёмный этаж заметно темнее светлого
-- [x] Тесты: обстановка не на занятых местах и без тел, город и погода по сиду,
-      бюджет источников — `test_building_scenery`
-- [x] Кадры вехи и сравнение с оригиналом, `light_bench`: 2.31 мс GPU (худший
-      2.85) при 67 источниках, на M18c 2.25. Кадры показали и поправлены: фасады
-      сливались с небом (небо светлее), ближний ряд стоял вплотную и окна были
-      размером с дверь (ряды с 60 м), окна гасли в дымке (без дымки, даль —
-      яркостью), дождь над крышей закрывал Otto (реже и прозрачнее)
-- [x] Авторевью: 15 находок, исправлены все, кроме одной. Трубы под потолком
-      не было видно вовсе — их прятала кромка плиты; теперь висят перед
-      пилястрами и режутся у шахт, эскалаторов, вывесок и номера этажа. Табло
-      над шахтами было красным, как знак двери с документом, — стало холодным;
-      янтарный неон совпадал со знаком двери — стал фиолетовым. Дождь над крышей
-      вылетал за парапет, камера города стояла на 3.5 м ниже оси, узор холодных
-      окон повторялся, скамья и вывеска налезали на пилястру, оттенок ламп
-      ничего не давал — убран. Отложено в долг: город рисуется и тогда, когда
-      здание закрывает кадр целиком
-- [x] `check.ps1` зелёный после правок ревью: 54 файла за 160 с
+- [x] Check, questions, ADR-0029
+- [x] Roof: stepped slopes and parapets as a silhouette behind the play area
+- [x] Floor dressing: `BuildingDressing` by plan and seed, objects at the back
+      wall, pipes, indicator boards above the shafts
+- [x] City: generated blocks in their own perspective view, as the frame background
+- [x] Weather by seed: rain, fog, clear
+- [x] Round palette via materials (lamp light is not tinted — see code review)
+- [x] A dark floor is noticeably darker than a lit one
+- [x] Tests: dressing not on occupied slots and without bodies, city and weather by seed,
+      source budget — `test_building_scenery`
+- [x] Milestone frames and comparison with the original, `light_bench`: 2.31 ms GPU (worst
+      2.85) with 67 sources, M18c had 2.25. The frames revealed, and these were fixed: facades
+      merged with the sky (the sky is lighter), the near row stood right up against the building and windows were
+      the size of a door (rows from 60 m), windows faded out in the haze (no haze, distance via
+      brightness), rain above the roof covered Otto (sparser and more transparent)
+- [x] Code review: 15 findings, all fixed except one. The pipes under the ceiling
+      were not visible at all — the slab edge hid them; now they hang in front of the
+      pilasters and are cut at shafts, escalators, signs and the floor number. The indicator board
+      above the shafts was red, like the sign of a door with a document — it became cool-toned;
+      the amber neon matched the door sign — it became violet. Rain above the roof
+      flew past the parapet, the city camera sat 3.5 m below the axis, the pattern of cool
+      windows repeated, a bench and a sign overlapped a pilaster, the lamp tint
+      did nothing — removed. Deferred as debt: the city is rendered even when
+      the building covers the whole frame
+- [x] `check.ps1` green after the review fixes: 54 files in 160 s
 - [x] README
 - [x] PR #36
 
-## Веха M20 · Детализация сцены
+## Milestone M20 · Scene detail
 
-Решения — [ADR-0031](adr/0031-scene-detail.md). Грейдинг и качество — M22,
-[ADR-0030](adr/0030-grading-and-quality.md); начаты в этой же ветке.
+Decisions: [ADR-0031](adr/0031-scene-detail.md). Grading and quality are M22,
+[ADR-0030](adr/0030-grading-and-quality.md); started in this same branch.
 
-**DoD:** крыша читается крышей небоскрёба, лифт — лифтом, этаж — конторой.
+**DoD:** the roof reads as a skyscraper roof, the elevator as an elevator, a floor as an office.
 
-### Что показала сверка
+### What the check showed
 
-- **Кадры M19 и замечания пользователя:** крыша — плита, глухие ступени и голый
-  куб; шахта — синий прямоугольник, кабина — рамка на стойках; окна города —
-  пятна. Кадр — 2.3 мс из 16.6: деталям есть куда встать.
-- **Модели актёров:** выбран Quaternius Ultimate Modular Men Pack (CC0) — M21.
+- **M19 shots and the user's remarks:** the roof is a slab, blank steps and a bare
+  cube; the shaft is a blue rectangle, the cab is a frame on posts; the city windows are
+  blotches. A frame takes 2.3 ms out of 16.6: there is room for details.
+- **Actor models:** Quaternius Ultimate Modular Men Pack (CC0) is chosen — M21.
 
-### План вехи
+### Milestone plan
 
-- [x] Вопросы, ADR-0031, план разложен на M20–M22
-- [x] Лифт: кабина (стенки, светильник, поручень, пульт), тросы и противовес
-      навстречу, порталы на этажах — `CarDetail`, `BuildingShafts._build_portal`
-- [x] Крыша: бак, кондиционеры, трубы, лестница (`RoofKit`); парапет по пояс с
-      отливом вместо стен до неба; скаты с рёбрами; мачта с мигающим огнём;
-      неон HOTEL с отсветом. Машина встаёт в свободное место, не перед шахтой
-- [x] Этажи, двери и лампы детальнее (замечание пользователя: «всё пересмотри в
-      сторону детализации»): двери — наличник, филёнки, ручка, отбойник; лампы —
-      абажур, светящаяся чаша (видна сбоку, тени не глушат свет), чашка подвеса;
-      пол — ковровая дорожка с каймой и швы плитки, стена — стыки панелей и
-      карниз (`FloorDetail`, мультимешами). Потолок камера не видит — не трогаем
-- [x] Искры при попадании пули в лампу: вытянутые по скорости, падают, тают,
-      вспышка 0.1 с (`Sparks`)
-- [x] Кровь при попадании пули в агента и в Otto (`Blood`), выключается в
-      настройках; искры и кровь в плоскости игры — вглубь и вверх их прятали
-      плита и стена
-- [x] Этаж выхода — гараж без дверей и обстановки, разметка и упоры; машина —
-      седан из примитивов (`CarModel`)
-- [x] Палитра раунда заметна: раунды 1–4 различаются на глаз (вопрос
-      пользователя — на всех кадрах один цвет: палитра шла в стены на 18%, а
-      кадры всегда снимались в первом раунде). Задняя стена берёт тон этажа на
-      45%, дорожка — тон кладки; `layout_shot --round=N`, кадр `rounds.jpg`
-- [x] Город: окна сеткой — погасшие окна тёмным стеклом, фасад читается сеткой
-- [x] Тесты (`test_building_scenery`): без тел и два источника в окружении,
-      техника крыши в её стенах, гараж без дверей на любом сиде, машина не на
-      шахте и выходе, противовес навстречу кабине, кровь по настройке, искры
-- [x] Кадры вехи и сравнение с оригиналом: сценарий `capture.py M20` и
-      `layout_shot --folder=M20` (крыша в погодах, гараж, эффекты, раунды 1–4).
-      `light_bench`: 2.66 мс GPU (худший 3.49) при 68 источниках, до вехи 2.31.
-      Бот: навык 0 — 0, 0, 1; 3 — 4, 3, 1; 6 — 1, (91, не прошёл), 17; 10 — 22,
-      29, 16. На шести сид 2 гибнет в бою на 11-м этаже от четырёх агентов
-      вплотную — гараж без дверей сдвинул жребий раскладки; пик на шести —
-      свойство бота и в M18e
-- [x] Авторевью: 15 находок, исправлены 12. Седан шириной 1.5 м уходил в стену и
-      в Otto — 0.7; стенки кабины висели на 18 см над её полом; качество графики
-      не доходило до стоящего здания; машина не обходила стены и эскалаторы
-      гаража; тросы шахты крыши торчали в небо; кровь с неуязвимого Otto; тёмные
-      окна в тумане темнее фасада; тени от деталей пола; противовес сквозь
-      направляющую; бак перед вывеской; заливка ламп без тени пробивала плиты на
-      низком и среднем — радиус в этаж. Отложено: `car.glb` без читателя и его
-      сборка в `build_actors.py` — уйдут в M21 с пайплайном актёров; тест запасной
-      ветки ламп (правила, где она срабатывает, ещё не найдены)
-- [x] `check.ps1` зелёный после правок ревью: 54 файла за 161 с
+- [x] Questions, ADR-0031, plan split into M20–M22
+- [x] Elevator: cab (walls, light fixture, handrail, control panel), ropes and a counterweight
+      moving the opposite way, portals on the floors — `CarDetail`, `BuildingShafts._build_portal`
+- [x] Roof: tank, air conditioners, pipes, ladder (`RoofKit`); a waist-high parapet with
+      a drip edge instead of walls up to the sky; ribbed slopes; a mast with a blinking light;
+      HOTEL neon with a glow. The car parks in a free spot, not in front of a shaft
+- [x] Floors, doors and lamps more detailed (user's remark: "revisit everything toward
+      more detail"): doors get a casing, panels, a handle, a kick plate; lamps get a
+      shade, a glowing bowl (visible from the side, shadows don't kill the light), a canopy cup;
+      floor gets a carpet runner with a border and tile seams, the wall gets panel joints and a
+      cornice (`FloorDetail`, via multimeshes). The camera never sees the ceiling — left alone
+- [x] Sparks when a bullet hits a lamp: stretched along the velocity, falling, fading,
+      a 0.1 s flash (`Sparks`)
+- [x] Blood when a bullet hits an agent or Otto (`Blood`), can be turned off in the
+      settings; sparks and blood stay in the play plane — deeper or higher they were hidden by
+      the slab and the wall
+- [x] The exit floor is a garage without doors or dressing, with markings and wheel stops; the car is
+      a sedan made of primitives (`CarModel`)
+- [x] Round palette is noticeable: rounds 1–4 differ by eye (user's question:
+      every shot had the same color — the palette went into the walls at 18%, and the
+      shots were always taken in the first round). The back wall takes the floor's tone at
+      45%, the runner takes the masonry tone; `layout_shot --round=N`, shot `rounds.jpg`
+- [x] City: windows as a grid — unlit windows are dark glass, the facade reads as a grid
+- [x] Tests (`test_building_scenery`): no bodies and two light sources in the surroundings,
+      roof equipment within its walls, a garage without doors on any seed, the car not on a
+      shaft or the exit, the counterweight moving opposite the cab, blood per setting, sparks
+- [x] Milestone shots and comparison with the original: the `capture.py M20` scenario and
+      `layout_shot --folder=M20` (roof in each weather, garage, effects, rounds 1–4).
+      `light_bench`: 2.66 ms GPU (worst 3.49) with 68 light sources, 2.31 before the milestone.
+      Bot: skill 0 — 0, 0, 1; 3 — 4, 3, 1; 6 — 1, (91, did not finish), 17; 10 — 22,
+      29, 16. At six, seed 2 dies in a fight on floor 11 against four agents
+      at point-blank range — the doorless garage shifted the layout draw; the spike at six
+      is a property of the bot, also in M18e
+- [x] Code review: 15 findings, 12 fixed. The 1.5 m wide sedan went into the wall and
+      into Otto — now 0.7; the cab walls hung 18 cm above its floor; the graphics quality
+      setting did not reach an already built building; the car did not avoid the walls and escalators
+      of the garage; the ropes of the roof shaft stuck out into the sky; blood came from an invulnerable Otto; dark
+      windows in fog were darker than the facade; floor details cast shadows; the counterweight went through
+      the guide rail; the tank stood in front of the sign; the shadowless lamp fill light punched through the slabs on
+      low and medium — radius now one floor. Deferred: `car.glb` with no reader and its
+      build in `build_actors.py` — they go to M21 with the actor pipeline; a test for the lamp fallback
+      branch (the rules for when it fires are not found yet)
+- [x] `check.ps1` green after the review fixes: 54 files in 161 s
 - [x] README
 - [x] PR #37
 
-### Сделано в ветке для M22 (ADR-0030)
+### Done in the branch for M22 (ADR-0030)
 
-- [x] Тон: ночной нуар — кривые по каналам, контраст, насыщенность (подбор по кадрам — впереди)
-- [x] Город размыт глубиной резкости своей камеры
-- [x] Качество графики: три уровня в настройках, применяются сразу
-- [x] Город не рисуется, когда здание закрывает кадр (долг M19)
-- [x] CI падал на PR через раз: `test_agents_take_their_combat_numbers_from_the_rules`
-      без выстрелов за окно. Полоса выпуска агентов бралась из сглаженного кадра
-      камеры, который едет по настенным часам, — после скачка Otto она зависела
-      от скорости машины. Физика берёт кадр правил
+- [x] Tone: night noir — per-channel curves, contrast, saturation (tuning by shots is still ahead)
+- [x] The city is blurred by its own camera's depth of field
+- [x] Graphics quality: three levels in the settings, applied immediately
+- [x] The city is not rendered when the building covers the frame (M19 debt)
+- [x] CI failed on every other PR: `test_agents_take_their_combat_numbers_from_the_rules`
+      without shots beyond the window. The agent release band was taken from the smoothed camera
+      frame, which moves on wall-clock time — after Otto's jump it depended
+      on the machine's speed. Physics takes the rules frame
 
-## Веха M21 · Модели Otto, агентов и машины
+## Milestone M21 · Models for Otto, agents and the car
 
-Решения — [ADR-0032](adr/0032-actor-models.md).
+Decisions: [ADR-0032](adr/0032-actor-models.md).
 
-**DoD:** Otto и агенты — люди в костюмах, а не коробки, стойки держат высоты
-пуль ROM, машина у выхода — настоящая машина.
+**DoD:** Otto and the agents are people in suits, not boxes, the stances keep the ROM bullet
+heights, the car at the exit is a real car.
 
-### Что показала сверка
+### What the check showed
 
-- **Business Man из пака:** 4162 треугольника, цвета без текстур, скелет в 62
-  кости с коленями и локтями, покой — T-поза. Стопы прицеплены к корню (IK).
-- **Клипы:** 24, но приседа, лёжки и прыжка нет — а их высоты держит ROM.
-- **Шляпы у Business Man нет, пистолета в паке нет ни у кого.**
-- **Cars Pack (CC0):** такси, полиция, SUV, две спортивные, две обычные.
+- **Business Man from the pack:** 4162 triangles, colors without textures, a 62-bone
+  skeleton with knees and elbows, rest pose is a T-pose. Feet are attached to the root (IK).
+- **Clips:** 24, but no crouch, lying down or jump — and the ROM holds their heights.
+- **Business Man has no hat, and no one in the pack has a pistol.**
+- **Cars Pack (CC0):** taxi, police, SUV, two sports cars, two ordinary ones.
 
-### План вехи
+### Milestone plan
 
-- [x] Сверка, вопросы, ADR-0032, план M21 и M21b в EPIC
-- [x] Исходник пака в `assets/source/quaternius/` с лицензией, под `.gdignore`
-      папки `assets/source/`
-- [x] `build_actors.py` собирает из пака: рост 1.68 вместе с клипами, палитра,
-      федора и очки агенту, пистолет в кулаке, четыре клипа
-- [x] `FigureRig` на клипах и позах кодом: кадр костей, сферическая
-      интерполяция, оси поворота от фигуры, стопа на конце голени
-- [x] `tools/actor_shot.tscn` — позы Otto и агента рядом, с линиями пуль ROM
-- [x] Позы под высоты ROM: агент на колене под пулей стоя, залёгший под
-      пулей из приседа. Рост — по первому кадру стойки, не по T-позе
-- [x] Ходьба клипом под скорость актёра: опора в клипе 1.27 м/с, актёр 2.22 —
-      множитель 1.75 (`tools/walk_stride.gd`)
-- [x] Машина у выхода из Cars Pack: пять моделей, восемь красок, жребий по
-      номеру и сиду здания, первое — красное купе; колёса крутятся на отъезде.
-      Длина машины `BODY * 2.1` (было 1.9): масштаб длины и высоты общий, иначе
-      колёса овальные. Старый `car.glb` удалён (долг M20)
-- [x] Тесты: позы и клипы, заземление по крайним вершинам, ходьба, машины;
-      полный набор зелёный за 162 с (было 139), боты проходят здания
-- [x] Кадры: `capture.py M21`, `actor_shot.tscn`, гаражи шести зданий
+- [x] Check, questions, ADR-0032, plan for M21 and M21b in EPIC
+- [x] Pack source in `assets/source/quaternius/` with the license, under the `.gdignore` of
+      the `assets/source/` folder
+- [x] `build_actors.py` builds from the pack: height 1.68 together with the clips, palette,
+      fedora and glasses for the agent, a pistol in the fist, four clips
+- [x] `FigureRig` on clips and code-driven poses: bone frame, spherical
+      interpolation, rotation axes from the figure, foot at the end of the shin
+- [x] `tools/actor_shot.tscn` — Otto's and the agent's poses side by side, with the ROM bullet lines
+- [x] Poses for the ROM heights: a kneeling agent ducks under a standing shot, a prone one
+      under a shot from a crouch. Height is taken from the first frame of the stance, not from the T-pose
+- [x] Walking via a clip matched to the actor's speed: the foothold in the clip moves at 1.27 m/s, the actor at 2.22 —
+      multiplier 1.75 (`tools/walk_stride.gd`)
+- [x] The car at the exit from Cars Pack: five models, eight paints, drawn by the
+      building number and seed, the first is a red coupe; wheels spin when driving off.
+      Car length `BODY * 2.1` (was 1.9): length and height share one scale, otherwise
+      the wheels are oval. The old `car.glb` is removed (M20 debt)
+- [x] Tests: poses and clips, grounding by the extreme vertices, walking, cars;
+      the full suite green in 162 s (was 139), bots clear the buildings
+- [x] Shots: `capture.py M21`, `actor_shot.tscn`, garages of six buildings
       (`layout_shot --garage --building=N`)
-- [x] Пуля — трассер: светящееся ядро, хвост растёт с путём и тает, вспышка
-      у ствола гаснет за полметра (`BulletLook`); форма пули прежняя
-- [x] Звонок лифта убран совсем — кабина, список звуков, генератор, файл
-      (решение пользователя: звенели все кабины на каждом этаже)
-- [x] Замер: GPU 2.56 мс, как на `main`; CPU рендера 5.2–5.4 против 5.1 —
-      модели прибавили ~0.2 мс
-- [x] Сравнение с оригиналом: агенты у нас были бледно-голубыми, в аркаде —
-      чёрные. Палитра актёров писалась байтами как линейный цвет; теперь честно
-      переводится из sRGB — агент тёмный силуэт в федоре, Otto светлый
-- [x] Авторевью: 14 находок, исправлены 12. Риг не замирал никогда — порог
-      сравнения кадров ниже шума float32, и каждый актёр раскладывал скелет
-      каждый кадр; погоня за клипом экспонентой отставала от ходьбы на 15° —
-      теперь переход — смешивание по времени от кадра, где поза сменилась, а
-      неподвижная цель замирает. Колёса машины крутились вокруг нуля машины и
-      назад — теперь вокруг своих осей и вперёд. Труп после клипа смерти лежал
-      на 6 см в полу — клипы «один раз» заземляются. Ядро трассера было
-      неосвещённым, а такой материал эмиссию не берёт. Тест ходьбы на полу не
-      мог упасть — меряет теперь без заземления. Отложено: отдача второго
-      выстрела в позе выстрела (нужен перезапуск позы у актёров) и кэш
-      материалов трассера мимо `GreyboxLook`
+- [x] The bullet is a tracer: a glowing core, a tail that grows with distance and fades, the muzzle
+      flash dies out within half a meter (`BulletLook`); the bullet shape is unchanged
+- [x] The elevator bell is removed completely — cab, sound list, generator, file
+      (user's decision: every cab rang on every floor)
+- [x] Measurement: GPU 2.56 ms, same as on `main`; render CPU 5.2–5.4 versus 5.1 —
+      the models added ~0.2 ms
+- [x] Comparison with the original: our agents were pale blue, in the arcade they are
+      black. The actor palette was written as bytes as a linear color; now it is properly
+      converted from sRGB — the agent is a dark silhouette in a fedora, Otto is light
+- [x] Code review: 14 findings, 12 fixed. The rig never froze — the frame comparison
+      threshold was below float32 noise, and every actor laid out its skeleton
+      every frame; chasing the clip exponentially lagged behind walking by 15° —
+      now a transition is a time-based blend from the frame where the pose changed, and
+      a still target freezes. The car wheels spun around the car's origin and
+      backwards — now around their own axes and forwards. A corpse after the death clip lay
+      6 cm inside the floor — "once" clips are now grounded. The tracer core was
+      unshaded, and such a material does not take emission. The floor walking test could not
+      fail — it now measures without grounding. Deferred: the recoil of a second
+      shot in the shooting pose (needs a pose restart in the actors) and a cache of
+      tracer materials bypassing `GreyboxLook`
 - [x] README
-- [x] `check.ps1` зелёный после правок ревью: 55 файлов за 161 с
+- [x] `check.ps1` green after the review fixes: 55 files in 161 s
 - [x] PR #38
 
-## Веха M21b · Этажи, крыша и лифт моделями паков
+## Milestone M21b · Floors, roof and elevator from pack models
 
-Решения — [ADR-0033](adr/0033-dressing-from-packs.md).
+Decisions: [ADR-0033](adr/0033-dressing-from-packs.md).
 
-**DoD:** этаж читается отелем или конторой без подписи, у лифта видно, где
-кабина, крыша — крыша небоскрёба, шахта видна столбом сквозь здание.
+**DoD:** a floor reads as a hotel or an office without a caption, the elevator shows where
+the cab is, the roof is a skyscraper roof, the shaft shows as a column through the building.
 
-### Что показала сверка
+### What the check showed
 
-- **Этаж** — плоские прямоугольники: панели стены тоном раунда и шесть видов
-  коробок. Фактур нет нигде.
-- **Каталог poly.pizza:** 327 моделей; CC0 — Quaternius, CreativeTrio, Kenney;
-  CC-BY 3.0 — большая часть The Office Pack. Фактуры — ambientCG, CC0.
-- **Крыша** — коробки `RoofKit`; неон HOTEL за техникой и за верхом кадра.
-- **Табло над шахтой** статичное, хотя кабина знает свой этаж.
+- **A floor** is flat rectangles: wall panels in the round tone and six kinds of
+  boxes. No textures anywhere.
+- **poly.pizza catalog:** 327 models; CC0 — Quaternius, CreativeTrio, Kenney;
+  CC-BY 3.0 — most of The Office Pack. Textures — ambientCG, CC0.
+- **The roof** is `RoofKit` boxes; the HOTEL neon is behind the equipment and above the top of the frame.
+- **The indicator board above the shaft** is static, although the cab knows its floor.
 
-### План вехи
+### Milestone plan
 
-- [x] Сверка, вопросы, ADR-0033, план в EPIC
-- [x] Тип и имя здания жребием (`BuildingIdentity`): первое — отель EMPIRE,
-      дальше отель или офис с именем из списка
-- [x] `PropCatalog`: 44 модели в `assets/models/props/` (CC0 и CC-BY 3.0),
-      рост, поворот к камере, где висит, для какого здания; `credits.json` и
-      `CREDITS.md`. Кадр каталога — `tools/props_shot.tscn`
-- [x] Обстановка: мебель на каждом втором свободном месте, широкая — только
-      если соседние места свободны и до двери, шахты, стены и пролёта
-      эскалатора хватает ширины; на стенах — почти всегда, кроме мест у шахты и
-      над высокой мебелью; таблички с номерами у дверей; трубы — только в офисе
-- [x] Фактуры (`tools/build_textures.py`, `BuildingFinish`): обои отеля — свои,
-      в полоску с ромбиком; остальное — ambientCG, трипланарно, тон раунда
-      множителем
-- [x] Стальная шахта: лист с болтами во всю высоту, распорки, хромированный
-      наличник, рифлёный порог; табло этажа кабины со стрелкой, кнопки ▲▼ с той
-      стороны портала, где нет двери и стены
-- [x] Вертикальная неоновая вывеска на углу (`VerticalSign`), одна буква мигает;
-      неон с крыши убран, отсвет — тот же единственный источник
-- [x] Крыша моделями: водонапорная башня или бак, тарелка, кондиционеры,
-      солнечная панель, выход на крышу, антенна с огнём на машинном отделении
-- [x] Тесты: каталог и авторство, раскладка на любом сиде, табло и вывеска
-- [x] Табличка этажа — табло: стальная рамка, тёмное стекло, светятся только
-      красные цифры (замечание пользователя: красный щит «сильно выделяется»)
-- [x] Кадры: `capture.py M21b`, `layout_shot --folder=M21b --building=N` (отель
-      EMPIRE и офис VECTOR), `props_shot`; сравнение с оригиналом — табло этажа
-      красное, как в аркаде, шахта — столб, как бирюзовая шахта оригинала
-- [x] Замер: GPU 3.0 мс (было 2.6), CPU рендера 6.0–6.3 (было 5.4) — фактуры и
-      модели; первый прогон после переимпорта давал 7 мс — компиляция шейдеров
-- [x] `check.ps1` зелёный: 58 файлов за 167 с
+- [x] Check, questions, ADR-0033, plan in EPIC
+- [x] Building kind and name by draw (`BuildingIdentity`): the first is the hotel EMPIRE,
+      then a hotel or an office with a name from a list
+- [x] `PropCatalog`: 44 models in `assets/models/props/` (CC0 and CC-BY 3.0),
+      height, turn toward the camera, where it hangs, which building it is for; `credits.json` and
+      `CREDITS.md`. Catalog shot — `tools/props_shot.tscn`
+- [x] Dressing: furniture on every second free spot, wide pieces only
+      if the neighboring spots are free and there is enough width to the door, shaft, wall and
+      escalator opening; on the walls — almost always, except spots by the shaft and
+      above tall furniture; number plates by the doors; pipes only in the office
+- [x] Textures (`tools/build_textures.py`, `BuildingFinish`): the hotel wallpaper is our own,
+      striped with a small diamond; the rest is ambientCG, triplanar, the round tone as a
+      multiplier
+- [x] Steel shaft: a bolted sheet at full height, braces, a chrome
+      casing, a ribbed sill; an indicator board for the cab's floor with an arrow, ▲▼ buttons on the
+      side of the portal where there is no door or wall
+- [x] A vertical neon sign on the corner (`VerticalSign`), one letter blinks;
+      the neon is removed from the roof, the glow is the same single light source
+- [x] Roof from models: a water tower or tank, a dish, air conditioners,
+      a solar panel, a roof exit, an antenna with a light on the machine room
+- [x] Tests: catalog and attribution, layout on any seed, indicator board and sign
+- [x] The floor plate is an indicator board: a steel frame, dark glass, only the
+      red digits glow (user's remark: the red plate "stands out a lot")
+- [x] Shots: `capture.py M21b`, `layout_shot --folder=M21b --building=N` (hotel
+      EMPIRE and office VECTOR), `props_shot`; comparison with the original — the floor board is
+      red, like in the arcade, the shaft is a column, like the original's turquoise shaft
+- [x] Measurement: GPU 3.0 ms (was 2.6), render CPU 6.0–6.3 (was 5.4) — textures and
+      models; the first run after reimport gave 7 ms — shader compilation
+- [x] `check.ps1` green: 58 files in 167 s
 - [x] README
-- [x] Авторевью: 15 находок, исправлены все. Табло хранились по колонке, а
-      шахты на разных этажах делят колонку — табло шахты крыши показывали чужую
-      кабину; знак хода был перевёрнут (у кабины «вниз» — плюс); тёмные кнопки
-      рисовались белыми — сброс материала отдавал белый по умолчанию; таблички
-      дверей и панели кнопок тонули в пилястрах; выход на крышу на 7 сидах из 20
-      стоял в плоскости игры; крыша показывалась «31» — теперь «R»; мебель
-      закрывала кнопки; гравий и бетон лежали без дела — теперь на скатах и
-      машинном отделении. Тест табло не мог упасть: мерил до первого шага физики
-- [x] Антенна `antenna` встаёт на короткой стороне крыши, если нет места выходу
-- [x] `check.ps1` зелёный после правок ревью
+- [x] Code review: 15 findings, all fixed. Indicator boards were stored per column, but
+      shafts on different floors share a column — the roof shaft boards showed someone else's
+      cab; the direction sign was inverted (for the cab "down" is plus); dark buttons
+      rendered white — the material reset returned white by default; door plates
+      and button panels sank into pilasters; the roof exit on 7 seeds out of 20
+      stood in the play plane; the roof was shown as "31" — now "R"; furniture
+      covered buttons; gravel and concrete sat unused — now on the slopes and the
+      machine room. The indicator board test could not fail: it measured before the first physics step
+- [x] The `antenna` goes on the short side of the roof if there is no room for the exit
+- [x] `check.ps1` green after the review fixes
 - [x] PR #39
 
-## Веха M22 · Грейдинг и полировка
+## Milestone M22 · Grading and polish
 
-Решения — [ADR-0030](adr/0030-grading-and-quality.md) и
+Decisions: [ADR-0030](adr/0030-grading-and-quality.md) and
 [ADR-0034](adr/0034-ultra-and-auto-quality.md).
 
-**DoD:** кадр можно поставить рядом с референсом и говорить о разнице в ремесле,
-а не в возможностях.
+**DoD:** a frame can be put next to a reference and the difference is about craft,
+not about capabilities.
 
-### Вопросы вехи
+### Milestone questions
 
-- **«Ультра»:** объёмный свет ламп, отражённый свет SSIL, тени высокого
-  разрешения. SDFGI — нет: свет потёк бы сквозь стены разреза.
-- **Сглаживание** — в уровнях, без отдельного пункта.
-- **Уровень при первом запуске** — по замеру кадра.
-- **Тон** — доводим нуар.
+- **"Ultra":** volumetric lamp light, SSIL bounced light, high-resolution
+  shadows. No SDFGI: light would leak through the walls of the cutaway.
+- **Anti-aliasing** is part of the levels, without a separate option.
+- **Level on first launch** is based on a frame measurement.
+- **Tone:** we finish the noir.
 
-### План вехи
+### Milestone plan
 
-- [x] Вопросы, ADR-0034, план в EPIC
-- [x] «Ультра» в `Graphics`, настройках и переводах: SSIL, свет ламп, шахт и
-      неона в объёмном тумане втрое, сетка тумана вдвое мельче, атлас теней 8192
-      с мягким фильтром. Гуще туман не сделан: на пробе дымка ложилась на Otto
-- [x] Сглаживание по уровням на корневом окне: FXAA, MSAA ×2, ×2, ×4. TAA снят
-      по кадрам — размывал обводку актёров
-- [x] Уровень при первом запуске по замеру (`QualityProbe`): на вступлении
-      первого здания, с «Ультра» вниз по медиане GPU ≤ 12 мс, не дольше 8 с
-- [x] Виньетка слоем под HUD (`Vignette`); дизеринг включён в `project.godot`
-      — дополнение ADR-0002 записывало его с M20, а настройки не было
-- [x] `layout_shot --floor-only --quality=N` — один этаж на каждом уровне
-- [x] Тон по кадрам: три набора (`layout_shot --tone=N`), взят второй — холод
-      в тенях и тепло в свете разведены сильнее, мрамор не выбеливается
-- [x] HUD — неон-нуар (решение пользователя): плашки с кромкой в цвет вывески,
-      шрифт Exo 2 (OFL), значки вместо слов — папки документов, силуэты
-      жизней; по центру имя здания и этаж Otto. Папок — сколько документов в
-      здании (по ROM 5–10): на первой сборке их было пять навсегда
-- [x] Мерцание (замечание пользователя): `tools/flicker_shot.tscn` снимает 60
-      кадров неподвижного этажа с вертикальной синхронизацией и строит карту
-      разницы. Кромки дверей, перекрытий и стен мерцали от камеры: сглаживание
-      экспонентой не доходило до стоящей цели и сдвигало кадр на доли пикселя
-      — теперь в полумиллиметре камера встаёт ровно. Остальное на карте
-      задумано: кабины, дыхание Otto, табло, мигающая буква вывески. Разрыв
-      кадра в прогонах — замер `light_bench`, он выключает синхронизацию
-- [x] Разрешение (вопрос пользователя, `DisplayModes`): окно, без рамки или
-      полный экран в родном разрешении; размер окна — стандартные до 3840×2160,
-      только те, что влезают на монитор; масштаб 3D-рендера 100/77/67/50 % через
-      FSR, интерфейс не задет. Старый флажок «полный экран» читается режимом
-- [x] Город детальнее (`CityDetails`): верхи домов — уступы, шпили, баки,
-      антенны; красные огни мигают каждый в своей фазе шейдером; неоновые вывески
-      на любой высоте фасада; у трети домов горит целый этаж; зарево улиц. Без
-      источников света. Раскладка кварталов по сиду не сдвинулась
-- [x] Погода богаче: ясной ночью звёзды и луна, в тумане плывут полосы дымки,
-      в дождь — молнии (`Lightning`): серии вспышек, небо и погасшие стёкла
-      домов загораются, воздух здания светлеет, изредка виден разряд. Гром — M23
-- [x] Бюджет по всему зданию (`light_bench --whole`), худший кадр GPU:
-      низкое 1.1 мс, среднее 1.7, высокое 3.7, «Ультра» 8.6 из 16.6
-- [x] Уборка 2D: `tools/palette.py` удалён — девять цветов актёров переехали в
-      `build_actors.py`; у `BuildingPalette` сняты поля без читателей (`lit`,
-      `shaft_light`), тест темноты сверяет тон с настоящим светом лампы
-- [x] Тесты: уровни качества и замер (`test_graphics`), режимы окна, папки
-      HUD, камера в покое, город и молния; `check.ps1` зелёный: 60 файлов за 164 с
-- [x] Кадры: `capture.py M22`, уровни рядом (`layout_shot --floor-only
-      --quality=N`), тон (`--tone=N`), погода на крыше (`--roof-only`), карта
-      мерцания; сравнение с оригиналом
+- [x] Questions, ADR-0034, plan in EPIC
+- [x] "Ultra" in `Graphics`, settings and translations: SSIL, lamp, shaft and
+      neon light three times stronger in volumetric fog, a fog grid twice as fine, an 8192 shadow atlas
+      with a soft filter. Denser fog was not done: in a trial the haze settled on Otto
+- [x] Anti-aliasing by level on the root window: FXAA, MSAA ×2, ×2, ×4. TAA was dropped
+      after looking at shots — it blurred the actors' outlines
+- [x] Level on first launch by measurement (`QualityProbe`): during the intro of the
+      first building, from "Ultra" downward by median GPU ≤ 12 ms, no longer than 8 s
+- [x] Vignette as a layer under the HUD (`Vignette`); debanding is enabled in `project.godot`
+      — the ADR-0002 addendum recorded it since M20, but the setting was not there
+- [x] `layout_shot --floor-only --quality=N` — one floor at each level
+- [x] Tone by shots: three sets (`layout_shot --tone=N`), the second is taken — cold
+      in the shadows and warmth in the light are separated more, marble does not wash out
+- [x] HUD is neon noir (user's decision): plates with an edge in the sign's color,
+      the Exo 2 font (OFL), icons instead of words — document folders, life
+      silhouettes; in the center the building name and Otto's floor. The number of folders is the number of documents in
+      the building (5–10 per ROM): in the first build there were always five
+- [x] Flicker (user's remark): `tools/flicker_shot.tscn` takes 60
+      frames of a still floor with vertical sync and builds a difference
+      map. The edges of doors, slabs and walls flickered because of the camera: exponential smoothing
+      never reached a still target and shifted the frame by fractions of a pixel
+      — now within half a millimeter the camera snaps exactly. The rest on the map is
+      intended: cabs, Otto's breathing, indicator boards, the blinking letter of the sign. Frame tearing
+      in runs is the `light_bench` measurement, it turns sync off
+- [x] Resolution (user's question, `DisplayModes`): windowed, borderless or
+      fullscreen at native resolution; window size — standard sizes up to 3840×2160,
+      only those that fit on the monitor; 3D render scale 100/77/67/50 % via
+      FSR, the interface is not affected. The old "fullscreen" flag is read as a mode
+- [x] More detailed city (`CityDetails`): building tops with setbacks, spires, tanks,
+      antennas; red lights blink each in its own phase via a shader; neon signs
+      at any height of a facade; in a third of the buildings a whole floor is lit; street glow. No
+      light sources. The block layout per seed did not shift
+- [x] Richer weather: stars and the moon on a clear night, bands of haze drift in fog,
+      lightning in rain (`Lightning`): series of flashes, the sky and the unlit windows
+      of the buildings light up, the building's air brightens, occasionally a bolt is visible. Thunder — M23
+- [x] Budget over the whole building (`light_bench --whole`), worst GPU frame:
+      low 1.1 ms, medium 1.7, high 3.7, "Ultra" 8.6 out of 16.6
+- [x] 2D cleanup: `tools/palette.py` removed — the nine actor colors moved to
+      `build_actors.py`; `BuildingPalette` lost fields without readers (`lit`,
+      `shaft_light`), the darkness test checks the tone against the real lamp light
+- [x] Tests: quality levels and measurement (`test_graphics`), window modes, HUD
+      folders, camera at rest, city and lightning; `check.ps1` green: 60 files in 164 s
+- [x] Shots: `capture.py M22`, levels side by side (`layout_shot --floor-only
+      --quality=N`), tone (`--tone=N`), weather on the roof (`--roof-only`), flicker
+      map; comparison with the original
 - [x] README
-- [x] Авторевью: 15 находок, исправлены 14. Разряд молнии не рисовался вовсе
-      — треугольники отсекались как задние; замер на исходе времени оставлял
-      неизмеренный уровень, и самая слабая карта получала «Ультра»; замер
-      перебивал выбор игрока и жил дольше здания — второй запускался поверх
-      первого; окно прыгало в центр при любой смене настроек; окно FullHD на
-      FullHD-мониторе уходило заголовком за край и низом под панель задач;
-      подписи HUD не переводились при смене языка; замер не видел кадра города —
-      теперь складывает время окна и вида города. Оставлено как есть: заливка
-      ламп светит в туман на четверть на всех уровнях — так подобран вид по кадрам
-- [x] `check.ps1` зелёный после правок ревью
+- [x] Code review: 15 findings, 14 fixed. The lightning bolt was not drawn at all
+      — the triangles were culled as back faces; a measurement running out of time left
+      a level unmeasured, and the weakest card got "Ultra"; the measurement
+      overrode the player's choice and outlived the building — a second one started on top of
+      the first; the window jumped to the center on any settings change; a FullHD window on
+      a FullHD monitor went with its title bar past the edge and its bottom under the taskbar;
+      HUD captions were not translated when the language changed; the measurement did not see the city frame —
+      now it adds up the window time and the city view time. Left as is: the lamp fill
+      light shines into the fog at a quarter on all levels — that is how the look was tuned by shots
+- [x] `check.ps1` green after the review fixes
 - [x] PR #40
 
-## Сверка документации
+## Documentation check
 
-Решение пользователя после M22: каждый `.md` проекта, включая README, по каждому
-предложению и утверждению. Ветка `docs/sweep`.
+User's decision after M22: every `.md` of the project, including README, sentence by
+sentence and claim by claim. Branch `docs/sweep`.
 
-### Как сверяем
+### How we check
 
-- **Документ описывает то, что есть.** Если неправ, похоже, код — документ
-  пишет, как есть сейчас, а расхождение уходит в долг ниже с пометкой «правка за
-  кодом». Код в этой ветке не трогаем.
-- **ADR не переписываем:** это запись того, что решили тогда. Отменённому или
-  дополненному ADR — строка статуса в шапке со ссылкой на того, кто отменил;
-  ссылки, имена и числа, которые ADR называет текущими, — сверяем.
-- **`milestones.md` — каждое утверждение** против кода той вехи, по git.
-- **Закрытый долг из STATUS уходит;** разборы, которые стоит помнить, —
-  в `milestones.md` к своей вехе.
+- **A document describes what exists.** If the code seems to be wrong, the document
+  describes how it is now, and the discrepancy goes into the debt below marked "fix
+  in code". The code is not touched in this branch.
+- **ADRs are not rewritten:** they are a record of what was decided then. A superseded or
+  amended ADR gets a status line in the header linking to the one that superseded it;
+  links, names and numbers that the ADR calls current are checked.
+- **`milestones.md` — every claim** against the code of that milestone, via git.
+- **Closed debt leaves STATUS;** analyses worth remembering go
+  to `milestones.md` under their milestone.
 
-### План
+### Plan
 
-- [x] Вопросы, план
+- [x] Questions, plan
 - [x] README, CLAUDE.md, CHANGELOG, CREDITS, `conventions.md`, `testing.md`,
-      `reference/arcade-rom.md`. Главное: CLAUDE.md обещал проверку типов
-      линтером, которой нет; CHANGELOG описывал 2D-сборку и дату несостоявшегося
-      релиза; высоты пуль в `arcade-rom.md` стояли в клетке этажа, а не над полом
-- [x] STATUS.md и EPIC.md: «Что работает» переписан под 3D и ROM, размеры
-      здания по `Proportions`, закрытые вопросы и шестнадцать пунктов закрытого
-      долга сняты; в EPIC M20 стояла несделанной, хотя влита
-- [x] ADR 0001–0034: шапки статуса у всех, отменён целиком только ADR-0002;
-      около двадцати неверных ссылок на пункты других ADR, ссылки в синтаксисе
-      докстрок Godot заменены именами
-- [x] `milestones.md` по вехам против git: около сорока правок, материал M18b,
-      попавший в M18a, перенесён; дописаны вехи M1, M5a, M9, M10 и M12
-- [x] Расхождения с кодом — в долг ниже: лицензии в архиве релиза, проверка
-      типов, бонус без потолка, устаревшие комментарии
-- [x] `check.ps1` зелёный: 60 файлов за 164 с
-- [x] PR #43, вместе с M22b
+      `reference/arcade-rom.md`. The main points: CLAUDE.md promised type checking by
+      the linter, which does not exist; CHANGELOG described the 2D build and the date of a release
+      that never happened; bullet heights in `arcade-rom.md` were given in the floor cell, not above the floor
+- [x] STATUS.md and EPIC.md: "What works" rewritten for 3D and the ROM, building
+      dimensions per `Proportions`, closed questions and sixteen items of closed
+      debt removed; in EPIC, M20 was listed as not done although it was merged
+- [x] ADR 0001–0034: status headers on all of them, only ADR-0002 is superseded entirely;
+      about twenty wrong links to items of other ADRs, links in Godot docstring
+      syntax replaced with names
+- [x] `milestones.md` milestone by milestone against git: about forty fixes, M18b material
+      that ended up in M18a moved; milestones M1, M5a, M9, M10 and M12 written up
+- [x] Discrepancies with the code go into the debt below: licenses in the release archive, type
+      checking, the bonus without a cap, outdated comments
+- [x] `check.ps1` green: 60 files in 164 s
+- [x] PR #43, together with M22b
 
-## Долг после сверки
+## Debt after the check
 
-Решение пользователя: закрыть найденное сверкой и мелкий старый долг, правило
-ухода агента по ROM и утечку. Переназначение клавиш, демо-режим, качание лампы,
-темнота в поздних зданиях и трассировка лучей остаются в долге — это вехи.
+User's decision: close what the check found and small old debt, the ROM agent
+leaving rule and the leak. Key rebinding, demo mode, lamp swinging,
+darkness in later buildings and ray tracing stay in the debt — those are milestones.
 
-- [x] **Типы проверяет движок:** `untyped_declaration` в `project.godot` —
-      ошибка разбора; всплыли семь переменных цикла в четырёх тестах
-- [x] **Архив релиза с лицензиями:** Exo 2 и `CREDITS.md` едут с игрой; тест —
-      у каждого шрифта `assets/fonts/` лицензия в архиве
-- [x] **Бонус по ROM:** 1000 × номер здания, но не больше чем за десятое
+- [x] **Types are checked by the engine:** `untyped_declaration` in `project.godot` is
+      a parse error; seven loop variables in four tests surfaced
+- [x] **Release archive with licenses:** Exo 2 and `CREDITS.md` ship with the game; test —
+      every font in `assets/fonts/` has a license in the archive
+- [x] **Bonus per ROM:** 1000 × building number, but no more than for the tenth
       (`Arcade.building_bonus`, @5793)
-- [x] **Уход агента по ROM:** 80 px и этаж ROM с восьмого (`Arcade.agent_leaves`);
-      прежде уходил с любого этажа. Бот не заметил: 0, 1, 1 смерть на сидах
-      1–3, как и было. Третье условие ROM — «кроме двадцатого» — не взято: с
-      ним сид 2 стоил 10 смертей вместо одной, дважды подряд; вопрос 9
-- [x] **Устаревшие комментарии** — семь мест; ссылки эскалатора на ADR-0004
-- [x] **Мелочи:** действия `restart`/`quit_game` удалены; четыре копии ожидания
-      спуска сведены в `GreyboxLevel.wait_for_the_landing`; CI гонит тесты
-      матрицей на трёх машинах (`run_tests.py --part K/N`)
-- [x] **Утечка ObjectDB — не наша.** Утекает не здание, а воспроизведение темы
-      `theme.ogg`: выход застаёт его у звукового сервера, пока микшер не успел
-      его снять. В headless так всегда — фиктивный драйвер микшер не крутит; с
-      настоящим (WASAPI) — только когда выход идёт сразу за стартом музыки, как
-      в `ui_shot`. Игра на 300 кадров с окном не теряет ничего, а остановка
-      звука на выходе не помогает — это гонка движка, правки в коде нет
-- [x] `check.ps1` зелёный: 60 файлов за 165 с
-- [x] PR #43, вместе с M22b
+- [x] **Agent leaving per ROM:** 80 px and ROM floor from the eighth (`Arcade.agent_leaves`);
+      before, an agent left from any floor. The bot did not notice: 0, 1, 1 deaths on seeds
+      1–3, as before. The third ROM condition, "except the twentieth", is not taken: with
+      it seed 2 cost 10 deaths instead of one, twice in a row; question 9
+- [x] **Outdated comments** — seven places; the escalator's links to ADR-0004
+- [x] **Small things:** the `restart`/`quit_game` actions removed; four copies of waiting
+      for the descent merged into `GreyboxLevel.wait_for_the_landing`; CI runs the tests
+      as a matrix on three machines (`run_tests.py --part K/N`)
+- [x] **The ObjectDB leak is not ours.** What leaks is not the building but the playback of the
+      `theme.ogg` theme: exit catches it at the audio server before the mixer has had time
+      to remove it. In headless it is always so — the dummy driver does not run the mixer; with
+      a real one (WASAPI) only when exit comes right after the music starts, as
+      in `ui_shot`. A 300-frame game with a window loses nothing, and stopping
+      the sound on exit does not help — it is an engine race, there is no fix in the code
+- [x] `check.ps1` green: 60 files in 165 s
+- [x] PR #43, together with M22b
 
-## Веха M22b · Меню
+## Milestone M22b · Menu
 
-Решения — [ADR-0035](adr/0035-menu.md). Замечание пользователя: игра смотрится
-современно, а меню — «убого».
+Decisions: [ADR-0035](adr/0035-menu.md). User's remark: the game looks
+modern, and the menu looks "shabby".
 
-**DoD:** меню можно поставить рядом с кадром игры, и они выглядят одной игрой.
+**DoD:** the menu can be put next to a game frame, and they look like one game.
 
-### Что показал разбор
+### What the analysis showed
 
-- **За главным меню пусто:** `Main._open_menu` выбрасывает здание, под
-  затемнением — серый градиент.
-- **Город живёт сам:** `CityBackdrop` — свой `SubViewport` на слое −1, от
-  здания ему нужны только высота, ширина и земля; камеру он ведёт по текущей.
-- **Шрифтов два:** Pixellari в теме меню, на вывеске фасада, табличках этажей,
-  табло шахт и табличках дверей; Exo 2 — в HUD.
-- **Мелко и крупно разом:** подписи настроек — кегль 12, выпадающие списки —
-  48 из темы.
+- **There is nothing behind the main menu:** `Main._open_menu` throws away the building, under
+  the dimming there is a grey gradient.
+- **The city lives on its own:** `CityBackdrop` is its own `SubViewport` on layer −1, from
+  the building it needs only the height, width and ground; it drives its camera from the current one.
+- **There are two fonts:** Pixellari in the menu theme, on the facade sign, floor plates,
+  shaft indicator boards and door plates; Exo 2 in the HUD.
+- **Small and large at once:** settings captions are size 12, dropdown lists are
+  48 from the theme.
 
-### Вопросы вехи
+### Milestone questions
 
-- **Фон** — живая сцена: ночной город; на паузе — игра, размытая.
-- **Название** — неоновая вывеска.
-- **Шрифт** — Exo 2 везде, Pixellari уходит.
-- **Анимация** — переходы, подсветка и звуки.
+- **Background** is a live scene: the night city; on pause it is the game, blurred.
+- **Title** is a neon sign.
+- **Font:** Exo 2 everywhere, Pixellari goes.
+- **Animation:** transitions, highlighting and sounds.
 
-### План вехи
+### Milestone plan
 
-- [x] Вопросы, ADR-0035, план в EPIC
-- [x] Общий стиль: `NeonStyle` — плашка, шрифт нужного веса, подпись; HUD
-      перешёл на него. Тема `ui_theme.tres` удалена — меню собирает стиль кодом
-- [x] Фон: `MenuStage` — город со своей ортокамерой, втрое шире игрового кадра
-      (при игровом окна вставали во весь экран), камера качается вдоль улицы;
-      на паузе и в конце партии — игра, размытая шейдером (`menu_blur`)
-- [x] Вывеска `NeonTitle`: три слоя ореола, трубка и раскалённая середина,
-      буква «T» мигает узором; свечение нарисовано — 2D-свечения у движка нет
-- [x] Страницы: колонка слева, пункты `MenuRow` — кнопка, переключатель
-      «‹ значение ›», громкость полосой, флажок; рекорды и управление сеткой;
-      Esc и B — назад с подстраниц
-- [x] Анимация: колонка въезжает слева, выбранный пункт загорается за 0.14 с;
-      звуки `ui_move`, `ui_select`, `ui_back` — синтезом
-- [x] Pixellari → Exo 2 в сцене: вывеска, таблички этажей (высота цифры
-      перемерена по глифам — 0.71 кегля), табло шахт, таблички дверей; шрифт с
-      лицензией удалён
-- [x] Тесты: `test_menu` — каждая страница собирается и отдаёт фокус, состав
-      настроек, размытие только над игрой, переключатели, сцена без здания,
-      ни одной ссылки на Pixellari; `check.ps1` зелёный: 61 файл за 166 с
-- [x] Кадры: `ui_shot` до и после (`screens/menu_before`, `menu_after`),
-      `capture.py M22b`, сравнение с оригиналом — вывеска и таблички на Exo 2
-      читаются, цифры этажей того же характера, что красные табло аркады
-- [x] Авторевью: 15 находок, исправлены 12. Esc на настройках, открытых с
-      паузы, возвращал на паузу и тут же её снимал — тест; смена языка уводила
-      фокус на громкость; снимки меню шли посреди въезда колонки; цвет пункта,
-      заданный после сборки, не применялся; громкость у края щёлкала впустую и
-      не листалась удержанием; вывеска мигала невидимой; «Esc — назад» висело
-      там, где Esc назад не ведёт. Оставлены: имя проверки CI сменила матрица —
-      правится в защите ветки на GitHub; мипмапы Exo 2 — в долг
-- [x] `check.ps1` зелёный после правок ревью: 61 файл за 166 с
+- [x] Questions, ADR-0035, plan in EPIC
+- [x] Shared style: `NeonStyle` — plate, font of the needed weight, caption; the HUD
+      switched to it. The `ui_theme.tres` theme is removed — the menu builds its style in code
+- [x] Background: `MenuStage` — the city with its own orthographic camera, three times wider than the game frame
+      (at the game width the windows filled the whole screen), the camera sways along the street;
+      on pause and at the end of a game it is the game, blurred by a shader (`menu_blur`)
+- [x] The `NeonTitle` sign: three halo layers, a tube and a white-hot core,
+      the letter "T" blinks in a pattern; the glow is painted — the engine has no 2D glow
+- [x] Pages: a column on the left, `MenuRow` items — a button, a "‹ value ›"
+      switcher, volume as a bar, a checkbox; high scores and controls as a grid;
+      Esc and B go back from subpages
+- [x] Animation: the column slides in from the left, the selected item lights up in 0.14 s;
+      the `ui_move`, `ui_select`, `ui_back` sounds are synthesized
+- [x] Pixellari → Exo 2 in the scene: the sign, floor plates (the digit height
+      remeasured by glyphs — 0.71 of the font size), shaft indicator boards, door plates; the font with
+      its license removed
+- [x] Tests: `test_menu` — every page builds and takes focus, the settings
+      contents, blur only over the game, switchers, a scene without a building,
+      not a single reference to Pixellari; `check.ps1` green: 61 files in 166 s
+- [x] Shots: `ui_shot` before and after (`screens/menu_before`, `menu_after`),
+      `capture.py M22b`, comparison with the original — the sign and plates in Exo 2
+      are readable, the floor digits have the same character as the arcade's red boards
+- [x] Code review: 15 findings, 12 fixed. Esc on settings opened from
+      pause returned to pause and immediately unpaused — test; a language change moved
+      focus to the volume; menu shots were taken in the middle of the column sliding in; an item color
+      set after building was not applied; volume at the edge clicked for nothing and
+      did not scroll when held; the sign blinked while invisible; "Esc — back" hung
+      where Esc does not lead back. Left: the CI check name was changed by the matrix —
+      fixed in the branch protection on GitHub; Exo 2 mipmaps go to the debt
+- [x] `check.ps1` green after the review fixes: 61 files in 166 s
 - [x] README
 - [x] PR #43
 
-## Веха M23 · Звуковое сопровождение
+## Milestone M23 · Sound
 
-Решение пользователя (2026-09-24): звук «теперь кажется очень примитивным» на
-фоне картинки. Сейчас все 17 эффектов, тема здания и мотив тревоги
-синтезированы `tools/render_audio.py` (ADR-0012), звуки меню — там же (M22b).
+User's decision (2026-09-24): the sound "now seems very primitive" next to
+the picture. Currently all 17 effects, the building theme and the alarm motif are
+synthesized by `tools/render_audio.py` (ADR-0012), the menu sounds too (M22b).
 
-### Что показала сверка
+### What the check showed
 
-- **Музыка оригинала — одна тема Yoshio Imamura в нескольких обличьях:**
-  тема здания и её же «Hurry Up» по тревоге (@466E). Рип аркады (KHInsider,
-  12 дорожек) называет ещё восемь коротких джинглов: вступление здания, вход в
-  красную дверь, документ, жизнь, бонус, смерть, смерть под кабиной, конец
-  партии.
-- **Звуковые команды ROM** (запись в `sound_latch_D50B`, дизассемблер jotd):
-  шаг `$66` и прыжок `$33`; выстрел Otto `$91` и агента `$92` — разные; пуля
-  в стену `$93`; смерть агента `$3A`, агента ногой `$CB`; смерть Otto от пули
-  `$C4`, под кабиной `$C5`, падением `$C3`; падение лампы `$C7`; ход кабины
-  `$64`/`$65` — звучит, пока кабина едет; эскалатор вверх `$62`, вниз `$63`;
-  вход в красную дверь `$37`, документ `$36`; «документы не собраны» на выходе
-  `$38`; крюк на крыше `$C2`; жизнь `$3D`; тревога `$3E`.
-- **Чего у нас нет из оригинала:** выстрел агента звучит как выстрел Otto; нет
-  удара пули в стену, прыжка, смерти под кабиной и падением отдельными
-  звуками, крюка и троса, джинглов вступления, входа в дверь и несобранных
-  документов. Эскалатор гудит одинаково вверх и вниз.
-- **Чего нет ни у нас, ни в оригинале, но просит картинка:** город, дождь и
-  гром к молниям, гул шахты, машина у выхода, неон вывески, шаги по разным
-  полам.
-- **Что есть:** 17 эффектов и две темы синтезом (`tools/render_audio.py`),
-  звуки меню, три шины, позиционные источники у дверей, кабин и эскалаторов.
+- **The original's music is one Yoshio Imamura theme in several guises:**
+  the building theme and its own "Hurry Up" on alarm (@466E). The arcade rip (KHInsider,
+  12 tracks) names eight more short jingles: building intro, entering a
+  red door, document, life, bonus, death, death under a cab, game
+  over.
+- **ROM sound commands** (writes to `sound_latch_D50B`, jotd's disassembly):
+  step `$66` and jump `$33`; Otto's shot `$91` and an agent's `$92` are different; bullet
+  into a wall `$93`; agent death `$3A`, agent killed by a kick `$CB`; Otto's death by a bullet
+  `$C4`, under a cab `$C5`, by a fall `$C3`; lamp falling `$C7`; cab movement
+  `$64`/`$65` — plays while the cab moves; escalator up `$62`, down `$63`;
+  entering a red door `$37`, document `$36`; "documents not collected" at the exit
+  `$38`; hook on the roof `$C2`; life `$3D`; alarm `$3E`.
+- **What we lack from the original:** an agent's shot sounds like Otto's shot; there are no
+  bullet hitting a wall, jump, death under a cab or by a fall as separate
+  sounds, hook and rope, jingles for the intro, entering a door and uncollected
+  documents. The escalator hums the same up and down.
+- **What neither we nor the original have, but the picture asks for:** city, rain and
+  thunder for the lightning, shaft hum, the car at the exit, the sign's neon, footsteps on different
+  floors.
+- **What exists:** 17 effects and two themes via synthesis (`tools/render_audio.py`),
+  menu sounds, three buses, positional sources at doors, cabs and escalators.
 
-### Вопросы вехи
+### Milestone questions
 
-Решения — [ADR-0036](adr/0036-sound-from-libraries.md).
+Decisions: [ADR-0036](adr/0036-sound-from-libraries.md).
 
-- **Характер** — шпионский нуар-джаз.
-- **Музыка** — из библиотек CC0/CC-BY, свой трек на экран.
-- **Звуки оригинала** не добавляем: звучат те же события, что сейчас.
-- **Фон** — на крыше и в меню в полную силу, на этажах глухо.
-- **Музыка следит за игрой:** тревога наплывом, за дверью и на паузе глуше.
-- **Синтез** уходит целиком, включая меню.
-- **Выбор** — пользователь на слух, по странице с кандидатами.
+- **Character:** spy noir jazz.
+- **Music** from CC0/CC-BY libraries, its own track per screen.
+- **The original's sounds** are not added: the same events sound as now.
+- **Ambience:** at full strength on the roof and in the menu, muffled on the floors.
+- **Music follows the game:** alarm fades in, behind a door and on pause it is muffled.
+- **Synthesis** goes entirely, including the menu.
+- **Selection** is made by the user by ear, on a page with candidates.
 
-### План вехи
+### Milestone plan
 
-- [x] Сверка звука с оригиналом: что звучит в аркаде, когда и как
-- [x] Вопросы вехи, ADR-0036, план в EPIC
-- [x] Кандидаты на слух: страница с плеером, 122 файла в 35 слотах; выбор
-      множественный — треков здания пользователь взял четыре, тревоги три
-- [x] Выбранное — в игру: `tools/build_audio.py` качает по ссылкам, режет,
-      сшивает петли, выравнивает громкость; 43 файла, 29 МБ. Попадание в тело
-      без звука — ни один кандидат не подошёл, его слышно смертью
-- [x] Микс: шина `Ambience`, фильтры «из-за стены», наплыв тревоги, джинглы
-      поверх трека, гром к молниям, гул шахты вровень с Otto, неон у вывески;
-      шаг по ковру в отеле, по камню в конторе и на крыше
-- [x] Синтез удалён; авторы в `credits.json` и `CREDITS.md`, тест на авторство
-- [x] Послушать в игре: у пользователя вопросов нет
-- [x] Кадры (`capture.py M23`), авторевью, `check.ps1`, README. Авторевью: «заново» с паузы
-      оставляло музыку глухой на всю партию — выход из паузы теперь один,
-      `_unpause`; глухоту двери снимает сама дверь, уходя из дерева; петля фона,
-      позванная обратно, пока уходила, заводилась второй поверх неё и звучала
-      вполсилы навсегда; гром прежнего города приходил в следующий; второй раскат
-      обрывал первый; у выхода фон не звучал улицей, как велит ADR-0036
+- [x] Check of the sound against the original: what plays in the arcade, when and how
+- [x] Milestone questions, ADR-0036, plan in EPIC
+- [x] Candidates by ear: a page with a player, 122 files in 35 slots; multiple
+      choice — the user took four building tracks, three alarm tracks
+- [x] The selection goes into the game: `tools/build_audio.py` downloads by links, cuts,
+      stitches loops, levels the volume; 43 files, 29 MB. A body hit
+      has no sound — not a single candidate fit, it is heard as the death
+- [x] Mix: the `Ambience` bus, "behind the wall" filters, alarm fade-in, jingles
+      over the track, thunder for the lightning, shaft hum level with Otto, neon by the sign;
+      footsteps on carpet in the hotel, on stone in the office and on the roof
+- [x] Synthesis removed; authors in `credits.json` and `CREDITS.md`, an attribution test
+- [x] Listen in the game: the user has no questions
+- [x] Shots (`capture.py M23`), code review, `check.ps1`, README. Code review: "restart" from pause
+      left the music muffled for the whole game — there is now one way out of pause,
+      `_unpause`; the door muffling is removed by the door itself when it leaves the tree; an ambience loop
+      called back while it was fading out started a second one on top of it and played
+      at half strength forever; thunder from the previous city came into the next; a second clap
+      cut off the first; at the exit the ambience did not sound like the street, as ADR-0036 requires
 - [x] PR #44
 
-## Веха M24a · Баги, дождь, быстрые пули
+## Milestone M24a · Bugs, rain, fast bullets
 
-Решения — [ADR-0037](adr/0037-polish-bugs-and-combat.md). Замечания пользователя
-после M23 (2026-09-25) разложены на три вехи: M24a — баги, вид и бой; M24b —
-начало и конец здания; M24c — анимация и клавиши.
+Decisions — [ADR-0037](adr/0037-polish-bugs-and-combat.md). User remarks
+after M23 (2026-09-25) are split into three milestones: M24a — bugs, look and combat; M24b —
+the start and end of a building; M24c — animation and keys.
 
-### Что показал разбор
+### What the analysis showed
 
-- **Кабина застревает с Otto:** пассажиром он становится, едва тело зашло в
-  проём на 6 см, хотя кабина ещё ниже этажа (`elevator_car.gd`,
-  `_on_body_entered`); занятая кабина без «вверх/вниз» стоит, а невровень Otto
-  не шагает. Воспроизведено отдельным скриптом.
-- **Мерцание шахты:** буферы в одной плоскости с направляющими, наверху — с
-  фасадом машинного отделения; видно только в движении камеры.
-- **Дождь сквозь крышу:** капли гаснут по таймеру, округлённому до тиков частиц
-  (30 в секунду), — половина пролетает под плиту. Замер: 419 столбцов пикселей
-  дождя ниже потолка 30-го этажа, при частоте без округления — 5.
-- **Полосы на фоне:** камера города наклонена, у неё перспектива, вид без
-  сглаживания и растянут вдвое — ступеньки краёв окон ползут на ходу.
-- **Пули** — скорость ROM, кадр за 2,6 с; **трупы** уходят через 0,5 с;
-  **документов** в первом здании всегда 5; **падение** убивает только на дне
-  шахты; **справки** на паузе нет; **номера здания** в HUD нет.
+- **The cab gets stuck with Otto:** he becomes a passenger as soon as his body has entered the
+  opening by 6 cm, although the cab is still below the floor (`elevator_car.gd`,
+  `_on_body_entered`); an occupied cab without "up/down" stands still, and Otto does not
+  step out when it is not level. Reproduced with a separate script.
+- **Shaft flicker:** the buffers are in the same plane as the guide rails, at the top — with
+  the machine room facade; visible only while the camera moves.
+- **Rain through the roof:** drops die on a timer rounded to particle ticks
+  (30 per second) — half of them fly under the slab. Measurement: 419 pixel columns of
+  rain below the ceiling of the 30th floor, with an unrounded rate — 5.
+- **Stripes in the background:** the city camera is tilted, it has perspective, the view has no
+  anti-aliasing and is stretched twofold — the stair-steps of window edges crawl while moving.
+- **Bullets** — ROM speed, crossing the frame in 2.6 s; **corpses** go away after 0.5 s;
+  there are always 5 **documents** in the first building; a **fall** kills only at the bottom of
+  the shaft; there is no **help** on pause; there is no **building number** in the HUD.
 
-### Вопросы вехи
+### Milestone questions
 
-- **Пули** — втрое быстрее у обеих сторон; агент уклоняется в то же время, что
-  в ROM; пулю агента видно замахом и лучом прицела.
-- **Падение** — больше чем на этаж убивает везде: пол, кабина, дно шахты.
-- **Документы** — 5–10 жребием, расстановка таблицей ROM.
-- **Трупы** — до конца здания.
-- **Вехи** — три: M24a, M24b, M24c.
+- **Bullets** — three times faster for both sides; the agent dodges at the same time as
+  in the ROM; the agent's bullet is telegraphed by a wind-up and an aiming beam.
+- **Falling** — more than one floor kills everywhere: floor, cab, shaft bottom.
+- **Documents** — 5–10 by draw, placement by the ROM table.
+- **Corpses** — until the end of the building.
+- **Milestones** — three: M24a, M24b, M24c.
 
-### План вехи
+### Milestone plan
 
-- [x] Разбор, вопросы, ADR-0037, план в EPIC
-- [x] Кабина: посадка только вровень или на полу; тест на любом здании —
-      перекрытие проверяется каждый кадр, вошедшего на ходу кабина довозит до
-      этажа, стоящего под днищем давит; `test_car_boarding.gd`
-- [x] Шахта без совпадающих граней; тест на любом здании. Упоры — между
-      стойками и мельче их, машинное отделение на 4 см глубже, у портала
-      створки и порог не доходят до пола; `test_shaft_faces.gd` ищет грани
-      разных материалов в одной плоскости на пяти сидах
-- [x] Дождь: коллизия с крышей, брызги, круги, мокрая крыша, капель, слои в
-      городе; замер. `RoofRain`: капли гаснут о карту высот крыши (слой 20,
-      без людей) и о крышку над проёмом шахты, брызги — подэмиттером в месте
-      удара, круги и лужи наклейкой с отражениями, капель с отлива и козырька;
-      в городе три слоя струй и три завесы между рядами. Проба: ни одной капли
-      ниже плиты крыши. `light_bench --whole --seed=2` (теперь с видом города),
-      GPU в среднем / крыша, мс: до — 0.87/0.79, 1.34/1.17, 2.15/1.78,
-      4.88/3.82; после — 0.89/0.83, 1.38/1.21, 2.32/2.01, 5.17/3.91.
-      Дождь светом (вариант «B» по кадрам, ADR-0037, дополнение к решению 3):
-      капли от ламп и фона, без тумана, дымка от среднего уровня, ореол у лампы
-      и неона; капель над крышей 1100. Замер: до — 0.89/0.82, 1.39/1.22,
-      2.29/1.92, 5.35/4.20; после — 0.95/0.90, 1.42/1.27, 2.50/1.98, 5.60/4.21
-      (среднее двух прогонов)
-- [x] Фон: ровная камера со сдвигом объектива, сглаживание, расфокус за ближним
-      рядом. Камера города — `PROJECTION_FRUSTUM` со сдвигом кадра вниз вместо
-      наклона, MSAA вида города по уровню (`Graphics.smooth`), расфокус с 106 м
-      и мягче; на ходу окна ближнего ряда больше не ползут ступеньками
-- [x] Детализация фона: фасады шейдером — пояса, подоконники, простенки,
-      карниз, ребро угла, зарево улиц снизу; четыре типа домов со своим тоном и
-      окнами; окна с рамой и переплётом, за стеклом жалюзи, шторы, люди,
-      телевизоры, мигающие лампы; вывески с трубкой и буквами, часть —
-      вертикальные у угла. Город на «высоком» в 3/4 окна, на «Ультра» — в
-      полное; всё мультимешами, без новых источников света
-- [x] Пули втрое, уклонение по времени, замах и луч прицела, новый вид, искры и
-      след на стене; бот видит луч. `Arcade.BULLET_PACE` поверх таблиц ROM,
-      дальность увёртки растёт с ним; пуля проверяет путь за кадр целиком
-      (`cast_motion`) — сквозь стену не проскочить и под `time_scale` 4. Луч —
-      `AimLaser` (эмиссия, без света), вид — `ShotFx`: импульс света у ствола,
-      дымок, искры, пыль, след (не больше 40). Бот уходит по лучу: высокий —
-      присесть, низкий — прыжок за 0,55 с до пули. Смертей в тесте боя, сиды 1–3:
-      было 0, 1, 1 — стало 0, 0, 1; `playthrough.gd --agents`, сиды 1–5: было
-      0, 0, 1, 0, 0 — стало 0, 0, 1, 0, 1. Кадры — `tools/aim_shot.tscn`
-- [x] Трупы до конца здания: сходят со слоя врагов, засыпают, легши; убитый в
-      кабине едет с ней, у края шахты падает на пол, а не над проёмом
-- [x] Падение больше этажа — смерть везде: Otto сам меряет падение от опоры
-      при приземлении, дна шахты как зоны больше нет; `test_otto_fall.gd`
-- [x] Документов 5–10 жребием: число — свой жребий от сида здания, расстановка
-      столбцом ROM с тем же итогом (`BuildingDocuments.count`, `column`)
-- [x] Экран управления с паузы; на нём только клавиши — подсказки об игре
-      убраны (решение пользователя); раунд — в центре HUD первой строкой
-- [x] Бот и честность боя после слияния: смерти 3/16/8 — бот не уворачивался в
-      кабине и отбрасывал луч, упёршийся в край Otto; а в долгом здании злость
-      доходила до 10, где у ROM замаха нет, — втрое быстрая пуля без луча
-      неотвратима. Бот уворачивается кабиной; замах не короче 0,25 с
-      (`EnemyBrain.MIN_TELL`) — тест боя проходит на всех сидах
-- [x] «Показывать FPS» в настройках (просьба пользователя): счётчик мелко в
-      правом нижнем углу HUD, где раньше стоял раунд
-- [x] Кадры (`capture.py M24a`, сравнение с оригиналом), авторевью, `check.ps1`,
-      README. Авторевью: 12 находок, исправлены 10. Пуля сдвигалась к точке
-      касания до того, как знала, чего коснулась, и при пустом ответе добавляла
-      ещё шаг — могла проскочить тонкую стену; у выстрела в упор не было
-      вспышки; луч прицела считался каждый кадр на каждом агенте и трупе;
-      дымок собирался заново на каждый выстрел; мёртвый код дождя, копия
-      взвешенного жребия, устаревшие комментарии; тест справки не нажимал
-      «назад». Оставлены: префикс `merge:` у трёх коммитов (правка — переписать
-      историю), круги луж над проёмом шахты крыши — косметика, в долг
-- [x] PR #45. CI упал на части 2/3: `test_the_fps_counter_follows_the_setting`
-      ждал один `process_frame`, а дерево шлёт его до `_process` узлов того же
-      кадра — HUD мог ещё не обновиться. Тест ждёт два кадра (`fix/ci-fps-test`)
+- [x] Analysis, questions, ADR-0037, plan in EPIC
+- [x] Cab: boarding only when level or on the floor; a test on any building —
+      the overlap is checked every frame, the cab carries someone who entered on the move to
+      the floor, crushes someone standing under the floor; `test_car_boarding.gd`
+- [x] A shaft without coinciding faces; a test on any building. Stops — between
+      the posts and smaller than them, the machine room 4 cm deeper, at the portal
+      the leaves and the threshold do not reach the floor; `test_shaft_faces.gd` looks for faces
+      of different materials in the same plane on five seeds
+- [x] Rain: collision with the roof, splashes, ripples, wet roof, dripping, layers in
+      the city; measurement. `RoofRain`: drops die on the roof height map (layer 20,
+      no people) and on the cover over the shaft opening, splashes — by a sub-emitter at the point of
+      impact, ripples and puddles as a decal with reflections, dripping from the sill and the canopy;
+      in the city three layers of streaks and three curtains between rows. Probe: not a single drop
+      below the roof slab. `light_bench --whole --seed=2` (now with the city view),
+      GPU average / roof, ms: before — 0.87/0.79, 1.34/1.17, 2.15/1.78,
+      4.88/3.82; after — 0.89/0.83, 1.38/1.21, 2.32/2.01, 5.17/3.91.
+      Rain by light (option "B" by shots, ADR-0037, addendum to decision 3):
+      drops lit by lamps and the background, no fog, haze from the medium level, a halo at the lamp
+      and the neon; 1100 drops above the roof. Measurement: before — 0.89/0.82, 1.39/1.22,
+      2.29/1.92, 5.35/4.20; after — 0.95/0.90, 1.42/1.27, 2.50/1.98, 5.60/4.21
+      (average of two runs)
+- [x] Background: a level camera with a lens shift, anti-aliasing, defocus behind the near
+      row. City camera — `PROJECTION_FRUSTUM` with the frame shifted down instead of
+      a tilt, MSAA of the city view by level (`Graphics.smooth`), defocus from 106 m
+      and softer; while moving the near row windows no longer crawl in stair-steps
+- [x] Background detail: facades by shader — bands, sills, piers,
+      cornice, corner edge, street glow from below; four house types with their own tone and
+      windows; windows with a frame and mullions, behind the glass blinds, curtains, people,
+      TVs, flickering lamps; signs with a tube and letters, some
+      vertical at the corner. The city on "high" at 3/4 of the windows, on "Ultra" —
+      all of them; everything as multimeshes, no new light sources
+- [x] Bullets three times faster, dodging by time, wind-up and aiming beam, new look, sparks and
+      a mark on the wall; the bot sees the beam. `Arcade.BULLET_PACE` on top of the ROM tables,
+      the dodge range grows with it; the bullet checks its whole path per frame
+      (`cast_motion`) — it cannot pass through a wall even under `time_scale` 4. Beam —
+      `AimLaser` (emission, no light), look — `ShotFx`: a light pulse at the muzzle,
+      smoke, sparks, dust, a mark (no more than 40). The bot avoids by the beam: high —
+      crouch, low — jump 0.55 s before the bullet. Deaths in the combat test, seeds 1–3:
+      were 0, 1, 1 — now 0, 0, 1; `playthrough.gd --agents`, seeds 1–5: were
+      0, 0, 1, 0, 0 — now 0, 0, 1, 0, 1. Shots — `tools/aim_shot.tscn`
+- [x] Corpses until the end of the building: they leave the enemy layer, fall asleep once lying; one killed in
+      a cab rides with it, at the shaft edge falls onto the floor, not over the opening
+- [x] A fall of more than a floor is death everywhere: Otto himself measures the fall from support
+      on landing, the shaft bottom is no longer a zone; `test_otto_fall.gd`
+- [x] 5–10 documents by draw: the number is its own draw from the building seed, placement
+      by a ROM column with the same total (`BuildingDocuments.count`, `column`)
+- [x] Controls screen from pause; it shows only keys — gameplay hints
+      removed (user decision); the round — in the center of the HUD on the first line
+- [x] The bot and combat fairness after the merge: deaths 3/16/8 — the bot did not dodge in
+      the cab and discarded a beam that hit the edge of Otto; and in a long building the anger
+      went up to 10, where the ROM has no wind-up — a three-times-faster bullet without a beam
+      is unavoidable. The bot dodges with the cab; the wind-up is no shorter than 0.25 s
+      (`EnemyBrain.MIN_TELL`) — the combat test passes on all seeds
+- [x] "Show FPS" in settings (user request): a small counter in
+      the bottom right corner of the HUD, where the round used to be
+- [x] Shots (`capture.py M24a`, comparison with the original), code review, `check.ps1`,
+      README. Code review: 12 findings, 10 fixed. The bullet moved to the contact point
+      before it knew what it had touched, and on an empty result added
+      another step — it could pass through a thin wall; a point-blank shot had no
+      flash; the aiming beam was computed every frame on every agent and corpse;
+      the smoke was rebuilt for every shot; dead rain code, a copy of
+      the weighted draw, outdated comments; the help test did not press
+      "back". Left as is: the `merge:` prefix on three commits (the fix is rewriting
+      history), puddle ripples over the roof shaft opening — cosmetic, to debt
+- [x] PR #45. CI failed on part 2/3: `test_the_fps_counter_follows_the_setting`
+      waited for one `process_frame`, and the tree emits it before `_process` of nodes in the same
+      frame — the HUD might not have updated yet. The test waits two frames (`fix/ci-fps-test`)
 
-## Веха M24b · Вертолёт, двери, паркинг, выход
+## Milestone M24b · Helicopter, doors, garage, exit
 
-Решения — [ADR-0038](adr/0038-building-start-and-end.md).
+Decisions — [ADR-0038](adr/0038-building-start-and-end.md).
 
-### Что показала сверка
+### What the check against the original showed
 
-Дизассемблер ROM: крюк прилетает из-за края кадра, трос наискосок, сценка раз
-за партию, вертолёт — только на ZX. Красная дверь закрывается за Otto, внутри
-ровно 70 тиков (4,73 с), выйти раньше в ROM можно, документ — на выходе; агенты
-к двери не подходят. В подвал спускается одна шахта из пяти нижних, дверей нет,
-машина всегда слева. Выход — управление забирают в подвале, Otto сам запрыгивает
-в машину; без документов — звук, кадр едет вверх, Otto у пропущенной двери.
+ROM disassembly: the hook flies in from beyond the frame edge, the rope is diagonal, the scene plays once
+per game, the helicopter — only on the ZX. The red door closes behind Otto, inside
+exactly 70 ticks (4.73 s), in the ROM you can leave earlier, the document is given on exit; agents
+do not come up to the door. One shaft of the five lowest goes down into the basement, there are no doors,
+the car is always on the left. Exit — control is taken away in the basement, Otto jumps into
+the car by himself; without the documents — a sound, the frame moves up, Otto at the missed door.
 
-### Вопросы вехи
+### Milestone questions
 
-- **Трос** — с вертолёта, как на ZX; сценка в каждом здании.
-- **Красная дверь** — раньше не выйти; внутри 4,73 с, как в ROM.
-- **Подвал** — одна шахта вниз; настоящий подземный паркинг.
-- **Выход** — подошёл сам, сел, уехал в ворота; бонус поверх сцены.
-- **Без документов** — лифт в подвал не везёт; возврата, как в ROM, нет.
+- **Rope** — from a helicopter, as on the ZX; the scene in every building.
+- **Red door** — no leaving earlier; 4.73 s inside, as in the ROM.
+- **Basement** — one shaft down; a real underground garage.
+- **Exit** — walks up by himself, gets in, drives out through the gate; the bonus over the scene.
+- **Without documents** — the elevator does not go to the basement; no return, as in the ROM.
 
-### План вехи
+### Milestone plan
 
-- [x] Сверка с ROM, вопросы, ADR-0038, план в EPIC
-- [x] Вертолёт: влетает, спускает трос, Otto съезжает, вертолёт уходит; пропуск.
-      `Helicopter` (модель в `assets/models/aircraft/`, винт отдельным мешем,
-      огни, прожектор и свет кабины в висении) и `RoofArrival`: около 4,5 с до
-      управления, кадр вступления неподвижен и выше верха мира, пропуск —
-      прыжок, выстрел, пауза; после гибели вертолёта нет. Путь и висение —
-      над техникой крыши с запасом (`Helicopter.clear_height`, тест на пяти
-      сидах: корпус и диск винта не задевают ни одного предмета); ободок
-      корпуса вторым проходом держит хвост в темноте. Звук на вертолёте:
-      петля висения всю сценку (громче в висении), пролёт — слоем по скорости,
-      трос — пока Otto едет. Кадры — `tools/intro_shot.tscn`,
-      тест `test_roof_arrival.gd`
-- [x] Красная дверь: закрывается, 4,73 с, раньше не выйти, документ на выходе,
-      глухо сквозь дверь, агенты иногда ждут у двери. Шина SFX получила свой
-      фильтр «из-за стены» (`Sounds.muffle_world`). `DoorVisit` ведёт визит
-      подсказками створке: открыть — спрятать и закрыть — открыть заранее —
-      выпустить ровно через `Arcade.ROOM_TICKS`; ввода у него нет, выхода по
-      «влево/вправо» больше нет. В проём Otto шагает поездкой (на виду, но не
-      достать), прячется в открытую створку. `DoorWatch`: жребий 1/2 на агента
-      раз на визит, свой генератор от сида, не больше одного у двери, место —
-      сбоку от коврика со стороны агента, путь без проёмов и стен.
-      Вышедший неуязвим, пока створка не закрылась («до полного выхода» ROM).
-      `test_red_door.gd` — узел и здание на трёх сидах, `test_door_watch.gd`.
-      Тест боя с агентами после слияния с планом подвала (раскладка другая),
-      сиды 1–3: смертей 1, 0, 5 за 2907, 2594, 4775 шагов — в пороге 5 и
-      бюджете 7000. Ожидающие агенты на сиде 3 не стоят ни смерти: с
-      выключенным жребием — те же 5 и 4775. Смерти `playthrough.gd --agents`
-      на сиде 3 — три в кабине и одна в дуэли, у дверей ни одной, поэтому бот
-      и бюджет не тронуты. Сид 3 стоит на пороге — следить
-- [x] Подвал: одна шахта вниз, без эскалаторов; паркинг с колоннами, потолком,
-      чужими машинами, воротами и пандусом; машина Otto у ворот слева.
-      План подвала готов (`BuildingBasement`): одна шахта вниз жребием из пяти,
-      эскалаторов в подвал нет, выход и машина у левого торца капотом к воротам;
-      запертый спуск башни (сиды 65, 79…) лечится перекладкой шахт.
-      Вид паркинга — `Garage` и `GarageGate`: открытый зал за проездом,
-      чужие машины мимо машины Otto, светильники гаснут с зоной лампы,
-      штора ворот под мотор (`Sounds.GARAGE_GATE`) — `Garage.open_gate()`
-- [x] Выход: подошёл — сел — фары — уехал; бонус поверх, затемнение. Садятся
-      у водительской двери (`ExitBoarding`), ворота — `open_gate()` у `Garage`,
-      бонус набегает на HUD, смена здания под `FadeCurtain`; дверца, стартер
-      и отъезд звучат у машины
-- [x] Без всех документов лифт в подвал не везёт (решение пользователя вместо
-      возврата за документами из ROM): нижняя остановка заперта, проём над
-      подвалом закрыт створками, последний документ их открывает с зуммером
-      (`BasementLock`); возврат к пропущенной двери снят вместе с `DocumentRoute`
-- [x] Звуки выбраны на слух (страница кандидатов, 56 файлов): вертолёт висит и
-      пролетает, трос, дверца и мотор машины, ворота, шахта в подвал открылась —
-      `build_audio.py`, имена в `Sounds`, авторы в `CREDITS.md`
-- [x] 4K в настройках (замечание пользователя): список размеров строился по
-      рабочей области экрана, и на 4K-мониторе с панелью задач 3840×2160 в неё
-      не влезал. Теперь — по экрану; окно больше рабочей области встаёт без
-      рамки (`DisplayModes.windowed_rect`)
-- [x] Предел кадров (по монитору, 60–240, без предела) и вертикальная
-      синхронизация в настройках (просьба пользователя). Списка частот монитора
-      нет: Godot 4.7 не перечисляет и не меняет режимы экрана
-- [x] Правки по кадрам `m24b_shot`: запертые створки подвала — тёмная сталь с
-      зеброй и красными огоньками; посадка видна (поворот, дверца на петле со
-      светом салона, шаг к борту, хлопок); на выезде кадр раздвигается за торец,
-      машина уходит по пандусу, выезд собран разрезом (`GarageRamp`); бонус
-      досчитывается до затемнения, счёт и раунд — под чёрным; нижний этаж — «P» и
-      «ПАРКИНГ»; поля плашки бонуса; занятая красная дверь светится и дышит табло
-- [x] Правки: шина Interface — меню и джинглы мимо глушения за дверью; тест поездки агента в лифте больше не зависит от жребия; агент не стреляет в неуязвимого Otto (целится, пуля ждёт); пропуск вступления не стреляет и не прыгает
-- [x] Выезд: тоннель, рампа, улица через дорогу (`ExitStreet`), кадр едет за машиной
-- [x] Кадры, авторевью, `check.ps1`, README. Полный `check.ps1` после
-      слияния всех частей зелёный (75 файлов, 222 с). Маршрут `capture.py M24B`
-      и сравнение с оригиналом сняты; сценки вертолёта — `intro_shot`, паркинг —
-      `garage_shot`. Авторевью: 15 находок, исправлены 11 — замок подвала
-      открывался от сброса счёта (0 из 0); на тёмном нижнем этаже светильники
-      паркинга не гасли; шаг в паркинге отеля звучал ковром; ворота искались по
-      имени; шейдер ободка вертолёта собирался заново в каждом здании; повторные
-      расчёты раскладки паркинга и ожидания у двери; копия `_box`; устаревшие
-      комментарии про возврат к двери. Финальный `check.ps1` зелёный (77
-      файлов, 228 с)
+- [x] Check against the ROM, questions, ADR-0038, plan in EPIC
+- [x] Helicopter: flies in, lowers the rope, Otto slides down, the helicopter leaves; skip.
+      `Helicopter` (model in `assets/models/aircraft/`, the rotor as a separate mesh,
+      lights, a searchlight and cabin light while hovering) and `RoofArrival`: about 4.5 s until
+      control, the intro frame is still and above the top of the world, skip —
+      jump, shot, pause; after a death there is no helicopter. The path and hover —
+      above the roof equipment with a margin (`Helicopter.clear_height`, a test on five
+      seeds: the body and rotor disc do not touch a single object); a rim
+      on the body as a second pass keeps the tail in darkness. Helicopter sound:
+      the hover loop through the whole scene (louder while hovering), the flyby — a layer by speed,
+      the rope — while Otto slides. Shots — `tools/intro_shot.tscn`,
+      test `test_roof_arrival.gd`
+- [x] Red door: closes, 4.73 s, no leaving earlier, the document on exit,
+      muffled through the door, agents sometimes wait at the door. The SFX bus got its own
+      "behind the wall" filter (`Sounds.muffle_world`). `DoorVisit` drives the visit
+      by hints to the leaf: open — hide and close — open in advance —
+      release exactly after `Arcade.ROOM_TICKS`; it has no input, exiting by
+      "left/right" is gone. Otto steps into the opening as a ride (in view, but not
+      reachable), hides in the open leaf. `DoorWatch`: a 1/2 draw per agent
+      once per visit, its own generator from the seed, no more than one at the door, the spot —
+      beside the doormat on the agent's side, a path without openings and walls.
+      One who comes out is invulnerable until the leaf has closed ("until fully out" in the ROM).
+      `test_red_door.gd` — the node and the building on three seeds, `test_door_watch.gd`.
+      Combat test with agents after the merge with the basement plan (the layout differs),
+      seeds 1–3: deaths 1, 0, 5 over 2907, 2594, 4775 steps — within threshold 5 and
+      budget 7000. Waiting agents on seed 3 do not cost a single death: with
+      the draw switched off — the same 5 and 4775. Deaths in `playthrough.gd --agents`
+      on seed 3 — three in the cab and one in a duel, none at doors, so the bot
+      and the budget are untouched. Seed 3 sits at the threshold — keep an eye on it
+- [x] Basement: one shaft down, no escalators; a garage with columns, a ceiling,
+      other cars, a gate and a ramp; Otto's car by the gate on the left.
+      The basement plan is ready (`BuildingBasement`): one shaft down by a draw from five,
+      no escalators into the basement, the exit and the car at the left end wall with the hood towards the gate;
+      a blocked tower descent (seeds 65, 79…) is fixed by rearranging shafts.
+      Garage look — `Garage` and `GarageGate`: an open hall behind the driveway,
+      other cars past Otto's car, light fixtures go out with the lamp zone,
+      the gate shutter to a motor sound (`Sounds.GARAGE_GATE`) — `Garage.open_gate()`
+- [x] Exit: walks up — gets in — headlights — drives off; the bonus on top, fade-out. He gets in
+      at the driver's door (`ExitBoarding`), the gate — `open_gate()` of `Garage`,
+      the bonus counts up on the HUD, the building changes under `FadeCurtain`; the door, the starter
+      and the departure sound at the car
+- [x] Without all documents the elevator does not go to the basement (user decision instead
+      of returning for the documents as in the ROM): the bottom stop is locked, the opening above
+      the basement is closed by leaves, the last document opens them with a buzzer
+      (`BasementLock`); returning to the missed door is removed together with `DocumentRoute`
+- [x] Sounds chosen by ear (a page of candidates, 56 files): the helicopter hovers and
+      flies by, the rope, the car door and engine, the gate, the shaft to the basement opened —
+      `build_audio.py`, names in `Sounds`, authors in `CREDITS.md`
+- [x] 4K in settings (user remark): the size list was built from
+      the screen work area, and on a 4K monitor with a taskbar 3840×2160 did not
+      fit into it. Now — by the screen; a window larger than the work area is placed without
+      a border (`DisplayModes.windowed_rect`)
+- [x] Frame limit (by monitor, 60–240, unlimited) and vertical
+      sync in settings (user request). There is no list of monitor refresh rates:
+      Godot 4.7 neither enumerates nor changes display modes
+- [x] Fixes from `m24b_shot` shots: the locked basement leaves — dark steel with
+      zebra stripes and red indicator lights; boarding is visible (turn, the door on a hinge with
+      the interior light, a step to the side, a slam); on exit the frame widens past the end wall,
+      the car leaves up the ramp, the exit is built as a cutaway (`GarageRamp`); the bonus
+      finishes counting before the fade-out, score and round — under black; the bottom floor — "P" and
+      "PARKING"; the bonus plate margins; an occupied red door glows and its board breathes
+- [x] Fixes: Interface bus — menus and jingles bypass the muffling behind the door; the agent elevator ride test no longer depends on the draw; the agent does not shoot an invulnerable Otto (aims, the bullet waits); skipping the intro does not shoot or jump
+- [x] Exit: tunnel, ramp, the street across the road (`ExitStreet`), the frame follows the car
+- [x] Shots, code review, `check.ps1`, README. Full `check.ps1` after
+      merging all parts is green (75 files, 222 s). The `capture.py M24B` route
+      and the comparison with the original are captured; helicopter scenes — `intro_shot`, garage —
+      `garage_shot`. Code review: 15 findings, 11 fixed — the basement lock
+      opened on a score reset (0 of 0); on a dark bottom floor the garage light fixtures
+      did not go out; a step in the hotel garage sounded like carpet; the gate was looked up by
+      name; the helicopter rim shader was compiled anew in every building; repeated
+      calculations of the garage layout and waiting at the door; a copy of `_box`; outdated
+      comments about returning to the door. Final `check.ps1` is green (77
+      files, 228 s)
 - [x] PR #47
 
-## Веха M24c · Анимация и клавиши
+## Milestone M24c · Animation and keys
 
-Решения — [ADR-0039](adr/0039-animation-and-controls.md).
+Decisions — [ADR-0039](adr/0039-animation-and-controls.md).
 
-### Что показала сверка
+### What the check against the original showed
 
-В автомате джойстик на четыре положения и две кнопки, продублированные для
-правшей и левшей; переназначения нет, прыжок и разворот — спрайты без фаз.
-Плавность — наш выбор. У пака из нужных клипов только стойка, ходьба, выстрел и
-смерть. Universal Animation Library (Quaternius, CC0, 45 клипов бесплатно) даёт
-прыжок тремя фазами, присед, стойку и выстрел с пистолетом, ходьбу и смерть;
-разворота нет. Скелет UAL — Rigify, кость к кости ложится на скелет пака, кроме
-стоп: у пака они на корне под IK.
+The cabinet has a four-way joystick and two buttons, duplicated for
+right- and left-handed players; there is no rebinding, the jump and the turn are sprites without phases.
+Smoothness is our choice. Of the clips we need, the pack has only idle, walk, shoot and
+death. Universal Animation Library (Quaternius, CC0, 45 clips free) gives
+a jump in three phases, a crouch, idle and shooting with a pistol, walk and death;
+there is no turn. The UAL skeleton is Rigify, bone to bone it fits the pack's skeleton, except
+the feet: the pack has them on the root under IK.
 
-### Вопросы вехи
+### Milestone questions
 
-- **Что плохо** — всё: приземление, вязкие переходы, прыжок одной позой,
-  ходьба и разворот.
-- **Клипы** — UAL с переносом на скелет пака, вся локомоция, одним стилем.
-- **Отклик** — короткие паузы разворота и приземления; длительности по тесту боя.
-- **Агенты** — те же клипы; позы под высоты ROM остаются кодом.
-- **Клавиши** — одна клавиша и одна кнопка на действие; занятая меняется местами.
-- **Демо-режим** — отдельной вехой M24d; меню остаётся как есть.
+- **What is bad** — everything: landing, sluggish transitions, a jump as a single pose,
+  walking and turning.
+- **Clips** — UAL retargeted onto the pack's skeleton, all locomotion, one style.
+- **Responsiveness** — short pauses for turning and landing; durations by the combat test.
+- **Agents** — the same clips; poses for ROM heights stay in code.
+- **Keys** — one key and one button per action; an occupied one swaps places.
+- **Demo mode** — a separate milestone M24d; the menu stays as is.
 
-### План вехи
+### Milestone plan
 
-- [x] Сверка, вопросы, ADR-0039, план в EPIC
-- [x] Клипы UAL на скелете пака: `build_actors.py ual <glb>` урезает UAL до
-      492 КБ (`assets/source/quaternius/ual_clips.glb`), `_retarget_ual`
-      переносит повороты в мире (арматура пака повёрнута импортёром на 90°
-      вокруг X), стопы ставит на голень, ход таза — на `Body` и каждый кадр
-      заземляет по вершинам: ноги пака длиннее, и в шаге подошва уходила в пол
-      на 6 см. Основа поз кодом — нейтральная стойка `stand` (UAL `Idle_Loop`):
-      от стойки с пистолетом в двух руках углы рук поехали, и залёгший вышел
-      над пулей. Суффикс `_loop` Godot срезает с имени клипа при импорте
-- [x] Прыжок тремя фазами: толчок клипом с отрыва (`JUMP_FROM` 0.125 с — в
-      клипе до него присед-замах), в полёте удар ногой позой кодом, приземление
-      клипом в 2.5 раза быстрее (`LAND_RATE`): глубокий присед UAL держался до
-      0.33 с и выпрямлялся к 0.9 с — то самое «медленно выпрямляется»
-- [x] Переходы по времени (`FigurePoses.BLEND_TIMES`, 0.04–0.3 с, сглаженная
-      кривая) вместо экспоненты на 0.43 с; разворот телом через «лицом в
-      камеру» за `MoveLocks.TURN_TIME`. Клипы заземлены при сборке, и риг их на
-      ходу не заземляет вовсе
-- [x] Паузы — `MoveLocks`: разворот 0.1 с (не идёт, стрелять можно),
-      приземление 0.15 с (не идёт и не прыгает). Разворот засчитывается только
-      на полу — в воздухе поворот лицом свободный (ROM @42A7); приземление —
-      после полёта дольше 0.15 с, не от кадра без опоры на кабине. Полный набор
-      с паузами зелёный, тест боя с агентами в пороге
-- [x] Агенты на тех же клипах и с той же паузой разворота
-- [x] Переназначение: `KeyBindings` — клавиша и кнопка на действие, обмен при
-      занятой, Esc/F12/Start/Back закреплены, стик не трогается, схема в
-      `settings.cfg` своей секцией; экран управления — строка на действие,
-      «нажмите клавишу или кнопку», сброс. Вторые клавиши (WASD, Z, J) из
-      `project.godot` убраны: слот один
-- [x] Прогрев: `ShaderWarmup` один раз за запуск ставит в кадр вспышку, дым,
-      пыль, искры, кровь, пулю, луч и разряд молнии, пока первое здание
-      открывается из чёрного (`FadeCurtain.reveal`); `shader_baker/enabled` в
-      обоих пресетах. Локально экспорт не проверить — нет шаблонов; у шага
-      экспорта в релизе предел 30 минут (Shader Baker умел висеть, godot#112794)
-- [x] Кадры: маршрут `capture.py M24C` (толчок, полёт, приземление, разворот,
-      шаг) и `actor_shot.tscn -- --folder=M24C`, сравнение с оригиналом. Кадры
-      нашли «колени»: под низким потолком прыжок короткий, и приземление с
-      начала клипа сидело почти на коленях — клип теперь с полуприседа
-      (`LAND_FROM` 0.45 с) вдвое быстрее, стойка через 0.23 с
-- [x] Авторевью: 15 находок, исправлены 13. Настоящих регрессий две:
-      переназначенные кнопки слушали только первый геймпад (событие без
-      `device = -1`), и труп агента лежал полями шляпы на 9 см в полу — клипы
-      заземлялись при сборке до того, как надета федора; теперь на ходу не
-      заземляются только стойка и ходьба. Ещё: разворот трупа при падении у
-      шахты шёл живым поворотом; время полёта не сбрасывалось перестановкой;
-      пауза держала лишний кадр из-за остатка float; `load_from` не запоминал
-      путь файла; лишние клипы `jump_air` и `crouch` в моделях; разряд молнии
-      грелся не в окне города; прыжок, нажатый в восстановлении, пропадал.
-      Оставлены: Shader Baker на CI печёт не всё (экспорт `--headless`, у
-      раннеров нет видеокарты — записано в ADR-0039); бот тестов паузы не
-      учитывает — и не нужно, тест боя в пороге
+- [x] Check against the original, questions, ADR-0039, plan in EPIC
+- [x] UAL clips on the pack's skeleton: `build_actors.py ual <glb>` trims UAL down to
+      492 KB (`assets/source/quaternius/ual_clips.glb`), `_retarget_ual`
+      transfers rotations in world space (the pack's armature is rotated by the importer by 90°
+      around X), puts the feet onto the shin, the pelvis motion onto `Body`, and every frame
+      grounds it by vertices: the pack's legs are longer, and in a step the sole went into the floor
+      by 6 cm. The base of code poses is a neutral stance `stand` (UAL `Idle_Loop`):
+      starting from the two-handed pistol stance, the arm angles drifted, and the prone one ended up
+      above the bullet. Godot strips the `_loop` suffix from the clip name on import
+- [x] Jump in three phases: the push-off by the clip from take-off (`JUMP_FROM` 0.125 s — in
+      the clip before it is a crouch wind-up), in flight a kick as a code pose, landing
+      by the clip 2.5 times faster (`LAND_RATE`): the UAL deep crouch held until
+      0.33 s and straightened by 0.9 s — exactly that "straightens up slowly"
+- [x] Transitions by time (`FigurePoses.BLEND_TIMES`, 0.04–0.3 s, a smoothed
+      curve) instead of an exponential over 0.43 s; turning the body through "facing the
+      camera" over `MoveLocks.TURN_TIME`. Clips are grounded at build time, and the rig does not
+      ground them at runtime at all
+- [x] Pauses — `MoveLocks`: turn 0.1 s (does not walk, can shoot),
+      landing 0.15 s (does not walk or jump). A turn counts only
+      on the floor — in the air turning to face is free (ROM @42A7); landing —
+      after a flight longer than 0.15 s, not from a frame without support on the cab. The full suite
+      with pauses is green, the combat test with agents within the threshold
+- [x] Agents on the same clips and with the same turn pause
+- [x] Rebinding: `KeyBindings` — a key and a button per action, a swap when
+      occupied, Esc/F12/Start/Back are fixed, the stick is not touched, the scheme in
+      `settings.cfg` as its own section; the controls screen — a line per action,
+      "press a key or button", reset. The second keys (WASD, Z, J) were removed from
+      `project.godot`: one slot
+- [x] Warm-up: `ShaderWarmup` once per launch puts a flash, smoke,
+      dust, sparks, blood, a bullet, a beam and a lightning bolt into the frame while the first building
+      opens from black (`FadeCurtain.reveal`); `shader_baker/enabled` in
+      both presets. Export cannot be checked locally — no templates; the release export
+      step has a 30-minute limit (Shader Baker could hang, godot#112794)
+- [x] Shots: route `capture.py M24C` (push-off, flight, landing, turn,
+      step) and `actor_shot.tscn -- --folder=M24C`, comparison with the original. The shots
+      found "knees": under a low ceiling the jump is short, and landing from
+      the start of the clip sat almost on the knees — the clip now starts from a half crouch
+      (`LAND_FROM` 0.45 s) twice as fast, standing after 0.23 s
+- [x] Code review: 15 findings, 13 fixed. There were two real regressions:
+      rebound buttons listened only to the first gamepad (an event without
+      `device = -1`), and an agent's corpse lay with the hat brim 9 cm in the floor — the clips
+      were grounded at build time before the fedora was put on; now only idle and walk
+      are not grounded at runtime. Also: a corpse's turn when falling at
+      the shaft went as a live turn; the flight time was not reset by a teleport;
+      the pause held an extra frame because of a float remainder; `load_from` did not remember
+      the file path; extra `jump_air` and `crouch` clips in the models; the lightning bolt
+      was warmed up outside the city window; a jump pressed during recovery was lost.
+      Left as is: Shader Baker on CI does not bake everything (export `--headless`,
+      the runners have no GPU — recorded in ADR-0039); the test bot does not account for the pause
+      — and does not need to, the combat test is within the threshold
 - [x] README
-- [x] `check.ps1` после правок зелёный (82 файла, 289 с)
+- [x] `check.ps1` green after the fixes (82 files, 289 s)
 - [x] PR #48
 
-## Веха M24d · Добивания вместо удара ногой
+## Milestone M24d · Takedowns instead of the kick
 
-Решения — [ADR-0040](adr/0040-takedowns.md).
+Decisions — [ADR-0040](adr/0040-takedowns.md).
 
-### Что показало исследование
+### What the research showed
 
-В ROM удар встроен в прыжок: касание агента за весь прыжок убивает (@3127),
-отдельной атаки вплотную нет; очки — выстрел 100, удар 150, в темноте и на
-11–15 этажах 150 и 200. В Elevator Action Returns «выстрел» вплотную — уже
-рукопашная, двойные очки. В других играх у добивания есть условие входа и
-цена — риск; сценка 0,6–3 с, 2–4 варианта. Свободных парных анимаций нет:
-UAL 2 (CC0) даёт хук, отброс и «лежит на спине», захват и удушение — позами
-кодом. Mixamo в публичном репозитории нельзя.
+In the ROM the kick is built into the jump: touching an agent during the whole jump kills (@3127),
+there is no separate close-range attack; points — shot 100, kick 150, in darkness and on
+floors 11–15 150 and 200. In Elevator Action Returns a point-blank "shot" is already
+melee, double points. In other games a takedown has an entry condition and
+a price — risk; the scene is 0.6–3 s, 2–4 variants. There are no free paired animations:
+UAL 2 (CC0) gives a hook, a knockback and "lies on the back", the grab and the choke — as poses
+in code. Mixamo is not allowed in a public repository.
 
-### Вопросы вехи
+### Milestone questions
 
-- **Удар ногой** — убрать совсем; прыжок — просто прыжок.
-- **Кнопка** — выстрел по месту: вплотную добивает, вдали стреляет.
-- **Условие** — вплотную, с любой стороны; сценки свои сзади и спереди.
-- **Сценки** — сзади удушение и свёрнутая шея (300), спереди серия ударов и
-  рукоятью (200), сверху напрыгивание — само, при приземлении на агента (300);
-  +100 в темноте и на 11–15.
-- **Во время сценки** — мир замедляется, Otto уязвим.
+- **Kick** — remove entirely; the jump is just a jump.
+- **Button** — shoot depending on position: point-blank it takes down, at a distance it shoots.
+- **Condition** — point-blank, from any side; separate scenes from behind and from the front.
+- **Scenes** — from behind a choke and a neck snap (300), from the front a series of punches and
+  a pistol-grip strike (200), from above a jump-on — automatic, on landing on an agent (300);
+  +100 in darkness and on 11–15.
+- **During a scene** — the world slows down, Otto is vulnerable.
 
-### План вехи
+### Milestone plan
 
-- [x] Исследование, вопросы, ADR-0040, план в EPIC
-- [x] Прыжок без удара: клип полёта UAL (`jump_air`), зона удара, очки за удар
-      и поза `kick` ушли; звук удара стал звуком сценки (`Sounds.BLOW`)
-- [x] Правила — `Takedown`: вплотную 0,9 м впереди по взгляду Otto на том же
-      этаже, сторона по взгляду агента, сверху — ноги над макушкой в 0,45 м по
-      горизонтали и опора выше этажа агента (свой прыжок не в счёт);
-      сценки таблицами поз по времени, случайно без повтора подряд, жребий от
-      сида здания; очки 200/300/300, +100 в темноте
-- [x] Клипы: UAL 2 на том же скелете с другими именами — `build_actors.py`
-      переносит обе библиотеки (`UAL_LIBRARIES`); из UAL 2 взят отброс, из UAL 1
-      джеб, кросс, реакции, полёт. Позы кодом: захват, удушение, свёрнутая шея
-      (новый поворот головы вбок — `Pose.twist`), удар рукоятью, добивание сверху
-- [x] Режиссёр — `TakedownScene`: агент на смещение за 0,12 с, оба рига по
-      одним часам, смерть и очки на ключевом кадре, мир замедлен втрое
-      (`Engine.time_scale`, риги ускорены на столько же), пауза замедление
-      снимает; Otto уязвим — погиб до ключевого кадра, агент возвращается в бой
-- [x] Крупный план (пожелание пользователя): камера наезжает на пару до 0,38
-      кадра и отъезжает к концу сценки; кадр боя не трогается
-- [x] Напрыгивание сверху — само, при приземлении на агента
-- [x] Полный набор зелёный с добиваниями, тест боя в пороге (бот стреляет, и
-      выстрел вплотную сам становится добиванием)
-- [x] Кадры сценок — `tools/takedown_shot.tscn`: настоящий режиссёр на живых
-      Otto и агенте. Кадры нашли: бросок UAL 2 вместо удара рукоятью нырял
-      агенту в ноги — теперь позы кодом; хук UAL 2 уходил в горизонтальный
-      выпад — серия из джеба и кросса; тела сзади перекрывались — Otto на 14 см
-      глубже; наезд 0,62 не читался — 0,38
-- [x] Кадры вехи: маршрут `capture.py M24D` (прыжок без ноги, полёт клипом),
-      сравнение с оригиналом, сценки — `takedown_shot`
-- [x] Авторевью: 15 находок, исправлены все. Настоящие ошибки: обычный прыжок
-      рядом с агентом срабатывал как напрыгивание (пик прыжка выше макушки) —
-      теперь напрыгивание только с опоры выше пола агента; мёртвый Otto,
-      упав на агента, добивал его; выбор сценки не был засеян по зданию, и бой
-      переставал повторяться на одном сиде; режиссёр шёл по кадрам отрисовки,
-      а не по шагам физики; очки за агента, убитого посреди сценки лампой или
-      кабиной, шли дважды; труп сценки мог лечь над шахтой; `vertical_intent`
-      в сценке пускал Otto в дверь. Ещё: стоящих на кабине не добивают и они не
-      добивают — кабина уехала бы из-под замершей пары; режиссёр не вдвигает
-      агента в стену (щуп на высоте колена). Тест «прыжок не бьёт» раньше не
-      прыгал вовсе — Otto ещё падал со спавна. Полный `check.ps1` после правок
-      нашёл ещё одно: агента освобождали посреди сценки, а режиссёр обращался
-      к нему — теперь сценка снимается, тест на это есть
+- [x] Research, questions, ADR-0040, plan in EPIC
+- [x] A jump without a kick: the UAL flight clip (`jump_air`), the kick zone, kick points
+      and the `kick` pose are gone; the kick sound became the scene sound (`Sounds.BLOW`)
+- [x] Rules — `Takedown`: point-blank 0.9 m ahead along Otto's facing on the same
+      floor, the side by the agent's facing, from above — feet over the top of the head within 0.45 m
+      horizontally and support above the agent's floor (one's own jump does not count);
+      scenes as pose tables by time, random without repeating in a row, a draw from
+      the building seed; points 200/300/300, +100 in darkness
+- [x] Clips: UAL 2 on the same skeleton with different names — `build_actors.py`
+      transfers both libraries (`UAL_LIBRARIES`); from UAL 2 the knockback is taken, from UAL 1
+      the jab, cross, reactions, flight. Poses in code: grab, choke, neck snap
+      (a new sideways head turn — `Pose.twist`), pistol-grip strike, takedown from above
+- [x] Director — `TakedownScene`: the agent to the offset in 0.12 s, both rigs on
+      one clock, death and points on the key frame, the world slowed down threefold
+      (`Engine.time_scale`, the rigs sped up by the same amount), pause removes
+      the slowdown; Otto is vulnerable — if he dies before the key frame, the agent returns to combat
+- [x] Close-up (user wish): the camera pushes in on the pair to 0.38
+      of the frame and pulls back by the end of the scene; the combat frame is not touched
+- [x] Jump-on from above — automatic, on landing on an agent
+- [x] The full suite is green with takedowns, the combat test within the threshold (the bot shoots, and
+      a point-blank shot itself becomes a takedown)
+- [x] Scene shots — `tools/takedown_shot.tscn`: the real director on live
+      Otto and agent. The shots found: the UAL 2 throw instead of the pistol-grip strike dived
+      into the agent's legs — now poses in code; the UAL 2 hook went into a horizontal
+      lunge — a series of jab and cross; the bodies from behind overlapped — Otto 14 cm
+      deeper; a 0.62 push-in did not read — 0.38
+- [x] Milestone shots: route `capture.py M24D` (a jump without a leg, flight by clip),
+      comparison with the original, scenes — `takedown_shot`
+- [x] Code review: 15 findings, all fixed. Real bugs: an ordinary jump
+      next to an agent triggered as a jump-on (the jump peak above the top of the head) —
+      now a jump-on only from support above the agent's floor; a dead Otto,
+      falling onto an agent, took him down; the scene choice was not seeded by building, and combat
+      stopped being repeatable on one seed; the director ran on render frames,
+      not on physics steps; points for an agent killed mid-scene by a lamp or
+      a cab were awarded twice; the scene corpse could lie over the shaft; `vertical_intent`
+      in a scene let Otto into a door. Also: those standing on a cab are not taken down and do not
+      take down — the cab would drive out from under the frozen pair; the director does not push
+      the agent into a wall (a probe at knee height). The "jump does not hit" test used to not
+      jump at all — Otto was still falling from the spawn. The full `check.ps1` after the fixes
+      found one more: the agent was released in the middle of a scene while the director referred
+      to him — now the scene is removed, there is a test for it
 - [x] README
-- [x] `check.ps1` после правок зелёный (83 файла, 289 с)
+- [x] `check.ps1` green after the fixes (83 files, 289 s)
 - [x] PR #49
 
-## Веха M24e · Демо-режим
+## Milestone M24e · Demo mode
 
-Решения — [ADR-0041](adr/0041-demo-mode.md).
+Decisions — [ADR-0041](adr/0041-demo-mode.md).
 
-### Что показала сверка
+### What the check against the original showed
 
-В ROM после заставки (~12 с) без монеты идёт демо: не бот, а запись нажатий,
-три записи по кругу, каждая со своего этажа (28, 18, 5), навык 2, жизней ноль,
-около 25–35 с, без звука; кончается с записью или смертью Otto.
+In the ROM after the attract screen (~12 s) without a coin a demo runs: not a bot but a recording of inputs,
+three recordings in rotation, each from its own floor (28, 18, 5), skill 2, zero lives,
+about 25–35 s, without sound; it ends with the recording or with Otto's death.
 
-### Вопросы вехи
+### Milestone questions
 
-- **Кто играет** — бот тестов, а не запись: запись ломается от любой правки.
-- **Когда** — 45 с бездействия в главном меню; любое нажатие — назад в меню.
-- **Сколько и откуда** — около 30 с, три точки по кругу: крыша, середина, низ.
-- **Смерть** — кончает демо, как в ROM.
-- **Вид** — звук как в игре, HUD как в игре, надписи «демо» нет.
+- **Who plays** — the test bot, not a recording: a recording breaks from any change.
+- **When** — 45 s of inactivity in the main menu; any press — back to the menu.
+- **How long and from where** — about 30 s, three points in rotation: roof, middle, bottom.
+- **Death** — ends the demo, as in the ROM.
+- **Look** — sound as in the game, HUD as in the game, no "demo" label.
 
-### План вехи
+### Milestone plan
 
-- [x] Сверка с ROM, вопросы, ADR-0041, план в EPIC
-- [x] Бот переезжает из `tests/` в `src/actors/otto/otto_bot.gd`
-- [x] Отсчёт бездействия в главном меню, запуск и конец демо: `DemoPlan`,
-      `DemoRun`; любое нажатие — клавиша, кнопка геймпада, мышь — замораживает
-      здание, затемнение, главное меню; нажатие в игру не проходит
-- [x] Три точки по кругу, 30 с, смерть кончает демо; снизу документы выше
-      старта засчитаны, и подвал открыт — бот идёт к выходу
-- [x] Рекорды и замер качества демо не трогает; доехавшее до выхода демо
-      кончается, а не собирает следующее здание
-- [x] Бот умнее: пользуется добиваниями (просьба пользователя) — не целящегося
-      агента нагоняет стоя и добивает в упор, спиной — подкарауливает до 5 м,
-      лицом — ближе 2,2 м; тест `test_the_bot_takes_down_an_agent_from_behind`;
-      прогон прохождения зданий с агентами зелёный
-- [x] Кадры демо — `tools/demo_shot.tscn`: настоящая главная сцена, демо с
-      трёх точек. Кадры нашли: бот ждал кабину полдемо (кабины уезжали за
-      вступление) — стоянка у старта продлевается (`ElevatorMotion.hold`),
-      середина и низ стартуют у шахты с кабиной на этом этаже; снизу счёт
-      начинался с 3600 — документы выше засчитаны без очков
-- [x] Кадры вехи: маршрут `capture.py M24E`, сравнение с оригиналом, демо —
+- [x] Check against the ROM, questions, ADR-0041, plan in EPIC
+- [x] The bot moves from `tests/` to `src/actors/otto/otto_bot.gd`
+- [x] Inactivity countdown in the main menu, start and end of the demo: `DemoPlan`,
+      `DemoRun`; any press — a key, a gamepad button, the mouse — freezes
+      the building, fade-out, main menu; the press does not pass into the game
+- [x] Three points in rotation, 30 s, death ends the demo; from the bottom the documents above
+      the start are counted, and the basement is open — the bot goes to the exit
+- [x] The demo does not touch high scores and the quality measurement; a demo that reached the exit
+      ends instead of building the next building
+- [x] A smarter bot: uses takedowns (user request) — an agent that is not aiming
+      it catches up with standing and takes down point-blank, one with his back turned — it lies in wait for up to 5 m,
+      one facing it — closer than 2.2 m; test `test_the_bot_takes_down_an_agent_from_behind`;
+      the building playthrough run with agents is green
+- [x] Demo shots — `tools/demo_shot.tscn`: the real main scene, the demo from
+      three points. The shots found: the bot waited for the cab for half the demo (cabs left during
+      the intro) — parking at the start is extended (`ElevatorMotion.hold`),
+      middle and bottom start at a shaft with a cab on that floor; from the bottom the score
+      started at 3600 — documents above are counted without points
+- [x] Milestone shots: route `capture.py M24E`, comparison with the original, demo —
       `demo_shot`
-- [x] Авторевью: 11 находок, исправлены 9. Бот шёл добивать напрямую, через
-      пустую шахту или в стену, — теперь только на одном куске этажа
-      (`_same_piece`); конец демо посреди сценки добивания не останавливал
-      сценку (та живёт в режиме PAUSABLE под выключенным зданием) и держал мир
-      замедленным; `ElevatorCar.hold` не доходил до нижнего яруса пары; демо с
-      середины и снизу начиналось с проезда камеры с крыши через всё здание;
-      F12 в демо кончал демо вместо снимка; стик геймпада не сбрасывал отсчёт
-      бездействия. Оставлен прогрев шейдеров в демо: прогрев ставит эффекты
-      перед камерой и помечается сделанным на весь запуск, а в демо с середины
-      камера до первого кадра уезжает на 25 этажей — прогрелось бы ничего, а
-      настоящая партия прогрева лишилась бы
+- [x] Code review: 11 findings, 9 fixed. The bot went for a takedown in a straight line, through
+      an empty shaft or into a wall — now only on one piece of the floor
+      (`_same_piece`); the end of the demo in the middle of a takedown scene did not stop
+      the scene (it lives in PAUSABLE mode under the disabled building) and kept the world
+      slowed down; `ElevatorCar.hold` did not reach the lower deck of a pair; the demo from
+      the middle and from the bottom began with a camera pass from the roof through the whole building;
+      F12 in the demo ended the demo instead of taking a screenshot; the gamepad stick did not reset the inactivity
+      countdown. Shader warm-up in the demo is left as is: the warm-up puts the effects
+      in front of the camera and is marked done for the whole launch, while in the demo from the middle
+      the camera moves 25 floors away before the first frame — nothing would get warmed up, and
+      the real game would lose its warm-up
 - [x] README
-- [x] `check.ps1` после правок зелёный (84 файла, 326 с)
+- [x] `check.ps1` green after the fixes (84 files, 326 s)
 - [x] PR #50
 
-## Веха M24f · Баги, настройки, Game Over
+## Milestone M24f · Bugs, settings, Game Over
 
-Решения — [ADR-0042](adr/0042-bugs-and-settings.md). Вторая половина замечаний —
+Decisions — [ADR-0042](adr/0042-bugs-and-settings.md). The second half of the remarks —
 M24g, [ADR-0043](adr/0043-animation-and-look.md).
 
-### Что показала сверка
+### What the check against the original showed
 
-- Труп засыпал и переходил в узел кабины, если под его ступнями была кабина:
-  лежащий туловищем на площадке ехал сквозь перекрытия. Потерю управления
-  кабиной с двумя трупами тестами воспроизвести не удалось.
-- У лампы два источника с тенью, у заливки тень кубом — шесть проходов; внизу
-  ламп втрое больше, чем в башне.
-- Пункт «Разрешение» в полном экране ничего не делал: Godot не меняет
-  видеорежим монитора.
-- Меню Game Over выходило в кадр смерти, и пробел прыжка жал «Заново».
-- Напрыгивание требовало опоры выше этажа агента: с прыжка на том же этаже не
-  срабатывало никогда.
+- A corpse fell asleep and moved into the cab node if there was a cab under its feet:
+  one lying with its torso on the landing rode through the floor slabs. Loss of control
+  of a cab with two corpses could not be reproduced by tests.
+- A lamp has two shadow-casting sources, the fill has a cube shadow — six passes; at the bottom
+  there are three times as many lamps as in the tower.
+- The "Resolution" item in fullscreen did nothing: Godot does not change
+  the monitor's video mode.
+- The Game Over menu came up over the death frame, and the jump space bar pressed "Restart".
+- A jump-on required support above the agent's floor: from a jump on the same floor it
+  never triggered.
 
-### План вехи
+### Milestone plan
 
-- [x] Сверка, вопросы, ADR-0042 и ADR-0043, план в EPIC
-- [x] Труп — физическое тело: едет на полу кабины, падает в шахту, не проходит
-      сквозь перекрытия; кабина слушается с трупами внутри. Лежит коробкой по
-      длине, съезжает на опору середины, на кабине держит её высоту, засыпает
-      только на неподвижной опоре; шаг трупа после шага кабин. Потерю управления
-      тестами не поймали — три теста `test_car_corpses` остаются сторожем
-- [x] Напрыгивание проще: приземлился после полёта вплотную к агенту на его
-      этаже — добивание сверху (`Takedown.lands_on`); «над макушкой» и опора
-      выше этажа ушли
-- [x] FPS внизу на «Ультре»: замер по этажам (`light_bench -- --floors`), тени
-      дешевле. Заливка — тень двумя полусферами, а не кубом, и без обстановки
-      (`PropCatalog.RENDER_LAYER`); запасные этажи за кромкой кадра — конус до
-      своего пола без тени. 1080p, «Ультра», сид 1: низ здания 21,8 → 6,5 мс
-      кадра, башня 14 → 4,5 мс; источников с тенью внизу 42 → 24, вызовов
-      12 тыс. → 3–8 тыс. Кадры сквозь перекрытия не просвечивают; вокруг дверей
-      чуть светлее
-- [x] Разрешение в полном экране задаёт разрешение 3D; курсор скрыт в игре.
-      `DisplayModes.share` — выбранное к родному, ниже 100% тянет FSR; пункт
-      «Масштаб рендера» ушёл; нестандартный родной экран — в списке; смена
-      разрешения в полном экране окно не трогает. Курсор виден только в меню
-- [x] Последняя смерть: замедление, наезд, «GAME OVER», меню не сразу.
-      `LastDeath` — мир втрое медленнее, наезд за 0,8 с, 1,6 с настоящих часов;
-      запускается отложенно, чтобы сценка добивания, оборванная смертью, не
-      сняла замедление; пункты конца партии 1,5 с не нажимаются
-- [x] Обводка снята: меши фигур на своём слое (`FigureRig.RENDER_LAYER`), на
-      него светит слабый холодный свет камеры (`SideCamera.actor_fill`) — без
-      тени и мимо тумана; на тёмных этажах 11–15 агенты читаются
-- [x] Свой свет у красной двери: бра перед створкой — красный конус без тени,
-      горит и при сбитой лампе, гаснет с документом; сквозь плиту не светит;
-      за кадром не горит, как лампы (поймал тест бюджета света в `check.ps1`)
-- [x] Страница «Авторы» в меню: `CREDITS.md` → `tools/build_credits.py` →
-      `assets/credits.json` → `Credits`; тест `test_credits` сверяет JSON с
+- [x] Check against the original, questions, ADR-0042 and ADR-0043, plan in EPIC
+- [x] A corpse is a physics body: rides on the cab floor, falls into the shaft, does not pass
+      through floor slabs; the cab obeys with corpses inside. It lies as a box along its
+      length, slides onto the support under its middle, on a cab holds its height, falls asleep
+      only on stationary support; the corpse step after the cab step. Loss of control
+      was not caught by tests — three `test_car_corpses` tests remain as a guard
+- [x] Jump-on simplified: landed after a flight right next to an agent on his
+      floor — a takedown from above (`Takedown.lands_on`); "over the top of the head" and support
+      above the floor are gone
+- [x] FPS at the bottom on "Ultra": a per-floor measurement (`light_bench -- --floors`), cheaper
+      shadows. Fill — a shadow with two hemispheres instead of a cube, and without dressing
+      (`PropCatalog.RENDER_LAYER`); spare floors beyond the frame edge — a cone down to
+      their own floor without a shadow. 1080p, "Ultra", seed 1: building bottom 21.8 → 6.5 ms
+      per frame, tower 14 → 4.5 ms; shadow-casting sources at the bottom 42 → 24, draw calls
+      12k → 3–8k. Shots do not show light through floor slabs; around the doors it is
+      slightly brighter
+- [x] Resolution in fullscreen sets the 3D resolution; the cursor is hidden in game.
+      `DisplayModes.share` — the chosen one relative to native, below 100% FSR upscales; the
+      "Render scale" item is gone; a non-standard native screen is in the list; changing
+      the resolution in fullscreen does not touch the window. The cursor is visible only in menus
+- [x] Last death: slowdown, push-in, "GAME OVER", menu not immediately.
+      `LastDeath` — the world three times slower, push-in over 0.8 s, 1.6 s of real time;
+      started deferred so that a takedown scene cut short by death does not
+      remove the slowdown; the end-of-game items cannot be pressed for 1.5 s
+- [x] Outline removed: figure meshes on their own layer (`FigureRig.RENDER_LAYER`),
+      lit by a weak cool camera light (`SideCamera.actor_fill`) — without
+      shadow and bypassing fog; on the dark floors 11–15 agents read
+- [x] The red door has its own light: a sconce in front of the leaf — a red cone without a shadow,
+      stays lit even with a shot-out lamp, goes out with the document; does not shine through the slab;
+      off-frame it is not lit, like lamps (caught by the light budget test in `check.ps1`)
+- [x] "Credits" page in the menu: `CREDITS.md` → `tools/build_credits.py` →
+      `assets/credits.json` → `Credits`; test `test_credits` checks the JSON against
       `CREDITS.md`
-- [x] Кадры вехи: маршрут `capture.py M24F`, сравнение с оригиналом; свет и
-      темнота до и после — `light_bench -- --shot=`, меню — `ui_shot`
-- [x] Авторевью: 15 находок, исправлены 12. Esc во время последней смерти
-      снимал паузу, которой нет, — и конец партии не показывался; предметы
-      оставались на слое 1, и маска теней заливки их не отсекала (слой — не
-      добавка, а замена); напрыгивание срабатывало в кабине; смена режима окна
-      не пересобирала список разрешений; труп падал навзничь в стену; труп на
-      люке подвала засыпал и повис бы в воздухе; файл настроек до M24f в полном
-      экране дал бы на 4K половину разрешения 3D — переходит на родное. Оставлены:
-      отступ трупа при посадке в едущую кабину (неясен), затухание конуса
-      запасных этажей (не видно), общий помощник замедления у сценки добивания и
-      последней смерти
+- [x] Milestone shots: route `capture.py M24F`, comparison with the original; light and
+      darkness before and after — `light_bench -- --shot=`, menu — `ui_shot`
+- [x] Code review: 15 findings, 12 fixed. Esc during the last death
+      removed a pause that did not exist — and the end of the game was not shown; objects
+      stayed on layer 1, and the fill shadow mask did not cut them off (a layer is not
+      an addition but a replacement); a jump-on triggered in a cab; changing the window mode
+      did not rebuild the resolution list; a corpse fell backward into a wall; a corpse on
+      the basement hatch fell asleep and would have hung in the air; a settings file from before M24f in
+      fullscreen would have given half the 3D resolution on 4K — it switches to native. Left as is:
+      the corpse offset when boarding a moving cab (unclear), the fade of the spare-floor
+      cone (not visible), a shared slowdown helper for the takedown scene and
+      the last death
 - [x] README
-- [x] `check.ps1` после правок зелёный (90 файлов, 363 с)
+- [x] `check.ps1` green after the fixes (90 files, 363 s)
 - [x] PR #51, #52
 
-## Веха M24g · Анимация и вид
+## Milestone M24g · Animation and look
 
-Решения — [ADR-0043](adr/0043-animation-and-look.md).
+Decisions — [ADR-0043](adr/0043-animation-and-look.md).
 
-### Что показала сверка
+### What the check against the original showed
 
-- На тросе, на эскалаторе и в двери у Otto нет своей позы; в дверь он не входит,
-  а пропадает за кадр. В ROM он 7 тиков идёт в дверь (@3BDA–3C25).
-- Фары машины — узкий луч без следа в воздухе; эскалатор собран из коробок.
-- Кабина проходит днищем по телу только на нижнем этаже шахты: туда падают
-  трупы, там она давит живых. Сейчас такой труп исчезает за кадр.
-- Трупы друг друга не видят: общий слой без столкновений сам с собой.
-- В ROM нет ни расчленёнки, ни стопки трупов — убитый исчезает.
+- On the rope, on the escalator and in a door Otto has no pose of his own; he does not walk
+  into a door, he vanishes off-frame. In the ROM he walks into the door for 7 ticks (@3BDA–3C25).
+- The car headlights are a narrow beam with no trace in the air; the escalator is built from boxes.
+- The cab passes its floor through a body only on the bottom floor of the shaft: corpses fall
+  there, and there it crushes the living. Right now such a corpse disappears off-frame.
+- Corpses do not see each other: a shared layer with no collisions with itself.
+- The ROM has neither dismemberment nor a pile of corpses — a killed one disappears.
 
-### План вехи
+### Milestone plan
 
-- [x] Сверка, вопросы, решения 7–10 в ADR-0043, план в EPIC
-- [x] Трупы — рэгдолл (решение 12): тринадцать частей на суставах, скелет
-      собирается с рождения актёра, падает от удара. Агенты и Otto; толчок
-      пули — в ту часть, куда попала (решение 14). Ложатся друг на друга по-
-      настоящему, свой слой 5 `corpses`
-- [x] Физика — Jolt (решение 13): встроенный движок проталкивал части сквозь
-      плиту и не усыплял их
-- [x] Расчленёнка: срез днищем по краю кабины шейдером, части под днищем
-      пропадают, брызги, пятно; тело поперёк порога рвётся стенкой тронувшейся
-      кабины, части внутри уезжают куском `CorpsePiece` (решение 11). Тесты —
+- [x] Check against the original, questions, decisions 7–10 in ADR-0043, plan in EPIC
+- [x] Corpses are a ragdoll (decision 12): thirteen parts on joints, the skeleton
+      is assembled when the actor is born, it falls from a hit. Agents and Otto; the bullet
+      push goes into the part it hit (decision 14). They really lie on top of each other,
+      own layer 5 `corpses`
+- [x] Physics is Jolt (decision 13): the built-in engine pushed parts through the
+      slab and did not put them to sleep
+- [x] Dismemberment: a cut by the cab floor along the cab edge with a shader, parts under the floor
+      disappear, splashes, a stain; a body across the threshold is torn by the wall of the cab
+      that starts moving, parts inside ride away as a `CorpsePiece` (decision 11). Tests —
       `test_car_cut`, `test_enemy_corpse`
-- [x] Суставы как у человека: колено назад, бедро и спина вперёд сильнее,
-      чем назад; часть на полу едущей кабины едет с ней
-- [x] Трос: Otto висит на руках над головой, ноги вместе, качается; касание
-      крыши — клип приземления. Позам кодом добавлены сведение рук и ног
-- [x] Эскалатор: Otto идёт по ступеням клипом ходьбы, лицом по ходу
-- [x] Эскалатор: модель своим скриптом в Blender (`tools/build_escalator.py`) —
-      набор деталей, эскалатор расставляет их по пролёту: рифлёные ступени с
-      жёлтой кромкой, стеклянная балюстрада с поручнем, тумбы, площадки с
-      гребёнкой, ферма
-- [x] Красная дверь: Otto поворачивается спиной и уходит вглубь проёма, пока
-      открывается створка (7 тиков ROM); выходит на камеру, пока она закрывается
-- [x] Эскалаторы у края этажа под 45°, зигзагом (решение 15): верхняя
-      площадка внутри этажа, нижняя у края, проём до края; лампа под проёмом не
-      висит. `test_escalator_edges`
-- [x] Бой на новой раскладке: пуля не рождается за стеной (`Bullet.spawn_point`),
-      возвращение в игру не в тупике у шахты (`RESPAWN_POCKET`)
-- [x] Пуля из дула (решение 16): риг наводит руку на две кости так, что дуло
-      встаёт в точку вылета по ROM, вторая рука держит рукоять; Otto стреляет из
-      приседа, не вставая; у лежащего агента свой вынос ствола. `test_muzzle`
-- [x] Фары светят путь до затемнения (решение 18): две фары, мягкий ореол,
-      кадр обгоняет машину, асфальт берёт свет
-- [x] Выезд плавной кривой (решение 17)
-- [x] Журнал прогона `RunLog` (просьба пользователя): события строкой JSON в
-      `logs/`, разбор `tools/run_log.py`; тест прохождения пишет его всегда
-- [x] Окна города включаются и выключаются: доля окон по своему жребию раз в
-      20–60 с меняет состояние, загоревшееся тёмное светит тёплым
-- [x] Создатель игры в титрах: первый блок страницы «Авторы» (просьба
-      пользователя по ходу вехи)
-- [x] Кадры вехи и сравнение с оригиналом: маршрут `capture.py M24G`, сцены вехи
-      `tools/m24g_shot.tscn`, выезд покадрово `m24b_shot -- --sequence`
-- [x] Авторевью: 15 находок, исправлены 13. Рука не наводилась в замершей позе
-      (присед, лёжа) — риг не замирает, пока целится; труп, уснувший на люке
-      подвала, висел над открытым проёмом — люк будит трупы; стена вставала под
-      пролётом эскалатора (65 сидов из 200) и мебель — под его низом; труп на
-      крыше кабины, прижатый к верху шахты, проходил сквозь плиту — исчезает, как
-      до рэгдолла; сценка добивания держала наведённую руку; лампы искали потолок
-      после запасного выбора. Оставлены: кабина не режет повторно тело, которое
-      уже резала (редко, нужна переделка состояния среза), и рэгдолл с рождения
-      (решение 12). Правка ревью замкнула загрузку пули в кольцо — поймал
-      `check.ps1`, возвращены строки меток
-- [x] `check.ps1` после правок зелёный (99 единиц, 385 с)
+- [x] Joints like a human's: the knee bends backward, the hip and spine bend forward more
+      than backward; a part on the floor of a moving cab rides with it
+- [x] Rope: Otto hangs by his hands above his head, legs together, swings; touching
+      the roof plays the landing clip. Code adds bringing the arms and legs together to the poses
+- [x] Escalator: Otto walks up the steps with the walk clip, facing the direction of travel
+- [x] Escalator: model built by its own Blender script (`tools/build_escalator.py`) — a
+      set of parts that the escalator arranges along the span: ribbed steps with a
+      yellow edge, a glass balustrade with a handrail, newels, landings with a
+      comb plate, a truss
+- [x] Red door: Otto turns his back and walks deep into the doorway while
+      the leaf opens (7 ROM ticks); he comes out towards the camera while it closes
+- [x] Escalators at the floor edge at 45°, in a zigzag (decision 15): the upper
+      landing is inside the floor, the lower one at the edge, the opening runs to the edge; no lamp
+      hangs under the opening. `test_escalator_edges`
+- [x] Combat on the new layout: a bullet is not born behind a wall (`Bullet.spawn_point`),
+      returning to the game does not happen in a dead end by the shaft (`RESPAWN_POCKET`)
+- [x] Bullet from the muzzle (decision 16): the rig aims the arm with two bones so that the muzzle
+      lands on the ROM firing point, the other hand holds the grip; Otto fires from
+      a crouch without standing up; a lying agent has his own barrel offset. `test_muzzle`
+- [x] Headlights light the road up to the fade-out (decision 18): two headlights, a soft halo,
+      the frame leads the car, the asphalt catches the light
+- [x] Exit along a smooth curve (decision 17)
+- [x] Run log `RunLog` (user request): events as a JSON line in
+      `logs/`, parsing with `tools/run_log.py`; the playthrough test always writes it
+- [x] City windows switch on and off: a share of windows, by its own draw, changes state
+      once every 20–60 s; a dark window that lights up glows warm
+- [x] The game's creator in the credits: the first block of the "Credits" page (user
+      request during the milestone)
+- [x] Milestone shots and comparison with the original: route `capture.py M24G`, milestone scenes
+      `tools/m24g_shot.tscn`, the exit frame by frame `m24b_shot -- --sequence`
+- [x] Code review: 15 findings, 13 fixed. The arm did not aim in a frozen pose
+      (crouching, lying) — the rig does not freeze while aiming; a corpse that fell asleep on the
+      basement hatch hung over the open opening — the hatch wakes corpses; a wall stood under
+      the escalator span (65 seeds out of 200) and furniture under its bottom; a corpse on
+      the cab roof pressed against the top of the shaft passed through the slab — it disappears, as
+      before the ragdoll; the takedown scene kept the arm aimed; lamps searched for the ceiling
+      after the fallback choice. Left as is: the cab does not cut again a body it has
+      already cut (rare, needs a rework of the cut state), and the ragdoll from birth
+      (decision 12). A review fix closed bullet loading into a cycle — caught by
+      `check.ps1`, the label lines were restored
+- [x] `check.ps1` green after the fixes (99 units, 385 s)
 - [x] README
 - [x] PR #53
 
-## Веха M24h · Улица с движением и кабина
+## Milestone M24h · Street with traffic and the cab
 
-Решения — [ADR-0044](adr/0044-street-and-cab.md). Замечаний по M24g набралось
-десять, и веха разделена: вид — в M24i ([ADR-0045](adr/0045-takedowns-helicopter-dressing.md)).
+Decisions — [ADR-0044](adr/0044-street-and-cab.md). Ten remarks on M24g piled up,
+and the milestone was split: the look goes to M24i ([ADR-0045](adr/0045-takedowns-helicopter-dressing.md)).
 
-### Что показала сверка
+### What the check against the original showed
 
-- Дизассемблер ROM (часть 5 `reference/arcade-rom.md`): в дверь игрока пускает
-  только красная, пока документ не забран; в кабине Otto ходит и на ходу,
-  сойти можно, пока пол этажа не дальше 18/48 этажа под полом кабины; касание
-  кабины краем не убивает — выталкивает; давит только того, кто целиком под
-  днищем; 300 очков — только за кабину, в которой едет Otto.
-- Потока машин в оригинале нет — это расхождение по просьбе пользователя.
-- Эскалатор 30° уже пробовали в M24g, и пользователь сам поправил его на 45°:
-  угол оставлен, крутым пролёт выглядел оттого, что был тонким.
+- ROM disassembly (part 5 of `reference/arcade-rom.md`): only the red door lets the player
+  in, while the document is not taken; in the cab Otto walks while it moves too,
+  and can step out while the floor of the storey is no further than 18/48 of a floor below the cab floor; touching
+  the cab with its edge does not kill — it pushes out; it crushes only someone who is entirely under
+  the floor; 300 points — only for the cab Otto rides in.
+- There is no traffic flow in the original — this is a deviation at the user's request.
+- A 30° escalator was already tried in M24g, and the user himself corrected it to 45°:
+  the angle stays; the span looked steep because it was thin.
 
-### План вехи
+### Milestone plan
 
-- [x] Сверка, вопросы тремя блоками, ADR-0044 и ADR-0045, план в EPIC
-- [x] Двери: только в красную, пока документ не забран
-- [x] Давка по ROM: целиком под днищем, задетого краем выталкивает; очки — за
-      свою кабину. `test_car_crush`, `test_shaft_hazards`
-- [x] В едущей кабине ходят от борта до борта и сходят на ходу.
+- [x] Check against the original, questions in three blocks, ADR-0044 and ADR-0045, plan in EPIC
+- [x] Doors: only into the red one, while the document is not taken
+- [x] Crush per the ROM: entirely under the floor, one touched by the edge is pushed out; points — for
+      one's own cab. `test_car_crush`, `test_shaft_hazards`
+- [x] In a moving cab you walk from wall to wall and step out on the move.
       `test_car_walk`, `test_car_step_out`
-- [x] Срез кабиной не тянет модель: у границы отрыва пропадает весь
-      треугольник, который тянет спрятанная кость
-- [x] Эскалатор в глубине: пролёт у задней стены, плита в плоскости игры
-      цельная, дыра — только в задней полосе и только под пролётом; модель
-      толще, обшита, стекло с поручнем с обеих сторон. `test_escalator_depth`
-- [x] Поток машин в две полосы, машина Otto ждёт просвета и вливается.
+- [x] The cab cut does not stretch the model: at the tear boundary the whole
+      triangle pulled by a hidden bone disappears
+- [x] Escalator in depth: the span by the back wall, the slab in the play plane
+      is solid, the hole is only in the back strip and only under the span; the model
+      is thicker, clad, glass with a handrail on both sides. `test_escalator_depth`
+- [x] Two-lane traffic flow, Otto's car waits for a gap and merges.
       `test_street_traffic`, `test_exit_car`
-- [x] FPS внизу здания: свет гаснет и за краем кадра по X, тень заливки — у
-      четырёх ламп у середины кадра (19 → 15 мс GPU на «Ультра»); табло шахт
-      перерисовываются только в кадре (физика 7 → 3.3 мс: кабины ходят в ногу,
-      и надписи всех шахт перестраивались разом); улёгшиеся трупы застывают,
-      выпавшее из мира тело пропадает. Разбор кадра — `light_bench --probe`.
+- [x] FPS at the bottom of the building: lights also go out beyond the frame edge along X, the fill shadow is on
+      the four lamps near the middle of the frame (19 → 15 ms GPU on "Ultra"); shaft indicator boards
+      are redrawn only in frame (physics 7 → 3.3 ms: the cabs move in step,
+      and the labels of all shafts were rebuilt at once); settled corpses freeze,
+      a body that fell out of the world disappears. Frame breakdown — `light_bench --probe`.
       `test_light_band`, `test_corpse_freeze`
-- [x] Бой не подорожал: замер `playthrough --agents --endless` на сидах 1–8 —
-      на `main` 148 смертей на шести сидах, на ветке 85 на семи. Застревание
-      сида 1 на 24-м этаже (100 смертей, петля воскрешения) на готовой ветке
-      не повторилось — 3 смерти; причина тех 49 смертей «без пули и кабины» не
-      найдена, отчёт `playthrough` её не пишет
-- [x] Кадры вехи и сравнение с оригиналом: маршрут `capture.py M24H`, эскалатор
-      — `m24g_shot`, выезд и поток — `m24b_shot -- --sequence`. Маршрут по
-      секундомеру не застаёт кабину на крыше и в M24G — кадр «шаг в едущей
-      кабине» вышел без кабины
-- [x] Авторевью: Otto выпрыгивал из едущей кабины сквозь борт — предел борта
-      теперь и в прыжке; ореолы фар потока путались с ореолами дождя; тень
-      заливки уходила лампам без тени; дыра эскалатора считалась только для 45°;
-      колёса — общим кодом `CarModel`. Оставлены: выталкивание краем кабины не
-      проверяет, что там (как в ROM, редко); застрявший на краю при закрывшемся
-      окне выхода может вернуться внутрь; `board_text` дорисовывает табло при
-      чтении
-- [x] `check.ps1` после правок зелёный
+- [x] Combat did not get more expensive: measured `playthrough --agents --endless` on seeds 1–8 —
+      on `main` 148 deaths over six seeds, on the branch 85 over seven. Seed 1 getting stuck
+      on the 24th floor (100 deaths, a respawn loop) did not repeat on the finished branch
+      — 3 deaths; the cause of those 49 deaths "without a bullet or a cab" was not
+      found, the `playthrough` report does not record it
+- [x] Milestone shots and comparison with the original: route `capture.py M24H`, escalator
+      — `m24g_shot`, exit and traffic — `m24b_shot -- --sequence`. The route by
+      stopwatch does not catch the cab on the roof in M24G either — the "step in a moving
+      cab" shot came out without the cab
+- [x] Code review: Otto jumped out of a moving cab through its wall — the wall limit
+      now applies in a jump too; traffic headlight halos got mixed up with rain halos; the fill
+      shadow went to lamps without a shadow; the escalator hole was computed only for 45°;
+      wheels — shared code `CarModel`. Left as is: pushing out by the cab edge does not
+      check what is there (as in the ROM, rare); one stuck on the edge when the step-out
+      window closed may return inside; `board_text` finishes drawing the board on
+      read
+- [x] `check.ps1` green after the fixes
 - [x] README
 - [x] PR #62
 
-Замечания пользователя по ходу закрытия — в M24i: интерьер за открытой дверью
-(красной и агента), посадка в машину заново (плафон у пояса, дверца без
-проёма, салона не видно).
+User remarks while closing — moved to M24i: the interior behind an open door
+(red and agent's), getting into the car redone (dome light at waist height, door without
+an opening, interior not visible).
 
-## Веха M24i · Добивания, вертолёт, обстановка
+## Milestone M24i · Takedowns, helicopter, dressing
 
-Решения — [ADR-0045](adr/0045-takedowns-helicopter-dressing.md) (вопросы
-заданы перед M24h), [ADR-0046](adr/0046-car-cabin-indicator-traffic.md),
+Decisions — [ADR-0045](adr/0045-takedowns-helicopter-dressing.md) (questions
+asked before M24h), [ADR-0046](adr/0046-car-cabin-indicator-traffic.md),
 [ADR-0047](adr/0047-room-behind-the-door.md),
 [ADR-0048](adr/0048-hotel-and-office-apart.md),
 [ADR-0049](adr/0049-own-helicopter.md),
 [ADR-0050](adr/0050-takedown-direction.md).
 
-### Что показала сверка
+### What the check against the original showed
 
-В аркаде 1983 года добиваний и вертолёта нет (вертолёт — только на ZX), за
-дверью чёрный проём, мебели на этажах нет, машина Otto — спрайт без салона.
-Всё в вехе — вид ремейка, механику она не трогает; состав сверка не поменяла.
+The 1983 arcade has no takedowns and no helicopter (the helicopter is only on the ZX), behind
+a door there is a black opening, there is no furniture on the floors, Otto's car is a sprite without an interior.
+Everything in the milestone is the remake's look, it does not touch the mechanics; the check did not change its scope.
 
-### План вехи
+### Milestone plan
 
-- [x] Посадка в машину заново — у всех пяти машин жребия: кузов прорезан по
-      проёму двери в Blender, дверь на петле с обшивкой, салон под свою машину
-      (купе, седан, универсал, внедорожник), плафон под крышей. LOD моделей
-      машин выключен: Godot сглаживал гранёную дверь пятнами.
+- [x] Getting into the car redone — on all five cars of the draw: the body is cut along the
+      door opening in Blender, the door on a hinge with trim, an interior for each car
+      (coupe, sedan, wagon, SUV), a dome light under the roof. LOD for car models
+      is switched off: Godot smoothed the faceted door into blotches.
       `test_exit_car`
-- [x] Правый поворотник на подъезде к краю мостовой, в ожидании и на съезде
-      (просьба пользователя; левый был ошибкой — машина уходит от камеры)
-- [x] Дорожная ситуация жребием здания: свободная, обычная, плотная; есть
-      просвет — съезд с ходу. `test_street_traffic`, `test_exit_car`
-- [x] Комната за открытой дверью: номер отеля или кабинет, окно на город,
-      свой свет, только пока створка открыта. `test_door_room` — сотня жребиев
-- [x] Отель и офис — разные коридоры: пол, двери, светильники, бра,
-      таблички, мелочи у дверей; мебели на полу больше. `test_building_style`
-- [x] Вертолёт — своя модель скриптом (`tools/build_helicopter.py`), винты с
-      диском размытия, огни по точкам модели. `test_roof_arrival`
-- [x] Режиссура добиваний: заход, стоп-кадр на ударе, разгон; толчок камеры,
-      вспышка, фон бесцветнее, провал музыки, гулкий удар; агент отыгрывает,
-      шляпа слетает, падает рэгдоллом. `test_takedown`
-- [x] Кадр в бюджете: `light_bench --floors` на «Ультра» 1080p — кадр 5–13 мс
-      по всем этажам, GPU внизу здания 7–8 мс (M24h — 15)
-- [x] Кадры вехи и сравнение с оригиналом: `capture.py M24I`, машины —
-      `car_shot`, посадка на всех моделях — `m24b_shot -- --building=N
-      --only=exit`, комнаты — `room_shot`, добивания — `takedown_shot`
-- [x] Авторевью: пятно бра не рисовалось — грань смотрела от камеры; стоп-кадр
-      при низком FPS пропадал — шаг физики считал время по уже новому
-      замедлению; диск хвостового винта лежал не в той плоскости; комната у
-      крайней двери торчала из здания; агент, убитый посреди сценки лампой,
-      стоял замершим до конца сценки; модели обстановки грузились с диска на
-      каждое открытие двери; шейдер размытия винта собирался заново в каждом
-      здании; мёртвые константы и дубли. Решения пользователя: на тёмном этаже
-      комната без своего света; бра со сбитой лампой горят дальше
-- [x] `check.ps1` после правок зелёный
+- [x] Right turn signal when approaching the curb edge, while waiting and when pulling out
+      (user request; the left one was a mistake — the car moves away from the camera)
+- [x] Traffic situation by the building draw: free, normal, dense; if there is
+      a gap — pull out on the move. `test_street_traffic`, `test_exit_car`
+- [x] A room behind an open door: a hotel room or an office, a window onto the city,
+      its own light, only while the leaf is open. `test_door_room` — a hundred draws
+- [x] Hotel and office have different corridors: floor, doors, light fixtures, wall sconces,
+      signs, small items by the doors; more furniture on the floor. `test_building_style`
+- [x] Helicopter — its own model by script (`tools/build_helicopter.py`), rotors with
+      a blur disc, lights at model points. `test_roof_arrival`
+- [x] Takedown direction: approach, freeze frame on the hit, acceleration; camera shake,
+      flash, the background more colorless, a dip in the music, a booming hit; the agent acts it out,
+      the hat flies off, he falls as a ragdoll. `test_takedown`
+- [x] Frame within budget: `light_bench --floors` on "Ultra" 1080p — frame 5–13 ms
+      on all floors, GPU at the bottom of the building 7–8 ms (M24h — 15)
+- [x] Milestone shots and comparison with the original: `capture.py M24I`, cars —
+      `car_shot`, getting in on all models — `m24b_shot -- --building=N
+      --only=exit`, rooms — `room_shot`, takedowns — `takedown_shot`
+- [x] Code review: the sconce light spot was not drawn — the face pointed away from the camera; the freeze frame
+      disappeared at low FPS — the physics step computed time with the already new
+      slowdown; the tail rotor disc lay in the wrong plane; the room at
+      the outermost door stuck out of the building; an agent killed by a lamp in the middle of the scene
+      stood frozen until the end of the scene; dressing models were loaded from disk on
+      every door opening; the rotor blur shader was compiled anew in every
+      building; dead constants and duplicates. User decisions: on a dark floor
+      the room has no light of its own; sconces with a shot-out lamp keep burning
+- [x] `check.ps1` green after the fixes
 - [x] README
 - [x] PR #62
 
-Замечания пользователя по ходу вехи — в план: M24j — погода и время суток
-(снег; утро, день, вечер, ночь — двенадцать вариантов), M24k — жилой комплекс
-и свои агенты у каждого типа здания.
+User remarks during the milestone — into the plan: M24j — weather and time of day
+(snow; morning, day, evening, night — twelve variants), M24k — a residential complex
+and own agents for each building kind.
 
-## Веха M24j · Время суток и новый город
+## Milestone M24j · Time of day and a new city
 
-Решения — [ADR-0051](adr/0051-time-of-day.md): два блока вопросов до кода и
-второй — после первых кадров дня, когда стало ясно, что город M19 днём не
-спасти.
+Decisions — [ADR-0051](adr/0051-time-of-day.md): two blocks of questions before the code and
+a second one after the first daytime shots, when it became clear that the M19 city could not be
+saved in daylight.
 
-### Что показала сверка
+### What the check against the original showed
 
-В аркаде 1983 года вокруг здания чёрная пустота во всех четырёх палитрах ROM,
-времени суток и погоды нет ни в аркаде, ни в портах; ночь и вечер есть в
-Elevator Action Returns (1994). Утро, день, дождь и снег — расширение ремейка.
-Сверка поменяла объём: снег ушёл в свою веху.
+In the 1983 arcade there is black emptiness around the building in all four ROM palettes,
+there is no time of day or weather either in the arcade or in the ports; night and evening exist in
+Elevator Action Returns (1994). Morning, day, rain and snow are an extension of the remake.
+The check changed the scope: snow went into its own milestone.
 
-### План вехи
+### Milestone plan
 
-- [x] Время суток жребием по сиду здания, ночь 40 %, в здании застыло.
+- [x] Time of day by draw from the building seed, night 40 %, frozen within the building.
       `test_time_of_day`
-- [x] Темнота и тёмные этажи — только ночью; гроза — вечером и ночью; днём
-      здание раскладывается и проходится на любом навыке. `test_time_of_day`
-- [x] Воздух здания и тон кадра по времени; солнце только снаружи — слой
-      `Outdoors`, без объёмного тумана в коридорах
-- [x] Город заново: фасады Quaternius Downtown запечены атласом шести стилей
-      (`tools/build_city.py`), свет настоящий, стекло с небом, ночью окна по маске.
+- [x] Darkness and dark floors — only at night; thunderstorm — in the evening and at night; in daytime
+      the building lays out and is beatable at any skill level. `test_time_of_day`
+- [x] Building air and frame tone by time; sun only outside — layer
+      `Outdoors`, without volumetric fog in the corridors
+- [x] City redone: Quaternius Downtown facades baked into an atlas of six styles
+      (`tools/build_city.py`), real lighting, glass with the sky, windows by mask at night.
       `test_city_look`
-- [x] Небо — семь HDRI Poly Haven по выбору пользователя (`tools/build_sky.py`),
-      солнце панорамы там же, где свет города. `test_city_look`
-- [x] Кадры: `capture.py M24J`, все сочетания — `m24j_shot`, город вблизи —
-      `city_shot`; сравнение с оригиналом
-- [x] Кадр в бюджете: `light_bench --floors --quality=3 --time=1` — GPU 4.4–6 мс
-      по всем этажам днём
-- [x] Авторевью: мигающие окна горели днём в каждом седьмом окне мимо доли
-      горящих; импорт атласа красил края окон — альфа там маска, а не
-      прозрачность; солнце здания светило в объёмный туман коридоров; вывеска
-      не ловила солнце; дневная раскладка здания не проверялась; утечка уровня в
-      тесте; мёртвое небо погоды; ночной тон в двух местах; лишнее состояние
-      города и двойное приглушение дождя
-- [x] `check.ps1` после правок зелёный
+- [x] Sky — seven Poly Haven HDRIs chosen by the user (`tools/build_sky.py`),
+      the panorama's sun is where the city light is. `test_city_look`
+- [x] Shots: `capture.py M24J`, all combinations — `m24j_shot`, the city up close —
+      `city_shot`; comparison with the original
+- [x] Frame within budget: `light_bench --floors --quality=3 --time=1` — GPU 4.4–6 ms
+      on all floors in daytime
+- [x] Code review: blinking windows were lit in daytime in every seventh window regardless of the share
+      of lit ones; atlas import tinted window edges — alpha there is a mask, not
+      transparency; the building's sun lit the volumetric fog of the corridors; the sign
+      did not catch the sun; the daytime building layout was not checked; a level leak in
+      a test; dead weather sky; night tone in two places; redundant city state
+      and double rain dimming
+- [x] `check.ps1` green after the fixes
 - [x] README
 - [x] PR #62
 
-В долг: у атласа нет полей между стилями — на дальних мипах соседние стили
-подтекают тонкой чертой; `Weather.forced` — глобальный крючок инструментов.
+Debt: the atlas has no padding between styles — on far mips neighboring styles
+bleed in as a thin line; `Weather.forced` is a global hook for tools.
 
-## Веха M24k · Время суток для остального и кинематографичное начало
+## Milestone M24k · Time of day for the rest and a cinematic opening
 
-Решения — [ADR-0052](adr/0052-day-for-the-rest-and-arrival.md): вопросы по
-вступлению — до кода, музыка и два десятка звуков — страницами прослушивания,
-где пользователь выбрал каждый трек и каждый звук на слух.
+Decisions — [ADR-0052](adr/0052-day-for-the-rest-and-arrival.md): questions about
+the intro — before the code, music and two dozen sounds — through listening pages,
+where the user chose every track and every sound by ear.
 
-### Что показала сверка
+### What the check against the original showed
 
-В аркаде Otto соскальзывает по тросу с соседней крыши, вертолёта нет:
-вертолёт и его режиссура — решения ремейка (ADR-0038). Аудит звука прошёл по
-всем видимым событиям и нашёл два десятка беззвучных — от рикошета пули до
-поворотника; аудит поменял объём вехи. По ходу пользователь попросил и ночную
-улицу, и вид из окна комнаты собрать из того же города, что за зданием, — «всё
-в едином стиле».
+In the arcade Otto slides down a rope from the neighboring roof, there is no helicopter:
+the helicopter and its staging are decisions of the remake (ADR-0038). The sound audit went through
+all visible events and found two dozen silent ones — from a bullet ricochet to
+the turn signal; the audit changed the milestone's scope. Along the way the user asked for both the night
+street and the view from the room window to be built from the same city as behind the building — "everything
+in a single style".
 
-### План вехи
+### Milestone plan
 
-- [x] Музыка утра, дня и вечера — по два трека на выбор пользователя, тревога
-      общая. `test_day_for_the_rest`
-- [x] Фон снаружи по времени суток. `test_day_for_the_rest`
-- [x] Вывеска гаснет днём, комната за дверью днём — солнце из окна, окно —
-      проём, за которым настоящий город. `test_day_for_the_rest`
-- [x] Улица у выезда — фасадом пака во все времена суток, огни, фары и поток по
-      времени. `test_day_for_the_rest`, `test_exit_street`
-- [x] Вертолёт: дверь узлом, кресло и пилот, бухта троса с маятником, пыль от
-      винта, уход с креном; полное и короткое вступление, наезд камеры.
+- [x] Morning, day and evening music — two tracks each, chosen by the user, the alarm
+      is shared. `test_day_for_the_rest`
+- [x] Outdoor ambience by time of day. `test_day_for_the_rest`
+- [x] The sign goes out in daytime, the room behind the door in daytime — sun from the window, the window is
+      an opening with the real city behind it. `test_day_for_the_rest`
+- [x] The street at the exit — the pack's facade at all times of day, lights, headlights and traffic by
+      time. `test_day_for_the_rest`, `test_exit_street`
+- [x] Helicopter: the door as a node, a seat and a pilot, a coil of rope with a pendulum, dust from
+      the rotor, departure with a bank; full and short intro, camera push-in.
       `test_roof_arrival`
-- [x] Звуки пробелов, выбранные на слух; замедление ниже тоном. `test_sounds`
-- [x] Кадры: `capture.py M24k`, `intro_shot --full --time=…`,
-      `m24j_shot --only=street|room`, `room_shot --time=…`; сравнение с оригиналом
-- [x] Кадр в бюджете: `light_bench --floors --quality=3` — GPU 4.8–6 мс днём и
-      ночью; выезд — 2.3 мс
-- [x] Авторевью: звук давки сыпался каждым кадром на неуязвимого Otto;
-      приземление с троса считалось перестановкой и обрывало звук; спуск мог
-      встать на нуле скорости у самой крыши; разгон шейдеров звенел рикошетом в
-      чёрном экране; утечка источника вывески днём; Otto на кадр висел в воздухе
-      в позе проёма; колокол тревоги в начале здания с поднятой тревогой; гудок
-      не только за машиной Otto; тени лишних фасадов; запас над техникой на
-      уходе не знал крена; лязг всех кабин на каждом этаже — теперь только у
-      кабины с Otto
-- [x] `check.ps1` после правок зелёный
+- [x] Sounds for the gaps, chosen by ear; slowdown lower in pitch. `test_sounds`
+- [x] Shots: `capture.py M24k`, `intro_shot --full --time=…`,
+      `m24j_shot --only=street|room`, `room_shot --time=…`; comparison with the original
+- [x] Frame within budget: `light_bench --floors --quality=3` — GPU 4.8–6 ms in daytime and
+      at night; exit — 2.3 ms
+- [x] Code review: the crush sound fired every frame on an invulnerable Otto;
+      landing from the rope counted as a teleport and cut the sound; the descent could
+      stop at zero speed right at the roof; shader warm-up rang with a ricochet on
+      the black screen; a sign light source leak in daytime; Otto hung in the air for a frame
+      in the doorway pose; the alarm bell at the start of a building with the alarm raised; the horn
+      not only behind Otto's car; shadows of extra facades; the clearance above roof equipment on
+      departure did not know about the bank; the clank of all cabs on every floor — now only for
+      the cab with Otto
+- [x] `check.ps1` green after the fixes
 - [x] README
 - [x] PR #59
 
-В долг ушло: поток от винта гонит пыль, но не сдувал струи дождя. Закрыто
+Went to debt: the rotor downwash drives dust but did not blow away the rain streaks. Closed by
 ADR-0053.
 
-## Открытые вопросы и долг после M24k
+## Open questions and debt after M24k
 
-[ADR-0053](adr/0053-open-questions-and-debt.md), ветка `chore/debt-and-questions`.
+[ADR-0053](adr/0053-open-questions-and-debt.md), branch `chore/debt-and-questions`.
 
-- [x] Сверка с ROM: кабина игрока, возвращение, выпуск у Otto, двадцатый этаж;
-      найдено правило толпы, в заметках записанное наоборот
-- [x] Кабина доезжает до этажа. `test_elevator_motion`, `test_elevator_passenger`
-- [x] Возвращение по ROM, агенты уходят и выходят с задержками.
+- [x] Check against the ROM: the player's cab, respawn, release near Otto, the twentieth floor;
+      found a crowd rule that the notes had written down the other way round
+- [x] The cab reaches the floor. `test_elevator_motion`, `test_elevator_passenger`
+- [x] Respawn per the ROM, agents leave and come out with delays.
       `test_respawn`, `test_building_architecture`
-- [x] Выпуск у Otto не ближе 1.2 м; толпа уходит в двери. `test_respawn`
-- [x] Бот сбивает лампы из кабины; прогон проверяет, что лампы падают.
-      `test_building_playthrough`; замер — `playthrough.gd --dark-range`, `--no-lamps`
-- [x] Долг: стрелки табло геометрией и знаки табло в шрифте, мипмапы надписей в
-      сцене, поля атласа фасадов, погода руками в правилах, поток винта и
-      дождь. `test_shaft_boards`, `test_city_look`, `test_time_of_day`, `test_rain`
-- [x] Тест боя после правил ROM: 1, 4, 6 смертей на сидах 1–3, порог 6 по замеру
-- [x] Авторевью, `check.ps1`
+- [x] Release near Otto no closer than 1.2 m; the crowd leaves through doors. `test_respawn`
+- [x] The bot shoots down lamps from the cab; the run checks that lamps fall.
+      `test_building_playthrough`; measurement — `playthrough.gd --dark-range`, `--no-lamps`
+- [x] Debt: indicator board arrows as geometry and board glyphs in the font, label mipmaps in
+      the scene, facade atlas padding, weather set by hand in the rules, rotor downwash and
+      rain. `test_shaft_boards`, `test_city_look`, `test_time_of_day`, `test_rain`
+- [x] Combat test after the ROM rules: 1, 4, 6 deaths on seeds 1–3, threshold 6 by measurement
+- [x] Code review, `check.ps1`
 - [x] PR #60
 
-## M24l · Снег
+## M24l · Snow
 
-[ADR-0054](adr/0054-snow.md), ветка `feat/m24l-snow`. Сверка: погоды в аркаде
-нет, снег — расширение ремейка; вопросы — 2026-10-02, по ходу вехи — просьбы
-пользователя по кадрам.
+[ADR-0054](adr/0054-snow.md), branch `feat/m24l-snow`. Check against the original: the arcade has no
+weather, snow is an extension of the remake; questions — 2026-10-02, during the milestone — user
+requests based on shots.
 
-- [x] Четвёртая погода, по 25 %; шестнадцать сочетаний. `test_snow`,
+- [x] A fourth weather, 25 % each; sixteen combinations. `test_snow`,
       `test_time_of_day`
-- [x] Хлопья комками, со сносом ветра, свет ламп и солнца
-      (`snow_flake.gdshader`); снег над крышей, на улице, в городе
-- [x] Покров на крыше, улице, машинах и крышах города; следы на крыше, колеи
-      на мостовой. `test_snow`
-- [x] Физика осадков: капли и хлопья гаснут о крышу и улицу по картам высот
-      (`RoofCatch`), о людей, машины, вертолёт — ловцами по позе (`Shelter`);
-      поток от винта разносит дождь и снег, пыль и снежная пыль гаснут о
-      настил. `test_snow`, `test_rain`
-- [x] Скользкая крыша (`Footing`, `SnowTracks`); замер ботом — в снег 14
-      смертей против 11 на шести сидах
-- [x] Звук снега — метель, шаги, шины по каше, выбраны на слух со страницы
-      прослушивания
-- [x] Прохожие у выезда: разные, идут, одеты по погоде во всех шестнадцати
-      сочетаниях, зонт в руке, встречные поднимают зонт; студия
+- [x] Flakes in clumps, drifting with the wind, lit by lamps and the sun
+      (`snow_flake.gdshader`); snow above the roof, on the street, in the city
+- [x] Snow cover on the roof, the street, cars and city roofs; footprints on the roof, ruts
+      on the roadway. `test_snow`
+- [x] Precipitation physics: drops and flakes die on the roof and street by height maps
+      (`RoofCatch`), on people, cars, the helicopter — by pose catchers (`Shelter`);
+      the rotor downwash scatters rain and snow, dust and snow dust die on
+      the deck. `test_snow`, `test_rain`
+- [x] Slippery roof (`Footing`, `SnowTracks`); bot measurement — in snow 14
+      deaths versus 11 over six seeds
+- [x] Snow sound — blizzard, footsteps, tires on slush, chosen by ear from the listening
+      page
+- [x] Pedestrians at the exit: varied, walking, dressed for the weather in all sixteen
+      combinations, umbrella in hand, passers-by raise their umbrella; studio
       `tools/people_shot.gd`. `test_people`
-- [x] Кадры: `capture.py M24L`, `m24j_shot --weather=3`, `--only=walk|people`,
-      `people_shot`; сравнение с оригиналом
-- [x] Авторевью, `check.ps1` — 880 тестов
+- [x] Shots: `capture.py M24L`, `m24j_shot --weather=3`, `--only=walk|people`,
+      `people_shot`; comparison with the original
+- [x] Code review, `check.ps1` — 880 tests
 - [x] README
 - [x] PR #62
 
-## M24m · Жилой дом и свои агенты
+## M24m · Residential building and own agents
 
-[ADR-0055](adr/0055-residential.md), ветка `feat/m24m-residential`. Сверка: в
-аркаде здание одно и агенты одни; ориентир — Elevator Action Returns, где у
-каждого места свои враги, а механика общая. Вопросы — 2026-10-02, звуки —
-страницей прослушивания.
+[ADR-0055](adr/0055-residential.md), branch `feat/m24m-residential`. Check against the original: in
+the arcade there is one building and one kind of agent; the reference is Elevator Action Returns, where
+each location has its own enemies while the mechanics are shared. Questions — 2026-10-02, sounds —
+through a listening page.
 
-- [x] Тип здания — `Kind` на три, жребий поровну, первое — отель EMPIRE;
-      имена и вывеска APTS, неон сине-фиолетовый. `test_prop_catalog`
-- [x] Коридор: шахматка, краска и глазурованный кирпич, стальные двери с
-      глазком, коврики и пакеты, квартиры с буквой, тарелки под потолком.
+- [x] Building kind — `Kind` with three values, an even draw, the first is the EMPIRE hotel;
+      names and the APTS sign, blue-violet neon. `test_prop_catalog`
+- [x] Corridor: checkerboard, paint and glazed brick, steel doors with
+      a peephole, doormats and bags, apartments with a letter, plates under the ceiling.
       `test_building_style`
-- [x] Подъезд: почтовые ящики, коляска, батарея — свои из Blender
-      (`build_residential.py`); велосипед и мусор — паки
-- [x] Потёртость: граффити, пятна, трещины (`WallWear`, `build_wear.py`),
-      мигающие лампы — только вид. `test_wall_wear`
-- [x] Квартира за дверью: кухня, гостиная с мерцающим телевизором, спальня;
-      мебель любой комнаты между стенами — тест нашёл старую ошибку офиса.
+- [x] Entrance hall: mailboxes, a stroller, a radiator — our own from Blender
+      (`build_residential.py`); bicycle and trash — from packs
+- [x] Wear: graffiti, stains, cracks (`WallWear`, `build_wear.py`),
+      flickering lamps — look only. `test_wall_wear`
+- [x] Apartment behind the door: kitchen, living room with a flickering TV, bedroom;
+      furniture of any room between the walls — the test found an old office bug.
       `test_door_room`
-- [x] Агенты по типу здания: федора, костюм без шляпы, кожанка с кепкой
+- [x] Agents by building kind: fedora, suit without a hat, leather jacket with a cap
       (`AgentWardrobe`). `test_wardrobe`, `test_figure_rig`, `test_muzzle`
-- [x] Звук на слух: фон коридора офиса и жилого дома, жизнь за дверью
-      (`DoorLife`), шаг по линолеуму; приглушение при сборке. `test_door_life`
-- [x] Очки на виду (просьба пользователя): прибавка над местом и у счёта,
-      счёт набегает (`ScoreBursts`). `test_score_bursts`
-- [x] Кадры: `capture.py M24M` — в жилом доме, `room_shot`, `actor_shot`,
-      `m24j_shot --kind`, `score_shot`; сравнение с оригиналом — неон
-      жилого дома под грейдингом сливался с отелем, сдвинут к синему
-- [x] Авторевью, `check.ps1` — 900 тестов
+- [x] Sound by ear: corridor ambience of the office and the residential building, life behind the door
+      (`DoorLife`), steps on linoleum; ducking on pickup. `test_door_life`
+- [x] Points in view (user request): the increment above the spot and by the score,
+      the score counts up (`ScoreBursts`). `test_score_bursts`
+- [x] Shots: `capture.py M24M` — in the residential building, `room_shot`, `actor_shot`,
+      `m24j_shot --kind`, `score_shot`; comparison with the original — the residential building's
+      neon under grading merged with the hotel's, shifted towards blue
+- [x] Code review, `check.ps1` — 900 tests
 - [x] README
 - [x] PR #63
 
-### Что показала веха
+### What the milestone showed
 
-Кадр трёх типов рядом (`screens/M24n/three_kinds.jpg`): отличия — в отделке, а
-цвет кадра, свет, каркас, шахты и улица общие, и здания читаются однотипно.
-Следующие вехи разводят типы по характеру (M24n) и по зданию целиком (M24o).
+A shot of the three kinds side by side (`screens/M24n/three_kinds.jpg`): the differences are in the finish, while
+the frame color, light, frame structure, shafts and street are shared, and the buildings read as alike.
+The next milestones set the kinds apart by character (M24n) and by the whole building (M24o).
 
-## M24n · Характер типа здания
+## M24n · Building kind character
 
-[ADR-0056](adr/0056-building-character.md), ветка
-`feat/m24n-building-character`. Просьба пользователя: «максимально развести
-дизайн трёх уровней». Сверка: в аркаде раунды различаются цветом, в Elevator
-Action Returns миссии — цветом, светом и плотностью детали. Вопросы —
-2026-10-02; музыка по типу перенесена в M24o.
+[ADR-0056](adr/0056-building-character.md), branch
+`feat/m24n-building-character`. User request: "set the design of the three levels apart
+as much as possible". Check against the original: in the arcade rounds differ by color, in Elevator
+Action Returns missions differ by color, light and density of detail. Questions —
+2026-10-02; music by kind moved to M24o.
 
-- [x] Свой воздух у типа (`BuildingAir`): кривая тона, насыщенность, контраст,
-      туман, цвет и сила ламп; время суток поверх
-- [x] Палитра раунда — набор своего типа (`BuildingPalette.of_kind`); темнота
-      одинаково тёмная — тест по каждой паре тип × раунд. `test_building_palette`
-- [x] Офис: стекло и open space на всю глубину плиты (`OpenSpace`), дверь
-      офиса открывается в зал. `test_building_style`
-- [x] Отель: высокие панели с золочёной рейкой, ниши с подсветкой, зеркала;
-      жилой дом: стояки, щитки, окна на пожарную лестницу, дверь STAIRS, люк
-      мусоропровода, голый кирпич (`WallFeatures`, `WallWear`).
+- [x] Each kind has its own air (`BuildingAir`): tone curve, saturation, contrast,
+      fog, lamp color and strength; time of day on top
+- [x] The round palette is a set of its kind (`BuildingPalette.of_kind`); darkness
+      is equally dark — a test for each kind × round pair. `test_building_palette`
+- [x] Office: glass and open space through the full depth of the slab (`OpenSpace`), the office
+      door opens into the hall. `test_building_style`
+- [x] Hotel: tall panels with a gilded rail, lit niches, mirrors;
+      residential building: risers, utility boxes, windows onto the fire escape, a STAIRS door, a trash
+      chute hatch, bare brick (`WallFeatures`, `WallWear`).
       `test_wall_features`, `test_wall_wear`
-- [x] Светильники по типу в габарите мишени: люстра, голая лампочка; трубы
-      под потолком — только у жилого дома
-- [x] Кадры: `kinds_sheet.py` — три типа рядом ночью и днём, `capture.py M24N`
-      — в офисе; сравнение с оригиналом
-- [x] Авторевью, `check.ps1` — 910 тестов
+- [x] Light fixtures by kind within the target's bounds: a chandelier, a bare bulb; pipes
+      under the ceiling — only in the residential building
+- [x] Shots: `kinds_sheet.py` — three kinds side by side at night and in daytime, `capture.py M24N`
+      — in the office; comparison with the original
+- [x] Code review, `check.ps1` — 910 tests
 - [x] README
 - [x] PR #64
 
-### Что показала веха
+### What the milestone showed
 
-Различие держится на свете и устройстве стены, а не на фактуре: на кадре трёх
-типов рядом тип узнаётся с одного взгляда и ночью, и днём. Каркас — шахты,
-крыша, силуэт, улица — пока общий: это M24o.
+The difference rests on light and wall construction, not on texture: in the shot of the three
+kinds side by side the kind is recognized at a glance both at night and in daytime. The frame structure — shafts,
+roof, silhouette, street — is still shared: that is M24o.
 
-## M24o · Особые этажи, кабина и музыка по типу
+## M24o · Special floors, cab and music by kind
 
-[ADR-0057](adr/0057-floors-cab-music-by-kind.md), ветка
-`feat/m24o-whole-building`. Сверка: в аркаде здание одно, этажи различаются
-только устройством — нижние 1–7 почти без дверей, тёмные 11–15 без ламп; в
-Elevator Action Returns у миссии своё место и своя музыка, тема меняется по
-ходу. Вопросы — 2026-10-03, двумя блоками; силуэт, крыша, паркинг и улица
-отделены в M24p.
+[ADR-0057](adr/0057-floors-cab-music-by-kind.md), branch
+`feat/m24o-whole-building`. Check against the original: in the arcade there is one building, floors differ
+only in layout — the lower 1–7 almost without doors, the dark 11–15 without lamps; in
+Elevator Action Returns each mission has its own location and its own music, the theme changes along
+the way. Questions — 2026-10-03, in two blocks; silhouette, roof, garage and street
+split off into M24p.
 
-- [x] Роль этажа по типу и этажу ROM (`FloorRole`): общественные залы на 1–7,
-      технические на 11–15. `test_floor_hall`
-- [x] Зал вглубь (`FloorHall`, `HallLook`, `MeshBatch`): колонны, стекло или
-      сетка-рабица вместо задней стены; восемнадцать залов, свой свет без
-      теней на видимых этажах; дверь особого этажа открывается в зал
-- [x] Мебель Kenney Furniture Kit, перекрашенная под тип
-- [x] Кабина по типу: латунь, дерево и зеркало; нержавейка; грузовая с
-      рифлёным полом, брусом и решёткой по окну выхода ROM. Портал и табло по
-      типу, циферблат у отеля. `test_cab_by_kind`, `tools/cab_shot.tscn`
-- [x] Музыка (`BuildingMusic`): тип × время суток, смена темы с середины
-      здания, своя тревога. `test_building_music`
-- [x] Фон залов и лязг решётки
-- [x] Кадры: маршрут `capture.py M24O`, залы `kinds_sheet.py --floors`, кабины;
-      сравнение с оригиналом; бюджет кадра на трёх типах — худший 6.8 мс
-- [x] Авторевью, `check.ps1` — 927 тестов
+- [x] Floor role by kind and ROM floor (`FloorRole`): public halls on 1–7,
+      technical ones on 11–15. `test_floor_hall`
+- [x] Hall in depth (`FloorHall`, `HallLook`, `MeshBatch`): columns, glass or
+      chain-link mesh instead of the back wall; eighteen halls, their own light without
+      shadows on visible floors; the special floor's door opens into the hall
+- [x] Kenney Furniture Kit furniture, recolored for the kind
+- [x] Cab by kind: brass, wood and mirror; stainless steel; a freight cab with
+      a ribbed floor, a bar and a grille along the ROM step-out window. Portal and indicator board by
+      kind, a dial for the hotel. `test_cab_by_kind`, `tools/cab_shot.tscn`
+- [x] Music (`BuildingMusic`): kind × time of day, theme change from the middle of the
+      building, its own alarm. `test_building_music`
+- [x] Hall ambience and grille clank
+- [x] Shots: route `capture.py M24O`, halls `kinds_sheet.py --floors`, cabs;
+      comparison with the original; frame budget on three kinds — worst 6.8 ms
+- [x] Code review, `check.ps1` — 927 tests
 - [x] README
 - [x] PR #65
 
-### Что показала веха
+### What the milestone showed
 
-- **Музыка и звуки — только на слух.** Первые 21 трек я подобрал по жанру в
-  каталоге и собрал, не слушая; пользователь остановил сборку. Выбор сделан
-  двумя страницами прослушивания, и половина подбора не прошла. Согласованная
-  схема — не согласованные треки.
-- **Авторевью нашло петли.** Новые темы и фон залов не стояли в списке петель
-  и замолкали после первого проигрыша; тест двери в залах проверял ноль
-  деталей — headless-движок не хранит места мультимеша. Оба теперь под тестом.
-- **Комната за дверью и зал несовместимы:** комната возникала посреди зала на
-  открытии двери. Дверь особого этажа открывается в зал, как у офиса.
+- **Music and sounds — by ear only.** I picked the first 21 tracks by genre in
+  the catalog and assembled them without listening; the user stopped the assembly. The choice was made
+  through two listening pages, and half of the selection did not pass. An agreed
+  scheme is not agreed tracks.
+- **Code review found loops.** The new themes and hall ambience were not in the loop list
+  and went silent after the first play; the door test in halls checked zero
+  details — the headless engine does not store multimesh positions. Both are now under test.
+- **The room behind the door and the hall are incompatible:** the room appeared in the middle of the hall on
+  opening the door. The special floor's door opens into the hall, as in the office.
 
-## M24p · Здание снаружи по типу
+## M24p · Building exterior by kind
 
-[ADR-0058](adr/0058-exterior-by-kind.md), ветка `feat/m24p-exterior-by-kind`.
-Сверка: в аркаде снаружи здания одинаковые, в Elevator Action Returns у миссии
-своё место и свой финал. Вопросы — 2026-10-03, двумя блоками.
+[ADR-0058](adr/0058-exterior-by-kind.md), branch `feat/m24p-exterior-by-kind`.
+Check against the original: in the arcade buildings look the same outside, in Elevator Action Returns each mission
+has its own location and its own finale. Questions — 2026-10-03, in two blocks.
 
-- [x] Высокая корона за плоскостью игры (`BuildingCrown`): ар-деко со шпилем и
-      неоном, стеклянная вершина с мачтой, бак на опорах; вертолёт облетает её
-      на всех трёх типах. `test_roof_arrival`
-- [x] Карниз парапета по типу; вынос — и для дождя и снега
-- [x] Торцы башни и уступ (`BuildingFlanks`): русты и флаги, терраса; ламели,
-      плаза с фонарями; пожарная лестница, рубероид и бельё
-- [x] Паркинг (`GarageDressing`): VALET, RESERVED и шлагбаум с воротами,
-      граффити, бак и велосипеды
-- [x] Вход с улицы (`StreetFront`): козырёк с ковром и парковщиком, стеклянный
-      тамбур, крыльцо
-- [x] Машина у выхода и в паркинге — жребий по типу (`CarModel.draw`)
-- [x] Кадры, сравнение с оригиналом, бюджет кадра — худший 6.9 мс.
-      `test_exterior_by_kind`, выезд и паркинг по трём типам
-- [x] Авторевью, `check.ps1` — 932 теста
+- [x] A tall crown behind the play plane (`BuildingCrown`): art deco with a spire and
+      neon, a glass top with a mast, a water tank on legs; the helicopter flies around it
+      on all three kinds. `test_roof_arrival`
+- [x] Parapet cornice by kind; the overhang — for rain and snow too
+- [x] Tower end walls and setback ledge (`BuildingFlanks`): rustication and flags, a terrace; louvers,
+      a plaza with lampposts; fire escape, roofing felt and laundry
+- [x] Garage (`GarageDressing`): VALET, RESERVED and a barrier with a gate,
+      graffiti, a tank and bicycles
+- [x] Street entrance (`StreetFront`): a canopy with a carpet and a valet, a glass
+      vestibule, a stoop
+- [x] The car at the exit and in the garage — a draw by kind (`CarModel.draw`)
+- [x] Shots, comparison with the original, frame budget — worst 6.9 ms.
+      `test_exterior_by_kind`, exit and garage for three kinds
+- [x] Code review, `check.ps1` — 932 tests
 - [x] README
-- [ ] PR
+- [x] PR #66
 
-### Что показала веха
+### What the milestone showed
 
-- **Снаружи камера видит торцом.** Плоское на стене торца не видно: вход у
-  улицы, торцы башни и паркинг читаются только тем, что выступает. Дальняя
-  стена паркинга видна лишь у пола — таблички переехали на колонны.
-- **Высокое не влезает во вступление.** Шпиль и мачта выше кадра, который
-  позволяют пределы камеры; оставлены силуэтом над городом (ADR-0058).
-- **Литерал в константе — не упакованный массив.** `Array[PackedInt32Array]`
-  из литералов молча вышел пустым, и веса машин не работали; тест весов это
-  поймал.
+- **Outside the camera sees end-on.** Flat things on the end wall are not visible: the street
+  entrance, the tower end walls and the garage read only by what protrudes. The far
+  wall of the garage is visible only near the floor — the signs moved onto the columns.
+- **Tall things do not fit into the intro.** The spire and mast are taller than the frame
+  the camera limits allow; left as a silhouette above the city (ADR-0058).
+- **A literal in a constant is not a packed array.** `Array[PackedInt32Array]`
+  from literals silently came out empty, and the car weights did not work; the weights test
+  caught it.

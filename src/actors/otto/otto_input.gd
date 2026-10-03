@@ -1,35 +1,35 @@
 class_name OttoInput
 extends RefCounted
 
-## Снимок ввода за один кадр.
+## Input snapshot for one frame.
 ##
-## Отделяет [OttoStateMachine] от синглтона [Input]: в игре снимок собирается
-## из действий, в тестах — заполняется руками.
+## Separates [OttoStateMachine] from the [Input] singleton: in the game the snapshot is built
+## from actions, in tests — filled in by hand.
 
-## Направление по горизонтали: -1 влево, +1 вправо, 0 стоим.
+## Horizontal direction: -1 left, +1 right, 0 standing.
 var move: float = 0.0
 
-## Направление по вертикали: -1 вверх, +1 вниз, 0 покой.
+## Vertical direction: -1 up, +1 down, 0 rest.
 ##
-## На этаже «вниз» — это присед, в шахте — команда кабине. Разводит эти два
-## смысла тот, кто знает контекст: сам снимок про лифты не знает.
+## On a floor "down" is a crouch, in a shaft — a command to the cab. These two
+## meanings are told apart by whoever knows the context: the snapshot knows nothing about lifts.
 var vertical: float = 0.0
 
-## Удерживается ли приседание.
+## Whether crouch is held.
 var crouch: bool = false
 
-## Нажат ли прыжок именно в этом кадре.
+## Whether jump was pressed in exactly this frame.
 var jump_pressed: bool = false
 
-## Нажат ли выстрел именно в этом кадре. Оружие Otto одиночное: удержание
-## очередью не стреляет.
+## Whether fire was pressed in exactly this frame. Otto's weapon is single-shot: holding
+## does not fire bursts.
 var shoot_pressed: bool = false
 
 
-## Перечитывает снимок из карты действий проекта.
+## Re-reads the snapshot from the project's action map.
 ##
-## Метод, а не фабрика: снимок переиспользуется кадр за кадром, чтобы не
-## выделять по объекту на каждый физический кадр.
+## A method, not a factory: the snapshot is reused frame after frame so as not to
+## allocate an object on every physics frame.
 func read_actions() -> void:
 	move = Input.get_axis("move_left", "move_right")
 	vertical = Input.get_axis("move_up", "move_down")

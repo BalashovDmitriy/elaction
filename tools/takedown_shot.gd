@@ -1,29 +1,29 @@
 extends Node3D
 
-## Сценки добивания кадрами (ADR-0040): каждая сценка — настоящим режиссёром
-## [TakedownScene] на живых Otto и агенте, с замедлением и крупным планом, как в
-## игре; по кадру на каждую долю сценки.
+## Takedown scenes as frames (ADR-0040): each scene with the real director
+## [TakedownScene] on live Otto and agent, with slowdown and close-up, as in
+## the game; one frame for each fraction of the scene.
 ##
-## Бой сценку не поймает — агента надо подвести вплотную и нажать выстрел в нужный
-## момент. Здесь каждая сценка ставится сама, и кадр показывает постановку.
+## Combat will not catch a scene — the agent must be brought up close and fire pressed at the right
+## moment. Here each scene sets itself up, and the frame shows the staging.
 ##
-## Запуск:
+## Run:
 ##     godot --path . res://tools/takedown_shot.tscn
 ##     godot --path . res://tools/takedown_shot.tscn -- --folder=M24D
 ##
-## Кадры ложатся в screens/<папка>/takedown_<сценка>.png — лист из кадров
-## сценки по порядку. Папка локальная.
+## Frames go to screens/<folder>/takedown_<scene>.png — a sheet of the scene's frames
+## in order. The folder is local.
 
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 
 const DEFAULT_FOLDER := "M24D"
-## В какие доли сценки снимать кадры.
+## At which fractions of the scene to take frames.
 const MOMENTS: Array[float] = [0.08, 0.3, 0.5, 0.7, 0.9]
-## Размер кадра на листе, px.
+## Frame size on the sheet, px.
 const CELL := Vector2i(640, 400)
-## Какую долю высоты кадра брать на лист.
+## What fraction of the frame height to take onto the sheet.
 const TIGHT: float = 0.6
 
 var _folder: String = DEFAULT_FOLDER
@@ -98,7 +98,7 @@ func _shoot_scene(scene: Takedown.Scene) -> void:
 	var frames: Array[Image] = []
 	var shown := 0.0
 	for moment in MOMENTS:
-		# Время сценки идёт в реальном темпе: ждать его надо мимо замедления мира.
+		# Scene time runs at the real pace: it must be awaited bypassing the world slowdown.
 		var wait := scene.duration * moment - shown
 		await get_tree().create_timer(wait, true, false, true).timeout
 		shown += wait
@@ -119,8 +119,8 @@ func _save_sheet(scene_name: String, frames: Array[Image]) -> void:
 	for index in frames.size():
 		var frame := frames[index]
 		frame.convert(Image.FORMAT_RGBA8)
-		# Середина кадра, теснее самого крупного плана: пара стоит в центре, и о
-		# постановке судят по позам, а не по кадру целиком.
+		# The middle of the frame, tighter than the closest close-up: the pair stands in the centre, and
+		# the staging is judged by poses, not by the whole frame.
 		var size := frame.get_size()
 		var high := int(size.y * TIGHT)
 		var wide := high * CELL.x / CELL.y

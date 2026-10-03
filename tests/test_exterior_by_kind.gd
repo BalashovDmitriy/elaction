@@ -1,8 +1,8 @@
 extends GutTest
 
-## Здание снаружи по типу (ADR-0058): корона за плоскостью игры, торцы и уступ
-## снаружи стен, паркинг и вход с улицы, машина жребием по типу. Всё — вид без
-## тел и без своих источников света; проверяется на здании каждого типа.
+## The building outside by kind (ADR-0058): the crown behind the play plane, end walls and setback
+## ledge outside the walls, the garage and the street entrance, the car drawn by kind. All of it is
+## look without bodies and without its own light sources; checked on a building of every kind.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const SETTLE_FRAMES: int = 5
@@ -15,8 +15,8 @@ func after_each() -> void:
 	GameState.instance().start_game()
 
 
-## Модели с нулевым весом типа не выпадают, запрещённые краски — тоже; у жилого
-## дома краска выцвела. Первое здание — красная спортивная у любого типа.
+## Models with zero weight for the kind do not come up, forbidden paints do not either; on a
+## residential building the paint is faded. The first building is a red sports car for any kind.
 func test_cars_follow_the_kind_weights() -> void:
 	for kind: BuildingIdentity.Kind in KINDS:
 		var rng := RandomNumberGenerator.new()
@@ -37,10 +37,10 @@ func test_cars_follow_the_kind_weights() -> void:
 		assert_eq(first.paint, 0, "первое здание — красная")
 
 
-## У каждого типа своя корона: стоит за плоскостью игры дальше размаха винта,
-## без тел; торцы и уступ — снаружи стен башни и над уступом и не закрывают
-## вывеску у правого торца; новых источников света нет — у окружения их
-## по-прежнему два.
+## Every kind has its own crown: it stands behind the play plane farther than the rotor span,
+## without bodies; end walls and setback ledge are outside the tower walls and above the ledge and
+## do not cover the sign at the right end wall; there are no new light sources — the environment
+## still has two.
 func test_crown_and_flanks_of_every_kind() -> void:
 	var tops := {}
 	for kind: BuildingIdentity.Kind in KINDS:
@@ -93,11 +93,11 @@ func test_crown_and_flanks_of_every_kind() -> void:
 	assert_eq(tops.size(), KINDS.size())
 
 
-## Паркинг: отделка — перед дальней стеной и полосой краски на ней, а не за
-## ними; у офиса шлагбаум поперёк полосы машины Otto, и он поднимается вместе
-## с воротами; у других шлагбаума нет. Вход с улицы: парковщик только у отеля.
+## Garage: the finish is in front of the far wall and the paint stripe on it, not behind them; the
+## office has a barrier across the lane of Otto's car, and it rises together with the gate; the
+## others have no barrier. Street entrance: a valet only at the hotel.
 func test_garage_and_street_front_by_kind() -> void:
-	# Лицо дальней стены и полосы краски на ней (1 см): за ним отделку не видно.
+	# Face of the far wall and the paint stripe on it (1 cm): finish behind it is not visible.
 	var band_face := Garage.FAR_Z + Garage.FAR_THICKNESS * 0.5 + 0.01
 	for kind: BuildingIdentity.Kind in KINDS:
 		var level := await _level(kind)
@@ -125,7 +125,7 @@ func test_garage_and_street_front_by_kind() -> void:
 		assert_eq(front.find_children("*", "PhysicsBody3D", true, false).size(), 0, "без тел")
 
 
-## Габарит мешей под [param root] в координатах сцены.
+## Bounds of the meshes under [param root] in scene coordinates.
 func _reach(root: Node3D) -> AABB:
 	var box := AABB()
 	var first := true

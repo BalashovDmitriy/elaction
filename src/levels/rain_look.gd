@@ -1,55 +1,57 @@
 class_name RainLook
 extends RefCounted
 
-## Вид дождя: струи, брызги, круги на лужах, завесы и ореол лампы (M24a,
-## ADR-0037, решение 3). Одни на крышу ([RoofRain]) и город ([CityBackdrop]):
-## у дождя один вид, и собирать его дважды значило бы развести капли при первой
-## правке.
+## The look of rain: streaks, splashes, ripples on puddles, curtains and the lamp halo
+## (M24a, ADR-0037, decision 3). Shared by the roof ([RoofRain]) and the city
+## ([CityBackdrop]): rain has one look, and building it twice would make the drops
+## diverge at the first edit.
 ##
-## Капля светится не своим цветом, а светом (решение 3, дополнение, — выбор
-## пользователя по кадрам): от ламп сцены, ярче против света, и несёт размытую
-## копию того, что за ней. Перед окнами и неоном дождь искрит, перед тёмным
-## небом пропадает — как дождь на фотографии ночного города.
+## A drop glows not with its own colour but with light (decision 3, amendment — the
+## user's choice by shots): from the scene's lamps, brighter against the light, and it
+## carries a blurred copy of what is behind it. In front of windows and neon the rain
+## sparkles, in front of a dark sky it vanishes — like rain in a photograph of a city
+## at night.
 ##
-## Струя — квад, повёрнутый по скорости частицы, со сдвигом назад: частица —
-## голова струи. Капля, погашенная коллизией, гаснет головой о крышу, а хвост
-## не уходит под настил.
+## A streak is a quad turned along the particle's velocity, shifted backward: the
+## particle is the head of the streak. A drop killed by collision dies with its head on
+## the roof, and the tail does not go under the deck.
 
 const STREAK_SHADER := preload("res://src/levels/rain_streak.gdshader")
 const RIPPLE_SHADER := preload("res://src/levels/rain_ripple.gdshader")
 const CURTAIN_SHADER := preload("res://src/levels/rain_curtain.gdshader")
 const HALO_SHADER := preload("res://src/levels/rain_halo.gdshader")
 
-## Цвет дождя: холодный, как свет неба над городом.
+## Rain colour: cold, like the sky light over the city.
 const TINT := Color(0.75, 0.82, 1.0)
 
-## Разброс направления капель, градусы: дождь не идёт строем.
+## Spread of drop direction, degrees: rain does not fall in formation.
 const SPREAD: float = 1.5
 
-## Под каким именем в частицах хранится число капель на «высоком»: по нему
-## [method scale_amount] пересчитывает долю по уровню качества.
+## The name under which the particles store the drop count on "High": by it
+## [method scale_amount] recomputes the share by quality level.
 const FULL := &"full_amount"
 
-## Слои дождя в городе, от камеры города вглубь (ADR-0037, решение 3): сколько
-## капель, насколько дальше камеры середина слоя и полуглубина, м, размер
-## струи. Ближние — крупные, дальние — тонкие, в дымке города. Капель в
-## полтора раза больше, чем было у струй своего цвета: видна из них только
-## часть — та, что на фоне окон.
+## Rain layers in the city, from the city camera into depth (ADR-0037, decision 3): how
+## many drops, how much farther than the camera the layer's middle is and the
+## half-depth, m, streak size. Near ones are large, far ones thin, in the city haze.
+## There are one and a half times more drops than the streaks of their own colour had:
+## only part of them is visible — the part against windows.
 const CITY_LAYERS: Array[Dictionary] = [
 	{"drops": 420, "depth": 22.0, "reach": 10.0, "size": Vector2(0.07, 2.4)},
 	{"drops": 1120, "depth": 52.0, "reach": 18.0, "size": Vector2(0.04, 1.6)},
 	{"drops": 960, "depth": 110.0, "reach": 30.0, "size": Vector2(0.06, 2.2)},
 ]
-## Струи города: ламп в городе нет, капли несут только свет за собой — вчетверо.
+## City streaks: there are no lamps in the city, drops carry only the light behind
+## them — four times over.
 const CITY_DROP := {
 	"lit_gain": 0.0, "back_gain": 4.0, "back_lod": 2.0, "base": 0.01, "opacity": 0.8
 }
-## Скорость капель в городе, м/с, и снос на метр падения.
+## Drop speed in the city, m/s, and drift per metre of fall.
 const CITY_SPEED := Vector2(22.0, 27.0)
 const CITY_SLANT: float = 0.14
 
-## Завесы между рядами домов: глубина, сколько света за ними несут, полос на
-## метр.
+## Curtains between rows of houses: depth, how much of the light behind them they carry,
+## stripes per metre.
 const CURTAINS: Array[Vector3] = [
 	Vector3(86.0, 3.0, 0.9),
 	Vector3(130.0, 3.0, 0.7),
@@ -57,14 +59,14 @@ const CURTAINS: Array[Vector3] = [
 ]
 const CURTAIN_HEIGHT: float = 260.0
 
-## Ореол лампы в дожде: размер квада, м, и яркость.
+## Lamp halo in rain: quad size, m, and brightness.
 const HALO_SIZE := Vector2(9.0, 8.1)
 const HALO_STRENGTH: float = 0.25
 
 
-## Струи дождя: [param amount] капель из коробки [param extents] сыплются со
-## скоростью [param speed] и сносом [param slant] и живут [param lifetime].
-## Размер струи — [param size], вид — [param look] из [method drop_look].
+## Rain streaks: [param amount] drops from box [param extents] fall at speed
+## [param speed] with drift [param slant] and live [param lifetime].
+## Streak size — [param size], look — [param look] from [method drop_look].
 static func streaks(
 	amount: int,
 	lifetime: float,
@@ -98,8 +100,8 @@ static func streaks(
 	return rain
 
 
-## Вид капли: шейдер струи с параметрами [param settings] — имена из
-## [code]rain_streak.gdshader[/code], остальное по умолчанию шейдера.
+## Drop look: the streak shader with parameters [param settings] — names from
+## [code]rain_streak.gdshader[/code], the rest at the shader's defaults.
 static func drop_look(settings: Dictionary) -> ShaderMaterial:
 	var look := ShaderMaterial.new()
 	look.shader = STREAK_SHADER
@@ -109,7 +111,7 @@ static func drop_look(settings: Dictionary) -> ShaderMaterial:
 	return look
 
 
-## Квад струи: сдвинут назад на свою длину, чтобы частица была головой.
+## Streak quad: shifted back by its length so the particle is the head.
 static func streak_mesh(size: Vector2, look: ShaderMaterial) -> QuadMesh:
 	var quad := QuadMesh.new()
 	quad.size = size
@@ -118,7 +120,7 @@ static func streak_mesh(size: Vector2, look: ShaderMaterial) -> QuadMesh:
 	return quad
 
 
-## Доля капель по уровню качества: число на «высоком» — в метке [constant FULL].
+## Drop share by quality level: the count on "High" is in the [constant FULL] meta.
 static func scale_amount(particles: GPUParticles3D, share: float) -> void:
 	var full := int(particles.get_meta(FULL, particles.amount))
 	var wanted := maxi(int(float(full) * share), 1)
@@ -126,11 +128,13 @@ static func scale_amount(particles: GPUParticles3D, share: float) -> void:
 		particles.amount = wanted
 
 
-## Дождь города: слои струй у камеры и завесы между рядами домов. Слои —
-## детьми [param camera]: едут с ней, а капли падают в мире.
+## City rain: streak layers at the camera and curtains between rows of houses. The
+## layers are children of [param camera]: they travel with it, while the drops fall in
+## the world.
 ##
-## [param share] — доля ночной силы (ADR-0051): капли и завесы несут свет того,
-## что за ними, и днём на светлом небе горели бы белым.
+## [param share] — share of the night strength (ADR-0051): drops and curtains carry the
+## light of what is behind them, and in the daytime against a light sky they would
+## burn white.
 static func city(
 	camera: Camera3D, ground: float, from_x: float, to_x: float, share: float = 1.0
 ) -> Node3D:
@@ -162,7 +166,7 @@ static func city(
 	return host
 
 
-## Струи дождя города, чтобы пересчитать их долю по уровню качества.
+## City rain streaks, to recompute their share by quality level.
 static func city_layers(camera: Camera3D) -> Array[GPUParticles3D]:
 	var found: Array[GPUParticles3D] = []
 	for child in camera.get_children():
@@ -171,8 +175,9 @@ static func city_layers(camera: Camera3D) -> Array[GPUParticles3D]:
 	return found
 
 
-## Ореол лампы цвета [param colour] в дожде: квад размером [param size] на
-## [param at], чуть позади лампы — между ней и фоном, яркость [param strength].
+## Lamp halo of colour [param colour] in rain: a quad of size [param size] at
+## [param at], slightly behind the lamp — between it and the background, brightness
+## [param strength].
 static func halo(
 	at: Vector3, colour: Color, strength: float = HALO_STRENGTH, size: Vector2 = HALO_SIZE
 ) -> MeshInstance3D:

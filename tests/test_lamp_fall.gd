@@ -1,10 +1,10 @@
 extends GutTest
 
-## Тесты падения лампы.
+## Lamp fall tests.
 ##
-## Второй «взвод» в проекте после двери: узел исчезает лишь в конце кадра, и до
-## тех пор продолжает ловить пули. Без запрета на повторный запуск вторая пуля
-## подняла бы уже упавшую лампу обратно.
+## The second "arming" in the project after the door: the node disappears only at the end of the
+## frame, and until then keeps catching bullets. Without a ban on restarting, a second bullet would
+## raise an already fallen lamp back.
 
 const STEP: float = 0.1
 

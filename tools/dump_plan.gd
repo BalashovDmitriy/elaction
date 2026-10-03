@@ -1,16 +1,16 @@
 extends SceneTree
 
-## Печатает раскладку здания: что и где сгенерировалось.
+## Prints the building layout: what was generated and where.
 ##
-## Раскладка случайна по сиду, и глазами по кадру её не проверить — в кадр влезает
-## меньше трети этажа. Инструмент отвечает на вопрос «а что там вообще получилось».
+## The layout is random by seed, and it cannot be checked by eye from a frame — less than a
+## third of a floor fits in the frame. The tool answers the question "what actually came out there".
 ##
-## Запуск:
+## Run:
 ##     godot --headless --script res://tools/dump_plan.gd -- 1
 ##     godot --headless --script res://tools/dump_plan.gd -- 3 --floors=4 --span=2
 ##
-## Первое число — сид. Размеры здания можно переопределить: так смотрят те же
-## маленькие здания, на которых гоняются тесты прохождения.
+## The first number is the seed. Building sizes can be overridden: this is how one looks at the same
+## small buildings the traversal tests run on.
 
 
 func _init() -> void:
@@ -68,18 +68,18 @@ func _init() -> void:
 	quit()
 
 
-## Маршрут, каким его видит бот: шаг за шагом от крыши к выходу.
+## The route as the bot sees it: step by step from the roof to the exit.
 ##
-## По этому следу ищут, где спуск встаёт: «бот не прошёл» говорит только этаж,
-## а здесь видно, чем он собирался воспользоваться и куда это ведёт.
+## This trace is used to find where the descent gets stuck: "the bot did not get through" names only
+## the floor, while here one sees what it meant to use and where that leads.
 func _trace_route(plan: BuildingPlan, rules: BuildingRules) -> void:
 	print("\nМаршрут по графу: документы сверху вниз, затем выход")
 	var graph := BuildingRoute.walkable(plan, rules)
 	var here := BuildingRules.ROOF
 	var x := plan.safe_x(rules, here)
 
-	# Цели те же, что у бота: верхний несобранный документ, а когда все собраны —
-	# выход. Иначе след показывал бы дорогу, которой бот не идёт.
+	# The goals are the same as the bot's: the top uncollected document, and when all are collected —
+	# the exit. Otherwise the trace would show a road the bot does not take.
 	var goals: Array[Dictionary] = []
 	for spot in plan.doors:
 		if spot.has_document:

@@ -1,8 +1,8 @@
 shader_type canvas_item;
 
-// Игра за паузой: размытая и притушенная, чтобы меню читалось поверх неё
-// (ADR-0035, решение 1). Размытие — mip-уровнем экранной текстуры: дёшево и
-// без второго прохода.
+// The game behind the pause: blurred and dimmed so the menu reads over it
+// (ADR-0035, decision 1). The blur is a mip level of the screen texture: cheap and
+// without a second pass.
 
 uniform sampler2D screen : hint_screen_texture, filter_linear_mipmap;
 uniform float blur : hint_range(0.0, 6.0) = 3.2;

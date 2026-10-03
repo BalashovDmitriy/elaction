@@ -1,10 +1,10 @@
 extends GutTest
 
-## Тесты тревоги по таймеру.
+## Timer alarm tests.
 ##
-## Главное здесь — то, чего нет: способа снять тревогу смертью. В оригинале она
-## держится до конца здания, и это наказание на всё прохождение, а не на попытку
-## (ADR-0009, пункт 1).
+## The main thing here is what does not exist: a way to clear the alarm by dying. In the original it
+## holds until the end of the building, and it is a punishment for the whole playthrough, not for an
+## attempt (ADR-0009, item 1).
 
 const STEP: float = 0.1
 

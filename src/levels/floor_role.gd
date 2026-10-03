@@ -1,15 +1,15 @@
 class_name FloorRole
 extends RefCounted
 
-## Роль этажа: обычный коридор или особый зал (ADR-0057, решения 2 и 3).
+## Floor role: an ordinary corridor or a special hall (ADR-0057, decisions 2 and 3).
 ##
-## Особые этажи стоят по устройству ROM, а не жребием: нижняя полоса 1–7, где
-## дверей почти нет (маски `81` и `00` в table_280E), — общественные залы;
-## тёмная полоса 11–15, где ламп нет вовсе, — технические. Каждый этаж полосы
-## свой, и в любом здании типа он тот же. Механику роль не трогает: двери, лампы
-## и раскладка остаются по ROM, меняется только то, что за плоскостью игры.
+## Special floors are placed by the ROM layout, not by a draw: the bottom band 1–7, where there are
+## almost no doors (masks `81` and `00` in table_280E), — public halls; the dark band 11–15, where
+## there are no lamps at all, — technical ones. Each floor of a band is its own, and in any building
+## of a kind it is the same. The role does not touch mechanics: doors, lamps and layout stay per the
+## ROM, only what is behind the play plane changes.
 ##
-## Без узлов: таблица проверяется тестом на любом здании.
+## No nodes: the table is checked by a test on any building.
 
 enum Role {
 	CORRIDOR,
@@ -33,17 +33,17 @@ enum Role {
 	WORKSHOP,
 }
 
-## Чем зал отделён от коридора вместо задней стены: колоннами, стеклом или
-## сеткой-рабицей на стойках (ADR-0057, решение 3).
+## What separates the hall from the corridor instead of a back wall: columns, glass or chain-link
+## mesh on posts (ADR-0057, decision 3).
 enum Screen { COLUMNS, GLASS, MESH }
 
-## Нижняя полоса ROM: общественные залы, по этажу ROM от 1 до 7.
+## Bottom ROM band: public halls, by ROM floor from 1 to 7.
 const PUBLIC_BAND := Vector2i(1, 7)
-## Тёмная полоса ROM — технические этажи ([constant Arcade.DARK_FLOORS]).
+## Dark ROM band — technical floors ([constant Arcade.DARK_FLOORS]).
 const TECHNICAL_BAND := Arcade.DARK_FLOORS
 
-## Общественные залы этажей ROM 1–7 по типу здания. Этаж ROM 1 у здания в
-## тридцать этажей — паркинг, и лобби стоит ещё и на втором.
+## Public halls of ROM floors 1–7 by building kind. ROM floor 1 in a thirty-floor building is the
+## garage, so the lobby also stands on the second.
 const PUBLIC_HOTEL: Array[Role] = [
 	Role.LOBBY, Role.LOBBY, Role.DINING, Role.BALLROOM, Role.POOL, Role.CONFERENCE, Role.BAR
 ]
@@ -60,7 +60,7 @@ const PUBLIC_RESIDENTIAL: Array[Role] = [
 	Role.LAUNDRY,
 ]
 
-## Технические этажи ROM 11–15 по типу здания.
+## Technical floors ROM 11–15 by building kind.
 const TECHNICAL_HOTEL: Array[Role] = [
 	Role.BOILER, Role.MECHANICAL, Role.LAUNDRY, Role.KITCHEN, Role.STORAGE
 ]
@@ -72,7 +72,7 @@ const TECHNICAL_RESIDENTIAL: Array[Role] = [
 ]
 
 
-## Роль этажа ROM [param rom] в здании типа [param kind].
+## Role of ROM floor [param rom] in a building of kind [param kind].
 static func of_rom(kind: BuildingIdentity.Kind, rom: int) -> Role:
 	if rom >= PUBLIC_BAND.x and rom <= PUBLIC_BAND.y:
 		return _public(kind)[rom - PUBLIC_BAND.x]
@@ -81,25 +81,25 @@ static func of_rom(kind: BuildingIdentity.Kind, rom: int) -> Role:
 	return Role.CORRIDOR
 
 
-## Роль нашего этажа [param index] в здании типа [member BuildingRules.kind]:
-## крыша и паркинг — не залы.
+## Role of our floor [param index] in a building of kind [member BuildingRules.kind]: the roof and
+## the garage are not halls.
 static func at(rules: BuildingRules, index: int) -> Role:
 	if index <= BuildingRules.ROOF or index >= rules.floors - 1:
 		return Role.CORRIDOR
 	return of_rom(rules.kind, Arcade.rom_floor(index, rules.floors))
 
 
-## Особый ли этаж [param index]: за коридором зал, а не задняя стена.
+## Whether floor [param index] is special: beyond the corridor is a hall, not a back wall.
 static func hall_at(rules: BuildingRules, index: int) -> bool:
 	return is_hall(at(rules, index))
 
 
-## Особый ли этаж: за коридором зал, а не задняя стена.
+## Whether the floor is special: beyond the corridor is a hall, not a back wall.
 static func is_hall(role: Role) -> bool:
 	return role != Role.CORRIDOR
 
 
-## Технический ли зал: тёмная полоса ROM.
+## Whether the hall is technical: the dark ROM band.
 static func is_technical(role: Role) -> bool:
 	return (
 		role
@@ -115,8 +115,8 @@ static func is_technical(role: Role) -> bool:
 	)
 
 
-## Чем зал отделён от коридора. Офис — стеклом везде, кроме подсобок; серверная
-## офиса — за стеклом, как в жизни; остальные технические — за сеткой.
+## What separates the hall from the corridor. The office — glass everywhere except utility rooms;
+## the office server room — behind glass, as in real life; other technical ones — behind mesh.
 static func screen_of(role: Role, kind: BuildingIdentity.Kind) -> Screen:
 	if role == Role.SERVER or role == Role.MEETING:
 		return Screen.GLASS
@@ -127,7 +127,7 @@ static func screen_of(role: Role, kind: BuildingIdentity.Kind) -> Screen:
 	return Screen.COLUMNS
 
 
-## Имя роли для журнала и кадров.
+## Role name for the log and shots.
 static func name_of(role: Role) -> String:
 	return String(Role.keys()[role]).to_lower()
 

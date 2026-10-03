@@ -1,17 +1,17 @@
 class_name Passerby
 extends RefCounted
 
-## Один прохожий у выезда (ADR-0054, решение 3), собранный из частей: модели
-## паков горожан Quaternius модульные — голова, корпус, ноги и обувь — четыре
-## части на одном скелете, — и прохожий берёт их от разных моделей своего пола.
-## Поверх — свой цвет одежды, волос и кожи и свой рост: толпа из одних и тех же
-## восьми моделей читалась бы клонами.
+## One pedestrian at the exit (ADR-0054, decision 3), assembled from parts: the Quaternius
+## townsfolk pack models are modular — head, torso, legs and shoes — four
+## parts on one skeleton — and a pedestrian takes them from different models of their sex.
+## On top — their own colour of clothes, hair and skin and their own height: a crowd of the same
+## eight models would read as clones.
 
-## Как одет прохожий ([method dress_for]; ADR-0054, решение 11):
-## [code]LIGHT[/code] — налегке, ясным утром и днём; [code]MILD[/code] — в куртке,
-## в туман и ясным вечером и ночью; [code]WET[/code] — от дождя;
-## [code]COLD[/code] — от холода, в снег. Кроме налегке, открыто только лицо:
-## руки в рукавах и перчатках, ноги в брюках, на ногах ботинки.
+## How a pedestrian is dressed ([method dress_for]; ADR-0054, decision 11):
+## [code]LIGHT[/code] — lightly, on a clear morning and day; [code]MILD[/code] — in a jacket,
+## in fog and on a clear evening and night; [code]WET[/code] — against rain;
+## [code]COLD[/code] — against cold, in snow. Except when dressed lightly, only the face is
+## open: hands in sleeves and gloves, legs in trousers, boots on the feet.
 enum Dress { LIGHT, MILD, WET, COLD }
 
 const MEN: Array[PackedScene] = [
@@ -26,15 +26,15 @@ const WOMEN: Array[PackedScene] = [
 	preload("res://assets/models/people/women_suit.glb"),
 	preload("res://assets/models/people/women_worker.glb"),
 ]
-## Кто одет не налегке — номера в [constant MEN] и [constant WOMEN]: в
-## прохладу, дождь и снег платьев, шорт и футболок на улице нет.
+## Who is not dressed lightly — indices in [constant MEN] and [constant WOMEN]: in
+## cool weather, rain and snow there are no dresses, shorts and T-shirts on the street.
 const MEN_COATED: Array[int] = [1, 2, 3]
 const WOMEN_COATED: Array[int] = [2, 3]
 
-## Части модели: имя меша кончается этим словом.
+## Model parts: the mesh name ends with this word.
 const PARTS: Array[String] = ["Head", "Body", "Legs", "Feet"]
 
-## Тона кожи и волос.
+## Skin and hair tones.
 const SKINS: Array[Color] = [
 	Color(0.96, 0.8, 0.69),
 	Color(0.87, 0.67, 0.53),
@@ -50,9 +50,9 @@ const HAIRS: Array[Color] = [
 	Color(0.55, 0.55, 0.56),
 	Color(0.45, 0.13, 0.07)
 ]
-## Цвета одежды горожанина: тёмно-синий, графит, чёрный, верблюжий, оливковый,
-## бордо, деним, серый, бежевый, белый, коричневый, хвойный. Сдвиг тона по
-## всему кругу давал голубые волосы и кислотную одежду.
+## Townsperson clothing colours: navy, graphite, black, camel, olive,
+## burgundy, denim, grey, beige, white, brown, forest green. Shifting the hue around
+## the whole wheel gave blue hair and acid clothing.
 const CLOTHES: Array[Color] = [
 	Color(0.1, 0.13, 0.24),
 	Color(0.17, 0.18, 0.2),
@@ -67,8 +67,8 @@ const CLOTHES: Array[Color] = [
 	Color(0.3, 0.2, 0.13),
 	Color(0.1, 0.24, 0.18)
 ]
-## Рукава и перчатки там, где налегке голая рука, — без цветов кожи:
-## коричневый и бежевый рукав читался голой рукой.
+## Sleeves and gloves where a light outfit has a bare arm — without skin colours:
+## a brown and beige sleeve read as a bare arm.
 const SLEEVES: Array[Color] = [
 	Color(0.1, 0.13, 0.24),
 	Color(0.17, 0.18, 0.2),
@@ -79,7 +79,7 @@ const SLEEVES: Array[Color] = [
 	Color(0.45, 0.46, 0.48),
 	Color(0.1, 0.24, 0.18)
 ]
-## Пальто и плащи: тёмные зимние и цветные дождевые.
+## Coats and raincoats: dark winter ones and coloured rain ones.
 const COATS: Array[Color] = [
 	Color(0.08, 0.08, 0.1),
 	Color(0.2, 0.15, 0.11),
@@ -87,12 +87,12 @@ const COATS: Array[Color] = [
 	Color(0.32, 0.3, 0.28),
 	Color(0.4, 0.27, 0.16)
 ]
-## Без бежевого: рукава и перчатки плаща — одного цвета, и бежевые читались
-## голыми руками.
+## Without beige: raincoat sleeves and gloves are one colour, and beige ones read
+## as bare hands.
 const RAINCOATS: Array[Color] = [
 	Color(0.8, 0.65, 0.1), Color(0.12, 0.16, 0.26), Color(0.15, 0.2, 0.14), Color(0.2, 0.2, 0.22)
 ]
-## Шапки и шарфы.
+## Hats and scarves.
 const KNITS: Array[Color] = [
 	Color(0.55, 0.08, 0.1),
 	Color(0.1, 0.12, 0.2),
@@ -101,24 +101,24 @@ const KNITS: Array[Color] = [
 	Color(0.3, 0.35, 0.22),
 	Color(0.6, 0.45, 0.2)
 ]
-## Какая доля прохожих в пальто, шапке и шарфе — в холод и в дождь.
+## What share of pedestrians wear a coat, hat and scarf — in cold and in rain.
 const COLD_COAT: float = 1.0
 const COLD_HAT: float = 0.65
 const COLD_SCARF: float = 0.7
 const WET_COAT: float = 0.85
-## Размеры в осях модели пака (она ростом 1.85): шапка — вязаная, по голове
-## — радиус, высота и подъём над костью головы; шарф — внутренний и внешний
-## радиус и подъём над костью шеи. Полы пальто деталью на кости не делаются:
-## жёсткий подол на бёдрах при шаге читался сумкой (кадры M24l) — пальто это
-## корпус в его цвете, рукава до перчаток и тёмные брюки.
+## Sizes in the pack model's axes (it is 1.85 tall): the hat — knitted, by the head
+## — radius, height and lift above the head bone; the scarf — inner and outer
+## radius and lift above the neck bone. Coat skirts are not made as a detail on a bone:
+## a stiff hem on the hips read as a bag when walking (M24l frames) — the coat is
+## the torso in its colour, sleeves down to the gloves and dark trousers.
 const HAT := Vector3(0.172, 0.14, 0.165)
-## Отворот шапки: толщина кольца.
+## Hat cuff: ring thickness.
 const HAT_CUFF: float = 0.035
 const SCARF := Vector3(0.055, 0.1, 0.0)
-## Что под пальто видно из-за отворотов: галстук. Остальной корпус — в цвет
-## пальто: светлая футболка под ним читалась бы голой грудью.
+## What is visible under the coat behind the lapels: a tie. The rest of the torso is in the coat
+## colour: a light T-shirt under it would read as a bare chest.
 const UNDER_COAT: Array[String] = ["Tie"]
-## Чем закрыто то, что налегке открыто: брюки или колготки, ботинки.
+## What covers what is open in a light outfit: trousers or tights, boots.
 const LEGWEAR: Array[Color] = [
 	Color(0.07, 0.07, 0.08), Color(0.13, 0.14, 0.18), Color(0.22, 0.2, 0.18), Color(0.1, 0.12, 0.2)
 ]
@@ -126,14 +126,14 @@ const BOOTS: Array[Color] = [
 	Color(0.05, 0.04, 0.04), Color(0.2, 0.12, 0.07), Color(0.12, 0.12, 0.13)
 ]
 
-## Головы, которых прохожему не надо: у рабочих — каска.
+## Heads a pedestrian does not need: workers have a hard hat.
 const HELMET_HEADS: Array[String] = ["Worker"]
 
-## Насколько прохожие разного роста, доля.
+## How much pedestrians differ in height, fraction.
 const HEIGHT_SPREAD: float = 0.05
 
 
-## Часть модели библиотеки: меш, скин и имя узла, по которому видно каску.
+## A library model part: mesh, skin and the node name that reveals a hard hat.
 class Part:
 	extends RefCounted
 	var mesh: Mesh = null
@@ -141,16 +141,16 @@ class Part:
 	var node_name: String = ""
 
 
-## Части моделей библиотеки по сцене: по имени части — [Part]. Хранятся
-## ресурсы, а не узлы: модель разворачивается один раз и сразу освобождается.
-## Узлы вне дерева сами не уходят, и кэш узлов держал бы восемь моделей до
-## выхода из игры, а на выходе — утечкой (авторевью M24l).
+## Library model parts by scene: by part name — a [Part]. Resources are stored,
+## not nodes: a model is instantiated once and freed right away.
+## Nodes outside the tree do not go away by themselves, and a node cache would hold eight models
+## until the game exits, and on exit — as a leak (code review M24l).
 static var _donors: Dictionary = {}
 
 
-## Во что одеты на улице в погоду [param weather] во время суток [param time]:
-## в снег — от холода, в дождь — от дождя, в туман и ясными вечером и ночью —
-## в куртках, ясными утром и днём — налегке.
+## What people wear on the street in weather [param weather] at time of day [param time]:
+## in snow — against cold, in rain — against rain, in fog and on clear evenings and nights —
+## jackets, on clear mornings and days — lightly.
 static func dress_for(weather: Weather.Kind, time: TimeOfDay.Kind = TimeOfDay.Kind.DAY) -> Dress:
 	if Weather.is_snowing(weather):
 		return Dress.COLD
@@ -161,7 +161,7 @@ static func dress_for(weather: Weather.Kind, time: TimeOfDay.Kind = TimeOfDay.Ki
 	return Dress.LIGHT
 
 
-## Собирает прохожего ростом около [param height], одетого по [param dress].
+## Assembles a pedestrian about [param height] tall, dressed per [param dress].
 static func make(rng: RandomNumberGenerator, height: float, dress: Dress) -> Node3D:
 	var covered := dress != Dress.LIGHT
 	var woman := rng.randf() < 0.5
@@ -175,8 +175,8 @@ static func make(rng: RandomNumberGenerator, height: float, dress: Dress) -> Nod
 	var base := pool[allowed[rng.randi_range(0, allowed.size() - 1)]].instantiate() as Node3D
 	for part in PARTS:
 		var donor := _part_of(pool[allowed[rng.randi_range(0, allowed.size() - 1)]], part)
-		# Не налегке ноги — только в брюках: шорты и юбка с голыми ногами под
-		# тёмным «колготками» читались пятнами (кадры M24l).
+		# Unless dressed lightly, legs are only in trousers: shorts and a skirt with bare legs under
+		# dark "tights" read as patches (M24l frames).
 		if part == "Legs" and covered and donor != null and _bare(donor):
 			donor = _covered_legs(pool, rng)
 		if part == "Head" and donor != null and _helmeted(donor):
@@ -195,7 +195,7 @@ static func make(rng: RandomNumberGenerator, height: float, dress: Dress) -> Nod
 	return base
 
 
-## Часть [param part] модели [param scene] из библиотеки или null.
+## Part [param part] of model [param scene] from the library, or null.
 static func _part_of(scene: PackedScene, part: String) -> Part:
 	if not _donors.has(scene):
 		var parts: Dictionary = {}
@@ -221,7 +221,7 @@ static func _find_part(model: Node, part: String) -> MeshInstance3D:
 	return null
 
 
-## Есть ли у части открытая кожа.
+## Whether the part has exposed skin.
 static func _bare(part: Part) -> bool:
 	for surface in part.mesh.get_surface_count():
 		var look := part.mesh.surface_get_material(surface)
@@ -230,7 +230,7 @@ static func _bare(part: Part) -> bool:
 	return false
 
 
-## Ноги в брюках — от любой модели [param pool], у которой они такие.
+## Legs in trousers — from any model in [param pool] that has them.
 static func _covered_legs(pool: Array[PackedScene], rng: RandomNumberGenerator) -> Part:
 	var dressed: Array[Part] = []
 	for scene in pool:
@@ -240,12 +240,12 @@ static func _covered_legs(pool: Array[PackedScene], rng: RandomNumberGenerator) 
 	return dressed[rng.randi_range(0, dressed.size() - 1)] if not dressed.is_empty() else null
 
 
-## Голова в каске: её меш назван по модели рабочего.
+## A head in a hard hat: its mesh is named after the worker model.
 static func _helmeted(head: Part) -> bool:
 	return HELMET_HEADS.any(func(word: String) -> bool: return head.node_name.begins_with(word))
 
 
-## Номер модели в [param pool], у которой голова без каски.
+## Index of a model in [param pool] whose head has no hard hat.
 static func _bare_head(pool: Array[PackedScene], rng: RandomNumberGenerator) -> int:
 	var bare: Array[int] = []
 	for index in pool.size():
@@ -255,8 +255,8 @@ static func _bare_head(pool: Array[PackedScene], rng: RandomNumberGenerator) -> 
 	return bare[rng.randi_range(0, bare.size() - 1)] if not bare.is_empty() else 0
 
 
-## Пальто по погоде: в холод — у всех, тёмное; в дождь — плащ у большинства;
-## [code]Color(0, 0, 0, 0)[/code] — без пальто.
+## A coat by weather: in cold — everyone, dark; in rain — a raincoat for most;
+## [code]Color(0, 0, 0, 0)[/code] — no coat.
 static func _coat_for(rng: RandomNumberGenerator, dress: Dress) -> Color:
 	if dress == Dress.COLD and rng.randf() < COLD_COAT:
 		return COATS[rng.randi_range(0, COATS.size() - 1)]
@@ -265,10 +265,10 @@ static func _coat_for(rng: RandomNumberGenerator, dress: Dress) -> Color:
 	return Color(0.0, 0.0, 0.0, 0.0)
 
 
-## Одежда — из палитры горожанина, свой цвет на каждую вещь; волосы — всё на
-## голове, кроме кожи, глаз и бровей; кожа — из тонов. Не налегке открыто
-## только лицо: кожа корпуса — рукава и перчатки в цвет пальто или куртки,
-## кожа ног — брюки, ступней — ботинки. Под пальто весь корпус — в его цвет.
+## Clothes — from the townsperson palette, its own colour for each item; hair — everything on
+## the head except skin, eyes and brows; skin — from the tones. Unless dressed lightly only the
+## face is open: torso skin — sleeves and gloves in the coat or jacket colour,
+## leg skin — trousers, feet — boots. Under a coat the whole torso is in its colour.
 static func _recolour(model: Node3D, rng: RandomNumberGenerator, dress: Dress, coat: Color) -> void:
 	var skin := SKINS[rng.randi_range(0, SKINS.size() - 1)]
 	var hair := HAIRS[rng.randi_range(0, HAIRS.size() - 1)]
@@ -296,14 +296,14 @@ static func _recolour(model: Node3D, rng: RandomNumberGenerator, dress: Dress, c
 			elif bare:
 				look.albedo_color = skin * (0.85 if name != "Skin" else 1.0)
 			elif part == "Body" and covered and not UNDER_COAT.has(name) and name != "White":
-				# Верх и рукава — одна вещь: пальто, а без него — кофта с длинным
-				# рукавом. Рукава другого цвета читались пришитыми руками.
+				# Top and sleeves are one item: the coat, and without it — a long-sleeved
+				# sweater. Sleeves of a different colour read as sewn-on arms.
 				look.albedo_color = jacket
 			elif part == "Feet" and covered:
 				look.albedo_color = boots
 			else:
-				# Одна вещь — один цвет: у рабочих брюк наколенники и у жилета
-				# вставки своим материалом, и пёстрые они читались пятнами.
+				# One item — one colour: worker trousers have knee pads and the vest has
+				# inserts in their own material, and in motley colours they read as patches.
 				var piece := name if name == "White" or name == "Tie" else part
 				if not outfit.has(piece):
 					outfit[piece] = CLOTHES[rng.randi_range(0, CLOTHES.size() - 1)]
@@ -311,7 +311,7 @@ static func _recolour(model: Node3D, rng: RandomNumberGenerator, dress: Dress, c
 			shape.set_surface_override_material(surface, look)
 
 
-## Часть модели, которой принадлежит меш: Head, Body, Legs, Feet или пусто.
+## The model part the mesh belongs to: Head, Body, Legs, Feet or empty.
 static func _part_name(shape: MeshInstance3D) -> String:
 	for part in PARTS:
 		if shape.name.ends_with("_" + part):
@@ -319,15 +319,15 @@ static func _part_name(shape: MeshInstance3D) -> String:
 	return ""
 
 
-## Одевает по погоде: шапка и шарф — деталями на костях скелета.
+## Dresses for the weather: hat and scarf as details on skeleton bones.
 static func _wrap_up(model: Node3D, rng: RandomNumberGenerator, dress: Dress) -> void:
 	var skeleton := model.find_child("Skeleton3D", true, false) as Skeleton3D
 	if skeleton == null:
 		return
 	var cold := dress == Dress.COLD
 	if cold and rng.randf() < COLD_HAT:
-		# Вязаная шапка: купол по ширине причёски от лба вверх и отворот
-		# кольцом. Шаром по голове она сползала на глаза повязкой (кадры M24l).
+		# Knitted hat: a dome as wide as the hairstyle from the forehead up, and a cuff
+		# ring. As a ball on the head it slid over the eyes like a headband (M24l frames).
 		var hat := SphereMesh.new()
 		hat.radius = HAT.x
 		hat.height = HAT.y
@@ -346,8 +346,8 @@ static func _wrap_up(model: Node3D, rng: RandomNumberGenerator, dress: Dress) ->
 		_wear(skeleton, "Neck", scarf, wool, Vector3(0.0, SCARF.z, 0.0), "Scarf")
 
 
-## Деталь одежды [param mesh] цвета [param tone] на кости [param bone]: едет
-## с костью, со сдвигом [param offset] в её осях.
+## Clothing detail [param mesh] of colour [param tone] on bone [param bone]: moves
+## with the bone, offset by [param offset] in its axes.
 static func _wear(
 	skeleton: Skeleton3D,
 	bone: String,
@@ -370,7 +370,7 @@ static func _wear(
 	holder.add_child(piece)
 
 
-## Рост модели по её видимому, м.
+## Model height by its visible part, m.
 static func _height_of(model: Node3D) -> float:
 	var top := -INF
 	var bottom := INF

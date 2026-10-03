@@ -1,9 +1,9 @@
 extends GutTest
 
-## Время суток (ADR-0051): жребий по сиду, ночь чаще прочих, темнота и тёмные
-## этажи только ночью, гроза — вечером и ночью, солнце — только снаружи.
+## Time of day (ADR-0051): a draw by seed, night more often than the others, darkness and dark
+## floors only at night, thunderstorm — in the evening and at night, sun — only outside.
 ##
-## Правила — без сцены, на любом здании. Сцена — на падение лампы и на солнце.
+## Rules — without a scene, on any building. The scene — for a lamp falling and for the sun.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
@@ -21,7 +21,7 @@ func after_all() -> void:
 	GameState.instance().reset()
 
 
-## Время повторяется по сиду, выпадает всякое, и ночь — около сорока процентов.
+## Time repeats by seed, anything can come up, and night is about forty percent.
 func test_time_follows_the_seed_and_night_comes_most() -> void:
 	var counts: Array[int] = [0, 0, 0, 0]
 	for building_seed: int in range(1, 1001):
@@ -37,7 +37,7 @@ func test_time_follows_the_seed_and_night_comes_most() -> void:
 		assert_lt(counts[kind], counts[TimeOfDay.Kind.NIGHT], "ночь не чаще времени %d" % kind)
 
 
-## Время — свой жребий: при одной погоде выпадает разное время, и наоборот.
+## Time is its own draw: with the same weather different times come up, and vice versa.
 func test_time_does_not_follow_the_weather() -> void:
 	var pairs: Dictionary = {}
 	for building_seed: int in range(1, 301):
@@ -49,8 +49,8 @@ func test_time_does_not_follow_the_weather() -> void:
 	)
 
 
-## Тёмные этажи карты бывают только ночью, а днём на них висят лампы — на любом
-## навыке, а значит, на любом здании партии.
+## Dark floors of the map happen only at night, while in daytime lamps hang on them — at any
+## skill, and therefore in any building of a game.
 func test_dark_floors_only_at_night() -> void:
 	for skill: int in SKILLS:
 		for kind: int in TimeOfDay.Kind.size():
@@ -70,10 +70,10 @@ func test_dark_floors_only_at_night() -> void:
 				assert_eq(unlit, 0, "навык %d, время %d: тёмный этаж не ночью" % [skill, kind])
 
 
-## Не ночью у здания своя раскладка: на этажах ROM 11–15 висят лампы и отнимают
-## места у дверей. Такое здание обязано быть тем же зданием — лампа на каждом
-## этаже, все документы достижимы — на любом сиде и навыке, а не только ночное,
-## которое проверяют тесты карты.
+## Not at night the building has its own layout: on ROM floors 11–15 lamps hang and take
+## slots from doors. Such a building must be the same building — a lamp on every
+## floor, all documents reachable — on any seed and skill, not just the night one
+## that the map tests check.
 func test_a_day_building_lays_out_and_can_be_finished() -> void:
 	for skill: int in SKILLS:
 		for kind: int in [TimeOfDay.Kind.MORNING, TimeOfDay.Kind.DAY, TimeOfDay.Kind.EVENING]:
@@ -96,7 +96,7 @@ func test_a_day_building_lays_out_and_can_be_finished() -> void:
 				assert_true(BuildingRoute.is_winnable(plan, rules), where + ": здание не пройти")
 
 
-## Гроза — вечером и ночью, утром и днём дождь без молний.
+## Thunderstorm — in the evening and at night, in the morning and daytime rain without lightning.
 func test_thunder_only_in_the_evening_and_at_night() -> void:
 	assert_false(TimeOfDay.has_thunder(TimeOfDay.Kind.MORNING))
 	assert_false(TimeOfDay.has_thunder(TimeOfDay.Kind.DAY))
@@ -104,7 +104,7 @@ func test_thunder_only_in_the_evening_and_at_night() -> void:
 	assert_true(TimeOfDay.has_thunder(TimeOfDay.Kind.NIGHT))
 
 
-## Днём сбитая лампа падает, а зона остаётся светлой; ночью — гаснет.
+## In daytime a shot-down lamp falls, and the zone stays lit; at night — it goes dark.
 func test_a_lamp_puts_out_its_zone_only_at_night() -> void:
 	for kind: int in [TimeOfDay.Kind.DAY, TimeOfDay.Kind.NIGHT]:
 		var level := _build(kind as TimeOfDay.Kind)
@@ -129,8 +129,8 @@ func test_a_lamp_puts_out_its_zone_only_at_night() -> void:
 		await wait_physics_frames(1)
 
 
-## Солнце есть только не ночью, светит лишь на слой снаружи, и на него
-## попадает крыша, но не коридоры.
+## There is sun only when it is not night, it shines only on the outside layer, and the roof
+## gets into it, but not the corridors.
 func test_the_sun_lights_only_the_outdoors() -> void:
 	for kind: int in TimeOfDay.Kind.size():
 		var level := _build(kind as TimeOfDay.Kind)
@@ -163,7 +163,7 @@ func test_the_sun_lights_only_the_outdoors() -> void:
 		await wait_physics_frames(1)
 
 
-## Любое сочетание времени и погоды собирает здание без ошибок.
+## Any combination of time and weather builds the building without errors.
 func test_every_time_and_weather_builds() -> void:
 	for kind: int in TimeOfDay.Kind.size():
 		for weather: int in Weather.Kind.size():
@@ -197,11 +197,11 @@ func _a_lamp(level: GreyboxLevel) -> Lamp:
 	return null
 
 
-## Стоит ли узел под тем, что снаружи целиком: вертолёт, вывеска, техника крыши.
+## Whether a node is under something entirely outside: helicopter, sign, roof equipment.
 func _outdoor_root(node: Node, level: GreyboxLevel) -> bool:
 	var up := node.get_parent()
 	while up != null and up != level:
-		# Улица у выезда — тоже снаружи: с M24k на ней солнце (ADR-0052, решение 3).
+		# The street at the exit is outside too: since M24k it has sun (ADR-0052, decision 3).
 		if up is Helicopter or up is VerticalSign or up is RoofKit or up is BuildingRoof:
 			return true
 		if up is ExitStreet:

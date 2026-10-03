@@ -1,43 +1,43 @@
 class_name Blood
 extends Node3D
 
-## Брызги крови при попадании пули в агента или в Otto (просьба пользователя,
+## Blood spatter when a bullet hits an agent or Otto (the user's request,
 ## ADR-0031).
 ##
-## Один выброс по ходу пули: капли конусом вперёд и немного вверх, падают под
-## тяжестью и темнеют. Без света и без тел — картинка, а не правило. Выключается
-## в настройках ([member enabled]). Убирает себя сама.
+## One burst along the bullet's path: drops in a cone forward and slightly up, falling under
+## gravity and darkening. No light and no bodies — a picture, not a rule. Can be turned off
+## in the settings ([member enabled]). Removes itself.
 
-## Сколько капель и сколько они живут, с.
+## How many drops and how long they live, s.
 const COUNT: int = 48
 const LIFETIME: float = 0.7
 
-## Скорость вылета, м/с, разброс конуса, градусы, и тяжесть.
+## Launch speed, m/s, cone spread, degrees, and gravity.
 const SPEED := Vector2(1.5, 4.5)
 const SPREAD: float = 32.0
 const GRAVITY: float = 9.8
 
-## Капля: размер, м.
+## Drop: size, m.
 const DROP := Vector2(0.05, 0.09)
 
-## Пятно под кабиной (ADR-0043, решение 7): глубина по коридору и толщина
-## слоя, на который оно ложится, м; сторона фактуры, пиксели.
+## Stain under a cab (ADR-0043, decision 7): depth along the corridor and thickness
+## of the layer it lies on, m; texture side, pixels.
 const PUDDLE_DEPTH: float = 0.9
 const PUDDLE_REACH: float = 0.12
 const PUDDLE_SIZE: int = 128
 const PUDDLE_COLOR := Color(0.36, 0.01, 0.02, 0.92)
 
-## Показывать ли кровь. Ставят настройки игрока; по умолчанию — да.
+## Whether to show blood. Set by the player's settings; yes by default.
 static var enabled: bool = true
 
-## Фактура пятна: одна на игру, рисуется при первой нужде.
+## Stain texture: one per game, drawn on first need.
 static var _puddle_texture: ImageTexture = null
 
 var _age: float = 0.0
 
 
-## Брызги в точке [param at] сцены по ходу [param towards] (−1 влево, +1 вправо).
-## Ничего не делает, если кровь выключена в настройках.
+## Spatter at scene point [param at] in direction [param towards] (−1 left, +1 right).
+## Does nothing if blood is turned off in the settings.
 static func spray(host: Node, at: Vector3, towards: float) -> void:
 	if not enabled or host == null:
 		return
@@ -48,8 +48,8 @@ static func spray(host: Node, at: Vector3, towards: float) -> void:
 	blood.add_child(blood._particles(towards))
 
 
-## Пятно крови на полу в точке [param at] шириной [param width] м по этажу.
-## Лежит до конца здания: уходит вместе с уровнем, в котором лежит.
+## A blood stain on the floor at point [param at], [param width] m wide along the floor.
+## Lies until the end of the building: goes away together with the level it lies in.
 static func puddle(host: Node, at: Vector3, width: float) -> Decal:
 	if not enabled or host == null:
 		return null
@@ -64,7 +64,7 @@ static func puddle(host: Node, at: Vector3, width: float) -> Decal:
 	return decal
 
 
-## Пятно с рваным краем: круг, край которого гуляет шумом.
+## A stain with a ragged edge: a circle whose edge wanders by noise.
 static func _puddle() -> ImageTexture:
 	if _puddle_texture != null:
 		return _puddle_texture

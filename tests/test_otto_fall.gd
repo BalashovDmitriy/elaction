@@ -1,28 +1,28 @@
 extends GutTest
 
-## Разбивается тот, кто упал больше чем на этаж (ADR-0037, решение 7).
+## Whoever falls more than a floor is killed (ADR-0037, decision 7).
 ##
-## Правило одно на всё, на что можно упасть: пол, крышу кабины и дно шахты. Сцена
-## минимальная — плиты на нужных высотах и кабина: проверяется Otto, а не
-## раскладка здания. Здание целиком с тем же правилом водит бот.
+## One rule for everything one can fall onto: floor, cab roof and shaft bottom. The scene
+## is minimal — slabs at the needed heights and a cab: Otto is checked, not the building
+## layout. The bot drives the whole building under the same rule.
 
 const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 
 const FLOOR: float = Proportions.FLOOR
 
-## Сколько шагов физики ждать приземления: падение на три этажа — меньше
-## секунды, остальное — запас.
+## How many physics steps to wait for landing: a three-floor fall is under a second, the
+## rest is margin.
 const FALL_FRAMES: int = 240
 
-## Сколько шагов держать «вниз» в кабине: три этажа по 1.6 с под time_scale 2.
+## How many steps to hold "down" in the cab: three floors at 1.6 s each under time_scale 2.
 const RIDE_FRAMES: int = 240
 
-## Сколько шагов ждать пустую кабину с Otto на крыше: три перегона с паузами
-## по 1.5 с — около 9 с, то есть 280 шагов под time_scale 2, и запас.
+## How many steps to wait for the empty cab with Otto on its roof: three runs with
+## 1.5 s pauses — about 9 s, that is 280 steps under time_scale 2, plus margin.
 const ROOF_RIDE_FRAMES: int = 420
 
-## Край верхней плиты: с него Otto сходит в пустоту.
+## Edge of the upper slab: Otto steps off it into the void.
 const LEDGE_X: float = -Proportions.SHAFT * 0.5
 
 
@@ -45,7 +45,7 @@ func _release() -> void:
 		Input.action_release(action)
 
 
-## Плита пола: верх на высоте [param top] сцены, от [param from_x] до [param to_x].
+## Floor slab: top at scene height [param top], from [param from_x] to [param to_x].
 func _slab(from_x: float, to_x: float, top: float) -> void:
 	var ground := StaticBody3D.new()
 	var shape := CollisionShape3D.new()
@@ -64,8 +64,8 @@ func _otto_at(x: float, y: float) -> Otto:
 	return otto
 
 
-## Кабина, стоящая на одной остановке [param stop] (в плоскости правил, вниз —
-## рост): ехать ей некуда, и крыша ждёт падающего на своём месте.
+## A cab standing at a single stop [param stop] (in the rules plane, down is growth): it
+## has nowhere to go, and its roof waits for the faller in its place.
 func _parked_car(stop: float) -> ElevatorCar:
 	var car := CAR_SCENE.instantiate() as ElevatorCar
 	add_child_autofree(car)
@@ -73,7 +73,8 @@ func _parked_car(stop: float) -> ElevatorCar:
 	return car
 
 
-## Уровень с края: верхняя плита до шахты, внизу — пол на глубине [param depth].
+## A level with an edge: the upper slab up to the shaft, below — a floor at depth
+## [param depth].
 func _ledge_over(depth: float) -> Otto:
 	_slab(-8.0, LEDGE_X, 0.0)
 	_slab(-8.0, 8.0, -depth)
@@ -87,11 +88,11 @@ func _standing_otto() -> Otto:
 	return otto
 
 
-## Край над шахтой, а в ней кабина на остановке [param stop].
+## An edge over the shaft, and in it a cab at stop [param stop].
 ##
-## Стенка за осью шахты ловит Otto: скорость полёта задаётся толчком, и сошедший
-## с края пролетел бы над крышей мимо — с этажа падать дольше, чем идти до
-## дальнего края кабины.
+## A wall beyond the shaft's axis catches Otto: the flight speed is set by a push, and
+## one stepping off the edge would fly over the roof and miss it — falling a floor takes
+## longer than walking to the cab's far edge.
 func _over_a_car(stop: float) -> Otto:
 	_slab(-8.0, LEDGE_X, 0.0)
 	_parked_car(stop)
@@ -106,13 +107,13 @@ func _over_a_car(stop: float) -> Otto:
 	return await _standing_otto()
 
 
-## Приземлился именно на крышу кабины, а не пролетел мимо.
+## Landed exactly on the cab's roof and did not fly past.
 func _assert_on_the_roof(otto: Otto, stop: float) -> void:
 	var roof := -stop + Proportions.CLEARANCE
 	assert_almost_eq(otto.global_position.y, roof, 0.1, "Otto на крыше кабины")
 
 
-## Шагает вправо с края и ждёт, пока Otto снова встанет — ниже, чем стоял.
+## Steps right off the edge and waits until Otto stands again — lower than he stood.
 func _step_off(otto: Otto, jump: bool = false) -> void:
 	Input.action_press(&"move_right")
 	if jump:
@@ -137,8 +138,8 @@ func test_falling_one_floor_is_survivable() -> void:
 
 
 func test_jumping_down_one_floor_is_survivable() -> void:
-	# Высота прыжка к падению не прибавляется: считается от опоры, а не от
-	# верхней точки полёта.
+	# Jump height is not added to the fall: it is counted from the support, not from the
+	# top of the flight.
 	var otto := await _ledge_over(FLOOR)
 	await _step_off(otto, true)
 	assert_false(otto.is_dead(), "с прыжка на этаж ниже — тоже")
@@ -162,7 +163,7 @@ func test_own_jump_on_the_spot_is_not_a_fall() -> void:
 
 
 func test_a_teleport_down_is_not_a_fall() -> void:
-	# Уровень, тесты и съёмка ставят Otto куда им надо — это не падение.
+	# The level, tests and captures put Otto wherever they need — that is not a fall.
 	_slab(-8.0, 8.0, 0.0)
 	_slab(-8.0, 8.0, -FLOOR * 3.0)
 	var otto := await _standing_otto()
@@ -173,7 +174,7 @@ func test_a_teleport_down_is_not_a_fall() -> void:
 
 
 func test_landing_on_a_car_roof_one_floor_down_is_survivable() -> void:
-	# Кабина стоит двумя этажами ниже: крыша на этаж и плиту ниже края.
+	# The cab stands two floors lower: its roof is a floor and a slab below the edge.
 	var otto := await _over_a_car(FLOOR * 2.0)
 	await _step_off(otto)
 	_assert_on_the_roof(otto, FLOOR * 2.0)
@@ -209,7 +210,7 @@ func test_riding_a_car_down_is_not_a_fall() -> void:
 
 
 func test_riding_a_car_roof_down_is_not_a_fall() -> void:
-	# На крыше кабина везёт так же, как внутри: опора едет под ногами.
+	# On the roof the cab carries the same as inside: the support moves under the feet.
 	var car := CAR_SCENE.instantiate() as ElevatorCar
 	add_child_autofree(car)
 	car.setup(PackedFloat32Array([0.0, FLOOR, FLOOR * 2.0, FLOOR * 3.0]), 0)

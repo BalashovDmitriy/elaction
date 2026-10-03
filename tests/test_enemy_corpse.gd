@@ -1,26 +1,27 @@
 extends GutTest
 
-## Труп агента лежит до конца здания телом на суставах (ADR-0037, решение 6;
-## ADR-0043, решение 12).
+## An agent's corpse lies until the end of the building as a body on joints (ADR-0037,
+## decision 6; ADR-0043, decision 12).
 ##
-## Тело не мишень, падает от удара по ходу пули, ложится на пол, а не под
-## него, падает в пустую шахту и едет на полу кабины, в которой его убили.
-## Улёгшись, засыпает: трупы до конца здания ничего не стоят кадру.
+## The body is not a target, falls from the hit along the bullet's path, lies on the
+## floor and not under it, falls into an empty shaft and rides on the floor of the cab it
+## was killed in. Once settled, it sleeps: corpses cost the frame nothing until the end
+## of the building.
 
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 
-## Сколько шагов физики ждать, пока тело ляжет.
+## How many physics steps to wait for the body to settle.
 const SETTLE_FRAMES: int = 150
 
-## Сколько шагов физики ждать, пока кабина тронется и отъедет: пауза у этажа
-## плюс перегон, с запасом.
+## How many physics steps to wait for the cab to start and move off: the pause at the
+## floor plus the run, with margin.
 const RIDE_FRAMES: int = 600
 
 
 func before_all() -> void:
-	# Мир вчетверо быстрее, а шаг физики прежний: на вчетверо длинном шаге
-	# суставы рэгдолла разлетаются, и тело проваливается сквозь пол.
+	# The world is four times faster, but the physics step is the same: on a step four
+	# times longer the ragdoll's joints fly apart and the body falls through the floor.
 	Engine.time_scale = 4.0
 	Engine.physics_ticks_per_second = 240
 
@@ -43,7 +44,7 @@ func _floor_at(height: float) -> void:
 	ground.global_position = Vector3(0.0, height, 0.0)
 
 
-## Агент, вышедший из проёма и стоящий на месте: выходящего не убить.
+## An agent who came out of the opening and stands still: one coming out cannot be killed.
 func _agent_at(at: Vector3) -> Enemy:
 	var agent := ENEMY_SCENE.instantiate() as Enemy
 	agent.walk_speed = 0.0
@@ -71,7 +72,7 @@ func test_a_corpse_lies_on_the_floor_and_falls_asleep() -> void:
 	assert_eq(agent.collision_layer, 0, "мишенью труп не служит")
 
 
-## Пуля слева роняет тело вправо: по её ходу.
+## A bullet from the left drops the body to the right: along its path.
 func test_a_bullet_throws_the_body_along_its_flight() -> void:
 	_floor_at(0.0)
 	var agent: Enemy = await _agent_at(Vector3.ZERO)
@@ -81,8 +82,8 @@ func test_a_bullet_throws_the_body_along_its_flight() -> void:
 	assert_gt(agent.corpse.ragdoll.bounds().get_center().x, 0.2, "тело упало вправо")
 
 
-## Убитый в кабине едет с ней на её полу. Стоит у правой стенки и падает
-## навзничь влево: тело длиной почти в кабину ложится в неё целиком.
+## One killed in a cab rides with it on its floor. He stands at the right wall and falls
+## on his back to the left: a body nearly as long as the cab lies in it entirely.
 func test_a_corpse_in_a_car_rides_with_it() -> void:
 	GameState.instance().start_game()
 	var car := CAR_SCENE.instantiate() as ElevatorCar
@@ -103,7 +104,7 @@ func test_a_corpse_in_a_car_rides_with_it() -> void:
 	assert_almost_eq(now, gap, 0.25, "а труп — вместе с ней, на её полу")
 
 
-## Убитый над пустой шахтой падает на её дно.
+## One killed over an empty shaft falls to its bottom.
 func test_a_corpse_over_an_empty_shaft_falls_to_the_bottom() -> void:
 	_floor_at(-Proportions.FLOOR * 2.0)
 	var agent: Enemy = await _agent_at(Vector3(0.0, 0.05, 0.0))
@@ -113,7 +114,7 @@ func test_a_corpse_over_an_empty_shaft_falls_to_the_bottom() -> void:
 	assert_almost_eq(bottom, -Proportions.FLOOR * 2.0, 0.1, "лежит на дне")
 
 
-## Добитый сценкой падает, когда сценка его отпустит, а не раньше.
+## One finished off by a takedown falls when the takedown releases him, not earlier.
 func test_a_held_corpse_falls_when_released() -> void:
 	_floor_at(0.0)
 	var agent: Enemy = await _agent_at(Vector3.ZERO)

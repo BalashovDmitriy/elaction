@@ -1,17 +1,17 @@
 extends GutTest
 
-## Кабина давит агентов — 300 очков, как в ROM (ADR-0027, решение 6).
+## The cab crushes agents: 300 points, as in the ROM (ADR-0027, decision 6).
 ##
-## Долг M18b: давилась только Otto. Сцена минимальная — пол, кабина над ним и
-## агент под её днищем: здание целиком тут ни к чему, проверяется правило
-## кабины, а не раскладка.
+## A debt from M18b: only Otto got crushed. The scene is minimal, a floor, a cab above it
+## and an agent under its bottom: a whole building is not needed here, what is checked is
+## the cab rule, not the layout.
 
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
 
-## Сколько шагов физики ждать, пока кабина доедет вниз: пауза у этажа плюс
-## перегон, с запасом.
+## How many physics steps to wait for the cab to go down: the pause at a floor plus the
+## run, with a margin.
 const RIDE_FRAMES: int = 600
 
 
@@ -24,7 +24,7 @@ func after_all() -> void:
 	GameState.instance().reset()
 
 
-## Пол нижнего этажа на высоте −3.6 м сцены: кабина стоит этажом выше.
+## The lower floor at a scene height of −3.6 m: the cab stands one floor higher.
 func _floor_at(height: float) -> void:
 	var ground := StaticBody3D.new()
 	var shape := CollisionShape3D.new()
@@ -46,7 +46,7 @@ func _agent_under_the_car(x: float = 0.0) -> Enemy:
 	return agent
 
 
-## Кабина на верхней из двух остановок; вниз поедет сама, своим расписанием.
+## The cab is at the upper of two stops; it will go down by itself, on its own schedule.
 func _car() -> ElevatorCar:
 	var car := CAR_SCENE.instantiate() as ElevatorCar
 	add_child_autofree(car)
@@ -54,7 +54,7 @@ func _car() -> ElevatorCar:
 	return car
 
 
-## Ждёт, пока кабина доедет вниз или [param done] вернёт true.
+## Waits until the cab goes down or [param done] returns true.
 func _ride_down(done: Callable) -> void:
 	for _frame: int in RIDE_FRAMES:
 		await wait_physics_frames(1)
@@ -67,8 +67,8 @@ func test_a_descending_car_crushes_the_agent_under_it() -> void:
 	_floor_at(-Proportions.FLOOR)
 	var car := CAR_SCENE.instantiate() as ElevatorCar
 	add_child_autofree(car)
-	# Остановки в координатах правил: вниз — рост. Кабина на верхней и поедет
-	# к нижней сама, своим расписанием.
+	# Stops in rules coordinates: down means growing. The cab is at the upper one and will
+	# go to the lower one by itself, on its own schedule.
 	car.setup(PackedFloat32Array([0.0, Proportions.FLOOR]), 0)
 	var agent := _agent_under_the_car()
 	var before := GameState.instance().score
@@ -82,8 +82,8 @@ func test_a_descending_car_crushes_the_agent_under_it() -> void:
 	assert_eq(GameState.instance().score - before, 0, "кабина ехала сама — очков нет, как в ROM")
 
 
-## Очки за давку — только за кабину, в которой едет Otto (@4A97 ROM,
-## ADR-0044, решение 7).
+## Crush points come only from the cab Otto rides in (@4A97 ROM,
+## ADR-0044, decision 7).
 func test_otto_s_own_car_scores_the_crush() -> void:
 	GameState.instance().start_game()
 	_floor_at(-Proportions.FLOOR)
@@ -109,13 +109,14 @@ func test_otto_s_own_car_scores_the_crush() -> void:
 	)
 
 
-## Задетого краем кабина не давит, а выталкивает к краю шахты (@4713 ROM,
-## ADR-0044, решение 6). Раньше касание бортом убивало.
+## Someone caught by the edge is not crushed by the cab but pushed out to the shaft edge
+## (@4713 ROM, ADR-0044, decision 6). Previously a touch of the side wall killed.
 func test_a_car_edge_pushes_the_agent_aside() -> void:
 	GameState.instance().start_game()
 	_floor_at(-Proportions.FLOOR)
 	var car := _car()
-	# Середина агента в 0.7 м от оси: половина тела — под бортом, половина снаружи.
+	# The agent's middle is 0.7 m from the axis: half the body is under the side, half
+	# outside.
 	var agent := _agent_under_the_car(0.7)
 	await _ride_down(
 		func() -> bool: return agent.is_dead() or car.is_aligned() and car.global_position.y < -1.0
@@ -141,11 +142,11 @@ func test_a_car_edge_pushes_otto_aside() -> void:
 	)
 
 
-## Кабина давит и Otto, который стоит под ней на полу, — он не пассажир.
+## The cab also crushes Otto standing under it on the floor: he is not a passenger.
 ##
-## До M24a Otto становился пассажиром, едва голова заходила в проём опускающейся
-## кабины: занятость спасала его от сдавливания, а занятая кабина без команды
-## вставала между этажами — оба застывали навсегда (ADR-0037, решение 1).
+## Before M24a Otto became a passenger as soon as his head entered the opening of a
+## descending cab: being occupied saved him from crushing, and an occupied cab with no
+## command stopped between floors, so both froze forever (ADR-0037, decision 1).
 func test_a_descending_car_crushes_otto_under_it() -> void:
 	GameState.instance().start_game()
 	_floor_at(-Proportions.FLOOR)

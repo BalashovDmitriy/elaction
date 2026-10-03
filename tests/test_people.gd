@@ -1,7 +1,8 @@
 extends GutTest
 
-## Прохожие у выезда (ADR-0054, решение 3): идут, а не плывут статуями, и не
-## клоны друг друга; в непогоду одеты по ней и под зонтами.
+## Pedestrians at the exit (ADR-0054, decision 3): they walk rather than glide like
+## statues, and are not clones of each other; in bad weather they dress for it and
+## carry umbrellas.
 
 
 func _street(weather: Weather.Kind, time: TimeOfDay.Kind = TimeOfDay.Kind.DAY) -> ExitStreet:
@@ -16,8 +17,8 @@ func _leg(walker: Node) -> Quaternion:
 	return skeleton.get_bone_pose_rotation(skeleton.find_bone("UpperLeg.L"))
 
 
-## Ходьба идёт и после первого шага: из glTF она приходит без петли, и
-## доигравший шаг прохожий застывал.
+## Walking continues after the first step: it comes from glTF without a loop, and a
+## pedestrian who finished a step froze.
 func test_walkers_keep_walking() -> void:
 	var people := _street(Weather.Kind.CLEAR).people()
 	assert_gt(people.count(), 2, "днём на улице почти никого")
@@ -29,8 +30,8 @@ func test_walkers_keep_walking() -> void:
 	assert_gt(before.angle_to(after), 0.02, "ноги не двигаются: прохожий плывёт")
 
 
-## Прохожие идут, только пока выезд в кадре, как поток машин: вне кадра ходьба
-## и хват зонта стоят, а в кадре идут снова.
+## Pedestrians walk only while the exit is in the frame, like the traffic: off frame the
+## walk and the umbrella grip stop, and in the frame they go again.
 func test_walkers_rest_while_the_street_is_out_of_view() -> void:
 	var street := _street(Weather.Kind.RAIN)
 	var people := street.people()
@@ -50,7 +51,7 @@ func test_walkers_rest_while_the_street_is_out_of_view() -> void:
 	assert_ne(walker.position, before, "в кадре прохожий не идёт")
 
 
-## Прохожие разные: из частей разных моделей и в своих цветах.
+## Pedestrians differ: made of parts of different models and in their own colours.
 func test_walkers_differ() -> void:
 	var people := _street(Weather.Kind.CLEAR).people()
 	var looks: Dictionary = {}
@@ -65,7 +66,8 @@ func test_walkers_differ() -> void:
 	assert_eq(looks.size(), people.count(), "среди прохожих есть одинаковые")
 
 
-## Ночью прохожих меньше, чем днём; в непогоду у многих зонт.
+## There are fewer pedestrians at night than in the daytime; in bad weather many have
+## an umbrella.
 func test_crowd_follows_time_and_weather() -> void:
 	var day := _street(Weather.Kind.CLEAR, TimeOfDay.Kind.DAY).people().count()
 	var night := _street(Weather.Kind.CLEAR, TimeOfDay.Kind.NIGHT).people().count()
@@ -83,8 +85,8 @@ func test_crowd_follows_time_and_weather() -> void:
 			)
 
 
-## Одеты по погоде: в снег все в пальто, многие в шапках и шарфах, в дождь —
-## в плащах, в ясную — налегке.
+## Dressed for the weather: in snow everyone wears a coat, many in hats and scarves, in
+## rain — in raincoats, in clear weather — lightly dressed.
 func test_walkers_dress_for_the_weather() -> void:
 	assert_eq(Passerby.dress_for(Weather.Kind.SNOW), Passerby.Dress.COLD)
 	assert_eq(Passerby.dress_for(Weather.Kind.RAIN), Passerby.Dress.WET)
@@ -95,15 +97,15 @@ func test_walkers_dress_for_the_weather() -> void:
 	assert_gt(knits, 0, "в снег ни шапки, ни шарфа")
 
 
-## В снег под зонтами не ходят: зонты — только в дождь.
+## Nobody walks under umbrellas in snow: umbrellas — only in rain.
 func test_no_umbrellas_in_the_snow() -> void:
 	var snowy := _street(Weather.Kind.SNOW).people()
 	assert_eq(snowy.find_children("Umbrella", "Node3D", true, false).size(), 0, "зонт в снег")
 
 
-## Ревизия по всем шестнадцати сочетаниям времени и погоды (просьба
-## пользователя): кроме ясных утра и дня, открыта только голова — у каждого
-## прохожего кожа корпуса, ног и ступней одета.
+## A review over all sixteen combinations of time and weather (the user's request):
+## except for clear morning and day, only the head is bare — every pedestrian's torso,
+## leg and foot skin is clothed.
 func test_no_bare_skin_unless_its_light_weather() -> void:
 	for time: int in TimeOfDay.Kind.size():
 		for weather: int in Weather.Kind.size():
@@ -123,7 +125,7 @@ func test_no_bare_skin_unless_its_light_weather() -> void:
 	assert_eq(Passerby.dress_for(Weather.Kind.FOG, TimeOfDay.Kind.DAY), Passerby.Dress.MILD)
 
 
-## Части тела, где под одеждой видна кожа — цвет из тонов кожи.
+## Body parts where skin shows under the clothes — colour from the skin tones.
 func _bare_parts(walker: Node) -> PackedStringArray:
 	var found := PackedStringArray()
 	for node in walker.find_children("*", "MeshInstance3D", true, false):
@@ -147,8 +149,8 @@ func _bare_parts(walker: Node) -> PackedStringArray:
 	return found
 
 
-## Под зонтом сухо от купола до земли: ловец едет с зонтом, а не стоит серединой
-## тела в рост человека.
+## Under an umbrella it is dry from the canopy to the ground: the catcher travels with
+## the umbrella rather than standing at the body's middle at human height.
 func test_umbrella_keeps_the_column_under_it_dry() -> void:
 	var rainy := _street(Weather.Kind.RAIN).people()
 	var checked := 0

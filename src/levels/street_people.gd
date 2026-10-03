@@ -1,50 +1,51 @@
 class_name StreetPeople
 extends Node3D
 
-## Прохожие у выезда (ADR-0054, решение 3): горожане из паков Quaternius идут
-## по дальнему тротуару в обе стороны и уходят за край улицы, а оттуда
-## приходят другие. Днём их больше, ночью — единицы; в дождь у большинства
-## зонт, в снег — шапки и шарфы, без зонтов. Капли и хлопья гаснут о них
-## ([Shelter]), а не идут насквозь.
+## Pedestrians by the exit (ADR-0054, decision 3): townspeople from the Quaternius packs walk
+## along the far sidewalk both ways and go off past the edge of the street, and others
+## come from there. By day there are more of them, at night just a few; in rain most have
+## an umbrella, in snow hats and scarves, no umbrellas. Raindrops and flakes die on them
+## ([Shelter]) rather than going through.
 ##
-## Прохожий — собран из частей моделей пака ([Passerby]) и идёт их же
-## ходьбой: шаг подогнан к скорости, и ноги не скользят. Механики у прохожих
-## нет: в игру они не вмешиваются.
+## A pedestrian is assembled from pack model parts ([Passerby]) and walks with the pack's
+## walk: the step is matched to the speed, and the feet do not slide. Pedestrians have no
+## mechanics: they do not interfere with the game.
 
-## Сколько прохожих на улице по времени суток: утро, день, вечер, ночь.
+## How many pedestrians are on the street by time of day: morning, day, evening, night.
 const COUNT: Array[int] = [4, 7, 5, 2]
-## Две полосы тротуара по глубине, м: ближе к бордюру идут налево, у витрин —
-## направо.
+## Two sidewalk lanes in depth, m: nearer the curb they walk left, by the shop windows —
+## right.
 const LANES := Vector2(-9.2, -9.68)
-## Скорость шага, м/с, и та, под которую снята ходьба пака: под неё шаг
-## подгоняется, иначе ноги скользили бы.
+## Walking speed, m/s, and the one the pack's walk was recorded at: the step is matched
+## to it, otherwise the feet would slide.
 const SPEED := Vector2(1.05, 1.45)
 const CLIP_SPEED: float = 1.05
-## Рост прохожего — как у Otto: улица в том же масштабе.
+## A pedestrian's height is the same as Otto's: the street is at the same scale.
 const HEIGHT: float = Proportions.BODY
-## Какая доля прохожих в дождь идёт под зонтом.
+## What share of pedestrians walk under an umbrella in the rain.
 const UMBRELLA_SHARE: float = 0.7
-## Зонт: радиус и высота купола, длина трости от кисти, м; цвета куполов.
+## Umbrella: canopy radius and height, shaft length from the hand, m; canopy colours.
 const CANOPY := Vector2(0.47, 0.26)
 const SHAFT: float = 0.82
-## На сколько основание купола выше кисти, м: кисть у груди, купол над головой.
+## How much the canopy base is above the hand, m: the hand is at the chest, the canopy above
+## the head.
 const ABOVE_HAND: float = 0.62
 const CANOPY_TONES: Array[Color] = [
 	Color(0.06, 0.06, 0.07), Color(0.32, 0.05, 0.06), Color(0.08, 0.12, 0.22), Color(0.2, 0.2, 0.22)
 ]
-## С какого зазора по ходу встречные уже поднимают зонт, м: заранее, а не
-## когда купола сошлись.
+## At what gap along the way people coming towards each other already raise the umbrella,
+## m: in advance, not when the canopies have met.
 const PASSING: float = 0.9
-## Насколько купол сплющен по высоте и на какой высоте над тротуаром кисть,
-## что его держит, м.
+## How much the canopy is flattened in height and at what height above the sidewalk is the
+## hand that holds it, m.
 const CANOPY_FLATTEN: float = 0.75
 const HAND_HEIGHT: float = 1.05
-## Насколько за край улицы прохожий уходит, прежде чем вернуться с другой
-## стороны, м.
+## How far past the edge of the street a pedestrian goes before coming back from the other
+## side, m.
 const BEYOND: float = 3.0
 
 
-## Прохожий: узел, скорость со знаком, его ходьба и хват зонта — или null.
+## A pedestrian: node, signed speed, his walk and umbrella grip — or null.
 class Walker:
 	extends RefCounted
 	var node: Node3D = null
@@ -60,8 +61,8 @@ var _dress := Passerby.Dress.LIGHT
 var _active: bool = true
 
 
-## Выводит прохожих на тротуар от [param from] до [param to] по x сцены, на
-## высоте тротуара [param walk] сцены, во время суток [param time] и погоду
+## Brings pedestrians onto the sidewalk from [param from] to [param to] along scene x, at
+## sidewalk height [param walk] of the scene, at time of day [param time] and in weather
 ## [param weather].
 func build(
 	from: float,
@@ -74,7 +75,7 @@ func build(
 	name = "People"
 	_span = Vector2(from - BEYOND, to + BEYOND)
 	_rng.seed = hash([building_seed, "people"])
-	# Зонты — только в дождь: в снег под зонтом не ходят (просьба пользователя).
+	# Umbrellas only in rain: nobody walks under an umbrella in snow (the user's request).
 	var rainy := Weather.is_raining(weather)
 	_dress = Passerby.dress_for(weather, time)
 	for index in COUNT[time]:
@@ -91,26 +92,26 @@ func build(
 		var player := walker.node.find_child("AnimationPlayer", true, false) as AnimationPlayer
 		walker.player = player
 		if player != null:
-			# Ходьба пака приходит из glTF без петли: доиграв шаг, прохожий
-			# застывал и плыл по тротуару статуей.
+			# The pack's walk comes from glTF without a loop: having played the step, a pedestrian
+			# froze and floated along the sidewalk like a statue.
 			player.get_animation(&"Walk").loop_mode = Animation.LOOP_LINEAR
 			player.play(&"Walk")
 			player.speed_scale = absf(walker.speed) / CLIP_SPEED
-			# Каждый — со своей фазы шага: строем идущая толпа читается куклами.
+			# Each starts from his own step phase: a crowd walking in step reads as puppets.
 			player.seek(_rng.randf() * player.current_animation_length, true)
 		Outdoors.mark(walker.node)
 		_walkers.append(walker)
 
 
-## Сколько прохожих на улице — для теста.
+## How many pedestrians are on the street — for a test.
 func count() -> int:
 	return _walkers.size()
 
 
-## Идут прохожие, только пока выезд в кадре, как поток машин
-## ([method StreetTraffic.set_active]): ходьба скелетов и хват зонта на каждый
-## кадр — работа на всё здание, а улицу видно только у выезда (авторевью
-## M24l). Зовёт улица каждый кадр, поэтому — только по смене.
+## Pedestrians walk only while the exit is in frame, like the car traffic
+## ([method StreetTraffic.set_active]): skeleton walking and the umbrella grip every
+## frame is work for the whole building, and the street is visible only at the exit (code
+## review M24l). The street calls this every frame, so — only on change.
 func set_active(on: bool) -> void:
 	if on == _active:
 		return
@@ -123,7 +124,7 @@ func set_active(on: bool) -> void:
 			walker.grip.active = on
 
 
-## Идут ли прохожие — для теста.
+## Whether pedestrians are walking — for a test.
 func is_active() -> bool:
 	return _active
 
@@ -140,8 +141,9 @@ func _process(delta: float) -> void:
 		walker.node.position = at
 
 
-## Встречные под зонтами расходятся: идущий у витрин поднимает свой зонт над
-## соседним, пока купола перекрываются по ходу, — потом опускает.
+## People under umbrellas coming towards each other give way: the one by the shop windows
+## raises his umbrella above the other's while the canopies overlap along the way, then
+## lowers it.
 func _make_way() -> void:
 	for walker in _walkers:
 		if walker.grip == null or walker.speed < 0.0:
@@ -156,8 +158,8 @@ func _make_way() -> void:
 		walker.grip.raised = near
 
 
-## Прохожий: собран из частей пака ростом с Otto, одет по погоде, под зонтом
-## или без.
+## A pedestrian: assembled from pack parts as tall as Otto, dressed for the weather, with
+## or without an umbrella.
 func _person(umbrella: bool, leftward: bool) -> Node3D:
 	var root := Node3D.new()
 	root.name = "Walker"
@@ -167,16 +169,18 @@ func _person(umbrella: bool, leftward: bool) -> Node3D:
 	if umbrella:
 		var canopy := _umbrella()
 		root.add_child(canopy)
-		# Зонт в руке: кисть держит ручку, зонт идёт за кистью ([UmbrellaGrip]).
+		# Umbrella in hand: the hand holds the handle, the umbrella follows the hand
+		# ([UmbrellaGrip]).
 		var grip := UmbrellaGrip.new()
 		grip.name = "Grip"
 		grip.umbrella = canopy
 		grip.forward = Vector3.LEFT if leftward else Vector3.RIGHT
-		# Ближняя к камере рука: идущему налево — левая, направо — правая.
+		# The arm nearer the camera: for one walking left — the left one, right — the right one.
 		grip.side = "L" if leftward else "R"
 		(model.find_child("Skeleton3D", true, false) as Skeleton3D).add_child(grip)
-		# Под зонтом сухо от купола до земли: ловец едет с зонтом, а не стоит
-		# серединой тела — купол у руки, сбоку от неё.
+		# Under an umbrella it is dry from the canopy to the ground: the catcher rides with the
+		# umbrella rather than standing at the middle of the body — the canopy is at the arm, to its
+		# side.
 		var top := ABOVE_HAND + CANOPY.y * CANOPY_FLATTEN
 		var dry := Shelter.over(canopy, Vector3(CANOPY.x * 2.0, top + HAND_HEIGHT, CANOPY.x * 2.0))
 		dry.size = Vector3(CANOPY.x * 2.0, top + HAND_HEIGHT, CANOPY.x * 2.0)
@@ -186,16 +190,17 @@ func _person(umbrella: bool, leftward: bool) -> Node3D:
 	return root
 
 
-## Зонт в дождь: начало — ручка в кисти, над ней трость и купол над головой.
+## Umbrella in rain: origin — the handle in the hand, above it the shaft and the canopy over
+## the head.
 func _umbrella() -> Node3D:
 	var umbrella := Node3D.new()
 	umbrella.name = "Umbrella"
 	var look := StandardMaterial3D.new()
 	look.albedo_color = CANOPY_TONES[_rng.randi_range(0, CANOPY_TONES.size() - 1)]
 	look.roughness = 0.6
-	# Изнутри купол тоже виден: полусфера без дна.
+	# The canopy is visible from inside too: a hemisphere without a bottom.
 	look.cull_mode = BaseMaterial3D.CULL_DISABLED
-	# Купол — выпуклый, а не конус: конусом зонт читался соломенной шляпой.
+	# The canopy is convex, not a cone: as a cone the umbrella read as a straw hat.
 	var dome := SphereMesh.new()
 	dome.radius = CANOPY.x
 	dome.height = CANOPY.y * 2.0

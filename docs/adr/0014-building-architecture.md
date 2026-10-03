@@ -1,260 +1,260 @@
-# ADR-0014 · Крыша, силуэт здания и выпуск агентов
+# ADR-0014 · Roof, building silhouette and agent release
 
-- **Статус:** принято; пункт 3 заменён силуэтом порогом
-  ([ADR-0024](0024-building-geometry.md), решение 2), пункт 4 — дверями по карте ROM
-  ([ADR-0028](0028-building-by-the-map.md), решение 2), пункт 5 — выпуском агентов
-  по правилам ROM ([ADR-0027](0027-rom-combat.md), решение 2). Всё из «Чего в вехе
-  нет» сделано позже: трос — ADR-0017, стены и шахты разной длины — ADR-0024,
-  тёмные этажи — ADR-0028
-- **Дата:** 2026-09-16
+- **Status:** accepted; item 3 replaced by a threshold silhouette
+  ([ADR-0024](0024-building-geometry.md), decision 2), item 4 by doors from the ROM map
+  ([ADR-0028](0028-building-by-the-map.md), decision 2), item 5 by agent release
+  by ROM rules ([ADR-0027](0027-rom-combat.md), decision 2). Everything from "What is not in
+  the milestone" was done later: the rope — ADR-0017, walls and shafts of different lengths —
+  ADR-0024, dark floors — ADR-0028
+- **Date:** 2026-09-16
 
-## Контекст
+## Context
 
-M9 закрыла сборки, и перед первым тегом игру прогнали целиком — ботом, по
-настоящему тридцатиэтажному зданию, а не по тестовому. Прогон нашёл три вещи,
-из-за которых собранный архив был бы неиграбельным.
+M9 closed the builds, and before the first tag the game was played through in full — by a bot,
+on the real thirty-floor building rather than a test one. The run found three things that would
+have made the built archive unplayable.
 
-### Крыша сплющена в перекрытие
+### The roof is squashed into a floor slab
 
-`BuildingRules.floor_surface(0)` возвращала `slab_height`, а `story_top(0)` — ноль.
-Просвет нулевого этажа выходил 20 px против 100 px на всех остальных:
+`BuildingRules.floor_surface(0)` returned `slab_height`, and `story_top(0)` returned zero.
+The clearance of floor zero came out at 20 px versus 100 px on all the others:
 
 ```
-этаж  0: пол y=20,   потолок y=0,    просвет  20 px
-этаж  1: пол y=140,  потолок y=40,   просвет 100 px
-этаж 29: пол y=3500, потолок y=3400, просвет 100 px
+floor  0: floor y=20,   ceiling y=0,    clearance  20 px
+floor  1: floor y=140,  ceiling y=40,   clearance 100 px
+floor 29: floor y=3500, ceiling y=3400, clearance 100 px
 ```
 
-Otto ростом 28 px по коллизии и 34 px по спрайту стоял ногами на y=20, то есть
-макушкой на y=−14. Камере задан `limit_top = 0`, кадр начинается с нуля — голова
-была срезана краем экрана с первого кадра игры. Прыжок высотой 80 px уводил
-макушку на y=−94, на 94 px выше видимой области, и камера туда не поднималась.
+Otto, 28 px tall by collision and 34 px by sprite, stood with his feet at y=20, that is, with
+the top of his head at y=−14. The camera has `limit_top = 0`, the frame starts at zero — the
+head was cut off by the screen edge from the first frame of the game. An 80 px jump took the top
+of the head to y=−94, 94 px above the visible area, and the camera did not go up there.
 
-Причина — в том, что нулевой этаж играл две роли сразу: и крышу, и верхний этаж
-здания. Код это местами уже знал: `_lay_lamps` начинался с первого этажа с
-комментарием «крыша, вешать лампу не на что», `_build_back_walls` — тоже с первого.
-А `_lay_doors` шёл с нулевого, и на крыше стояли две двери в открытом небе.
+The cause is that floor zero played two roles at once: both the roof and the top floor of the
+building. The code partly knew this already: `_lay_lamps` started from the first floor with the
+comment "roof, nothing to hang a lamp on", `_build_back_walls` also from the first. But
+`_lay_doors` went from zero, and two doors stood on the roof in the open sky.
 
-### С агентами здание не проходится
+### The building cannot be completed with agents
 
-`_ready()` выпускал агентов из всех агентских дверей разом: 60 дверей, 5 красных,
-55 агентов, живых одновременно и постоянно — убитого дверь заменяла через три
-секунды. Двое из них стояли на крыше, в 131 px от точки старта при `fire_range`
-200 px. Otto появлялся уже внутри зоны огня, и респавн возвращал его туда же.
+`_ready()` released agents from all agent doors at once: 60 doors, 5 red, 55 agents, alive
+simultaneously and permanently — a door replaced a killed one after three seconds. Two of them
+stood on the roof, 131 px from the start point with a `fire_range` of 200 px. Otto appeared
+already inside the fire zone, and respawn brought him back to the same spot.
 
-Прогон ботом на сидах 1, 2 и 3: три смерти на нулевом этаже за 64–113 кадров,
-партия окончена, ноль документов, ни одного этажа вниз. Без агентов те же сиды
-проходятся целиком за ~5000 кадров.
+Bot run on seeds 1, 2 and 3: three deaths on floor zero within 64–113 frames, game over, zero
+documents, not a single floor down. Without agents the same seeds complete in full in ~5000
+frames.
 
-### Здание однородно, а оригинал — нет
+### The building is uniform, but the original is not
 
-Сверка по доступным источникам:
+Check against available sources:
 
-- **Этажи 30–21:** один центральный лифт, по две двери с каждой стороны.
-- **Этажи 20–17:** эскалаторы слева и справа. **Этаж 16:** эскалатор только справа.
-- **Ниже:** «maze of elevators», стены, делящие этаж на половины, тёмные этажи.
-- Шахты разной длины: 19–30 — двенадцать этажей, ниже идут по три.
-- Otto попадает на крышу **спуском по тросу** и только потом входит в лифт.
-- Верх здания описывается как узкий, к низу оно расширяется и запутывается.
+- **Floors 30–21:** one central elevator, two doors on each side.
+- **Floors 20–17:** escalators left and right. **Floor 16:** escalator on the right only.
+- **Below:** a "maze of elevators", walls dividing the floor in halves, dark floors.
+- Shafts of different lengths: 19–30 is twelve floors, below they go by three.
+- Otto gets onto the roof **by sliding down a rope** and only then enters the elevator.
+- The top of the building is described as narrow; toward the bottom it widens and gets more
+  tangled.
 
-У нас было пять шахт ровно по шесть этажей, все этажи одной ширины, везде две
-двери и одна лампа, эскалатор строго на каждом стыке полос.
+We had five shafts of exactly six floors each, all floors the same width, two doors and one
+lamp everywhere, an escalator strictly at every band junction.
 
-Оговорка про ширину: формулировку «начинается узко наверху и расширяется к низу»
-дают два независимых обзора, но это вторичные источники, и они описывают скорее
-градиент проходимой ширины и сложности, чем буквально сужающийся силуэт. Прямыми
-цитатами подтверждается только то, что здание **неоднородно по высоте**. Решение
-ниже принято с этим знанием: силуэт выбран как читаемое воплощение подтверждённой
-неоднородности, а не как реконструкция пикселей оригинала.
+A caveat about width: the wording "starts narrow at the top and widens toward the bottom" comes
+from two independent reviews, but these are secondary sources, and they describe a gradient of
+traversable width and difficulty rather than a literally narrowing silhouette. Direct quotes
+confirm only that the building is **non-uniform in height**. The decision below was made with
+this knowledge: the silhouette is chosen as a readable embodiment of the confirmed
+non-uniformity, not as a reconstruction of the original's pixels.
 
-### Почему это дожило до релиза
+### Why this survived to release
 
-Ни один тест не собирал здание, в которое играет игрок, и ни один не включал агентов:
+Not one test assembled the building the player plays in, and not one enabled agents:
 
-| Тест | Этажей | Агенты |
+| Test | Floors | Agents |
 |---|---|---|
-| `test_building_playthrough` | 4 | выключены |
-| `test_building_assembly` | 8 | выключены |
-| `test_sprite_assets` | 6 | выключены |
-| `test_exit_car` | 4 | выключены |
+| `test_building_playthrough` | 4 | off |
+| `test_building_assembly` | 8 | off |
+| `test_sprite_assets` | 6 | off |
+| `test_exit_car` | 4 | off |
 
-241 тест был зелёным, пока игра не проходилась. Требование вехи «проверять любое
-здание, которое сгенерируется» выполнялось формально: проверялось здание, которого
-в игре не бывает.
+241 tests were green while the game could not be completed. The milestone requirement "check
+any building that gets generated" was met formally: the building checked was one that never
+occurs in the game.
 
-## Решения
+## Decisions
 
-### 1. Крыша — отдельный уровень с индексом −1
+### 1. The roof is a separate level with index −1
 
-Крыша перестаёт быть нулевым этажом и становится своим уровнем над зданием.
-Константа `BuildingRules.ROOF = -1`. Этажи здания остаются 0…`floors-1`.
+The roof stops being floor zero and becomes its own level above the building.
+Constant `BuildingRules.ROOF = -1`. Building floors stay 0…`floors-1`.
 
-Координаты считаются по одной формуле, и крыша в неё попадает как `index = -1`:
+Coordinates are computed by one formula, and the roof enters it as `index = -1`:
 
 ```gdscript
 func floor_surface(index: int) -> float:
     return sky_height + floor_height * float(index + 1)
 ```
 
-При `sky_height = 160` крыша ложится на y=160, нулевой этаж — на y=280, и просвет
-у всех уровней одинаковый — 100 px. `story_top(ROOF)` — ноль: над крышей небо, а
-не перекрытие. Otto стоит макушкой на y=126 и в прыжке уходит на y=46 — оба раза
-внутри кадра.
+With `sky_height = 160` the roof lies at y=160, floor zero at y=280, and all levels have the
+same clearance — 100 px. `story_top(ROOF)` is zero: above the roof is sky, not a slab. Otto
+stands with the top of his head at y=126 and in a jump goes to y=46 — both times inside the
+frame.
 
-Неба над крышей больше, чем занимает этаж, нарочно: при 120 px макушка в верхней
-точке прыжка проходила в шести пикселях от кромки, и прыжок читался как удар
-головой о край экрана.
+There is more sky above the roof than a floor takes, on purpose: at 120 px the top of the head
+at the top of a jump passed six pixels from the edge, and the jump read as hitting the head on
+the edge of the screen.
 
-Почему не «просто дать просвет нулевому этажу»: крыша в оригинале — место, а не
-служебный отступ. Otto спускается на неё по тросу, и на ней нет ни дверей, ни
-агентов. Отдельный индекс делает это правилом генератора, а не набором проверок
-`if index == 0`, разбросанных по коду, — а их уже было три.
+Why not "just give floor zero clearance": the roof in the original is a place, not a utility
+offset. Otto descends onto it by rope, and there are no doors or agents on it. A separate index
+makes this a generator rule rather than a set of `if index == 0` checks scattered through the
+code — and there were already three of them.
 
-### 2. На крыше нет дверей, ламп и агентов, но есть лифт
+### 2. The roof has no doors, lamps or agents, but has an elevator
 
-Двери и лампы раскладываются по `0…floors-1`, крыша в диапазон не входит.
-Лампа на крыше и раньше не вешалась; теперь это следствие правила, а не отдельная
-проверка, и нулевой этаж лампу наконец получает — потолок у него появился.
+Doors and lamps are laid out over `0…floors-1`; the roof is not in the range.
+A lamp was not hung on the roof before either; now this follows from the rule rather than a
+separate check, and floor zero finally gets a lamp — it now has a ceiling.
 
-Верхняя шахта продлевается до крыши: в оригинале Otto «enters the building in the
-elevator», то есть лифт приходит на крышу. Это единственный проём в её настиле.
+The top shaft is extended to the roof: in the original Otto "enters the building in the
+elevator", that is, the elevator comes to the roof. This is the only opening in its deck.
 
-### 3. Силуэт: здание расширяется книзу ступенями
+### 3. Silhouette: the building widens downward in steps
 
-Профиль задаётся не шириной, а числом доступных мест, и ширина выводится из них.
-Обратный порядок — ширина, а из неё места — давал этажи, где мест меньше, чем
-надо поставить: шахта, две двери и лампа требуют четырёх.
+The profile is set not by width but by the number of available slots, and the width is derived
+from them. The reverse order — width, and slots from it — produced floors with fewer slots than
+needed: a shaft, two doors and a lamp require four.
 
-- `width_steps = 3` — три ступени силуэта.
-- `top_slots = 5` — мест на самом узком уровне, при `slots = 9` внизу.
+- `width_steps = 3` — three steps of the silhouette.
+- `top_slots = 5` — slots at the narrowest level, with `slots = 9` at the bottom.
 
-Места доступны симметрично от середины, поэтому счёт всегда нечётный: 5 → 7 → 9.
-Границы этажа выводятся из крайних доступных мест плюс `margin`, отчего ширина
-идёт 720 → 1000 → 1280 px. Тридцать один уровень делится на ступени поровну,
-и это ложится на оригинал: верхняя треть простая, нижняя — самая широкая.
+Slots are available symmetrically from the middle, so the count is always odd: 5 → 7 → 9.
+Floor bounds are derived from the outermost available slots plus `margin`, so the width goes
+720 → 1000 → 1280 px. Thirty-one levels are divided evenly among the steps, and this fits the
+original: the top third is simple, the bottom is the widest.
 
-Места нумеруются глобально и стоят по всей высоте на одних и тех же x. Иначе
-шахта, проходящая сквозь несколько этажей, оказывалась бы на каждом в своём
-столбце. Ширина растёт только вниз, поэтому место, доступное на верхнем этаже
-полосы, доступно и на всех нижних, — этим шахта и держится.
+Slots are numbered globally and stand at the same x over the whole height. Otherwise a shaft
+passing through several floors would end up in a different column on each. Width only grows
+downward, so a slot available on the top floor of a band is available on all floors below it —
+that is what keeps the shaft together.
 
-Перекрытие при этом шире стен своего уровня: оно и пол своего этажа, и потолок
-нижнего, а нижний на ступени шире. Границы перекрытия отдаёт `slab_span`, границы
-стен и кусков пола — `floor_span`. Без этого различия над наружной полосой нижнего
-этажа оставалось открытое небо внутри здания, а лампа, попавшая там на крайнее
-место, висела бы вовсе не на чем. По выступу не ходят — он снаружи от стен своего
-уровня, — поэтому граф достижимости считает куски по `floor_span` и от `slab_span`
-не зависит.
+The slab is then wider than the walls of its level: it is both the floor of its storey and the
+ceiling of the one below, and the one below is a step wider. Slab bounds come from `slab_span`,
+wall and floor-piece bounds from `floor_span`. Without this distinction there was open sky inside
+the building above the outer strip of the lower floor, and a lamp landing on an outermost slot
+there would hang on nothing at all. The ledge is not walked on — it is outside the walls of its
+level — so the reachability graph counts pieces by `floor_span` and does not depend on
+`slab_span`.
 
-### 4. Наверху дверей меньше, чем внизу
+### 4. Fewer doors at the top than at the bottom
 
-Той же ступенью, что и ширина: `top_doors` на узких уровнях, `doors_per_floor` на
-широких. Источники описывают верх как редко заселённый, а низ — как тесный и злой;
-до вехи двери стояли поровну по всей высоте, и спуск начинался с той же плотности
-огня, какой он кончается.
+By the same step as width: `top_doors` on narrow levels, `doors_per_floor` on wide ones. The
+sources describe the top as sparsely populated and the bottom as cramped and mean; before the
+milestone doors were spread evenly over the whole height, and the descent started with the same
+density of fire it ended with.
 
-Побочный эффект — арифметический: на узком уровне всего пять мест, а поставить
-надо шахту, двери и лампу. Со старой плотностью раскладка упиралась в потолок
-на каждом верхнем этаже.
+A side effect is arithmetical: a narrow level has only five slots, and a shaft, doors and a lamp
+have to be placed. With the old density the layout hit the ceiling on every top floor.
 
-### 5. Агенты выпускаются рядом с игроком
+### 5. Agents are released near the player
 
-`_ready()` больше не выпускает никого. Дверь отдаёт агента, когда её этаж попадает
-в полосу видимых этажей, и убирает его, когда этаж ушёл далеко. Отбор — тот же
-`VisibleFloors`, по которому уже гасится свет (ADR-0010, пункт 8).
+`_ready()` no longer releases anyone. A door releases an agent when its floor enters the band of
+visible floors and removes him when the floor has gone far away. The selection is the same
+`VisibleFloors` that already turns off the light (ADR-0010, item 8).
 
-В кадре остаются единицы агентов вместо 55 по всему зданию. Это и ближе к
-оригиналу, где агенты выходят из дверей по ходу спуска, и снимает постоянную
-нагрузку в 55 тел с физикой и ИИ.
+A handful of agents stay in the frame instead of 55 across the whole building. This is closer to
+the original, where agents come out of doors as the descent progresses, and removes the constant
+load of 55 bodies with physics and AI.
 
-Паузы неуязвимости на старте не вводим: крыша пуста, и подходить к первому агенту
-игрок будет сам.
+No invulnerability pause at the start: the roof is empty, and the player will approach the first
+agent on his own.
 
-### 6. Возвращение в игру — с передышкой и подальше от убийцы
+### 6. Returning to play — with a breather and away from the killer
 
-Прогон нашёл смерть в петле: Otto возвращался на то же место, где погиб, а агент,
-который его убил, никуда не девался и стоял в своей зоне огня. Вторая смерть
-приходила через четверть секунды после первой, и три жизни сгорали на одном пятачке.
+The run found a death loop: Otto returned to the same spot where he died, and the agent who
+killed him had not gone anywhere and stood in his fire zone. The second death came a quarter of
+a second after the first, and three lives burned on one patch.
 
-Поэтому две правки, обе про возвращение, а не про бой:
+Hence two changes, both about returning, not about combat:
 
-- **Место выбирается по живым агентам:** из свободных мест этажа берётся самое
-  дальнее от них. На пустом этаже выбор вырождается в прежнее «первое свободное».
-- **Полторы секунды неуязвимости**, и Otto на это время мигает. Неуязвимость общая
-  на все причины смерти: воскреснуть под кабиной так же обидно, как под выстрелом.
+- **The spot is chosen by live agents:** of the free spots on the floor, the farthest from them
+  is taken. On an empty floor the choice degenerates into the former "first free".
+- **A second and a half of invulnerability**, and Otto blinks during it. The invulnerability is
+  shared across all causes of death: being revived under a cab is as frustrating as under a
+  shot.
 
-Последствие, принятое сознательно: падение в шахту, начатое во время передышки,
-Otto переживает. Дно шахты — это `body_entered`, и на неуязвимом оно срабатывает
-вхолостую; перевзводится оно при следующем входе, так что дыра ограничена одним
-падением за смерть, а не остаётся навсегда. Чинить это значило бы заводить
-неуязвимости исключения, а она нужна именно как правило без исключений.
+A consequence accepted deliberately: a fall into a shaft that starts during the breather is one
+Otto survives. The shaft bottom is a `body_entered`, and on an invulnerable Otto it fires for
+nothing; it re-arms on the next entry, so the hole is limited to one fall per death rather than
+staying forever. Fixing it would mean making exceptions to the invulnerability, and it is needed
+precisely as a rule without exceptions.
 
-Правил респавна в оригинале найти не удалось — они и в ADR-0006 помечены на сверку,
-и в открытом вопросе №4. Полторы секунды взяты как обычная для аркад передышка,
-оригиналом не подтверждены.
+The original's respawn rules could not be found — they are marked for checking both in ADR-0006
+and in open question No. 4. A second and a half is taken as a usual arcade breather, not
+confirmed by the original.
 
-### 7. Прогон настоящего здания уезжает в тесты
+### 7. The run on the real building moves into tests
 
-`tools/playthrough.gd` — прогон бота по тому зданию, которое собирает игра, — и
-есть проверка, которой не хватало. Он становится тестом, и тест прохождения
-гоняет настоящие правила, а не четыре этажа.
+`tools/playthrough.gd` — a bot run on the building the game assembles — is exactly the check that
+was missing. It becomes a test, and the playthrough test runs the real rules, not four floors.
 
-Маленькие здания из тестов не убираются: они быстрые и ловят другое — вырожденные
-раскладки. Добавляется настоящее.
+The small buildings are not removed from the tests: they are fast and catch something else —
+degenerate layouts. The real one is added.
 
-## Что веха не закрыла: бой на узких этажах
+## What the milestone did not close: combat on narrow floors
 
-DoD вехи задумывался как «бот проходит настоящее здание с включёнными агентами».
-Он **не достигнут**, и вот что про это известно точно.
+The milestone DoD was intended as "the bot completes the real building with agents enabled".
+It **was not reached**, and here is what is known about it for certain.
 
-- **Здание проходимо:** бот проходит настоящие тридцать этажей на пяти сидах
-  из пяти, собирая все пять документов, — но при выключенных агентах.
-- **Старт починен:** с агентами Otto теперь переживает старт, не делая ничего.
-  Раньше партия кончалась на крыше за 64–113 кадров.
-- **Дальше бот упирается в бой.** С включёнными агентами и неограниченными жизнями
-  он доходит до пятого этажа и встаёт там: агент занимает позицию в 130 px,
-  Otto возвращается в игру, идёт к эскалатору и проигрывает дуэль — раз за разом.
+- **The building is traversable:** the bot completes the real thirty floors on five seeds out of
+  five, collecting all five documents — but with agents off.
+- **The start is fixed:** with agents, Otto now survives the start doing nothing.
+  Previously the game ended on the roof within 64–113 frames.
+- **Further on the bot runs into combat.** With agents enabled and unlimited lives it reaches the
+  fifth floor and gets stuck there: an agent takes a position at 130 px, Otto returns to play,
+  walks to the escalator and loses the duel — again and again.
 
-Чей это счёт — игры или бота, — веха не решает, и намеренно.
+Whose fault this is — the game's or the bot's — the milestone does not decide, on purpose.
 
-**Бот не умеет уклоняться.** Он ходит и стреляет, но не приседает и не прыгает,
-а по ADR-0006, пункт 3, присед и прыжок — это и есть уклонение от пуль: у пули
-своя высота полёта. Значит, бот проигрывает дуэли, которые игрок выигрывал бы,
-и «бот не прошёл» не доказывает «игру не пройти».
+**The bot cannot dodge.** It walks and shoots, but does not crouch or jump, and per ADR-0006,
+item 3, crouching and jumping are exactly how bullets are dodged: a bullet has its own flight
+height. So the bot loses duels a player would win, and "the bot did not make it" does not prove
+"the game cannot be completed".
 
-Что с этим делать — вопрос баланса: дальность и скорострельность агентов, их
-плотность у дверей, длина передышки. Это отдельное решение и отдельная сверка,
-а подкрутить числа молча, пока чинишь геометрию, — верный способ не узнать,
-что именно помогло. Поэтому DoD вехи сведён к тому, что она действительно
-доказывает, а бой вынесен в следующую.
+What to do about it is a balance question: agents' range and rate of fire, their density at
+doors, the length of the breather. This is a separate decision and a separate check, and quietly
+tweaking numbers while fixing geometry is a sure way not to know what exactly helped. So the
+milestone DoD is reduced to what it actually proves, and combat is moved to the next one.
 
-## Последствия
+## Consequences
 
-- `floor_surface` меняет начало отсчёта, и вместе с ним едут все координаты
-  здания. Всё, что считало y по этажам, пересчитывается через те же методы правил.
-- Индекс уровня перестаёт быть неотрицательным. Списки, которые индексировались
-  номером этажа, переходят на словари: `Array[-1]` в GDScript берёт последний
-  элемент, и такой доступ молчит вместо того, чтобы упасть.
-- Ширина этажа перестаёт быть константой здания. `slab_segments`, задние стены,
-  окна, полосы света и граф достижимости принимают границы этажа.
-- Здание становится дороже по числу узлов на верхних уровнях не больше, чем было:
-  узкие этажи короче, а агентов в кадре стало меньше.
+- `floor_surface` changes its origin, and all building coordinates move with it. Everything that
+  computed y by floors is recomputed through the same rule methods.
+- The level index stops being non-negative. Lists that were indexed by floor number switch to
+  dictionaries: `Array[-1]` in GDScript takes the last element, and such access stays silent
+  instead of failing.
+- Floor width stops being a building constant. `slab_segments`, back walls, windows, light bands
+  and the reachability graph take the floor bounds.
+- The building gets no more expensive in node count at the top levels than it was: narrow floors
+  are shorter, and there are fewer agents in the frame.
 
-## Чего в вехе нет
+## What is not in the milestone
 
-- **Внутренние стены, делящие этаж на половины.** Оригинал их имеет, но они тянут
-  за собой отдельный проход графа достижимости и правила, где ставить лифты по обе
-  стороны стены. Отдельная работа.
-- **Шахты разной длины по высоте.** Оригинал даёт наверху одну длинную, внизу —
-  короткие. Правило простое, но меняет темп всего спуска и требует своей сверки.
-- **Тёмные этажи как часть раскладки.** Сейчас этаж гаснет только от сбитой лампы.
-- **Спуск по тросу как анимация.** Крыша есть, трос — нет: Otto появляется на ней
-  стоя. Это кадр вступления, а не механика.
+- **Interior walls dividing the floor in halves.** The original has them, but they bring a
+  separate reachability-graph pass and rules for placing elevators on both sides of the wall.
+  Separate work.
+- **Shafts of different lengths by height.** The original has one long one at the top and short
+  ones at the bottom. The rule is simple but changes the pace of the whole descent and requires
+  its own check.
+- **Dark floors as part of the layout.** Currently a floor goes dark only from a shot-down lamp.
+- **The rope descent as an animation.** There is a roof, but no rope: Otto appears on it
+  standing. This is an intro shot, not a mechanic.
 
-## Источники
+## Sources
 
 - [Wikipedia · Elevator Action](https://en.wikipedia.org/wiki/Elevator_Action)
 - [XP Arcade · Elevator Action](https://retroxp.beehiiv.com/p/xp-arcade-elevator-action)
 - [StrategyWiki · Elevator Action](https://strategywiki.org/wiki/Elevator_Action/Walkthrough)
-  — сама закрыта Cloudflare, цитаты взяты из поисковой выдачи
+  — itself behind Cloudflare, quotes taken from search results
 - [retroarcadia · My Life With… Elevator Action](https://retroarcadia.blog/2023/03/22/my-life-with-elevator-action-in-the-arcade-and-beyond/)

@@ -1,16 +1,16 @@
 extends GutTest
 
-## Тесты нарезки перекрытия проёмами.
+## Tests for cutting a slab with openings.
 ##
-## Порядок проёмов в списке не задан: шахта добавляется раньше эскалатора, но
-## стоит правее. Пока список не сортировался, куски накладывались друг на друга
-## и перекрытие выходило сплошным — проёма как не бывало.
+## The order of openings in the list is not defined: the shaft is added before the
+## escalator but stands to its right. While the list was not sorted, the pieces
+## overlapped and the slab came out solid, as if there were no opening.
 
 const SURFACE: float = 220.0
 const WIDTH: float = 1280.0
 const THICKNESS: float = 20.0
-## Границы этажа во всю ширину здания: перекрытие режется от стены до стены
-## своего уровня, а не по ширине здания (ADR-0014, пункт 3).
+## Floor bounds span the whole building width: the slab is cut from wall to wall of its
+## own level, not across the building width (ADR-0014, item 3).
 const BOUNDS := Vector2(0.0, WIDTH)
 
 
@@ -30,7 +30,7 @@ func test_single_gap_splits_the_slab_in_two() -> void:
 
 
 func test_gaps_are_cut_in_any_order() -> void:
-	# Именно в этом порядке их собирает уровень: шахта добавляется первой.
+	# This is exactly the order in which the level builds them: the shaft is added first.
 	var gaps: Array[Vector2] = [Vector2(560.0, 600.0), Vector2(380.0, 440.0)]
 	var rects := BuildingShell.slab_segments(SURFACE, gaps, BOUNDS, THICKNESS)
 	assert_eq(rects.size(), 3, "два проёма режут перекрытие на три куска")
@@ -47,8 +47,8 @@ func test_gap_at_the_left_edge_leaves_no_empty_slab() -> void:
 	assert_eq(rects[0].position.x, 40.0)
 
 
-## Узкий этаж не начинается в нуле, и проём за его стеной ничего не режет:
-## без обрезки кусок уходил бы в минус и переворачивался.
+## A narrow floor does not start at zero, and an opening beyond its wall cuts nothing:
+## without clipping, the piece would go negative and flip over.
 func test_narrow_floor_is_cut_within_its_own_walls() -> void:
 	var bounds := Vector2(280.0, 1000.0)
 	var gaps: Array[Vector2] = [Vector2(620.0, 660.0)]

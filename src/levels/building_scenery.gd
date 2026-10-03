@@ -1,53 +1,53 @@
 class_name BuildingScenery
 extends Node3D
 
-## Всё, что вокруг игры: воздух, свет над крышей, скаты крыши, обстановка
-## этажей, город и погода (ADR-0029).
+## Everything around the gameplay: air, light over the roof, roof slopes, floor dressing,
+## the city and the weather (ADR-0029).
 ##
-## Своим узлом, как [BuildingShell] и [BuildingShafts]: геймплея здесь нет, и
-## уровню, собранному из строителей, довольно одной строки. Раньше воздух и
-## свет крыши жили в самом уровне; город, погода и обстановка к ним добавились
-## бы ещё сотней строк в файл, который и так на пределе.
+## As its own node, like [BuildingShell] and [BuildingShafts]: there is no gameplay here,
+## and for a level assembled from builders one line is enough. The air and roof light
+## used to live in the level itself; the city, weather and dressing would have added
+## another hundred lines to a file that is already at its limit.
 
-## Лампа над крышей — у крыши ламп нет, а гаснуть она не должна никогда: ей
-## светит город. Общий тон и воздух здания — [Atmosphere].
+## Lamp over the roof — the roof has no lamps, and it must never go out: the city shines
+## on it. The building's overall tone and air — [Atmosphere].
 const ROOF_LIGHT_COLOR := Color(0.72, 0.78, 0.95)
 const ROOF_LIGHT_ENERGY: float = 2.4
 const ROOF_LIGHT_RANGE: float = 14.0
 const ROOF_LIGHT_HEIGHT: float = 4.0
 
-## Во сколько раз светлеет окружающий свет здания во вспышке молнии.
+## How many times the building's ambient light brightens in a lightning flash.
 const FLASH_AMBIENT: float = 2.5
 
-## Солнце утром, днём и вечером (ADR-0051): во сколько раз его сила из
-## [TimeOfDay] и докуда кладёт тень, м. Лампа над крышей днём — отсвет неба:
-## своя доля силы и цвет солнца.
+## The sun in the morning, daytime and evening (ADR-0051): how many times its strength
+## from [TimeOfDay], and how far it casts shadows, m. The lamp over the roof in the
+## daytime is the sky's glow: its own share of strength and the sun's colour.
 const SUN_GAIN: float = 1.5
 const SUN_SHADOW_DISTANCE: float = 70.0
 const ROOF_LIGHT_BY_DAY: float = 0.45
 
 var weather: Weather.Kind = Weather.Kind.CLEAR
 var dressing: BuildingDressing = null
-## Отель или офис и имя здания (ADR-0033, решение 1).
+## Hotel or office and the building's name (ADR-0033, decision 1).
 var identity: BuildingIdentity = null
 
-## Воздух здания и дождь над крышей: их перестраивает [method apply_graphics].
+## The building's air and the rain over the roof: rebuilt by [method apply_graphics].
 var _air: WorldEnvironment = null
 var _rain_node: RoofRain = null
-## Снег над крышей, если идёт снег (ADR-0054).
+## Snow over the roof, if it is snowing (ADR-0054).
 var _snow_node: RoofSnow = null
 var _roof_light: OmniLight3D = null
 var _sun: DirectionalLight3D = null
-## Крыша и её техника: с них снимается карта высот дождя.
+## The roof and its equipment: the rain heightmap is captured from them.
 var _roof_parts: Array[Node] = []
-## Вывеска на углу: висит снаружи, вдоль верхних этажей, и ловит солнце.
+## The corner sign: hangs outside, along the upper floors, and catches the sun.
 var _sign: VerticalSign = null
 var _city: CityBackdrop = null
-## Окружающий свет воздуха без вспышки: от него считается вспышка молнии.
+## Ambient light of the air without a flash: the lightning flash is counted from it.
 var _ambient: float = 0.0
 
 
-## Собирает окружение здания по правилам, плану и сиду.
+## Builds the building's surroundings by the rules, plan and seed.
 func build(
 	rules: BuildingRules,
 	plan: BuildingPlan,
@@ -75,7 +75,7 @@ func build(
 	kit.name = "RoofKit"
 	add_child(kit)
 	kit.build(rules, plan, building_seed)
-	# Корона по типу здания за плоскостью игры (ADR-0058, решение 2).
+	# Crown by building kind behind the play plane (ADR-0058, decision 2).
 	var crown := BuildingCrown.new()
 	add_child(crown)
 	crown.build(rules)
@@ -84,8 +84,8 @@ func build(
 	_sign = sign_board
 	add_child(sign_board)
 	sign_board.hang(rules, identity)
-	# Торцы башни и уступ стилобата по типу (ADR-0058, решение 3) — после
-	# вывески: перед ней на правом торце они не встают.
+	# Tower end walls and the podium setback by kind (ADR-0058, decision 3) — after the
+	# sign: they are not placed in front of it on the right end wall.
 	var flanks := BuildingFlanks.new()
 	add_child(flanks)
 	flanks.build(rules, building_seed, sign_board.span())
@@ -100,8 +100,8 @@ func build(
 	props.name = "Props"
 	add_child(props)
 	props.build(rules, plan, dressing, identity)
-	# Устройство стены раньше следов: след обходит окна и двери, а не ложится
-	# под них.
+	# The wall's structure before the stains: a stain goes around windows and doors
+	# rather than lying under them.
 	var laid := WallFeatures.lay(rules, plan, building_seed, identity, dressing)
 	var wear := WallWear.new()
 	add_child(wear)
@@ -117,7 +117,7 @@ func build(
 	add_child(city)
 	city.build(rules, building_seed, weather, rules.time_of_day)
 	if Weather.is_raining(weather):
-		# Капли гаснут о крышу, а не по таймеру (ADR-0037, решение 3).
+		# Drops die on the roof, not by a timer (ADR-0037, decision 3).
 		_rain_node = RoofRain.new()
 		_rain_node.name = "RoofRain"
 		add_child(_rain_node)
@@ -125,30 +125,30 @@ func build(
 		_rain_node.catch_on(_roof_parts)
 		sign_board.glow_in_rain()
 	elif Weather.is_snowing(weather):
-		# Хлопья гаснут о ту же карту высот, покров лёг заранее (ADR-0054).
+		# Flakes die on the same heightmap, the snow cover is laid in advance (ADR-0054).
 		_snow_node = RoofSnow.new()
 		_snow_node.name = "RoofSnow"
 		add_child(_snow_node)
 		_snow_node.build(rules, plan, rules.time_of_day)
 		_snow_node.catch_on(_roof_parts)
-	# Молнии — только в грозу: в ясную ночь, в туман и в дождь днём воздух
-	# покадрово не трогается (ADR-0051, решение 7).
+	# Lightning — only in a thunderstorm: on a clear night, in fog and in daytime rain the
+	# air is not touched every frame (ADR-0051, decision 7).
 	set_process(_city.has_lightning())
 	add_to_group(Graphics.GROUP)
 	apply_graphics()
 
 
-## Вспышка молнии доходит до здания: воздух коридоров на миг светлеет (M22).
-## Не источник — яркость окружающего света, и бюджет ламп она не трогает.
+## A lightning flash reaches the building: the corridor air brightens for a moment (M22).
+## Not a light source — ambient light brightness, and it does not touch the lamp budget.
 func _process(_delta: float) -> void:
 	if _city == null or _air == null:
 		return
 	_air.environment.ambient_light_energy = _ambient * (1.0 + _city.flash_level() * FLASH_AMBIENT)
 
 
-## Отдаёт солнцу то, что снаружи: всё, что окружение построило на крыше,
-## вывеску на углу и то, что над перекрытием крыши построили другие строители
-## уровня ([Outdoors]). Ночью солнца нет, и слой ставится всё равно — здание одно.
+## Gives the sun what is outside: everything the surroundings built on the roof, the
+## corner sign, and what other level builders built above the roof slab ([Outdoors]).
+## At night there is no sun, and the layer is set anyway — the building is the same.
 func light_outdoors(roots: Array[Node], rules: BuildingRules) -> void:
 	for part in _roof_parts:
 		Outdoors.mark(part)
@@ -161,7 +161,7 @@ func light_outdoors(roots: Array[Node], rules: BuildingRules) -> void:
 		Outdoors.mark_above(root, under_roof - 0.02)
 
 
-## Солнце над зданием: светит только на слой [constant Outdoors.LAYER].
+## The sun over the building: shines only on layer [constant Outdoors.LAYER].
 func _raise_sun(rules: BuildingRules) -> void:
 	var time := rules.time_of_day
 	_sun = DirectionalLight3D.new()
@@ -169,8 +169,8 @@ func _raise_sun(rules: BuildingRules) -> void:
 	_sun.light_color = TimeOfDay.sun_colour(time)
 	_sun.light_energy = TimeOfDay.sun_energy(time, weather) * SUN_GAIN
 	_sun.light_cull_mask = Outdoors.LAYER
-	# Объёмный туман слоя не знает: со своей долей солнце светило бы в дымке
-	# перед коридорами, внутри разреза здания.
+	# Volumetric fog does not know layers: with its own share the sun would shine in the
+	# haze in front of the corridors, inside the building's cutaway.
 	_sun.light_volumetric_fog_energy = 0.0
 	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	_sun.directional_shadow_max_distance = SUN_SHADOW_DISTANCE
@@ -181,14 +181,14 @@ func _raise_sun(rules: BuildingRules) -> void:
 	_roof_light.light_energy = ROOF_LIGHT_ENERGY * ROOF_LIGHT_BY_DAY
 
 
-## Солнце, если оно есть: утром, днём и вечером.
+## The sun, if there is one: in the morning, daytime and evening.
 func sun() -> DirectionalLight3D:
 	return _sun
 
 
-## Дождь и снег над крышей гаснут и о то, что на ней построили другие
-## строители уровня: плиту и парапеты, машинное отделение, торцы плит
-## ([RoofCatch]); на это же ложится снежный покров.
+## Rain and snow over the roof also die on what other level builders built on it: the
+## slab and parapets, the machine room, slab end faces ([RoofCatch]); the snow cover
+## lies on the same.
 func catch_rain(roots: Array[Node]) -> void:
 	if _rain_node != null:
 		_rain_node.catch_on(roots)
@@ -196,20 +196,20 @@ func catch_rain(roots: Array[Node]) -> void:
 		_snow_node.catch_on(roots)
 
 
-## Дождь над крышей — чтобы тест мог проверить, где гаснут капли.
+## Rain over the roof — so a test can check where the drops die.
 func roof_rain() -> RoofRain:
 	return _rain_node
 
 
-## Снег над крышей — для теста.
+## Snow over the roof — for the test.
 func roof_snow() -> RoofSnow:
 	return _snow_node
 
 
-## Отражения, контактные тени и объёмный туман по уровню качества (ADR-0030,
-## решение 5). Уровень меняют посреди партии, и применяется он к этому
-## зданию, а не со следующего: воздух собран на всё здание один раз. Долю
-## капель дождь над крышей пересчитывает сам ([RoofRain]).
+## Reflections, contact shadows and volumetric fog by quality level (ADR-0030,
+## decision 5). The level is changed mid-game, and it applies to this building, not from
+## the next one: the air is assembled for the whole building once. The rain over the
+## roof recomputes its drop share itself ([RoofRain]).
 func apply_graphics() -> void:
 	if _air != null:
 		Graphics.apply_to(_air.environment)
@@ -217,8 +217,8 @@ func apply_graphics() -> void:
 		_sun.shadow_enabled = Graphics.sun_shadows()
 
 
-## Лампа над крышей. Светлой зону делает собственный источник, а не отсутствие
-## темноты: на этом держится правило темноты (ADR-0010, пункт 3).
+## Lamp over the roof. A zone is made light by its own light source, not by an absence
+## of darkness: the darkness rule rests on this (ADR-0010, point 3).
 func _light_the_roof(rules: BuildingRules) -> void:
 	var roof_span := rules.floor_span(BuildingRules.ROOF)
 	var over_roof := Vector2(

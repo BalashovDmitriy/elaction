@@ -1,51 +1,52 @@
 class_name FigurePoses
 extends RefCounted
 
-## Позы фигуры: чем отыгрывается каждая поза [ActorPose].
+## Figure poses: what plays each [ActorPose] pose.
 ##
-## С M21 (ADR-0032, решение 1) поз две природы. Там, где ROM не диктует высот,
-## двигается клип — с M24c из Universal Animation Library (ADR-0039): стойка,
-## ходьба, выстрел, смерть, толчок, полёт и приземление, удары и реакции сценок
-## добивания (ADR-0040). Там, где диктует, — поза кодом из этой таблицы: присед
-## и залёгший под пулями ROM, раздавленный; и позы добиваний, которых нет ни в
-## одной свободной библиотеке: захват, удушение, свёрнутая шея.
+## Since M21 (ADR-0032, decision 1) poses are of two kinds. Where the ROM does not
+## dictate heights, a clip moves, since M24c from the Universal Animation Library
+## (ADR-0039): stance, walk, shot, death, push-off, flight and landing, blows and
+## reactions of takedown scenes (ADR-0040). Where it does dictate, a pose in code from
+## this table: the crouch and lying down under ROM bullets, the crushed one; and takedown
+## poses that no free library has: a grab, a choke, a broken neck.
 ##
-## Поза кодом строится не от покоя скелета, а от первого кадра стойки: покой
-## пака — T-поза с руками в стороны. Углы — в градусах, **положительный уводит
-## конечность вперёд**, по ходу взгляда; колено положительным сгибается (голень
-## уходит назад), локоть — тоже (предплечье уходит вперёд). Наклоны корпуса и
-## тела вперёд положительные; залёгший под пулю агент наклонён вперёд.
+## A pose in code is built not from the skeleton rest but from the first frame of the
+## stance: the pack's rest is a T-pose with arms out to the sides. Angles are in degrees,
+## **positive moves a limb forward**, in the direction of the gaze; a knee bends with a
+## positive angle (the shin goes back), so does an elbow (the forearm goes forward). Torso
+## and body forward tilts are positive; an agent lying down under a bullet is tilted
+## forward.
 ##
-## Без узлов, без сцены: проверяется тем же приёмом, что [OttoStateMachine].
+## No nodes, no scene: checked with the same technique as [OttoStateMachine].
 
 
-## Одна поза кодом.
+## One pose in code.
 class Pose:
 	extends RefCounted
 
-	## Бёдра, колени, плечи, локти: левая, правая.
+	## Hips, knees, shoulders, elbows: left, right.
 	var legs := Vector2.ZERO
 	var knees := Vector2.ZERO
 	var arms := Vector2.ZERO
 	var elbows := Vector2.ZERO
-	## Наклон корпуса вперёд от таза.
+	## Forward tilt of the torso from the pelvis.
 	var lean: float = 0.0
-	## Наклон головы вперёд относительно корпуса.
+	## Forward tilt of the head relative to the torso.
 	var head: float = 0.0
-	## Поворот головы вбок, вокруг вертикали: свёрнутая шея (ADR-0040).
+	## Sideways head turn, around the vertical: a broken neck (ADR-0040).
 	var twist: float = 0.0
-	## Наклон всего тела вокруг пяток: 90 — лежит вперёд лицом.
+	## Tilt of the whole body around the heels: 90 means lying face forward.
 	var tilt: float = 0.0
-	## Подъём всего тела над полом, в долях роста — сверх заземления: риг сам
-	## ставит любую позу на пол по её габариту, а это добавка к тому.
+	## Lift of the whole body above the floor, in fractions of height, beyond grounding: the
+	## rig itself puts any pose on the floor by its bounds, and this is an addition to that.
 	var lift: float = 0.0
-	## Сжатие по высоте: раздавленный — 0.3.
+	## Height squash: the crushed one is 0.3.
 	var squash: float = 1.0
-	## Разведение ног вбок от стойки, градусы: меньше нуля — сведены. Стойка
-	## пака стоит врозь, а висящий на тросе держит ноги вместе.
+	## Spreading the legs sideways from the stance, degrees: below zero means together. The
+	## pack's stance has the legs apart, while one hanging on the rope keeps the legs together.
 	var spread: float = 0.0
-	## Сведение рук к середине тела, градусы: висящий держится за трос кистями
-	## над головой, а стойка пака разводит руки.
+	## Bringing the arms toward the body's middle, degrees: one hanging holds the rope with
+	## his hands above the head, while the pack's stance spreads the arms.
 	var reach_in: float = 0.0
 
 	static func make(leg_angles: Vector2, arm_angles: Vector2) -> Pose:
@@ -54,49 +55,49 @@ class Pose:
 		pose.arms = arm_angles
 		return pose
 
-	## Сгиб колен и локтей. Возвращает себя: позы собираются цепочкой.
+	## Bend of the knees and elbows. Returns itself: poses are built as a chain.
 	func bent_at(knee_angles: Vector2, elbow_angles: Vector2 = Vector2.ZERO) -> Pose:
 		knees = knee_angles
 		elbows = elbow_angles
 		return self
 
-	## Наклон корпуса и головы.
+	## Torso and head tilt.
 	func leaned(torso_lean: float, head_tilt: float = 0.0) -> Pose:
 		lean = torso_lean
 		head = head_tilt
 		return self
 
-	## Поворот головы вбок.
+	## Sideways head turn.
 	func twisted(head_twist: float) -> Pose:
 		twist = head_twist
 		return self
 
-	## Ноги врозь или вместе.
+	## Legs apart or together.
 	func spread_by(degrees: float) -> Pose:
 		spread = degrees
 		return self
 
-	## Руки к середине тела.
+	## Arms toward the body's middle.
 	func reached_in(degrees: float) -> Pose:
 		reach_in = degrees
 		return self
 
-	## Наклон тела целиком вокруг пяток.
+	## Tilt of the whole body around the heels.
 	func tilted(body_tilt: float) -> Pose:
 		tilt = body_tilt
 		return self
 
-	## Подъём над полом.
+	## Lift above the floor.
 	func lifted(body_lift: float) -> Pose:
 		lift = body_lift
 		return self
 
-	## Сжатие по высоте.
+	## Height squash.
 	func squashed(height_squash: float) -> Pose:
 		squash = height_squash
 		return self
 
-	## Своя копия: таблица поз общая, а актёр работает со своей.
+	## Its own copy: the pose table is shared, and an actor works with its own.
 	func copy() -> Pose:
 		var twin := Pose.make(legs, arms).bent_at(knees, elbows).leaned(lean, head)
 		return (
@@ -110,25 +111,25 @@ class Pose:
 		)
 
 
-## Клип пака: какой и как его играть.
+## A pack clip: which one and how to play it.
 class Clip:
 	extends RefCounted
 
-	## Играет по кругу, по часам рига.
+	## Plays in a loop, by the rig's clock.
 	const LOOP := 0
-	## Играет один раз с начала позы и замирает на последнем кадре.
+	## Plays once from the start of the pose and freezes on the last frame.
 	const ONCE := 1
-	## Стоит на последнем кадре.
+	## Stays on the last frame.
 	const END := 2
-	## Идёт по фазе ходьбы актёра.
+	## Follows the actor's walk phase.
 	const WALK := 3
 
 	var name: String
 	var mode: int
-	## С какого момента клипа начинать, с: у толчка UAL в начале присед-замах,
-	## а прыжок в игре мгновенный.
+	## From which moment of the clip to start, s: the UAL push-off starts with a crouch
+	## windup, and a jump in the game is instant.
 	var start: float = 0.0
-	## Во сколько раз быстрее записанного играть.
+	## How many times faster than recorded to play.
 	var rate: float = 1.0
 
 	static func make(
@@ -142,13 +143,13 @@ class Clip:
 		return clip
 
 
-## Имена клипов в `.glb` — те, что пишет `tools/build_actors.py`.
-## С M24c клипы — из Universal Animation Library, перенесённые на скелет пака
-## (ADR-0039, решение 1).
+## Clip names in the `.glb`, as written by `tools/build_actors.py`.
+## Since M24c the clips are from the Universal Animation Library, retargeted to the
+## pack skeleton (ADR-0039, decision 1).
 ##
-## Нейтральная стойка, руки вниз: основа поз кодом. В кадре она не играет —
-## стойка в игре держит пистолет двумя руками, и углы рук от неё ничего бы не
-## значили.
+## A neutral stance, arms down: the base of poses in code. It is not played in the frame:
+## the in-game stance holds the pistol with both hands, and arm angles relative to it
+## would mean nothing.
 const CLIP_STAND := "stand"
 const CLIP_IDLE := "idle"
 const CLIP_WALK := "walk"
@@ -157,7 +158,7 @@ const CLIP_DEATH := "death"
 const CLIP_JUMP_START := "jump_start"
 const CLIP_JUMP_AIR := "jump_air"
 const CLIP_JUMP_LAND := "jump_land"
-## Клипы сценок добивания (ADR-0040): удары Otto и реакции агента.
+## Takedown scene clips (ADR-0040): Otto's blows and the agent's reactions.
 const CLIP_PUNCH_JAB := "punch_jab"
 const CLIP_PUNCH_CROSS := "punch_cross"
 const CLIP_HIT_HEAD := "hit_head"
@@ -179,30 +180,31 @@ const CLIP_NAMES: PackedStringArray = [
 	CLIP_KNOCKBACK,
 ]
 
-## С какой скоростью идёт клип ходьбы относительно записанной. Пак шагает
-## прогулочно, а Otto и агент идут 2.2 м/с (`Arcade.WALK_PX`): на родной
-## скорости подошвы ехали бы по полу. Множитель — скорость актёра, поделённая на
-## скорость опорной стопы в клипе: та едет назад 1.27 м/с, замер
-## `tools/walk_stride.gd`.
+## The speed of the walk clip relative to the recorded one. The pack walks at
+## a strolling pace, while Otto and the agent walk at 2.2 m/s (`Arcade.WALK_PX`): at the
+## native speed the soles would slide over the floor. The multiplier is the actor's speed
+## divided by the speed of the planted foot in the clip: it moves back at 1.27 m/s,
+## measured by `tools/walk_stride.gd`.
 const WALK_CLIP_RATE: float = 1.75
 
-## Толчок UAL: первые три кадра (0.125 с) — присед перед отрывом. Прыжок в игре
-## мгновенный, и клип начинается с отрыва.
+## UAL push-off: the first three frames (0.125 s) are a crouch before lift-off. A jump in
+## the game is instant, and the clip starts from lift-off.
 const JUMP_FROM: float = 0.125
-## Приземление UAL сидит в глубоком приседе до 0.45 с и выпрямляется к 0.9 с —
-## те самые «колени» и «медленно выпрямляется», на которые жаловался игрок.
-## Клип идёт с полуприседа и вдвое быстрее: касание пола видно, а на коленях
-## Otto не сидит. Кадры M24C: под низким потолком прыжок короткий, и с начала
-## клипа Otto приземлялся почти на колени.
+## UAL landing sits in a deep crouch until 0.45 s and straightens up by 0.9 s:
+## the very "knees" and "straightens up slowly" the player complained about.
+## The clip runs from a half crouch and twice as fast: the floor contact is visible, but
+## Otto does not sit on his knees. M24C shots: under a low ceiling the jump is short, and
+## from the start of the clip Otto landed almost on his knees.
 const LAND_FROM: float = 0.45
 const LAND_RATE: float = 2.0
-## Сколько показывать приземление, с: столько клип идёт от [constant LAND_FROM]
-## до стойки. Дольше — стойка, раньше — шаг, если пауза кончилась.
+## How long to show the landing, s: as long as the clip runs from [constant LAND_FROM]
+## to the stance. Longer means the stance, earlier means a step, if the pause has ended.
 const LAND_SHOW: float = 0.225
 
-## Сколько длится переход в позу, с (ADR-0039, решение 5). Смесь идёт по
-## времени, а не гаснущей экспонентой: переход кончается, а не подползает.
-## В приземление и выстрел — почти сразу: они про момент; в стойку — мягче.
+## How long a transition into a pose lasts, s (ADR-0039, decision 5). The blend goes by
+## time, not by a fading exponential: the transition ends instead of creeping closer.
+## Into a landing and a shot almost at once: they are about the moment; into the stance,
+## softer.
 const BLEND_DEFAULT: float = 0.12
 const BLEND_TIMES: Dictionary = {
 	"idle": 0.15,
@@ -222,10 +224,11 @@ const BLEND_TIMES: Dictionary = {
 	"punch_cross": 0.06,
 }
 
-## Присед: ноги вперёд, колени сложены, корпус над коленями, голова вперёд из-под
-## шляпы. С коленями это наконец «на корточках», а не «согнулся» (долг M18c).
-## Держит тест по габариту скелета: Otto под пулей агента и в коллизии приседа
-## 1.08 м, агент на колене — под пулей стоящего Otto, 1.09 по нижнему краю.
+## Crouch: legs forward, knees folded, torso over the knees, head forward from under the
+## hat. With the knees this is finally "squatting", not "bent over" (M18c debt).
+## A test holds it by the skeleton bounds: Otto is under an agent's bullet and within the
+## crouch collision of 1.08 m, a kneeling agent is under a standing Otto's bullet, 1.09
+## by the lower edge.
 const CROUCH_LEGS: float = 100.0
 const CROUCH_KNEES: float = 140.0
 const CROUCH_LEAN: float = 45.0
@@ -235,30 +238,31 @@ static var _table: Dictionary = _build_table()
 static var _clips: Dictionary = _build_clips()
 
 
-## Поза кодом по имени из [ActorPose]. Неизвестное имя и поза клипом —
-## «stand», первый кадр стойки: актёр без позы в кадре хуже, чем в неверной.
+## A pose in code by name from [ActorPose]. An unknown name and a clip pose give
+## "stand", the first frame of the stance: an actor with no pose in the frame is worse
+## than one in the wrong pose.
 ##
-## Отдаёт копию: методы сборки правят позу на месте, и запись таблицы, ушедшая
-## наружу, менялась бы у всех актёров разом.
+## Returns a copy: the builder methods modify the pose in place, and a table entry that
+## got out would change for all actors at once.
 static func of(pose_name: String) -> Pose:
 	var found: Variant = _table.get(pose_name, _table["stand"])
 	return (found as Pose).copy()
 
 
-## Клип позы или null, если поза кодом.
+## The pose's clip, or null if the pose is in code.
 static func clip_of(pose_name: String) -> Clip:
 	if pose_name.begins_with("walk_"):
 		return _clips["walk"] as Clip
 	return _clips.get(pose_name) as Clip
 
 
-## Есть ли у позы запись — кодом или клипом. По этому тест сверяет таблицу
-## со списками [ActorPose].
+## Whether the pose has an entry, in code or as a clip. By this the test checks the table
+## against the [ActorPose] lists.
 static func knows(pose_name: String) -> bool:
 	return clip_of(pose_name) != null or _table.has(pose_name)
 
 
-## Сколько длится переход в позу, с. Кадры ходьбы — одна поза «walk».
+## How long a transition into a pose lasts, s. Walk frames are a single "walk" pose.
 static func blend_time(pose_name: String) -> float:
 	var key := "walk" if pose_name.begins_with("walk_") else pose_name
 	return float(BLEND_TIMES.get(key, BLEND_DEFAULT))
@@ -269,76 +273,76 @@ static func _build_clips() -> Dictionary:
 		"idle": Clip.make(CLIP_IDLE, Clip.LOOP),
 		"walk": Clip.make(CLIP_WALK, Clip.WALK),
 		"shoot": Clip.make(CLIP_SHOOT, Clip.ONCE),
-		# Прыжок тремя фазами (ADR-0039): толчок клипом, в полёте удар ногой
-		# позой кодом — в оригинале прыжок и есть удар, — приземление клипом.
+		# A jump in three phases (ADR-0039): push-off as a clip, a kick in flight
+		# as a pose in code (in the original the jump is the kick), landing as a clip.
 		"jump": Clip.make(CLIP_JUMP_START, Clip.ONCE, JUMP_FROM),
-		# С M24d удара ногой нет (ADR-0040): на спуске — клип полёта UAL.
+		# Since M24d there is no kick (ADR-0040): on the descent, the UAL flight clip.
 		"fall": Clip.make(CLIP_JUMP_AIR, Clip.LOOP),
 		"land": Clip.make(CLIP_JUMP_LAND, Clip.ONCE, LAND_FROM, LAND_RATE),
-		# Сценки добивания (ADR-0040). Удары — с разгона стойки, без замаха в
-		# начале клипа: сценка короткая.
+		# Takedown scenes (ADR-0040). Blows start from the stance's momentum, without a windup
+		# at the start of the clip: the scene is short.
 		"punch_jab": Clip.make(CLIP_PUNCH_JAB, Clip.ONCE, 0.05, 1.3),
 		"punch_cross": Clip.make(CLIP_PUNCH_CROSS, Clip.ONCE, 0.05, 1.3),
 		"hit_head": Clip.make(CLIP_HIT_HEAD, Clip.ONCE, 0.0, 1.2),
 		"hit_chest": Clip.make(CLIP_HIT_CHEST, Clip.ONCE, 0.0, 1.2),
 		"knockback": Clip.make(CLIP_KNOCKBACK, Clip.ONCE, 0.0, 1.4),
-		# Лежит, отброшенный ударом: конец отброса — труп сценки.
+		# Lies thrown back by the blow: the end of the throw is the scene's corpse.
 		"knocked": Clip.make(CLIP_KNOCKBACK, Clip.END),
-		# Смерть показывается двумя позами (ADR-0011, пункт 12): падение — клип
-		# с начала, лежащее тело — его последний кадр.
+		# Death is shown with two poses (ADR-0011, item 12): the fall is the clip
+		# from the start, the lying body is its last frame.
 		"dead_0": Clip.make(CLIP_DEATH, Clip.ONCE),
 		"dead_1": Clip.make(CLIP_DEATH, Clip.END),
 	}
 
 
-## Позы добиваний (ADR-0040): захват, удушение, свёрнутая шея, добивание сверху.
-## Сценка ставит агента вплотную к Otto, и позы рассчитаны на это расстояние:
-## руки Otto — на высоте шеи агента того же роста.
+## Takedown poses (ADR-0040): a grab, a choke, a broken neck, a finishing blow from above.
+## The scene places the agent right next to Otto, and the poses are designed for that
+## distance: Otto's hands are at the neck height of an agent of the same height.
 static func _add_takedown_poses(table: Dictionary) -> void:
-	# Удушение сзади: руки Otto вперёд на уровень шеи, локти согнуты — предплечья
-	# охватывают горло; корпус откинут, ноги в упоре.
+	# A choke from behind: Otto's arms forward at neck level, elbows bent, the forearms
+	# wrap around the throat; torso leaning back, legs braced.
 	table["choke_hold"] = (
 		Pose
 		. make(Vector2(15.0, -12.0), Vector2(78.0, 72.0))
 		. bent_at(Vector2(20.0, 25.0), Vector2(95.0, 100.0))
 		. leaned(-10.0, 5.0)
 	)
-	# Душимый: руки к горлу, голова запрокинута, ноги подгибаются.
+	# The one being choked: hands to the throat, head thrown back, legs buckling.
 	table["choked"] = (
 		Pose
 		. make(Vector2(12.0, -6.0), Vector2(125.0, 118.0))
 		. bent_at(Vector2(25.0, 12.0), Vector2(115.0, 120.0))
 		. leaned(-12.0, -28.0)
 	)
-	# Душимый бьётся: нога брыкается вперёд.
+	# The one being choked struggles: a leg kicks forward.
 	table["choked_kick"] = (
 		Pose
 		. make(Vector2(40.0, -18.0), Vector2(110.0, 128.0))
 		. bent_at(Vector2(45.0, 8.0), Vector2(105.0, 120.0))
 		. leaned(-16.0, -32.0)
 	)
-	# Свёрнутая шея: Otto берёт голову двумя руками...
+	# Broken neck: Otto takes the head with both hands...
 	table["snap_grab"] = (
 		Pose
 		. make(Vector2(12.0, -10.0), Vector2(98.0, 92.0))
 		. bent_at(Vector2(15.0, 20.0), Vector2(55.0, 65.0))
 		. leaned(4.0)
 	)
-	# ...и рвёт её вбок: руки проходят вниз, корпус подаётся вперёд.
+	# ...and wrenches it sideways: the arms pass downward, the torso leans forward.
 	table["snap_twist"] = (
 		Pose
 		. make(Vector2(15.0, -12.0), Vector2(70.0, 110.0))
 		. bent_at(Vector2(20.0, 25.0), Vector2(35.0, 80.0))
 		. leaned(12.0, 8.0)
 	)
-	# Агент в захвате за голову: руки дёрнулись, голова чуть запрокинута.
+	# The agent in a head grab: arms jerked, head slightly thrown back.
 	table["snap_held"] = (
 		Pose
 		. make(Vector2(5.0, -5.0), Vector2(35.0, 30.0))
 		. bent_at(Vector2(10.0, 10.0), Vector2(40.0, 35.0))
 		. leaned(-4.0, -12.0)
 	)
-	# Шея свёрнута: голова повёрнута вбок и уронена, колени подломились.
+	# Neck broken: head turned sideways and dropped, knees buckled.
 	table["snap_broken"] = (
 		Pose
 		. make(Vector2(10.0, 0.0), Vector2(10.0, 5.0))
@@ -346,30 +350,32 @@ static func _add_takedown_poses(table: Dictionary) -> void:
 		. leaned(6.0, 22.0)
 		. twisted(78.0)
 	)
-	# Удар рукоятью: пистолет вскинут над головой, свободная рука держит за
-	# ворот...
+	# A pistol-grip blow: the pistol raised above the head, the free hand holds by the
+	# collar...
 	table["whip_raise"] = (
 		Pose
 		. make(Vector2(10.0, -8.0), Vector2(62.0, 170.0))
 		. bent_at(Vector2(15.0, 15.0), Vector2(40.0, 8.0))
 		. leaned(-6.0, -4.0)
 	)
-	# ...и рушится вниз: рука с рукоятью проходит перед грудью, корпус следом.
+	# ...and comes crashing down: the arm with the grip passes in front of the chest, the
+	# torso follows.
 	table["whip_strike"] = (
 		Pose
 		. make(Vector2(28.0, -12.0), Vector2(45.0, 52.0))
 		. bent_at(Vector2(32.0, 18.0), Vector2(35.0, 5.0))
 		. leaned(20.0, 10.0)
 	)
-	# Агент успевает отыграть (ADR-0050): спереди — тянет ствол, рука с
-	# пистолетом идёт вперёд, свободная прикрывается; корпус откинут...
+	# The agent manages to react (ADR-0050): from the front, he pulls the barrel, the arm
+	# with the pistol goes forward, the free one shields; the torso leans back...
 	table["reach_gun"] = (
 		Pose
 		. make(Vector2(8.0, -10.0), Vector2(35.0, 62.0))
 		. bent_at(Vector2(12.0, 14.0), Vector2(85.0, 40.0))
 		. leaned(-6.0, -6.0)
 	)
-	# ...сзади — почуял и оборачивается: голова через плечо, плечи следом.
+	# ...from behind, he senses it and turns around: head over the shoulder, shoulders
+	# following.
 	table["look_back"] = (
 		Pose
 		. make(Vector2(6.0, -6.0), Vector2(15.0, 25.0))
@@ -377,7 +383,7 @@ static func _add_takedown_poses(table: Dictionary) -> void:
 		. leaned(-2.0, -8.0)
 		. twisted(-70.0)
 	)
-	# Напрыгнувший сверху добивает: присел над поверженным, бьёт вниз.
+	# One who jumped from above finishes off: crouched over the fallen one, strikes down.
 	table["pounce_strike"] = (
 		Pose
 		. make(Vector2(75.0, 35.0), Vector2(55.0, -15.0))
@@ -386,12 +392,12 @@ static func _add_takedown_poses(table: Dictionary) -> void:
 	)
 
 
-## Позы вступления (ADR-0052, решение 6) и пилота вертолёта.
+## Intro poses (ADR-0052, decision 6) and the helicopter pilot's.
 ##
-## Проём вертолёта ниже роста Otto: выглядывая, он пригибается — колени
-## согнуты, корпус вперёд, голова к крыше внизу, руки на раме. Сидит на пороге
-## лицом к камере: бёдра вперёд, голени свисают, руки упёрты в порог; берясь
-## за трос, тянет обе руки вверх и вперёд, к стреле лебёдки.
+## The helicopter doorway is lower than Otto's height: looking out, he ducks, knees
+## bent, torso forward, head toward the roof below, hands on the frame. He sits on the
+## threshold facing the camera: thighs forward, shins hanging, hands braced on the
+## threshold; taking the rope, he stretches both arms up and forward, toward the winch boom.
 static func _add_arrival_poses(table: Dictionary) -> void:
 	table["peek"] = (
 		Pose
@@ -414,8 +420,9 @@ static func _add_arrival_poses(table: Dictionary) -> void:
 		. spread_by(-6.0)
 		. reached_in(22.0)
 	)
-	# Пилот в кресле: руки на ручке и рычаге, взгляд вперёд; кивок — голова
-	# вниз. Заземляет риг по ступням — пилота сажает вертолёт по месту кресла.
+	# The pilot in the seat: hands on the stick and the lever, looking forward; a nod is the
+	# head going down. The rig grounds by the feet: the helicopter seats the pilot at the
+	# seat's place.
 	table["pilot_sit"] = (
 		Pose
 		. make(Vector2(85.0, 85.0), Vector2(38.0, 30.0))
@@ -432,9 +439,10 @@ static func _add_arrival_poses(table: Dictionary) -> void:
 
 static func _build_table() -> Dictionary:
 	var table := {}
-	# Первый кадр стойки как есть: основа всех поз кодом и запасная поза.
+	# The first frame of the stance as is: the base of all poses in code and the fallback
+	# pose.
 	table["stand"] = Pose.new()
-	# Присед — не другая фигура, а поза скелета (ADR-0022, решение 3).
+	# A crouch is not a different figure but a skeleton pose (ADR-0022, decision 3).
 	table["crouch"] = (
 		Pose
 		. make(Vector2(CROUCH_LEGS, CROUCH_LEGS), Vector2(20.0, 25.0))
@@ -442,16 +450,16 @@ static func _build_table() -> Dictionary:
 		. leaned(CROUCH_LEAN, CROUCH_HEAD)
 	)
 	_add_takedown_poses(table)
-	# Раздавленный кабиной или лампой: ноги и руки врозь, сплющен по высоте.
+	# Crushed by a cab or a lamp: legs and arms apart, flattened in height.
 	table["crushed"] = (
 		Pose
 		. make(Vector2(-30.0, 30.0), Vector2(60.0, -60.0))
 		. bent_at(Vector2(40.0, 40.0))
 		. squashed(0.3)
 	)
-	# Висит на тросе вертолёта (ADR-0043, решение 1): руки прямо вверх — угол
-	# рук, как у залёгшего, только тело стоит, — ноги вместе и чуть вперёд,
-	# колени мягко согнуты, голова задрана к крюку.
+	# Hanging on the helicopter rope (ADR-0043, decision 1): arms straight up (the arm
+	# angle as for the one lying down, only the body stands), legs together and slightly
+	# forward, knees softly bent, head tilted up toward the hook.
 	table["rope"] = (
 		Pose
 		. make(Vector2(8.0, 4.0), Vector2(165.0, 160.0))
@@ -461,10 +469,11 @@ static func _build_table() -> Dictionary:
 		. reached_in(25.0)
 	)
 	_add_arrival_poses(table)
-	# Залёгший под пулю агент (ADR-0016, пункт 2). Лежит лицом вниз, руки со
-	# стволом вытянуты вперёд по полу — от трупа на спине отличается сразу.
-	# Угол рук — наклон тела плюс 90: так рука ложится вдоль пола. Голова
-	# задрана назад, к стволу: поля шляпы ложатся на затылок, а не встают стеной.
+	# An agent lying down under a bullet (ADR-0016, item 2). Lies face down, arms with the
+	# gun stretched forward along the floor: instantly distinct from a corpse on its back.
+	# The arm angle is the body tilt plus 90: this way the arm lies along the floor. The head
+	# is tilted back, toward the gun: the hat brim lies on the nape instead of standing up
+	# like a wall.
 	table["prone"] = (
 		Pose
 		. make(Vector2(-4.0, 4.0), Vector2(170.0, 176.0))

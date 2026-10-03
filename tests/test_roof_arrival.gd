@@ -1,24 +1,24 @@
 extends GutTest
 
-## Вступление здания: вертолёт привозит Otto на крышу (ADR-0038, решение 1).
+## Building intro: the helicopter brings Otto to the roof (ADR-0038, decision 1).
 ##
-## Здание генерируется, и место приземления у каждого своё, поэтому главное
-## проверяется на нескольких сидах: вертолёт есть, пока идёт вступление, Otto
-## встаёт ровно на место приземления и слушается, вертолёт улетает и убирается.
-## Пропуск, переставленный Otto и возвращение после гибели — по одному зданию.
+## The building is generated, and each has its own landing spot, so the essentials are
+## checked on several seeds: the helicopter exists while the intro runs, Otto lands
+## exactly on the landing spot and obeys, the helicopter flies away and removes itself.
+## Skipping, a repositioned Otto and returning after death — on one building each.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
 const SEEDS: Array[int] = [1, 2, 3, 4, 5]
 
-## Сколько кадров даётся зданию, чтобы встать на места.
+## How many frames a building gets to settle into place.
 const SETTLE_FRAMES: int = 4
 
-## Сколько кадров ждать, пока вертолёт уйдёт из кадра и уберёт себя: уход идёт
-## около трёх секунд, под ускорением времени вчетверо — полсотни кадров.
+## How many frames to wait for the helicopter to leave the frame and remove itself: the
+## departure takes about three seconds, at four times time scale — fifty frames.
 const GONE_FRAMES: int = 240
 
-## Насколько Otto стоит на своём месте, м: сантиметр.
+## How precisely Otto stands on his spot, m: a centimetre.
 const TOLERANCE: float = 0.01
 
 
@@ -42,8 +42,8 @@ func _build(
 	kind: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL
 ) -> GreyboxLevel:
 	GameState.instance().start_game()
-	# У каждого типа своя корона над крышей (ADR-0058, решение 2): здание
-	# нужного типа — первое такое в партии на этом сиде.
+	# Each kind has its own crown above the roof (ADR-0058, decision 2): the building
+	# of the needed kind is the first such in the game on this seed.
 	if kind != BuildingIdentity.Kind.HOTEL:
 		GameState.instance().building = BuildingIdentity.first_of(kind, building_seed)
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
@@ -55,8 +55,8 @@ func _build(
 	return level
 
 
-## Сиды отеля [param hotel] и сиды [param others] офиса и жилого дома: пары
-## «сид — тип» для тестов, которым важна корона.
+## Seeds of the hotel [param hotel] and seeds [param others] of the office and the
+## residential building: "seed — kind" pairs for tests where the crown matters.
 func _seeds_and_kinds(hotel: Array[int], others: Array[int]) -> Array[Vector2i]:
 	var runs: Array[Vector2i] = []
 	for seed_value: int in hotel:
@@ -82,8 +82,8 @@ func _otto_at(level: GreyboxLevel) -> Vector2:
 	return WorldSpace.to_plane(level.otto.global_position)
 
 
-## Вертолёты в уровне — узлом, а не по ссылке уровня: проверка «улетел» должна
-## видеть и того, кого уровень уже забыл.
+## Helicopters in the level — by node, not by the level's reference: the "left" check
+## must also see one the level has already forgotten.
 func _helicopters(level: GreyboxLevel) -> int:
 	return level.find_children("*", "Helicopter", true, false).size()
 
@@ -96,7 +96,7 @@ func _wait_until_gone(level: GreyboxLevel) -> bool:
 	return _helicopters(level) == 0
 
 
-## Габарит вида вертолёта в плоскости правил: все его меши вместе.
+## Bounds of the helicopter's look in the rules plane: all its meshes together.
 func _extent(helicopter: Helicopter) -> Rect2:
 	var box := AABB()
 	var first := true
@@ -111,8 +111,8 @@ func _extent(helicopter: Helicopter) -> Rect2:
 	return Rect2(box.position.x, top, box.size.x, box.size.y)
 
 
-## На любом здании вертолёт привозит Otto ровно на место приземления, отдаёт
-## управление и улетает.
+## On any building the helicopter brings Otto exactly to the landing spot, hands over
+## control and flies away.
 func test_the_helicopter_lands_otto_on_the_roof() -> void:
 	for building_seed: int in SEEDS:
 		var level := _build(building_seed)
@@ -135,8 +135,8 @@ func test_the_helicopter_lands_otto_on_the_roof() -> void:
 		_drop(level)
 
 
-## Отдали управление — значит Otto пошёл. Проверяется ходом, а не состоянием:
-## до M12 «приехал» не означало «отпустили».
+## Control handed over means Otto moved. Checked by movement, not by state: before M12
+## "arrived" did not mean "released".
 func test_otto_obeys_after_the_landing() -> void:
 	var level := _build(1)
 	await level.wait_for_the_landing()
@@ -148,8 +148,8 @@ func test_otto_obeys_after_the_landing() -> void:
 	_drop(level)
 
 
-## Трос достаёт до крыши, а вертолёт с винтом и крыша влезают в кадр вместе —
-## у здания любого типа, с любой короной (ADR-0058, решение 2).
+## The rope reaches the roof, and the helicopter with its rotor and the roof fit in the
+## frame together — for a building of any kind, with any crown (ADR-0058, decision 2).
 func test_the_rope_reaches_the_deck_and_the_frame_holds_both() -> void:
 	for run: Vector2i in _seeds_and_kinds([1, 2, 3], [1, 2]):
 		var building_seed := run.x
@@ -179,18 +179,18 @@ func test_the_rope_reaches_the_deck_and_the_frame_holds_both() -> void:
 		_drop(level)
 
 
-## Весь путь — прилёт, висение, уход — вертолёт идёт над техникой крыши, а не
-## сквозь неё: ни корпус, ни диск винта не задевают габарита ни одного предмета.
-## Сиды выбраны с водонапорной башней у места посадки (нечётные) и с баком.
-## Вступление полное: прилёт есть только у него, а висение и уход — те же, что
-## у короткого (ADR-0052, решение 6).
+## Along the whole path — arrival, hover, departure — the helicopter passes over the roof
+## equipment, not through it: neither the fuselage nor the rotor disc touches the bounds
+## of any item. Seeds are chosen with a water tower by the landing spot (odd) and with a
+## tank. The intro is the full one: only it has an arrival, while the hover and
+## departure are the same as in the short one (ADR-0052, decision 6).
 func test_the_flight_clears_everything_on_the_roof() -> void:
 	for run: Vector2i in _seeds_and_kinds([1, 2, 3, 5, 7], [1, 2]):
 		var building_seed := run.x
 		var level := _build(building_seed, true, run.y as BuildingIdentity.Kind)
 		var deck := WorldSpace.to_scene(_landing(level)).y
 		var roof := RoofArrival.roof_obstacles(level, deck, [level.otto] as Array[Node])
-		# Сначала — что техника вообще нашлась: пустой список прошёл бы всегда.
+		# First — that equipment was found at all: an empty list would always pass.
 		var kit := level.find_children("*", "RoofKit", true, false)
 		assert_eq(kit.size(), 1, "сид %d: на крыше есть техника" % building_seed)
 		var props := 0
@@ -224,10 +224,11 @@ func test_the_flight_clears_everything_on_the_roof() -> void:
 		_drop(level)
 
 
-## Звук вертолёта: петля висения и слой пролёта звучат с прилёта; на подлёте
-## громче пролёт, в висении — петля висения; трос звучит, пока Otto едет.
+## Helicopter sound: the hover loop and the flyby layer play from the arrival; on
+## approach the flyby is louder, in the hover — the hover loop; the rope sounds while
+## Otto rides it.
 func test_the_helicopter_sounds_its_flight() -> void:
-	# Подлёт есть только у полного вступления: в коротком вертолёт уже висит.
+	# Only the full intro has an approach: in the short one the helicopter already hovers.
 	var level := _build(1, true)
 	await wait_physics_frames(SETTLE_FRAMES)
 	var voices := _voices(level.helicopter())
@@ -253,7 +254,7 @@ func test_the_helicopter_sounds_its_flight() -> void:
 	_drop(level)
 
 
-## Звуки вертолёта по именам: поток каждого источника узнаётся по файлу.
+## Helicopter sounds by name: each source's stream is recognised by its file.
 func _voices(helicopter: Helicopter) -> Dictionary:
 	var found := {}
 	for node: Node in helicopter.find_children("*", "AudioStreamPlayer3D", true, false):
@@ -264,11 +265,11 @@ func _voices(helicopter: Helicopter) -> Dictionary:
 	return found
 
 
-## Вступление — сценка, а не ожидание: от четырёх до шести секунд до управления.
+## The intro is a scene, not a wait: four to six seconds until control.
 func test_the_intro_takes_four_to_six_seconds() -> void:
 	var level := _build(1)
-	# Счёт шагов — по движку, а не по ожиданиям: одно ожидание GUT бывает дольше
-	# шага, и счёт ожиданий занижал время вдвое.
+	# Steps are counted by the engine, not by waits: one GUT wait can be longer than a
+	# step, and counting waits underestimated the time by half.
 	var start := Engine.get_physics_frames()
 	var waits := 0
 	while level.is_in_the_intro() and waits < GreyboxLevel.LANDING_PATIENCE:
@@ -280,7 +281,7 @@ func test_the_intro_takes_four_to_six_seconds() -> void:
 	_drop(level)
 
 
-## Прыжок пропускает вступление: Otto сразу на крыше, вертолёт уходит.
+## A jump skips the intro: Otto is on the roof at once, the helicopter leaves.
 func test_a_jump_skips_the_intro() -> void:
 	var level := _build(2)
 	await wait_physics_frames(SETTLE_FRAMES * 3)
@@ -302,7 +303,7 @@ func test_a_jump_skips_the_intro() -> void:
 	_drop(level)
 
 
-## Выстрел — тоже пропуск; а зажатая заранее кнопка — нет: пропуск по нажатию.
+## A shot also skips; a button held down in advance does not: skipping is by press.
 func test_a_shot_skips_but_a_held_button_does_not() -> void:
 	Input.action_press(&"shoot")
 	var level := _build(3)
@@ -317,9 +318,9 @@ func test_a_shot_skips_but_a_held_button_does_not() -> void:
 	_drop(level)
 
 
-## Нажатие, пропустившее вступление, на этом и кончается: Otto не стреляет
-## и не прыгает от той же кнопки. Иначе пропуск выстрелом — это ещё и выстрел
-## в пустоту, а пропуск прыжком — прыжок с места приземления.
+## The press that skipped the intro ends there: Otto does not shoot or jump from the
+## same button. Otherwise skipping by shot would also be a shot into nowhere, and
+## skipping by jump — a jump from the landing spot.
 func test_the_skipping_press_does_not_reach_otto() -> void:
 	for action: StringName in [&"shoot", &"jump"]:
 		var level := _build(4)
@@ -337,7 +338,7 @@ func test_the_skipping_press_does_not_reach_otto() -> void:
 			)
 			assert_true(level.otto.is_grounded(), "%s: пропуск не прыгает" % action)
 			await wait_physics_frames(1)
-		# Следующее нажатие — уже Otto: пропуск глушит одно нажатие, а не кнопку.
+		# The next press is Otto's: skipping swallows one press, not the button.
 		if action == &"shoot":
 			Input.action_press(action)
 			await wait_physics_frames(1)
@@ -348,8 +349,8 @@ func test_the_skipping_press_does_not_reach_otto() -> void:
 		_drop(level)
 
 
-## Переставленный Otto — тестом или съёмкой — кончает вступление сам и стоит,
-## где поставили: так инструменты работают, ничего не зная про вертолёт.
+## A repositioned Otto — by a test or a capture — ends the intro himself and stands
+## where placed: that way tools work knowing nothing about the helicopter.
 func test_moving_otto_ends_the_intro_where_he_was_put() -> void:
 	var level := _build(1)
 	await wait_physics_frames(SETTLE_FRAMES)
@@ -366,7 +367,7 @@ func test_moving_otto_ends_the_intro_where_he_was_put() -> void:
 	_drop(level)
 
 
-## После гибели вертолёта нет: Otto возвращается на свой этаж, как было.
+## After death there is no helicopter: Otto returns to his floor, as before.
 func test_coming_back_after_death_has_no_helicopter() -> void:
 	var level := _build(1)
 	level.skip_the_intro()
@@ -386,8 +387,8 @@ func test_coming_back_after_death_has_no_helicopter() -> void:
 	_drop(level)
 
 
-## Пауза во вступлении его пропускает и меню не открывает: в сценке кнопка
-## «Start» значит «хватит смотреть».
+## Pause during the intro skips it and does not open the menu: in a scene the "Start"
+## button means "enough watching".
 func test_pause_in_the_intro_skips_it_instead_of_pausing() -> void:
 	var main := preload("res://src/main.tscn").instantiate()
 	add_child_autofree(main)
@@ -413,14 +414,14 @@ func test_pause_in_the_intro_skips_it_instead_of_pausing() -> void:
 	Sounds.stop_music()
 
 
-## Диск размытия лежит в плоскости вращения своего винта (ADR-0049): у
-## несущего — плашмя, у хвостового — стоймя, поперёк его оси. Плоскость
-## угадывалась по габариту, и у двухлопастного хвостового винта диск ложился
-## плашмя и кувыркался вокруг оси (авторевью M24i).
+## The blur disc lies in the rotation plane of its rotor (ADR-0049): for the main one —
+## flat, for the tail one — upright, across its axis. The plane used to be guessed from
+## the bounds, and for the two-blade tail rotor the disc lay flat and tumbled around
+## the axis (code review M24i).
 func test_each_rotor_blur_lies_in_its_plane_of_spin() -> void:
 	var helicopter := Helicopter.new()
 	autofree(helicopter)
-	# Ось вращения — та, вокруг которой винт крутит сам вертолёт ([Helicopter]).
+	# The rotation axis is the one around which [Helicopter] itself spins the rotor.
 	for pair: Array in [["MainRotor", Vector3.UP], ["TailRotor", Vector3.BACK]]:
 		var rotor := helicopter.find_child(String(pair[0]), true, false) as Node3D
 		assert_not_null(rotor, "%s есть в модели" % pair[0])
@@ -430,7 +431,7 @@ func test_each_rotor_blur_lies_in_its_plane_of_spin() -> void:
 		assert_not_null(disc, "%s: диск размытия" % pair[0])
 		if disc == null:
 			continue
-		# Нормаль плоского меша — его +Y: она и должна смотреть по оси винта.
+		# The normal of a flat mesh is its +Y: it must point along the rotor axis.
 		var normal := disc.transform.basis.y.normalized()
 		var axis: Vector3 = pair[1]
 		assert_almost_eq(
@@ -438,9 +439,9 @@ func test_each_rotor_blur_lies_in_its_plane_of_spin() -> void:
 		)
 
 
-## Полное вступление первого здания (ADR-0052, решение 6) — на любом здании:
-## шаги идут по порядку, дверь открыта, пока Otto в проёме, трос качается после
-## сброса, Otto встаёт ровно на место, а вертолёт уходит с закрытой дверью.
+## The first building's full intro (ADR-0052, decision 6) — on any building: the steps
+## go in order, the door is open while Otto is in the opening, the rope swings after the
+## drop, Otto lands exactly on the spot, and the helicopter leaves with the door closed.
 func test_the_full_intro_plays_every_step_in_order() -> void:
 	for building_seed: int in [1, 3, 5]:
 		var level := _build(building_seed, true)
@@ -449,7 +450,7 @@ func test_the_full_intro_plays_every_step_in_order() -> void:
 		var seen: Array[int] = []
 		var swung := false
 		var door_shut_in_flight := true
-		# С пределом: вставшее вступление — провал теста, а не вечный прогон.
+		# With a limit: a stalled intro is a test failure, not an endless run.
 		var waits := 0
 		while level.is_in_the_intro() and waits < GreyboxLevel.LANDING_PATIENCE:
 			waits += 1
@@ -499,7 +500,7 @@ func test_the_full_intro_plays_every_step_in_order() -> void:
 		_drop(level)
 
 
-## Полное вступление — сценка в 10–12 секунд до управления (ADR-0052).
+## The full intro is a 10–12 second scene until control (ADR-0052).
 func test_the_full_intro_takes_ten_to_twelve_seconds() -> void:
 	var level := _build(1, true)
 	var start := Engine.get_physics_frames()
@@ -513,7 +514,7 @@ func test_the_full_intro_takes_ten_to_twelve_seconds() -> void:
 	_drop(level)
 
 
-## Короткое вступление: вертолёт с первого кадра висит с открытой дверью.
+## Short intro: from the first frame the helicopter hovers with the door open.
 func test_the_short_intro_starts_hovering_with_the_door_open() -> void:
 	var level := _build(2)
 	await wait_physics_frames(2)
@@ -525,7 +526,8 @@ func test_the_short_intro_starts_hovering_with_the_door_open() -> void:
 	_drop(level)
 
 
-## Пилот сидит за остеклением: в кабине, выше пола и ниже потолка, у носа.
+## The pilot sits behind the glazing: in the cabin, above the floor and below the
+## ceiling, near the nose.
 func test_the_pilot_sits_in_the_cockpit() -> void:
 	var helicopter := Helicopter.new()
 	add_child_autofree(helicopter)

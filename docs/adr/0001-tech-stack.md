@@ -1,63 +1,64 @@
-# ADR-0001 · Godot 4.7 и типизированный GDScript
+# ADR-0001 · Godot 4.7 and typed GDScript
 
-- **Статус:** принято; в силе и после переезда в 3D ([ADR-0019](0019-3d-pivot.md)),
-  но довод 1 про 2D-свет с тех пор не работает — сцена трёхмерная
-- **Дата:** 2026-09-11
+- **Status:** accepted; still in force after the move to 3D ([ADR-0019](0019-3d-pivot.md)),
+  but argument 1 about 2D lighting no longer applies — the scene is three-dimensional
+- **Date:** 2026-09-11
 
-## Контекст
+## Context
 
-Нужно выбрать стек для ремейка Elevator Action. Требования: механика повторяет оригинал
-1983 года, картинка — современная. Разработчик один, основной опыт — Python и Django,
-опыта в геймдеве нет. Целевая платформа — PC.
+We need to pick a stack for the Elevator Action remake. Requirements: the mechanics repeat the
+1983 original, the picture is modern. There is one developer, whose main experience is Python
+and Django, with no game-dev experience. Target platform is PC.
 
-Ключевое наблюдение: качество картинки определяется не языком, а, в порядке убывания,
-арт-пайплайном, возможностями рендера движка и только потом языком. Dead Cells выглядит
-дорого не из-за Haxe, а потому что персонажей моделировали в 3D и пре-рендерили в спрайты.
+Key observation: picture quality is determined not by the language but, in descending order,
+by the art pipeline, by the engine's rendering capabilities, and only then by the language.
+Dead Cells looks expensive not because of Haxe, but because its characters were modelled in 3D
+and pre-rendered into sprites.
 
-Второе наблюдение: механика оригинала сама подсказывает визуальный приём. В Elevator
-Action лампы отстреливаются и этаж погружается в темноту — то есть игра построена вокруг
-динамического 2D-освещения, а не вокруг числа полигонов.
+Second observation: the original's mechanics themselves suggest a visual technique. In Elevator
+Action lamps get shot out and the floor sinks into darkness — that is, the game is built around
+dynamic 2D lighting, not around polygon count.
 
-## Рассмотренные варианты
+## Options considered
 
-| Вариант | Почему не выбран |
+| Option | Why not chosen |
 |---|---|
-| Unity 6 + C# | Потолок по 2D выше, но тяжелее вход, и весь выигрыш лежит в области, до которой проект не дойдёт |
-| Unreal 5 | Paper2D фактически заброшен, настоящий путь — HD-2D, то есть полноценный 3D-проект. Оверкилл |
-| Bevy (Rust) | Версия 0.18, ломающие изменения API каждый релиз, редактор не готов |
-| Python (pygame-ce, Arcade) | Знаком, но нет редактора, слабый шейдерный стек, потолок производительности. Годится только для прототипа |
-| GameMaker | Быстрый путь к результату, но GML — тупиковый навык, потолок по свету ниже |
-| Свой движок на C++/SDL или Rust/wgpu | Максимум контроля ценой месяцев на инфраструктуру вместо игры |
+| Unity 6 + C# | Higher ceiling for 2D, but a steeper entry, and the whole gain lies in an area the project will never reach |
+| Unreal 5 | Paper2D is effectively abandoned; the real path is HD-2D, i.e. a full 3D project. Overkill |
+| Bevy (Rust) | Version 0.18, breaking API changes every release, editor not ready |
+| Python (pygame-ce, Arcade) | Familiar, but no editor, weak shader stack, performance ceiling. Good only for a prototype |
+| GameMaker | Fast path to a result, but GML is a dead-end skill, lower ceiling for lighting |
+| Own engine on C++/SDL or Rust/wgpu | Maximum control at the cost of months of infrastructure instead of the game |
 
-## Решение
+## Decision
 
-**Godot 4.7.2 + типизированный GDScript.**
+**Godot 4.7.2 + typed GDScript.**
 
-Причины:
+Reasons:
 
-1. **2D — родная подсистема**, а не надстройка над 3D. `PointLight2D`, `DirectionalLight2D`,
-   `LightOccluder2D`, `CanvasModulate`, нормал- и specular-мапы через `CanvasTexture` —
-   ровно то, что нужно для отстреливаемых ламп.
-2. **GDScript синтаксически близок к Python** — отступы, `func`, `var`, аннотации типов.
-   Это снимает главный риск проекта: разработчик учит геймдев, а не ещё и язык.
-3. **Статическая типизация обязательна.** Типизированный GDScript до ~59% быстрее
-   нетипизированного и ловит ошибки на этапе разбора; разница с C# на игровой логике
-   незаметна.
-4. **MIT, без роялти и без рисков лицензирования.**
-5. **Живой релизный цикл:** 4.6 ускорил 2D-батчинг, 4.7 добавил HDR-вывод.
-6. **Лёгкий редактор** — около 100 МБ, запуск за секунды.
+1. **2D is a native subsystem**, not a layer on top of 3D. `PointLight2D`, `DirectionalLight2D`,
+   `LightOccluder2D`, `CanvasModulate`, normal and specular maps via `CanvasTexture` —
+   exactly what shoot-out lamps need.
+2. **GDScript is syntactically close to Python** — indentation, `func`, `var`, type annotations.
+   This removes the project's main risk: the developer learns game development, not a new
+   language on top of it.
+3. **Static typing is mandatory.** Typed GDScript is up to ~59% faster than untyped and catches
+   errors at parse time; the difference from C# on game logic is unnoticeable.
+4. **MIT, no royalties and no licensing risk.**
+5. **Active release cycle:** 4.6 sped up 2D batching, 4.7 added HDR output.
+6. **Lightweight editor** — about 100 MB, starts in seconds.
 
-C# в проекте не используется: он не даёт выигрыша на этой задаче, зато ломает веб-экспорт
-и добавляет .NET в цепочку сборки.
+C# is not used in the project: it gives no gain on this task, but it breaks web export
+and adds .NET to the build chain.
 
-## Последствия
+## Consequences
 
-- Весь код пишется с аннотациями типов, это проверяет `gdlint`.
-- Потолок по количеству одновременных 2D-источников света у Godot ниже, чем у Unity URP:
-  в сообществе фигурирует практический предел порядка 15–16 источников на узел, с заметной
-  просадкой уже на 5+ источниках с тенями. Часть жалоб тянется с Godot 3. Ограничение
-  проверяем прототипом в M6 и закладываем бюджет освещения и стриминг этажей.
-- Консольные сборки, если когда-нибудь понадобятся, возможны только через платного
-  партнёра W4 Games. В границы эпика это не входит.
-- Знание Python остаётся полезным: весь тулинг проекта (`gdlint`, `gdformat`, `pre-commit`,
-  `tools/godot_check.py`) — на Python.
+- All code is written with type annotations; `gdlint` checks this.
+- Godot's ceiling on the number of simultaneous 2D light sources is lower than Unity URP's:
+  the community cites a practical limit of about 15–16 sources per node, with a noticeable
+  drop already at 5+ shadow-casting sources. Some of the complaints date back to Godot 3. We
+  verify the limit with a prototype in M6 and plan for a lighting budget and floor streaming.
+- Console builds, if ever needed, are possible only through the paid partner W4 Games. This
+  is outside the scope of the epic.
+- Python knowledge stays useful: all project tooling (`gdlint`, `gdformat`, `pre-commit`,
+  `tools/godot_check.py`) is in Python.

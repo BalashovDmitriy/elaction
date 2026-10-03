@@ -1,25 +1,27 @@
 extends Node3D
 
-## Машины жребия рядом: кузов, проём водительской двери и салон (ADR-0046).
+## The draw's cars side by side: body, driver's door opening and interior (ADR-0046).
 ##
-## Три ряда по пять моделей, капотом влево — как стоит машина Otto у ворот:
-## закрытые, с распахнутой дверью и плафоном и вид с кормы, как машины на
-## местах паркинга. Кадр ортокамерой сбоку, при ровном свете: дефект модели —
-## торчащий из крыши потолок, тёмная дверь, дыра в борту — виден без партии.
+## Three rows of five models, hood to the left — the way Otto's car stands at the gate:
+## closed, with the door open and the dome light on, and a view from the rear, like the
+## cars in the garage bays. A side shot with an ortho camera, in even light: a model defect —
+## a ceiling sticking out of the roof, a dark door, a hole in the side — is visible without
+## a game.
 ##
-## Запуск:
+## Run:
 ##     godot --path . res://tools/car_shot.tscn
 ##     godot --path . res://tools/car_shot.tscn -- --folder=M24i
 
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 
-## Шаг ряда по горизонтали и по вертикали, м.
+## Row step horizontally and vertically, m.
 const STEP_X: float = 4.2
 const STEP_Y: float = 1.9
 const SETTLE_FRAMES: int = 20
 
 var _folder: String = "M24i"
-## Без салона (`--bare`): торчит ли из кузова салон или сам проём.
+## Without the interior (`--bare`): whether the interior or the opening itself sticks out of
+## the body.
 var _bare: bool = false
 
 
@@ -56,8 +58,8 @@ func _stage() -> void:
 			choice.paint = index % CarModel.PAINTS.size()
 			var car := CarModel.build(choice)
 			car.position = Vector3(index * STEP_X, -row * STEP_Y, 0.0)
-			# Капотом влево, дверью к камере — как у ворот ([ExitCar]); третий
-			# ряд — кормой к камере, как на местах паркинга.
+			# Hood to the left, door to the camera — as at the gate ([ExitCar]); the third
+			# row — rear to the camera, as in the garage bays.
 			car.rotation.y = PI if row < 2 else -PI * 0.5
 			add_child(car)
 			var interior := car.find_child("CarInterior", true, false) as Node3D
@@ -73,7 +75,7 @@ func _stage() -> void:
 	camera.make_current()
 
 
-## Распахивает дверь и зажигает плафон, как на посадке.
+## Opens the door and turns on the dome light, as at boarding.
 func _open(car: Node3D) -> void:
 	var door := car.find_child("DriverDoor", true, false) as Node3D
 	if door != null:
@@ -94,7 +96,7 @@ func _run() -> void:
 	var path := "res://screens/%s/cars%s.png" % [_folder, "_bare" if _bare else ""]
 	image.save_png(path)
 	print(ProjectSettings.globalize_path(path))
-	# Крупно — каждая машина с распахнутой дверью: салон и проём.
+	# Close-up — each car with the door open: interior and opening.
 	var camera := get_viewport().get_camera_3d()
 	camera.size = 2.2
 	for index: int in CarModel.MODELS.size():

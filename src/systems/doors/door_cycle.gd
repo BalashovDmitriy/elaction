@@ -1,42 +1,41 @@
 class_name DoorCycle
 extends RefCounted
 
-## Ход створки двери: закрыта, открывается, открыта, закрывается.
+## Door leaf travel: closed, opening, open, closing.
 ##
-## Ни узлов, ни физики: узел двери спрашивает, что показывать, и исполняет.
-## Поэтому ход проверяется без сцены — тем же приёмом, что [OttoStateMachine],
-## [ElevatorMotion] и [DoorVisit]. Основания — ADR-0020, решение 1.
+## No nodes, no physics: the door node asks what to show and does it. So the travel is
+## checked without a scene — the same trick as [OttoStateMachine], [ElevatorMotion] and
+## [DoorVisit]. Grounds — ADR-0020, decision 1.
 ##
-## Отделён от [DoorVisit] нарочно. Тот про правила визита — кого пустить и когда
-## выпустить; этот про саму створку, которой всё равно, кто её открыл: Otto,
-## пришедший за документом, или агент, идущий в засаду.
+## Separated from [DoorVisit] on purpose. That one is about the visit rules — whom to let
+## in and when to let out; this one is about the leaf itself, which does not care who
+## opened it: Otto, come for a document, or an agent heading for an ambush.
 
 enum Phase { CLOSED, OPENING, OPEN, CLOSING }
 
-## Сколько идёт створка в одну сторону, с. Задаётся тем, кто открывает: визит
-## Otto быстрый, выход агента медленный, потому что он ещё и предупреждение
-## (ADR-0020, решение 2).
+## How long the leaf takes in one direction, s. Set by whoever opens it: Otto's visit is
+## fast, an agent's exit is slow, because it is also a warning (ADR-0020, decision 2).
 var travel_time: float = 0.25
 
 var phase: Phase = Phase.CLOSED
 
-## Насколько створка отошла: 0 — закрыта, 1 — открыта настежь.
+## How far the leaf has moved: 0 — closed, 1 — wide open.
 var _openness: float = 0.0
 
 
-## Открывает створку. Уже открытую не трогает.
+## Opens the leaf. Does not touch one already open.
 func open() -> void:
 	if phase != Phase.OPEN:
 		phase = Phase.OPENING
 
 
-## Закрывает створку. Уже закрытую не трогает.
+## Closes the leaf. Does not touch one already closed.
 func close() -> void:
 	if phase != Phase.CLOSED:
 		phase = Phase.CLOSING
 
 
-## Шаг створки.
+## Leaf step.
 func tick(delta: float) -> void:
 	if phase == Phase.OPENING:
 		_openness = minf(_openness + _step(delta), 1.0)
@@ -48,22 +47,22 @@ func tick(delta: float) -> void:
 			phase = Phase.CLOSED
 
 
-## Открыта ли створка настежь: только тогда из двери можно выйти.
+## Whether the leaf is wide open: only then can one come out of the door.
 func is_open() -> bool:
 	return phase == Phase.OPEN
 
 
-## Закрыта ли створка совсем: только такую дверь можно занять заново.
+## Whether the leaf is fully closed: only such a door can be occupied again.
 func is_shut() -> bool:
 	return phase == Phase.CLOSED
 
 
-## Ход створки, 0..1. По нему узел и ведёт картинку (ADR-0020, решение 7).
+## Leaf travel, 0..1. The node drives the picture by it (ADR-0020, decision 7).
 func openness() -> float:
 	return _openness
 
 
-## Доля хода за кадр. Нулевое время хода — мгновенная створка, а не деление
-## на ноль: так дверь без анимации остаётся рабочей дверью.
+## Travel share per frame. Zero travel time means an instant leaf, not a division by
+## zero: that way a door without animation stays a working door.
 func _step(delta: float) -> float:
 	return delta / travel_time if travel_time > 0.0 else 1.0

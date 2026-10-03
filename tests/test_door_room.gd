@@ -1,26 +1,26 @@
 extends GutTest
 
-## Комната за дверью (ADR-0047, ADR-0055): номер отеля, кабинет офиса или
-## квартира.
+## The room behind a door (ADR-0047, ADR-0055): a hotel room, an office or
+## a flat.
 ##
-## Комната — жребий двери, поэтому проверяется не одна удачная, а любая: на
-## сотне жребиев каждого типа главный предмет стоит в створе двери и виден в
-## проём, мебель не заходит туда, где ходит створка, и ничто не торчит из
-## комнаты. Дверь собирает комнату, когда створка трогается, и убирает, когда
-## та закрылась.
+## The room is the door's draw, so what is checked is not one lucky room but any: over
+## a hundred draws of each kind the main item stands in line with the door and is seen through
+## the opening, furniture does not go where the leaf swings, and nothing sticks out of
+## the room. The door assembles the room when the leaf starts to move, and removes it when
+## it has closed.
 
 const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
 
-## Сколько жребиев проверять на каждый тип комнаты.
+## How many draws to check per room kind.
 const DRAWS: int = 100
-## Главный предмет — в створе двери: его середина не дальше этого от середины
-## проёма, м. Проём — [constant Door.LEAF_SIZE] в ширину.
+## The main item is in line with the door: its middle is no further than this from the middle of the
+## opening, m. The opening is [constant Door.LEAF_SIZE] wide.
 const HERO_REACH: float = Door.LEAF_SIZE.x * 0.5
-## Сколько кадров ждать, пока створка откроется и закроется.
+## How many frames to wait for the leaf to open and close.
 const PATIENCE: int = 240
 
-## Главные предметы: кровать — в номере и спальне, стол или рабочее место — в
-## кабинете, мойка — на кухне, диван — в гостиной.
+## Main items: the bed — in the hotel room and bedroom, the desk or workplace — in
+## the office, the sink — in the kitchen, the sofa — in the living room.
 const HEROES: PackedStringArray = [
 	"bed_hotel", "bed_double", "desk", "workstation_a", "workstation_b", "counter_sink", "sofa"
 ]
@@ -81,9 +81,9 @@ func test_the_room_holds_its_furniture_inside() -> void:
 			)
 
 
-## Мебель не уходит за боковые стены комнаты: у квартиры ряд из трёх предметов
-## шире половины комнаты, и без упора холодильник и торшер вылезали за стену
-## (кадры M24m). Повёрнутый телевизор шире своего габарита — допуск на него.
+## Furniture does not go past the room's side walls: in a flat a row of three items is
+## wider than half the room, and without a stop the fridge and floor lamp went through the wall
+## (M24m shots). A turned TV is wider than its extent — a tolerance for it.
 func test_furniture_stays_between_the_side_walls() -> void:
 	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
 		for seed: int in DRAWS:
@@ -97,9 +97,9 @@ func test_furniture_stays_between_the_side_walls() -> void:
 				assert_lte(x + half, shell.end.x + 0.12, where + " за правой стеной")
 
 
-## Телевизор гостиной повёрнут к дивану, а не в боковую стену, и повёрнутый не
-## входит в диван передним углом. У предмета каталога лицо — к камере, и
-## поворот на +угол уводит его к +X (авторевью M24m: экран смотрел в стену).
+## The living-room TV is turned toward the sofa, not into the side wall, and when turned it does not
+## go into the sofa with its front corner. A catalogue item faces the camera, and
+## rotating by +angle turns it toward +X (M24m code review: the screen faced the wall).
 func test_the_tv_faces_the_sofa() -> void:
 	var seen := 0
 	for seed: int in DRAWS:
@@ -123,9 +123,9 @@ func test_the_tv_faces_the_sofa() -> void:
 	assert_gt(seen, 0, "гостиные выпадали")
 
 
-## Тумбы спальни — вплотную к кровати. Ряд меряет кровать такой, какой она
-## встаёт: двуспальная ужимается по глубине на четверть, и по габариту каталога
-## тумбы отходили от неё на сорок сантиметров (авторевью M24m).
+## Bedroom nightstands are right against the bed. The row measures the bed as it
+## stands: a double one is squashed in depth by a quarter, and by the catalogue extent
+## the nightstands stood forty centimetres away from it (M24m code review).
 func test_the_night_stands_flank_the_bed() -> void:
 	var seen := 0
 	for seed: int in DRAWS:
@@ -148,7 +148,7 @@ func test_the_night_stands_flank_the_bed() -> void:
 	assert_gt(seen, 0, "спальни выпадали")
 
 
-## Что поставлено в комнату под именем [param prop]; пусто — если нет.
+## What was placed in the room under the name [param prop]; empty — if none.
 func _placed(room: DoorRoom, prop: String) -> Dictionary:
 	for item: Dictionary in room.placed:
 		if item["prop"] == prop:
@@ -156,7 +156,7 @@ func _placed(room: DoorRoom, prop: String) -> Dictionary:
 	return {}
 
 
-## Оболочка комнаты — её коробки: пол, потолок и стены.
+## The room shell — its boxes: floor, ceiling and walls.
 func _shell_of(room: DoorRoom) -> AABB:
 	var shell := AABB()
 	var first := true
@@ -170,10 +170,10 @@ func _shell_of(room: DoorRoom) -> AABB:
 	return shell
 
 
-## У крайнего места этажа до наружной стены меньше, чем комната со сдвигом
-## уходит от проёма: комната упирается в стену и из силуэта здания не торчит
-## (авторевью M24i). Мебель стоит от проёма, а не от стен, — меряется сама
-## комната, её оболочка.
+## At the outermost slot of a floor there is less room to the outer wall than the shifted room
+## extends from the opening: the room stops at the wall and does not stick out of the building
+## silhouette (M24i code review). Furniture stands from the opening, not the walls — what is
+## measured is the room itself, its shell.
 func test_a_room_at_the_end_of_the_floor_stays_inside_the_building() -> void:
 	var margin := BuildingRules.new().margin
 	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
@@ -204,8 +204,8 @@ func test_every_room_has_its_light_and_window() -> void:
 		assert_false(light.shadow_enabled, "свет комнаты без тени — в бюджете кадра")
 
 
-## Дверь собирает комнату, когда створка трогается, и убирает, когда закрылась.
-## Без [method Door.furnish] — как в тестах двери — за ней по-прежнему темно.
+## The door assembles the room when the leaf starts to move and removes it when it has closed.
+## Without [method Door.furnish] — as in the door tests — it is still dark behind it.
 func test_the_door_builds_its_room_only_while_open() -> void:
 	var ground := StaticBody3D.new()
 	add_child_autofree(ground)
@@ -243,8 +243,8 @@ func test_a_bare_door_stays_dark() -> void:
 	assert_null(door.room(), "без здания комнаты нет")
 
 
-## На тёмном этаже комната без своего света: светится только окно с городом
-## (решение пользователя, M24i).
+## On a dark floor the room has no light of its own: only the window with the city glows
+## (user's decision, M24i).
 func test_a_room_on_a_dark_floor_keeps_the_dark() -> void:
 	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
 		var room := DoorRoom.build(kind, 5, null, Vector2(-INF, INF), true)

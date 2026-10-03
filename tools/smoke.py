@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Прогон собранного билда: он должен запуститься, а не просто собраться.
+"""Run of a built binary: it must start, not just build.
 
-Экспорт возвращает 0 и когда собрал нерабочее, поэтому сборка проверяется
-запуском ([ADR-0013](../docs/adr/0013-release-and-versioning.md), пункт 6).
-Проверяем три вещи сразу:
+Export returns 0 even when it has built something broken, so the build is checked by
+running it ([ADR-0013](../docs/adr/0013-release-and-versioning.md), item 6).
+We check three things at once:
 
-1. **Маркер запуска.** Игра печатает `elaction <версия> · <платформа>` первой
-   строкой (`Release.banner`). Процесс, упавший на первом кадре, тоже выходит
-   с нулём — без маркера «запустилось» считать нельзя.
-2. **Ни одного `SCRIPT ERROR`** и прочих маркеров поломки в выводе.
-3. **Билд дожил до конца прогона** — либо сам вышел по `--quit-after`, либо был
-   снят по таймауту, прожив всё отведённое время. Оба исхода нормальны: главное,
-   что он не умер раньше.
+1. **The startup marker.** The game prints `elaction <version> · <platform>` as the
+   first line (`Release.banner`). A process that crashed on the first frame also exits
+   with zero: without the marker it cannot be counted as "started".
+2. **Not a single `SCRIPT ERROR`** or other breakage marker in the output.
+3. **The binary survived to the end of the run**: either it exited by itself via
+   `--quit-after`, or it was stopped by timeout after living the whole allotted time.
+   Both outcomes are fine: what matters is that it did not die earlier.
 
     python tools/smoke.py build/linux/elaction.x86_64
     python tools/smoke.py build/linux/elaction.x86_64 --frames 600
@@ -27,27 +27,27 @@ from godot_bin import PROJECT_ROOT, as_text, use_utf8_output
 from godot_check import find_errors
 from version import read as project_version
 
-# Сколько кадров игра должна прожить. 300 — это пять секунд при 60 FPS: меню
-# успевает собраться, музыка запуститься, а автолоады отработать.
+# How many frames the game must live. 300 is five seconds at 60 FPS: the menu
+# has time to build, the music to start and the autoloads to run.
 DEFAULT_FRAMES: int = 300
 
-# Запас по времени на случай, если --quit-after не сработает: кадры при этом
-# всё равно идут, и прожитое время само по себе годный признак.
+# A time margin in case --quit-after does not work: frames still go on,
+# and the time lived is a valid sign by itself.
 TIMEOUT_SECONDS: int = 60
 
 
 def marker() -> str:
-    """Начало строки запуска. Версия берётся из project.godot, как и везде."""
+    """The start of the startup line. The version is taken from project.godot, as everywhere."""
     return f"elaction {project_version()}"
 
 
 def launch(binary: Path, frames: int) -> tuple[str, bool]:
-    """Запускает билд. Возвращает вывод и признак «дожил до конца прогона»."""
+    """Runs the binary. Returns the output and the "survived to the end of the run" flag."""
     command = [
         str(binary),
         "--headless",
-        # Звуковой карты на runner'е нет, а без явного драйвера Godot ищет её
-        # и жалуется — в выводе это лишний шум, который легко принять за поломку.
+        # There is no sound card on the runner, and without an explicit driver Godot looks for
+        # one and complains: extra noise in the output that is easy to mistake for breakage.
         "--audio-driver",
         "Dummy",
         "--quit-after",
@@ -64,16 +64,16 @@ def launch(binary: Path, frames: int) -> tuple[str, bool]:
             check=False,
         )
     except subprocess.TimeoutExpired as expired:
-        # Потоки снятого процесса приезжают вразнобой — str, bytes или None,
-        # поэтому каждый приводится к строке отдельно (godot_bin.as_text).
+        # Streams of a killed process arrive in mixed forms, str, bytes or None,
+        # so each is converted to a string separately (godot_bin.as_text).
         output = as_text(expired.stdout) + as_text(expired.stderr)
-        # Снят по таймауту — значит, всё это время был жив. Это успех, а не сбой.
+        # Stopped by timeout means it was alive all that time. This is success, not a failure.
         return output, True
     return (completed.stdout or "") + (completed.stderr or ""), completed.returncode == 0
 
 
 def parse(argv: list[str]) -> tuple[list[str], int] | None:
-    """Делит аргументы на пути и число кадров. None — если разобрать не вышло."""
+    """Splits the arguments into paths and a frame count. None if parsing failed."""
     paths: list[str] = []
     frames = DEFAULT_FRAMES
     index = 0
@@ -82,8 +82,8 @@ def parse(argv: list[str]) -> tuple[list[str], int] | None:
             paths.append(argv[index])
             index += 1
             continue
-        # Без явной проверки «--frames» последним аргументом валит скрипт
-        # трассировкой вместо внятного сообщения.
+        # Without an explicit check, "--frames" as the last argument crashes the script
+        # with a traceback instead of a clear message.
         if index + 1 >= len(argv) or not argv[index + 1].isdigit():
             print("После --frames нужно число кадров: python tools/smoke.py <билд> --frames 600")
             return None

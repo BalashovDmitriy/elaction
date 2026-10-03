@@ -1,15 +1,15 @@
 extends SceneTree
 
-## Разбор модели актёра: что импортировал Godot из `.glb`.
+## Actor model breakdown: what Godot imported from the `.glb`.
 ##
-## Печатает дерево узлов, кости скелета с покоем и то, куда уходит конец
-## каждой кости при положительном повороте вокруг её оси X, — по этому
-## выверяется знак углов в [FigurePoses]: «вперёд» обязано быть вперёд.
+## Prints the node tree, the skeleton bones with their rest pose, and where the end of
+## each bone goes under a positive rotation around its X axis — this is how
+## the sign of angles in [FigurePoses] is verified: "forward" must be forward.
 ##
-## Запуск:
+## Run:
 ##     godot --headless --script res://tools/dump_model.gd -- res://assets/models/otto.glb
 
-## На сколько повернуть кость, чтобы увидеть направление, градусов.
+## How much to rotate a bone to see the direction, degrees.
 const PROBE_ANGLE: float = 30.0
 
 
@@ -81,9 +81,9 @@ func _dump_bones(skeleton: Skeleton3D) -> void:
 		)
 
 
-## Поворачивает каждую кость на +PROBE_ANGLE вокруг своей X и печатает, куда
-## сдвинулся её конец относительно покоя. Конец — точка в десяти сантиметрах
-## вдоль оси кости; направление сдвига по Z и есть знак «вперёд».
+## Rotates each bone by +PROBE_ANGLE around its X and prints where
+## its end moved relative to rest. The end is a point ten centimetres
+## along the bone axis; the direction of the shift along Z is the sign of "forward".
 func _probe_axes(skeleton: Skeleton3D) -> void:
 	print("--- проба: +%.0f° вокруг локальной X ---" % PROBE_ANGLE)
 	for index in skeleton.get_bone_count():

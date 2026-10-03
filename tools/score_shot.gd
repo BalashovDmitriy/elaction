@@ -1,9 +1,9 @@
 extends Node
 
-## Прибавка очков кадром: здание, HUD, два начисления — над местом в коридоре и
-## документ над Otto — и кадр на взлёте прибавок.
+## Score increment as a shot: the building, the HUD, two awards — above a place in the corridor and
+## a document above Otto — and a shot as the increments rise.
 ##
-## Запуск:
+## Run:
 ##     godot --path . res://tools/score_shot.tscn
 ##     godot --path . res://tools/score_shot.tscn -- --folder=M24m
 

@@ -1,54 +1,55 @@
 class_name EnemyBrain
 extends RefCounted
 
-## Решения агента: идти, стрелять, уворачиваться или стоять.
+## Agent decisions: walk, shoot, dodge or stand.
 ##
-## Ни узлов, ни физики — принимает вектор до Otto и факты, возвращает состояние.
-## Поэтому проверяется без сцены, как [OttoStateMachine] и [DoorVisit].
+## No nodes, no physics — takes the vector to Otto and facts, returns a state.
+## So it is checked without a scene, like [OttoStateMachine] and [DoorVisit].
 ##
-## С M18d решения — по правилам аркадного ROM ([Arcade], ADR-0027). У агента
-## своя злость: от неё замах перед выстрелом, пауза после, поза выстрела — стоя,
-## присев или лёжа — и шанс увернуться. За Otto он не гонится: бродит по этажу,
-## а стреляет, когда смотрит на него; под тревогой — не глядя, сам развернувшись.
+## Since M18d the decisions follow the arcade ROM rules ([Arcade], ADR-0027). The agent has his own
+## aggression: it drives the wind-up before a shot, the pause after, the shooting pose — standing,
+## crouched or lying — and the chance to dodge. He does not chase Otto: he wanders the floor, and
+## shoots when facing him; under alarm — without looking, having turned around himself.
 ##
-## В кабинах агент ездит пассажиром (ADR-0025, решение 6), но это решает [Enemy]
-## с уровнем, а не мозг. Не прыгает — ни в оригинале, ни здесь (ADR-0026, ADR-0027).
+## In cabs the agent rides as a passenger (ADR-0025, decision 6), but [Enemy] decides that with the
+## level, not the brain. Does not jump — neither in the original nor here (ADR-0026, ADR-0027).
 
 enum State { EMERGING, WALK, SHOOT, DEAD }
 
-## Стойка агента. От неё зависит и рост, и то, какая пуля пройдёт мимо, и на
-## какой высоте уйдёт его собственная.
+## Agent stance. Both the height and which bullet will pass by depend on it, and at
+## what height his own will leave.
 enum Stance { STAND, KNEEL, PRONE }
 
-## Замах не короче этого, с, при любой злости. В ROM при злости 10 и выше замаха
-## нет вовсе, и пуля уходит в тот же кадр; от медленной пули ROM это было
-## терпимо, от втрое быстрой (ADR-0037, решение 5) без луча прицела не уйти —
-## ни человеку, ни боту тестов. Четверть секунды — на реакцию, а не на отдых.
+## The wind-up is no shorter than this, s, at any aggression. In ROM at aggression 10 and up there
+## is no wind-up at all, and the bullet leaves on the same frame; with ROM's slow bullet this was
+## tolerable, with a three times faster one (ADR-0037, decision 5) it cannot be dodged without the
+## aim laser — neither by a human nor by the test bot. A quarter second — for reaction, not for
+## rest.
 const MIN_TELL: float = 0.25
 
-## Сколько агент выбирается из двери, с: всё это время он не стреляет.
+## How long the agent takes to get out of a door, s: all this time he does not shoot.
 var emerge_time: float = 0.6
 
-## Насколько близко по вертикали, чтобы считать, что Otto на той же линии, м.
+## How close vertically to count Otto as on the same line, m.
 var same_line: float = 0.45
 
-## Рост агента в каждой стойке, м. По ним и решается, пройдёт ли пуля мимо.
+## Agent height in each stance, m. These decide whether a bullet passes by.
 var stand_height: float = Proportions.BODY
 var kneel_height: float = Proportions.KNEEL
 var prone_height: float = Proportions.PRONE
 
-## Злость агента, 0..[constant Arcade.TOP]. Растит её [Enemy] со временем.
+## Agent aggression, 0..[constant Arcade.TOP]. [Enemy] raises it over time.
 var anger: int = 0
 
-## Тревога агентов (ADR-0027, решение 5): стреляет, не глядя на Otto.
+## Agents' alarm (ADR-0027, decision 5): shoots without looking at Otto.
 var alert: bool = false
 
-## Агент из поздних — третий или четвёртый в здании: у него своя таблица поз,
-## он чаще стреляет на ходу (table_1D95).
+## An agent from the late ones — third or fourth in the building: he has his own pose table,
+## he shoots on the move more often (table_1D95).
 var late: bool = false
 
-## Генератор решений. Свой у каждого агента, посеянный уровнем: иначе прогон
-## бота перестаёт повторяться.
+## Decision generator. Each agent has his own, seeded by the level: otherwise a bot
+## run stops repeating.
 var rng := RandomNumberGenerator.new()
 
 var state: State = State.EMERGING
@@ -58,21 +59,21 @@ var facing: float = 1.0
 var _emerging_left: float = 0.0
 var _cooldown_left: float = 0.0
 var _fired_now: bool = false
-## Действие — выстрел или увёртка: сколько оно ещё длится и сколько до вылета пули.
+## Action — a shot or a dodge: how long it still lasts and how long until the bullet leaves.
 var _action_left: float = 0.0
 var _wind_up_left: float = 0.0
 var _shot_pending: bool = false
-## Можно ли в Otto сейчас попасть. Нельзя — замах доходит до [constant MIN_TELL]
-## и держится там: луч горит, а пуля ждёт.
+## Whether Otto can be hit now. If not — the wind-up runs up to [constant MIN_TELL]
+## and holds there: the laser is lit, and the bullet waits.
 var _target_hittable: bool = true
-## Стреляет ли агент на ходу: поза «прочее» ROM — выстрел без остановки.
+## Whether the agent shoots on the move: ROM's "other" pose — a shot without stopping.
 var _on_the_move: bool = false
-## Брожение: сколько ещё идти и сколько ещё стоять.
+## Wandering: how much longer to walk and how much longer to stand.
 var _stroll_left: float = 0.0
 var _pause_left: float = 0.0
 
 
-## Начинает жизнь агента: он выбирается из двери в сторону [param towards].
+## Starts the agent's life: he gets out of the door toward [param towards].
 func start(towards: float) -> void:
 	state = State.EMERGING
 	stance = Stance.STAND
@@ -89,7 +90,7 @@ func start(towards: float) -> void:
 
 func kill() -> void:
 	state = State.DEAD
-	# Мёртвый не уклоняется: труп лежит как упал, и стойка на него не влияет.
+	# The dead do not dodge: the corpse lies as it fell, and stance does not affect it.
 	stance = Stance.STAND
 	_fired_now = false
 	_action_left = 0.0
@@ -100,54 +101,54 @@ func is_dead() -> bool:
 	return state == State.DEAD
 
 
-## Разворачивает агента. Зовёт узел, когда пол впереди кончился: бродящий
-## агент идёт дальше в другую сторону, а не стоит у края.
+## Turns the agent around. The node calls it when the floor ahead has ended: a wandering
+## agent walks on the other way rather than standing at the edge.
 func turn_around() -> void:
 	facing = -facing
 
 
-## Поворачивает агента в заданную сторону. Зовёт узел, когда идти надо не куда
-## глаза глядят, а к стоящей кабине (ADR-0025, решение 6).
+## Turns the agent to a given side. The node calls it when he must walk not wherever
+## his eyes lead but to a standing cab (ADR-0025, decision 6).
 func face(towards: float) -> void:
 	if not is_zero_approx(towards):
 		facing = signf(towards)
 
 
-## Выстрелил ли агент именно в этом кадре. Спрашивают сразу после [method update].
+## Whether the agent fired exactly on this frame. Asked right after [method update].
 func fired() -> bool:
 	return _fired_now
 
 
-## Замахивается ли агент: выстрел решён, а пуля ещё не ушла. Всё это время
-## виден луч прицела (ADR-0037, решение 5). Замаха короче [constant MIN_TELL]
-## нет и при злости 10 и выше, где у ROM он нулевой (@1BDF): луч есть всегда.
+## Whether the agent is winding up: the shot is decided, but the bullet has not left yet. All this
+## time the aim laser is visible (ADR-0037, decision 5). There is no wind-up shorter than [constant
+## MIN_TELL] even at aggression 10 and up, where ROM's is zero (@1BDF): the laser is always there.
 func is_winding_up() -> bool:
 	return state == State.SHOOT and _shot_pending and _wind_up_left > 0.0
 
 
-## Сколько ещё до вылета пули, с; ноль — замаха нет.
+## How long until the bullet leaves, s; zero — no wind-up.
 func wind_up_left() -> float:
 	return maxf(_wind_up_left, 0.0) if is_winding_up() else 0.0
 
 
-## Пересчитывает решение.
+## Recomputes the decision.
 ##
-## [param to_target] — от агента к Otto. [param target_alive] — есть ли в кого
-## целиться: жив ли Otto и виден ли. Невидимого — в тени или за дверью — мозг
-## не обстреливает (ADR-0023, решение 8).
+## [param to_target] — from the agent to Otto. [param target_alive] — whether there is someone to
+## aim at: whether Otto is alive and visible. An invisible one — in shadow or behind a door — the
+## brain does not shoot at (ADR-0023, decision 8).
 ##
-## [param incoming_height] — высота летящей в агента пули над его ногами, м;
-## отрицательная — ничего не летит. [param in_range] — достаёт ли выстрел: в
-## ROM дальности нет, этаж оригинала целиком на экране, и у нас это «агент
-## в кадре» (ADR-0027, решение 3а). [param gun_free] — нет ли в полёте его
-## прошлой пули: она у агента одна (@1BAE). [param target_low] — Otto присел:
-## тогда агент стреляет из приседа (@1CD8).
+## [param incoming_height] — height of the bullet flying at the agent above his feet, m;
+## negative — nothing is flying. [param in_range] — whether the shot reaches: in
+## ROM there is no range, the original's floor is wholly on screen, and here that is "the agent
+## is in frame" (ADR-0027, decision 3a). [param gun_free] — whether his last bullet is not
+## in flight: he has only one (@1BAE). [param target_low] — Otto crouched:
+## then the agent shoots from a crouch (@1CD8).
 ##
-## [param target_hittable] — можно ли в Otto сейчас попасть. Нельзя, пока он
-## выходит из двери, едет на эскалаторе или мигает после возвращения в игру:
-## пуля прошла бы сквозь него, и игрок видел бы попадание без смерти. Целиться
-## в такого можно, стрелять — нет: замах держится на [constant MIN_TELL], и
-## пуля уходит через четверть секунды после того, как Otto стал уязвим.
+## [param target_hittable] — whether Otto can be hit now. Not while he
+## is coming out of a door, riding an escalator or blinking after returning to play:
+## the bullet would pass through him, and the player would see a hit without a death. Aiming
+## at such an Otto is allowed, shooting is not: the wind-up holds at [constant MIN_TELL], and
+## the bullet leaves a quarter second after Otto becomes vulnerable.
 func update(
 	delta: float,
 	to_target: Vector2,
@@ -172,9 +173,9 @@ func update(
 		state = State.WALK
 
 	if _action_left > 0.0:
-		# Otto скрылся за дверью или погиб, пока агент замахивался: выстрела нет.
-		# Невидимого не обстреливают (ADR-0023, решение 8), и замах, начатый по
-		# видимому, этого не отменяет — иначе дверь переставала бы прятать.
+		# Otto hid behind a door or died while the agent was winding up: no shot.
+		# The invisible are not shot at (ADR-0023, decision 8), and a wind-up begun on a
+		# visible one does not cancel that — otherwise a door would stop hiding.
 		if _shot_pending and not target_alive:
 			_shot_pending = false
 		_act(delta)
@@ -193,8 +194,8 @@ func update(
 	return state
 
 
-## Хочет ли агент сейчас идти. Стоя на месте он целится, уворачивается или
-## стоит паузу брожения.
+## Whether the agent wants to walk now. Standing still he aims, dodges or
+## waits out a wandering pause.
 func wants_to_walk() -> bool:
 	if state == State.EMERGING:
 		return true
@@ -203,16 +204,16 @@ func wants_to_walk() -> bool:
 	return stance == Stance.STAND and _action_left <= 0.0 and _pause_left <= 0.0
 
 
-## Стойка против летящей пули: от высокой — на колено, от низкой — лечь (@05F5).
+## Stance against a flying bullet: from a high one — onto a knee, from a low one — lie down (@05F5).
 ##
-## Высокая — та, что проходит над присевшим; всё ниже — низкая.
+## High is one that passes over a crouching one; everything lower is low.
 func stance_against(incoming_height: float) -> Stance:
 	if incoming_height < 0.0:
 		return Stance.STAND
 	return Stance.KNEEL if incoming_height > kneel_height else Stance.PRONE
 
 
-## Рост в текущей стойке. По нему уровень задаёт форму коллизии.
+## Height in the current stance. The level sets the collision shape by it.
 func height() -> float:
 	match stance:
 		Stance.KNEEL:
@@ -223,24 +224,24 @@ func height() -> float:
 			return stand_height
 
 
-## Стоит ли агент на ногах.
+## Whether the agent is on his feet.
 func is_standing() -> bool:
 	return stance == Stance.STAND
 
 
-## Выходит ли агент ещё из проёма двери.
+## Whether the agent is still coming out of the doorway.
 ##
-## Пока выходит — он неуязвим: иначе телеграф створки превращает дверь в тир,
-## и игрок снимает каждого на выходе (ADR-0020, решение 3).
+## While coming out he is invulnerable: otherwise the leaf's telegraph turns a door into a shooting
+## gallery, and the player picks off each one on the way out (ADR-0020, decision 3).
 func is_emerging() -> bool:
 	return state == State.EMERGING
 
 
-## Идёт действие: замах, выстрел, выдержка позы. Кончилось — агент встаёт.
+## An action is running: wind-up, shot, pose hold. Finished — the agent stands up.
 ##
-## Пока в Otto не попасть, время замаха идёт только до [constant MIN_TELL], и
-## действие стоит вместе с ним: разрыв между замахом и концом действия тот же,
-## что по ROM, — просто пуля уходит позже.
+## While Otto cannot be hit, wind-up time runs only up to [constant MIN_TELL], and
+## the action stands still with it: the gap between wind-up and the end of the action is the same
+## as in ROM — the bullet just leaves later.
 func _act(delta: float) -> void:
 	if _shot_pending and not _target_hittable:
 		delta = clampf(_wind_up_left - MIN_TELL, 0.0, delta)
@@ -258,8 +259,8 @@ func _act(delta: float) -> void:
 		state = State.WALK
 
 
-## Увёртка: пуля Otto рядом, и злость дала шанс — агент приседает или ложится
-## на время действия. Шанс в ROM — за тик, здесь переведён на кадр.
+## Dodge: Otto's bullet is close, and aggression gave a chance — the agent crouches or lies down
+## for the duration of the action. ROM's chance is per tick, here it is converted per frame.
 func _dodges(delta: float, incoming_height: float) -> bool:
 	if incoming_height < 0.0:
 		return false
@@ -275,7 +276,7 @@ func _dodges(delta: float, incoming_height: float) -> bool:
 	return true
 
 
-## Начинает выстрел: поза по злости, разворот к Otto, замах.
+## Starts a shot: pose by aggression, turn to Otto, wind-up.
 func _open_fire(to_target: Vector2, target_low: bool) -> void:
 	face(to_target.x)
 	var pose := Arcade.fire_pose(anger, rng.randi_range(0, 255), late)
@@ -291,22 +292,22 @@ func _open_fire(to_target: Vector2, target_low: bool) -> void:
 			stance = Stance.STAND
 	state = State.SHOOT
 	_wind_up_left = tell_time(anger)
-	# Действие по ROM всегда длиннее замаха на два тика и больше (@1C7A): пуля
-	# уходит внутри него.
+	# A ROM action is always longer than the wind-up by two ticks or more (@1C7A): the bullet
+	# leaves within it.
 	_action_left = Arcade.action_time(anger)
 	_shot_pending = true
-	# Замаха в ноль не бывает ([constant MIN_TELL]), но шаг зовётся сразу: так
-	# замах начинается в этом же кадре, а не в следующем.
+	# A zero wind-up does not happen ([constant MIN_TELL]), but the step is called at once: that way
+	# the wind-up starts on this same frame, not the next.
 	_act(0.0)
 
 
-## Замах перед выстрелом на злости [param level], с: по ROM, но не короче
+## Wind-up before a shot at aggression [param level], s: by ROM, but no shorter than
 ## [constant MIN_TELL].
 static func tell_time(level: int) -> float:
 	return maxf(MIN_TELL, Arcade.wind_up(level))
 
 
-## Брожение по этажу: идёт, стоит, снова идёт — в случайную сторону (@5D13).
+## Wandering the floor: walks, stands, walks again — in a random direction (@5D13).
 func _stroll(delta: float) -> void:
 	if _pause_left > 0.0:
 		_pause_left -= delta
@@ -317,7 +318,7 @@ func _stroll(delta: float) -> void:
 		return
 	_stroll_left -= delta
 	if _stroll_left <= 0.0:
-		# Пауза 7 тиков плюс случайная добавка, как между решениями ROM (@04E6).
+		# A pause of 7 ticks plus a random addition, as between ROM decisions (@04E6).
 		_pause_left = Arcade.seconds(7.0 + float(rng.randi_range(0, 7)))
 
 
@@ -325,7 +326,7 @@ func _stroll_time() -> float:
 	return rng.randf_range(0.6, 2.4)
 
 
-## Смотрит ли агент на Otto. Под тревогой не нужно: развернётся сам (@0568).
+## Whether the agent faces Otto. Not needed under alarm: he will turn around himself (@0568).
 func _faces(to_target: Vector2) -> bool:
 	return alert or is_zero_approx(to_target.x) or signf(to_target.x) == facing
 

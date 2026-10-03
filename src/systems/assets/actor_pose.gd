@@ -1,25 +1,24 @@
 class_name ActorPose
 extends RefCounted
 
-## Какую позу показать актёру. Чистая функция от того, что с ним происходит.
+## Which pose to show for an actor. A pure function of what is happening to it.
 ##
-## Вынесена из узлов по той же причине, что [OttoStateMachine] и
-## [ElevatorMotion]: набор поз обязан покрывать все состояния, и проверять это
-## надо без сцены, физики и отрисованного кадра. Списки поз лежат здесь же, и
-## тест следит, чтобы выбор позы не выходил за них.
+## Taken out of the nodes for the same reason as [OttoStateMachine] and [ElevatorMotion]: the pose
+## set must cover all states, and this has to be checked without a scene, physics or a rendered
+## frame. The pose lists live right here, and a test makes sure the pose choice does not go beyond
+## them.
 ##
-## До M15 списки жили у спрайтов: поза и была картинкой. Теперь позу отыгрывает
-## [FigureRig] по таблице [FigurePoses], и место списка — рядом с правилом,
-## которое позу выбирает, а не рядом с тем, кто её показывает.
+## Up to M15 the lists lived with the sprites: a pose was a picture. Now the pose is acted out by
+## [FigureRig] from the [FigurePoses] table, and the list belongs next to the rule that chooses the
+## pose, not next to the one that shows it.
 
-## Кадров в цикле ходьбы (ADR-0011, пункт 5).
+## Frames in the walk cycle (ADR-0011, item 5).
 const WALK_FRAMES: int = 3
 
-## Кадров ходьбы в секунду. На двенадцати шаг читается как бег, а Otto ходит
-## (ADR-0011, пункт 5).
+## Walk frames per second. At twelve the step reads as running, while Otto walks (ADR-0011, item 5).
 const WALK_FPS: float = 10.0
 
-## Позы Otto.
+## Otto's poses.
 const OTTO_POSES: PackedStringArray = [
 	"idle",
 	"walk_0",
@@ -39,8 +38,8 @@ const OTTO_POSES: PackedStringArray = [
 	"sit_grab",
 ]
 
-## Позы агента. Он не прыгает и не бьёт ногой — этого не умеет [EnemyBrain].
-## «Crouch» служит ему позой «на колене», «prone» — своя (ADR-0016, пункт 3).
+## Agent poses. He does not jump or kick — [EnemyBrain] cannot do that. "Crouch" serves him as the
+## "on one knee" pose, "prone" is his own (ADR-0016, item 3).
 const AGENT_POSES: PackedStringArray = [
 	"idle",
 	"walk_0",
@@ -54,38 +53,37 @@ const AGENT_POSES: PackedStringArray = [
 	"crushed",
 ]
 
-## Поза приседа. Одна на Otto и на агента: у агента это «на колене».
+## The crouch pose. One for Otto and the agent: for the agent it is "on one knee".
 const CROUCH := "crouch"
 
-## Otto висит на тросе вертолёта: руки вверх, ноги вместе (ADR-0043,
-## решение 1). Выбирает её не состояние, а тот, кто везёт ([member Otto.ride_look]).
+## Otto hangs on the helicopter rope: arms up, legs together (ADR-0043, decision 1). It is chosen
+## not by the state but by whoever carries him ([member Otto.ride_look]).
 const ROPE := "rope"
 
-## Вступление здания (ADR-0052, решение 6): Otto выглядывает из проёма
-## вертолёта, садится на порог и берётся за трос. Как и трос, их выбирает не
-## состояние, а вступление ([member Otto.ride_pose]).
+## Building intro (ADR-0052, decision 6): Otto looks out of the helicopter doorway, sits on the sill
+## and takes hold of the rope. Like the rope, these are chosen not by the state but by the intro
+## ([member Otto.ride_pose]).
 const PEEK := "peek"
 const SIT_EDGE := "sit_edge"
 const SIT_GRAB := "sit_grab"
 const ARRIVAL_POSES: PackedStringArray = [PEEK, SIT_EDGE, SIT_GRAB]
 
-## Поза агента лёжа. Единственная лежащая поза живого: в [FigurePoses] у неё
-## своя запись — лицом вниз, ствол вперёд, — а не труп, положенный набок.
+## The agent's prone pose. The only lying pose of a living actor: in [FigurePoses] it has its own
+## entry — face down, gun forward — rather than a corpse laid on its side.
 const PRONE := "prone"
 
-## Позы, в которых актёр лежит, — все виды смерти, с M24d и труп, отброшенный
-## ударом сценки добивания (ADR-0040), — и уклонение лёжа.
+## Poses in which the actor lies — all kinds of death, since M24d also the corpse thrown by the blow
+## of a takedown scene (ADR-0040), — and the prone dodge.
 ##
-## В греев-боксе по этому списку коробка ложилась набок; риг M16 читает позу из
-## таблицы и его не спрашивает. Список остаётся фактом о позах, на котором стоят
-## тесты выбора: труп обязан лежать, кто бы его ни показывал.
+## In the greybox the box was laid on its side according to this list; the M16 rig reads the pose
+## from the table and does not consult it. The list remains a fact about poses on which the choice
+## tests rest: a corpse must lie, whoever shows it.
 const DOWN: PackedStringArray = ["dead_0", "dead_1", "crushed", "knocked", PRONE]
 
-## Поза по состоянию для тех состояний, у которых она одна. Константа, а не
-## словарь на каждый вызов: поза пересчитывается каждый физический кадр и на
-## Otto, и на каждом агенте в кадре.
+## Pose by state for states that have only one. A constant rather than a dictionary on every call:
+## the pose is recomputed every physics frame for Otto and for every agent in the frame.
 ##
-## С M24d удара ногой нет (ADR-0040): на спуске Otto просто летит — клип полёта.
+## Since M24d there is no kick (ADR-0040): on the descent Otto just flies — the flight clip.
 const BY_STATE: Dictionary = {
 	OttoStateMachine.State.CROUCH: CROUCH,
 	OttoStateMachine.State.JUMP: "jump",
@@ -93,13 +91,12 @@ const BY_STATE: Dictionary = {
 }
 
 
-## Поза Otto.
+## Otto's pose.
 ##
-## [param shooting] и [param falling_over] — не состояния машины, а короткие
-## таймеры: выстрел мгновенный, а показать его надо; смерть же показывается
-## двумя позами, падением и лежащим телом (ADR-0011, пункт 12). Так же и
-## [param landing]: только что приземлившийся и стоящий на месте показывает
-## приземление (ADR-0039), шагнул — идёт.
+## [param shooting] and [param falling_over] are not machine states but short timers: a shot is
+## instant, but it has to be shown; and death is shown with two poses, the fall and the lying body
+## (ADR-0011, item 12). The same with [param landing]: one who has just landed and stands still
+## shows the landing (ADR-0039), once he steps — he walks.
 static func of_otto(
 	state: OttoStateMachine.State,
 	crushed: bool,
@@ -110,8 +107,8 @@ static func of_otto(
 ) -> String:
 	if state == OttoStateMachine.State.DEAD:
 		return _death(crushed, falling_over)
-	# Из приседа Otto стреляет, не вставая: пуля летит низко, и рука наводится
-	# на неё в самом приседе (ADR-0043, решение 16).
+	# From a crouch Otto shoots without standing up: the bullet flies low, and the arm aims at it in
+	# the crouch itself (ADR-0043, decision 16).
 	if shooting and state != OttoStateMachine.State.CROUCH:
 		return "shoot"
 	if landing and state == OttoStateMachine.State.IDLE:
@@ -121,13 +118,13 @@ static func of_otto(
 	return BY_STATE.get(state, "idle")
 
 
-## Поза агента. Он не прыгает и не бьёт ногой — этого не умеет [EnemyBrain], и
-## кадры на несуществующие состояния были бы мусором. А уклоняться он умеет
-## с M11, и у колена с положением лёжа свои позы (ADR-0016, пункт 3).
+## Agent pose. He does not jump or kick — [EnemyBrain] cannot do that, and frames for non-existent
+## states would be garbage. But he can dodge since M11, and kneeling and lying down have their own
+## poses (ADR-0016, item 3).
 ##
-## Стойка важнее выстрела: выстрел держится 0.18 с, а стойка — пока в агента
-## летит пуля, и подменять её позой выстрела значило бы показывать стоящего
-## там, где на самом деле лежит. Сам выстрел видно по вспышке пули.
+## The stance matters more than the shot: the shot holds for 0.18 s, while the stance holds as long
+## as a bullet flies at the agent, and replacing it with the shooting pose would show him standing
+## where he is actually lying. The shot itself is seen by the bullet flash.
 static func of_agent(
 	dead: bool,
 	walking: bool,
@@ -148,36 +145,36 @@ static func of_agent(
 	return walk_frame(walk_phase) if walking else "idle"
 
 
-## Продвигает фазу ходьбы на один кадр времени.
+## Advances the walk phase by one frame of time.
 ##
-## Живёт рядом с [method walk_frame] нарочно: длину цикла знает один
-## [constant WALK_FRAMES]. Со своим `fmod` в каждом актёре цикл замыкался бы не
-## там, где считается кадр, и последний кадр ходьбы просто не показывался бы.
+## Lives next to [method walk_frame] on purpose: only [constant WALK_FRAMES] knows the cycle length.
+## With its own `fmod` in each actor the cycle would wrap not where the frame is computed, and the
+## last walk frame would simply never show.
 static func advance(walk_phase: float, delta: float) -> float:
 	return fmod(walk_phase + delta * WALK_FPS, float(WALK_FRAMES))
 
 
-## Лежит ли актёр в этой позе.
+## Whether the actor lies in this pose.
 static func is_down(pose: String) -> bool:
 	return DOWN.has(pose)
 
 
-## Кадр ходьбы по фазе: целая часть фазы и есть номер кадра.
+## Walk frame by phase: the integer part of the phase is the frame number.
 static func walk_frame(walk_phase: float) -> String:
 	var frame := int(walk_phase) % WALK_FRAMES
 	return "walk_%d" % maxi(frame, 0)
 
 
-## Номер кадра ходьбы из имени позы: обратное к [method walk_frame]. Нужен
-## ригу, которому имя кадра приходит строкой, а цикл ходьбы идёт по фазе.
+## Walk frame number from the pose name: the inverse of [method walk_frame]. Needed by the rig,
+## which gets the frame name as a string while the walk cycle runs by phase.
 static func walk_frame_index(pose: String) -> int:
 	if not pose.begins_with("walk_"):
 		return 0
 	return clampi(pose.trim_prefix("walk_").to_int(), 0, WALK_FRAMES - 1)
 
 
-## Как именно убили: раздавленный показан своей картинкой, а падение и лежащее
-## тело — двумя разными.
+## How exactly he was killed: a crushed one is shown with its own picture, and a fall and a lying
+## body with two different ones.
 static func _death(crushed: bool, falling_over: bool) -> String:
 	if crushed:
 		return "crushed"

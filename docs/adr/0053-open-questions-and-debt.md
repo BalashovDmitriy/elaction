@@ -1,148 +1,149 @@
-# ADR-0053 · Открытые вопросы и долг: сверка с ROM и чистка
+# ADR-0053 · Open questions and debt: check against the ROM and cleanup
 
-- **Статус:** принято
-- **Дата:** 2026-10-02
-- **Дополняет:** [ADR-0004](0004-elevator-mechanics.md) (пункт 6 — кабина игрока),
-  [ADR-0010](0010-lighting-and-atmosphere.md) (пункт 7 — сложность темноты),
-  [ADR-0020](0020-agent-doors.md) (выпуск у двери),
-  [ADR-0023](0023-light-and-readability.md) (решение 8 — тень),
-  [ADR-0027](0027-rom-combat.md) (бой по ROM),
-  [ADR-0051](0051-time-of-day.md) (атлас фасадов),
-  [ADR-0052](0052-day-for-the-rest-and-arrival.md) (поток от винта)
+- **Status:** accepted
+- **Date:** 2026-10-02
+- **Extends:** [ADR-0004](0004-elevator-mechanics.md) (item 6 — the player's cab),
+  [ADR-0010](0010-lighting-and-atmosphere.md) (item 7 — darkness difficulty),
+  [ADR-0020](0020-agent-doors.md) (release at a door),
+  [ADR-0023](0023-light-and-readability.md) (decision 8 — shadow),
+  [ADR-0027](0027-rom-combat.md) (combat per the ROM),
+  [ADR-0051](0051-time-of-day.md) (facade atlas),
+  [ADR-0052](0052-day-for-the-rest-and-arrival.md) (rotor downwash)
 
-## Контекст
+## Context
 
-После M24k в `docs/STATUS.md` висели три открытых вопроса и десяток пунктов
-долга. Вопросы 4 и 9 упирались в правила, которых не было в наших заметках по
-дизассемблеру ROM (`docs/reference/arcade-rom.md`), вопрос 8 — в то, что бот не
-умел сбивать лампы и не мог проверить темноту.
+After M24k `docs/STATUS.md` had three open questions and a dozen debt items. Questions
+4 and 9 depended on rules that were not in our notes on the ROM disassembly
+(`docs/reference/arcade-rom.md`), question 8 — on the bot being unable to shoot out
+lamps and so unable to check darkness.
 
-**Сверка с ROM** (2026-10-02, тот же дизассемблер jotd666/elevator_action):
+**Check against the ROM** (2026-10-02, the same jotd666/elevator_action disassembly):
 
-- **Кабина игрока** между этажами не встаёт. Кнопка вверх-вниз только задаёт
-  ход; отпущенная кабина идёт, пока не поравняется с этажом (@5E1E), стоит там
-  30 тиков и едет дальше сама (@5E2B). Команды «стоп» в ROM нет.
-- **Возвращение после гибели** (@7633, @2FAA, @2F44-2F6F): этаж — тот же, но не
-  ниже пятого; место — у красной двери этажа, если документ не взят, иначе
-  постоянная точка $67. Агентов не остаётся: все четыре ячейки пусты и
-  выпускают снова через 10, 25, 40 и 55 тиков. Неуязвимости нет — проверка
-  попадания (@08F8) не знает таймера. Кабины ставятся заново.
-- **Выпуск у Otto** (@5AAB): проверки расстояния от двери до Otto нет. Агента
-  отделяет только время выхода из двери, 9–17 тиков.
-- **Двадцатый этаж** (вопрос 9): его делит стена в $AC, не посередине. ROM ищет
-  ближайшую дверь для ухода по своей половине этажа (@049F, раздел по $7B), и на
-  двадцатом агента послало бы в дверь за стеной — поэтому этаж и исключён.
-- **Толпа** — правило, которого у нас не было: если на этаже Otto, выше или
-  ниже стоят три агента и больше, агенты этого этажа уходят в двери
-  (@041F-0458). В наших заметках оно было записано наоборот — «на этаже,
-  кроме плотного».
+- **The player's cab** does not stop between floors. The up-down button only sets the
+  direction; a released cab goes on until it is level with a floor (@5E1E), stands
+  there 30 ticks and moves on by itself (@5E2B). The ROM has no "stop" command.
+- **Return after death** (@7633, @2FAA, @2F44-2F6F): the floor is the same, but not
+  lower than the fifth; the place is at the floor's red door if the document is not
+  taken, otherwise the fixed point $67. No agents remain: all four slots are empty and
+  release again after 10, 25, 40 and 55 ticks. There is no invulnerability — the hit
+  check (@08F8) does not know the timer. Cabs are placed anew.
+- **Release near Otto** (@5AAB): there is no check of the distance from the door to
+  Otto. The agent is separated only by the time it takes to leave the door, 9–17 ticks.
+- **The twentieth floor** (question 9): it is divided by a wall at $AC, not in the
+  middle. The ROM looks for the nearest door to leave through on its own half of the
+  floor (@049F, split at $7B), and on the twentieth an agent would be sent to a door
+  behind the wall — that is why the floor is excluded.
+- **Crowd** — a rule we did not have: if three or more agents stand on Otto's floor,
+  above or below, the agents of that floor leave through doors (@041F-0458). In our
+  notes it was written the other way round — "on the floor, except a crowded one".
 
-## Решения
+## Decisions
 
-Вопросы заданы пользователю 2026-10-02, двумя блоками.
+Questions asked of the user on 2026-10-02, in two blocks.
 
-1. **Кабина игрока доезжает до этажа.** Отпущенная, она идёт до этажа по ходу
-   и встаёт там, как в ROM; сама дальше не едет — это уже наше, в аркаде
-   кабина через 2 с трогалась без игрока (выбор пользователя: управлять так
-   проще). Переключатель `stops_between_floors` и признак «кабину вёл
-   пассажир» (ADR-0037, решение 1) удалены: кабина больше нигде не встаёт
-   между этажами. Пункт 6 ADR-0004 этим закрыт.
-2. **Возвращение — по ROM, неуязвимость — наша.** Этаж не ниже пятого этажа ROM
-   ([`RespawnSpot.floor_for`](../../src/levels/respawn_spot.gd)), место — у
-   красной двери с документом, а без неё — ближайшее место к доле $67/256
-   ширины этажа, не в кармане короче 3 м (карман M24g, сид 3). Все живые агенты
-   уходят, ячейки выпускают снова через 10, 25, 40 и 55 тиков
-   (`AgentSpawn.after_death`). Трупы остаются до конца здания, как с M24a.
-   Неуязвимость 1.5 с после возвращения оставлена (выбор пользователя). Кабины
-   на месте не переставляются: в ROM это следствие перерисовки экрана, а у нас
-   кабина, в которой Otto ехал, просто стоит, где стояла.
-3. **Выпуск у Otto — не ближе 1.2 м.** Сначала запрет `AGENT_SAFE_RELEASE`
-   (2.88 м) сняли, как в ROM, — и тест боя на навыке 0 покраснел: сид 1 стоил 9
-   смертей, сид 3 — 13 при пороге 5, и почти каждая — рядом с агентом, только
-   что вышедшим в метре от Otto. Замер `playthrough.gd --release-gap` на сидах
-   1–3: 0 м — 11 смертей, 1.2 м — 4, 2.88 м — 10. Пользователь выбрал 1.2 м
-   (`BuildingRules.agent_release_gap`, 2026-10-02). Остаётся и телеграф створки
-   (ADR-0020): агент выходит, только когда дверь открылась. С 1.2 м тест боя —
-   1, 4 и 6 смертей; сид 3 и раньше стоял на пороге 5, и порог
-   `DEATHS_ALLOWED` поднят до 6 по замеру (решение пользователя).
-4. **Бот сбивает лампы, дистанция тени — по замеру.** Лампу сбивают только из
-   кабины (`test_a_lamp_is_out_of_reach_from_the_floor`), и бот стреляет по
-   висящей лампе перед собой, когда ствол едущего Otto на её высоте
-   ([`OttoBot._lamp_in_line`](../../src/actors/otto/otto_bot.gd)). Прогон
-   настоящего здания проверяет, что лампы падают. Замер — ниже, в «Замере
-   тени».
-5. **Толпа уходит в двери** (@041F-0458). На этаже Otto, выше и ниже, с
-   восьмого этажа ROM: из трёх и больше стоящих на полу агентов остаются двое
-   ближних к Otto, остальные идут в ближайшую дверь, до которой можно дойти
-   (`Arcade.crowd_leavers`, [`AgentCrowd.extras`](../../src/levels/agent_crowd.gd)).
-   Вышедшие из двери и едущие в кабине не в счёт. В ROM уходят все агенты
-   переполненного этажа; у нас — только лишние: иначе этаж пустел бы разом от
-   одного лишнего. Уже ушедший к двери так и уходит, даже став по дороге
-   ближним: счёт идёт каждый кадр, и без этого уход переходил бы от агента к
-   агенту.
-6. **Двадцатый этаж не исключаем.** Наш поиск двери для ухода
-   ([`AgentLifts.nearest_door`](../../src/levels/agent_lifts.gd)) и так берёт
-   только дверь, до которой дойти, — то, что ROM обеспечивал исключением
-   двадцатого. Вопрос 9 закрыт.
-7. **Лампа после выстрела не качается** (выбор пользователя): сбитая падает
-   сразу, как и с ADR-0007. Пункт вычеркнут из долга.
-8. **Темнота с навыком не слабеет** (выбор пользователя). В ROM темнота на
-   агентов не влияет вовсе, наша — сознательное расхождение (ADR-0027,
-   решение 9), и одинаково во всех зданиях. ADR-0010, пункт 7 — закрыт.
-9. **Мипмапы — только у надписей в сцене.** Таблички, табло, вывески и
-   разметка паркинга берут Exo 2 через `NeonStyle.scene_font` — копию шрифта с
-   мипмапами; HUD и меню — прежний `NeonStyle.font` без них. Импорт шрифта не
-   менялся: включить мипмапы в нём значило смягчить и весь интерфейс.
-10. **Стрелки табло шахт — геометрией.** ▲ и ▼ не было ни в Exo 2, ни в прежнем
-    Pixellari; их рисовал системный запасной шрифт. Теперь стрелка — треугольник
-    рядом с цифрами, а тест сверяет, что всё, что табло пишет текстом, есть в
-    шрифте игры.
-11. **Атлас фасадов с полями.** Между столбцами стилей — по 0.5 м (32 px) с
-    каждой стороны, заполненные продолжением той же плитки; атлас 1920×448,
-    столбец 320 px кратен 64, и до шестого мипа соседний стиль на шов не
-    подтекает. Собирается `tools/build_city.py`, шейдер берёт поле параметром.
-12. **Погода руками — в правилах здания.** `Weather.forced` — статическое поле,
-    которое тест мог забыть сбросить, — заменён на
-    `BuildingRules.forced_weather` рядом с `time_of_day`: у каждого здания своё,
-    утекать некуда.
-13. **Поток от винта гонит и дождь.** Под осью винта, пока вертолёт висит
-    низко, стоит отталкиватель частиц (`Downwash.gust`): струи дождя
-    разносит вниз и в стороны, и они ложатся косо — по скорости, как и
-    рисуются.
-14. **Не долг, а заметки.** Трассировка лучей — пункт проверки при обновлении
-    движка, а не долг: её нет в основной ветке Godot. Заметка «новый
-    `class_name` не виден до переимпорта» перенесена в
-    [`docs/conventions.md`](../conventions.md).
+1. **The player's cab goes on to the floor.** Released, it goes to the next floor in
+   its direction and stops there, as in the ROM; it does not move on by itself — this
+   is ours, in the arcade the cab started off without the player after 2 s (the user's
+   choice: it is easier to control this way). The `stops_between_floors` switch and the
+   "the cab was driven by a passenger" flag (ADR-0037, decision 1) are removed: the cab
+   no longer stops between floors anywhere. Item 6 of ADR-0004 is closed by this.
+2. **Return — per the ROM, invulnerability — ours.** The floor is no lower than the
+   ROM's fifth floor ([`RespawnSpot.floor_for`](../../src/levels/respawn_spot.gd)), the
+   place is at the red door with a document, and without one — the spot nearest to the
+   fraction $67/256 of the floor width, not in a pocket shorter than 3 m (the M24g
+   pocket, seed 3). All living agents leave, the slots release again after 10, 25, 40
+   and 55 ticks (`AgentSpawn.after_death`). Corpses stay until the end of the building,
+   as since M24a. The 1.5 s invulnerability after return is kept (the user's choice).
+   Cabs are not re-placed: in the ROM this is a consequence of the screen redraw, while
+   in ours the cab Otto was riding simply stays where it was.
+3. **Release near Otto — no closer than 1.2 m.** First the `AGENT_SAFE_RELEASE` ban
+   (2.88 m) was removed, as in the ROM — and the combat test at skill 0 went red: seed 1
+   cost 9 deaths, seed 3 — 13 with a threshold of 5, and almost every one was next to an
+   agent that had just come out a meter from Otto. Measurement `playthrough.gd
+   --release-gap` on seeds 1–3: 0 m — 11 deaths, 1.2 m — 4, 2.88 m — 10. The user chose
+   1.2 m (`BuildingRules.agent_release_gap`, 2026-10-02). The door leaf telegraph also
+   stays (ADR-0020): an agent comes out only when the door has opened. With 1.2 m the
+   combat test gives 1, 4 and 6 deaths; seed 3 was already at the threshold of 5 before,
+   and the `DEATHS_ALLOWED` threshold is raised to 6 by measurement (the user's
+   decision).
+4. **The bot shoots out lamps, the shadow distance — by measurement.** A lamp can be
+   shot out only from a cab (`test_a_lamp_is_out_of_reach_from_the_floor`), and the bot
+   shoots at a hanging lamp in front of it when the barrel of the riding Otto is at its
+   height ([`OttoBot._lamp_in_line`](../../src/actors/otto/otto_bot.gd)). A run of a real
+   building checks that lamps fall. The measurement is below, in "Shadow measurement".
+5. **A crowd leaves through doors** (@041F-0458). On Otto's floor, above and below, from
+   ROM floor eight: of three or more agents standing on the floor the two nearest to
+   Otto stay, the rest go to the nearest reachable door (`Arcade.crowd_leavers`,
+   [`AgentCrowd.extras`](../../src/levels/agent_crowd.gd)). Those coming out of a door
+   and those riding in a cab do not count. In the ROM all agents of an overcrowded floor
+   leave; in ours — only the extra ones: otherwise a floor would empty at once because of
+   one extra. One already heading to a door keeps leaving, even if he becomes one of the
+   nearest on the way: the count runs every frame, and without this the leaving would
+   pass from agent to agent.
+6. **We do not exclude the twentieth floor.** Our search for a door to leave through
+   ([`AgentLifts.nearest_door`](../../src/levels/agent_lifts.gd)) already takes only a
+   reachable door — what the ROM ensured by excluding the twentieth. Question 9 is
+   closed.
+7. **A lamp does not swing after a shot** (the user's choice): a shot-out lamp falls
+   immediately, as since ADR-0007. The item is struck from the debt.
+8. **Darkness does not weaken with skill** (the user's choice). In the ROM darkness does
+   not affect agents at all, ours is a deliberate divergence (ADR-0027, decision 9), and
+   the same in all buildings. ADR-0010, item 7 — closed.
+9. **Mipmaps — only for text in the scene.** Plaques, indicator boards, signs and garage
+   markings take Exo 2 via `NeonStyle.scene_font` — a copy of the font with mipmaps; the
+   HUD and menu use the previous `NeonStyle.font` without them. The font import did not
+   change: enabling mipmaps there would soften the whole interface too.
+10. **Shaft indicator board arrows — as geometry.** ▲ and ▼ were in neither Exo 2 nor
+    the old Pixellari; they were drawn by the system fallback font. Now the arrow is a
+    triangle next to the digits, and a test checks that everything the indicator board
+    writes as text exists in the game font.
+11. **The facade atlas with padding.** Between the style columns — 0.5 m (32 px) on each
+    side, filled with a continuation of the same tile; the atlas is 1920×448, a 320 px
+    column is a multiple of 64, and down to the sixth mip the neighboring style does not
+    bleed onto the seam. Built by `tools/build_city.py`, the shader takes the padding as
+    a parameter.
+12. **Manual weather — in the building rules.** `Weather.forced` — a static field that a
+    test could forget to reset — is replaced by `BuildingRules.forced_weather` next to
+    `time_of_day`: each building has its own, there is nowhere to leak.
+13. **The rotor downwash also drives the rain.** Under the rotor axis, while the
+    helicopter hovers low, there is a particle repeller (`Downwash.gust`): rain streaks
+    are blown down and to the sides, and they lie slanted — by velocity, as they are
+    drawn.
+14. **Not debt, but notes.** Ray tracing is an item to check on engine updates, not
+    debt: it is not in Godot's main branch. The note "a new `class_name` is not visible
+    until reimport" is moved to [`docs/conventions.md`](../conventions.md).
 
-## Замер тени
+## Shadow measurement
 
-Прогон `tools/playthrough.gd --agents --endless --skill=4` на сидах 1–6
-(2026-10-02), смерти по сидам и всего. Снят до выпуска не ближе 1.2 м и до
-правок авторевью бота, поэтому до шага не повторится; вывод — порядок, а не числа:
+Run `tools/playthrough.gd --agents --endless --skill=4` on seeds 1–6 (2026-10-02),
+deaths per seed and in total. Taken before the no-closer-than-1.2 m release and before
+the code review fixes to the bot, so it will not repeat step for step; the conclusion
+is the order, not the numbers:
 
-| Вариант | Сиды 1–6 | Всего |
+| Variant | Seeds 1–6 | Total |
 |---|---|---|
-| бот не сбивает лампы (`--no-lamps`) | 3, 0, 27, 11, 13, 3 | 57 |
+| bot does not shoot out lamps (`--no-lamps`) | 3, 0, 27, 11, 13, 3 | 57 |
 | `--dark-range=0` | 14, 3, 28, 2, 2, 7 | 56 |
 | `--dark-range=1.2` | 14, 4, 28, 2, 7, 3 | 58 |
 | **`--dark-range=1.8`** | 0, 4, 12, 2, 18, 3 | **39** |
 | `--dark-range=2.4` | 0, 4, 17, 6, 16, 3 | 46 |
 | `--dark-range=3.6` | 0, 4, 28, 6, 10, 3 | 51 |
 
-Бот за здание сбивает 0–14 ламп из 45. Разброс между сидами больше разницы
-между вариантами, и ряд не монотонен: даже полная невидимость в тени (0 м) не
-снижает смертей — бот сбивает лампы, но в темноте нарочно не прячется, и
-партия расходится от первой иной развилки. Поэтому замер не выбирает число
-точно, а проверяет, что выбранное не хуже соседних: **1.8 м оставлено** — у
-него наименьшая сумма, на треть меньше, чем без ламп. Вопрос 8 закрыт; более
-точный подбор потребует бота, который ищет тень, — это уже не долг, а
-отдельная задача, если темнота станет предметом баланса.
+Per building the bot shoots out 0–14 lamps of 45. The spread between seeds is larger
+than the difference between variants, and the series is not monotonic: even full
+invisibility in shadow (0 m) does not reduce deaths — the bot shoots out lamps but does
+not deliberately hide in the dark, and the game diverges from the first different fork.
+So the measurement does not pick the number precisely but checks that the chosen one is
+no worse than its neighbors: **1.8 m is kept** — it has the smallest total, a third
+less than without lamps. Question 8 is closed; more precise tuning would need a bot that
+seeks shadow — that is no longer debt but a separate task, if darkness becomes a subject
+of balance.
 
-## Последствия
+## Consequences
 
-- Заметки по ROM исправлены: правило толпы записано верно, добавлены кабина,
-  возвращение, выпуск и двадцатый этаж.
-- Открытых вопросов в `docs/STATUS.md` не осталось.
-- Тест возвращения теперь проверяет точку ROM и уход агентов, а не «подальше
-  от агента»; новый `tests/test_respawn.gd` проверяет этаж и место возвращения
-  на любом сгенерированном здании.
+- The ROM notes are fixed: the crowd rule is written correctly, the cab, return,
+  release and the twentieth floor are added.
+- No open questions remain in `docs/STATUS.md`.
+- The return test now checks the ROM point and the agents leaving, not "farther from an
+  agent"; the new `tests/test_respawn.gd` checks the return floor and place on any
+  generated building.

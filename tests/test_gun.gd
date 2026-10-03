@@ -1,9 +1,9 @@
 extends GutTest
 
-## Тесты правила трёх пуль.
+## Tests of the three-bullet rule.
 ##
-## В оригинале Otto держит на экране не больше трёх выстрелов разом — расстрелял
-## и стоишь безоружным, пока они не улетят (ADR-0006, пункт 2).
+## In the original Otto keeps no more than three shots on screen at once — fire them all
+## and you stand unarmed until they fly off (ADR-0006, point 2).
 
 
 func test_fresh_gun_is_ready() -> void:

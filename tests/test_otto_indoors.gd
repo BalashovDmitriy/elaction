@@ -1,9 +1,9 @@
 extends GutTest
 
-## Тесты пребывания Otto за дверью.
+## Tests for Otto staying behind a door.
 ##
-## Как и поездка на эскалаторе, это состояние снимается только снаружи: дверь
-## выпускает Otto сама через 70 тиков ROM, раньше не выйти (ADR-0038, решение 2).
+## Like an escalator ride, this state is lifted only from outside: the door lets Otto out
+## by itself after 70 ROM ticks, you cannot leave earlier (ADR-0038, decision 2).
 
 const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
 
@@ -58,8 +58,8 @@ func test_world_driven_covers_door_and_escalator() -> void:
 	assert_true(machine.is_world_driven(), "мёртвый ввод не разбирает вовсе")
 
 
-## Уязвим Otto только на своих ногах и без передышки: по этому агенты
-## придерживают выстрел, а не пускают пулю сквозь него.
+## Otto is vulnerable only on his own feet and without a breather: this is how agents
+## know to hold their fire instead of sending a bullet through him.
 func test_otto_can_be_hit_only_on_foot_and_out_of_grace() -> void:
 	var otto := OTTO_SCENE.instantiate() as Otto
 	add_child_autofree(otto)
@@ -79,9 +79,9 @@ func test_otto_can_be_hit_only_on_foot_and_out_of_grace() -> void:
 	assert_true(otto.hittable, "передышка кончилась — снова уязвим")
 
 
-## Кабина зовёт [method Otto.kill] каждый шаг физики, пока Otto под ней, и в
-## передышке тоже: давка звучит только настоящей смертью, а не очередью на все
-## голоса (авторевью M24k).
+## The cab calls [method Otto.kill] every physics step while Otto is under it, during a
+## breather as well: the crush sounds only as a real death, not as a volley in every
+## voice (M24k code review).
 func test_a_crush_in_grace_makes_no_sound() -> void:
 	var director := AudioDirector.instance()
 	assert_not_null(director, "автолоад звука поднят")

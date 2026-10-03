@@ -1,224 +1,209 @@
-# ADR-0025 · M18b: эскалатор конструкцией, свет шахты, двухэтажная пара, агенты в кабинах
+# ADR-0025 · M18b: escalator as a structure, shaft light, double-deck pair, agents in cabs
 
-- **Статус:** принято
-- **Дата:** 2026-09-22
+- **Status:** accepted
+- **Date:** 2026-09-22
 
-## Контекст
+## Context
 
-M18b — вторая половина вехи геометрии ([ADR-0024](0024-building-geometry.md),
-решение 10). Первая, M18a, влита в `main` (PR #30): сетка мест, силуэт порогом,
-перехлёст шахт, эскалаторы полосой, внутренние стены и поиск пути ботом по
-графу здания. Раскладка готова и проверена; M18b трогает вид и ход, а не
-достижимость.
+M18b is the second half of the geometry milestone ([ADR-0024](0024-building-geometry.md),
+decision 10). The first, M18a, is merged into `main` (PR #30): slot grid, threshold silhouette,
+overlapping shafts, escalators as a band, interior walls and bot pathfinding over the building
+graph. The layout is ready and checked; M18b touches look and movement, not reachability.
 
-ADR-0024 писался под обе половины, но его решения о второй — 6, 7 и 8 —
-принимались до сверки, сделанной перед самой M18b. Сверка их поправила, и
-поправки записаны здесь.
+ADR-0024 was written for both halves, but its decisions about the second — 6, 7 and 8 — were made
+before the check done right before M18b. The check corrected them, and the corrections are recorded
+here.
 
-### Что показала сверка
+### What the check showed
 
-- **Двухэтажных шахт в оригинале две, а не одна.** Elevator World: *«two shafts
-  featured a kind of double-decker elevator»*. ADR-0024, решение 6 говорит «не
-  больше одной на здание» — это расхождение, и оно исправляется.
-- **Агенты в оригинале ездят в кабинах, но не управляют ими.** *«When Agent 17
+- **The original has two double-deck shafts, not one.** Elevator World: *"two shafts
+  featured a kind of double-decker elevator"*. ADR-0024, decision 6 says "no more than one per
+  building" — this is a divergence, and it is corrected.
+- **Agents in the original ride in cabs but do not control them.** *"When Agent 17
   is in an elevator, he will have complete control of it… When Otto is not in an
   elevator, it will move from floor to floor automatically, even when enemy
-  spies are in it.»* То есть «агент в соседнем ярусе» — не выдумка ADR-0024, а
-  поведение оригинала, и устроено оно дешевле, чем кажется: агент — пассажир,
-  а не диспетчер.
-- **Эскалаторы 17–20 по два и 16 один** подтвердились повторно: полоса,
-  выложенная в M18a, легла верно.
-- **Двери кабины открываются на две стороны** — подтверждено снова. В вехе их
-  по-прежнему нет: у нашей кабины дверей нет вовсе, Otto входит сбоку.
-- **Кабиной в оригинале давят агентов** — отдельным приёмом счёта. У нас
-  давится только Otto (`ElevatorCar._crush_those_underneath`). Расхождение
-  записано, но в M18b не берётся: это правило боя и счёта, ему место в M18d
-  рядом с остальными числами ([ADR-0016](0016-combat-balance.md)).
-- **Столб света в шахте оригиналом не подтверждается ничем.** Это наш долг
-  с M12 ([ADR-0017](0017-spectrum-palette-and-shafts.md), решение 3) и наше
-  решение — так и записано.
+  spies are in it."* That is, "an agent in the other deck" is not an invention of ADR-0024 but the
+  original's behaviour, and it is arranged more cheaply than it seems: the agent is a passenger, not
+  a dispatcher.
+- **Escalators: two each on 17–20 and one on 16** were confirmed again: the band laid out in M18a
+  landed correctly.
+- **The cab doors open on two sides** — confirmed again. They are still not in the milestone: our cab
+  has no doors at all, Otto enters from the side.
+- **In the original the cab crushes agents** — as a separate scoring technique. We crush only Otto
+  (`ElevatorCar._crush_those_underneath`). The divergence is recorded but not taken into M18b: it is
+  a combat and scoring rule, and its place is in M18d next to the other numbers
+  ([ADR-0016](0016-combat-balance.md)).
+- **The light column in the shaft is not confirmed by the original in any way.** It is our debt from
+  M12 ([ADR-0017](0017-spectrum-palette-and-shafts.md), decision 3) and our decision — and it is
+  recorded as such.
 
-### Что показал код
+### What the code showed
 
-- **Шахт на здание двенадцать** (сид 1, `tools/dump_plan.gd`), длиной от трёх
-  этажей до четырнадцати. Кандидаты под двухэтажную пару — те, что в стилобате:
-  там шахт на этаже до пяти.
-- **Агенты лифтами не пользуются вовсе.** Во всём `src/` `ElevatorCar` знает
-  только Otto, а `EnemyBrain` говорит об этом прямо: «Ездить на лифте
-  по-прежнему не умеет, это отложено с [ADR-0006](0006-combat-and-enemies.md)».
-  Обещание ADR-0024 «в соседнем ярусе может ехать агент» исполнить было нечем.
-- **Эскалатор — две коробки полотна** (`Escalator._lay_belt`). Балюстрады,
-  ступеней, площадок и обрамления проёма нет.
-- **В шахте нет источника света.** `BuildingShafts` ставит направляющие,
-  створки этажей и упоры; светят только лампы этажей и индикаторы кабины.
+- **There are twelve shafts per building** (seed 1, `tools/dump_plan.gd`), from three to fourteen
+  floors long. Candidates for a double-deck pair are those in the podium: there are up to five shafts
+  per floor there.
+- **Agents do not use elevators at all.** In all of `src/`, `ElevatorCar` knows only Otto, and
+  `EnemyBrain` says so directly: "It still cannot ride the elevator, this has been postponed since
+  [ADR-0006](0006-combat-and-enemies.md)". There was nothing to fulfil ADR-0024's promise "an agent
+  may ride in the other deck" with.
+- **The escalator is two belt boxes** (`Escalator._lay_belt`). There is no balustrade, steps, pads
+  or framing of the opening.
+- **There is no light source in the shaft.** `BuildingShafts` places guide rails, floor doors and
+  buffer stops; only floor lamps and cab indicators give light.
 
-## Решения
+## Decisions
 
-### 1. Двухэтажных пар до двух, и в каждом здании, где есть куда
+### 1. Up to two double-deck pairs, in every building where there is room
 
-ADR-0024, решение 6 правится в двух числах и сохраняется в главном.
+ADR-0024, decision 6 is amended in two numbers and kept in its essence.
 
-| | ADR-0024 | Здесь |
+| | ADR-0024 | Here |
 |---|---|---|
-| Пар на здание | не больше одной | **до двух** |
-| Как часто | примерно в одном здании из трёх | **в каждом, где есть куда** |
-| Куда ставится | шахта, у которой на каждом её этаже есть другой путь | без изменений |
+| Pairs per building | no more than one | **up to two** |
+| How often | about one building in three | **in every one where there is room** |
+| Where it is placed | a shaft that has another path on each of its floors | unchanged |
 
-Две — потому что столько в оригинале. «В каждом здании» — потому что «одно из
-трёх» было числом выбранным, не замеренным и оригиналом не подтверждённым, а
-цена у него высокая: диковину не увидело бы большинство партий, и проверять её
-пришлось бы подбором сидов.
+Two — because that is how many the original has. "In every building" — because "one in three" was a
+chosen number, not measured and not confirmed by the original, and its cost is high: most games
+would never see the curiosity, and checking it would require picking seeds.
 
-**Условие места не смягчается.** Пара ходит по укороченному диапазону и
-занимает на этаж больше; будь такая шахта единственной на своих этажах, спуск
-мог бы упереться. Ставится она только туда, где на каждом её этаже есть другой
-путь — соседняя шахта или эскалатор.
+**The placement condition is not relaxed.** The pair travels a shortened range and takes one floor
+more; were such a shaft the only one on its floors, the descent could get stuck. It is placed only
+where each of its floors has another path — a neighbouring shaft or an escalator.
 
-**Кандидата нет — здание остаётся без пары.** «В каждом здании» читается как
-«всегда, когда есть куда»: безопасность спуска важнее гарантии диковины.
-Насколько это частый случай, отвечает не рассуждение, а тест: он мерит долю
-сидов с парой и держит её высокой, а не равной единице.
+**No candidate — the building stays without a pair.** "In every building" reads as "always when there
+is room": the safety of the descent matters more than guaranteeing the curiosity. How frequent this
+case is, is answered not by reasoning but by a test: it measures the share of seeds with a pair and
+keeps it high, not equal to one.
 
-### 2. Минимум полосы шахты — четыре этажа
+### 2. The minimum shaft band is four floors
 
-`BuildingRules.MIN_SHAFT_FLOORS` поднимается с трёх до четырёх: пара ярусов
-занимает два этажа, и в трёхэтажной шахте ей остаётся один ход.
+`BuildingRules.MIN_SHAFT_FLOORS` goes up from three to four: a pair of decks takes two floors, and in
+a three-floor shaft it is left one move.
 
-Это **меняет раскладку всех зданий**, а не только тех, где пара выпала:
-`shafts_on` кончает рост числа путей на этаж выше (`last = floors -
-MIN_SHAFT_FLOORS`), и самые короткие шахты стилобата исчезают. Значит прогон
-бота перемеряется целиком, и шкала смертей ([ADR-0016](0016-combat-balance.md),
-пункт 8) выставляется заново.
+This **changes the layout of all buildings**, not only those where a pair came up: `shafts_on` ends
+the growth of the number of paths one floor higher (`last = floors - MIN_SHAFT_FLOORS`), and the
+shortest podium shafts disappear. So the bot run is re-measured entirely, and the death scale
+([ADR-0016](0016-combat-balance.md), item 8) is set anew.
 
-Цена записана здесь заранее. Второй способ — оставить минимум три и просто не
-ставить пару в короткие шахты — дешевле ровно на этот перемер, но оставляет в
-правилах шахту, в которую половина решений вехи не помещается.
+The cost is recorded here in advance. The second way — keep the minimum at three and just not place a
+pair into short shafts — is cheaper by exactly this re-measurement, but leaves in the rules a shaft
+into which half of the milestone's decisions do not fit.
 
-### 3. Столб света в шахте — настоящий источник, а не свечение
+### 3. The light column in the shaft is a real source, not emission
 
-Шахта получает свой источник на всю высоту, а не самосветящийся материал.
+The shaft gets its own source for its full height, not a self-illuminated material.
 
-Свечение без источника дешевле и решает половину задачи: шахта видна. Но на
-погашенном этаже она тогда висит светящейся полосой в черноте — свет не ложится
-ни на направляющие, ни на створки, ни на пол перед проёмом, и «здесь путь вниз»
-читается хуже, чем лампа, которой уже нет. Ради света на рельефе пивот и
-затевался ([ADR-0019](0019-3d-pivot.md)).
+Emission without a source is cheaper and solves half the problem: the shaft is visible. But on a
+darkened floor it then hangs as a glowing strip in the blackness — the light falls neither on the
+guide rails, nor on the doors, nor on the floor in front of the opening, and "the way down is here"
+reads worse than a lamp that is no longer there. Light on relief is what the pivot was undertaken
+for ([ADR-0019](0019-3d-pivot.md)).
 
-**Источник не гаснет от выстрела и в зонах темноты не участвует**
-([ADR-0023](0023-light-and-readability.md), решение 2). Темнота решает, видят ли
-агенты Otto; шахта решает, видит ли игрок путь. Это разные вопросы, и общий
-выключатель им не нужен: погашенное здание обязано остаться проходимым на глаз.
+**The source does not go out from a shot and does not take part in darkness zones**
+([ADR-0023](0023-light-and-readability.md), decision 2). Darkness decides whether agents see Otto;
+the shaft decides whether the player sees the way. These are different questions, and they do not
+need a common switch: a darkened building must stay traversable by eye.
 
-**Цена меряется, а не предполагается.** `tools/light_bench.gd` считает время
-GPU на кадр; бюджет 16.6 мс, на M17 занято 2.0. Мерить надо широкий этаж
-стилобата — там шахт на этаже до пяти. Не уложились — первым жертвуем тенью
-от этого источника: она в шахте почти ничего не показывает, а стоит дороже
-всего остального.
+**The cost is measured, not assumed.** `tools/light_bench.gd` computes GPU time per frame; the budget
+is 16.6 ms, 2.0 used at M17. The wide podium floor must be measured — there are up to five shafts per
+floor there. If it does not fit, the first sacrifice is the shadow from this source: in the shaft it
+shows almost nothing and costs more than everything else.
 
-### 4. Эскалатор строится конструкцией
+### 4. The escalator is built as a structure
 
-Две коробки полотна заменяются балюстрадой, ступенями рельефом, площадками
-сверху и снизу и обрамлением проёма. Ступени — рельеф, а не анимация: решение 8
-[ADR-0024](0024-building-geometry.md) в силе.
+The two belt boxes are replaced by a balustrade, steps in relief, upper and lower pads and a framing
+of the opening. The steps are relief, not animation: decision 8 of
+[ADR-0024](0024-building-geometry.md) is in force.
 
-Механика поездки не трогается: встать на площадку и нажать «вверх» или «вниз»
-([ADR-0004](0004-elevator-mechanics.md), пункт 8), позицией пассажира
-распоряжается эскалатор, путь идёт через перегиб в проёме.
+The ride mechanic is not touched: stand on the pad and press "up" or "down"
+([ADR-0004](0004-elevator-mechanics.md), item 8), the escalator controls the passenger's position,
+the path goes through the bend in the opening.
 
-### 5. Балюстрада несимметрична: дальняя глухая, ближняя — низкий отбойник
+### 5. The balustrade is asymmetric: the far one solid, the near one a low guard
 
-Камера смотрит сбоку и чуть сверху ([ADR-0023](0023-light-and-readability.md),
-решение 1). Полноценная балюстрада со стороны камеры закрыла бы едущего Otto
-по грудь — а на эскалаторе он беззащитен: ввод не действует, уклониться нечем,
-и поездка длится больше секунды.
+The camera looks from the side and slightly from above ([ADR-0023](0023-light-and-readability.md),
+decision 1). A full balustrade on the camera side would cover a riding Otto up to the chest — and on
+the escalator he is defenceless: input does not act, there is no way to dodge, and the ride lasts
+more than a second.
 
-Поэтому у задней стены балюстрада полная, с поручнем, а со стороны игрока —
-низкий борт у самого полотна. Тот же выбор, что у стены M18a: читаемость аркады
-важнее правдоподобия ([ADR-0019](0019-3d-pivot.md)).
+So at the back wall the balustrade is full, with a handrail, and on the player's side there is a low
+board right at the belt. The same choice as with the M18a wall: arcade readability matters more than
+plausibility ([ADR-0019](0019-3d-pivot.md)).
 
-### 6. Агенты ездят в кабинах, но не управляют ими
+### 6. Agents ride in cabs but do not control them
 
-Долг с [ADR-0006](0006-combat-and-enemies.md) закрывается — и закрывается ровно
-так, как устроен оригинал.
+The debt from [ADR-0006](0006-combat-and-enemies.md) is closed — and closed exactly the way the
+original is arranged.
 
-- **Кабина слушается только Otto.** Занятой она считается, когда внутри он;
-  агент внутри — пассажир, и кабина при нём ходит сама от этажа к этажу, как
-  пустая. `ElevatorMotion.update` этим и так различает случаи, менять правило
-  не нужно.
-- **Агент садится, когда кабина стоит вровень с его этажом**, и сходит на том,
-  где ему есть что делать. Кабину он не вызывает: вызова нет ни у кого, в том
-  числе у игрока.
-- **Потолок живых агентов и запрет выпуска вплотную к Otto не меняются**
-  ([ADR-0016](0016-combat-balance.md)). Езда добавляет агентам досягаемости, а
-  не числа.
+- **The cab obeys only Otto.** It counts as occupied when he is inside; an agent inside is a
+  passenger, and with him the cab goes by itself from floor to floor, like an empty one.
+  `ElevatorMotion.update` already distinguishes the cases this way, the rule need not change.
+- **An agent boards when the cab stands level with his floor**, and gets off on the one where he has
+  something to do. He does not call the cab: nobody has a call button, including the player.
+- **The live-agent cap and the ban on releasing right next to Otto do not change**
+  ([ADR-0016](0016-combat-balance.md)). Riding adds reach to agents, not numbers.
 
-**Решает уровень, а не агент.** Какая кабина стоит вровень с его этажом и куда
-она ведёт, знает только уровень: он же каждый кадр раздаёт агентам темноту и
-стену (`_shroud_agent`). Агенту приходит одно число — ось кабины или NAN, —
-и ходить по графу здания он не умеет; это остаётся привилегией бота.
+**The level decides, not the agent.** Which cab stands level with his floor and where it leads is
+known only to the level: it is also what hands out darkness and walls to agents every frame
+(`_shroud_agent`). The agent receives one number — the cab's axis or NAN — and he cannot walk the
+building graph; that remains the bot's privilege.
 
-**Предложение липкое, а из подходящих берётся ближайшая.** На этаже стилобата
-шахт до пяти, кабины встают вровень и уходят каждая в свой черёд. Пока
-предложение пересчитывалось от нуля каждый кадр, агент разворачивался между
-двумя кабинами и за полминуты не сдвигался с места.
+**The offer is sticky, and the nearest of the suitable ones is taken.** On a podium floor there are
+up to five shafts, cabs come level and leave each in turn. While the offer was recomputed from
+scratch every frame, an agent turned back and forth between two cabs and did not move from the spot
+for half a minute.
 
-**У проёма агент ждёт, а не разворачивается.** Правило M17 «видя Otto, агент
-встаёт у края, потеряв — разворачивается» для идущего к кабине не годится:
-развернувшись, он тут же забывает, зачем шёл. Ушедшая кабина оставляет его
-стоять у проёма — и это не ожидание вызова, а то же самое «сажусь в ту, что
-стоит», только с паузой.
+**At the opening the agent waits rather than turning around.** The M17 rule "seeing Otto, the agent
+stops at the edge; having lost him, turns around" does not fit someone walking to a cab: having
+turned around, he immediately forgets why he was going. A departed cab leaves him standing at the
+opening — and this is not waiting for a call but the same "I board the one that is standing", just
+with a pause.
 
-**Чего нельзя было делать: гейт по «видит Otto».** Первая попытка пускала агента
-к лифту, только пока он Otto не видит. Но `sees_target` значит «Otto не в тени
-и не за стеной», а не «Otto на расстоянии выстрела»: через десять этажей оно
-тоже истинно, и лифты не включались почти никогда.
+**What must not be done: gating on "sees Otto".** The first attempt let the agent go to the elevator
+only while he did not see Otto. But `sees_target` means "Otto is not in shadow and not behind a
+wall", not "Otto is within shooting distance": ten floors away it is also true, and elevators almost
+never came into play.
 
-Это самая крупная часть вехи и единственная, которая двигает бой. Поэтому она
-идёт **последней**: раскладка меняется решением 2, и перемер прогона бота
-должен быть один, а не два.
+This is the largest part of the milestone and the only one that moves combat. So it goes **last**:
+the layout changes with decision 2, and there must be one re-measurement of the bot run, not two.
 
-### 7. Два долга вехи закрываются заодно
+### 7. Two debts of the milestone are closed along the way
 
-Оба записаны в `docs/STATUS.md` и оба мешают именно этой вехе.
+Both are recorded in `docs/STATUS.md` and both get in the way of exactly this milestone.
 
-- **Прогон с боем на сиде 1 не повторяется** (тест даёт 4–5 смертей, инструмент
-  на том же сиде — 2, расходится с первого шага). Решение 2 заставляет
-  выставлять шкалу смертей заново, а выставлять её по невоспроизводимому сиду
-  нельзя.
-- **`_moves` и `_links` в `BuildingRoute` — два счёта одного графа.** Отложено
-  в M18a как «не в конце вехи»; агенты в кабинах добавляют графу третьего
-  читателя, и расхождение счетов стало бы дороже слияния. Слияние обязано
-  сохранить скорость: `is_winnable` зовётся около десяти раз на здание.
+- **The combat run on seed 1 does not repeat** (the test gives 4–5 deaths, the tool on the same
+  seed — 2, diverging from the first step). Decision 2 forces the death scale to be set anew, and it
+  cannot be set on a non-reproducible seed.
+- **`_moves` and `_links` in `BuildingRoute` are two counts of one graph.** Postponed in M18a as "not
+  at the end of a milestone"; agents in cabs add a third reader to the graph, and a divergence of the
+  counts would become more expensive than merging. The merge must keep the speed: `is_winnable` is
+  called about ten times per building.
 
-## Чего в вехе нет
+## What is not in the milestone
 
-- **Дверей кабины на две стороны.** Сверка называет их снова, но у нашей кабины
-  дверей нет вовсе.
-- **Едущих ступеней.** Рельеф — да, анимация полотна — нет.
-- **Раздавливания агентов кабиной.** В оригинале есть, у нас нет; это правило
-  боя и счёта — M18d.
-- **Вызова кабины кем бы то ни было.** Ни агенту, ни игроку его в оригинале
-  не дано.
-- **Обстановки этажа** — M19.
+- **Cab doors on two sides.** The check names them again, but our cab has no doors at all.
+- **Moving steps.** Relief — yes, belt animation — no.
+- **Agents crushed by the cab.** The original has it, we do not; it is a combat and scoring rule —
+  M18d.
+- **Calling the cab by anyone.** Neither the agent nor the player is given it in the original.
+- **Floor dressing** — M19.
 
-## Как проверяем
+## How we check
 
-- Двухэтажных пар на здание не больше двух, и у каждой на всех её этажах есть
-  другой путь — на сотнях сидов.
-- **Пара не отрезает ни одного куска этажа.** Порог строже, чем у стены: стене
-  довольно `is_winnable` — та следит за документами и выходом, — а пара обязана
-  оставить достижимым ровно то же, что было достижимо без неё. Проверяется
-  счётом достижимых узлов до и после.
-- Диапазон хода пары держит оба яруса внутри шахты: верхний не выходит над
-  верхним этажом, нижний не уходит под дно.
-- Доля сидов, где пара выпала, замерена и записана — числом, а не словом.
-- Полоса шахты нигде не короче четырёх этажей, и число шахт на этаже по-прежнему
-  совпадает с целью правил на каждом этаже.
-- Бот проходит здание на любом сиде, и шкала смертей выставлена заново, после
-  решения 2 и после агентов в кабинах.
-- Прогон теста и прогон `tools/playthrough.gd` на одном сиде сходятся до шага —
-  включая сид 1.
-- Агент, вошедший в кабину, не управляет ею: кабина при нём ходит своим
-  расписанием.
-- Бюджет кадра со столбами света в шахтах — под 16.6 мс на широком этаже
-  стилобата.
+- No more than two double-deck pairs per building, and each has another path on all its floors — on
+  hundreds of seeds.
+- **A pair does not cut off a single floor piece.** The threshold is stricter than for a wall: for a
+  wall `is_winnable` is enough — it watches documents and the exit — while a pair must leave reachable
+  exactly what was reachable without it. Checked by counting reachable nodes before and after.
+- The pair's travel range keeps both decks inside the shaft: the upper does not go above the top
+  floor, the lower does not go below the bottom.
+- The share of seeds where a pair came up is measured and recorded — as a number, not a word.
+- A shaft band is nowhere shorter than four floors, and the number of shafts per floor still matches
+  the rules' target on every floor.
+- The bot completes the building on any seed, and the death scale is set anew, after decision 2 and
+  after agents in cabs.
+- A test run and a `tools/playthrough.gd` run on the same seed match step for step — including
+  seed 1.
+- An agent who has entered a cab does not control it: with him the cab follows its own schedule.
+- The frame budget with light columns in the shafts is under 16.6 ms on a wide podium floor.

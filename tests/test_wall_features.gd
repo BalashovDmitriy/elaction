@@ -1,9 +1,9 @@
 extends GutTest
 
-## Задняя стена по устройству (ADR-0056, решение 4): у отеля и жилого дома свои
-## элементы, у офиса — стекло, и на нём ничего. Здание — жребий, поэтому
-## проверяется любое: элемент не ложится на дверь, шахту, глухую стену и пролёт
-## эскалатора и не налезает на картину.
+## The back wall by layout (ADR-0056, decision 4): the hotel and the residential building have their
+## own elements, the office has glass, and nothing on it. The building is a draw, so any is checked:
+## an element does not go on a door, a shaft, a blank wall or an escalator span and does not overlap
+## a painting.
 
 const SEEDS: Array[int] = [1, 2, 3, 5, 8, 13, 21, 34]
 const SKILLS: Array[int] = [0, 5, 12]
@@ -42,8 +42,8 @@ func test_each_kind_lines_its_own_wall() -> void:
 				assert_eq(kinds.size(), 0, "у офиса на стекле ничего")
 
 
-## Элемент не прячется за мебелью: за высокой — никакой, как картина, а перед
-## дверью на лестницу, что стоит до пола, — никакая.
+## An element does not hide behind furniture: behind a tall piece — none, like a painting, and in
+## front of a stairwell door, which goes down to the floor — no furniture at all.
 func test_features_keep_off_openings_pictures_and_furniture() -> void:
 	for kind: BuildingIdentity.Kind in [
 		BuildingIdentity.Kind.HOTEL, BuildingIdentity.Kind.RESIDENTIAL
@@ -85,8 +85,9 @@ func test_features_keep_off_openings_pictures_and_furniture() -> void:
 						)
 
 
-## Дверь на лестницу стоит до пола — перед панелью низа стены с поручнем, а не
-## за ней; низ люка мусоропровода, ниши и рамы зеркала — над поручнем.
+## The stairwell door goes down to the floor — in front of the lower wall panel with the handrail,
+## not behind it; the bottom of the rubbish chute hatch, the niche and the mirror frame is above the
+## handrail.
 func test_features_clear_the_wainscot() -> void:
 	var rules := _rules(5)
 	var own := {
@@ -107,21 +108,21 @@ func test_features_clear_the_wainscot() -> void:
 			var features := WallFeatures.new()
 			add_child_autofree(features)
 			features.build(rules, [feature] as Array[WallFeatures.Feature])
-			# Коробки — до мультимеша: без экрана движок их места не хранит.
+			# Boxes — before the multimesh: without a screen the engine does not store their places.
 			for part: String in features._parts:
 				for box: Transform3D in features._parts[part]:
 					var size := box.basis.get_scale()
 					var low := box.origin.y - size.y * 0.5 - ground
 					var face := box.origin.z + size.z * 0.5
-					# Что ниже верха поручня, то — перед ним: стояки труб уходят за
-					# панель, как в жизни за плинтус, — их это не касается.
+					# Whatever is below the top of the handrail is in front of it: pipe risers go behind the panel,
+					# as behind a skirting in real life, — this does not apply to them.
 					if low < rail_top - 0.001 and what != "risers":
 						low_parts += 1
 						assert_gte(face, front, "тип %d: %s за панелью низа" % [kind, what])
 	assert_gt(low_parts, 0, "дверь на лестницу до пола проверена")
 
 
-## На тёмном этаже ниша не светится: свет погашен по правилам ROM.
+## On a dark floor the niche does not glow: the light is off by the ROM rules.
 func test_a_niche_on_a_dark_floor_stays_dark() -> void:
 	var rules := _rules(5)
 	var lit := WallFeatures.Feature.new()
@@ -140,7 +141,7 @@ func test_a_niche_on_a_dark_floor_stays_dark() -> void:
 	assert_not_null(off, "на тёмном — погашенная")
 
 
-## Первый этаж, тёмный по карте или светлый.
+## The first floor that is dark by the map, or a lit one.
 func _floor(rules: BuildingRules, unlit: bool) -> int:
 	for index: int in rules.floors - 1:
 		if rules.is_unlit(index) == unlit:

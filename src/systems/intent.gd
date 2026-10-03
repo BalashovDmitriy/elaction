@@ -1,19 +1,19 @@
 class_name Intent
 extends RefCounted
 
-## Общие для проекта направления и пороги намерения игрока.
+## Project-wide directions and thresholds of player intent.
 ##
-## Способ «встать на площадку и нажать направление» повторяется у кабины лифта,
-## эскалатора и двери. Раньше каждый объявлял свои константы, и «вверх — это -1»
-## было записано в двух местах, а порог нажатия — в трёх, с разными значениями.
-## Найдено авторевью M2.
+## The "step onto a spot and press a direction" pattern repeats for the elevator cab,
+## the escalator and the door. Previously each declared its own constants, and "up is -1"
+## was written in two places and the press threshold in three, with different values.
+## Found by the M2 code review.
 
-## Вверх по экрану — это уменьшение y.
+## Up on the screen means decreasing y.
 const UP: float = -1.0
 const DOWN: float = 1.0
 
-## Осознанное нажатие направления: ниже этого наклон стика им не считается.
+## A deliberate direction press: below this, a stick tilt does not count as one.
 ##
-## Отличается от [constant ElevatorMotion.COMMAND_THRESHOLD] намеренно: там речь
-## о том, отпущена ли команда у кабины, и порог должен быть мелким.
+## Differs from [constant ElevatorMotion.COMMAND_THRESHOLD] on purpose: that one is about
+## whether a command at the cab is released, and its threshold must be small.
 const PRESS: float = 0.5

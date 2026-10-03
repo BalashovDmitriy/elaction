@@ -1,94 +1,94 @@
 class_name RoofRain
 extends Node3D
 
-## Дождь над крышей (M24a, ADR-0037, решение 3; решение пользователя —
-## «капли естественно попадают по крыше, и это видно»).
+## Rain over the roof (M24a, ADR-0037, decision 3; the user's decision —
+## "the drops naturally hit the roof, and it shows").
 ##
-## До M24a капля умирала по таймеру, рассчитанному на высоту до настила. Время
-## жизни округлялось до тиков частиц, и половина капель пролетала лишний метр —
-## под плиту крыши, на тридцатый этаж. Теперь капли гаснут о саму крышу:
-## коллизия частиц по карте высот, снятой сверху с настила, ступеней, парапетов,
-## машинного отделения и техники. Где капля ударила, там брызги; на настиле —
-## круги, сам настил мокрый: темнее, с лужами, в которых на уровнях с
-## отражениями видно машинное отделение и вывеску. С отлива парапетов и
-## козырька машинного отделения капает.
+## Before M24a a drop died by a timer computed for the height down to the deck. The
+## lifetime was rounded to particle ticks, and half the drops flew an extra metre —
+## under the roof slab, onto the thirtieth floor. Now drops die on the roof itself:
+## particle collision against a heightmap captured from above off the deck, steps,
+## parapets, machine room and equipment. Where a drop hits, there are splashes; on the
+## deck — ripples, the deck itself is wet: darker, with puddles in which, at levels with
+## reflections, the machine room and the sign are visible. Water drips from the parapet
+## flashing and the machine room canopy.
 ##
-## Перед этажами дождя нет: здание в разрезе, и струи перед этажом читались бы
-## дождём в комнате. Капли сыплются только над настилом, между передней гранью
-## коридора и задними ступенями кровли; рядом с башней идёт дождь города
-## ([RainLook.city]) — он позади здания.
+## There is no rain in front of the floors: the building is in cutaway, and streaks in
+## front of a floor would read as rain in a room. Drops fall only over the deck, between
+## the corridor's front face and the back steps of the roof; next to the tower falls the
+## city rain ([RainLook.city]) — it is behind the building.
 ##
-## Дождь виден светом (решение 3, дополнение): капли светятся от лампы над
-## крышей и несут размытую копию фона ([RainLook]), над настилом — тонкая
-## дымка с водяной пылью у самого настила, в которой у лампы виден конус, а
-## вокруг лампы — ореол, разбитый на струи. Дымка — объёмный туман, её нет на
-## низком; ореол и капли — на любом уровне.
+## Rain is seen by light (decision 3, amendment): drops glow from the lamp over the roof
+## and carry a blurred copy of the background ([RainLook]); over the deck there is a thin
+## haze with water dust right at the deck, in which the lamp's cone is visible, and
+## around the lamp a halo broken into streaks. The haze is volumetric fog, absent on low;
+## the halo and drops are on any level.
 ##
-## Карта высот, крышки над проёмами и слой крыши — общие со снегом
+## The heightmap, the covers over openings and the roof layer are shared with snow
 ## ([RoofCatch]).
 
-## Слой крыши ([constant RoofCatch.LAYER]): на него ложится мокрый настил.
+## Roof layer ([constant RoofCatch.LAYER]): the wet deck lies on it.
 const LAYER: int = RoofCatch.LAYER
 
-## Капель на «высоком» ([method Graphics.rain_share]), высота неба над
-## настилом, скорость, м/с, и снос на метр падения. Падают быстрее настоящего
-## дождя: при 9 м/с струя за кадр — точка, и дождь читается снегом.
+## Drops on "High" ([method Graphics.rain_share]), sky height above the deck, speed,
+## m/s, and drift per metre of fall. They fall faster than real rain: at 9 m/s a streak
+## per frame is a dot, and the rain reads as snow.
 const DROPS: int = 1100
 const HEIGHT: float = 8.0
 const SPEED := Vector2(15.0, 19.0)
 const SLANT: float = 0.08
 const DROP := Vector2(0.018, 0.8)
-## Вид капли ([RainLook.drop_look]): свет лампы вдвое и гаснет круче лампы —
-## светятся капли у неё, а не по всей крыше; две бегущие волны порывов.
+## Drop look ([RainLook.drop_look]): lamp light doubled and falling off more steeply than
+## the lamp — the drops glow near it, not across the whole roof; two running gust waves.
 const DROP_LOOK := {"lit_gain": 2.0, "falloff": 2.5, "back_gain": 1.4, "gust_amount": 1.0}
-## Брызги и капель: тусклее капель и без ближних, широких.
+## Splashes and drips: dimmer than drops and without near, wide ones.
 const SPRAY_LOOK := {
 	"lit_gain": 0.6, "back_gain": 0.6, "base": 0.03, "opacity": 1.0, "near_share": 0.0
 }
 
-## Где по глубине идёт дождь: от задних ступеней кровли до передней грани
-## коридора — не дальше, иначе капли вставали бы перед плитой крыши.
+## Where in depth the rain falls: from the back steps of the roof to the corridor's
+## front face — no farther, otherwise drops would appear in front of the roof slab.
 const BACK_Z: float = -3.0
 const FRONT_Z: float = WorldSpace.CORRIDOR_DEPTH * 0.5 - 0.08
 
-## Шаг частиц: на 120 в секунду капля за шаг проходит 15 см, и брызги встают
-## почти там, где она коснулась, а не под настилом.
+## Particle step: at 120 per second a drop travels 15 cm per step, and splashes rise
+## almost where it touched, not under the deck.
 const TICKS: int = 120
 
-## Брызги: сколько капелек на удар, их размер и прозрачность, взлёт, м/с.
+## Splashes: how many droplets per hit, their size and opacity, rise speed, m/s.
 const SPLASH_PER_HIT: int = 4
 const SPLASH := Vector2(0.024, 0.12)
-## Какая доля ударов успевает дать брызги: при тысяче капель брызги от каждой
-## читались бы кипением.
+## What share of hits gets to splash: with a thousand drops, splashes from each would
+## read as boiling.
 const SPLASH_SHARE: float = 0.4
 const SPLASH_SPEED := Vector2(0.9, 2.1)
 const SPLASH_LIFE: float = 0.3
 
-## Круги на настиле: сколько разом, размер, жизнь.
+## Ripples on the deck: how many at once, size, life.
 const RIPPLES: int = 36
 const RIPPLE: float = 0.24
 const RIPPLE_LIFE: float = 0.65
 
-## Капель с отлива парапетов и козырька машинного отделения: сколько капель
-## разом и через сколько точек по кромке.
+## Drips from the parapet flashing and the machine room canopy: how many drops at once
+## and over how many points along the edge.
 const DRIPS: int = 9
 const DRIP_POINTS: int = 48
 const DRIP := Vector2(0.02, 0.12)
 
-## Мокрый настил: тон и шероховатость сухого и лужи. Шероховатость лужи — почти
-## зеркало: отражения ([method Graphics.reflections]) ложатся только в неё.
+## Wet deck: tone and roughness of dry and puddle. Puddle roughness is nearly a mirror:
+## reflections ([method Graphics.reflections]) fall only into it.
 const WET := Color(0.02, 0.022, 0.03, 0.55)
 const PUDDLE := Color(0.012, 0.014, 0.02, 0.9)
 const WET_ROUGHNESS: float = 0.32
 const PUDDLE_ROUGHNESS: float = 0.04
 
-## Дымка над крышей: густота, во сколько раз гуще у настила, высота. Густота
-## мала нарочно: гуще — и дымка проявила бы плоские щиты позади крыши.
+## Haze over the roof: density, how many times denser at the deck, height. The density
+## is low on purpose: denser — and the haze would reveal the flat panels behind the roof.
 const MIST_DENSITY: float = 0.009
 const MIST_SPRAY: float = 4.0
 const MIST_HEIGHT: float = 9.0
 const MIST_SHADER := preload("res://src/levels/rain_mist.gdshader")
-## Сколько света лампы над крышей уходит в туман в дождь: конус в дымке.
+## How much of the roof lamp's light goes into the fog in rain: a cone in the haze.
 const LAMP_IN_FOG: float = 2.0
 
 var _drops: GPUParticles3D = null
@@ -98,12 +98,12 @@ var _drips: GPUParticles3D = null
 var _mist: FogVolume = null
 var _halo: MeshInstance3D = null
 var _catcher: GPUParticlesCollisionHeightField3D = null
-## Где идёт дождь, в координатах сцены: карта высот снимается с этой коробки.
+## Where the rain falls, in scene coordinates: the heightmap is captured from this box.
 var _box := AABB()
 
 
-## Собирает дождь над крышей здания по правилам и плану. [param lamp] —
-## лампа над крышей: у неё ореол, её конус виден в дымке.
+## Builds the rain over the building's roof by the rules and the plan. [param lamp] — the
+## lamp over the roof: it has a halo, its cone is visible in the haze.
 func build(rules: BuildingRules, plan: BuildingPlan, lamp: OmniLight3D) -> void:
 	var deck := WorldSpace.height_to_scene(rules.floor_surface(BuildingRules.ROOF))
 	_box = RoofCatch.box(rules, BACK_Z, FRONT_Z, HEIGHT)
@@ -122,15 +122,15 @@ func build(rules: BuildingRules, plan: BuildingPlan, lamp: OmniLight3D) -> void:
 	apply_graphics()
 
 
-## Переводит на слой [constant LAYER] неподвижное на крыше под [param roots]:
-## по нему снимается карта высот и на него ложится мокрый настил.
+## Moves the static things on the roof under [param roots] to layer [constant LAYER]:
+## the heightmap is captured from it and the wet deck lies on it.
 func catch_on(roots: Array[Node]) -> void:
 	RoofCatch.mark(roots, _box)
 
 
-## Сколько капель, брызг и кругов по уровню качества. На низком кругов и
-## капели нет: там и капель вчетверо меньше, и круги на тонкой полосе настила
-## читались бы мельканием. Дымка — только там, где есть объёмный туман.
+## How many drops, splashes and ripples by quality level. On low there are no ripples or
+## drips: there are four times fewer drops there too, and ripples on the thin strip of
+## deck would read as flicker. Haze — only where there is volumetric fog.
 func apply_graphics() -> void:
 	var share := Graphics.rain_share()
 	RainLook.scale_amount(_drops, share)
@@ -144,34 +144,34 @@ func apply_graphics() -> void:
 	_mist.visible = Graphics.volumetric_fog()
 
 
-## Капли, которые гаснут о крышу, — чтобы тест мог проверить коллизию.
+## Drops that die on the roof — so a test can check the collision.
 func drops() -> GPUParticles3D:
 	return _drops
 
 
-## Карта высот дождя: с чего она снимается.
+## The rain's heightmap: what it is captured from.
 func catcher() -> GPUParticlesCollisionHeightField3D:
 	return _catcher
 
 
-## Дымка над крышей — для теста.
+## Haze over the roof — for the test.
 func mist() -> FogVolume:
 	return _mist
 
 
-## Ореол лампы над крышей — для теста.
+## Halo of the lamp over the roof — for the test.
 func halo() -> MeshInstance3D:
 	return _halo
 
 
 func _rain(rules: BuildingRules, deck: float) -> void:
 	var bounds := rules.floor_span(BuildingRules.ROOF)
-	# Сыплются между краями отливов и со сдвигом против сноса: капля не
-	# выносится за парапет и не падает мимо крыши вниз по фасаду.
+	# They fall between the edges of the flashing and shifted against the drift: a drop is
+	# not carried past the parapet and does not fall past the roof down the facade.
 	var fall := HEIGHT + 0.3
 	var spread := fall * tan(deg_to_rad(RainLook.SPREAD))
-	# Вынос карниза — своего здания (ADR-0058): у офиса отлив узкий, и по
-	# выносу отеля капли сыпались бы мимо него.
+	# Cornice overhang of its own building (ADR-0058): the office's flashing is narrow, and
+	# with the hotel's overhang drops would fall past it.
 	var overhang := BuildingShell.coping_overhang(rules.kind)
 	var from := bounds.x - overhang + spread
 	var to := bounds.y + overhang - fall * SLANT - spread
@@ -199,11 +199,11 @@ func _rain(rules: BuildingRules, deck: float) -> void:
 	add_child(_drops)
 
 
-## Брызги в месте удара: несколько капелек вверх и в стороны, падают обратно.
+## Splashes at the hit point: a few droplets up and sideways, falling back.
 func _splash() -> void:
 	var process := ParticleProcessMaterial.new()
 	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_POINT
-	# Капля гаснет, уже чуть уйдя под поверхность — на полшага частиц.
+	# A drop dies having gone slightly under the surface — by half a particle step.
 	process.emission_shape_offset = Vector3(0.0, SPEED.y / float(TICKS) * 0.5, 0.0)
 	process.direction = Vector3.UP
 	process.spread = 55.0
@@ -212,8 +212,8 @@ func _splash() -> void:
 	process.gravity = Vector3(0.0, -9.8, 0.0)
 	process.scale_min = 0.6
 	process.scale_max = 1.3
-	# Брызги гаснут к концу жизни, а не с первого кадра: иначе в среднем их
-	# вдвое меньше видно.
+	# Splashes fade toward the end of their life, not from the first frame: otherwise on
+	# average half as many of them are visible.
 	var fade := Gradient.new()
 	fade.offsets = PackedFloat32Array([0.0, 0.6, 1.0])
 	fade.colors = PackedColorArray([Color.WHITE, Color.WHITE, Color(1.0, 1.0, 1.0, 0.0)])
@@ -240,7 +240,7 @@ func _splash() -> void:
 	_drops.sub_emitter = _drops.get_path_to(_splashes)
 
 
-## Круги на мокром настиле: на всей его полосе между парапетами.
+## Ripples on the wet deck: across its whole strip between the parapets.
 func _ripple(rules: BuildingRules, deck: float) -> void:
 	var bounds := rules.floor_span(BuildingRules.ROOF)
 	var inner := Vector2(bounds.x + BuildingShell.WALL_WIDTH, bounds.y - BuildingShell.WALL_WIDTH)
@@ -276,12 +276,12 @@ func _ripple(rules: BuildingRules, deck: float) -> void:
 	add_child(_ripples)
 
 
-## Капель с кромок: отлив обоих парапетов и козырёк машинного отделения.
+## Drips from the edges: the flashing of both parapets and the machine room canopy.
 func _drip(rules: BuildingRules, plan: BuildingPlan, deck: float) -> void:
 	var bounds := rules.floor_span(BuildingRules.ROOF)
 	var coping := deck + BuildingShell.PARAPET_HEIGHT
-	# Кромка — по выносу карниза своего здания: по наибольшему капель у офиса
-	# висела бы в воздухе в 14 см от отлива.
+	# The edge follows the cornice overhang of its own building: by the largest one, the
+	# office's drips would hang in the air 14 cm from the flashing.
 	var overhang := BuildingShell.coping_overhang(rules.kind)
 	var edges: Array[PackedVector3Array] = []
 	for x: float in [
@@ -332,8 +332,8 @@ func _drip(rules: BuildingRules, plan: BuildingPlan, deck: float) -> void:
 	add_child(_drips)
 
 
-## Мокрый настил: наклейка на слой [constant LAYER] — темнее и глаже, в лужах
-## почти зеркало.
+## Wet deck: a decal on layer [constant LAYER] — darker and smoother, nearly a mirror in
+## puddles.
 func _wet(rules: BuildingRules, deck: float) -> void:
 	var bounds := rules.floor_span(BuildingRules.ROOF)
 	var noise := FastNoiseLite.new()
@@ -364,8 +364,8 @@ func _wet(rules: BuildingRules, deck: float) -> void:
 	add_child(wet)
 
 
-## Дымка над крышей: объёмный туман над всем настилом, гуще у него самого.
-## Нижний край — чуть под настилом: этажи под крышей в дымку не попадают.
+## Haze over the roof: volumetric fog over the whole deck, denser right at it.
+## The lower edge is slightly under the deck: the floors under the roof stay out of the haze.
 func _fog(rules: BuildingRules, deck: float) -> void:
 	var bounds := rules.floor_span(BuildingRules.ROOF)
 	var look := ShaderMaterial.new()
@@ -383,14 +383,14 @@ func _fog(rules: BuildingRules, deck: float) -> void:
 	add_child(_mist)
 
 
-## Ореол лампы в дожде и её конус в дымке.
+## The lamp's halo in the rain and its cone in the haze.
 func _glow(lamp: OmniLight3D) -> void:
 	lamp.light_volumetric_fog_energy = LAMP_IN_FOG
 	_halo = RainLook.halo(lamp.position + Vector3(0.0, 0.0, -1.5), lamp.light_color)
 	add_child(_halo)
 
 
-## Лужи по шуму: сухое до середины шума, лужа — выше неё.
+## Puddles by noise: dry up to the noise's middle, puddle above it.
 static func _puddles(noise: FastNoiseLite, pixels: Vector2i, colours: Array[Color]) -> Texture2D:
 	var gradient := Gradient.new()
 	gradient.offsets = PackedFloat32Array([0.0, 0.56, 0.64, 1.0])

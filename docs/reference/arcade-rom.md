@@ -1,27 +1,27 @@
-# Правила аркадного ROM: заметки по дизассемблеру
+# Arcade ROM rules: notes from the disassembly
 
-Источник — аннотированный дизассемблер аркадного ROM Elevator Action (Z80,
-набор `elevatorb`), сделанный jotd для точного переноса игры на Amiga:
-https://github.com/jotd666/elevator_action, файл `src/elevator_z80.asm`.
-Метки и комментарии в нём — jotd; выводы ниже (помечены `=>`) — наши, со
-сверки перед M18d (2026-09-23). Адреса вида `@1BDF` — места в том файле.
-В коде эти числа живут в `Arcade` (`src/systems/arcade.gd`) — с теми же адресами
-в комментариях.
+Source — an annotated disassembly of the Elevator Action arcade ROM (Z80,
+set `elevatorb`), made by jotd for an exact port of the game to the Amiga:
+https://github.com/jotd666/elevator_action, file `src/elevator_z80.asm`.
+The labels and comments in it are jotd's; the conclusions below (marked `=>`) are ours,
+from the check against the original before M18d (2026-09-23). Addresses like `@1BDF`
+are locations in that file. In the code these numbers live in `Arcade`
+(`src/systems/arcade.gd`) — with the same addresses in the comments.
 
-Частота логики подтверждена драйвером MAME `taitosj.cpp`: кадр 59.19 Гц,
-логика раз в 4 кадра — **14.8 тика в секунду, тик 67.6 мс**. Все «тики» ниже —
-тики логики. Высоты — в пикселях клетки этажа 48 px, где ступни стоящего на
-полу — 6; над полом = значение − 6. Пиксель оригинала у нас 0.075 м
-(`Proportions.PX`).
+The logic rate is confirmed by the MAME driver `taitosj.cpp`: the frame is 59.19 Hz,
+logic runs once every 4 frames — **14.8 ticks per second, a tick is 67.6 ms**. All
+"ticks" below are logic ticks. Heights are in pixels of a 48 px floor cell, where the
+feet of someone standing on the floor are at 6; above the floor = value − 6. One
+original pixel is 0.075 m for us (`Proportions.PX`).
 
-Независимая проверка по видео аркады (60 кадров/с) сошлась до пикселя:
-прыжок +25–26 px за 0.87–0.95 с, низкая пуля на 8 px над полом.
+An independent check against arcade video (60 frames/s) matched to the pixel:
+a jump of +25–26 px over 0.87–0.95 s, a low bullet 8 px above the floor.
 
-**Вторая часть заметок уточняет первую:** агенты сами не прыгают (от пули
-они приседают и ложатся), а `$834C` — скорость пули агента.
+**The second part of the notes refines the first:** agents do not jump by themselves
+(they crouch and lie down to avoid a bullet), and `$834C` is the agent bullet speed.
 
-Карта здания целиком — StrategyWiki, `Elevator_Action_Level.png`; совпадает
-с NES- и ZX-картами.
+The full building map is on StrategyWiki, `Elevator_Action_Level.png`; it matches
+the NES and ZX maps.
 
 ---
 

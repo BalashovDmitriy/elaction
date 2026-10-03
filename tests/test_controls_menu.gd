@@ -1,13 +1,13 @@
 extends GutTest
 
-## Экран управления: переназначение клавиш из меню (ADR-0039, решение 7).
+## Controls screen: key rebinding from the menu (ADR-0039, decision 7).
 
 const MENU_SCENE := preload("res://src/ui/menu.tscn")
-## Куда экран управления сохраняет схему в тестах: настройки игрока не трогаются.
+## Where the controls screen saves the scheme in tests: the player's settings are not touched.
 const TEMP := "user://test_menu_bindings.cfg"
 
-## События игровых действий в [InputMap]: экран управления меняет их для всего
-## процесса, и тест обязан вернуть как было — даже если упал посередине.
+## Game action events in [InputMap]: the controls screen changes them for the whole
+## process, and the test must restore them as they were — even if it failed midway.
 var _saved: Dictionary = {}
 
 
@@ -43,8 +43,8 @@ func _row_labelled(menu: Menu, text: String) -> MenuRow:
 	return null
 
 
-## Экран управления переназначает клавиши (ADR-0039, решение 7): нажал строку —
-## она ждёт, первая нажатая клавиша встаёт на место, занятая меняется местами.
+## The controls screen rebinds keys (ADR-0039, decision 7): pressed a row —
+## it waits, the first key pressed takes the place, an occupied one is swapped.
 func test_the_controls_rebind_a_key_and_swap_a_taken_one() -> void:
 	var menu := _menu()
 	menu.show_page(Menu.Page.CONTROLS)

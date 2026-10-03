@@ -1,15 +1,16 @@
 extends GutTest
 
-## Особые этажи (ADR-0057, решения 2–4): роль этажа — по устройству ROM, на
-## особом этаже вместо задней стены зал. Роли проверяются без сцены на любой
-## высоте здания, зал — в собранном здании каждого типа: без тел и теней, не
-## стоит перед дверями, свет гасится вместе с этажом.
+## Special floors (ADR-0057, decisions 2–4): a floor's role follows the ROM layout, on a
+## special floor there is a hall instead of the back wall. Roles are checked without a
+## scene at any building height, the hall in an assembled building of each kind: no
+## bodies or shadows, not standing in front of doors, the light goes out together with
+## the floor.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const SETTLE_FRAMES: int = 5
-## Сколько сидов проходит проверка залов без сцены.
+## How many seeds the scene-less hall check goes through.
 const SEEDS: int = 30
-## Запас по высоте, с которым деталь относится к своему этажу ([method _story_of]), м.
+## Height slack with which a detail belongs to its floor ([method _story_of]), m.
 const STORY_SLACK: float = 0.2
 const KINDS: Array[BuildingIdentity.Kind] = [
 	BuildingIdentity.Kind.HOTEL, BuildingIdentity.Kind.OFFICE, BuildingIdentity.Kind.RESIDENTIAL
@@ -21,7 +22,7 @@ func after_each() -> void:
 	HallLook.forget()
 
 
-## Залы — ровно на этажах ROM 1–7 и 11–15, в остальных — коридор.
+## Halls are exactly on ROM floors 1–7 and 11–15; the rest have a corridor.
 func test_halls_stand_on_the_rom_bands() -> void:
 	for kind: BuildingIdentity.Kind in KINDS:
 		for rom: int in range(1, Arcade.FLOORS + 1):
@@ -30,7 +31,7 @@ func test_halls_stand_on_the_rom_bands() -> void:
 			assert_eq(hall, banded, "тип %d, этаж ROM %d" % [kind, rom])
 
 
-## Нижняя полоса — общественные залы, тёмная — технические.
+## The lower band is public halls, the dark one technical ones.
 func test_dark_band_is_technical_and_lower_band_public() -> void:
 	for kind: BuildingIdentity.Kind in KINDS:
 		for rom: int in range(11, 16):
@@ -43,8 +44,8 @@ func test_dark_band_is_technical_and_lower_band_public() -> void:
 			assert_false(FloorRole.is_technical(FloorRole.of_rom(kind, rom)), "ROM %d" % rom)
 
 
-## Каждый этаж полосы свой: соседние залы не повторяются (решение 2), лобби
-## на 1–2 — одно и то же помещение в два этажа, и паркинг занимает первый.
+## Each floor of a band is its own: neighboring halls do not repeat (decision 2), the
+## lobby on 1–2 is one and the same two-story room, and the garage takes the first.
 func test_neighbour_halls_differ() -> void:
 	for kind: BuildingIdentity.Kind in KINDS:
 		for rom: int in range(2, 15):
@@ -56,8 +57,8 @@ func test_neighbour_halls_differ() -> void:
 				assert_ne(role, above, "тип %d, ROM %d и %d" % [kind, rom, rom + 1])
 
 
-## Типы разведены: у каждой пары типов залы на одних этажах различаются хотя
-## бы на половине полосы.
+## The kinds are set apart: for every pair of kinds, the halls on the same floors differ
+## on at least half of the band.
 func test_kinds_get_their_own_halls() -> void:
 	for first: int in KINDS.size():
 		for second: int in range(first + 1, KINDS.size()):
@@ -73,8 +74,8 @@ func test_kinds_get_their_own_halls() -> void:
 			assert_lt(same * 2, total, "типы %d и %d" % [first, second])
 
 
-## Крыша и паркинг — не залы на любой высоте здания; у здания любой высоты
-## залы есть и все роли — из таблицы.
+## The roof and the garage are not halls at any building height; a building of any
+## height has halls and all roles come from the table.
 func test_roof_and_garage_are_never_halls() -> void:
 	for floors: int in [6, 8, 12, 20, 30]:
 		var rules := BuildingRules.new()
@@ -89,8 +90,8 @@ func test_roof_and_garage_are_never_halls() -> void:
 			assert_gt(halls, 0, "тип %d, %d этажей: есть особые" % [kind, floors])
 
 
-## Чем отделён зал: технические — сеткой, серверная и переговорные — стеклом,
-## общественные офиса — стеклом, остальные — колоннами.
+## What separates a hall: technical ones by mesh, the server room and meeting rooms by
+## glass, the office's public ones by glass, the rest by columns.
 func test_screen_follows_the_role() -> void:
 	var office := BuildingIdentity.Kind.OFFICE
 	var hotel := BuildingIdentity.Kind.HOTEL
@@ -100,9 +101,9 @@ func test_screen_follows_the_role() -> void:
 	assert_eq(FloorRole.screen_of(FloorRole.Role.LOBBY, hotel), FloorRole.Screen.COLUMNS)
 
 
-## В собранном здании любого типа: залы есть на каждом особом этаже, без тел и
-## теней; свет — только на светлых этажах и гаснет вне кадра; ни одна мелкая
-## деталь не стоит перед дверью на глубину её комнаты.
+## In an assembled building of any kind: there are halls on every special floor, without
+## bodies or shadows; light only on lit floors, and it goes out off-frame; no small
+## detail stands in front of a door to the depth of its room.
 func test_halls_in_a_built_building_of_every_kind() -> void:
 	for kind: BuildingIdentity.Kind in KINDS:
 		var level := await _level(kind)
@@ -132,10 +133,10 @@ func test_halls_in_a_built_building_of_every_kind() -> void:
 		_assert_clear_of_doors(level.rules, level.plan(), hall, kind)
 
 
-## Залы любого здания, а не одного сида: на коротком пролёте между шахтами
-## деталь не выворачивается наизнанку и не вылезает за край пролёта, и ни одна
-## не стоит перед дверью. Короткие пролёты бывают не на каждом сиде — на
-## первом их не было, и стойка регистрации отрицательной ширины прошла тест.
+## Halls of any building, not of one seed: on a short span between shafts a detail does
+## not turn inside out or stick out beyond the span edge, and none stands in front of a
+## door. Short spans do not occur on every seed: the first one had none, and a reception
+## desk of negative width passed the test.
 func test_halls_of_any_building_stay_in_their_spans() -> void:
 	for kind: BuildingIdentity.Kind in KINDS:
 		var rules := BuildingRules.new()
@@ -157,7 +158,8 @@ func test_halls_of_any_building_stay_in_their_spans() -> void:
 			hall.free()
 
 
-## Обстановка коридора и вещи на стене не ставятся на особом этаже: стены нет.
+## Corridor dressing and items on the wall are not placed on a special floor: there is
+## no wall.
 func test_no_corridor_dressing_on_hall_floors() -> void:
 	for kind: BuildingIdentity.Kind in KINDS:
 		var level := await _level(kind)
@@ -175,8 +177,8 @@ func test_no_corridor_dressing_on_hall_floors() -> void:
 			)
 
 
-## Стоит ли середина детали [param origin] (сцена) в пролёте зала своего
-## этажа: между шахтами и стенами, с допуском на край.
+## Whether the middle of detail [param origin] (scene) stands in the hall span of its
+## floor: between shafts and walls, with a tolerance at the edge.
 func _within_a_span(rules: BuildingRules, plan: BuildingPlan, origin: Vector3) -> bool:
 	var index := _story_of(rules, -origin.y)
 	var bounds := rules.floor_span(index)
@@ -190,16 +192,16 @@ func _within_a_span(rules: BuildingRules, plan: BuildingPlan, origin: Vector3) -
 func _assert_clear_of_doors(
 	rules: BuildingRules, plan: BuildingPlan, hall: FloorHall, kind: BuildingIdentity.Kind
 ) -> void:
-	# Дверь особого этажа открывается в зал (ADR-0057): свободна полоса створки.
+	# A special floor's door opens into the hall (ADR-0057): the door leaf's strip is free.
 	var reach := FloorHall.LEAF_CLEAR
 	var clear := Door.LEAF_SIZE.x * 0.5
-	# Места — из набора, а не из мультимеша: под headless-движком мультимеш их не
-	# хранит и отдаёт единичные, и проверка не видела ни одной детали.
+	# Placements come from the set, not from the multimesh: under the headless engine the
+	# multimesh does not store them and returns identity ones, and the check saw no details.
 	var places := hall.placements()
 	assert_eq(places.size(), hall.parts(), "места всех деталей известны")
 	var checked := 0
 	for place: Transform3D in places:
-		# Пол, стены и ленты окон — во весь пролёт, их середина где угодно.
+		# Floor, walls and window bands span the whole span; their middle can be anywhere.
 		if absf(place.basis.get_scale().x) > 2.5:
 			continue
 		var depth := WorldSpace.BACK_WALL_Z - place.origin.z
@@ -217,15 +219,16 @@ func _assert_clear_of_doors(
 					% [kind, index, place.origin.x, spot.x]
 				)
 			)
-	# Полоса створки узкая, и мелочи в ней бывает немного: проверено столько,
-	# сколько нашлось, — ноль тоже честный ответ.
+	# The door leaf's strip is narrow, and few small items end up in it: as many are
+	# checked as were found; zero is an honest answer too.
 	gut.p("тип %d: у дверей проверено деталей %d" % [kind, checked])
 
 
-## Этаж, в высоту которого попадает [param y]: от пола этажа выше до своего пола.
-## Мебель стоит низом на полу, а начало меша у иной модели и на сантиметр ниже:
-## без запаса [constant STORY_SLACK] деталь относилась к этажу ниже. Выше
-## потолка зала деталей нет, и запас этажа выше не задевает.
+## The floor whose height contains [param y]: from the floor of the floor above to its
+## own floor. Furniture stands with its bottom on the floor, and some models have the
+## mesh origin a centimeter lower: without the [constant STORY_SLACK] slack, a detail
+## belonged to the floor below. There are no details above the hall ceiling, and the
+## slack does not touch the floor above.
 func _story_of(rules: BuildingRules, y: float) -> int:
 	return int(ceilf((y - STORY_SLACK - rules.sky_height) / rules.floor_height)) - 1
 

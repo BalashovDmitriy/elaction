@@ -1,20 +1,20 @@
 extends GutTest
 
-## Ходьба в едущей кабине и выход на ходу (ADR-0044, решения 4 и 5).
+## Walking in a moving cab and stepping out on the move (ADR-0044, decisions 4 and 5).
 ##
-## Как в ROM (@45C5, @36F2): кабина слушает только «вверх/вниз», а влево-вправо
-## Otto ходит в ней и на ходу; сойти можно, пока пол этажа не дальше 18/48
-## этажа под полом кабины. До M24h в едущей кабине Otto стоял.
+## As in ROM (@45C5, @36F2): the cab listens only to "up/down", while left-right
+## Otto walks in it on the move too; one can step off while the floor is no further than 18/48
+## of a floor below the cab floor. Before M24h Otto stood in a moving cab.
 ##
-## Сцена минимальная — кабина на двух остановках и пол нижнего этажа справа от
-## шахты: проверяется правило кабины, а не раскладка.
+## The scene is minimal — a cab at two stops and the bottom floor's floor to the right of
+## the shaft: the cab rule is checked, not the layout.
 
 const CAR_SCENE := preload("res://src/systems/elevators/elevator_car.tscn")
 const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
 
-## Сколько шагов физики ждать поездки: пауза плюс перегон, с запасом.
+## How many physics steps to wait for the ride: the pause plus the run, with margin.
 const RIDE_FRAMES: int = 600
-## Где кончается шахта и начинается пол нижнего этажа, м от оси кабины.
+## Where the shaft ends and the bottom floor's floor begins, m from the cab axis.
 const SHAFT_EDGE: float = 0.95
 
 
@@ -30,7 +30,7 @@ func after_all() -> void:
 	Input.action_release(&"jump")
 
 
-## Пол нижнего этажа справа от шахты: верх — на высоте −1 этаж.
+## The bottom floor's floor to the right of the shaft: its top is at the height of −1 floor.
 func _lower_floor() -> void:
 	var ground := StaticBody3D.new()
 	var shape := CollisionShape3D.new()
@@ -43,7 +43,7 @@ func _lower_floor() -> void:
 	ground.global_position = Vector3(0.0, -Proportions.FLOOR, 0.0)
 
 
-## Otto в кабине на верхней остановке; кабина тронулась вниз.
+## Otto in the cab at the top stop; the cab has set off downward.
 func _riding_down() -> Array:
 	GameState.instance().start_game()
 	_lower_floor()
@@ -88,8 +88,8 @@ func test_otto_walks_in_a_moving_car_and_stops_at_its_wall() -> void:
 	assert_true(walked, "в едущей кабине Otto идёт")
 
 
-## Борт держит и в прыжке: скорость полёта берётся с земли, и прыжок с разбега
-## выносил бы Otto из едущей кабины в шахту (авторевью M24h).
+## The side holds in a jump too: flight speed is taken from the ground, and a running jump
+## would carry Otto out of a moving cab into the shaft (M24h code review).
 func test_a_jump_in_a_moving_car_stops_at_its_wall_too() -> void:
 	var pair := await _riding_down()
 	var car := pair[0] as ElevatorCar

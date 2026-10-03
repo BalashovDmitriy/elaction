@@ -1,9 +1,9 @@
 extends SceneTree
 
-## Разбор скриптов движком пачкой в одном процессе (M24j): загрузка каждого
-## скрипта компилирует его и всё, от чего он зависит, — то же, что
-## `--check-only`, без старта движка на каждый файл. Пути — в файле, чей путь
-## после `--`; итог по скрипту — строка `CHECK OK <путь>` или `CHECK FAIL <путь>`.
+## Engine parsing of scripts in a batch in one process (M24j): loading each script
+## compiles it and everything it depends on — the same as `--check-only`, without
+## starting the engine for every file. The paths are in a file whose path comes after
+## `--`; the result per script is a line `CHECK OK <path>` or `CHECK FAIL <path>`.
 
 
 func _init() -> void:

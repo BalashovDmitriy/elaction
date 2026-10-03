@@ -1,13 +1,14 @@
 extends Node3D
 
-## Модели обстановки рядом: как они стоят, куда смотрят и какого роста.
+## Dressing models side by side: how they stand, where they face and how tall they are.
 ##
-## Модели паков приходят как есть: у одних фасад смотрит в +Z, у других — вбок,
-## рост у всех свой. Каталог [PropCatalog] приводит их к игре, а этот кадр —
-## проверка каталога глазами: каждая модель стоит в своём росте, лицом к камере,
-## с подписью. Без каталога (`--raw`) — как пришли из пака, с габаритом в выводе.
+## Pack models come as they are: some face +Z, others face sideways, and each has its own
+## height. The [PropCatalog] catalog brings them to the game, and this shot is an eye
+## check of the catalog: every model stands at its height, facing the camera, with a
+## label. Without the catalog (`--raw`), they are as they came from the pack, with the
+## bounding size in the output.
 ##
-## Запуск:
+## Run:
 ##     godot --path . res://tools/props_shot.tscn
 ##     godot --path . res://tools/props_shot.tscn -- --raw --folder=M21b
 ##     godot --path . res://tools/props_shot.tscn -- --raw --only=fridge,stove
@@ -15,13 +16,13 @@ extends Node3D
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 const PROPS_DIR := "res://assets/models/props"
 
-## Шаг сетки, м, и сколько моделей в ряду.
+## Grid step, m, and how many models per row.
 const STEP: float = 2.4
 const PER_ROW: int = 8
 
 var _folder: String = "M21b"
 var _raw: bool = false
-## Только эти модели: `--only=fridge,stove`. Пусто — весь каталог.
+## Only these models: `--only=fridge,stove`. Empty means the whole catalog.
 var _only := PackedStringArray()
 
 
@@ -68,8 +69,8 @@ func _stage() -> void:
 		var spot := Vector3((index % PER_ROW) * STEP, -(index / PER_ROW) * 3.2, 0.0)
 		var node: Node3D = null
 		if _raw:
-			# Как пришли из пака, но вписаны в ячейку: единицы у паков разные, и
-			# без этого огнетушитель в шесть метров закрыл бы соседей.
+			# As they came from the pack, but fitted into the cell: packs use different units, and
+			# without this a six-meter fire extinguisher would cover its neighbors.
 			var model := (load("%s/%s.glb" % [PROPS_DIR, prop_name]) as PackedScene).instantiate()
 			var box := PropCatalog.bounds_of(model as Node3D)
 			print("%-18s %s" % [prop_name, box.size])
@@ -96,8 +97,8 @@ func _stage() -> void:
 	var camera := Camera3D.new()
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 	var rows := ceili(float(names.size()) / PER_ROW)
-	# Высота кадра — по рядам, но не уже ряда целиком: с `--only` ряд один, и
-	# кадр по одной высоте ряда резал бы края.
+	# Shot height follows the rows, but is not narrower than a whole row: with `--only`
+	# there is one row, and a shot one row high would cut the edges.
 	camera.size = maxf(rows * 3.2 + 1.0, PER_ROW * STEP * 9.0 / 16.0 + 0.5)
 	camera.position = Vector3((PER_ROW - 1) * STEP * 0.5, -(rows - 1) * 1.6 + 1.0, 20.0)
 	add_child(camera)

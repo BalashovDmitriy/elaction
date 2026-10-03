@@ -1,107 +1,107 @@
 class_name RoofArrival
 extends RefCounted
 
-## Вступление здания: вертолёт привозит Otto на крышу (ADR-0038, решение 1;
-## режиссура — ADR-0052, решение 6).
+## Building intro: the helicopter brings Otto to the roof (ADR-0038, decision 1;
+## staging — ADR-0052, decision 6).
 ##
-## Полное — в первом здании партии, 10–12 с: вертолёт подлетает с закрытой
-## дверью, зависает и откатывает её, Otto выглядывает в проём, садится на
-## порог, бухту троса сбрасывают, он берётся за трос, соскальзывает с порога и
-## быстро съезжает на руках, тормозя у крыши, — и встаёт с приседом. С этого
-## мига он слушается игрока, а вертолёт выбирает трос, задвигает дверь, пилот
-## кивает, и вертолёт уходит сам. Короткое — в остальных зданиях, около 6 с:
-## вертолёт с первого кадра висит над местом с открытой дверью.
+## The full one — in the first building of a game, 10–12 s: the helicopter flies in with the door
+## closed, hovers and slides it open, Otto looks out of the opening, sits down on
+## the threshold, the rope coil is thrown down, he grabs the rope, slips off the threshold and
+## quickly slides down hand over hand, braking near the roof — and lands in a crouch. From this
+## moment he obeys the player, while the helicopter reels the rope in, slides the door shut, the
+## pilot nods, and the helicopter leaves on its own. The short one — in the other buildings, about
+## 6 s: from the first frame the helicopter hovers over the spot with the door open.
 ##
-## Прыжок, выстрел или пауза пропускают вступление: Otto сразу стоит на крыше,
-## вертолёт уходит оттуда, где был.
+## Jump, fire or pause skip the intro: Otto stands on the roof right away,
+## the helicopter leaves from where it was.
 ##
-## Пока идёт вступление, Otto «едет» ([method Otto.ride]): ввод не действует,
-## физика молчит, неуязвим, координатой распоряжается вступление — тот же приём,
-## что у эскалатора. В плоскости игры он стоит под проёмом и на тросе; в глубину
-## кадра, в проём, уходит его фигура ([member Otto.ride_depth]). Пока вертолёт
-## летит, Otto в нём, то есть не виден.
+## While the intro runs, Otto "rides" ([method Otto.ride]): input does nothing,
+## physics is silent, he is invulnerable, the intro owns his coordinate — the same trick
+## as the escalator. In the play plane he stands under the opening and on the rope; his figure
+## goes into the depth of the frame, into the opening ([member Otto.ride_depth]). While the
+## helicopter flies, Otto is inside it, that is, not visible.
 ##
-## Камера наезжает без смены ракурса, как у добиваний ([method SideCamera.close_up]):
-## крупнее на двери, ведёт Otto по тросу и после приземления отъезжает к
-## игровому кадру ([method linger]).
+## The camera zooms in without changing angle, like for takedowns ([method SideCamera.close_up]):
+## closer on the door, it follows Otto down the rope and after landing pulls back to
+## the gameplay frame ([method linger]).
 ##
-## Уровень только зовёт [method advance] каждый шаг физики, пока идёт
-## [method is_playing], и держит на это время агентов и кабины.
+## The level only calls [method advance] every physics step while
+## [method is_playing] holds, and keeps agents and cabs still for that time.
 
 enum Step { FLY_IN, DOOR, PEEK, SIT, DROP, GRAB, SWING, SLIDE, DONE }
 
-## Высота полозьев над крышей в висении, м: выше прыжка Otto (2.4 м) и такая,
-## чтобы спуск читался спуском, а вертолёт с винтом влезал в кадр.
+## Height of the skids above the roof when hovering, m: higher than Otto's jump (2.4 m) and such
+## that the descent reads as a descent, and the helicopter with its rotor fits in the frame.
 const HOVER_HEIGHT: float = 4.2
 
-## Насколько выше верха мира поднят кадр вступления, м.
+## How far above the top of the world the intro frame is raised, m.
 ##
-## Кадр на крыше упирается в верх мира в 4.8 м над настилом — вертолёт с
-## винтом над тросом туда не влезает. На вступление кадр встаёт выше и по
-## вертикали не ходит вовсе: полоса границ ровно в кадр высотой. Границы здания
-## возвращаются, когда вертолёт улетел или Otto ушёл с крыши, и камера съезжает
-## к ним сглаживанием, без рывка.
+## The frame on the roof stops at the top of the world 4.8 m above the deck — the helicopter with
+## its rotor above the rope does not fit there. For the intro the frame rises higher and does not
+## move vertically at all: the bounds band is exactly one frame tall. The building bounds
+## return when the helicopter has flown away or Otto has left the roof, and the camera glides
+## to them with smoothing, without a jerk.
 const CAMERA_HEADROOM: float = 4.5
 
-## Выше кадр вступления не поднимается, даже если вертолёт висит выше обычного
-## над высокой техникой: крыша должна остаться в кадре с запасом на рост Otto.
+## The intro frame does not rise higher than this, even if the helicopter hovers higher than usual
+## over tall equipment: the roof must stay in the frame with room for Otto's height.
 const DECK_IN_FRAME: float = 1.6
 
-## Сколько над верхом вертолёта остаётся неба в кадре, м.
+## How much sky stays in the frame above the top of the helicopter, m.
 const SKY_ABOVE: float = 0.4
 
-## Руки Otto на тросе, ступни ниже на столько, м: рост с поднятыми руками.
+## Otto's hands on the rope, feet lower by this much, m: height with raised arms.
 const REACH: float = Proportions.BODY * 1.15
 
-## Сколько длится каждый шаг, с: полное вступление и короткое. Сброс троса и
-## спуск длятся столько, сколько падает бухта и едет Otto.
+## How long each step lasts, s: the full intro and the short one. The rope drop and
+## the descent last as long as the coil falls and Otto slides.
 const DOOR_PAUSE: float = 0.35
 const PEEK_TIME: float = 1.5
 const PEEK_TIME_SHORT: float = 0.9
 const SIT_TIME: float = 1.0
 const SIT_TIME_SHORT: float = 0.7
-## Сколько трос качается, прежде чем Otto за него возьмётся, с.
+## How long the rope swings before Otto grabs it, s.
 const SETTLE_TIME: float = 0.45
 const GRAB_TIME: float = 0.5
 const SWING_TIME: float = 0.45
 
-## Otto в проёме: насколько глубже порога стоит, выглядывая, и насколько
-## порог под ним, когда он сидит, — ступни свисают ниже, м.
+## Otto in the opening: how much deeper than the threshold he stands while looking out, and how
+## far the threshold is below him when he sits — the feet hang lower, m.
 const PEEK_INSET: float = 0.3
 const SIT_DROP: float = 0.5
 const SIT_OUT: float = 0.05
-## Где Otto берётся за трос: руки на столько выше порога, м.
+## Where Otto grabs the rope: hands this much above the threshold, m.
 const GRAB_ABOVE_SILL: float = 0.95
 
-## Спуск по тросу на руках (ADR-0052, решение 6): разгон, предел скорости, м/с,
-## и торможение у крыши — с какой высоты над ней ступней, м, с каким
-## замедлением, м/с², и до какой скорости, м/с.
+## Hand-over-hand rope descent (ADR-0052, decision 6): acceleration, speed limit, m/s,
+## and braking near the roof — from what feet height above it, m, with what
+## deceleration, m/s², and down to what speed, m/s.
 const SLIDE_SPEED: float = 7.0
 const SLIDE_ACCELERATION: float = 14.0
 const BRAKE_FROM: float = 1.8
 const BRAKING: float = 11.0
 const TOUCH_SPEED: float = 1.3
 
-## Сколько вертолёт висит после приземления, прежде чем выбирать трос, с.
+## How long the helicopter hovers after landing before reeling the rope in, s.
 const LINGER: float = 0.35
 
-## Наезд камеры: доля крупного плана у двери и на тросе, как быстро кадр идёт
-## к нужному наезду, 1/с, и за сколько секунд отъезжает после приземления.
+## Camera zoom: close-up fraction at the door and on the rope, how fast the frame moves
+## to the needed zoom, 1/s, and in how many seconds it pulls back after landing.
 const CLOSE_AT_DOOR: float = 0.5
 const CLOSE_ON_ROPE: float = 0.32
 const CLOSE_EASE: float = 2.6
 const CLOSE_RELEASE: float = 0.9
-## Сколько неба над винтом и крыши под тросом остаётся в кадре у двери, м, на
-## оба края вместе.
+## How much sky above the rotor and roof under the rope stays in the frame at the door, m, for
+## both edges together.
 const DOOR_FRAME_MARGIN: float = 1.6
-## Меньше этой доли наезд в расчёте точки не берётся: на нуле точка ушла бы в
-## бесконечность, а кадр всё равно почти обычный.
+## Below this fraction the zoom is not used in computing the point: at zero the point would go to
+## infinity, and the frame is almost the regular one anyway.
 const MIN_CLOSE: float = 0.05
-## Середина кадра на тросе выше ступней Otto на столько, м.
+## The middle of the frame on the rope is this much above Otto's feet, m.
 const ROPE_FRAME_RISE: float = 1.0
 
-## Действия, пропускающие вступление. Пауза — тоже, но её ловит [Main]: у него
-## кнопка паузы, и открыть меню в ту же секунду он не должен.
+## Actions that skip the intro. Pause too, but [Main] catches it: it owns
+## the pause button, and it must not open the menu in the same second.
 const SKIP_ACTIONS: Array[StringName] = [&"jump", &"shoot"]
 
 var _otto: Otto = null
@@ -112,31 +112,31 @@ var _bounds := Rect2()
 var _step: Step = Step.DONE
 var _wait: float = 0.0
 var _speed: float = 0.0
-## Полное вступление или короткое.
+## Full intro or short one.
 var _full: bool = true
-## Сколько троса между крюком и руками Otto, м.
+## How much rope is between the hook and Otto's hands, m.
 var _along: float = 0.0
-## Где вступление поставило Otto в прошлый шаг. Стоит он не там — его переставил
-## кто-то другой (тест, инструмент съёмки), и вступление кончается само, не
-## трогая его: так было и с тросом до M24b.
+## Where the intro put Otto in the previous step. If he stands elsewhere, someone else moved
+## him (a test, a capture tool), and the intro ends on its own without
+## touching him: that is how it was with the rope before M24b.
 var _placed := Vector3.ZERO
-## Какие действия были нажаты в прошлый шаг: пропуск — по нажатию, а не по
-## удержанию, иначе прыжок, зажатый с прошлого здания, съедал бы вступление.
+## Which actions were pressed in the previous step: skipping is by press, not by
+## hold, otherwise a jump held down from the previous building would eat the intro.
 var _held: Dictionary = {}
-## Кадр ещё держится на вступлении: границы здания не вернули.
+## The frame is still held by the intro: the building bounds have not been returned.
 var _camera_held: bool = false
-## Наезд камеры сейчас и его середина в координатах сцены.
+## Current camera zoom and its middle in scene coordinates.
 var _close: float = 0.0
 var _close_point := Vector2.ZERO
-## Сколько ещё отъезжает камера после приземления, с.
+## How much longer the camera pulls back after landing, s.
 var _release_left: float = 0.0
 
 
-## Начинает вступление: вертолёт появляется в [param host], Otto — в нём.
-## [param landing] — место на крыше в плоскости правил, [param bounds] — границы
-## камеры по зданию, которые вернутся после приземления. [param full] — полное
-## вступление первого здания партии, иначе короткое; [param daytime] — утро
-## или день: прожектор не горит.
+## Starts the intro: the helicopter appears in [param host], Otto inside it.
+## [param landing] — the spot on the roof in the rules plane, [param bounds] — the camera's
+## building bounds that return after landing. [param full] — the full
+## intro of the first building of a game, otherwise the short one; [param daytime] — morning
+## or day: the searchlight is off.
 func begin(
 	host: Node3D,
 	otto: Otto,
@@ -155,12 +155,12 @@ func begin(
 	var obstacles := roof_obstacles(host, deck, [otto] as Array[Node])
 	_helicopter = Helicopter.new()
 	host.add_child(_helicopter)
-	# Вертолёт снаружи: днём на нём солнце (ADR-0051).
+	# The helicopter is outside: in daytime the sun is on it (ADR-0051).
 	Outdoors.mark(_helicopter)
 	_helicopter.daytime = daytime
-	# Над техникой крыши — с запасом; на саму крышу поток от винта гонит пыль.
+	# Above the roof equipment — with margin; the rotor downwash blows dust onto the roof itself.
 	_helicopter.avoid(obstacles, deck, snow)
-	# Над высокой техникой — башней, антенной — вертолёт висит выше обычного.
+	# Above tall equipment — a tower, an antenna — the helicopter hovers higher than usual.
 	var hover := _helicopter.safe_hover(WorldSpace.to_scene(landing - Vector2(0.0, HOVER_HEIGHT)))
 	_helicopter.fly_in(hover, not full)
 
@@ -169,8 +169,8 @@ func begin(
 	_otto.ride(true)
 	_otto.visible = not full
 	_place(Vector3(hook.x, hook.y - REACH, WorldSpace.PLAY_Z))
-	# Кадр встаёт сразу, снимком: первый кадр здания — уже кадр вступления.
-	# Висит вертолёт выше обычного — и кадр выше, пока крыша в нём остаётся.
+	# The frame is set right away, as a snap: the building's first frame is already an intro frame.
+	# If the helicopter hovers higher than usual — the frame is higher too, while the roof stays in it.
 	var top := WorldSpace.to_plane(hover).y - _helicopter.top_above_skids() - SKY_ABOVE
 	var headroom := clampf(
 		bounds.position.y - top,
@@ -192,11 +192,11 @@ func begin(
 		_enter(Step.PEEK)
 
 
-## Что стоит на крыше выше настила [param deck] (высота в координатах сцены):
-## видимые меши уровня — техника, машинное отделение с антенной, кровля,
-## вывеска. Без кабин (их прикрывает машинное отделение), без города (он в
-## своём [SubViewport] и своём мире), без дождя (его струи и ореолы — не
-## предметы) и без [param skip] — Otto и тому подобного.
+## What stands on the roof above the deck [param deck] (height in scene coordinates):
+## the level's visible meshes — equipment, the machine room with the antenna, roofing,
+## the sign. Without cabs (the machine room covers them), without the city (it is in
+## its own [SubViewport] and its own world), without rain (its streaks and halos are not
+## objects) and without [param skip] — Otto and the like.
 static func roof_obstacles(host: Node, deck: float, skip: Array[Node]) -> Array[AABB]:
 	var found: Array[AABB] = []
 	for node: Node in host.find_children("*", "MeshInstance3D", true, false):
@@ -214,35 +214,35 @@ static func _skipped(node: Node, host: Node, skip: Array[Node]) -> bool:
 	while at != null and at != host:
 		if at is SubViewport or at is RoofRain or at is Helicopter or skip.has(at):
 			return true
-		# Кабина — внутри шахты, а её тросы тянутся до потолка машинного
-		# отделения и режутся шейдером: габарит у них выше того, что видно.
+		# The cab is inside the shaft, and its ropes stretch up to the machine room
+		# ceiling and are cut by a shader: their bounds are higher than what is visible.
 		if at is ElevatorCar:
 			return true
 		at = at.get_parent()
 	return false
 
 
-## Идёт ли вступление: Otto ещё не на крыше.
+## Whether the intro is running: Otto is not on the roof yet.
 func is_playing() -> bool:
 	return _step != Step.DONE
 
 
-## Полное ли вступление.
+## Whether the intro is full.
 func is_full() -> bool:
 	return _full
 
 
-## Какой шаг идёт — для тестов и кадров.
+## Which step is running — for tests and shots.
 func step() -> Step:
 	return _step
 
 
-## Вертолёт вступления; null, когда он уже улетел и убран.
+## The intro helicopter; null once it has flown away and been removed.
 func helicopter() -> Helicopter:
 	return _helicopter if is_instance_valid(_helicopter) else null
 
 
-## Пропускает вступление: Otto сразу на крыше. Возвращает, было ли что пропускать.
+## Skips the intro: Otto is on the roof right away. Returns whether there was anything to skip.
 func skip() -> bool:
 	if not is_playing():
 		return false
@@ -251,9 +251,9 @@ func skip() -> bool:
 	return true
 
 
-## Шаг после вступления: отъезд камеры к игровому кадру и возврат границ, когда
-## вертолёт улетел или Otto ушёл с крыши — съехал кабиной, спрыгнул. Зовётся
-## каждый шаг физики и почти всегда ничего не делает.
+## The step after the intro: the camera pulls back to the gameplay frame and bounds return when
+## the helicopter has flown away or Otto has left the roof — rode down by cab, jumped off. Called
+## every physics step and almost always does nothing.
 func linger(delta: float = 1.0 / 60.0) -> void:
 	if _release_left > 0.0:
 		_release_left = maxf(_release_left - delta, 0.0)
@@ -268,17 +268,17 @@ func linger(delta: float = 1.0 / 60.0) -> void:
 		_restore_camera()
 
 
-## Шаг вступления. [param delta] — шаг физики, с.
+## Intro step. [param delta] — physics step, s.
 func advance(delta: float) -> void:
 	if not is_playing():
 		return
 	if _otto.global_position.distance_to(_placed) > 0.01:
-		# Переставили — вступление им больше не распоряжается.
+		# Moved — the intro no longer owns him.
 		_let_go()
 		return
 	if _skip_pressed():
-		# Нажатие потрачено на пропуск: Otto, отпущенный в этом же шаге, его
-		# уже не получит — ни выстрела, ни прыжка с места приземления.
+		# The press was spent on the skip: Otto, released in this same step,
+		# will not get it — neither a shot nor a jump from the landing spot.
 		_land(true)
 		_release_camera(true)
 		return
@@ -322,7 +322,7 @@ func advance(delta: float) -> void:
 	_follow(delta)
 
 
-## Переход к шагу [param next]: его длина, поза и звук.
+## Transition to step [param next]: its length, pose and sound.
 func _enter(next: Step) -> void:
 	_step = next
 	match next:
@@ -333,8 +333,8 @@ func _enter(next: Step) -> void:
 			_otto.visible = true
 			_otto.ride_pose = ActorPose.PEEK
 			_otto.ride_turn = 1.0
-			# В проём сразу: показанный под крюком, он на кадр висел бы в воздухе
-			# снаружи вертолёта.
+			# Into the opening right away: shown under the hook, for a frame he would hang in the air
+			# outside the helicopter.
 			_peek()
 		Step.SIT:
 			_wait = SIT_TIME if _full else SIT_TIME_SHORT
@@ -356,22 +356,22 @@ func _enter(next: Step) -> void:
 			_helicopter.rope_slide(true)
 
 
-## Пока вертолёт летит и открывает дверь, Otto в салоне: не виден и стоит под
-## крюком, куда смотрит кадр.
+## While the helicopter flies and opens the door, Otto is in the cabin: invisible and standing under
+## the hook, where the frame is looking.
 func _hold_in_the_cabin() -> void:
 	var hook := _helicopter.hook()
 	_place(Vector3(hook.x, hook.y - REACH, WorldSpace.PLAY_Z))
 
 
-## Выглядывает: стоит на полу салона в глубине проёма, лицом к камере.
+## Looks out: stands on the cabin floor deep in the opening, facing the camera.
 func _peek() -> void:
 	var sill := _sill()
 	_place(Vector3(sill.x, sill.y, WorldSpace.PLAY_Z))
 	_otto.ride_depth = sill.z - WorldSpace.PLAY_Z - PEEK_INSET
 
 
-## Садится на порог: опускается и выдвигается к краю за время шага, потом
-## сидит, свесив ноги, — и пока падает бухта, и пока берётся за трос.
+## Sits down on the threshold: lowers and moves to the edge over the step, then
+## sits with legs hanging — both while the coil falls and while he grabs the rope.
 func _sit_down() -> void:
 	var sill := _sill()
 	var share := 1.0
@@ -383,8 +383,8 @@ func _sit_down() -> void:
 	_otto.ride_depth = (sill.z - WorldSpace.PLAY_Z + lerpf(-PEEK_INSET, SIT_OUT, share))
 
 
-## Соскальзывает с порога на трос: из сидячей в висящую, в плоскость игры, и
-## поворачивается вдоль этажа.
+## Slips off the threshold onto the rope: from sitting to hanging, into the play plane, and
+## turns along the floor.
 func _swing_out() -> void:
 	var share := smoothstep(0.0, 1.0, 1.0 - _wait / SWING_TIME)
 	var sill := _sill()
@@ -395,13 +395,13 @@ func _swing_out() -> void:
 	_otto.ride_turn = 1.0 - share
 
 
-## Съезжает на руках: разгон до предела и торможение у крыши.
+## Slides down hand over hand: acceleration to the limit and braking near the roof.
 func _slide(delta: float) -> void:
 	var feet := _on_rope().y
 	var left := feet - _deck_height()
-	# Предел скорости: полный ход, а у крыши — тот, с которого успеть затормозить.
-	# Разгон — и в зоне торможения: начатый у самой крыши спуск с нуля иначе
-	# так и стоял бы на месте.
+	# Speed limit: full travel, and near the roof — the one from which it can still brake in time.
+	# Accelerate in the braking zone too: otherwise a descent started from zero right at the roof
+	# would just stay in place.
 	var top := SLIDE_SPEED
 	if left < BRAKE_FROM:
 		top = minf(top, maxf(sqrt(2.0 * BRAKING * maxf(left, 0.0)), TOUCH_SPEED))
@@ -409,8 +409,8 @@ func _slide(delta: float) -> void:
 	_along += _speed * delta
 	var at := _on_rope()
 	if at.y <= _deck_height() + 0.001:
-		# Сам встал на место: вступление его и поставило, — иначе отпуск принял
-		# бы приезд за перестановку и оборвал звук троса.
+		# He was put in place by himself: the intro put him there — otherwise the release would take
+		# the arrival for a move and cut the rope sound.
 		_place(WorldSpace.to_scene(_landing))
 		_land()
 		_release_camera(false)
@@ -418,28 +418,28 @@ func _slide(delta: float) -> void:
 	_place(at)
 
 
-## Где стоит Otto, держась за трос в [member _along] метрах от крюка: ступни
-## ниже рук на рост с поднятыми руками, в плоскости игры.
+## Where Otto stands holding the rope [member _along] metres from the hook: feet
+## lower than hands by his height with raised arms, in the play plane.
 func _on_rope() -> Vector3:
 	var hands := _helicopter.rope_point(_along)
 	return Vector3(hands.x, hands.y - REACH, WorldSpace.PLAY_Z)
 
 
-## Конец вступления приездом или пропуском: Otto стоит на месте приземления и
-## слушается, вертолёт уходит, а кадр вступления держится, пока он не улетел
+## End of the intro by arrival or skip: Otto stands at the landing spot and
+## obeys, the helicopter leaves, and the intro frame is held until it has flown away
 ## ([method linger]).
 ##
-## [param presses_spent] — вступление пропущено нажатием, и Otto его не слышит
+## [param presses_spent] — the intro was skipped by a press, and Otto does not hear it
 ## ([method Otto.ride]).
 func _land(presses_spent: bool = false) -> void:
 	_otto.global_position = WorldSpace.to_scene(_landing)
-	# Приземление с приседом — клипом троса, а не стойкой из проёма.
+	# Landing in a crouch — with the rope clip, not the stance from the opening.
 	_otto.ride_look = Otto.LOOK_ROPE
 	_release(presses_spent)
 
 
-## Отпускает Otto там, где его поставили, — тест, съёмка, возвращение после
-## гибели. Кадр догоняет его сразу, снимком: вступление им не распоряжается.
+## Releases Otto where he was put — a test, a capture, a return after
+## death. The frame catches up with him right away, as a snap: the intro does not own it.
 func _let_go() -> void:
 	_otto.ride_look = ""
 	_release()
@@ -454,14 +454,14 @@ func _release(presses_spent: bool = false) -> void:
 	_otto.visible = true
 	_otto.ride(false, presses_spent)
 	if is_instance_valid(_helicopter):
-		# Приехал — звук троса доигрывает сам, он короче спуска; сорвали
-		# посреди спуска — обрывается.
+		# Arrived — the rope sound plays out on its own, it is shorter than the descent; torn off
+		# mid-descent — it is cut.
 		if not sliding or _otto.global_position.distance_to(_placed) > 0.01:
 			_helicopter.rope_slide(false)
 		_helicopter.leave(LINGER)
 
 
-## Кадр едет к наезду шага: у двери — на проём, на тросе — за Otto.
+## The frame moves to the step's zoom: at the door — on the opening, on the rope — after Otto.
 func _follow(delta: float) -> void:
 	if not is_playing():
 		return
@@ -469,7 +469,7 @@ func _follow(delta: float) -> void:
 	var point := _close_point
 	match _step:
 		Step.DOOR, Step.PEEK, Step.SIT, Step.DROP, Step.GRAB:
-			# Крупно, но так, чтобы в кадр влезли и винт, и крыша под тросом.
+			# Close, but so that both the rotor and the roof under the rope fit in the frame.
 			var top := _helicopter.global_position.y + _helicopter.top_above_skids()
 			var deck := _deck_height()
 			var needed := (top - deck + DOOR_FRAME_MARGIN) / Proportions.FIELD
@@ -485,7 +485,7 @@ func _follow(delta: float) -> void:
 	_frame(_close, _close_point)
 
 
-## Отъезд к игровому кадру: после приземления — плавно, на пропуске — сразу.
+## Pull back to the gameplay frame: after landing — smoothly, on a skip — at once.
 func _release_camera(at_once: bool) -> void:
 	if at_once:
 		_close = 0.0
@@ -495,10 +495,10 @@ func _release_camera(at_once: bool) -> void:
 		_release_left = CLOSE_RELEASE
 
 
-## Наезд на [param amount] с серединой кадра в [param centre]. Камера ставит
-## середину между целью — Otto — и точкой наезда в доле наезда
-## ([method SideCamera.close_up]); точка считается обратно, чтобы середина
-## встала туда, куда нужно вступлению.
+## Zoom to [param amount] with the frame middle at [param centre]. The camera puts
+## the middle between the target — Otto — and the zoom point at the zoom fraction
+## ([method SideCamera.close_up]); the point is computed backwards so that the middle
+## lands where the intro needs it.
 func _frame(amount: float, centre: Vector2) -> void:
 	var camera := _camera()
 	if camera == null:
@@ -515,7 +515,7 @@ func _camera() -> SideCamera:
 	return viewport.get_camera_3d() as SideCamera if viewport != null else null
 
 
-## Возвращает камере границы здания — без снимка, сглаживанием.
+## Returns the building bounds to the camera — without a snap, with smoothing.
 func _restore_camera() -> void:
 	_camera_held = false
 	_otto.apply_camera_bounds(_bounds, false)
@@ -526,7 +526,7 @@ func _place(at: Vector3) -> void:
 	_placed = at
 
 
-## Порог проёма в координатах сцены.
+## The opening threshold in scene coordinates.
 func _sill() -> Vector3:
 	return _helicopter.doorway()
 

@@ -1,28 +1,29 @@
 class_name Ragdoll
 extends RefCounted
 
-## Тело на суставах: каждая часть — своё физическое тело (ADR-0043, решение 12).
+## A jointed body: each part is its own physics body (ADR-0043, decision 12).
 ##
-## Брусок вместо тела ложился на другой труп доской. Рэгдолл собирается из
-## [PhysicalBone3D] на скелете фигуры пака: таз, туловище, голова, руки и ноги
-## по две части и стопы — тринадцать тел, связанных конусами с пределами.
-## Остальные кости (пальцы, шея, плечевой пояс) едут за своей частью.
+## A single block in place of a body lay on another corpse like a plank. The ragdoll is built
+## from [PhysicalBone3D] on the skeleton of the pack figure: pelvis, torso, head, arms and
+## legs in two parts each and the feet — thirteen bodies linked by cones with limits.
+## The other bones (fingers, neck, shoulder girdle) follow their part.
 ##
-## Стопы пака висят не на голенях, а на корне скелета (он собран под IK):
-## своего родителя-тела у них нет, и к голени их крепит отдельный шарнир.
+## The pack's feet hang not from the shins but from the skeleton root (it is rigged for IK):
+## they have no parent body of their own, and a separate hinge attaches them to the shin.
 ##
-## Части лежат на слое трупов ([constant Corpse.LAYER]) и видят пол и другие
-## трупы; живые их не видят. Друг с другом части одного тела не сталкиваются —
-## их держат суставы. Каждая часть заперта в плоскости игры по Z: руки и ноги
-## ложатся вглубь коридора на своей глубине, а тело не укатывается к камере.
+## The parts lie on the corpse layer ([constant Corpse.LAYER]) and see the floor and other
+## corpses; the living do not see them. Parts of one body do not collide with each other —
+## the joints hold them. Each part is locked to the play plane along Z: the arms and legs
+## lie into the corridor depth at their own depth, and the body does not roll towards the
+## camera.
 
-## Части тела: кость, до какой кости мерить длину (пусто — [code]length[/code]),
-## радиус и длина капсулы, м, масса, кг, и сустав. [code]swing[/code] — конус
-## плеча и локтя, градусы. [code]bend[/code] — сустав как у человека, не
-## поровну во все стороны: наклон вокруг оси X модели от и до (вперёд у спины
-## и головы — плюс, у бедра — минус, колено гнётся только в плюс), поворот
-## вокруг вертикали и вбок — в обе стороны поровну. Оси — модели, а не кости:
-## у костей пака свои оси повёрнуты кто как.
+## Body parts: bone, the bone to measure length to (empty — [code]length[/code]),
+## capsule radius and length, m, mass, kg, and the joint. [code]swing[/code] — the cone
+## of the shoulder and elbow, degrees. [code]bend[/code] — a joint like a human's, not
+## equal in all directions: tilt around the model's X axis from and to (forward for the back
+## and head is plus, for the thigh minus, the knee bends only into plus), rotation
+## around the vertical and sideways — equally both ways. The axes are the model's, not the
+## bone's: the pack bones have their own axes rotated every which way.
 const PARTS: Array[Dictionary] = [
 	{"bone": "Body", "to": "", "length": 0.2, "radius": 0.13, "mass": 12.0},
 	{
@@ -75,52 +76,53 @@ const PARTS: Array[Dictionary] = [
 	{"bone": "Foot.L", "to": "", "length": 0.16, "radius": 0.045, "mass": 1.0},
 	{"bone": "Foot.R", "to": "", "length": 0.16, "radius": 0.045, "mass": 1.0},
 ]
-## Стопа и голень, к которой её крепит шарнир.
+## A foot and the shin the hinge attaches it to.
 const ANKLES := {"Foot.L": "LowerLeg.L", "Foot.R": "LowerLeg.R"}
 
-## Тяжесть частей: мир игры падает быстрее земного (у агента и Otto 27 м/с²).
+## Gravity of the parts: the game world falls faster than the Earth's (27 m/s² for the agent
+## and Otto).
 const GRAVITY_SCALE: float = 2.75
 const FRICTION: float = 0.9
 const LINEAR_DAMP: float = 0.2
 const ANGULAR_DAMP: float = 2.0
-## Предел скорости части, м/с: быстрее тело за шаг физики пролетало бы плиту
-## перекрытия насквозь. У живых предел падения тот же порядка (12.6 м/с).
+## Part speed limit, m/s: faster, a body would fly through a floor slab in one physics
+## step. For the living the fall limit is of the same order (12.6 m/s).
 const MAX_SPEED: float = 8.0
-## Часть медленнее этого, м/с, считается улёгшейся.
+## A part slower than this, m/s, counts as settled.
 const RESTING_SPEED: float = 0.15
-## Сколько тело лежит неподвижно, прежде чем застыть, с (ADR-0044, решение 11).
+## How long a body lies still before freezing, s (ADR-0044, decision 11).
 ##
-## Сами части засыпали плохо: в стопке соседи будят друг друга, и двадцать
-## улёгшихся тел стоили физике 11 мс на шаг (замер M24h). Застывшее тело —
-## статичное: из расчёта оно уходит, а столкновения остаются, и на него
-## по-прежнему ложатся другие. Выглядит оно так же и лежит до конца здания.
+## The parts themselves fell asleep poorly: in a pile neighbours wake each other, and twenty
+## settled bodies cost physics 11 ms per step (measured in M24h). A frozen body is
+## static: it leaves the simulation, but its collisions stay, and others still
+## lie down on it. It looks the same and lies there until the end of the building.
 const FREEZE_AFTER: float = 1.0
-## Насколько ниже низа здания тело считается выпавшим из мира, м.
+## How far below the bottom of the building a body counts as fallen out of the world, m.
 const ABYSS_MARGIN: float = 10.0
 
-## Высота сцены, ниже которой тело выпало из мира и пропадает: падало бы оно
-## вечно и вечно считалось бы физикой. Ставит уровень по своему зданию.
+## Scene height below which a body has fallen out of the world and disappears: it would
+## fall forever and forever be simulated. The level sets it from its building.
 static var abyss: float = -INF
 
-## Части по кости, пока они есть: отрезанная кабиной уходит из словаря.
+## Parts by bone, while they exist: one cut off by a cab leaves the dictionary.
 var parts: Dictionary = {}
-## Тело, которому принадлежит рэгдолл: по нему кабина узнаёт, чью часть задела.
+## The body the ragdoll belongs to: by it a cab learns whose part it hit.
 var corpse: Corpse = null
 
 var _figure: FigureRig
 var _skeleton: Skeleton3D
 var _simulator: PhysicalBoneSimulator3D
 var _joints: Dictionary = {}
-## Кости скелета, которые ведёт каждая часть: она сама и потомки без своей
-## части. Прячутся вместе с ней.
+## Skeleton bones each part drives: itself and its descendants without a part of their
+## own. They are hidden together with it.
 var _owned: Dictionary = {}
 var _hidden := PackedStringArray()
-## Застыло ли тело ([method freeze]).
+## Whether the body is frozen ([method freeze]).
 var _frozen: bool = false
 
 
-## Собирает рэгдолл на фигуре [param figure]. [param only] — только эти части
-## (кусок, оторванный от тела); пусто — все.
+## Builds the ragdoll on figure [param figure]. [param only] — only these parts
+## (a piece torn off the body); empty — all.
 func _init(figure: FigureRig, only: PackedStringArray = PackedStringArray()) -> void:
 	_figure = figure
 	_skeleton = figure.skeleton()
@@ -139,9 +141,9 @@ func _init(figure: FigureRig, only: PackedStringArray = PackedStringArray()) -> 
 	_own_bones()
 
 
-## Пускает тело в физику со скоростью [param velocity] и толчком [param impulse]:
-## в точку [param at] ближайшей к ней части, а без точки — в туловище. До этого
-## части ни с чем не сталкиваются: живой ходит своей формой.
+## Releases the body into physics with velocity [param velocity] and push [param impulse]:
+## at point [param at] of the part closest to it, and without a point — into the torso.
+## Until then the parts collide with nothing: the living walk with their own shape.
 func start(velocity: Vector3, impulse: Vector3 = Vector3.ZERO, at: Variant = null) -> void:
 	for part: PhysicalBone3D in parts.values():
 		part.collision_layer = 1 << (Corpse.LAYER - 1)
@@ -172,14 +174,14 @@ func start(velocity: Vector3, impulse: Vector3 = Vector3.ZERO, at: Variant = nul
 			)
 		):
 			struck = part
-	# Попадание — у самой части: точка по высоте и глубине пули, но не дальше
-	# капсулы, иначе рычаг крутил бы часть волчком.
+	# The hit is at the part itself: the point at the bullet's height and depth, but no further
+	# than the capsule, otherwise the lever would spin the part like a top.
 	var offset := (point - struck.global_position).limit_length(0.3)
 	struck.apply_impulse(impulse, offset)
 
 
-## Убирает части [param bones]: их кости прячутся, тела исчезают. Потомки
-## остаются и повисают на своих суставах свободными.
+## Removes parts [param bones]: their bones are hidden, the bodies disappear. Descendants
+## stay and hang free on their joints.
 func remove(bones: PackedStringArray) -> void:
 	for bone_name: String in bones:
 		var part := parts.get(bone_name) as PhysicalBone3D
@@ -199,8 +201,8 @@ func remove(bones: PackedStringArray) -> void:
 	_figure.hide_bones(_hidden)
 
 
-## Ставит свои части туда, где стоят те же части [param source], с их
-## скоростями: оторванный кусок продолжает движение тела.
+## Puts its parts where the same parts of [param source] are, with their
+## velocities: a torn-off piece continues the body's motion.
 func follow(source: Ragdoll) -> void:
 	for bone_name: String in parts:
 		var from := source.parts.get(bone_name) as PhysicalBone3D
@@ -212,13 +214,13 @@ func follow(source: Ragdoll) -> void:
 		part.angular_velocity = from.angular_velocity
 
 
-## Имена частей, которые ещё есть.
+## Names of the parts that still exist.
 func names() -> PackedStringArray:
 	return PackedStringArray(parts.keys())
 
 
-## Прячет кости частей, которых нет в [param kept]: у оторванного куска
-## остальное тело — чужое.
+## Hides the bones of parts not in [param kept]: for a torn-off piece
+## the rest of the body is someone else's.
 func hide_all_but(kept: PackedStringArray) -> void:
 	for bone_name: String in _owned:
 		if not kept.has(bone_name):
@@ -226,7 +228,7 @@ func hide_all_but(kept: PackedStringArray) -> void:
 	_figure.hide_bones(_hidden)
 
 
-## Разбирает рэгдолл: фигура снова на ногах, всё спрятанное видно.
+## Takes the ragdoll apart: the figure is on its feet again, everything hidden is visible.
 func dispose() -> void:
 	if is_instance_valid(_simulator):
 		_simulator.physical_bones_stop_simulation()
@@ -239,13 +241,13 @@ func dispose() -> void:
 	_figure.hide_bones(_hidden)
 
 
-## Середина части [param part] в мире: капсула идёт от кости вдоль её Y.
+## Middle of part [param part] in the world: the capsule goes from the bone along its Y.
 static func center_of(part: PhysicalBone3D) -> Vector3:
 	var shape := part.get_child(0) as CollisionShape3D
 	return part.global_transform * shape.position
 
 
-## Габарит тела по частям, в мире.
+## Body bounds from the parts, in the world.
 func bounds() -> AABB:
 	var box := AABB()
 	var first := true
@@ -253,7 +255,8 @@ func bounds() -> AABB:
 		var shape := part.get_child(0) as CollisionShape3D
 		var capsule := shape.shape as CapsuleShape3D
 		var reach := Vector3.ONE * capsule.radius
-		# Высота капсулы — с полусферами: центры полусфер ближе концов на радиус.
+		# Capsule height includes the hemispheres: the hemisphere centres are a radius closer than
+		# the ends.
 		var spine := capsule.height * 0.5 - capsule.radius
 		for end: float in [-spine, spine]:
 			var point := part.global_transform * (shape.position + Vector3(0.0, end, 0.0))
@@ -263,9 +266,9 @@ func bounds() -> AABB:
 	return box
 
 
-## Будит части: опора ушла из-под улёгшегося тела — люк подвала открылся, — а
-## спящее тело физика сама не будит, и оно висело бы в воздухе. Застывшее —
-## снова живёт физикой.
+## Wakes the parts: support has gone from under a settled body — the basement hatch opened —
+## and physics does not wake a sleeping body by itself, so it would hang in the air.
+## A frozen one is simulated by physics again.
 func wake() -> void:
 	if _frozen:
 		_frozen = false
@@ -276,8 +279,8 @@ func wake() -> void:
 		PhysicsServer3D.body_set_state(part.get_rid(), PhysicsServer3D.BODY_STATE_SLEEPING, false)
 
 
-## Застывает улёгшееся тело: части становятся статичными телами — физика их
-## больше не считает, но сталкиваются они по-прежнему ([constant FREEZE_AFTER]).
+## A settled body freezes: the parts become static bodies — physics no longer
+## simulates them, but they still collide ([constant FREEZE_AFTER]).
 func freeze() -> void:
 	if _frozen:
 		return
@@ -287,7 +290,7 @@ func freeze() -> void:
 	_set_limiter(false)
 
 
-## Застыло ли тело.
+## Whether the body is frozen.
 func is_frozen() -> bool:
 	return _frozen
 
@@ -299,7 +302,7 @@ func _set_limiter(on: bool) -> void:
 			(child as SpeedLimit).still = 0.0
 
 
-## Спят ли все части: тело улеглось.
+## Whether all parts are asleep: the body has settled.
 func asleep() -> bool:
 	for part: PhysicalBone3D in parts.values():
 		if part.linear_velocity.length() > RESTING_SPEED:
@@ -307,23 +310,23 @@ func asleep() -> bool:
 	return true
 
 
-## Шаг частей, которого физика не делает сама: предел скорости — у
-## [PhysicalBone3D] его нет, — и езда на полу кабины. Кабину двигает код, и
-## тело, лежащее на её полу, падало бы на уходящий пол раз за разом, сползая
-## с него; часть на полу кабины берёт её ход по вертикали и едет с ней.
+## A step of the parts that physics does not do by itself: the speed limit —
+## [PhysicalBone3D] has none — and riding on a cab floor. The cab is moved by code, and
+## a body lying on its floor would fall onto the receding floor again and again, sliding
+## off it; a part on a cab floor takes its vertical motion and rides with it.
 ##
-## Кабина, идущая вверх, зажимает лежащее на её крыше тело под верхом шахты —
-## тела тогда больше нет, как и до рэгдолла (ADR-0042): физика вдавила бы его
-## и в крышу, и в плиту разом.
+## A cab going up pins a body lying on its roof under the top of the shaft —
+## then there is no body anymore, as before the ragdoll (ADR-0042): physics would press it
+## into both the roof and the slab at once.
 class SpeedLimit:
 	extends Node
 
-	## Насколько ниже поверхности части ищется пол кабины и насколько выше —
-	## потолок, м.
+	## How far below a part's surface the cab floor is searched for and how far above —
+	## the ceiling, m.
 	const REACH: float = 0.08
 
 	var ragdoll: Ragdoll = null
-	## Сколько тело уже лежит неподвижно, с.
+	## How long the body has been lying still, s.
 	var still: float = 0.0
 
 	func _physics_process(delta: float) -> void:
@@ -335,16 +338,16 @@ class SpeedLimit:
 				return
 			if part.linear_velocity.length() > RESTING_SPEED:
 				resting = false
-			# Уснувшая часть лежит на неподвижном: на кабине части не засыпают —
-			# её тело кинематическое и будит всё, что на нём лежит. Трупов до
-			# конца здания много, и луч под каждую часть каждый шаг стоил бы кадру.
+			# A part that fell asleep lies on something still: on a cab parts do not fall asleep —
+			# its body is kinematic and wakes everything lying on it. There are many corpses until
+			# the end of the building, and a ray under every part every step would cost the frame.
 			if PhysicsServer3D.body_get_state(part.get_rid(), PhysicsServer3D.BODY_STATE_SLEEPING):
 				continue
 			if part.linear_velocity.length_squared() > MAX_SPEED * MAX_SPEED:
 				part.linear_velocity = part.linear_velocity.limit_length(MAX_SPEED)
 			var car := _car_under(space, part)
 			if car != null:
-				# На полу кабины тело не застывает: кабина уехала бы из-под него.
+				# On a cab floor the body does not freeze: the cab would drive out from under it.
 				resting = false
 			if car == null or is_zero_approx(car.speed_now()):
 				continue
@@ -359,7 +362,7 @@ class SpeedLimit:
 		if still >= FREEZE_AFTER:
 			ragdoll.freeze()
 
-	## Кабина, на полу которой лежит часть, или null.
+	## The cab a part lies on the floor of, or null.
 	func _car_under(space: PhysicsDirectSpaceState3D, part: PhysicalBone3D) -> ElevatorCar:
 		var shape := part.get_child(0) as CollisionShape3D
 		var radius := (shape.shape as CapsuleShape3D).radius
@@ -370,7 +373,7 @@ class SpeedLimit:
 		var hit := space.intersect_ray(query)
 		return hit.get("collider") as ElevatorCar if not hit.is_empty() else null
 
-	## Упёрлась ли часть, которую везёт вверх кабина [param car], в потолок.
+	## Whether a part carried up by cab [param car] has hit the ceiling.
 	func _pinned(space: PhysicsDirectSpaceState3D, part: PhysicalBone3D, car: ElevatorCar) -> bool:
 		var shape := part.get_child(0) as CollisionShape3D
 		var radius := (shape.shape as CapsuleShape3D).radius
@@ -415,7 +418,7 @@ func _part(spec: Dictionary) -> PhysicalBone3D:
 		_bend(part, bone, spec["bend"] as Array)
 	elif swing > 0.0:
 		part.joint_type = PhysicalBone3D.JOINT_TYPE_CONE
-		# Ось скручивания конуса — X сустава, кость идёт вдоль Y.
+		# The cone's twist axis is the joint's X, the bone goes along Y.
 		part.joint_rotation = Vector3(0.0, 0.0, PI * 0.5)
 		part.set(&"joint_constraints/swing_span", swing)
 		part.set(&"joint_constraints/twist_span", float(spec.get("twist", 30.0)))
@@ -433,9 +436,9 @@ func _part(spec: Dictionary) -> PhysicalBone3D:
 	return part
 
 
-## Сустав как у человека: оси модели в осях кости, пределы [param limits] —
-## наклон вокруг X модели от и до, поворот вокруг Y и вбок вокруг Z в обе
-## стороны, градусы.
+## A joint like a human's: model axes in bone axes, limits [param limits] —
+## tilt around the model's X from and to, rotation around Y and sideways around Z both
+## ways, degrees.
 func _bend(part: PhysicalBone3D, bone: int, limits: Array) -> void:
 	part.joint_type = PhysicalBone3D.JOINT_TYPE_6DOF
 	var to_bone := _skeleton.get_bone_global_rest(bone).basis.orthonormalized().inverse()
@@ -456,7 +459,7 @@ func _bend(part: PhysicalBone3D, bone: int, limits: Array) -> void:
 		part.set("joint_constraints/%s/angular_limit_upper" % axis, span[1])
 
 
-## Шарнир стопы к голени: на лодыжке, где стопа начинается.
+## Foot hinge to the shin: at the ankle, where the foot begins.
 func _pin_ankle(foot: String) -> void:
 	var leg := parts.get(ANKLES[foot]) as PhysicalBone3D
 	var sole := parts.get(foot) as PhysicalBone3D
@@ -470,7 +473,7 @@ func _pin_ankle(foot: String) -> void:
 	_joints[foot] = joint
 
 
-## Какие кости скелета ведёт каждая часть.
+## Which skeleton bones each part drives.
 func _own_bones() -> void:
 	var owner_of := {}
 	for bone: int in _skeleton.get_bone_count():

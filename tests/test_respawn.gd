@@ -1,13 +1,13 @@
 extends GutTest
 
-## Возвращение Otto после гибели и толпа агентов по правилам ROM (ADR-0053,
-## решения 2 и 5): без сцены и на любом здании, какое сгенерируется.
+## Otto's return after death and the agent crowd by ROM rules (ADR-0053, decisions 2
+## and 5): without a scene and on any building that gets generated.
 
 const SKILLS: Array[int] = [0, 5, 10]
 const SEEDS: Array[int] = [1, 2, 3, 5, 8, 13, 21, 34]
 
 
-## Ниже пятого этажа ROM Otto не возвращается, а выше — возвращается на свой.
+## Below the ROM's fifth floor Otto does not return, and above it he returns to his own.
 func test_the_respawn_floor_is_never_below_the_fifth() -> void:
 	for floors: int in [6, 12, 30]:
 		var rules := BuildingRules.new()
@@ -25,8 +25,8 @@ func test_the_respawn_floor_is_never_below_the_fifth() -> void:
 				assert_lt(back, index, "этажей %d: с %d не подняло" % [floors, index])
 
 
-## На любом этаже любого здания точка возвращения — место, где можно стоять,
-## и не в кармане, если на этаже есть кусок шире кармана.
+## On any floor of any building the return point is a place where one can stand, and
+## not in a pocket if the floor has a piece wider than the pocket.
 func test_the_respawn_spot_is_safe_on_any_building() -> void:
 	for skill in SKILLS:
 		var rules := BuildingRules.new()
@@ -45,7 +45,7 @@ func test_the_respawn_spot_is_safe_on_any_building() -> void:
 					assert_true(open.has(x), "%s: x=%.2f в кармане" % [where, x])
 
 
-## Есть на этаже красная дверь с документом — Otto встаёт у неё (@2FAA).
+## If the floor has a red door with a document, Otto stands by it (@2FAA).
 func test_otto_comes_back_at_the_red_door() -> void:
 	var checked := 0
 	for skill in SKILLS:
@@ -70,7 +70,7 @@ func test_otto_comes_back_at_the_red_door() -> void:
 	assert_gt(checked, 0, "красных дверей не нашлось — тест ничего не проверил")
 
 
-## После гибели ячейки свободны и выпускают по очереди: 10, 25, 40, 55 тиков.
+## After death the slots are free and release in turn: 10, 25, 40, 55 ticks.
 func test_the_slots_come_back_one_after_another() -> void:
 	var spawn := AgentSpawn.new()
 	for slot in AgentSpawn.SLOTS:
@@ -91,8 +91,8 @@ func test_the_slots_come_back_one_after_another() -> void:
 		assert_almost_eq(opened[index], due, Arcade.TICK, "ячейка %d" % index)
 
 
-## Толпа: с трёх агентов на этаже лишние уходят, двое остаются; ниже восьмого
-## этажа ROM — никто.
+## Crowd: from three agents on a floor the extra ones leave, two stay; below the ROM's
+## eighth floor — nobody.
 func test_the_crowd_sends_the_extra_agents_away() -> void:
 	assert_eq(Arcade.crowd_leavers(20, 2), 0, "двое — не толпа")
 	assert_eq(Arcade.crowd_leavers(20, 3), 1, "из трёх уходит один")
@@ -100,8 +100,8 @@ func test_the_crowd_sends_the_extra_agents_away() -> void:
 	assert_eq(Arcade.crowd_leavers(Arcade.LEAVE_FROM_FLOOR - 1, 4), 0, "низ здания не в счёт")
 
 
-## Толпа в сцене: из трёх агентов на этаже Otto уходит дальний, двое ближних
-## остаются; этажом дальше полосы Otto толпа не в счёт.
+## Crowd in a scene: of three agents on Otto's floor the farthest leaves, the two
+## nearest stay; a floor beyond Otto's band the crowd does not count.
 func test_the_farthest_of_a_crowd_goes_to_a_door() -> void:
 	var rules := BuildingRules.new()
 	var here := 5
@@ -109,7 +109,8 @@ func test_the_farthest_of_a_crowd_goes_to_a_door() -> void:
 	var crowd: Array[Enemy] = []
 	for x: float in [2.0, 4.0, 9.0]:
 		var agent := preload("res://src/actors/enemy/enemy.tscn").instantiate() as Enemy
-		# Из проёма выходят мгновенно: вышедший из двери в толпе не в счёт.
+		# They come out of the opening instantly: one who came out of a door in a crowd
+		# does not count.
 		agent.emerge_time = 0.0
 		agent.walk_speed = 0.0
 		add_child_autofree(agent)
@@ -123,8 +124,29 @@ func test_the_farthest_of_a_crowd_goes_to_a_door() -> void:
 	assert_eq(extras.size(), 1, "уходит один из трёх")
 	assert_true(extras.has(crowd[2]), "уходит дальний от Otto")
 	assert_true(AgentCrowd.extras(crowd, rules, here + 2, otto_x).is_empty(), "не у Otto")
-	# Уходящий остаётся уходящим, даже став по дороге ближним: иначе уход
-	# переходил бы от агента к агенту каждый кадр, и толпа не редела бы.
+	# A leaving agent stays leaving even if it becomes one of the nearest on the way:
+	# otherwise leaving would pass from agent to agent every frame, and the crowd would
+	# not thin out.
 	var still := AgentCrowd.extras(crowd, rules, here, otto_x, {crowd[0]: true})
 	assert_eq(still.size(), 1, "уходит всё так же один")
 	assert_true(still.has(crowd[0]), "уходящего отозвали ради дальнего")
+
+
+## Just after Otto's return a door on his floor does not release an agent closer than
+## [member BuildingRules.agent_respawn_gap]; when the calm is over, the usual gap holds
+## (fix/bot-determinism, user's choice — the ROM has no distance check).
+func test_doors_near_otto_stay_shut_just_after_his_return() -> void:
+	var rules := BuildingRules.new()
+	var spawn := AgentSpawn.new()
+	var otto := Node3D.new()
+	add_child_autofree(otto)
+	var middle := (rules.agent_release_gap + rules.agent_respawn_gap) * 0.5
+	assert_false(spawn.hugs(rules, 3, 3, middle, otto), "in play the usual gap")
+	spawn.after_death(rules.agent_respawn_calm)
+	assert_true(spawn.is_calm())
+	assert_true(spawn.hugs(rules, 3, 3, middle, otto), "after the return the wider gap")
+	assert_false(spawn.hugs(rules, 2, 3, middle, otto), "other floors are not held back")
+	assert_false(spawn.hugs(rules, 3, 3, rules.agent_respawn_gap + 0.5, otto), "a far door opens")
+	spawn.tick(rules.agent_respawn_calm + 0.1)
+	assert_false(spawn.is_calm())
+	assert_false(spawn.hugs(rules, 3, 3, middle, otto), "after the calm the usual gap")

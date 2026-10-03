@@ -1,25 +1,25 @@
 class_name FloorDetail
 extends Node3D
 
-## Мелкие детали этажей: ковровая дорожка вдоль коридора, швы плитки, стыки
-## стеновых панелей и карниз под потолком (ADR-0031, решение 3).
+## Small floor details: a carpet runner along the corridor, tile seams, wall panel joints and a
+## cornice under the ceiling (ADR-0031, decision 3).
 ##
-## Потолок не детализируется: камера смотрит сверху (ADR-0023, решение 1), и
-## его нижней стороны не видно. Детали — там, где их видно: пол и задняя стена.
-## Всё мультимешами по одному на материал: деталей тысячи, а узлов — единицы.
-## Без тел. Этаж выхода — гараж, у него своя разметка ([BuildingProps]).
+## The ceiling gets no detail: the camera looks from above (ADR-0023, decision 1), and its underside
+## is not visible. Details are where they are visible: the floor and the back wall. All as
+## multimeshes, one per material: there are thousands of details and only a handful of nodes. No
+## bodies. The exit floor is the garage, it has its own markings ([BuildingProps]).
 
-## Дорожка: ширина поперёк коридора, толщина, где её середина по глубине.
+## Runner: width across the corridor, thickness, where its middle is by depth.
 const RUNNER := Vector2(1.0, 0.012)
 const RUNNER_Z: float = -0.15
-## Кайма дорожки — светлая полоса по краям.
+## Runner border — a light stripe along the edges.
 const RUNNER_EDGE: float = 0.05
 
-## Швы плитки: шаг вдоль коридора и толщина.
+## Tile seams: pitch along the corridor and thickness.
 const SEAM_STEP: float = 0.9
 const SEAM: float = 0.012
 
-## Стыки панелей задней стены: шаг, ширина и докуда от пола (над плинтусом).
+## Back wall panel joints: pitch, width and how far up from the floor (above the skirting).
 const JOINT_STEP: float = 0.9
 const JOINT_WIDTH: float = 0.02
 const JOINT_FROM: float = BuildingRibs.SKIRTING_HEIGHT + BuildingRibs.RAIL_HEIGHT
@@ -28,19 +28,19 @@ const RUNNER_COLOR := Color(0.26, 0.08, 0.09)
 const RUNNER_EDGE_COLOR := Color(0.62, 0.5, 0.26)
 const SEAM_COLOR := Color(0.09, 0.09, 0.1)
 const JOINT_COLOR := Color(0.07, 0.08, 0.09)
-## Шахматка: пикселей на плитку в фактуре и блеск натёртой плитки.
+## Checkerboard: pixels per tile in the texture and the sheen of polished tile.
 const CHECKER_PIXELS: int = 32
 const CHECKER_ROUGHNESS: float = 0.45
 
 var _rules: BuildingRules = null
 var _plan: BuildingPlan = null
 var _parts: Dictionary = {}
-## Вид по типу здания (ADR-0048): дорожка у отеля, плитка у офиса, карниз.
+## Look by building kind (ADR-0048): runner for the hotel, tile for the office, cornice.
 var _style := BuildingStyle.new()
 
 
-## Собирает детали всех этажей, кроме гаража. [param style] — вид по типу
-## здания; без него — отель, как до M24i.
+## Assembles the details of all floors except the garage. [param style] — look by building kind;
+## without it — hotel, as before M24i.
 func build(rules: BuildingRules, plan: BuildingPlan, style: BuildingStyle = null) -> void:
 	_rules = rules
 	_plan = plan
@@ -48,7 +48,7 @@ func build(rules: BuildingRules, plan: BuildingPlan, style: BuildingStyle = null
 		_style = style
 	for index in rules.floors - 1:
 		_dress_floor(index)
-	# Дорожка — в тон кладки раунда: ещё одна метка, какой идёт раунд (ADR-0031).
+	# The runner matches the round's masonry tone: one more sign of which round is on (ADR-0031).
 	_commit(
 		"runner", GreyboxLook.surface(RUNNER_COLOR.lerp(rules.palette.masonry.darkened(0.55), 0.6))
 	)
@@ -64,8 +64,8 @@ func _dress_floor(index: int) -> void:
 	var surface := _rules.floor_surface(index)
 	var bounds := _rules.floor_span(index)
 	var inner := Vector2(bounds.x + BuildingShell.WALL_WIDTH, bounds.y - BuildingShell.WALL_WIDTH)
-	# Над проёмом эскалатора дорожки и швов нет: они легли бы поперёк дыры в
-	# задней полосе коридора (ADR-0044, решение 10).
+	# Over an escalator opening there is no runner and no seams: they would lie across the hole in the
+	# corridor's rear strip (ADR-0044, decision 10).
 	var cuts := _plan.gaps_on(_rules, index) + _plan.escalator_holes_on(_rules, index)
 	for span in BuildingPlan.spans_between(cuts, inner):
 		var length := span.y - span.x
@@ -94,9 +94,9 @@ func _dress_floor(index: int) -> void:
 	var wall_height := surface - story_top
 	var joint_height := wall_height - JOINT_FROM - _style.crown.x
 	var wall_z := WorldSpace.BACK_WALL_Z + 0.004
-	# Стыков панелей у стекла офиса нет (ADR-0056, решение 4): они висели бы
-	# тёмными полосами перед перегородкой, у неё свои стойки ([BuildingShell]).
-	# На особом этаже стены нет — за коридором зал (ADR-0057, решение 3).
+	# There are no panel joints at the office glass (ADR-0056, decision 4): they would hang as dark
+	# stripes in front of the partition, which has its own posts ([BuildingShell]). On a special floor
+	# there is no wall — beyond the corridor is a hall (ADR-0057, decision 3).
 	var plain := _style.glass_wall or FloorRole.hall_at(_rules, index)
 	var joints := 0 if plain else int((inner.y - inner.x) / JOINT_STEP)
 	for joint in joints:
@@ -120,14 +120,14 @@ func _dress_floor(index: int) -> void:
 	)
 
 
-## Ковровая плитка офиса во весь пол коридора с сеткой швов (ADR-0048).
+## Office carpet tile over the whole corridor floor with a grid of seams (ADR-0048).
 func _carpet_tiles(span: Vector2, surface: float) -> void:
 	var length := span.y - span.x
 	var middle := (span.x + span.y) * 0.5
 	var depth := WorldSpace.CORRIDOR_DEPTH
 	_add("carpet", Vector3(length, RUNNER.y, depth), Vector3(middle, surface - RUNNER.y * 0.5, 0.0))
-	# Шахматка рисуется фактурой с затиркой в координатах мира: тысячи
-	# плиток коробками стоили бы мультимеш на десятки тысяч штук.
+	# The checkerboard is drawn as a texture with grout in world coordinates: thousands of tiles as
+	# boxes would cost a multimesh of tens of thousands of instances.
 	if _style.checker:
 		return
 	var step := _style.tile_step
@@ -143,9 +143,8 @@ func _carpet_tiles(span: Vector2, surface: float) -> void:
 		)
 
 
-## Плитка шахматкой жилого дома (ADR-0055, решение 4): две плитки на две,
-## между ними тёмная затирка, раскладка в координатах мира — шов ложится
-## в одну линию на всех этажах.
+## Checkerboard tile of a residential building (ADR-0055, decision 4): two tiles by two, dark grout
+## between them, layout in world coordinates — the seam runs in one line on all floors.
 func _checker() -> StandardMaterial3D:
 	var cells := CHECKER_PIXELS * 2
 	var image := Image.create(cells, cells, false, Image.FORMAT_RGB8)
@@ -157,8 +156,9 @@ func _checker() -> StandardMaterial3D:
 			if x % CHECKER_PIXELS == 0 or y % CHECKER_PIXELS == 0:
 				colour = grout
 			image.set_pixel(x, y, colour)
-	# Пол виден почти вскользь: два метра коридора — полтора десятка строк кадра,
-	# и без мипов плитка рябит, когда кадр едет за лифтом (авторевью M24m).
+	# The floor is seen almost at a grazing angle: two metres of corridor are a dozen and a half rows
+	# of the frame, and without mips the tile ripples when the view follows an elevator (M24m code
+	# review).
 	image.generate_mipmaps()
 	var material := StandardMaterial3D.new()
 	material.albedo_texture = ImageTexture.create_from_image(image)
@@ -170,7 +170,7 @@ func _checker() -> StandardMaterial3D:
 	return material
 
 
-## Стоит ли точка стены в проёме двери или в портале шахты: стыку там не место.
+## Whether a wall point is in a door opening or a shaft portal: a joint does not belong there.
 func _near_opening(index: int, x: float) -> bool:
 	var half_door := Door.LEAF_SIZE.x * 0.5 + Door.FRAME_WIDTH
 	for door in _plan.doors:
@@ -183,7 +183,7 @@ func _near_opening(index: int, x: float) -> bool:
 	return false
 
 
-## Запоминает коробку: [param at] — x и y в плоскости правил, z сцены.
+## Remembers a box: [param at] — x and y in the rules plane, scene z.
 func _add(kind: String, size: Vector3, at: Vector3) -> void:
 	if not _parts.has(kind):
 		_parts[kind] = [] as Array[Transform3D]
@@ -192,10 +192,10 @@ func _add(kind: String, size: Vector3, at: Vector3) -> void:
 	(_parts[kind] as Array[Transform3D]).append(Transform3D(Basis.from_scale(size), place))
 
 
-## Кладёт накопленные коробки [param kind] одним мультимешем. Тень кладёт только
-## карниз ([param casts_shadow]): мультимеш — на всё здание, его не отсечь по
-## кадру, и тысячи швов и стыков рисовались бы в каждом проходе теней каждой
-## лампы, хотя плоской детали отбрасывать нечего.
+## Places the accumulated boxes of [param kind] as one multimesh. Only the cornice casts a shadow
+## ([param casts_shadow]): the multimesh covers the whole building, it cannot be culled by the
+## frame, and thousands of seams and joints would be drawn in every shadow pass of every lamp,
+## although a flat detail has nothing to cast.
 func _commit(kind: String, material: StandardMaterial3D, casts_shadow: bool = false) -> void:
 	if not _parts.has(kind):
 		return

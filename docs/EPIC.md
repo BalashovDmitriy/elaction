@@ -1,1253 +1,1262 @@
-# EPIC-1 · elaction — ремейк Elevator Action
+# EPIC-1 · elaction — an Elevator Action remake
 
 | | |
 |---|---|
-| **Статус** | В работе, текущая веха — в [STATUS.md](STATUS.md) |
-| **Начат** | 2026-09-11 |
-| **Стек** | Godot 4.7.2, типизированный GDScript |
-| **Репозиторий** | https://github.com/BalashovDmitriy/elaction |
-| **Решения** | ADR-0001…0034 в [`adr/`](adr/); сводная таблица — в [STATUS.md](STATUS.md#принятые-решения) |
+| **Status** | In progress, the current milestone is in [STATUS.md](STATUS.md) |
+| **Started** | 2026-09-11 |
+| **Stack** | Godot 4.7.2, typed GDScript |
+| **Repository** | https://github.com/BalashovDmitriy/elaction |
+| **Decisions** | ADR-0001…0034 in [`adr/`](adr/); summary table in [STATUS.md](STATUS.md#accepted-decisions) |
 
-## 1. Цель
+## 1. Goal
 
-Выпустить на PC законченную аркадную игру, которая:
+Release a finished arcade game for PC that:
 
-1. воспроизводит механику Elevator Action (Taito, 1983) **без изменений в геймплее**;
-2. выглядит современно — за счёт 3D-сцены с ортокамерой сбоку, динамического света,
-   PBR-материалов и пост-обработки ([ADR-0019](adr/0019-3d-pivot.md)), а не за счёт
-   переизобретения дизайна: игра остаётся плоской;
-3. на каждом коммите проходит автоматические проверки.
+1. reproduces the mechanics of Elevator Action (Taito, 1983) **with no gameplay changes**;
+2. looks modern — through a 3D scene with a side-on orthographic camera, dynamic lighting,
+   PBR materials and post-processing ([ADR-0019](adr/0019-3d-pivot.md)), not through
+   reinventing the design: the game stays flat;
+3. passes automated checks on every commit.
 
-Формула проекта: **механика 1983 года, картинка 2026 года.**
+The project formula: **1983 mechanics, 2026 picture.**
 
-## 2. Definition of Done эпика
+## 2. Epic Definition of Done
 
-- [x] Полный игровой цикл: вход с крыши → сбор всех документов → выход к машине → следующее здание
-- [x] 30 этажей, лифты, эскалаторы, двери, враги-агенты, стрельба, удар ногой
-- [x] Отстреливаемые лампы и затемнение
-- [x] Жизни, счёт, таблица рекордов, экран Game Over
-- [x] Главное меню, настройки, поддержка геймпада
-- [ ] Сборки под Windows и Linux собираются в CI по тегу — workflow есть с M9,
-      первый тег ещё не ставился
-- [x] Зелёный CI; игровая логика покрыта тестами (рендер — нет)
+- [x] Full game loop: entry from the roof → collect all documents → exit to the car → next building
+- [x] 30 floors, elevators, escalators, doors, enemy agents, shooting, kick
+- [x] Lamps that can be shot out, and darkening
+- [x] Lives, score, high score table, Game Over screen
+- [x] Main menu, settings, gamepad support
+- [ ] Windows and Linux builds are built in CI on a tag — the workflow exists since M9,
+      the first tag has not been set yet
+- [x] Green CI; game logic is covered by tests (rendering is not)
 
-## 3. Границы
+## 3. Scope
 
-**Не входит в эпик:** мультиплеер, мобильные платформы, консоли, редактор уровней для
-игроков, онлайн-таблица рекордов, 3D-геймплей (сцена трёхмерная, игра плоская —
-[ADR-0019](adr/0019-3d-pivot.md)), сюжетные вставки.
+**Not part of the epic:** multiplayer, mobile platforms, consoles, a level editor for
+players, an online high score table, 3D gameplay (the scene is 3D, the game is flat —
+[ADR-0019](adr/0019-3d-pivot.md)), story cutscenes.
 
-Онлайн-лидерборд вынесен в опциональную M24 — он единственный, ради чего в проекте
-может появиться бэкенд и docker compose (см. [ADR-0003](adr/0003-no-docker.md)).
+The online leaderboard is moved to the optional M24 — it is the only reason a backend and
+docker compose might appear in the project (see [ADR-0003](adr/0003-no-docker.md)).
 
-## 4. Механика оригинала — источник правды
+## 4. The original's mechanics — the source of truth
 
-Реализуем как в аркадном оригинале. Спорные детали сверяем с кодом ROM и запуском
-в MAME, а не по памяти: заметки по дизассемблеру — в
+Implemented as in the arcade original. Disputed details are checked against the ROM code
+and runs in MAME, not from memory: disassembler notes are in
 [`reference/arcade-rom.md`](reference/arcade-rom.md).
 
-| Механика | Суть | Веха |
+| Mechanic | Essence | Milestone |
 |---|---|---|
-| Otto | Агент 17. Ходит, приседает, прыгает, стреляет, бьёт ногой | M1, M18d |
-| Здание | 30 этажей и крыша, спуск сверху вниз, выход внизу к машине | M5a, M18a, M18e |
-| Лифты | Кабина в шахте; управляется игроком изнутри; без игрока ездит сама; на крыше едут без управления; давит насмерть | M2, M18b |
-| Эскалаторы | Посадка нажатием на площадке, автоматический перенос между этажами | M2 |
-| Двери | Обычные — из них выходят агенты; красные — в них документы; внутри прячутся до пяти секунд | M3, M14 |
-| Документы | 500 очков за штуку, 5–10 на здание по навыку; выход без всех возвращает к верхней несобранной двери | M3, M18e |
-| Враги | Агенты выходят из дверей, ходят и стреляют стоя, присев и лёжа; телом не вредят | M4a, M18d |
-| Свет | Лампы отстреливаются и падают на головы; зона темнеет; тёмные этажи 11–15 | M4b, M17, M18e |
-| Финал уровня | Выход внизу к машине | M5b |
+| Otto | Agent 17. Walks, crouches, jumps, shoots, kicks | M1, M18d |
+| Building | 30 floors and a roof, descent from top to bottom, exit at the bottom to the car | M5a, M18a, M18e |
+| Elevators | Cab in a shaft; the player controls it from inside; without the player it moves on its own; on the cab roof you ride without control; crushes to death | M2, M18b |
+| Escalators | Boarding by a press on the landing, automatic transfer between floors | M2 |
+| Doors | Regular — agents come out of them; red — they hold documents; you can hide inside for up to five seconds | M3, M14 |
+| Documents | 500 points each, 5–10 per building depending on skill; exiting without all of them returns you to the topmost uncollected door | M3, M18e |
+| Enemies | Agents come out of doors, walk and shoot standing, crouching and lying down; their bodies do no harm | M4a, M18d |
+| Lighting | Lamps can be shot out and fall on heads; the zone goes dark; dark floors 11–15 | M4b, M17, M18e |
+| Level end | Exit at the bottom to the car | M5b |
 
-Сверка по ROM закрыла прежние спорные места — число красных дверей, таблицу очков,
-бонус на выходе, выпуск агентов, темноту ([ADR-0027](adr/0027-rom-combat.md),
-[ADR-0028](adr/0028-building-by-the-map.md)). Сознательные расхождения записаны
-в этих ADR.
+The ROM check closed the former disputed points — the number of red doors, the score table,
+the exit bonus, agent release, darkness ([ADR-0027](adr/0027-rom-combat.md),
+[ADR-0028](adr/0028-building-by-the-map.md)). Deliberate deviations are recorded
+in these ADRs.
 
-## 5. Дорожная карта
+## 5. Roadmap
 
-Каждая веха — отдельная ветка и PR. Веха закрыта, когда выполнен её DoD и CI зелёный.
-Подробные итоги пройденных вех — в [`milestones.md`](milestones.md).
+Each milestone is a separate branch and PR. A milestone is closed when its DoD is met and CI
+is green. Detailed results of completed milestones are in [`milestones.md`](milestones.md).
 
-Пройдены M0–M22b, все влиты в `main` (последняя — M22b, PR #43, вместе со
-сверкой документации и её долгом); пивот в 3D закончен. Пройдена и
-**M23** — звук (PR #44), **M24a** (PR #45), **M24b** (PR #47), **M24c** (PR #48),
-**M24d** (PR #49), **M24e** (PR #50), **M24f** (PR #51, #52) и **M24g** — анимация
-и вид (PR #53). Пройдена **M24h** — улица с движением и механика по замечаниям
-к M24g. Пройдена **M24i** — добивания, вертолёт и обстановка (PR #57), **M24j** — время
-суток и новый город (PR #58), **M24k** — время суток для остального и
-кинематографичное начало (PR #59). Пройдено **закрытие открытых вопросов и долга**
-([ADR-0053](adr/0053-open-questions-and-debt.md), PR #60) и **M24l** — снег
-(PR #62); пройдены **M24m** — жилой комплекс (PR #63) и **M24n** — характер типа здания (PR #64); **M24o** — особые этажи, кабина и музыка (PR #65); дальше **M24p** — здание снаружи по типу, **M25** — онлайн-лидерборд (опционально).
+M0–M22b are done and all merged into `main` (the last is M22b, PR #43, together with
+the documentation check and its debt); the 3D pivot is finished. Also done:
+**M23** — sound (PR #44), **M24a** (PR #45), **M24b** (PR #47), **M24c** (PR #48),
+**M24d** (PR #49), **M24e** (PR #50), **M24f** (PR #51, #52) and **M24g** — animation
+and look (PR #53). **M24h** is done — the street with traffic and mechanics fixes from the
+M24g remarks. Done: **M24i** — takedowns, helicopter and dressing (PR #57), **M24j** — time
+of day and the new city (PR #58), **M24k** — time of day for everything else and
+the cinematic opening (PR #59). Done: **closing open questions and debt**
+([ADR-0053](adr/0053-open-questions-and-debt.md), PR #60) and **M24l** — snow
+(PR #62); done: **M24m** — the residential complex (PR #63) and **M24n** — building kind character (PR #64); **M24o** — special floors, cab and music (PR #65); **M24p** — the building exterior by kind (PR #66); next is **M25** — the online leaderboard (optional).
 
-### M0 · Фундамент
+### M0 · Foundation
 
-Репозиторий, движок, тулинг, процесс.
+Repository, engine, tooling, process.
 
-- [x] Git-репозиторий, публичный, SSH
-- [x] Godot 4.7.2, `project.godot`, базовые настройки рендера и карта управления
-- [x] Структура папок и соглашения (`docs/conventions.md`)
-- [x] `gdformat` + `gdlint` + pre-commit (на коммит) и проверка движком (на push)
-- [x] CI на GitHub Actions: линт + импорт проекта
-- [x] Минимальная запускаемая сцена `src/main.tscn`
-- [x] Тест-фреймворк GUT 9.6.1, первые тесты, запуск в CI
-- [x] Закрыть [ADR-0002](adr/0002-visual-target.md): визуальный ориентир (отменён
+- [x] Git repository, public, SSH
+- [x] Godot 4.7.2, `project.godot`, basic render settings and the input map
+- [x] Folder structure and conventions (`docs/conventions.md`)
+- [x] `gdformat` + `gdlint` + pre-commit (on commit) and the engine check (on push)
+- [x] CI on GitHub Actions: lint + project import
+- [x] Minimal runnable scene `src/main.tscn`
+- [x] GUT 9.6.1 test framework, first tests, running in CI
+- [x] Close [ADR-0002](adr/0002-visual-target.md): the visual target (superseded by
       [ADR-0019](adr/0019-3d-pivot.md))
 
-**DoD:** `tools/check.ps1` проходит локально, CI зелёный, проект запускается. ✅
-
-### M1 · Otto ходит — вертикальный срез
-
-Первое, во что можно играть. Графика — серые коробки.
-
-- [x] `CharacterBody2D` и машина состояний: idle / walk / crouch / jump / fall / dead
-- [x] Гравитация, коллизии, пол этажа, стены по краям уровня
-- [x] Камера: следование за игроком, привязка к границам уровня
-- [x] Grey-box уровень одного этажа с площадками для прыжков
-- [x] Ввод: клавиатура и геймпад
-- [x] Тесты машины состояний (14 штук)
-- [x] Снятие скриншотов вехи (`tools/capture.py M1`)
-
-**DoD:** Otto бегает, приседает и прыгает по одному этажу; тесты зелёные. ✅
-
-Машина состояний вынесена из узла в класс `OttoStateMachine`: принимает снимок ввода
-и факты о теле, возвращает состояние — и тестируется без сцены и физики.
-
-### M2 · Лифты и эскалаторы — ядро игры
+**DoD:** `tools/check.ps1` passes locally, CI is green, the project runs. ✅
+
+### M1 · Otto walks — a vertical slice
+
+The first thing you can play. Graphics are grey boxes.
+
+- [x] `CharacterBody2D` and a state machine: idle / walk / crouch / jump / fall / dead
+- [x] Gravity, collisions, the floor, walls at the level edges
+- [x] Camera: follows the player, clamped to the level bounds
+- [x] Grey-box level of one floor with platforms for jumping
+- [x] Input: keyboard and gamepad
+- [x] State machine tests (14 of them)
+- [x] Taking milestone screenshots (`tools/capture.py M1`)
+
+**DoD:** Otto runs, crouches and jumps along one floor; tests are green. ✅
+
+The state machine is moved out of the node into the `OttoStateMachine` class: it takes an
+input snapshot and facts about the body, returns a state — and is tested without a scene or
+physics.
+
+### M2 · Elevators and escalators — the core of the game
+
+Decisions — [ADR-0004](adr/0004-elevator-mechanics.md).
 
-Решения — [ADR-0004](adr/0004-elevator-mechanics.md).
-
-- [x] Шахта описана данными уровня: границы и этажи-остановки (в `Resource` — в M5a)
-- [x] Кабина: `AnimatableBody2D`, движение вверх и вниз, остановка на этажах
-- [x] Вход в кабину и управление ею изнутри, выход на этаж при совпадении полов
-- [x] Автономное движение кабины, когда Otto в ней нет: от этажа к этажу с паузой
-- [x] Езда на крыше кабины, без управления ею (перенос игрока платформой)
-- [x] Открытый проём шахты: перебегается и перепрыгивается, падение в пустую шахту убивает
-- [x] Смертельное сдавливание игрока кабиной (агентов — с M18d)
-- [x] Эскалаторы: посадка нажатием «вверх/вниз» на площадке, перенос между этажами
-- [x] Контекстный ввод: «вниз» — присед на этаже и спуск кабины в шахте
-- [x] Проверка свободного места над головой при вставании из приседа (долг M1)
-- [x] Тесты: перенос платформой, посадка и высадка, сдавливание, падение в шахту
-
-**DoD:** можно спуститься с верхнего этажа на нижний, используя лифт и эскалатор. ✅
-
-### M3 · Двери и документы
-
-Решения — [ADR-0005](adr/0005-doors-and-documents.md).
-
-- [x] Дверь как сцена: закрыта / открывается / открыта, коврик перед входом
-- [x] Вход с коврика по нажатию «вверх»; внутри Otto прячется до пяти секунд,
-      с досрочным выходом по нажатию в сторону
-- [x] Красные двери: документ при первом входе, +500 очков, дверь перестаёт быть красной
-- [x] Обычные двери: сцена и состояния; агенты из них — в M4a
-- [x] Автолоад `GameState`: очки и собранные документы, связь через сигналы
-- [x] Счётчик документов и очки в HUD
-- [x] Выход из здания открыт всегда, но без всех документов переносит на самый
-      верхний этаж с несобранной красной дверью — блокировки выхода в оригинале нет
-- [x] Тесты: сбор документа, счёт, выбор двери для переноса, условие настоящего выхода
-
-**DoD:** на тестовом здании из трёх этажей можно собрать все документы и выйти; попытка
-выйти раньше возвращает к несобранной двери. ✅
-
-### M4a · Бой и враги
-
-M4 разделена надвое, нумерация остальных вех не сдвигается. Решения и сверка —
-[ADR-0006](adr/0006-combat-and-enemies.md).
-
-- [x] Стрельба Otto: стоя, приседая, в прыжке; не больше трёх пуль на экране разом
-- [x] Удар ногой в прыжке
-- [x] Пули как отдельные сущности: высота полёта, попадания
-- [x] Уклонение: от высокой пули приседают, низкую перепрыгивают
-- [x] Враг-агент: выход из обычной двери, ход по этажу, выстрел по линии
-- [x] Три жизни; жизнь снимает только выстрел — столкновение с врагом безвредно
-- [x] Смерть игрока, респавн, Game Over
-- [x] Очки за врагов: 100 за выстрел, 150 за удар ногой
-- [x] Тесты: попадания, уклонение, счётчик жизней, поведение агента
-
-**DoD:** этаж с врагами проходится с боем; кончились жизни — Game Over. ✅
-
-### M4b · Лампы и темнота
-
-Решения — [ADR-0007](adr/0007-lamps-and-darkness.md).
-
-- [x] Лампа как сцена: отстреливается, падает, убивает агента под собой (300 очков)
-- [x] Падающая лампа не трогает Otto: источники говорят только об агентах
-- [x] Сбитая лампа гасит свой этаж насовсем — отход от оригинала, где гаснет всё
-      здание и ненадолго ([ADR-0006](adr/0006-combat-and-enemies.md), пункт 7);
-      с M17 — свою зону
-- [x] Темнота до M6 показывается затемняющим прямоугольником поверх этажа
-- [x] В темноте у агентов падает дальность стрельбы (с M17 — дальность, с которой
-      агент замечает Otto)
-- [x] Надбавка за убийство в темноте (размер поправлен в M6)
-- [x] Неуязвимость Otto на эскалаторе — долг M2
-- [x] Тесты: свет этажа, очки в темноте, дальность агента в темноте
-
-**DoD:** лампы гасятся, на тёмном этаже враги ведут себя иначе. ✅
-
-### M5a · Здание
-
-M5 разделена надвое, как M4. Решения — [ADR-0008](adr/0008-building-generation.md).
-
-- [x] Здание описывается правилами, а не списком этажей: сколько шахт, дверей, ламп
-- [x] Раскладка по сиду: в оригинале здания различаются расположением красных дверей
-- [x] Сборка 30 этажей из этого описания
-- [x] Шахта и эскалатор переезжают в данные — долг M2
-- [x] Площадка эскалатора развязана с полотном: посадка без рывка, полотно не режет
-      перекрытие (долг авторевью M2)
-- [x] Замер FPS на полном здании: 60 держатся, стриминг не понадобился
-- [x] Тесты: правила раскладки, повторяемость по сиду
-
-**DoD:** здание на 30 этажей собирается из данных и проходится сверху донизу, 60 FPS. ✅
-
-### M5b · Игровой цикл
-
-Решения — [ADR-0009](adr/0009-game-loop-and-alarm.md).
-
-- [x] Выход с собранными документами → бонус → следующее здание
-- [x] Бонус за здание: 1000 × номер. В ROM он не растёт дальше десятого здания
-      ([`arcade-rom.md`](reference/arcade-rom.md)) — у нас потолка нет, расхождение
-- [x] Сложность растёт агентами: чаще стреляют, дальше видят, быстрее приходят на смену
-- [x] Тревога по времени на здание: агенты злее, кабина отвечает с задержкой.
-      Смерть тревогу не снимает, сбрасывает только смена здания
-- [x] Пауза по Esc с подсказкой: продолжить, начать заново, выйти
-- [x] Тесты: тревога, бонус и номер здания, отклик кабины с задержкой
-
-**DoD:** игра проходится от первого здания до второго без вылетов. ✅
-
-### M6 · Свет и атмосфера — графический слой
-
-Решения — [ADR-0010](adr/0010-lighting-and-atmosphere.md). Реализация 2D-света ушла
-с пивотом, правила остались ([ADR-0019](adr/0019-3d-pivot.md), решение 7).
-
-- [x] Замер бюджета света — долг M0
-- [x] `CanvasModulate` задаёт тон погашенного этажа; светлым этаж делает своя лампа
-- [x] Два источника на этаж: заливка во всю ширину и пятно под лампой
-- [x] `LightOccluder2D` на перекрытиях: свет не течёт между этажами
-- [x] Свет из шахты лифта, вспышки выстрелов
-- [x] Отбор источников по кадру: горят только видимые этажи
-- [x] Пост-обработка: bloom и виньетка
-- [x] Параллакс-фон города, выложенный из сида здания
-- [x] Надбавка за убийство в темноте: +50 вместо удвоения — правка по сверке
-- [x] Тесты: отбор видимых этажей, бюджет на собранном здании, фон по сиду, очки
-
-**DoD:** тёмный этаж с перестрелкой держит 60 FPS, замер на собранном здании. ✅
-
-### M7a · Арт-пайплайн и окружение
-
-M7 разделена надвое. Решения — [ADR-0011](adr/0011-asset-pipeline.md). Спрайтовый
-пайплайн вехи ушёл с пивотом (M16, [ADR-0019](adr/0019-3d-pivot.md), решение 8);
-остался `tools/blender_bin.py`.
-
-- [x] `tools/blender_bin.py`: Blender 5.2.1 ищется как Godot — `$BLENDER_BIN` → PATH → winget
-- [x] Пайплайн доходит до конца на одном ассете: рендер → импорт-пресет →
-      `CanvasTexture` → свет из M6 на нём ложится
-- [x] `tools/palette.py` — палитра в одном месте (удалён в M22 уборкой 2D)
-- [x] Генератор окружения `tools/render_env.py`: диффуз, нормаль, specular из одной геометрии
-- [x] Тайлсет здания, перекрытия, задняя стена, окна
-- [x] Двери (красные и обычные), кабина лифта, эскалатор, лампа, выход
-- [x] Город за окнами получает текстуры, правила раскладки из M6 остаются
-- [x] Импорт-пресеты Godot зафиксированы в репозитории
-- [x] Тесты: каждый ассет, который просит сцена, существует, делится на кадры и имеет нормаль
-
-**DoD:** серых коробок в кадре не осталось, кроме Otto и агентов; 60 FPS держатся
-на собранном здании. ✅
-
-### M7b · Актёры
-
-Решения — [ADR-0011](adr/0011-asset-pipeline.md), пункты 12–14. Спрайты актёров
-заменены моделями на скелете в M16.
-
-- [x] `tools/render_actors.py`: лоу-поли модель и ортографический рендер в Blender 5.2.1
-- [x] Otto: idle, ходьба в три кадра, присед, прыжок, падение, удар ногой, выстрел
-- [x] Смерть в две позы и отдельная поза раздавленного — как в финальной аркаде
-- [x] Агент: шляпа против помпадура Otto — силуэт читается в темноте
-- [x] Нормал- и specular-мапы из второго прохода рендера (глубиной, а не normal pass)
-- [x] Пули и вспышки попаданий
-- [x] Красная машина у выхода: уезжает, и только потом собирается следующее здание
-- [x] Ни одна коллизия из M1–M5 не изменилась — это проверяется тестом
-
-**DoD:** все grey-box плейсхолдеры заменены финальными ассетами. ✅
-
-### M8a · Звук
-
-M8 разделена надвое: звук ни от чего не зависит, а меню зависит от шрифта, языка
-и громкостей. Решения — [ADR-0012](adr/0012-sound-and-interface.md).
-
-- [x] `tools/render_audio.py`: синтез в `assets/audio/` — эффект из атаки, тела
-      и хвоста комнаты; частое в WAV, длинное и музыка в OGG
-- [x] SFX на все события игры: шаги, выстрел, попадание, удар ногой, лампа, лифт,
-      эскалатор, дверь, документ, смерть, выход
-- [x] Своя тема и отдельный мотив на тревогу
-- [x] Шины Master / Music / SFX и общий микс
-- [x] Тесты: у каждого события игры есть звук, и ни один файл не потерялся
-
-**DoD:** партия звучит от первого шага до Game Over, и ничто не молчит без причины. ✅
-
-### M8b · Интерфейс
-
-Решения — [ADR-0012](adr/0012-sound-and-interface.md), пункты 8–11.
-
-- [x] Pixellari (OFL) с кириллицей в `assets/fonts/` вместе с текстом лицензии
-- [x] Два языка: `ru` и `en`, по локали системы, с переключателем в настройках
-- [x] HUD вместо отладочного оверлея: очки, жизни, документы, этаж, тревога —
-      современный, по углам, без аркадной строки сверху
-- [x] Главное меню: играть, рекорды, настройки, управление, выход
-- [x] Настройки: три громкости, язык, полноэкранный режим; экран управления
-      только показывает раскладку — переназначение в долге (STATUS)
-- [x] Локальная таблица рекордов: десять строк со счётом и датой, без инициалов
-- [x] Дополнительная жизнь за 10 000 очков — правка по сверке с мануалом Taito
-- [x] Тесты: строки есть на обоих языках, рекорды и настройки переживают
-      перезапуск, жизнь за очки выдаётся один раз
-
-**DoD:** игра запускается из меню и возвращается в него. ✅
-
-### M9 · Релиз
-
-Решения — [ADR-0013](adr/0013-release-and-versioning.md). Страниц на itch.io и в Steam
-в эпике нет — только GitHub Releases (там же, пункт 1).
-
-- [x] `export_presets.cfg`: Windows и Linux, ресурсы внутри исполняемого файла,
-      без `tests/`, `tools/` и `addons/`
-- [x] `icon.ico` рисуется генератором из той же геометрии, что и `icon.svg`
-- [x] `tools/version.py`: версия правится одной командой и проставляется
-      и в `project.godot`, и в пресеты; тег сверяется с ней
-- [x] Версия видна не только в гите: строка в логе при запуске и угол главного меню
-- [x] `release.yml`: тег `v*` → сверка версии → сборка на ubuntu и windows →
-      архивы в GitHub Releases, заметки из `CHANGELOG.md`
-- [x] `tools/smoke.py`: собранный билд запускается headless, печатает маркер
-      и не пишет ни одного `SCRIPT ERROR`
-- [x] `CHANGELOG.md` по Keep a Changelog
-- [x] Тесты: версия semver и совпадает с пресетами, оба пресета на месте,
-      в экспорт не утекают `tests/` и `tools/`
-
-**DoD:** скачанный из Releases архив запускается и играется. Первый тег ещё не
-ставился — прогон Windows-архива на чистой машине перенесён на него.
-
-### M10 · Архитектура здания
-
-Решения — [ADR-0014](adr/0014-building-architecture.md). Веха открыта после M9:
-прогон настоящего здания ботом показал, что собранный архив неиграбелен.
-
-- [x] Крыша — отдельный уровень с индексом −1, над ней небо; просвет у всех
-      уровней одинаковый, Otto и его прыжок помещаются в кадр
-- [x] На крыше нет дверей, ламп и агентов; верхняя шахта доходит до неё
-- [x] Нулевой этаж становится обычным: у него появляются потолок, задняя стена и лампа
-- [x] Силуэт ступенями: 5 → 7 → 9 мест (с M18a — порогом)
-- [x] Границы этажа знают перекрытия, стены, окна, свет и граф достижимости
-- [x] Агенты выпускаются по `VisibleFloors`, а не все 55 разом в `_ready()`
-- [x] Наверху дверей меньше, чем внизу
-- [x] Возвращение в игру — с передышкой и подальше от того, кто убил
-- [x] Тесты: прогон бота по настоящему зданию, просвет крыши, пустая крыша,
-      монотонность профиля, шахта стоит на доступном месте на всех своих этажах,
-      Otto переживает старт с агентами
-
-**DoD:** бот проходит настоящее тридцатиэтажное здание, и с включёнными агентами
-игрок переживает старт, ничего не делая. ✅ Баланс боя вынесен в M11.
-
-### M11 · Баланс боя
-
-Решения — [ADR-0016](adr/0016-combat-balance.md). Бот, которым мерили бой в M10,
-не умел уклоняться, поэтому веха начиналась с замера, а не с правки чисел. Числа
-боя с M18d взяты из ROM.
-
-- [x] Сверить с оригиналом оси роста сложности
-- [x] Рост по осям оригинала: скорострельность и скорость пули, дальность заморожена
-- [x] Агенты уклоняются: колено против высокой пули, лёжа против низкой
-- [x] Замах перед первым выстрелом — без него у игрока не было хода
-- [x] Научить бота уклоняться — иначе измерять нечем
-- [x] Числа боя вынести в правила здания, как вынесены злость и плотность дверей
-- [x] Потолок живых агентов — восемь (с M18d по ROM — 3–4 на здание)
-- [x] Бот дерётся, а не проходит мимо, — и по-настоящему стреляет
-- [x] Тесты: бот проходит настоящее здание с включёнными агентами
-
-**DoD:** бот проходит настоящее тридцатиэтажное здание с агентами, не исчерпав
-трёх жизней. ✅ Сиды 1–6, ноль–две смерти на прогон.
-
-### M12 · Спектрумовский визуал: палитра раунда, шахты, крыша
-
-Решения — [ADR-0017](adr/0017-spectrum-palette-and-shafts.md) поверх
-[ADR-0015](adr/0015-round-palette-and-roof.md). Спектрумовские цвета отменены
-пивотом; палитра раунда как приём осталась ([ADR-0019](adr/0019-3d-pivot.md),
-решение 7).
-
-- [x] Палитра переезжает из констант уровня в правила здания и меняется по раунду
-- [x] Палитра задаёт обе пары цветов — горящего этажа и погашенного
-- [x] Ассеты окружения перерисованы спектрумовским языком цвета
-- [x] Шахта получает тело: направляющие во всю высоту и створки на своих этажах
-- [x] Надстройка машинного отделения на крыше, Otto спускается к ней по тросу
-- [x] Счётчик раундов в HUD называется ROUND
-- [x] Тесты: разрыв между горящим и погашенным на каждой палитре, шахта одета
-      на всех сидах, надстройка не мешает появлению Otto
-
-**DoD:** здания подряд отличаются на глаз, погашенный этаж читается в каждом,
-а шахта видна в кадре первой, а не последней. ✅
-
-### M13 · Нативный FullHD и качественные текстуры
-
-Решения — [ADR-0018](adr/0018-native-fullhd.md). Мир рисовался в 640×360 и троился
-до 1080p. Проба показала, что разрешение само по себе ничего не даёт, — веха
-про детализацию ассетов (подробно — в [`milestones.md`](milestones.md)).
-Детализация масштабом холста отменена пивотом ([ADR-0019](adr/0019-3d-pivot.md),
-решение 7), вьюпорт 1920×1080 остался.
-
-- [x] ADR-0018 на смену визуальной цели [ADR-0002](adr/0002-visual-target.md)
-- [x] Вьюпорт 1920×1080, мир масштабируется втрое: высота этажа, ширина здания,
-      рост актёров, скорости, прыжок
-- [x] `render_env.py --scale` и `render_actors.py --scale` — общий масштаб холста
-- [x] Ассеты окружения перерисованы с мелкой деталью: кладка, двери с филёнками,
-      перекрытия с кромкой, кабина с панелями, лампа с патроном и проводом
-- [x] Детализация зависит от масштаба, а не дублирует ассет
-- [x] Актёры перерендерены из Blender крупнее
-- [x] Шрифты, HUD и меню пересчитаны под новый вьюпорт
-- [x] Пропорции: Otto и агенты крупнее, дверь выше, окно меньше (ADR-0018, решение 5)
-- [x] Предел полосы шахты виден: упоры и стрелки в кабине (решение 6)
-- [x] Тесты: ни одно число геометрии не осталось в старом масштабе; каждый ассет
-      втрое крупнее прежнего; бот проходит здание; кадр в бюджете 16.6 мс
-
-**DoD:** игра идёт в 1920×1080 без растягивания, и на глаз она детальнее, а не
-просто крупнее. ✅
-
-### M14 · Дверь открывается по-настоящему
-
-Решения — [ADR-0020](adr/0020-agent-doors.md). Последняя веха на 2D, про поведение,
-а не про картинку: агенты появлялись поверх закрытой двери. Баг логики пережил бы
-смену рендера, поэтому чинился до неё.
-
-- [x] Цикл двери — класс без узла (`DoorCycle` на `RefCounted`):
-      `closed → ajar → open → closed`, с временами и запретом выпуска
-- [x] Дверь не отдаёт агента, пока не открылась, и закрывается за ним
-- [x] Агент выходит из проёма шагом, а не возникает на коврике
-- [x] Ход двери плавный и для Otto
-- [x] Тесты: дверь не выпускает агента раньше, чем открылась; за вышедшим
-      закрывается; цикл проверяется без сцены
-
-**DoD:** ни один агент не появляется поверх закрытой двери, и цикл двери
-проверяется тестом без сцены. ✅
-
-### Пивот: с M15 проект переезжает в 3D
-
-Решение и его цена — [ADR-0019](adr/0019-3d-pivot.md). Визуальной целью стала
-3D-сцена с ортокамерой сбоку вместо 2D-кадра из спрайтов. Логика игры не меняется
-ни в одном правиле; меняются слой узлов, пайплайн ассетов и свет. 2D-сборка
-осталась в истории — слияние M14, `d5774df`.
-
-Три правила на все вехи пивота:
-
-- **Каждая веха заканчивается играбельной сборкой.** Первая (M15) дала коробки,
-  а не красоту (ADR-0019, решение 4); до неё `main` держал 2D-сборку.
-- **Читаемость аркады важнее кинематографичности.** Игровой объект не имеет права
-  зависеть от освещения сцены (решение 5). Кадр с погашенными лампами снимается
-  в каждой вехе наравне с освещённым.
-- **Механика не живёт в узле.** Если новое правило оказалось в `_physics_process`,
-  оно написано неправильно: решение принимает класс без сцены, узел его исполняет.
-
-### M15 · 3D-greybox: здание, лифты, Otto
-
-Решения — [ADR-0021](adr/0021-3d-greybox.md). Переезд слоя узлов; мерять её тем,
-что играется, а не тем, что видно.
-
-- [x] Сцена трёхмерная: `Node3D`, `CharacterBody3D`, `AnimatableBody3D`,
-      координата Z у игровых тел заперта
-- [x] Плоскость игры одна (Z = 0), глубина живёт за задней стеной коридора
-- [x] `Vector2` остаётся в слое правил; перевод в `Vector3` — только в `WorldSpace`
-- [x] Один источник света на этаж — лампа; правило «сбитая лампа гасит этаж» живо
-- [x] Масштаб метрический: числа `BuildingRules`, `ElevatorMotion` и `EnemyBrain`
-      поделены на сто (ADR-0019, решение 3)
-- [x] Генератор здания кормит меши и коллизии; `BuildingPlan` и `BuildingRoute` не тронуты
-- [x] Ортокамера сбоку: `CameraBounds`, `SideCamera`
-- [x] Настройки рендера пересмотрены: пиксельная привязка и фильтр ближайшего
-      соседа отменены вместе с ADR-0002
-- [x] Ядро переехало без правок логики; одно исключение — допуск прибытия кабины
-      к остановке — записано в ADR-0021
-- [x] Тесты: все тесты без сцены проходят; сценовые переписаны; бот проходит
-      здание с агентами на трёх жизнях
-
-**DoD:** бот проходит тридцатиэтажное здание в 3D-сцене из серых коробок, и ни
-один тест правил при этом не правился. ✅
-
-### M16 · Актёры: модели и анимации
-
-Решения — [ADR-0022](adr/0022-actors-rig.md).
-
-- [x] `tools/build_actors.py`: Blender строит фигуру из коробок на арматуре
-      и отдаёт `assets/models/*.glb`; машина у выхода — тем же скриптом
-- [x] `FigurePoses` — таблица поз углами конечностей; `FigureRig` ведёт кости
-      к позе со сглаживанием, ходьба — непрерывный цикл; позу выбирает `ActorPose`
-- [x] Агенту — то же плюс стойки уклонения (стоя, с колена, лёжа)
-- [x] Актёр освещается сценой; читаемость на погашенном этаже держит обводка
-- [x] Спрайтовый пайплайн ушёл: `render_actors.py`, `render_env.py`,
+- [x] The shaft is described by level data: bounds and stop floors (in a `Resource` — in M5a)
+- [x] Cab: `AnimatableBody2D`, moving up and down, stopping at floors
+- [x] Entering the cab and controlling it from inside, stepping out onto a floor when the floors line up
+- [x] Autonomous cab movement when Otto is not in it: floor to floor with a pause
+- [x] Riding on the cab roof, without controlling it (platform carries the player)
+- [x] Open shaft opening: can be run across and jumped over, falling into an empty shaft kills
+- [x] Lethal crushing of the player by the cab (agents — since M18d)
+- [x] Escalators: boarding by pressing "up/down" on the landing, transfer between floors
+- [x] Contextual input: "down" is a crouch on the floor and lowering the cab in the shaft
+- [x] Checking for headroom when standing up from a crouch (M1 debt)
+- [x] Tests: platform carry, boarding and stepping off, crushing, falling into the shaft
+
+**DoD:** you can descend from the top floor to the bottom one using an elevator and an escalator. ✅
+
+### M3 · Doors and documents
+
+Decisions — [ADR-0005](adr/0005-doors-and-documents.md).
+
+- [x] A door as a scene: closed / opening / open, a mat in front of the entrance
+- [x] Entering from the mat by pressing "up"; inside, Otto hides for up to five seconds,
+      with an early exit by pressing sideways
+- [x] Red doors: a document on first entry, +500 points, the door stops being red
+- [x] Regular doors: scene and states; agents from them — in M4a
+- [x] `GameState` autoload: score and collected documents, connected via signals
+- [x] Document counter and score in the HUD
+- [x] The building exit is always open, but without all documents it moves you to the
+      topmost floor with an uncollected red door — the original has no exit lock
+- [x] Tests: collecting a document, score, choosing the door to move to, the real-exit condition
+
+**DoD:** in a three-floor test building you can collect all documents and exit; an attempt
+to exit early returns you to the uncollected door. ✅
+
+### M4a · Combat and enemies
+
+M4 is split in two; the numbering of the other milestones does not shift. Decisions and the
+check — [ADR-0006](adr/0006-combat-and-enemies.md).
+
+- [x] Otto's shooting: standing, crouching, mid-jump; no more than three bullets on screen at once
+- [x] Jump kick
+- [x] Bullets as separate entities: flight height, hits
+- [x] Dodging: crouch under a high bullet, jump over a low one
+- [x] Enemy agent: comes out of a regular door, walks along the floor, shoots along the line
+- [x] Three lives; only a shot takes a life — colliding with an enemy is harmless
+- [x] Player death, respawn, Game Over
+- [x] Points for enemies: 100 for a shot, 150 for a kick
+- [x] Tests: hits, dodging, the life counter, agent behaviour
+
+**DoD:** a floor with enemies can be fought through; out of lives — Game Over. ✅
+
+### M4b · Lamps and darkness
+
+Decisions — [ADR-0007](adr/0007-lamps-and-darkness.md).
+
+- [x] A lamp as a scene: can be shot out, falls, kills an agent beneath it (300 points)
+- [x] A falling lamp does not touch Otto: the sources speak only of agents
+- [x] A downed lamp darkens its floor for good — a deviation from the original, where the
+      whole building goes dark for a short while ([ADR-0006](adr/0006-combat-and-enemies.md),
+      item 7); since M17 — its zone
+- [x] Until M6, darkness is shown as a darkening rectangle over the floor
+- [x] In darkness, agents' shooting range drops (since M17 — the range at which an
+      agent notices Otto)
+- [x] Bonus for a kill in the dark (amount corrected in M6)
+- [x] Otto's invulnerability on the escalator — M2 debt
+- [x] Tests: floor lighting, points in the dark, agent range in the dark
+
+**DoD:** lamps go out, enemies behave differently on a dark floor. ✅
+
+### M5a · Building
+
+M5 is split in two, like M4. Decisions — [ADR-0008](adr/0008-building-generation.md).
+
+- [x] The building is described by rules, not a list of floors: how many shafts, doors, lamps
+- [x] Layout by seed: in the original, buildings differ by the placement of red doors
+- [x] Assembling 30 floors from this description
+- [x] The shaft and the escalator move into data — M2 debt
+- [x] The escalator landing is decoupled from the belt: boarding without a jerk, the belt
+      does not cut through the slab (M2 code review debt)
+- [x] FPS measurement on the full building: 60 holds, streaming was not needed
+- [x] Tests: layout rules, repeatability by seed
+
+**DoD:** a 30-floor building is assembled from data and can be played top to bottom, 60 FPS. ✅
+
+### M5b · Game loop
+
+Decisions — [ADR-0009](adr/0009-game-loop-and-alarm.md).
+
+- [x] Exit with the documents collected → bonus → next building
+- [x] Building bonus: 1000 × number. In the ROM it does not grow past the tenth building
+      ([`arcade-rom.md`](reference/arcade-rom.md)) — we have no cap, a deviation
+- [x] Difficulty grows through agents: they shoot more often, see farther, replace each other faster
+- [x] Alarm on a per-building timer: agents get angrier, the cab responds with a delay.
+      Death does not clear the alarm, only a building change resets it
+- [x] Pause on Esc with a hint: resume, restart, quit
+- [x] Tests: alarm, bonus and building number, delayed cab response
+
+**DoD:** the game plays from the first building to the second without crashes. ✅
+
+### M6 · Lighting and atmosphere — the graphics layer
+
+Decisions — [ADR-0010](adr/0010-lighting-and-atmosphere.md). The 2D lighting
+implementation left with the pivot, the rules stayed ([ADR-0019](adr/0019-3d-pivot.md), decision 7).
+
+- [x] Measuring the lighting budget — M0 debt
+- [x] `CanvasModulate` sets the tone of a darkened floor; the floor's own lamp makes it bright
+- [x] Two sources per floor: a full-width fill and a spot under the lamp
+- [x] `LightOccluder2D` on the slabs: light does not leak between floors
+- [x] Light from the elevator shaft, muzzle flashes
+- [x] Per-frame source culling: only visible floors are lit
+- [x] Post-processing: bloom and vignette
+- [x] Parallax city background, laid out from the building seed
+- [x] Bonus for a kill in the dark: +50 instead of doubling — a fix from the check
+- [x] Tests: visible floor culling, the budget on the assembled building, background by seed, points
+
+**DoD:** a dark floor with a firefight holds 60 FPS, measured on the assembled building. ✅
+
+### M7a · Art pipeline and environment
+
+M7 is split in two. Decisions — [ADR-0011](adr/0011-asset-pipeline.md). The milestone's
+sprite pipeline left with the pivot (M16, [ADR-0019](adr/0019-3d-pivot.md), decision 8);
+`tools/blender_bin.py` remained.
+
+- [x] `tools/blender_bin.py`: Blender 5.2.1 is looked up like Godot — `$BLENDER_BIN` → PATH → winget
+- [x] The pipeline runs end to end on one asset: render → import preset →
+      `CanvasTexture` → the M6 lighting falls on it
+- [x] `tools/palette.py` — the palette in one place (removed in M22 with the 2D cleanup)
+- [x] Environment generator `tools/render_env.py`: diffuse, normal, specular from one geometry
+- [x] Building tileset, slabs, back wall, windows
+- [x] Doors (red and regular), elevator cab, escalator, lamp, exit
+- [x] The city behind the windows gets textures, the M6 layout rules stay
+- [x] Godot import presets are committed to the repository
+- [x] Tests: every asset a scene requests exists, splits into frames and has a normal map
+
+**DoD:** no grey boxes left in the frame except Otto and the agents; 60 FPS holds
+on the assembled building. ✅
+
+### M7b · Actors
+
+Decisions — [ADR-0011](adr/0011-asset-pipeline.md), items 12–14. Actor sprites
+were replaced by skinned models in M16.
+
+- [x] `tools/render_actors.py`: a low-poly model and an orthographic render in Blender 5.2.1
+- [x] Otto: idle, a three-frame walk, crouch, jump, fall, kick, shot
+- [x] Death in two poses and a separate crushed pose — as in the final arcade
+- [x] Agent: a hat versus Otto's pompadour — the silhouette reads in the dark
+- [x] Normal and specular maps from a second render pass (from depth, not the normal pass)
+- [x] Bullets and hit flashes
+- [x] The red car at the exit: drives off, and only then is the next building assembled
+- [x] Not one collision from M1–M5 changed — a test checks this
+
+**DoD:** all grey-box placeholders are replaced with final assets. ✅
+
+### M8a · Sound
+
+M8 is split in two: sound depends on nothing, while the menu depends on the font, language
+and volumes. Decisions — [ADR-0012](adr/0012-sound-and-interface.md).
+
+- [x] `tools/render_audio.py`: synthesis into `assets/audio/` — an effect built from an
+      attack, a body and a room tail; frequent sounds in WAV, long ones and music in OGG
+- [x] SFX for all game events: steps, shot, hit, kick, lamp, elevator,
+      escalator, door, document, death, exit
+- [x] Our own theme and a separate alarm motif
+- [x] Master / Music / SFX buses and an overall mix
+- [x] Tests: every game event has a sound, and no file is lost
+
+**DoD:** a session sounds from the first step to Game Over, and nothing is silent without reason. ✅
+
+### M8b · Interface
+
+Decisions — [ADR-0012](adr/0012-sound-and-interface.md), items 8–11.
+
+- [x] Pixellari (OFL) with Cyrillic in `assets/fonts/` together with the license text
+- [x] Two languages: `ru` and `en`, by system locale, with a switch in the settings
+- [x] HUD instead of the debug overlay: score, lives, documents, floor, alarm —
+      modern, in the corners, without the arcade line at the top
+- [x] Main menu: play, high scores, settings, controls, quit
+- [x] Settings: three volumes, language, fullscreen; the controls screen
+      only shows the bindings — rebinding is in the debt (STATUS)
+- [x] Local high score table: ten rows with score and date, no initials
+- [x] Extra life at 10,000 points — a fix from the check against the Taito manual
+- [x] Tests: strings exist in both languages, high scores and settings survive
+      a restart, the extra life for points is granted once
+
+**DoD:** the game starts from the menu and returns to it. ✅
+
+### M9 · Release
+
+Decisions — [ADR-0013](adr/0013-release-and-versioning.md). Pages on itch.io and Steam
+are not in the epic — only GitHub Releases (same place, item 1).
+
+- [x] `export_presets.cfg`: Windows and Linux, resources embedded in the executable,
+      without `tests/`, `tools/` and `addons/`
+- [x] `icon.ico` is drawn by a generator from the same geometry as `icon.svg`
+- [x] `tools/version.py`: the version is changed with one command and written
+      into both `project.godot` and the presets; the tag is checked against it
+- [x] The version is visible outside git too: a log line at startup and the main menu corner
+- [x] `release.yml`: tag `v*` → version check → build on ubuntu and windows →
+      archives in GitHub Releases, notes from `CHANGELOG.md`
+- [x] `tools/smoke.py`: the built binary runs headless, prints a marker
+      and writes not a single `SCRIPT ERROR`
+- [x] `CHANGELOG.md` following Keep a Changelog
+- [x] Tests: the version is semver and matches the presets, both presets are in place,
+      `tests/` and `tools/` do not leak into the export
+
+**DoD:** an archive downloaded from Releases runs and plays. The first tag has not been
+set yet — the run of the Windows archive on a clean machine is postponed to it.
+
+### M10 · Building architecture
+
+Decisions — [ADR-0014](adr/0014-building-architecture.md). The milestone was opened after
+M9: a bot run of a real building showed that the built archive was unplayable.
+
+- [x] The roof is a separate level with index −1, with sky above it; all levels have the
+      same clearance, Otto and his jump fit in the frame
+- [x] The roof has no doors, lamps or agents; the top shaft reaches it
+- [x] Floor zero becomes a regular floor: it gets a ceiling, a back wall and a lamp
+- [x] A stepped silhouette: 5 → 7 → 9 places (since M18a — by threshold)
+- [x] The floor bounds are known to slabs, walls, windows, lighting and the reachability graph
+- [x] Agents are released by `VisibleFloors`, not all 55 at once in `_ready()`
+- [x] Fewer doors at the top than at the bottom
+- [x] Returning to the game — with a breather and away from the one who killed you
+- [x] Tests: a bot run of the real building, roof clearance, an empty roof,
+      profile monotonicity, the shaft stands on an accessible spot on all its floors,
+      Otto survives the start with agents
+
+**DoD:** the bot clears a real thirty-floor building, and with agents enabled the
+player survives the start doing nothing. ✅ Combat balance is moved to M11.
+
+### M11 · Combat balance
+
+Decisions — [ADR-0016](adr/0016-combat-balance.md). The bot used to measure combat in M10
+could not dodge, so the milestone started with a measurement, not with tuning numbers.
+Combat numbers since M18d are taken from the ROM.
+
+- [x] Check the difficulty growth axes against the original
+- [x] Growth along the original's axes: fire rate and bullet speed, range is frozen
+- [x] Agents dodge: a knee against a high bullet, lying down against a low one
+- [x] A wind-up before the first shot — without it the player had no move
+- [x] Teach the bot to dodge — otherwise there is nothing to measure with
+- [x] Move combat numbers into the building rules, as anger and door density were moved
+- [x] A cap of eight live agents (since M18d, by the ROM — 3–4 per building)
+- [x] The bot fights rather than walking past — and really shoots
+- [x] Tests: the bot clears a real building with agents enabled
+
+**DoD:** the bot clears a real thirty-floor building with agents without using up
+three lives. ✅ Seeds 1–6, zero to two deaths per run.
+
+### M12 · Spectrum-style visuals: round palette, shafts, roof
+
+Decisions — [ADR-0017](adr/0017-spectrum-palette-and-shafts.md) on top of
+[ADR-0015](adr/0015-round-palette-and-roof.md). The Spectrum colours were cancelled by
+the pivot; the round palette as a technique stayed ([ADR-0019](adr/0019-3d-pivot.md),
+decision 7).
+
+- [x] The palette moves from level constants into the building rules and changes by round
+- [x] The palette sets both colour pairs — of a lit floor and a darkened one
+- [x] Environment assets are redrawn in the Spectrum colour language
+- [x] The shaft gets a body: full-height guide rails and doors on its floors
+- [x] A machine room superstructure on the roof, Otto descends to it on a rope
+- [x] The round counter in the HUD is called ROUND
+- [x] Tests: the gap between lit and darkened on every palette, the shaft is dressed
+      on all seeds, the superstructure does not hinder Otto's appearance
+
+**DoD:** consecutive buildings differ by eye, a darkened floor reads in each,
+and the shaft is seen first in the frame, not last. ✅
+
+### M13 · Native FullHD and quality textures
+
+Decisions — [ADR-0018](adr/0018-native-fullhd.md). The world was drawn at 640×360 and
+tripled to 1080p. A trial showed that resolution by itself gives nothing — the milestone
+is about asset detail (details in [`milestones.md`](milestones.md)).
+Detail through canvas scale was cancelled by the pivot ([ADR-0019](adr/0019-3d-pivot.md),
+decision 7), the 1920×1080 viewport stayed.
+
+- [x] ADR-0018 replacing the visual target [ADR-0002](adr/0002-visual-target.md)
+- [x] 1920×1080 viewport, the world is scaled threefold: floor height, building width,
+      actor height, speeds, jump
+- [x] `render_env.py --scale` and `render_actors.py --scale` — a shared canvas scale
+- [x] Environment assets redrawn with fine detail: masonry, panelled doors,
+      slabs with an edge, a cab with panels, a lamp with a socket and a wire
+- [x] Detail depends on scale rather than duplicating an asset
+- [x] Actors re-rendered from Blender at a larger size
+- [x] Fonts, HUD and menus recalculated for the new viewport
+- [x] Proportions: Otto and agents larger, the door taller, the window smaller (ADR-0018, decision 5)
+- [x] The limit of the shaft's travel is visible: stops and arrows in the cab (decision 6)
+- [x] Tests: no geometry number remained at the old scale; every asset
+      is three times larger than before; the bot clears the building; the frame is within the 16.6 ms budget
+
+**DoD:** the game runs at 1920×1080 without stretching, and by eye it is more detailed, not
+just larger. ✅
+
+### M14 · The door really opens
+
+Decisions — [ADR-0020](adr/0020-agent-doors.md). The last milestone on 2D, about behaviour,
+not the picture: agents appeared over a closed door. A logic bug would have survived
+the renderer change, so it was fixed before it.
+
+- [x] The door cycle is a class without a node (`DoorCycle` on `RefCounted`):
+      `closed → ajar → open → closed`, with timings and a release ban
+- [x] The door does not hand out an agent until it is open, and closes behind him
+- [x] The agent steps out of the doorway rather than appearing on the mat
+- [x] The door moves smoothly for Otto too
+- [x] Tests: the door does not release an agent before it opens; it closes behind
+      the one who came out; the cycle is checked without a scene
+
+**DoD:** not one agent appears over a closed door, and the door cycle is
+checked by a test without a scene. ✅
+
+### Pivot: from M15 the project moves to 3D
+
+The decision and its cost — [ADR-0019](adr/0019-3d-pivot.md). The visual target became
+a 3D scene with a side-on orthographic camera instead of a 2D frame of sprites. The game
+logic does not change in a single rule; the node layer, the asset pipeline and lighting
+change. The 2D build remains in history — the M14 merge, `d5774df`.
+
+Three rules for all pivot milestones:
+
+- **Each milestone ends with a playable build.** The first (M15) gave boxes,
+  not beauty (ADR-0019, decision 4); before it `main` kept the 2D build.
+- **Arcade readability matters more than cinematics.** A game object has no right
+  to depend on the scene lighting (decision 5). A shot with the lamps out is taken
+  in each milestone on a par with a lit one.
+- **Mechanics do not live in a node.** If a new rule ended up in `_physics_process`,
+  it is written wrong: a class without a scene makes the decision, the node executes it.
+
+### M15 · 3D greybox: building, elevators, Otto
+
+Decisions — [ADR-0021](adr/0021-3d-greybox.md). Moving the node layer; it is measured by
+what plays, not by what is seen.
+
+- [x] The scene is 3D: `Node3D`, `CharacterBody3D`, `AnimatableBody3D`,
+      the Z coordinate of game bodies is locked
+- [x] There is one play plane (Z = 0), depth lives behind the corridor's back wall
+- [x] `Vector2` stays in the rules layer; conversion to `Vector3` is only in `WorldSpace`
+- [x] One light source per floor — the lamp; the rule "a downed lamp darkens the floor" lives on
+- [x] Metric scale: the numbers of `BuildingRules`, `ElevatorMotion` and `EnemyBrain`
+      are divided by a hundred (ADR-0019, decision 3)
+- [x] The building generator feeds meshes and collisions; `BuildingPlan` and `BuildingRoute` are untouched
+- [x] Side-on orthographic camera: `CameraBounds`, `SideCamera`
+- [x] Render settings revised: pixel snapping and nearest-neighbour
+      filtering are cancelled together with ADR-0002
+- [x] The core moved without logic changes; the one exception — the cab's arrival
+      tolerance at a stop — is recorded in ADR-0021
+- [x] Tests: all scene-less tests pass; scene tests are rewritten; the bot clears
+      the building with agents on three lives
+
+**DoD:** the bot clears a thirty-floor building in a 3D scene of grey boxes, and not
+one rules test was changed along the way. ✅
+
+### M16 · Actors: models and animations
+
+Decisions — [ADR-0022](adr/0022-actors-rig.md).
+
+- [x] `tools/build_actors.py`: Blender builds a figure from boxes on an armature
+      and exports `assets/models/*.glb`; the car at the exit — with the same script
+- [x] `FigurePoses` — a table of poses as limb angles; `FigureRig` drives the bones
+      towards the pose with smoothing, walking is a continuous cycle; `ActorPose` picks the pose
+- [x] The agent gets the same plus dodge stances (standing, kneeling, lying)
+- [x] The actor is lit by the scene; readability on a darkened floor is held by an outline
+- [x] The sprite pipeline is gone: `render_actors.py`, `render_env.py`,
       `assets/sprites/`, `ActorBox`
-- [x] Тесты: у каждой позы есть запись в таблице; присед ниже пули агента; кости
-      не долетают за кадр перехода; ни одна поза не уходит под пол
+- [x] Tests: every pose has a table entry; the crouch is below an agent's bullet; bones
+      do not overshoot within a transition frame; no pose goes below the floor
 
-**DoD:** на стоп-кадре ходьбы видно, что это шаг, и Otto в приседе ниже пули
-агента. ✅ Колен у рига нет — присед наклоном корпуса; модель с коленями — M21.
+**DoD:** a freeze-frame of walking shows a step, and crouching Otto is below an agent's
+bullet. ✅ The rig has no knees — crouching is a torso lean; a model with knees — M21.
 
-### M16a · Цена приседа — снята
+### M16a · The cost of crouching — dropped
 
-Припаркованная веха (2026-09-20): присевшего Otto не брал ни один агент, и планировался
-отдельный тип — стрелок с колена в каске. Снята в M18d: по ROM низкий выстрел умеет
-обычный агент, пуля лёжа бьёт и присевшего, спасает только прыжок
-([ADR-0027](adr/0027-rom-combat.md), решение 3; закрыт открытый вопрос №7).
+A parked milestone (2026-09-20): no agent could hit a crouching Otto, and a separate type
+was planned — a kneeling shooter in a helmet. Dropped in M18d: by the ROM, a regular agent
+can fire low, a lying-down bullet hits a crouching Otto too, only a jump saves you
+([ADR-0027](adr/0027-rom-combat.md), decision 3; open question #7 is closed).
 
-### M17 · Свет, материалы и читаемость
+### M17 · Lighting, materials and readability
 
-Решения — [ADR-0023](adr/0023-light-and-readability.md).
+Decisions — [ADR-0023](adr/0023-light-and-readability.md).
 
-- [x] Ортокамера наклонена на десять градусов сверху: пол виден полосой;
-      плоскость игры и попадания не тронуты (решение 1)
-- [x] Ламп на этаже по ширине — одна наверху, три внизу; сбитая гасит свою зону
-      (решение 2)
-- [x] **Новая механика:** видит ли агент Otto, решает тень — в тёмной зоне
-      замечают ближе 1,8 м, за дверью не видят вовсе (решение 8)
-- [x] PBR-материалы: пол полированный, бетон шершавый, металл шахт, кабин и реек.
-      Текстур нет: M19 пошла материалами палитры, детали — геометрией в M20,
-      фактуры стен — с M21b
-- [x] Источники с мягкими тенями: у лампы конус вниз и слабая заливка. Холодного
-      источника у окон нет: город M19 светит эмиссией
-- [x] Объёмный туман и свечение намёком
-- [x] Отражения в полу — SSR; контактные тени — SSAO
-- [x] Рёбра, чтобы свету было за что цепляться: торцы плит, плинтус, пилястры
+- [x] The orthographic camera is tilted ten degrees from above: the floor is visible as a strip;
+      the play plane and hits are untouched (decision 1)
+- [x] Lamps per floor by width — one at the top, three at the bottom; a downed one darkens
+      its zone (decision 2)
+- [x] **New mechanic:** shadow decides whether an agent sees Otto — in a dark zone
+      they notice him closer than 1.8 m, behind a door they do not see him at all (decision 8)
+- [x] PBR materials: polished floor, rough concrete, metal of shafts, cabs and rails.
+      No textures: M19 went with palette materials, details — with geometry in M20,
+      wall textures — since M21b
+- [x] Sources with soft shadows: the lamp has a downward cone and a weak fill. There is no
+      cold source at the windows: the M19 city glows by emission
+- [x] Volumetric fog and a hint of glow
+- [x] Floor reflections — SSR; contact shadows — SSAO
+- [x] Edges for the light to catch on: slab ends, skirting, pilasters
       (`BuildingRibs`)
-- [x] Лампа на подвесе; качания нет — сбитая падает сразу (ADR-0007)
-- [x] Читаемость огоньками: табло двери, индикаторы кабины, вывеска выхода;
-      светильник и пуля светятся сами, актёры в обводке
-- [x] Тесты: `tools/light_bench.gd` — 1.2 мс GPU; `test_readability`,
+- [x] The lamp hangs on a pendant; no swinging — a downed one falls at once (ADR-0007)
+- [x] Readability through indicator lights: the door board, cab indicators, the exit sign;
+      the light fixture and the bullet glow on their own, actors are outlined
+- [x] Tests: `tools/light_bench.gd` — 1.2 ms GPU; `test_readability`,
       `test_darkness`
 
-**DoD:** свет мягкий и объёмный, и на тёмном этаже игрок видит, во что стреляет. ✅
+**DoD:** the light is soft and volumetric, and on a dark floor the player sees what they are shooting at. ✅
 
-### M18 · Геометрия здания
+### M18 · Building geometry
 
-Решения — [ADR-0024](adr/0024-building-geometry.md). Сверка по
-[Elevator World](https://elevatorworld.com/article/elevator-action/) дала правило
-**чем ниже, тем больше путей**: шахты неравные и пересекаются, эскалаторы — там, где
-перехлёста нет. Веха разделена: сперва граф достижимости, потом вид, затем
-пропорции, бой и здание по ROM.
+Decisions — [ADR-0024](adr/0024-building-geometry.md). The check against
+[Elevator World](https://elevatorworld.com/article/elevator-action/) gave the rule
+**the lower, the more paths**: shafts are unequal and overlap, escalators are where
+there is no overlap. The milestone is split: first the reachability graph, then the look,
+then proportions, combat and the building by the ROM.
 
-#### M18a · Раскладка
+#### M18a · Layout
 
-- [x] Сетка мест мельче: 17 мест вместо 9 (шаг с M18c — 1.8 м)
-- [x] Силуэт порогом: до двадцатого этажа узкая башня, влезает в кадр; с двадцатого —
-      широкий стилобат
-- [x] Шахты перехлёстываются: от одной наверху до пяти на дне
-- [x] Эскалаторы полосой у порога плюс гарантия на разрыве
-- [x] Внутренняя стена делит этаж надвое; стена, отрезавшая документ или выход,
-      снимается
-- [x] Тесты: башня влезает в кадр, стилобат — нет; число шахт не убывает книзу;
-      каждый стык — перехлёст или эскалатор; бот проходит любое здание
+- [x] A finer grid of places: 17 places instead of 9 (pitch since M18c — 1.8 m)
+- [x] A threshold silhouette: down to the twentieth floor a narrow tower that fits in the
+      frame; from the twentieth — a wide podium
+- [x] Shafts overlap: from one at the top to five at the bottom
+- [x] Escalators as a strip at the threshold plus a guarantee at a break
+- [x] An inner wall splits the floor in two; a wall that cuts off a document or the exit
+      is removed
+- [x] Tests: the tower fits in the frame, the podium does not; the number of shafts does not
+      decrease downward; every junction is an overlap or an escalator; the bot clears any building
 
-**DoD:** с двадцатого этажа и ниже есть выбор пути, и любое здание проходимо. ✅
+**DoD:** from the twentieth floor down there is a choice of path, and any building is passable. ✅
 
-#### M18b · Геометрия, вид и пассажиры
+#### M18b · Geometry, look and riders
 
-Решения — [ADR-0025](adr/0025-shafts-escalators-and-riders.md).
+Decisions — [ADR-0025](adr/0025-shafts-escalators-and-riders.md).
 
-- [x] Эскалатор конструкцией: балюстрада, ступени, площадки, обрамление проёма;
-      со стороны камеры — низкий борт
-- [x] Столб света в шахте — настоящий источник, не гаснет от выстрела
-- [x] Двухэтажная кабина: жёсткая пара, до двух на здание, только в шахте, у которой
-      на каждом этаже есть другой путь
+- [x] The escalator as a structure: balustrade, steps, landings, opening frame;
+      a low side on the camera side
+- [x] The light column in the shaft is a real source, it does not go out from a shot
+- [x] A two-storey cab: a rigid pair, up to two per building, only in a shaft that
+      has another path on every floor
 - [x] `BuildingRules.MIN_SHAFT_FLOORS` 3 → 4
-- [x] Агенты ездят в кабинах, но не управляют ими — как в оригинале
-- [x] `_moves` и `_links` в `BuildingRoute` слиты в один счёт графа
-- [x] Прогон с боем на сиде 1 воспроизводится — последняя причина закрыта в M18d
-- [x] Параллельный прогон проверок: `run_tests.py` по шести процессам, 139 с против
-      755 ([`testing.md`](testing.md)). Матрица джоб в CI — в долге (STATUS)
-- [x] Тесты: ход держит оба яруса в шахте; доля сидов с парой; полоса шахты не короче
-      четырёх этажей; бюджет кадра со столбами света
+- [x] Agents ride in cabs but do not control them — as in the original
+- [x] `_moves` and `_links` in `BuildingRoute` are merged into one graph count
+- [x] A combat run on seed 1 is reproducible — the last cause was closed in M18d
+- [x] Parallel check runs: `run_tests.py` over six processes, 139 s versus
+      755 ([`testing.md`](testing.md)). A CI job matrix is in the debt (STATUS)
+- [x] Tests: travel keeps both tiers in the shaft; the share of seeds with a pair; a shaft's
+      travel is no shorter than four floors; the frame budget with light columns
 
-**DoD:** ниже двадцатого этажа в кадре есть выбор, эскалатор выглядит эскалатором,
-и в кабине можно встретить не только Otto. ✅
+**DoD:** below the twentieth floor there is a choice in the frame, the escalator looks like
+an escalator, and in a cab you can meet someone other than Otto. ✅
 
-#### M18c · Пропорции по оригиналу
+#### M18c · Proportions from the original
 
-Решения — [ADR-0026](adr/0026-proportions.md). Этаж у нас верен, а всё, что стоит на
-полу, было мало в 1.33 раза. Доли — от просвета этажа (40 px у оригинала, 3.0 м у нас):
+Decisions — [ADR-0026](adr/0026-proportions.md). Our floor is right, but everything that
+stands on the floor was 1.33 times too small. Shares are of the floor clearance (40 px in
+the original, 3.0 m here):
 
-| | Оригинал | До вехи | После |
+| | Original | Before the milestone | After |
 |---|---|---|---|
-| Otto | 56% × 25% | 42% × 18% | 1.68 × 0.72 м |
-| Агент | 56%, ростом с Otto | 39%, ниже Otto | 1.68 м |
-| Дверь | 70% × 40% | 57% × 28% | 2.1 × 1.2 м |
-| Шахта и кабина | 60% | 40% | 1.8 м |
-| Шаг места | 60% | 70% | 1.8 м |
-| Этажей в кадре | 3.67 | 3.0 | 3.67 |
+| Otto | 56% × 25% | 42% × 18% | 1.68 × 0.72 m |
+| Agent | 56%, as tall as Otto | 39%, shorter than Otto | 1.68 m |
+| Door | 70% × 40% | 57% × 28% | 2.1 × 1.2 m |
+| Shaft and cab | 60% | 40% | 1.8 m |
+| Place pitch | 60% | 70% | 1.8 m |
+| Floors in frame | 3.67 | 3.0 | 3.67 |
 
-- [x] Растим содержимое, этаж не трогаем
-- [x] Otto и агент — 1.68 м, одного роста; модели пересобраны
-- [x] Числа, привязанные к росту: выстрелы, колено и лёжа, присед, удар, допуски бота
-- [x] Дверь 2.1×1.2, створка поворачивается внутрь комнаты
-- [x] Шахта и кабина 1.8, ширина кабины из правил; шахты не встают рядом
-- [x] Шаг места 1.8, здание 33.6 м
-- [x] Лампа под потолком, сбивается из кабины
-- [x] Эскалатор круче, в свои два места
-- [x] Машина по росту Otto; проём выхода 1.68
-- [x] Камера показывает 3.67 этажа
-- [x] Размеры — одной таблицей `Proportions` в пикселях оригинала (решение 8)
-- [x] Номер этажа на каждом этаже (решение 9)
-- [x] Перемер прогона бота и бюджета кадра: 2.25 мс GPU
-- [x] Тесты: доли против таблицы оригинала, габариты этажа не налезают друг на друга,
-      створка в проёме, кабина в ширину шахты
+- [x] Grow the contents, leave the floor alone
+- [x] Otto and the agent are 1.68 m, the same height; models rebuilt
+- [x] Numbers tied to height: shots, kneeling and lying, crouch, kick, bot tolerances
+- [x] Door 2.1×1.2, the leaf swings into the room
+- [x] Shaft and cab 1.8, cab width from the rules; shafts do not stand side by side
+- [x] Place pitch 1.8, building 33.6 m
+- [x] The lamp under the ceiling, can be shot down from a cab
+- [x] The escalator steeper, into its two places
+- [x] The car sized to Otto's height; exit opening 1.68
+- [x] The camera shows 3.67 floors
+- [x] Sizes — in one `Proportions` table in original pixels (decision 8)
+- [x] A floor number on every floor (decision 9)
+- [x] Re-measuring the bot run and the frame budget: 2.25 ms GPU
+- [x] Tests: shares against the original's table, floor footprints do not overlap each other,
+      the leaf in the opening, the cab fills the shaft width
 
-**DoD:** доли всех предметов здания к просвету этажа сходятся с оригиналом,
-и сознательные расхождения записаны числом. ✅
+**DoD:** the shares of all building objects to the floor clearance match the original,
+and deliberate deviations are recorded as numbers. ✅
 
-#### M18d · Бой по правилам ROM
+#### M18d · Combat by the ROM rules
 
-Решения — [ADR-0027](adr/0027-rom-combat.md); заметки по дизассемблеру —
-[`reference/arcade-rom.md`](reference/arcade-rom.md). Частота логики оригинала —
-14.8 тика/с.
+Decisions — [ADR-0027](adr/0027-rom-combat.md); disassembler notes —
+[`reference/arcade-rom.md`](reference/arcade-rom.md). The original's logic rate is
+14.8 ticks/s.
 
-- [x] `Arcade` — формулы ROM одной таблицей
-- [x] Сложность: навык + время в здании, после тревоги вчетверо быстрее, потолок 15;
-      у агента своя злость
-- [x] Агентов в здании 3–4, выход из случайной синей двери на этаже Otto и соседних
-- [x] Выстрел агента: замах, пауза, одна пуля в полёте, стоя, присев и лёжа; высоты
-      пуль ROM
-- [x] Увёртка по ROM: высокая пуля — присесть, низкая — лечь
-- [x] Скорости ROM: ходьба 2.2 обоим, пули 8.9 и 6.7–8.9, кабина 2.2
-- [x] Прыжок ROM: +1.88 м, 0.95 с, направление в воздухе не меняется
-- [x] Выстрелы Otto будят агентов на 6 с
-- [x] Кабина давит агентов — 300 очков
-- [x] Тревога 277 с
-- [x] Четыре уровня сложности в настройках — DIP 0–3
-- [x] Бот прыгает от низкой пули; смертность замерена на каждом уровне
-- [x] Тесты: `Arcade` против чисел ROM, порядок «пуля — стойка», пределы агентов,
-      давка кабиной
+- [x] `Arcade` — the ROM formulas in one table
+- [x] Difficulty: skill + time in the building, four times faster after the alarm, cap 15;
+      each agent has its own anger
+- [x] 3–4 agents per building, coming out of a random blue door on Otto's floor and adjacent ones
+- [x] Agent shot: wind-up, pause, one bullet in flight, standing, crouching and lying; ROM
+      bullet heights
+- [x] Dodging by the ROM: high bullet — crouch, low — lie down
+- [x] ROM speeds: walking 2.2 for both, bullets 8.9 and 6.7–8.9, cab 2.2
+- [x] ROM jump: +1.88 m, 0.95 s, direction does not change in the air
+- [x] Otto's shots wake agents for 6 s
+- [x] The cab crushes agents — 300 points
+- [x] Alarm at 277 s
+- [x] Four difficulty levels in the settings — DIP 0–3
+- [x] The bot jumps over a low bullet; the death rate is measured at each level
+- [x] Tests: `Arcade` against ROM numbers, the "bullet — stance" order, agent limits,
+      cab crush
 
-**DoD:** бой идёт по правилам оригинала, а сложность выражена смертностью бота
-на каждом уровне. ✅
+**DoD:** combat follows the original's rules, and difficulty is expressed by the bot's
+death rate at each level. ✅
 
-#### M18e · Здание по карте оригинала
+#### M18e · The building by the original's map
 
-Решения — [ADR-0028](adr/0028-building-by-the-map.md). Генерация остаётся, но
-берёт у карты оригинала правила.
+Decisions — [ADR-0028](adr/0028-building-by-the-map.md). Generation stays but
+takes its rules from the original's map.
 
-- [x] `Arcade`: этаж ROM по доле высоты, двери этажа (`table_280E`), тёмные этажи,
-      квоты красных дверей
-- [x] Дверей на этаже по ROM на ширину экрана; обязательна одна на этаж
-- [x] Красных дверей 5 → 10 по навыку, полосами ROM
-- [x] Тёмные этажи ROM 11–15 — без ламп, тёмные с начала здания; двери на них есть
-- [x] Нижние этажи ROM 1–7 — лампы остаются (расхождение записано)
-- [x] Соль партии: сид здания из номера и соли, ноль в тестах и у бота
-- [x] Телеграф двери в конце смены (долг M14)
-- [x] Перемер бота на новой плотности дверей, все уровни сложности
-- [x] Тесты: на любом сиде и навыке — двери по ROM, документы по квоте и достижимы,
-      тёмные этажи без ламп, соль меняет здание
+- [x] `Arcade`: ROM floor by share of height, floor doors (`table_280E`), dark floors,
+      red door quotas
+- [x] Doors per floor by the ROM per screen width; one per floor is mandatory
+- [x] Red doors 5 → 10 by skill, in ROM bands
+- [x] ROM dark floors 11–15 — without lamps, dark from the building start; they do have doors
+- [x] ROM lower floors 1–7 — the lamps stay (deviation recorded)
+- [x] Session salt: the building seed from the number and the salt, zero in tests and for the bot
+- [x] Door telegraph at the end of a shift (M14 debt)
+- [x] Re-measuring the bot on the new door density, all difficulty levels
+- [x] Tests: on any seed and skill — doors by the ROM, documents by quota and reachable,
+      dark floors without lamps, the salt changes the building
 
-**DoD:** этаж не пустее оригинала, и заучить здание от партии к партии нельзя. ✅
+**DoD:** a floor is no emptier than the original, and a building cannot be memorised from
+session to session. ✅
 
-### M19 · Наполнение и задний план
+### M19 · Dressing and background
 
-Решения — [ADR-0029](adr/0029-city-weather-dressing.md). В аркаде ничего этого нет;
-правило одно — не мешать читаемости.
+Decisions — [ADR-0029](adr/0029-city-weather-dressing.md). The arcade has none of this;
+there is one rule — do not get in the way of readability.
 
-- [x] Город: кварталы генерацией, окна эмиссией, три–четыре ряда глубины, в своём
-      перспективном виде фоном кадра
-- [x] Погода раунда по сиду: дождь, туман или ясная ночь; в коридоре сухо
-- [x] Обстановка этажа — декор у задней стены, не на занятых местах
-- [x] Табло этажа над шахтами
-- [x] Крыша по оригиналу: скаты ступенями и парапеты силуэтом за плоскостью игры
-- [x] Палитра раунда материалами ([ADR-0017](adr/0017-spectrum-palette-and-shafts.md)
-      в части приёма, не цветов)
-- [x] Тёмный этаж заметно темнее светлого
-- [x] Тесты: обстановка не на занятых местах и без тел, город и погода по сиду,
-      бюджет источников не растёт
+- [x] City: blocks by generation, windows by emission, three to four rows of depth, in its
+      own perspective view as the frame background
+- [x] Round weather by seed: rain, fog or a clear night; dry in the corridor
+- [x] Floor dressing — decor by the back wall, not on occupied places
+- [x] A floor indicator board above the shafts
+- [x] The roof as in the original: stepped slopes and parapets as a silhouette behind the play plane
+- [x] Round palette via materials ([ADR-0017](adr/0017-spectrum-palette-and-shafts.md)
+      as to the technique, not the colours)
+- [x] A dark floor is noticeably darker than a lit one
+- [x] Tests: dressing not on occupied places and without bodies, city and weather by seed,
+      the source budget does not grow
 
-**DoD:** по кадру видно, что это здание ночью в городе, а не схема здания. ✅
+**DoD:** the frame shows a building at night in a city, not a diagram of a building. ✅
 
-### M20 · Детализация сцены
+### M20 · Scene detail
 
-Решения — [ADR-0031](adr/0031-scene-detail.md). Кадры M19: крыша, лифт и этажи —
-коробки без деталей, а кадр стоит 2.3 мс из 16.6. Всё новое — без тел; новых
-источников света не больше двух (неон крыши).
+Decisions — [ADR-0031](adr/0031-scene-detail.md). M19 shots: the roof, the elevator and
+the floors are boxes without detail, while the frame costs 2.3 ms of 16.6. Everything new
+is without bodies; no more than two new light sources (the roof neon).
 
-- [x] Лифт как на референсе: кабина открыта спереди, со стенками, светильником,
-      поручнем и пультом; в шахте направляющие, тросы и противовес; на этажах
-      порталы с раскрытыми створками
-- [x] Крыша: техника (бак, кондиционеры, трубы, лестница); парапет с отливом,
-      карниз, скаты с рёбрами; мачта с мигающим огнём; неоновая вывеска. С M21b
-      техника — моделями паков, неон переехал на угол фасада
-- [x] Этажи: наличники, филёнки и ручки дверей, лампы с абажуром, ковровая
-      дорожка и шов плитки, стыки панелей стены. Потолок не тронут — камера
-      его не видит
-- [x] Этаж выхода — гараж без дверей и обстановки (в ROM машина в подвале, нулевой
-      этаж без дверей); машина — седан с фарами и стоп-сигналами (с M21 — из
-      Cars Pack)
-- [x] Искры от пули в лампу, кровь от пули в агента и в Otto (выключается
-      в настройках)
-- [x] Палитра раунда заметна на глаз: раунды 1–4 различаются без подписи, кадры
-      раундов рядом
-- [x] Город: окна сеткой, погасшие — тёмным стеклом
-- [x] Тесты: детали без тел, раскладка крыши на любом сиде, этаж выхода без дверей,
-      бюджет источников
+- [x] The elevator as in the reference: the cab is open at the front, with walls, a light,
+      a handrail and a panel; in the shaft guide rails, ropes and a counterweight; on the
+      floors portals with open doors
+- [x] Roof: equipment (tank, air conditioners, pipes, ladder); a parapet with a drip edge,
+      a cornice, ribbed slopes; a mast with a blinking light; a neon sign. Since M21b
+      the equipment is pack models, the neon moved to the facade corner
+- [x] Floors: door casings, panels and handles, lamps with shades, a carpet
+      runner and a tile seam, wall panel joints. The ceiling is untouched — the camera
+      does not see it
+- [x] The exit floor is a garage without doors or dressing (in the ROM the car is in the
+      basement, floor zero has no doors); the car is a sedan with headlights and brake
+      lights (since M21 — from the Cars Pack)
+- [x] Sparks from a bullet into a lamp, blood from a bullet into an agent and into Otto
+      (can be turned off in the settings)
+- [x] The round palette is noticeable by eye: rounds 1–4 differ without a caption, shots
+      of the rounds side by side
+- [x] City: windows in a grid, unlit ones as dark glass
+- [x] Tests: details without bodies, roof layout on any seed, the exit floor without doors,
+      the source budget
 
-**DoD:** крыша читается крышей небоскрёба, лифт — лифтом, этаж — конторой. ✅
+**DoD:** the roof reads as a skyscraper roof, the elevator as an elevator, the floor as an office. ✅
 
-### M21 · Модели Otto, агентов и машины
+### M21 · Models of Otto, the agents and the car
 
-Решения — [ADR-0032](adr/0032-actor-models.md). Quaternius Ultimate Modular Men
-(CC0), Business Man для Otto и для агентов; машина — Cars Pack (CC0).
+Decisions — [ADR-0032](adr/0032-actor-models.md). Quaternius Ultimate Modular Men
+(CC0), Business Man for Otto and for the agents; the car — Cars Pack (CC0).
 
-- [x] Пайплайн: исходник пака в `assets/source/`, `build_actors.py` приводит рост,
-      палитру, клипы; федора и очки агенту, пистолет обоим
-- [x] Анимация смешанная: клипы пака (стойка, ходьба, выстрел, смерть) и позы
-      кодом с коленями и локтями (присед, лёжа, прыжок, удар, раздавленный)
-- [x] Присед на корточках и лёжа по высотам ROM (долг M18c)
-- [x] Заземление по крайним вершинам костей — модель в двести раз тяжелее
-- [x] Машина у выхода из Cars Pack: пять моделей без такси и полиции, восемь
-      красок, жребий по номеру и сиду здания, первое здание — красная
-      спортивная; длина — `Proportions.CAR_LENGTH`
-- [x] Инструмент кадра поз `tools/actor_shot.tscn`
-- [x] Пуля — трассер с хвостом и вспышкой у ствола вместо коробки (замечание
-      пользователя по ходу вехи)
-- [x] Звонка лифта на этажах нет (решение пользователя: «как будто в звонок
-      звонят»)
-- [x] Тесты поз по вершинам и габаритам, клипы и кости в моделях, жребий машины
+- [x] Pipeline: the pack source in `assets/source/`, `build_actors.py` fixes height,
+      palette, clips; a fedora and glasses for the agent, a pistol for both
+- [x] Mixed animation: pack clips (stance, walk, shot, death) and poses
+      in code with knees and elbows (crouch, lying, jump, kick, crushed)
+- [x] Squatting crouch and lying down at ROM heights (M18c debt)
+- [x] Grounding by the extreme bone vertices — the model is two hundred times heavier
+- [x] The car at the exit from the Cars Pack: five models without taxi and police, eight
+      paints, a draw by the building number and seed, the first building gets a red
+      sports car; length — `Proportions.CAR_LENGTH`
+- [x] A pose shot tool `tools/actor_shot.tscn`
+- [x] The bullet is a tracer with a tail and a muzzle flash instead of a box (a user
+      remark during the milestone)
+- [x] No elevator chime on the floors (the user's decision: "as if someone is ringing a
+      doorbell")
+- [x] Tests of poses by vertices and bounds, clips and bones in the models, the car draw
 
-**DoD:** Otto и агенты — люди в костюмах, а не коробки, стойки держат высоты
-пуль ROM, машина у выхода — настоящая машина. ✅
+**DoD:** Otto and the agents are people in suits, not boxes, the stances hold the ROM
+bullet heights, the car at the exit is a real car. ✅
 
-### M21b · Этажи, крыша и лифт моделями паков
+### M21b · Floors, roof and elevator from pack models
 
-Решения — [ADR-0033](adr/0033-dressing-from-packs.md). Замечания пользователя:
-«на этажах одни квадраты непонятные», «всё натурально, как в жизни».
+Decisions — [ADR-0033](adr/0033-dressing-from-packs.md). User remarks:
+"nothing but incomprehensible squares on the floors", "everything natural, as in real life".
 
-- [x] Тип здания и имя — жребий по зданию: отель или офисная башня
-- [x] Каталог моделей `PropCatalog`, модели паков в `assets/models/props/`,
-      `CREDITS.md` с автором и лицензией каждой модели и фактуры
-- [x] Обстановка этажей: на стенах между дверями бра, картины, часы, доски,
-      номера комнат; на полу мебель на каждом втором свободном месте
-- [x] Стены — фактуры по типу здания с тоном раунда множителем
-- [x] Шахта стальная: листы с болтами, бетон, распорки, хромированный портал
-- [x] У портала табло этажа кабины со стрелкой и кнопки ▲▼ (только вид)
-- [x] Вертикальная неоновая вывеска на углу фасада; неон с крыши уходит
-- [x] Крыша моделями: бак, кондиционеры, антенны, тарелка, вентиляция, панели,
-      выход; покрытие фактурой
-- [x] Тесты: у каждой модели строка в CREDITS, модели без тел и влезают по
-      глубине, раскладка на любом сиде, табло показывает этаж кабины
+- [x] Building kind and name — a draw per building: a hotel or an office tower
+- [x] A model catalogue `PropCatalog`, pack models in `assets/models/props/`,
+      `CREDITS.md` with the author and license of every model and texture
+- [x] Floor dressing: on the walls between doors sconces, paintings, clocks, boards,
+      room numbers; furniture on the floor on every second free place
+- [x] Walls — textures by building kind with the round tone as a multiplier
+- [x] The shaft is steel: bolted sheets, concrete, braces, a chrome portal
+- [x] By the portal a cab floor indicator with an arrow and ▲▼ buttons (display only)
+- [x] A vertical neon sign on the facade corner; the neon leaves the roof
+- [x] Roof from models: tank, air conditioners, antennas, a dish, ventilation, panels,
+      an exit; the surface with a texture
+- [x] Tests: every model has a line in CREDITS, models without bodies that fit in
+      depth, layout on any seed, the indicator shows the cab's floor
 
-**DoD:** этаж читается отелем или конторой без подписи, у лифта видно, где
-кабина, крыша — крыша небоскрёба, шахта видна столбом сквозь здание. ✅
+**DoD:** a floor reads as a hotel or an office without a caption, at the elevator you can
+see where the cab is, the roof is a skyscraper roof, the shaft is visible as a column
+through the building. ✅
 
-### M22 · Грейдинг и полировка
+### M22 · Grading and polish
 
-Решения — [ADR-0030](adr/0030-grading-and-quality.md) и
-[ADR-0034](adr/0034-ultra-and-auto-quality.md). Последняя веха пивота. Часть
-сделана ещё в ветке M20 и здесь доводится по кадрам на детальной сцене.
+Decisions — [ADR-0030](adr/0030-grading-and-quality.md) and
+[ADR-0034](adr/0034-ultra-and-auto-quality.md). The last milestone of the pivot. Part of
+it was done back in the M20 branch and is finished here by shots of the detailed scene.
 
-- [x] Тон — ночной нуар: холодные тени, тёплые лампы, глубже чёрный; игровые
-      знаки остаются яркими. Кривые в коде с M20, подбор — по кадрам
-- [x] Глубина резкости — только у города, плоскость игры резкая (в ветке M20)
-- [x] Лёгкая виньетка под HUD, без зерна
-- [x] Полосы на градиентах убираются дизерингом
-- [x] Качество графики: низкое, среднее, высокое (в ветке M20)
-- [x] Уровень «Ультра»: объёмный свет ламп, отражённый свет SSIL, тени высокого
-      разрешения. Настоящего RT в Godot 4.7 нет — только низкоуровневый Vulkan
-      RT в `RenderingDevice`; опцией он станет, когда появится в основной ветке
-- [x] Сглаживание по уровням: FXAA, MSAA ×2, MSAA ×2, MSAA ×4. TAA снят по
-      кадрам — размывал обводку актёров
-- [x] Уровень при первом запуске — по замеру кадра
-- [x] Город не рисуется, когда здание закрывает кадр — долг M19 (в ветке M20)
-- [x] HUD современнее и красивее (замечание пользователя по ходу вехи)
-- [x] Разрешение в настройках (вопрос пользователя): режим окна — окно, без
-      рамки, полный экран в родном разрешении; размер окна из тех, что держит
-      монитор, до 4K; масштаб 3D-рендера (FSR) для слабых карт на 4K
-- [x] Город за зданием детальнее (замечание пользователя): силуэты крыш,
-      мигающие огни антенн, неон и щиты на дальних домах, зарево улиц
-- [x] Погода богаче (замечание пользователя): в дождь — молнии с отсветом в
-      стёклах города и вспышкой в коридоре; в тумане — плывущие полосы дымки;
-      ясной ночью — звёзды и луна
-- [x] Бюджет кадра на полном здании, на каждом уровне качества
-- [x] Уборка 2D: остатки спрайтовой палитры (ADR-0019, решение 8)
-- [x] Тесты: уровень качества включает обещанное и не меняет правил
+- [x] The tone is night noir: cold shadows, warm lamps, deeper black; game
+      signs stay bright. Curves in code since M20, tuning — by shots
+- [x] Depth of field — only on the city, the play plane is sharp (in the M20 branch)
+- [x] A light vignette under the HUD, no grain
+- [x] Banding on gradients is removed by dithering
+- [x] Graphics quality: low, medium, high (in the M20 branch)
+- [x] The "Ultra" level: volumetric lamp light, SSIL reflected light, high-resolution
+      shadows. Godot 4.7 has no real RT — only low-level Vulkan
+      RT in `RenderingDevice`; it becomes an option when it lands in the main branch
+- [x] Anti-aliasing by level: FXAA, MSAA ×2, MSAA ×2, MSAA ×4. TAA was dropped based on
+      shots — it blurred the actors' outline
+- [x] The level at first launch — by a frame measurement
+- [x] The city is not drawn when the building covers the frame — M19 debt (in the M20 branch)
+- [x] A more modern and better-looking HUD (a user remark during the milestone)
+- [x] Resolution in the settings (a user question): window mode — windowed, borderless,
+      fullscreen at native resolution; the window size from those the monitor
+      supports, up to 4K; 3D render scale (FSR) for weak cards at 4K
+- [x] A more detailed city behind the building (a user remark): roof silhouettes,
+      blinking antenna lights, neon and billboards on distant buildings, the glow of streets
+- [x] Richer weather (a user remark): in rain — lightning with a reflection in
+      the city's glass and a flash in the corridor; in fog — drifting bands of haze;
+      on a clear night — stars and the moon
+- [x] Frame budget on the full building, at every quality level
+- [x] 2D cleanup: the remains of the sprite palette (ADR-0019, decision 8)
+- [x] Tests: a quality level enables what it promises and does not change the rules
 
-**DoD:** кадр можно поставить рядом с референсом и говорить о разнице в ремесле,
-а не в возможностях. ✅
+**DoD:** the frame can be put next to the reference and the difference discussed in terms
+of craft, not capabilities. ✅
 
-### Документация после пивота
+### Documentation after the pivot
 
-Решение пользователя (2026-09-24). После M22 — сверка всей документации: каждый
-`.md` в проекте, включая README, по каждому предложению и утверждению. Пивот
-прошёл вехи M15–M22, и документы писались по ходу каждой: что устарело, что
-противоречит коду, что обещано и не сделано. Ветка `docs/sweep`, план — в
-[STATUS.md](STATUS.md).
+The user's decision (2026-09-24). After M22 — a check of all documentation: every
+`.md` in the project, including the README, sentence by sentence and claim by claim. The
+pivot went through milestones M15–M22, and the documents were written during each: what is
+outdated, what contradicts the code, what was promised and not done. Branch `docs/sweep`,
+the plan is in [STATUS.md](STATUS.md).
 
 - [x] README, CLAUDE.md, CHANGELOG, CREDITS, `conventions.md`, `testing.md`,
       `reference/arcade-rom.md`
-- [x] STATUS и EPIC; долг — чистка
-- [x] ADR 0001–0034: строка статуса там, где решение отменено или изменено,
-      со ссылкой на заменивший ADR
-- [x] `milestones.md` — по вехам против git
-- [x] Сверка утверждений с кодом: имена классов, файлов, чисел, команд
-- [x] Долг, найденный сверкой, — ветка `fix/sweep-debt`: лицензии в архиве,
-      проверка типов движком, бонус и уход агента по ROM, матрица CI
+- [x] STATUS and EPIC; the debt — cleanup
+- [x] ADR 0001–0034: a status line where a decision is superseded or changed,
+      with a link to the replacing ADR
+- [x] `milestones.md` — milestone by milestone against git
+- [x] Checking claims against the code: names of classes, files, numbers, commands
+- [x] Debt found by the check — branch `fix/sweep-debt`: licenses in the archive,
+      type checking by the engine, the bonus and agent departure by the ROM, the CI matrix
 
-### M22b · Меню
+### M22b · Menu
 
-Решения — [ADR-0035](adr/0035-menu.md). Замечание пользователя после M22: игра
-смотрится современно, а меню — нет.
+Decisions — [ADR-0035](adr/0035-menu.md). A user remark after M22: the game
+looks modern, but the menu does not.
 
-- [x] За главным меню — ночной город со своей камерой, погода жребием; на
-      паузе и в конце партии — игра, размытая и затемнённая
-- [x] Название — неоновая вывеска «ELACTION», одна буква мигает
-- [x] Один шрифт — Exo 2: меню, вывеска на фасаде, таблички, табло; Pixellari
-      уходит из проекта
-- [x] Колонка слева, пункты — плашки в стиле HUD; стиль плашек общий с HUD
-- [x] Переключатели «‹ значение ›» вместо выпадающих списков; рекорды сеткой
-- [x] Переходы между страницами и подсветка выбора с анимацией
-- [x] Звуки наведения, выбора и возврата — синтезом
-- [x] Тесты: каждая страница собирается и держит фокус с геймпада, фон
-      строится без здания, в проекте нет ссылок на Pixellari
+- [x] Behind the main menu — the night city with its own camera, weather by draw; on
+      pause and at the end of a session — the game, blurred and darkened
+- [x] The title is a neon sign "ELACTION", one letter blinks
+- [x] One font — Exo 2: menu, the facade sign, plaques, indicator boards; Pixellari
+      leaves the project
+- [x] A column on the left, items are HUD-style plates; the plate style is shared with the HUD
+- [x] "‹ value ›" switches instead of drop-down lists; high scores as a grid
+- [x] Page transitions and selection highlight with animation
+- [x] Hover, select and back sounds — by synthesis
+- [x] Tests: every page builds and holds gamepad focus, the background
+      builds without a building, the project has no references to Pixellari
 
-**DoD:** меню можно поставить рядом с кадром игры, и они выглядят одной игрой. ✅
+**DoD:** the menu can be put next to a game frame, and they look like one game. ✅
 
-### M23 · Звуковое сопровождение
+### M23 · Soundtrack
 
-Решения — [ADR-0036](adr/0036-sound-from-libraries.md). Решение пользователя
-(2026-09-24): звук «теперь кажется очень примитивным» на фоне картинки. Звуки и
-музыка с M8a синтезированы кодом (`tools/render_audio.py`).
+Decisions — [ADR-0036](adr/0036-sound-from-libraries.md). The user's decision
+(2026-09-24): the sound "now seems very primitive" next to the picture. Sounds and
+music since M8a were synthesised by code (`tools/render_audio.py`).
 
-- [x] Сверка с оригиналом, вопросы, ADR-0036
-- [x] Кандидаты на слух: страница с плеером, по каждому слоту два–четыре
-      файла CC0/CC-BY с автором и лицензией; выбирает пользователь
-- [x] Треки нуар-джаза: здание, тревога, меню, конец партии; джинглы —
-      документ, жизнь, бонус, смерть, конец партии
-- [x] Эффекты тех же событий, что сейчас: шаги по ковру и бетону, выстрел,
-      попадание, удар ногой, двери, кабина, эскалатор, лампы, смерти, машина,
-      звуки меню
-- [x] Фон: улица и дождь — на крыше, у выхода и в меню в полную силу, на этажах
-      глухо (шина `Ambience`, фильтр); гул шахты; гром к молниям с задержкой по
-      дальности разряда
-- [x] Музыка: тревога наплывом, за красной дверью и на паузе глуше, джингл
-      приглушает трек
-- [x] Синтез удалён: `render_audio.py`, `audio_dsp.py`; авторы в `CREDITS.md`
-      и `assets/audio/credits.json`, тест на авторство каждого файла
+- [x] Check against the original, questions, ADR-0036
+- [x] Candidates by ear: a page with a player, two to four CC0/CC-BY files per slot
+      with the author and license; the user chooses
+- [x] Noir jazz tracks: building, alarm, menu, end of session; jingles —
+      document, life, bonus, death, end of session
+- [x] Effects for the same events as now: steps on carpet and concrete, shot,
+      hit, kick, doors, cab, escalator, lamps, deaths, car,
+      menu sounds
+- [x] Ambience: street and rain — at full strength on the roof, at the exit and in the menu,
+      muffled on the floors (the `Ambience` bus, a filter); shaft hum; thunder after
+      lightning with a delay by the strike's distance
+- [x] Music: the alarm fades in, behind a red door and on pause it is more muffled, a jingle
+      ducks the track
+- [x] Synthesis removed: `render_audio.py`, `audio_dsp.py`; authors in `CREDITS.md`
+      and `assets/audio/credits.json`, a test for the authorship of every file
 
-### M24a · Баги, дождь, быстрые пули
+### M24a · Bugs, rain, fast bullets
 
-Решения — [ADR-0037](adr/0037-polish-bugs-and-combat.md). Замечания пользователя
-после M23 (2026-09-25).
+Decisions — [ADR-0037](adr/0037-polish-bugs-and-combat.md). User remarks
+after M23 (2026-09-25).
 
-- [x] Кабина, подъехавшая к этажу, не застревает вместе с Otto
-- [x] Верх и низ шахты не мерцают
-- [x] Дождь заново: капли гаснут о крышу, брызги, лужи, мокрая крыша, слои в городе
-- [x] Фон не ползёт полосами, когда камера едет
-- [x] Пули втрое быстрее у обеих сторон; замах и луч прицела агента; новый вид
-- [x] Трупы агентов лежат до конца здания
-- [x] Падение больше чем на этаж убивает везде
-- [x] Документов в здании 5–10 жребием
-- [x] Экран управления с паузы; номер здания в HUD
+- [x] A cab that has arrived at a floor does not get stuck together with Otto
+- [x] The top and bottom of the shaft do not flicker
+- [x] Rain from scratch: drops die on the roof, splashes, puddles, a wet roof, layers in the city
+- [x] The background does not crawl in bands when the camera moves
+- [x] Bullets three times faster for both sides; the agent's wind-up and aiming beam; a new look
+- [x] Agent corpses stay until the end of the building
+- [x] A fall of more than one floor kills everywhere
+- [x] 5–10 documents in a building by draw
+- [x] The controls screen from pause; the building number in the HUD
 
-### M24b · Здание: вертолёт, двери, паркинг, выход
+### M24b · Building: helicopter, doors, garage, exit
 
-Решения — [ADR-0038](adr/0038-building-start-and-end.md). Влита в `main` (PR #47).
+Decisions — [ADR-0038](adr/0038-building-start-and-end.md). Merged into `main` (PR #47).
 
-- [x] Сверка с ROM, вопросы, ADR-0038
-- [x] Вертолёт в каждом здании: влетает, спускает трос, Otto съезжает, вертолёт
-      уходит; пропуск клавишей
-- [x] Красная дверь: закрывается за Otto, внутри 70 тиков ROM (4,73 с), раньше
-      не выйти, документ на выходе; сквозь дверь глухо; агенты иногда ждут у двери
-- [x] Подвал: одна шахта вниз, без эскалаторов; паркинг — колонны, потолок с
-      трубами и лампами, чужие машины, ворота и пандус; машина Otto у ворот слева
-- [x] Выход: подошёл — сел — фары — уехал в ворота; бонус поверх, затемнение
-- [x] Без всех документов лифт в подвал не везёт
+- [x] Check against the ROM, questions, ADR-0038
+- [x] A helicopter in every building: flies in, lowers a rope, Otto slides down, the
+      helicopter leaves; skippable with a key
+- [x] Red door: closes behind Otto, 70 ROM ticks inside (4.73 s), no way out
+      earlier, the document on exit; muffled through the door; agents sometimes wait at the door
+- [x] Basement: one shaft down, no escalators; the garage — columns, a ceiling with
+      pipes and lamps, other cars, a gate and a ramp; Otto's car at the gate on the left
+- [x] Exit: walk up — get in — headlights — drive out through the gate; the bonus on top, a fade
+- [x] Without all documents the elevator does not go to the basement
 
-### M24c · Анимация и клавиши
+### M24c · Animation and keys
 
-Решения — [ADR-0039](adr/0039-animation-and-controls.md). Влита в `main` (PR #48).
+Decisions — [ADR-0039](adr/0039-animation-and-controls.md). Merged into `main` (PR #48).
 
-- [x] Сверка, вопросы, ADR-0039
-- [x] Клипы UAL на скелете пака: перенос в `build_actors.py`, прыжок тремя
-      фазами, приземление, присед, стойка, ходьба, выстрел, смерть
-- [x] Переходы между позами по времени, а не одной экспонентой; разворот телом
-- [x] Короткие паузы разворота и приземления в правилах; тест боя в пороге
-- [x] Агенты на тех же клипах
-- [x] Переназначение: одна клавиша и одна кнопка на действие, обмен при
-      занятой, сброс, схема в `settings.cfg`
-- [x] Прогрев шейдеров: Shader Baker в экспорте, первый показ редких эффектов
-      (вспышка, дым, искры, кровь, молния) невидимо при входе в здание
+- [x] Check, questions, ADR-0039
+- [x] UAL clips on the pack skeleton: retargeting in `build_actors.py`, a jump in three
+      phases, landing, crouch, stance, walk, shot, death
+- [x] Transitions between poses by time, not by a single exponential; turning with the body
+- [x] Short turn and landing pauses in the rules; a combat test at the threshold
+- [x] Agents on the same clips
+- [x] Rebinding: one key and one button per action, a swap when
+      taken, reset, the scheme in `settings.cfg`
+- [x] Shader warm-up: Shader Baker in the export, the first display of rare effects
+      (flash, smoke, sparks, blood, lightning) invisibly on entering the building
 
-### M24d · Добивания вместо удара ногой
+### M24d · Takedowns instead of the kick
 
-Решения — [ADR-0040](adr/0040-takedowns.md). Влита в `main` (PR #49).
+Decisions — [ADR-0040](adr/0040-takedowns.md). Merged into `main` (PR #49).
 
-- [x] Исследование: оригинал, Elevator Action Returns, добивания в других играх,
-      свободные анимации; вопросы, ADR-0040
-- [x] Прыжок без удара: клип полёта UAL, зона удара и очки за удар уходят
-- [x] Выстрел вплотную — добивание; сзади — удушение или свёрнутая шея (300),
-      спереди — серия ударов или рукоятью (200), +100 в темноте и на 11–15
-- [x] Напрыгивание сверху — само, при приземлении на агента (300)
-- [x] Замедление мира на время сценки, Otto уязвим
-- [x] Клипы UAL 2, режиссёр парной сценки, правила с тестами, бот добивает
+- [x] Research: the original, Elevator Action Returns, takedowns in other games,
+      free animations; questions, ADR-0040
+- [x] A jump without a kick: the UAL flight clip, the kick zone and kick points are gone
+- [x] A point-blank shot is a takedown; from behind — a chokehold or a neck snap (300),
+      from the front — a series of punches or a pistol-whip (200), +100 in the dark and on 11–15
+- [x] Jumping on from above — automatic, on landing on an agent (300)
+- [x] World slow-down for the duration of the scene, Otto is vulnerable
+- [x] UAL 2 clips, a paired-scene director, rules with tests, the bot does takedowns
 
-### M24e · Демо-режим
+### M24e · Demo mode
 
-Решения — [ADR-0041](adr/0041-demo-mode.md). Влита в `main` (PR #50).
+Decisions — [ADR-0041](adr/0041-demo-mode.md). Merged into `main` (PR #50).
 
-- [x] Сверка с ROM, вопросы, ADR-0041
-- [x] Бот переезжает из `tests/` в `src/`
-- [x] 45 с бездействия в главном меню — демо; любое нажатие — назад в меню
-- [x] Около 30 с, три точки по кругу: крыша, середина, низ; смерть кончает демо
-- [x] Звук как в игре, без надписи; рекорды и замер качества не трогаются
+- [x] Check against the ROM, questions, ADR-0041
+- [x] The bot moves from `tests/` to `src/`
+- [x] 45 s of inactivity in the main menu — demo; any press — back to the menu
+- [x] About 30 s, three points in rotation: roof, middle, bottom; death ends the demo
+- [x] Sound as in the game, no caption; high scores and the quality measurement are untouched
 
-### M24f · Баги, настройки, Game Over
+### M24f · Bugs, settings, Game Over
 
-Решения — [ADR-0042](adr/0042-bugs-and-settings.md). Замечания пользователя
-после M24e (2026-09-28).
+Decisions — [ADR-0042](adr/0042-bugs-and-settings.md). User remarks
+after M24e (2026-09-28).
 
-- [x] Сверка, вопросы, ADR-0042 и ADR-0043
-- [x] Труп — физическое тело: едет на полу кабины, падает в шахту, не проходит
-      сквозь перекрытия; кабина слушается с трупами внутри
-- [x] Напрыгивание проще: приземлился внахлёст на агента — добивание
-- [x] FPS внизу на «Ультре»: замер по этажам, тени дешевле
-- [x] Разрешение в полном экране задаёт разрешение 3D; курсор скрыт в игре
-- [x] Последняя смерть: замедление, наезд, «GAME OVER», меню не сразу
-- [x] Обводка снята; свой свет у красной двери
-- [x] Страница «Авторы» в меню
+- [x] Check, questions, ADR-0042 and ADR-0043
+- [x] A corpse is a physics body: it rides on the cab floor, falls into the shaft, does not
+      pass through slabs; the cab obeys with corpses inside
+- [x] Jumping on is simpler: landing overlapping an agent is a takedown
+- [x] FPS at the bottom on "Ultra": a measurement by floors, cheaper shadows
+- [x] The fullscreen resolution sets the 3D resolution; the cursor is hidden in game
+- [x] The last death: slow-down, zoom-in, "GAME OVER", the menu not right away
+- [x] The outline is removed; the red door gets its own light
+- [x] A "Credits" page in the menu
 
-### M24g · Анимация и вид
+### M24g · Animation and look
 
-Решения — [ADR-0043](adr/0043-animation-and-look.md).
+Decisions — [ADR-0043](adr/0043-animation-and-look.md).
 
-- [x] Трос: поза кодом, приземление клипом
-- [x] Эскалатор: Otto идёт по ступеням; модель из Blender
-- [x] Красная дверь: вход вглубь и выход
-- [x] Фары светят путь до затемнения
-- [x] Окна города включаются и выключаются
-- [x] Расчленёнка: кабина, проходя днищем по телу, срезает его по краю
-      кабины; часть под днищем исчезает с брызгами, остаётся пятно. Трупы,
-      агенты и Otto; вместе с флажком «Кровь» (решения 7–9)
-- [x] Трупы ложатся друг на друга физикой, без предела высоты (решение 10)
+- [x] Rope: a pose in code, landing by a clip
+- [x] Escalator: Otto walks on the steps; the model from Blender
+- [x] Red door: entering into the depth and coming out
+- [x] Headlights light the way until the fade
+- [x] City windows turn on and off
+- [x] Dismemberment: a cab passing over a body with its floor cuts it at the cab's
+      edge; the part under the floor disappears with splashes, a stain remains. Corpses,
+      agents and Otto; together with the "Blood" flag (decisions 7–9)
+- [x] Corpses pile onto each other with physics, with no height limit (decision 10)
 
-### M24h · Улица с движением
+### M24h · Street with traffic
 
-Просьба пользователя по ходу M24g: на улице у выезда ездят машины, и Otto на
-своей вклинивается в поток и уезжает. Машины — настоящие модели, не коробки.
-Плюс замечания пользователя по итогам M24g (2026-09-29), которые касаются
-механики и хода; вид — в M24i. Решения — [ADR-0044](adr/0044-street-and-cab.md).
+The user's request during M24g: cars drive along the street at the exit, and Otto in
+his car merges into the traffic and drives off. The cars are real models, not boxes.
+Plus the user's remarks after M24g (2026-09-29) that concern
+mechanics and flow; the look — in M24i. Decisions — [ADR-0044](adr/0044-street-and-cab.md).
 
-- [x] Поток машин по улице у выезда в две полосы: модели, фары и стоп-сигналы,
-      скорость и просветы жребием
-- [x] Машина Otto ждёт просвета, вливается в поток и уезжает с ним
-- [x] **Эскалатор заново — в глубину.** Пролёт за плоскостью игры, у задней
-      стены, пологий, около 30°; плита этажа в плоскости игры цельная, мимо
-      эскалатора проходят по полу; на площадку — шаг вглубь. Модель
-      перерисована: пролёт толще, ступени чаще, перила видны. Проверять на
-      кадрах и тестом на всех сидах
-- [x] **FPS на нижних этажах.** Проседает — нужно большое исследование: замер
-      по этажам (`light_bench --whole`), что растёт к низу здания (трупы и
-      рэгдолл, свет, тени, обстановка, город), потом правка. Если трупы —
-      улёгшееся тело застывает неподвижной моделью, но не исчезает
-- [x] **В едущей кабине можно ходить влево-вправо** — как в ROM. Выход и
-      посадка на ходу, пока разница полов меньше 0.4 этажа
-- [x] **Случайное касание кабины не убивает.** Давит только кабина, под
-      которой Otto стоит целиком, — как в ROM; задетого краем выталкивает.
-      Очки за агента — только за кабину, в которой едет Otto
-- [x] **Расчленёнка: фактура не едет с кабиной.** Когда кабина режет тело,
-      фактура модели тянется вслед за кабиной — растягивается. Срез не должен
-      трогать фактуру
-- [x] **В обычные двери не войти — только в красные,** пока документ не забран.
-      Сверено с ROM (@3BDA): оригинал в обычную дверь не пускает. Бот, который
-      прятался в двери, и тесты боя меняются
+- [x] A flow of cars along the exit street in two lanes: models, headlights and brake lights,
+      speed and gaps by draw
+- [x] Otto's car waits for a gap, merges into the traffic and drives off with it
+- [x] **The escalator from scratch — into the depth.** The flight behind the play plane, at the
+      back wall, gentle, about 30°; the floor slab in the play plane is solid, you walk past
+      the escalator on the floor; onto the landing — a step into the depth. The model is
+      redrawn: a thicker flight, more frequent steps, the handrails visible. Check on
+      shots and with a test on all seeds
+- [x] **FPS on the lower floors.** It drops — a big investigation is needed: measurement
+      by floors (`light_bench --whole`), what grows towards the bottom of the building
+      (corpses and ragdoll, lighting, shadows, dressing, city), then a fix. If it is corpses —
+      a settled body freezes into a static model but does not disappear
+- [x] **In a moving cab you can walk left and right** — as in the ROM. Stepping out and
+      boarding on the move while the floor difference is less than 0.4 of a floor
+- [x] **Accidentally touching a cab does not kill.** Only a cab under which Otto stands
+      entirely crushes him — as in the ROM; one grazed by the edge is pushed out.
+      Points for an agent — only for the cab Otto is riding in
+- [x] **Dismemberment: the texture does not ride with the cab.** When the cab cuts a body,
+      the model's texture stretches after the cab. The cut must not
+      touch the texture
+- [x] **Regular doors cannot be entered — only red ones,** until the document is taken.
+      Checked against the ROM (@3BDA): the original does not let you into a regular door.
+      The bot that hid in doors and the combat tests change
 
-### M24i · Добивания, вертолёт, обстановка
+### M24i · Takedowns, helicopter, dressing
 
-Вторая половина замечаний по M24g — вид. Решения —
+The second half of the M24g remarks — the look. Decisions —
 [ADR-0045](adr/0045-takedowns-helicopter-dressing.md).
 
-- [x] **Добивания кинематографичнее.** Сценки M24d смотрятся слишком просто:
-      нужна режиссура. Камера остаётся сбоку, но наезд живее — толчок и крен
-      на ударе; неровное замедление со стоп-кадром на ударе; вспышка лепит
-      лица, фон темнеет, музыка проваливается; агент отыгрывает и падает
-      рэгдоллом. Проверять по кадрам `tools/takedown_shot.tscn`. Сделано
+- [x] **More cinematic takedowns.** The M24d scenes look too simple:
+      direction is needed. The camera stays at the side, but the zoom-in is livelier — a
+      jolt and a roll on the hit; uneven slow-down with a freeze-frame on the hit; a flash
+      sculpts the faces, the background darkens, the music drops out; the agent acts it
+      out and falls as a ragdoll. Check by the shots of `tools/takedown_shot.tscn`. Done
       ([ADR-0050](adr/0050-takedown-direction.md))
-- [x] **Вертолёт детальнее.** По кадрам M24g плохи и модель, и свет. Модель —
-      лоу-поли kazuma (CC0, 78 КБ): плоский силуэт из десятка граней,
-      несущий винт — одна тонкая линия, полозья из палок, ни дверей, ни
-      заклёпок, ни хвостового винта, который читался бы. Свет: корпус
-      тёмный и держится на одной кромке, по бокам огней нет, днище и кабина
-      почти не освещены — вертолёт читается силуэтом. Нужна модель
-      детальнее — свободная CC0/CC-BY с деталями поверх в Blender, а нет
-      достойной — своя; винт с размытием на вращении, и свет, который лепит
-      объём: огни города на металле, подсветка кабины, прожектор снизу.
-      Сделано своей моделью скриптом ([ADR-0049](adr/0049-own-helicopter.md))
-- [x] **Отель и офис богаче внутри.** По кадрам M24g обстановка бедная: на этаже
-      двери, обои, картина да столик с лампой. Нужно больше деталей, и всё —
-      моделями, а не плоскими фактурами и коробками: мебель холла и
-      коридора, растения, светильники, ковры, указатели, мелочи у стен.
-      Каждая вещь — со своим светом и тенью в бюджете кадра; не мешает
-      проходу и бою; разная по этажам и зданиям жребием. У офиса свой набор:
-      кулер, копир, стеллажи, кресла. Авторы — в `CREDITS.md`. Сделано, и
-      коридоры разведены по типу: двери, светильники, пол, бра, таблички
-      ([ADR-0048](adr/0048-hotel-and-office-apart.md))
-- [x] **Посадка в машину заново** (замечания пользователя, 2026-09-30).
-      Сейчас у пояса садящегося Otto светится пятно: плафон салона стоит
-      снаружи борта, в 30 см к камере, на высоте метра (`exit_car.gd`, `Dome`),
-      и выжигает белый костюм. Дверца не читается открытой: распахивается
-      отдельная панель, а кузов модели остаётся глухим с нарисованной дверью,
-      и салона не видно; внутренняя сторона панели — чёрное пятно. Нужно:
-      плафон — под крышу внутри салона (решение пользователя); кузов на
-      посадке прорезан по проёму двери; в проёме — салон моделями: сиденья,
-      торпедо, руль, обшивка, потолок; у дверцы — внутренняя обшивка.
-      Сделано у всех пяти машин жребия, салон — по типу машины
-      ([ADR-0046](adr/0046-car-cabin-indicator-traffic.md), решение 1)
-- [x] **Правый поворотник,** пока машина Otto подъезжает к краю мостовой,
-      ждёт просвета и съезжает в полосу (просьба пользователя, 2026-09-30;
-      ADR-0046, решение 2)
-- [x] **Дорожная ситуация жребием:** свободная, обычная или плотная; есть
-      просвет — машина съезжает с ходу, нет — ждёт (просьба пользователя,
-      2026-09-30; ADR-0046, решение 3)
-- [x] **За открытой дверью — комната, а не темнота** (просьба пользователя,
-      2026-09-30): и за красной, куда входит Otto, и за той, из которой
-      выходит агент. Пока створка открыта, в проёме виден интерьер: номер отеля
-      или кабинет офиса — по типу здания, жребием по двери, детально и
-      моделями: кровать, тумба, лампа, окно с городом; стол, шкаф, кресло.
-      Свой свет комнаты, в бюджете кадра. Сделано
+- [x] **A more detailed helicopter.** In the M24g shots both the model and the lighting are
+      poor. The model is the low-poly kazuma (CC0, 78 KB): a flat silhouette of a dozen
+      faces, the main rotor is one thin line, skids made of sticks, no doors, no
+      rivets, no tail rotor that would read. Lighting: the body is
+      dark and holds on one rim, no lights on the sides, the belly and the cockpit
+      are almost unlit — the helicopter reads as a silhouette. A more detailed model
+      is needed — a free CC0/CC-BY one with details added on top in Blender, and if there
+      is no worthy one — our own; a rotor with blur when spinning, and lighting that
+      sculpts volume: city lights on the metal, cockpit illumination, a searchlight below.
+      Done with our own model by a script ([ADR-0049](adr/0049-own-helicopter.md))
+- [x] **Richer hotel and office interiors.** In the M24g shots the dressing is poor: on a
+      floor doors, wallpaper, a painting and a side table with a lamp. More detail is
+      needed, and all of it as models, not flat textures and boxes: hall and
+      corridor furniture, plants, light fixtures, rugs, signs, small things by the walls.
+      Each item has its own light and shadow within the frame budget; it does not get in
+      the way of movement and combat; it varies by floor and building by draw. The office
+      has its own set: a water cooler, a copier, shelving, armchairs. Authors — in
+      `CREDITS.md`. Done, and the corridors are set apart by kind: doors, light fixtures,
+      floor, sconces, plaques ([ADR-0048](adr/0048-hotel-and-office-apart.md))
+- [x] **Getting into the car from scratch** (user remarks, 2026-09-30).
+      Currently a spot glows at the waist of Otto as he gets in: the interior dome light
+      stands outside the body, 30 cm towards the camera, at a height of one metre
+      (`exit_car.gd`, `Dome`), and burns out the white suit. The door does not read as
+      open: a separate panel swings out, while the model's body stays solid with a
+      painted door, and no interior is visible; the inner side of the panel is a black
+      spot. Needed: the dome light under the roof inside the cabin (the user's decision);
+      the body cut along the door opening during boarding; in the opening — an interior
+      from models: seats, dashboard, steering wheel, trim, headliner; at the door — the
+      inner trim. Done for all five cars of the draw, the interior by car type
+      ([ADR-0046](adr/0046-car-cabin-indicator-traffic.md), decision 1)
+- [x] **The right turn signal,** while Otto's car pulls up to the edge of the roadway,
+      waits for a gap and pulls out into the lane (the user's request, 2026-09-30;
+      ADR-0046, decision 2)
+- [x] **Traffic situation by draw:** free, normal or dense; if there is a
+      gap the car pulls out on the move, if not it waits (the user's request,
+      2026-09-30; ADR-0046, decision 3)
+- [x] **Behind an open door — a room, not darkness** (the user's request,
+      2026-09-30): both behind the red one that Otto enters and behind the one an agent
+      comes out of. While the leaf is open, the interior is visible in the opening: a hotel
+      room or an office — by building kind, by a draw per door, in detail and
+      as models: a bed, a nightstand, a lamp, a window with the city; a desk, a cabinet, an
+      armchair. The room's own light, within the frame budget. Done
       ([ADR-0047](adr/0047-room-behind-the-door.md))
 
-### M24j · Время суток и новый город
+### M24j · Time of day and the new city
 
-Просьбы пользователя (2026-09-30): к ночи — утро, день и вечер, к ясной погоде,
-туману и дождю — снег. Шестнадцать сочетаний раунда жребием. Сверка и вопросы
-— [ADR-0051](adr/0051-time-of-day.md). После первых кадров дня решено строить
-город за зданием заново (решения 10–13), и веха разделилась на четыре.
+The user's requests (2026-09-30): add morning, day and evening to night, and snow to clear
+weather, fog and rain. Sixteen round combinations by draw. Check and questions
+— [ADR-0051](adr/0051-time-of-day.md). After the first daytime shots it was decided to
+build the city behind the building from scratch (decisions 10–13), and the milestone split
+into four.
 
-- [x] Время суток жребием по сиду здания, ночь 40 %, в здании застыло
-- [x] Темнота и тёмные этажи — только ночью; гроза — вечером и ночью
-- [x] Воздух здания и тон кадра по времени суток; солнце только снаружи
-- [x] Кадры всех сочетаний — `tools/m24j_shot.tscn`
-- [x] Город моделями паков с настоящими материалами, один на все времена:
-      фасады Quaternius Downtown запечены атласом (`tools/build_city.py`)
-- [x] Небо HDRI-панорамами по времени и погоде, выбраны пользователем
+- [x] Time of day by draw from the building seed, night 40 %, frozen within the building
+- [x] Darkness and dark floors — only at night; thunderstorms — in the evening and at night
+- [x] The building's air and the frame tone by time of day; the sun only outside
+- [x] Shots of all combinations — `tools/m24j_shot.tscn`
+- [x] The city from pack models with real materials, one for all times:
+      Quaternius Downtown facades baked into an atlas (`tools/build_city.py`)
+- [x] The sky as HDRI panoramas by time and weather, chosen by the user
       (`tools/build_sky.py`, [CitySky])
-- [x] Ночь нового города — состояние того же города; меню — ночь
-- [ ] Кадры и тесты на все двенадцать сочетаний
+- [x] The new city's night is a state of the same city; the menu is night
+- [ ] Shots and tests for all twelve combinations
 
-### M24k · Время суток для остального и кинематографичное начало
+### M24k · Time of day for everything else and the cinematic opening
 
-- [x] Улица выезда и пандус: огни по жизни, фары днём только в непогоду;
-      дома фасадом пака во все времена суток (просьба пользователя)
-- [x] Окно комнаты за дверью, вывеска здания, вертолёт, лампа над крышей
-- [x] Музыка своя на утро, день и вечер — треки на выбор пользователя; фон
-      улицы по времени
-- [x] **Кинематографичное начало** (просьба пользователя, 2026-10-01): вертолёт
-      подлетает, его дверь открывается, Otto вылезает и спускается на тросе,
-      вертолёт улетает, дверь закрывается сама, трос убирается. Решено
-      вопросами 2026-10-01:
-      - дверь сдвижная: в зависании отъезжает назад с лязгом, в проёме
-        загорается салон; на уходе задвигается обратно;
-      - трос: после открытия бухту сбрасывают, она разматывается до крыши с
-        покачиванием в потоке от винта; на уходе лебёдка выбирает его в
-        салон, потом закрывается дверь;
-      - Otto выглядывает в проём, садится на порог, берётся за трос,
-        соскальзывает и быстро съезжает на руках, тормозя у крыши, — и
-        приземляется с приседом;
-      - камера — наезд без смены ракурса, как у добиваний: крупнее на двери и
-        выходе, ведёт Otto по тросу, отъезжает к игровому кадру;
-      - длина: в первом здании партии полное, 10–12 с; дальше — короткое,
-        около 6 с: вертолёт уже висит с открытой дверью; пропуск — как сейчас;
-      - за остеклением — пилот (модель пака Quaternius), кивает на уходе;
-      - уход: нос вниз, крен, вверх и вбок с разгоном за край кадра, поток
-        от винта гонит пыль по крыше, а с ADR-0053 — и дождь
-- [x] Пробелы в звуке, найденные аудитом (просьба пользователя, 2026-10-01):
-      два десятка звуков на выбор пользователя ([ADR-0052](adr/0052-day-for-the-rest-and-arrival.md))
-- [x] Кадры и тесты
+- [x] The exit street and the ramp: lights as in real life, headlights in daytime only in
+      bad weather; buildings with the pack facade at all times of day (the user's request)
+- [x] The window of the room behind the door, the building sign, the helicopter, the lamp
+      above the roof
+- [x] Own music for morning, day and evening — tracks chosen by the user; street
+      ambience by time
+- [x] **Cinematic opening** (the user's request, 2026-10-01): the helicopter
+      flies up, its door opens, Otto climbs out and descends on the rope,
+      the helicopter flies away, the door closes by itself, the rope is retracted.
+      Settled by questions on 2026-10-01:
+      - a sliding door: while hovering it slides back with a clang, the cabin lights up
+        in the opening; on departure it slides shut again;
+      - the rope: after the door opens the coil is thrown out, it unwinds down to the roof,
+        swaying in the rotor downwash; on departure the winch reels it into the
+        cabin, then the door closes;
+      - Otto looks out of the opening, sits on the sill, grabs the rope,
+        slides off and quickly rides down on his hands, braking near the roof — and
+        lands with a crouch;
+      - the camera — a zoom-in without a change of angle, as with takedowns: closer on the
+        door and the exit, it follows Otto down the rope, pulls back to the gameplay frame;
+      - length: in the first building of a session the full one, 10–12 s; after that a short
+        one, about 6 s: the helicopter is already hovering with the door open; skipping is
+        as now;
+      - behind the glazing — a pilot (a Quaternius pack model), he nods on departure;
+      - departure: nose down, a bank, up and sideways accelerating past the frame edge, the
+        rotor downwash drives dust across the roof, and since ADR-0053 rain too
+- [x] Gaps in the sound found by an audit (the user's request, 2026-10-01):
+      some twenty sounds chosen by the user ([ADR-0052](adr/0052-day-for-the-rest-and-arrival.md))
+- [x] Shots and tests
 
-### Открытые вопросы и долг после M24k
+### Open questions and debt after M24k
 
-[ADR-0053](adr/0053-open-questions-and-debt.md). Сверка с ROM, затем вопросы
-пользователю двумя блоками (2026-10-02).
+[ADR-0053](adr/0053-open-questions-and-debt.md). Check against the ROM, then questions
+to the user in two blocks (2026-10-02).
 
-- [x] Кабина игрока между этажами не встаёт — доезжает до этажа, как в ROM
-- [x] Возвращение после гибели по ROM, неуязвимость 1.5 с — наша
-- [x] Выпуск у Otto не ближе 1.2 м (в ROM вплотную); толпа на этаже уходит в двери
-- [x] Двадцатый этаж ROM — не исключаем: наш поиск двери не ведёт за стену
-- [x] Бот сбивает лампы из кабины; дистанция тени — по замеру
-- [x] Долг: поток от винта и дождь, поля атласа фасадов, погода руками в
-      правилах здания, мипмапы надписей в сцене, стрелки табло геометрией
-- [x] Сняты решением: качание лампы, ослабление темноты с навыком
-- [x] Авторевью, `check.ps1`, README
+- [x] The player's cab does not stop between floors — it travels to a floor, as in the ROM
+- [x] Returning after death by the ROM, 1.5 s invulnerability — ours
+- [x] Release no closer than 1.2 m to Otto (in the ROM right next to him); a crowd on a
+      floor goes into the doors
+- [x] The ROM's twentieth floor — not excluded: our door search does not lead behind a wall
+- [x] The bot shoots down lamps from a cab; the shadow distance — by measurement
+- [x] Debt: rotor downwash and rain, facade atlas margins, weather set by hand in
+      the building rules, label mipmaps in the scene, indicator arrows as geometry
+- [x] Dropped by decision: lamp swinging, darkness weakening with skill
+- [x] Code review, `check.ps1`, README
 
-### M24l · Снег
+### M24l · Snow
 
-[ADR-0054](adr/0054-snow.md). Сверка: погоды в аркаде нет; вопросы заданы
-2026-10-02.
+[ADR-0054](adr/0054-snow.md). Check: the arcade has no weather; questions asked
+on 2026-10-02.
 
-- [x] Четвёртая погода, жребий по 25 %
-- [x] Падающий снег со сносом ветра, покров на крыше, карнизах, технике и улице
-      с первого кадра, следы Otto и агентов, колеи машин; свой звук и ветер,
-      город в снегопад
-- [x] Хлопья комками, осадки гаснут о людей, машины, вертолёт и улицу, поток от
-      винта разносит дождь и снег (просьбы пользователя, 2026-10-02)
-- [x] Прохожие у выезда в любую погоду: разные, идут, одеты по погоде, под
-      зонтами
-- [x] Скользкая крыша в снег — замер ботом на снежных сидах
-- [x] Авторевью, `check.ps1`
-- [ ] Кадры и тесты на шестнадцать сочетаний
+- [x] A fourth weather, a 25 % draw
+- [x] Falling snow drifting with the wind, cover on the roof, cornices, equipment and street
+      from the first frame, footprints of Otto and the agents, car ruts; its own sound and
+      wind, the city in a snowfall
+- [x] Flakes in clumps, precipitation dies on people, cars, the helicopter and the street,
+      the rotor downwash scatters rain and snow (the user's requests, 2026-10-02)
+- [x] Pedestrians at the exit in any weather: varied, walking, dressed for the weather,
+      under umbrellas
+- [x] A slippery roof in snow — measured by the bot on snowy seeds
+- [x] Code review, `check.ps1`
+- [ ] Shots and tests for the sixteen combinations
 
-### M24m · Жилой комплекс и свои агенты у каждого типа здания
+### M24m · The residential complex and its own agents for each building kind
 
-[ADR-0055](adr/0055-residential.md). Просьба пользователя (2026-09-30). Сверка:
-в аркаде здание одно и агенты одни; ориентир — Elevator Action Returns, где у
-каждого места свои враги. Вопросы заданы 2026-10-02.
+[ADR-0055](adr/0055-residential.md). The user's request (2026-09-30). Check:
+the arcade has one building and one kind of agent; the reference is Elevator Action
+Returns, where each place has its own enemies. Questions asked on 2026-10-02.
 
-- [x] Тип здания — `Kind` на три вместо `is_hotel()`, жребий поровну, первое —
-      отель EMPIRE
-- [x] Американский жилой дом 80-х: имена и неон своего цвета
-- [x] Коридор: двери квартир с глазком, номером и ковриком; линолеум или
-      шахматка, стены в два тона, плафоны; потёртость и граффити, мигающая
-      лампа; почтовые ящики, коляска, батареи, мусор, огнетушитель
-- [x] Недостающая мебель из CC0-паков: кухня, телевизор, обеденный стол,
-      обстановка подъезда
-- [x] Квартира за красной дверью жребием: кухня, гостиная с мерцающим
-      телевизором, спальня
-- [x] Агенты по типу здания — гардероб в игре: отель — федора, офис — без
-      шляпы с галстуком, жилой — плащ и кепка или капюшон; механика общая
-- [x] Свой фон коридора у трёх типов, звуки из-за дверей жилого дома, шаг по
-      линолеуму — на выбор пользователя по странице прослушивания
-- [x] Кадры и тесты на все три типа
-- [x] Авторевью, `check.ps1`, README
+- [x] Building kind — a three-way `Kind` instead of `is_hotel()`, an equal draw, the first is
+      the EMPIRE hotel
+- [x] An American 1980s apartment building: names and neon of its own colour
+- [x] Corridor: apartment doors with a peephole, a number and a mat; linoleum or
+      checkerboard, two-tone walls, ceiling lights; wear and graffiti, a blinking
+      lamp; mailboxes, a stroller, radiators, trash, a fire extinguisher
+- [x] Missing furniture from CC0 packs: a kitchen, a TV, a dining table,
+      lobby dressing
+- [x] An apartment behind a red door by draw: a kitchen, a living room with a flickering
+      TV, a bedroom
+- [x] Agents by building kind — a wardrobe in the game: hotel — a fedora, office — no
+      hat, with a tie, residential — a raincoat and a cap or a hood; the mechanics are shared
+- [x] Each of the three kinds has its own corridor ambience, sounds from behind the doors of
+      the residential building, steps on linoleum — chosen by the user via the listening page
+- [x] Shots and tests for all three kinds
+- [x] Code review, `check.ps1`, README
 
-### M24n · Характер типа здания
+### M24n · Building kind character
 
-[ADR-0056](adr/0056-building-character.md). Просьба пользователя (2026-10-02):
-«максимально развести дизайн трёх уровней». Сверка: в аркаде раунды различаются
-цветом, в Elevator Action Returns миссии — цветом, светом и плотностью детали.
-Механика — по ROM, без изменений. Вопросы — 2026-10-02.
+[ADR-0056](adr/0056-building-character.md). The user's request (2026-10-02):
+"set the design of the three levels as far apart as possible". Check: in the arcade rounds
+differ by colour, in Elevator Action Returns missions differ by colour, lighting and detail
+density. The mechanics — by the ROM, unchanged. Questions — 2026-10-02.
 
-- [x] Свой воздух у типа внутри нуара: тёплый янтарь отеля, холодный
-      бело-голубой офис, тусклый натрий с зеленью жилого дома; цвет ламп по
-      типу; время суток — поверх
-- [x] Палитра раунда — свой набор у каждого типа; темнота одинаково тёмная,
-      разрыв со светом — тестом по каждой паре тип × раунд
-- [x] Офис: стеклянные перегородки, за ними open space на видимых этажах;
-      дверь офиса открывается в него
-- [x] Отель: арочные ниши с подсветкой, зеркала в рамах, высокие панели с
-      лепниной
-- [x] Жилой дом: стояки, щитки и кабели, окна на пожарную лестницу, голый
-      кирпич, двери EXIT и люк мусоропровода
-- [x] Светильники по типу в габарите мишени: люстра, короб под подвесным
-      потолком, лампочка на проводе
-- [x] Кадры трёх типов рядом, тесты на любое здание
-- [x] Авторевью, `check.ps1`, README
+- [x] Each kind has its own air within the noir: the warm amber of the hotel, the cold
+      white-blue office, the dim sodium with green of the residential building; lamp colour
+      by kind; the time of day on top
+- [x] The round palette — each kind has its own set; darkness is equally dark,
+      the gap to the light — by a test for every kind × round pair
+- [x] Office: glass partitions, with an open space behind them on visible floors;
+      the office door opens into it
+- [x] Hotel: arched niches with lighting, framed mirrors, tall panels with
+      mouldings
+- [x] Residential building: risers, electrical panels and cables, windows onto the fire
+      escape, bare brick, EXIT doors and a garbage chute hatch
+- [x] Light fixtures by kind within the target's footprint: a chandelier, a box under a
+      suspended ceiling, a bulb on a wire
+- [x] Shots of the three kinds side by side, tests on any building
+- [x] Code review, `check.ps1`, README
 
-### M24o · Особые этажи, кабина и музыка по типу
+### M24o · Special floors, cab and music by kind
 
-[ADR-0057](adr/0057-floors-cab-music-by-kind.md). Сверка: в аркаде здание одно,
-этажи различаются только устройством — нижние 1–7 почти без дверей, тёмные
-11–15 без ламп; в Elevator Action Returns у миссии своё место и своя музыка,
-тема меняется по ходу. Вопросы — 2026-10-03.
+[ADR-0057](adr/0057-floors-cab-music-by-kind.md). Check: the arcade has one building,
+floors differ only in their layout — the lower 1–7 have almost no doors, the dark
+11–15 have no lamps; in Elevator Action Returns each mission has its own place and its own
+music, the theme changes along the way. Questions — 2026-10-03.
 
-- [x] Роль этажа по типу и этажу ROM: общественные залы на 1–7, технические
-      на 11–15, каждый этаж полосы свой
-- [x] Зал вглубь на особом этаже: колонны, стекло или сетка-рабица вместо
-      задней стены; комнаты за дверями на месте
-- [x] Залы: лобби трёх типов, ресторан и столовая, бальный зал, бассейн, бар,
-      конференц-зал, переговорные, спортзал, общая комната, кладовые-клетки,
-      прачечная, котельная, вентиляция, серверная, архив, кухня, склад,
-      мастерская
-- [x] Мелочи особых этажей: фон по залу, пар, рябь, индикаторы, бутылки
-- [x] Мебель из Kenney Furniture Kit с записью в CREDITS
-- [x] Кабина и шахта своего типа: латунь и циферблат, нержавейка и цифры,
-      грузовая с решёткой по окну выхода ROM и лампами этажей
-- [x] Музыка: тип × время суток, смена темы с середины здания, своя тревога
-- [x] Кадры трёх типов, тесты на любое здание, бюджет кадра
-- [x] Авторевью, `check.ps1`, README
+- [x] Floor role by kind and ROM floor: public halls on 1–7, technical ones
+      on 11–15, each floor of a band is different
+- [x] A hall extending into the depth on a special floor: columns, glass or chain-link
+      instead of the back wall; the rooms behind the doors stay in place
+- [x] Halls: lobbies of three kinds, a restaurant and a canteen, a ballroom, a pool, a bar,
+      a conference room, meeting rooms, a gym, a common room, storage cages,
+      a laundry, a boiler room, ventilation, a server room, an archive, a kitchen, a
+      warehouse, a workshop
+- [x] Small touches on special floors: ambience by hall, steam, ripples, indicators, bottles
+- [x] Furniture from the Kenney Furniture Kit with an entry in CREDITS
+- [x] A cab and shaft of each kind: brass and a dial, stainless steel and digits,
+      a freight cab with a gate following the ROM step-out window and floor lamps
+- [x] Music: kind × time of day, a theme change from the middle of the building, its own alarm
+- [x] Shots of the three kinds, tests on any building, the frame budget
+- [x] Code review, `check.ps1`, README
 
-### M24p · Здание снаружи по типу
+### M24p · The building exterior by kind
 
-[ADR-0058](adr/0058-exterior-by-kind.md). Отделено от M24o (ADR-0057,
-решение 1). Сверка: в аркаде снаружи здания одинаковые, в Returns у миссии
-своё место и свой финал. Вопросы — 2026-10-03.
+[ADR-0058](adr/0058-exterior-by-kind.md). Split off from M24o (ADR-0057,
+decision 1). Check: in the arcade the buildings are identical outside, in Returns each
+mission has its own place and its own finale. Questions — 2026-10-03.
 
-- [x] Высокая корона по типу за плоскостью игры: ар-деко со шпилем, стеклянная
-      вершина с мачтой, бак на опорах; вертолёт облетает, кадр вступления заново
-- [x] Парапет и карниз по типу
-- [x] Уступ стилобата: терраса, зенитные фонари, рубероид с бельём
-- [x] Торцы башни: русты и флаги, стеклянные рёбра, пожарная лестница
-- [x] Паркинг по типу: VALET и стойка, шлагбаум и Reserved, граффити и бак
-- [x] Фасад у улицы выезда: козырёк с ковром, стеклянное лобби, крыльцо
-- [x] Шлагбаум поднимается перед машиной Otto, парковщик у выезда отеля
-- [x] Машина у выхода, в паркинге и на улице — жребий по типу
-- [x] Кадры трёх типов, тесты на любое здание, бюджет кадра
-- [x] Авторевью, `check.ps1`, README
+- [x] A tall crown by kind behind the play plane: art deco with a spire, a glass
+      top with a mast, a water tank on supports; the helicopter flies around it, the intro
+      shot redone
+- [x] Parapet and cornice by kind
+- [x] The podium setback ledge: a terrace, skylights, roofing felt with laundry
+- [x] Tower end walls: rustication and flags, glass fins, a fire escape
+- [x] Garage by kind: VALET and a stand, a barrier and Reserved, graffiti and a dumpster
+- [x] The facade at the exit street: a canopy with a carpet, a glass lobby, a stoop
+- [x] The barrier rises in front of Otto's car, a valet at the hotel exit
+- [x] The car at the exit, in the garage and on the street — a draw by kind
+- [x] Shots of the three kinds, tests on any building, the frame budget
+- [x] Code review, `check.ps1`, README
 
-### M25 · Онлайн-лидерборд (опционально)
+### M25 · Online leaderboard (optional)
 
-Единственная часть, где появится бэкенд и docker compose
-([ADR-0003](adr/0003-no-docker.md); там она ещё под номером M10 — номер менялся
-каждый раз, когда находилась работа по визуалу и по замечаниям).
+The only part where a backend and docker compose will appear
+([ADR-0003](adr/0003-no-docker.md); there it is still numbered M10 — the number changed
+every time work on the visuals and on remarks turned up).
 
-- [ ] API, БД, docker compose
-- [ ] Клиент в игре, минимальная защита от накрутки
-- [ ] Деплой
+- [ ] API, DB, docker compose
+- [ ] An in-game client, minimal protection against score cheating
+- [ ] Deployment
 
-## 6. Сквозные требования
+## 6. Cross-cutting requirements
 
-| Требование | Как проверяем |
+| Requirement | How we check |
 |---|---|
-| Типизированный GDScript везде | `gdlint` и ревью |
-| Единое форматирование | `gdformat --check` в pre-commit и CI |
-| Логика покрыта тестами | GUT, прогон в CI; локально — по шардам (`tools/run_tests.py`) |
-| Любое сгенерированное здание работает | Тесты на всех сидах, бот проходит здание — [`testing.md`](testing.md) |
-| Кадр в бюджете 16.6 мс | `tools/light_bench.gd` в каждой визуальной вехе; по всему зданию — `--whole`, с M22 |
-| Нет ошибок импорта и разбора | `tools/godot_check.py` на pre-push и в CI |
-| Геймпад работает наравне с клавиатурой | Ручная проверка в конце каждой вехи |
-| Русский и английский интерфейс | Тест: каждая строка есть на обоих языках (с M8b) |
-| Скриншоты и сравнение с оригиналом | `tools/capture.py <веха>`, `tools/compare_original.py <веха>` |
-| Авторевью изменений после каждой вехи | `/code-review xhigh --fix` до открытия PR |
+| Typed GDScript everywhere | `gdlint` and review |
+| Uniform formatting | `gdformat --check` in pre-commit and CI |
+| Logic is covered by tests | GUT, run in CI; locally — in shards (`tools/run_tests.py`) |
+| Any generated building works | Tests on all seeds, the bot clears the building — [`testing.md`](testing.md) |
+| Frame within the 16.6 ms budget | `tools/light_bench.gd` in every visual milestone; across the whole building — `--whole`, since M22 |
+| No import or parse errors | `tools/godot_check.py` on pre-push and in CI |
+| The gamepad works on a par with the keyboard | A manual check at the end of each milestone |
+| Russian and English interface | Test: every string exists in both languages (since M8b) |
+| Screenshots and comparison with the original | `tools/capture.py <milestone>`, `tools/compare_original.py <milestone>` |
+| Code review of the changes after each milestone | `/code-review xhigh --fix` before opening the PR |
 
-### Скриншоты вех
+### Milestone screenshots
 
-После каждой вехи снимаем кадры для анализа и сравнения с предыдущими вехами и
-с оригиналом:
+After each milestone we take shots for analysis and comparison with previous milestones and
+with the original:
 
 ```powershell
 python tools/capture.py M20
 python tools/compare_original.py M20
 ```
 
-Игра запускается с аргументом `--capture=<веха>`, автолоад `Screenshotter` проходит
-маршрут вехи, сохраняет по кадру на шаг и закрывается. Кадры ложатся в
-`screens/<веха>/`, сравнение — в `screens/<веха>/compare_original.jpg`. Папка
-`screens/` не версионируется. Вручную кадр снимается клавишей **F12**.
+The game starts with the argument `--capture=<milestone>`, the `Screenshotter` autoload walks
+the milestone's route, saves one shot per step and exits. Shots go into
+`screens/<milestone>/`, the comparison — into `screens/<milestone>/compare_original.jpg`. The
+`screens/` folder is not versioned. A shot is taken manually with the **F12** key.
 
-### Авторевью
+### Code review
 
-Перед тем как открыть PR по вехе, изменения прогоняются через авторевью повышенной
-тщательности с автоприменением исправлений:
+Before opening a milestone PR, the changes go through a high-thoroughness code review
+with fixes applied automatically:
 
 ```
 /code-review xhigh --fix
 ```
 
-После правок заново гоняются `tools/check.ps1` и тесты. Результат ревью кратко
-фиксируется в описании PR.
+After the fixes, `tools/check.ps1` and the tests are run again. The review result is briefly
+recorded in the PR description.
 
-## 7. Процесс работы
+## 7. Workflow
 
-- **Начало вехи:** сверка механики с оригиналом, уточняющие вопросы, ответы — в ADR,
-  затем обновление EPIC и STATUS. Только потом код.
-- **Ветки:** `feat/m20-detail`, `fix/elevator-crush`, `chore/ci-cache`. В `main` напрямую не пушим.
-- **Коммиты:** Conventional Commits — `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`.
-- **Перед коммитом:** хуки прогоняются сами. Вручную — `tools/check.ps1`.
-- **Перед push:** дополнительно прогоняется проверка движком и тесты.
-- **В конце вехи:** скриншоты и сравнение с оригиналом, `/code-review xhigh --fix`,
-  повтор проверок, тесты усилены на уровне здания, README актуализирован.
-- **PR:** один PR на веху или на крупную задачу внутри вехи, merge только при зелёном CI.
-- **Решения:** всё, что влияет на архитектуру, оформляется как ADR в `docs/adr/`.
+- **Starting a milestone:** check the mechanics against the original, clarifying questions,
+  the answers go into an ADR, then update EPIC and STATUS. Only then code.
+- **Branches:** `feat/m20-detail`, `fix/elevator-crush`, `chore/ci-cache`. No direct pushes to `main`.
+- **Commits:** Conventional Commits — `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`.
+- **Before a commit:** hooks run by themselves. Manually — `tools/check.ps1`.
+- **Before a push:** the engine check and the tests run in addition.
+- **At the end of a milestone:** screenshots and comparison with the original, `/code-review xhigh --fix`,
+  re-running the checks, tests strengthened at the building level, README brought up to date.
+- **PR:** one PR per milestone or per large task within a milestone, merge only with green CI.
+- **Decisions:** everything that affects the architecture is recorded as an ADR in `docs/adr/`.
 
-## 8. Открытые вопросы
+## 8. Open questions
 
-Открытых вопросов нет. Последние — 4, 8 и 9: кабина игрока, возвращение в игру,
-выпуск у двери, дистанция тени и двадцатый этаж — закрыты сверкой с ROM и
-замером ботом ([ADR-0053](adr/0053-open-questions-and-debt.md)).
+There are no open questions. The last ones — 4, 8 and 9: the player's cab, returning to the
+game, release at a door, the shadow distance and the twentieth floor — were closed by the
+check against the ROM and a bot measurement ([ADR-0053](adr/0053-open-questions-and-debt.md)).
 
-Закрытые раньше: 1 — визуальный ориентир ([ADR-0019](adr/0019-3d-pivot.md)); 2 —
-арт-пайплайн (модели из Blender, [ADR-0022](adr/0022-actors-rig.md)); 3 — площадка,
-только GitHub Releases ([ADR-0013](adr/0013-release-and-versioning.md)); 6 — сверка
-механики и числа боя по ROM ([ADR-0027](adr/0027-rom-combat.md),
-[ADR-0028](adr/0028-building-by-the-map.md)); 5 — кадры анимации (снят вместе
-со спрайтами); 7 — цена приседа, низкий выстрел по ROM
-([ADR-0027](adr/0027-rom-combat.md), решение 3).
+Closed earlier: 1 — the visual target ([ADR-0019](adr/0019-3d-pivot.md)); 2 —
+the art pipeline (models from Blender, [ADR-0022](adr/0022-actors-rig.md)); 3 — the platform,
+only GitHub Releases ([ADR-0013](adr/0013-release-and-versioning.md)); 6 — checking
+the mechanics and combat numbers against the ROM ([ADR-0027](adr/0027-rom-combat.md),
+[ADR-0028](adr/0028-building-by-the-map.md)); 5 — animation frames (dropped together
+with the sprites); 7 — the cost of crouching, the low shot by the ROM
+([ADR-0027](adr/0027-rom-combat.md), decision 3).

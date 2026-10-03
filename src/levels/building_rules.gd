@@ -1,269 +1,277 @@
 class_name BuildingRules
 extends Resource
 
-## Правила, по которым собирается здание.
+## The rules a building is assembled by.
 ##
-## В оригинале здания почти одинаковы и различаются расположением красных дверей
-## (ADR-0008, пункт 2), поэтому зданием считается не список этажей, а эти правила
-## плюс сид. Меняя правила от здания к зданию, в M5b получим нарастающую сложность.
+## In the original, buildings are nearly identical and differ in where the red doors are
+## (ADR-0008, point 2), so a building is not a list of floors but these rules
+## plus a seed. Changing the rules from building to building gives rising difficulty in M5b.
 ##
-## [b]Длины здесь метрические[/b] — с M15 мир измеряется в метрах, 100 прежних
-## пикселей = 1 м (ADR-0019, решение 3). Пропорции при переводе не тронуты: делились
-## только константы, и [code]test_proportions.gd[/code] проверяет это без правок.
-## Метр выбран потому, что от него зависят затухание света, плотность тумана и
-## шероховатость материала — в пикселях их не задать.
+## [b]Lengths here are metric[/b] — since M15 the world is measured in metres, 100 former
+## pixels = 1 m (ADR-0019, decision 3). Proportions were not touched by the conversion: only
+## constants were divided, and [code]test_proportions.gd[/code] checks this without changes.
+## Metres were chosen because light falloff, fog density and material roughness
+## depend on them — they cannot be set in pixels.
 
-## Крыша: уровень над зданием, с которого начинается спуск.
+## Roof: the level above the building where the descent begins.
 ##
-## Не этаж и потому не входит в [member floors]: на ней нет ни дверей, ни ламп,
-## ни агентов, а над ней небо вместо перекрытия. Отдельный индекс, а не нулевой
-## этаж, — ADR-0014, пункт 1: раньше нулевой был крышей и верхним этажом сразу,
-## и просвет у него выходил 20 px вместо 100.
+## Not a floor and so not part of [member floors]: it has no doors, no lamps,
+## no agents, and sky above it instead of a ceiling slab. A separate index rather than floor
+## zero — ADR-0014, point 1: floor zero used to be the roof and the top floor at once,
+## and its clearance came out 20 px instead of 100.
 const ROOF: int = -1
 
-## Сколько этажей шахта обслуживает самое малое.
+## The fewest floors a shaft serves.
 ##
-## Два — это уже лифт, но только для одноярусной кабины. Двухэтажная пара
-## ([ADR-0025](../../docs/adr/0025-shafts-escalators-and-riders.md), решение 2)
-## занимает по высоте два этажа, и возит она только между теми, куда попадает
-## любой из ярусов, — то есть между [code]top + 1[/code] и [code]bottom - 1[/code].
-## В шахте на три этажа таких остаётся один: ехать некуда. Поэтому минимум
-## четыре, и это не про пару одну — полоса короче четырёх не годится никому,
-## а держать два минимума в правилах значило бы объяснять разницу на каждой
-## проверке.
+## Two is already an elevator, but only for a single-deck cab. A double-deck pair
+## ([ADR-0025](../../docs/adr/0025-shafts-escalators-and-riders.md), decision 2)
+## is two floors tall, and it carries only between floors that either deck can
+## reach — that is, between [code]top + 1[/code] and [code]bottom - 1[/code].
+## A three-floor shaft leaves one such floor: there is nowhere to go. Hence the minimum
+## is four, and it is not about the pair alone — a run shorter than four suits no one,
+## and keeping two minimums in the rules would mean explaining the difference in every
+## check.
 ##
-## Правило нужно и раскладке, и проверкам, поэтому живёт числом, а не двумя
-## одинаковыми константами в разных файлах.
+## Both the layout and the checks need the rule, so it lives as one number rather than two
+## identical constants in different files.
 const MIN_SHAFT_FLOORS: int = 4
 
-## Палитра раунда: чем красится здание и каким светом оно горит.
+## Round palette: what the building is painted with and what light it burns with.
 ##
-## Меняется от раунда к раунду, как цвета в оригинале, и набор зацикливается:
-## [method BuildingPalette.of_round], ADR-0017, решение 2. По умолчанию берётся
-## первая палитра набора — та самая, что на кадре порта.
+## Changes from round to round, like the colours in the original, and the set loops:
+## [method BuildingPalette.of_round], ADR-0017, decision 2. By default the first palette
+## of the set is taken — the very one in the port's frame.
 @export var palette: BuildingPalette = BuildingPalette.of_round(1)
 
-## Время суток здания (ADR-0051): жребием по сиду в [method Main._enter_building].
-## По умолчанию ночь — здание, собранное тестом без жребия, темнеет, как и до M24j.
+## Building time of day (ADR-0051): a draw by seed in [method Main._enter_building].
+## Night by default — a building assembled by a test without a draw goes dark, as before M24j.
 @export var time_of_day: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT
 
-## Тип здания ([BuildingIdentity]): ставит уровень по жребию здания. От него
-## зависят роли этажей ([method FloorRole.at], ADR-0057). По умолчанию — отель,
-## как первое здание партии.
+## Building kind ([BuildingIdentity]): the level sets it from the building draw. Floor
+## roles depend on it ([method FloorRole.at], ADR-0057). Hotel by default,
+## like the first building of a game.
 @export var kind: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL
 
-## Погода, поставленная руками ([enum Weather.Kind]), или -1 — жребий по сиду
-## ([method Weather.of_building]). Ставят инструменты кадров и тесты: сочетание
-## времени суток и погоды снимается без подбора сида. Живёт в правилах здания,
-## а не глобально: до авторевью M24j это было статическое поле [Weather], и
-## тест, забывший его сбросить, оставлял погоду следующим.
+## Weather set by hand ([enum Weather.Kind]), or -1 — a draw by seed
+## ([method Weather.of_building]). Shot tools and tests set it: a combination of
+## time of day and weather is shot without hunting for a seed. Lives in the building
+## rules, not globally: before the M24j code review it was a static field of [Weather], and
+## a test that forgot to reset it left the weather to the next one.
 @export var forced_weather: int = -1
 
-## Этажей в здании, не считая крыши. Нулевой — верхний, последний — с выходом.
+## Floors in the building, not counting the roof. Zero is the top, the last one has the exit.
 @export var floors: int = 30
 
-## Высота этажа и толщина перекрытия, м.
+## Floor height and ceiling slab thickness, m.
 @export var floor_height: float = Proportions.FLOOR
 @export var slab_height: float = Proportions.SLAB
 
-## Сколько открытого неба над настилом крыши, м.
+## How much open sky is above the roof deck, m.
 ##
-## Больше, чем этаж: Otto прыгает на 2.4 м, и над макушкой в верхней точке
-## должно оставаться небо, а не кромка кадра. При высоте в этаж он проходил
-## впритык, и прыжок читался как удар головой о край экрана.
+## More than a floor: Otto jumps 2.4 m, and above his head at the peak there
+## must still be sky, not the frame edge. At one floor's height he cleared it
+## barely, and the jump read as hitting his head on the edge of the screen.
 @export var sky_height: float = 4.8
 
-## Ширина здания и отступ от стен, м.
+## Building width and margin from the walls, m.
 ##
-## Ширина выводится из шага места: шестнадцать шагов по [constant
-## Proportions.SLOT] и два отступа по 2.4 м (ADR-0026, решение 3).
+## The width is derived from the slot pitch: sixteen pitches of [constant
+## Proportions.SLOT] and two 2.4 m margins (ADR-0026, decision 3).
 @export var width: float = Proportions.SLOT * 16.0 + 2.4 * 2.0
 @export var margin: float = 2.4
 
-## Сколько мест по горизонтали на самом широком уровне. Всё, что стоит на этаже,
-## занимает место целиком, поэтому шахта, эскалатор, дверь и лампа не могут
-## оказаться друг на друге.
+## How many horizontal slots the widest level has. Everything on a floor
+## takes a whole slot, so a shaft, an escalator, a door and a lamp cannot
+## end up on top of each other.
 ##
-## Места нумеруются глобально и стоят по всей высоте на одних и тех же x. Иначе
-## шахта, проходящая сквозь этажи разной ширины, оказывалась бы на каждом из них
-## в своём столбце (ADR-0014, пункт 3).
+## Slots are numbered globally and stand at the same x over the full height. Otherwise
+## a shaft passing through floors of different widths would end up in its own column
+## on each of them (ADR-0014, point 3).
 ##
-## **Число должно быть нечётным.** Силуэт отмеряется полушириной от середины
-## ([method slot_reach]), и у чётного набора середины нет: крайний столбец
-## оказывается недоступен на всех уровнях разом, а нижний этаж перестаёт быть
-## во всю ширину здания. Проверяется тестом.
+## **The number must be odd.** The silhouette is measured by half-width from the middle
+## ([method slot_reach]), and an even set has no middle: the outermost column
+## becomes unreachable on all levels at once, and the bottom floor stops spanning
+## the full building width. Checked by a test.
 ##
-## Семнадцать мест вместо девяти — ADR-0024, решение 1: только на мелкой сетке
-## узкий верх влезает в кадр и всё равно вмещает шахту, дверь, лампу и эскалатор.
-## Шаг 1.8 м, как в оригинале: дверь 1.2 и зазор 0.6, шахта ровно в шаг
-## (ADR-0026, решение 3). Поэтому шахты в соседних местах не встают — между
-## ними не осталось бы пола.
+## Seventeen slots instead of nine — ADR-0024, decision 1: only on a fine grid does
+## the narrow top fit in the frame and still hold a shaft, a door, a lamp and an escalator.
+## 1.8 m pitch, as in the original: a 1.2 door and a 0.6 gap, the shaft exactly one pitch
+## (ADR-0026, decision 3). So shafts do not go in adjacent slots — there would be no
+## floor left between them.
 @export var slots: int = 17
 
-## Мест на самом узком уровне — наверху здания.
+## Slots on the narrowest level — at the top of the building.
 ##
-## Профиль задаётся местами, а ширина выводится из них, а не наоборот: от ширины
-## получались этажи, куда не влезало обязательное — шахта, две двери и лампа.
+## The profile is set in slots and the width derived from them, not vice versa: deriving
+## from width produced floors that could not fit the must-haves — a shaft, two doors, a lamp.
 @export var top_slots: int = 7
 
-## С какого этажа начинается широкая часть здания.
+## The floor where the wide part of the building begins.
 ##
-## Силуэт задаётся порогом, а не равными ступенями (ADR-0024, решение 2): выше
-## порога узкая башня в [member top_slots] мест, которая влезает в кадр целиком,
-## с порога и ниже — стилобат во все [member slots], вдвое шире кадра.
+## The silhouette is set by a threshold, not by equal steps (ADR-0024, decision 2): above
+## the threshold is a narrow tower of [member top_slots] slots that fits in the frame whole,
+## at the threshold and below is the podium across all [member slots], twice the frame width.
 @export var wide_from: int = 20
 
-## Сколько этажей обслуживает шахта. Шахта не сквозная: доехал до предела —
-## пересаживайся, и в этом весь спуск (ADR-0008).
+## How many floors a shaft serves. A shaft does not run through: reached the end —
+## change over, and that is the whole descent (ADR-0008).
 ##
-## С M18 шахты перехлёстываются: открытые на разных этажах закрываются на разных,
-## и пересадка идёт не только эскалатором (ADR-0024, решение 3).
+## Since M18 shafts overlap: ones opening on different floors close on different ones,
+## and changing over is not only by escalator (ADR-0024, decision 3).
 @export var shaft_span: int = 6
 
-## На сколько этажей пролёт шахты может отличаться от [member shaft_span].
+## By how many floors a shaft's run may differ from [member shaft_span].
 ##
-## Без разброса шахты, открытые на одном уровне, закрываются на одном, и
-## перехлёста не выходит вовсе. В оригинале длины разные: 5, 6, 7, 3, 12.
+## Without spread, shafts opening on one level close on one level, and
+## there is no overlap at all. In the original the lengths differ: 5, 6, 7, 3, 12.
 @export var shaft_span_spread: int = 2
 
-## Сколько этажей обслуживает верхняя шахта — та, что идёт от крыши.
+## How many floors the top shaft serves — the one running from the roof.
 ##
-## Длиннее обычной: в оригинале это 19–30 с крышей, двенадцать этажей на одну
-## шахту. Верхняя треть здания безальтернативна, и в этом её характер.
+## Longer than usual: in the original it is 19–30 with the roof, twelve floors on one
+## shaft. The top third of the building has no alternative, and that is its character.
 ##
-## На уровень глубже однашахтной зоны ([member single_shaft_until] плюс крыша
-## плюс один): шахта башни заходит в стилобат, и стык у порога закрыт
-## перехлёстом. Без этого захода спуск всего здания держался бы на том, найдётся
-## ли эскалатору место на самом тесном этаже, — а на семи местах, четыре из
-## которых уже съела полоса, оно находится не всегда.
+## One level deeper than the single-shaft zone ([member single_shaft_until] plus the roof
+## plus one): the tower shaft reaches into the podium, and the joint at the threshold is
+## closed by overlap. Without this reach the descent of the whole building would depend on
+## whether an escalator finds room on the tightest floor — and with seven slots, four of
+## which the band has already eaten, it does not always.
 @export var top_shaft_span: int = 14
 
-## Докуда здание обходится одной шахтой. Ниже этого этажа путей становится
-## больше — [method shafts_on].
+## How far down the building makes do with one shaft. Below this floor there are
+## more paths — [method shafts_on].
 @export var single_shaft_until: int = 11
 
-## Сколько шахт обслуживает этаж над подвалом. Пять — как в оригинале, где
-## 1–5, 1–6 и три 1–7 доходят до земли разом; в подвал из них спускается одна
+## How many shafts serve the floor above the basement. Five — as in the original, where
+## 1–5, 1–6 and three 1–7 reach the ground together; one of them goes down to the basement
 ## ([method shafts_on]).
 @export var shafts_max: int = 5
 
-## Сколько нижних этажей однашахтной зоны отданы эскалаторам.
+## How many bottom floors of the single-shaft zone are given to escalators.
 ##
-## Полоса у порога: шахта башни кончается над стилобатом, и вниз ведёт эскалатор
-## (ADR-0024, решение 4). В оригинале это этажи 16–20.
+## The band at the threshold: the tower shaft ends above the podium, and an escalator leads
+## down (ADR-0024, decision 4). In the original these are floors 16–20.
 @export var escalator_band: int = 5
 
-## Ширина шахты, она же ширина кабины: по краям не должно остаться щелей.
+## Shaft width, which is also the cab width: there must be no gaps at the sides.
 ##
-## Ровно в шаг места, 60% просвета — как в оригинале (ADR-0026, решение 3).
+## Exactly one slot pitch, 60% of the clearance — as in the original (ADR-0026, decision 3).
 @export var shaft_width: float = Proportions.SHAFT
 
-## Толщина внутренней стены, делящей этаж надвое, м, и с какой вероятностью
-## она на этаже появляется.
+## Thickness of the inner wall dividing a floor in two, m, and the probability
+## that it appears on a floor.
 ##
-## Не на каждом: стена — это крюк через другой этаж, и на каждом этаже подряд
-## спуск превратился бы в лабиринт (ADR-0024, решение 5).
+## Not on every floor: a wall is a detour through another floor, and on every floor in a row
+## the descent would turn into a maze (ADR-0024, decision 5).
 ##
-## Почти метр, а не толщина наружной стены: на первых кадрах вехи стена шириной
-## 0.48 м не отличалась от пилястры (0.45), и «здесь не пройти» читалось как
-## украшение. Читаемость аркады важнее правдоподобия — правило пивота
-## ([ADR-0019](0019-3d-pivot.md)). Места это не стоит: стена стоит на границе
-## между местами, а шаг сетки 1.8 м.
+## Almost a metre, not the outer wall thickness: in the milestone's first shots a wall
+## 0.48 m wide was indistinguishable from a pilaster (0.45), and "no way through" read as
+## decoration. Arcade readability matters more than realism — the pivot rule
+## ([ADR-0019](0019-3d-pivot.md)). It costs no slot: the wall stands on the boundary
+## between slots, and the grid pitch is 1.8 m.
 @export var inner_wall_width: float = 0.9
 @export var wall_chance: float = 0.35
 
-## Проём под эскалатор: на сколько он отступает от площадки и какой он ширины, м.
-## Лежит здесь, а не в уровне, потому что по нему раскладка узнаёт, где в полу дыра:
-## иначе геометрия проёма была бы записана дважды и разъехалась бы.
+## Escalator opening: how far it is set back from the landing and how wide it is, m.
+## Lives here, not in the level, because the layout learns from it where the floor has a hole:
+## otherwise the opening geometry would be written twice and would drift apart.
 ##
-## С M24g проём тянется от площадки до края этажа
-## ([method EscalatorSpot.gap]): ширины у него нет, есть отступ от
-## площадки.
+## Since M24g the opening runs from the landing to the floor edge
+## ([method EscalatorSpot.gap]): it has no width, only a setback from the
+## landing.
 @export var escalator_gap_offset: float = 0.12
 
-## Наклон эскалатора, градусы (ADR-0043, решение 15). До M24g пролёт умещался в
-## два места и стоял под ~66°; под 30°, как у настоящего, он в кадре читался
-## слишком пологим — решение пользователя, 45°.
+## Escalator slope, degrees (ADR-0043, decision 15). Before M24g the run fit into
+## two slots and stood at ~66°; at 30°, like a real one, it read in the frame as
+## too flat — the user's decision, 45°.
 @export var escalator_angle: float = 45.0
 
-## Сколько от края этажа до нижней площадки, м: площадка с пассажиром на ней и
-## зазор до стены.
+## Distance from the floor edge to the lower landing, m: the landing with a rider on it and
+## the gap to the wall.
 @export var escalator_edge_margin: float = Proportions.BODY_WIDTH * 0.5 + 0.52
 
-## Сколько пролёта над этажом ниже занято под ним, м от нижней площадки: там
-## полотно ниже двери, и ни двери, ни лампе под ним не место.
+## How much of the run above the floor below is taken under it, m from the lower landing:
+## there the belt is below door height, and neither a door nor a lamp belongs under it.
 @export var escalator_low_span: float = 2.7
 
-## Красных дверей на здание вручную; −1 — от 5 до 10 жребием по сиду здания
-## ([method BuildingDocuments.count], ADR-0037, решение 8). Для тестов и
-## прогонов, которым нужно здание с одним документом или вовсе без них
-## (ADR-0028, решение 3).
+## Red doors per building set by hand; −1 — 5 to 10 by a draw on the building seed
+## ([method BuildingDocuments.count], ADR-0037, decision 8). For tests and
+## runs that need a building with one document or none at all
+## (ADR-0028, decision 3).
 ##
-## Ручное число раскладывается поровну по высоте; по ROM — полосами оригинала.
+## A manual number is spread evenly over the height; ROM-driven ones follow the original's bands.
 @export var documents_cap: int = -1
 
-## Дверей на этаже вручную, считая красную; ноль — по ROM на ширину экрана
-## ([method doors_on]). Для тестов, которым нужен тесный этаж.
+## Doors per floor set by hand, counting the red one; zero — by ROM per screen width
+## ([method doors_on]). For tests that need a tight floor.
 @export var doors_cap: int = 0
 
-## Потолок ламп на этаже. Сколько их на самом деле, решает ширина этажа —
-## [method lamps_on]: узкий верх обходится одной, широкий низ получает три.
+## Cap on lamps per floor. How many there actually are is decided by floor width —
+## [method lamps_on]: the narrow top makes do with one, the wide bottom gets three.
 @export var lamps_per_floor: int = 3
 
-## Навык здания: уровень сложности партии (DIP-переключатель автомата, 0–3)
-## плюс пройденные здания. От него и от времени в здании [Arcade] считает всё
-## остальное — сложность, злость агентов, скорость их пуль (ADR-0027).
+## Building skill: the game's difficulty level (the cabinet's DIP switch, 0–3)
+## plus buildings cleared. From it and from time in the building [Arcade] computes all
+## the rest — difficulty, agent aggression, their bullet speed (ADR-0027).
 @export var skill: int = 0
 
-## Дальность, с которой агент замечает Otto, стоящего в темноте, м (ADR-0023,
-## решение 8). Решает тень Otto, а не агента: из тени освещённого видно,
-## освещённый в тень не видит. Дальности огня как таковой нет: в ROM агент
-## стреляет через весь этаж, у нас — пока он в кадре (ADR-0027, решение 3а).
+## Range at which an agent notices Otto standing in darkness, m (ADR-0023,
+## decision 8). Otto's shadow decides, not the agent's: from the shadow the lit one is seen,
+## the lit one does not see into the shadow. There is no fire range as such: in ROM an agent
+## shoots across the whole floor, here — while he is in frame (ADR-0027, decision 3a).
 @export var agent_dark_fire_range: float = 1.8
 
-## Ближе этого к Otto дверь его этажа агента не выпускает, м. В ROM запрета
-## нет (@5AAB), но выход вплотную стоил боту вдвое больше смертей: 1.2 м — по
-## замеру, меньше прежних 2.88 (ADR-0053, решение 3).
+## Closer than this to Otto, a door on his floor does not release an agent, m. ROM has no
+## such ban (@5AAB), but exiting point-blank cost the bot twice as many deaths: 1.2 m — by
+## measurement, less than the former 2.88 (ADR-0053, decision 3).
 @export var agent_release_gap: float = 1.2
 
-## Не стреляют ли агенты вовсе. Для кадров и проверок, где нужен агент,
-## который ходит и уворачивается, но не убивает; в игре всегда выключено.
+## For this long after Otto comes back, a door on his floor does not release an agent
+## closer to him than [member agent_respawn_gap], s and m. Our deviation from the ROM,
+## which has no distance check (@5AAB): an agent from the next door used to lie down
+## a step away and kill the returned Otto two seconds later, again and again
+## (ADR-0059, decision 3, user's choice).
+@export var agent_respawn_calm: float = 4.0
+@export var agent_respawn_gap: float = 4.0
+
+## Whether agents never shoot. For shots and checks that need an agent
+## who walks and dodges but does not kill; always off in the game.
 @export var agents_hold_fire: bool = false
 
-## Потолок агентов в здании вручную; ноль — по ROM, три или четыре
-## ([method Arcade.agents_at_once]). Для прогонов-экспериментов.
+## Cap on agents in the building set by hand; zero — by ROM, three or four
+## ([method Arcade.agents_at_once]). For experiment runs.
 @export var agents_at_once_cap: int = 0
 
-## Рост агента на колене и лёжа, м. Стоячий берётся у формы коллизии из сцены.
+## Agent height kneeling and lying, m. Standing height is taken from the scene's collision shape.
 ##
-## Числа — в [Proportions]: колено и лёжа сверены с кадром оригинала так же,
-## как рост (ADR-0026, решение 2).
+## The numbers are in [Proportions]: kneeling and lying are checked against the original's
+## frame the same way as height (ADR-0026, decision 2).
 @export var agent_kneel_height: float = Proportions.KNEEL
 @export var agent_prone_height: float = Proportions.PRONE
 
-## На сколько эскалатор уводит в сторону, спускаясь на этаж, м: по наклону.
+## How far sideways an escalator goes descending one floor, m: by the slope.
 var escalator_run: float:
 	get:
 		return floor_height / tan(deg_to_rad(escalator_angle))
 
 
-## Правила очередного здания: навык растёт с каждым пройденным (@0A0A), палитра
-## меняется. [param level] — уровень сложности партии, DIP 0–3.
+## Rules of the next building: skill grows with each one cleared (@0A0A), the palette
+## changes. [param level] is the game's difficulty level, DIP 0–3.
 static func for_building(number: int, level: int = 0) -> BuildingRules:
 	var rules := BuildingRules.new()
 	rules.skill = Arcade.skill(level, number)
-	# Цвет — такое же правило здания: в оригинале планировка почти не меняется,
-	# а палитра меняется каждый раунд.
+	# Colour is the same kind of building rule: in the original the layout barely changes,
+	# but the palette changes every round.
 	rules.palette = BuildingPalette.of_round(number)
 	return rules
 
 
-## Сколько агентов в здании разом сейчас: ручной потолок или по ROM.
+## How many agents are in the building at once now: the manual cap or by ROM.
 func agents_at_once(time: float) -> int:
 	return agents_at_once_cap if agents_at_once_cap > 0 else Arcade.agents_at_once(skill, time)
 
 
-## Координата места по горизонтали.
+## Horizontal coordinate of a slot.
 func slot_x(slot: int) -> float:
 	if slots <= 1:
 		return width * 0.5
@@ -271,37 +279,37 @@ func slot_x(slot: int) -> float:
 	return margin + usable * float(slot) / float(slots - 1)
 
 
-## Поверхность уровня, на которой стоят: [constant ROOF] — настил крыши,
-## нулевой — верхний этаж здания.
+## The level surface that is stood on: [constant ROOF] is the roof deck,
+## zero is the top floor of the building.
 ##
-## Одна формула на крышу и на этажи: крыша — это [code]index = -1[/code], и
-## отдельного счёта ей не нужно. Так просвет у всех уровней выходит одинаковым,
-## чего не было, пока крышей работал нулевой этаж (ADR-0014, пункт 1).
+## One formula for the roof and floors: the roof is [code]index = -1[/code], and
+## it needs no separate count. That way the clearance comes out equal on all levels,
+## which it did not while floor zero served as the roof (ADR-0014, point 1).
 func floor_surface(index: int) -> float:
 	return sky_height + floor_height * float(index + 1)
 
 
-## Высота здания целиком, м. Небо над крышей входит: это часть мира,
-## по которой ходит камера.
+## Height of the whole building, m. The sky above the roof is included: it is part of the world
+## that the camera moves over.
 func total_height() -> float:
 	return floor_surface(floors - 1) + slab_height
 
 
-## Ближайший уровень к точке по вертикали. Может вернуть [constant ROOF].
+## The level vertically nearest to a point. May return [constant ROOF].
 func floor_index_near(y: float) -> int:
 	var raw := roundf((y - sky_height) / floor_height) - 1.0
 	return clampi(int(raw), ROOF, floors - 1)
 
 
-## Потолок уровня: низ перекрытия сверху. У крыши потолка нет — над ней небо,
-## и полоса отмеряется от верха мира.
+## Level ceiling: the bottom of the slab above. The roof has no ceiling — there is sky above it,
+## and the band is measured from the top of the world.
 func story_top(index: int) -> float:
 	return 0.0 if index <= ROOF else floor_surface(index - 1) + slab_height
 
 
-## Все уровни сверху вниз, крышу включая. Один обход на весь проект: обойти
-## [code]range(floors)[/code] и забыть крышу — ровно та ошибка, из-за которой
-## на ней стояли двери.
+## All levels top to bottom, the roof included. One traversal for the whole project: walking
+## [code]range(floors)[/code] and forgetting the roof is exactly the mistake that
+## put doors on it.
 func levels() -> Array[int]:
 	var all: Array[int] = []
 	for index in range(ROOF, floors):
@@ -309,32 +317,32 @@ func levels() -> Array[int]:
 	return all
 
 
-## Стоит ли уровень в широкой части здания. Порог один и на силуэт, и на всё,
-## что от ширины зависит: двери, лампы, места (ADR-0024, решение 2).
+## Whether the level is in the wide part of the building. One threshold for both the
+## silhouette and everything that depends on width: doors, lamps, slots (ADR-0024, decision 2).
 ##
-## Крыша узкая всегда: [constant ROOF] меньше любого порога.
+## The roof is always narrow: [constant ROOF] is below any threshold.
 func is_wide(index: int) -> bool:
 	return index >= wide_from
 
 
-## Сколько шахт обслуживает уровень.
+## How many shafts serve the level.
 ##
-## Наверху одна — это шахта 19–30 оригинала, где спуск безальтернативен. Ниже
-## порога однашахтной зоны растёт от двух до [member shafts_max] к самому дну,
-## где в оригинале сходятся пять (ADR-0024, решение 3).
+## At the top one — this is the original's 19–30 shaft, where the descent has no alternative.
+## Below the single-shaft zone threshold it grows from two to [member shafts_max] toward the bottom,
+## where five meet in the original (ADR-0024, decision 3).
 ##
-## Это цель раскладки, а не результат: шахта живёт много этажей, и число на
-## этаже складывается из тех, что открыты. [method BuildingPlan.generate] идёт
-## сверху вниз и открывает недостающие.
+## This is the layout's target, not the result: a shaft lives many floors, and the number on
+## a floor adds up from those that are open. [method BuildingPlan.generate] goes
+## top to bottom and opens the missing ones.
 ##
-## **Не больше трети мест уровня.** Шахты не встают в соседние места (ADR-0026,
-## решение 3), и каждая, где бы ни встала, выедает с соседями не больше трёх
-## мест — поэтому треть мест, округлённая вверх, помещается всегда, как бы ни
-## легли открытые раньше. Узкой башне из семи мест это даёт три шахты, стилобату
-## из семнадцати — шесть, то есть потолок [member shafts_max] не трогается.
+## **No more than a third of the level's slots.** Shafts do not go in adjacent slots
+## (ADR-0026, decision 3), and each one, wherever it stands, eats no more than three slots
+## with its neighbours — so a third of the slots, rounded up, always fits, however the
+## earlier ones fell. A narrow tower of seven slots gets three shafts, a podium
+## of seventeen gets six, so the [member shafts_max] cap is not reached.
 ##
-## Подвал — нижний этаж — обслуживает одна шахта: в ROM туда спускается одна из
-## пяти, жребием (ADR-0038, решение 3). Пять сходятся этажом выше.
+## The basement — the bottom floor — is served by one shaft: in ROM one of the five goes down
+## there, by a draw (ADR-0038, decision 3). The five meet one floor above.
 func shafts_on(index: int) -> int:
 	if index >= floors - 1:
 		return mini(1, _shafts_wanted(index))
@@ -348,17 +356,17 @@ func _shafts_wanted(index: int) -> int:
 	if index <= single_shaft_until:
 		return 1
 	var first := single_shaft_until + 1
-	# Рост числа путей кончается там, где шахту ещё можно открыть. Новая шахта
-	# добавляет этажу путь, только если сама на нём открывается, а открыться она
-	# может не ниже, чем за [constant MIN_SHAFT_FLOORS] этажей до дна: короче
-	# полосы не бывает. Требуй правило роста до самого низа — раскладка не смогла
-	# бы его выполнить, и нижние этажи остались бы беднее обещанного.
+	# The growth in paths ends where a shaft can still be opened. A new shaft
+	# adds a path to a floor only if it opens on that floor itself, and it can open
+	# no lower than [constant MIN_SHAFT_FLOORS] floors above the bottom: there is no shorter
+	# run. Demand the growth rule all the way down and the layout could not
+	# satisfy it, and the bottom floors would end up poorer than promised.
 	#
-	# В оригинале так же: полосы 1–5, 1–6 и 1–7 доходят до земли, начавшись
-	# высоко, и ни одна не открывается этажом над ней.
+	# Same in the original: runs 1–5, 1–6 and 1–7 reach the ground, having started
+	# high, and none opens one floor above it.
 	#
-	# Дно полос — этаж над подвалом: в подвал спускается одна шахта из дошедших
-	# (ADR-0038, решение 3), поэтому счёт на этаж короче.
+	# The bottom of the runs is the floor above the basement: one shaft of those that reach it
+	# goes down to the basement (ADR-0038, decision 3), so the count per floor is shorter.
 	var last := floors - 1 - MIN_SHAFT_FLOORS
 	var fewest := mini(2, most)
 	if last <= first:
@@ -367,60 +375,60 @@ func _shafts_wanted(index: int) -> int:
 	return clampi(fewest + int(roundf(depth * float(most - fewest))), fewest, most)
 
 
-## Попадает ли уровень в полосу эскалаторов — нижние этажи однашахтной зоны.
+## Whether the level falls into the escalator band — the bottom floors of the single-shaft zone.
 ##
-## Там шахта башни кончается, а стилобат ещё не начался, и вниз ведёт эскалатор
-## (ADR-0024, решение 4). Эскалатор в полосе — альтернатива шахте, а не
-## единственный путь: в оригинале 19–30 проходит сквозь 19–20, где эскалаторы
-## тоже есть.
+## There the tower shaft ends and the podium has not begun yet, and an escalator leads
+## down (ADR-0024, decision 4). An escalator in the band is an alternative to a shaft, not
+## the only path: in the original 19–30 passes through 19–20, where there are
+## escalators too.
 func in_escalator_band(index: int) -> bool:
 	if index <= ROOF or index > single_shaft_until:
 		return false
 	return index > single_shaft_until - maxi(escalator_band, 0)
 
 
-## Сколько мест вправо и влево от середины доступно на уровне.
+## How many slots right and left of the middle are available on the level.
 ##
-## Счёт идёт полушириной, поэтому число мест всегда нечётное и они лежат
-## симметрично: этаж с чётным числом мест был бы сдвинут относительно
-## проходящей сквозь него шахты.
+## Counted by half-width, so the number of slots is always odd and they lie
+## symmetrically: a floor with an even number of slots would be offset relative to
+## the shaft passing through it.
 func slot_reach(index: int) -> int:
 	var full := (slots - 1) / 2
 	var narrow := clampi((top_slots - 1) / 2, 0, full)
 	return full if is_wide(index) else narrow
 
 
-## Первое и последнее доступное место уровня, включительно.
+## First and last available slot of the level, inclusive.
 func slot_range(index: int) -> Vector2i:
 	var middle := (slots - 1) / 2
 	var reach := slot_reach(index)
 	return Vector2i(maxi(middle - reach, 0), mini(middle + reach, slots - 1))
 
 
-## Стоит ли место на этом уровне. За границами силуэта места нет: там улица.
+## Whether a slot exists on this level. Outside the silhouette there is no slot: it is the street.
 func slot_available(slot: int, index: int) -> bool:
 	var span := slot_range(index)
 	return slot >= span.x and slot <= span.y
 
 
-## Границы уровня: внешние края стен, левый и правый.
+## Level bounds: the outer edges of the walls, left and right.
 ##
-## Выводятся из крайних доступных мест, а не из доли ширины: место должно
-## отстоять от стены на [member margin], как и на здании во всю ширину.
+## Derived from the outermost available slots, not from a fraction of width: a slot must be
+## [member margin] away from the wall, as on a full-width building.
 func floor_span(index: int) -> Vector2:
 	var span := slot_range(index)
 	return Vector2(slot_x(span.x) - margin, slot_x(span.y) + margin)
 
 
-## Границы перекрытия уровня: оно и пол своего уровня, и потолок нижнего,
-## поэтому берётся шире из двух.
+## Bounds of the level's slab: it is both the floor of its level and the ceiling of the one
+## below, so the wider of the two is taken.
 ##
-## Без этого на каждой ступени силуэта нижний, более широкий этаж оставался бы
-## без потолка над своей наружной полосой: внутри здания — открытое небо, а
-## лампа, попавшая там на крайнее место, висела бы вовсе не на чем.
+## Without this, on every step of the silhouette the lower, wider floor would be left
+## without a ceiling over its outer band: open sky inside the building, and
+## a lamp that landed on the outermost slot there would hang from nothing at all.
 ##
-## Ходить по этому выступу нельзя — он снаружи от стен своего уровня, — поэтому
-## граф достижимости считает куски по [method floor_span] и от этого не зависит.
+## That ledge cannot be walked on — it is outside its level's walls — so
+## the reachability graph counts pieces by [method floor_span] and does not depend on it.
 func slab_span(index: int) -> Vector2:
 	var own := floor_span(index)
 	if index >= floors - 1:
@@ -429,61 +437,61 @@ func slab_span(index: int) -> Vector2:
 	return Vector2(minf(own.x, below.x), maxf(own.y, below.y))
 
 
-## Тёмный ли этаж по карте оригинала: ламп на нём нет, и темен он с начала
-## здания (ADR-0028, решение 4). Крыша не темна никогда — ей светит город.
-## Тёмные этажи бывают только ночью (ADR-0051, решение 5).
+## Whether the floor is dark per the original's map: it has no lamps and is dark from the
+## start of the building (ADR-0028, decision 4). The roof is never dark — the city lights it.
+## Dark floors exist only at night (ADR-0051, decision 5).
 func is_unlit(index: int) -> bool:
 	if not is_night():
 		return false
 	return index > ROOF and index < floors and Arcade.is_dark_floor(Arcade.rom_floor(index, floors))
 
 
-## Ночь ли в здании: только ночью сбитая лампа гасит зону, а этажи карты темны
-## (ADR-0051, решение 5).
+## Whether it is night in the building: only at night does a shot lamp darken its zone, and
+## the map's floors are dark (ADR-0051, decision 5).
 func is_night() -> bool:
 	return TimeOfDay.is_night(time_of_day)
 
 
-## Во сколько экранов оригинала ширина уровня, не меньше одного. Башня — в
-## один, стилобат — в два (ADR-0028, решение 2).
+## How many original screens the level width spans, at least one. The tower is
+## one, the podium two (ADR-0028, decision 2).
 func _screens(index: int) -> int:
 	return maxi(1, roundi(floor_width(index) / Proportions.FIELD_WIDTH))
 
 
-## Сколько дверей на этаже, считая красную: число ROM на ширину в экранах
-## (ADR-0028, решение 2). Плотность в кадре — как в оригинале: башня получает
-## четыре, середина до семи, широкий низ вдвое больше.
+## How many doors are on a floor, counting the red one: the ROM number times width in screens
+## (ADR-0028, decision 2). Density in frame is as in the original: the tower gets
+## four, the middle up to seven, the wide bottom twice as many.
 ##
-## Это цель, а не обещание: шахты, эскалаторы и выход ставятся первыми, и
-## обязательна из этих дверей одна: остальные занимают то, что осталось после
-## ламп, — иначе эскалатору на тесном этаже не нашлось бы места.
+## This is a target, not a promise: shafts, escalators and the exit are placed first, and
+## only one of these doors is mandatory: the rest take what is left after the
+## lamps — otherwise an escalator would find no room on a tight floor.
 func doors_on(index: int) -> int:
 	if index <= ROOF or index == floors - 1:
-		# Этаж выхода — гараж, как подвал оригинала (маска 00): машина стоит не
-		# среди дверей (ADR-0031, решение 4).
+		# The exit floor is a garage, like the original's basement (mask 00): the car does not
+		# stand among doors (ADR-0031, decision 4).
 		return 0
 	if doors_cap > 0:
 		return doors_cap
 	return Arcade.doors_on_floor(Arcade.rom_floor(index, floors)) * _screens(index)
 
 
-## Сколько ламп вешать на уровень: ряд светильников по потолку, как на референсе
-## (ADR-0023, решение 2), а зона каждого — единица темноты: сбитая гасит свою,
-## соседние горят.
+## How many lamps to hang on a level: a row of ceiling fixtures, as in the reference
+## (ADR-0023, decision 2), and each one's zone is a unit of darkness: a shot one darkens its
+## own, the neighbours stay lit.
 ##
-## Считается долей ширины этажа от ширины здания: во всю ширину — [member
-## lamps_per_floor], узкий верх обходится одной. Не местами этажа, как было до
-## M18: на мелкой сетке ADR-0024 счёт по местам дал бы наверху две лампы вместо
-## одной — мест стало вдвое больше, а этаж остался той же ширины. И не метрами:
-## абсолютный шаг между лампами не пережил бы здание других размеров, а такие
-## собирают тесты.
+## Counted as the floor width's share of the building width: full width gets [member
+## lamps_per_floor], the narrow top makes do with one. Not by the floor's slots, as before
+## M18: on the fine ADR-0024 grid a count by slots would give the top two lamps instead of
+## one — the slots doubled while the floor stayed the same width. And not by metres:
+## an absolute lamp spacing would not survive a building of other dimensions, and tests
+## assemble those.
 ##
-## У тёмных этажей карты — ноль: они темны с начала здания ([method is_unlit]).
+## Dark floors on the map get zero: they are dark from the start ([method is_unlit]).
 ##
-## У крыши — ноль: над ней небо, подвес держать не на чем, и ей светит город
-## (ADR-0014). Отвечать «одна» значило бы обещать лампу тому, кто спросит по
-## всем уровням разом: раскладка крышу пропускает, а правило подтверждало бы
-## обратное.
+## The roof gets zero: there is sky above it, nothing to hang a fixture from, and the city
+## lights it (ADR-0014). Answering "one" would promise a lamp to whoever asks across
+## all levels at once: the layout skips the roof, and the rule would claim
+## the opposite.
 func lamps_on(index: int) -> int:
 	if index <= ROOF or is_unlit(index):
 		return 0
@@ -492,7 +500,7 @@ func lamps_on(index: int) -> int:
 	return clampi(int(roundf(share * float(most))), 1, most)
 
 
-## Ширина уровня, м.
+## Level width, m.
 func floor_width(index: int) -> float:
 	var span := floor_span(index)
 	return span.y - span.x

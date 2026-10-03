@@ -1,20 +1,20 @@
 class_name AgentCrowd
 extends RefCounted
 
-## Толпа на этаже (@041F-0458; ADR-0053, решение 5): на этаже Otto, выше и
-## ниже стоят на полу [constant Arcade.CROWD] агентов или больше — дальние от
-## Otto уходят в двери, ближние остаются. Вышедшие из двери и едущие в кабине не
-## в счёт: первые ещё в проёме, вторые на этаже не стоят. Вынесено из
-## [GreyboxLevel] — правило без узлов уровня.
+## A crowd on a floor (@041F-0458; ADR-0053, decision 5): on Otto's floor, above and
+## below, [constant Arcade.CROWD] agents or more stand on the floor — those far from
+## Otto leave through doors, the near ones stay. Those coming out of a door and riding a cab do not
+## count: the former are still in the doorway, the latter do not stand on the floor. Moved out of
+## [GreyboxLevel] — a rule without level nodes.
 
 
-## Лишние в толпе из [param agents]: словарь «агент — true». [param here] —
-## этаж Otto, [param otto_x] — где он стоит, сцена.
+## Extras in the crowd from [param agents]: a dictionary "agent — true". [param here] —
+## Otto's floor, [param otto_x] — where he stands, scene.
 ##
-## [param leaving] — лишние прошлого счёта: они остаются в лишних первыми, а не
-## по дальности. Счёт идёт каждый кадр, и ушедший к двери, что ближе к Otto, по
-## дороге переставал бы быть дальним — его отзывали бы, а уходить посылали
-## соседа, и толпа так и стояла бы, передавая уход друг другу.
+## [param leaving] — the extras of the previous count: they stay among the extras first, not
+## by distance. The count runs every frame, and one walking to a door closer to Otto would
+## stop being a far one on the way — he would be recalled and his neighbour sent away instead,
+## and the crowd would just stand there, passing the leaving to each other.
 static func extras(
 	agents: Array[Enemy], rules: BuildingRules, here: int, otto_x: float, leaving: Dictionary = {}
 ) -> Dictionary:

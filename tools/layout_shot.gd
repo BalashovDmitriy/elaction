@@ -1,25 +1,25 @@
 extends Node3D
 
-## Кадры раскладки M18a: узкая башня целиком в кадре, стилобат — шире кадра,
-## полоса эскалаторов и этаж, разрезанный глухой стеной.
+## M18a layout shots: the narrow tower fully in frame, the podium wider than the frame,
+## the escalator band and a floor cut by a blind wall.
 ##
-## Съёмка вехи ([code]capture.py[/code]) водит Otto по времени и до нижних этажей
-## не доходит: до двадцатого спускаться дольше, чем длится любой разумный
-## сценарий. А стены и эскалаторы стоят по сиду, и выдержкой до них не дойти.
-## Здесь кадр ставится по раскладке: нашли нужный этаж — поставили Otto — сняли.
+## The milestone capture ([code]capture.py[/code]) drives Otto by time and does not reach
+## the bottom floors: getting down to the twentieth takes longer than any reasonable
+## script lasts. And the walls and escalators stand by seed, a delay will not reach them.
+## Here the frame is set by the layout: found the needed floor — placed Otto — took the shot.
 ##
-## Эти кадры и есть проверка DoD M18a: выше порога этаж влезает в кадр целиком,
-## ниже — не влезает, и на этаже тем больше путей, чем он ниже
+## These shots are the M18a DoD check: above the threshold a floor fits into the frame whole,
+## below it does not, and the lower a floor is, the more paths it has
 ## ([ADR-0024](res://docs/adr/0024-building-geometry.md)).
 ##
-## С M18e здесь же кадры здания по карте: тёмный этаж и башня с дверями ROM
-## (ADR-0028), с M19 — крыша с городом за ней (ADR-0029). Папку задаёт
-## [code]--folder=[/code], по умолчанию — M18a; сид — [code]--seed=[/code], а с ним
-## и погоду: на сиде 1 туман, на 2 дождь, на 5 ясная ночь.
+## Since M18e there are also building shots by the map here: a dark floor and a tower with
+## ROM doors (ADR-0028), since M19 — the roof with the city behind it (ADR-0029). The folder
+## is set by [code]--folder=[/code], M18a by default; the seed by [code]--seed=[/code], and
+## with it the weather: seed 1 is fog, 2 is rain, 5 is a clear night.
 ##
-## Рендер настоящий, не headless — нужен экран.
+## Real rendering, not headless — a screen is needed.
 ##
-## Запуск:
+## Run:
 ##     godot --path . res://tools/layout_shot.tscn
 ##     godot --path . res://tools/layout_shot.tscn -- --folder=M18e
 ##     godot --path . res://tools/layout_shot.tscn -- --folder=M19 --seed=2
@@ -29,19 +29,19 @@ extends Node3D
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 
-## Куда складываются кадры по умолчанию.
+## Where the shots go by default.
 const FOLDER := "res://screens/M18a"
 
-## Сколько кадров дать зданию, свету и отражениям устояться.
+## How many frames to give the building, light and reflections to settle.
 const SETTLE_FRAMES: int = 45
 
-## Сид взят тот же, что у остальных инструментов вехи: раскладка по нему уже
-## разобрана в статусе, и кадры сравниваются с ней, а не с новым зданием.
+## The seed is the same as in the milestone's other tools: the layout for it is already
+## analysed in the status, and the shots are compared with it, not with a new building.
 const BUILDING_SEED: int = 1
 
-## Пробные наборы тона (ADR-0030, решение 1): тень, середина, свет, контраст,
-## насыщенность, экспозиция, свечение. Второй взят в игру в M22
-## ([Atmosphere]); остальные — для следующего подбора.
+## Trial tone sets (ADR-0030, decision 1): shadows, midtones, highlights, contrast,
+## saturation, exposure, glow. The second was taken into the game in M22
+## ([Atmosphere]); the rest are for the next tuning.
 const TONES: Array[Dictionary] = [
 	{},
 	{
@@ -76,17 +76,17 @@ const TONES: Array[Dictionary] = [
 var _level: GreyboxLevel = null
 var _folder: String = FOLDER
 var _seed: int = BUILDING_SEED
-## Раунд — палитра здания; ноль — правила по умолчанию (первый раунд).
+## Round — the building palette; zero — the default rules (first round).
 var _round: int = 0
-## Номер здания в партии: от него жребий машины у выхода (ADR-0032, решение 7).
+## Building number in the game: the car draw at the exit depends on it (ADR-0032, decision 7).
 var _building: int = 1
-## Снять только гараж — машины разных зданий рядом.
+## Shoot only the garage — cars of different buildings side by side.
 var _garage_only: bool = false
-## Снять только этаж башни с дверями — уровни качества рядом.
+## Shoot only a tower floor with doors — quality levels side by side.
 var _floor_only: bool = false
-## Снять только крышу — город над ней и погоду.
+## Shoot only the roof — the city above it and the weather.
 var _roof_only: bool = false
-## Вариант тона для подбора (M22): 0 — как в игре, иначе — пробный набор кривых.
+## Tone variant for tuning (M22): 0 — as in the game, otherwise a trial set of curves.
 var _tone: int = 0
 
 
@@ -123,8 +123,8 @@ func _ready() -> void:
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	_level.rules = BuildingRules.for_building(_round) if _round > 0 else BuildingRules.new()
 	_level.building_seed = _seed
-	# Агентов выпускает только кадр про стену: в остальных ходящая фигура
-	# закрывает собой то, ради чего кадр снят.
+	# Only the wall shot releases agents: in the others a walking figure
+	# covers what the shot is taken for.
 	_level.spawn_agents = false
 	add_child(_level)
 	_run()
@@ -133,7 +133,7 @@ func _ready() -> void:
 func _run() -> void:
 	var rules := _level.rules
 	if _round > 0:
-		# Кадр раунда: один этаж на палитре раунда — раунды сравниваются рядом.
+		# Round shot: one floor in the round palette — rounds are compared side by side.
 		await _shoot_floor("round%d" % _round, 2)
 		get_tree().quit(0)
 		return
@@ -174,8 +174,8 @@ func _run() -> void:
 	get_tree().quit(0)
 
 
-## Пробный тон поверх воздуха здания: кривые, контраст, насыщенность,
-## экспозиция и свечение.
+## Trial tone on top of the building's atmosphere: curves, contrast, saturation,
+## exposure and glow.
 func _apply_tone(tone: Dictionary) -> void:
 	var air := (_level.get_node("Scenery/Air") as WorldEnvironment).environment
 	var gradient := Gradient.new()
@@ -190,16 +190,16 @@ func _apply_tone(tone: Dictionary) -> void:
 	air.glow_intensity = tone["glow"]
 
 
-## Гараж у выхода: машина и разметка (ADR-0031, решение 4; машина — ADR-0032).
+## Garage by the exit: the car and markings (ADR-0031, decision 4; the car — ADR-0032).
 func _shoot_garage(label: String) -> void:
 	var bottom := _level.rules.floors - 1
-	# Не в самом проёме: без документов выход отправил бы Otto к красной двери.
+	# Not in the doorway itself: without documents the exit would send Otto to a red door.
 	_place(_level.plan().exit_x + 2.5, bottom)
 	await _shoot(label, bottom)
 
 
-## Ставит Otto посреди этажа и снимает кадр. Камера едет за ним, поэтому кадр
-## показывает ровно то, что увидит игрок, стоящий на этом этаже.
+## Puts Otto in the middle of a floor and takes a shot. The camera follows him, so the shot
+## shows exactly what a player standing on this floor will see.
 func _shoot_floor(label: String, index: int) -> void:
 	var spots := _level.plan().safe_spots(_level.rules, index)
 	if spots.is_empty():
@@ -209,16 +209,16 @@ func _shoot_floor(label: String, index: int) -> void:
 	await _shoot(label, index)
 
 
-## Кадр стены: Otto по одну сторону, агент по другую. Агент обязан стоять и не
-## стрелять — он Otto не видит, и кадр именно об этом.
+## Wall shot: Otto on one side, an agent on the other. The agent must stand and not
+## shoot — he does not see Otto, and that is what the shot is about.
 func _shoot_the_wall(label: String, index: int) -> void:
 	var wall_x := _wall_x(index)
 	var spots := _level.plan().safe_spots(_level.rules, index)
 	if spots.is_empty():
 		push_error("этаж %d: вставать некуда" % index)
 		return
-	# Шаг сетки, а не координата места: [method BuildingRules.slot_x] отдаёт «где»,
-	# а тут нужно «насколько в сторону».
+	# A grid step, not a slot coordinate: [method BuildingRules.slot_x] returns "where",
+	# and here we need "how far to the side".
 	var step := _level.rules.slot_x(1) - _level.rules.slot_x(0)
 	var left := _nearest_spot(spots, wall_x - step)
 	var right := _nearest_spot(spots, wall_x + step)
@@ -238,8 +238,8 @@ func _shoot(label: String, index: int) -> void:
 	print("  %s — этаж %d, ширина %.1f м" % [path, index, rules.floor_width(index)])
 
 
-## Первый сверху этаж, на котором раскладка поставила стену. [constant
-## BuildingRules.ROOF] — стен на этом сиде не выпало вовсе.
+## The first floor from the top on which the layout placed a wall. [constant
+## BuildingRules.ROOF] — no walls came up on this seed at all.
 func _floor_with_a_wall() -> int:
 	var highest := BuildingRules.ROOF
 	for wall in _level.plan().walls:
@@ -248,9 +248,9 @@ func _floor_with_a_wall() -> int:
 	return highest
 
 
-## Искры и кровь (ADR-0031): выброс у лампы и брызги у Otto, снимок на пике
-## разлёта — через несколько кадров, а не после долгой выдержки: искры живут
-## меньше секунды.
+## Sparks and blood (ADR-0031): a burst at the lamp and spatter at Otto, shot at the peak
+## of the spread — a few frames later, not after a long delay: sparks live
+## less than a second.
 func _shoot_effects(label: String, index: int) -> void:
 	var spots := _level.plan().safe_spots(_level.rules, index)
 	_place(spots[spots.size() / 2], index)
@@ -275,7 +275,7 @@ func _shoot_effects(label: String, index: int) -> void:
 	print("  %s — искры и кровь, этаж %d" % [path, index])
 
 
-## Первый сверху тёмный этаж карты (ADR-0028, решение 4).
+## The first dark floor of the map from the top (ADR-0028, decision 4).
 func _first_unlit_floor() -> int:
 	for index in _level.rules.floors:
 		if _level.rules.is_unlit(index):
@@ -305,7 +305,7 @@ func _place(x: float, index: int) -> void:
 
 func _stand_an_agent_at(x: float, index: int) -> void:
 	var agent := ENEMY_SCENE.instantiate() as Enemy
-	# Стоит на месте и безоружен: кадр про стену, а не про бой.
+	# Stands still and unarmed: the shot is about the wall, not about combat.
 	var peaceful := BuildingRules.new()
 	peaceful.agents_hold_fire = true
 	peaceful.agent_dark_fire_range = 0.0

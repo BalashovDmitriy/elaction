@@ -1,7 +1,7 @@
 extends GutTest
 
-## Вид пули: трассер, хвост и вспышка у ствола ([BulletLook]). Только вид —
-## попадания держит форма пули, и её здесь не трогают.
+## Bullet look: tracer, tail and muzzle flash ([BulletLook]). Looks only —
+## hits are handled by the bullet shape, and it is not touched here.
 
 const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
 
@@ -32,9 +32,10 @@ func test_the_trail_is_behind_the_bullet() -> void:
 		)
 
 
-## Вспышка у ствола — импульс света на несколько кадров, а не весь полёт
-## пули: с M24a пуля втрое быстрее, и свет, едущий с ней, гас бы за кадр в
-## метре от стрелка (ADR-0037, решение 5). Узел вспышки убирает себя сам.
+## The muzzle flash is a light pulse for a few frames, not for the whole flight of
+## the bullet: since M24a the bullet is three times faster, and a light riding with it would
+## go out within a frame a metre from the shooter (ADR-0037, decision 5). The flash node
+## removes itself.
 func test_the_muzzle_flash_is_a_short_pulse_that_cleans_up() -> void:
 	var host := Node3D.new()
 	add_child_autofree(host)
@@ -48,8 +49,8 @@ func test_the_muzzle_flash_is_a_short_pulse_that_cleans_up() -> void:
 	assert_false(is_instance_valid(fx), "дымок рассеялся — узла нет")
 
 
-## Ядро светится эмиссией, а unshaded Godot 4 эмиссию не берёт: ядро горело бы
-## альбедо, не ярче единицы, и ореола у трассера не было бы (авторевью M21).
+## The core glows with emission, and Godot 4 unshaded does not take emission: the core would
+## shine with albedo, no brighter than one, and the tracer would have no halo (code review M21).
 func test_the_core_glows_brighter_than_the_frame() -> void:
 	var core := _look(1.0).get_node("Core") as MeshInstance3D
 	var material := core.material_override as StandardMaterial3D
@@ -64,5 +65,5 @@ func test_the_bullet_wears_the_tracer_and_keeps_its_shape() -> void:
 	var bullet := BULLET_SCENE.instantiate() as Bullet
 	add_child_autofree(bullet)
 	assert_not_null(bullet.get_node_or_null("Look"), "у пули вид трассера")
-	# Форма пули — то, от чего приседают и уклоняются: вид её не меняет.
+	# The bullet shape is what one crouches and dodges from: the look does not change it.
 	assert_almost_eq(bullet.half_length(), 0.09, 0.001)

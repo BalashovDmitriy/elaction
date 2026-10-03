@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Авторы для страницы «Авторы» в меню (ADR-0042, решение 6).
+"""Authors for the "Credits" page in the menu (ADR-0042, decision 6).
 
-Источник — `CREDITS.md`: его правят руками, когда в проект приходит чужой
-ассет. Сам он в сборку не идёт — это markdown в корне, — поэтому игра читает
-`assets/credits.json`, собранный отсюда: разделы в порядке файла, в каждом —
-авторы в порядке первого появления и их лицензии. Свои работы проекта
-(«elaction») в список не идут.
+The source is `CREDITS.md`: it is edited by hand when a third-party asset comes into
+the project. It does not go into the build itself — it is markdown in the root — so the
+game reads `assets/credits.json`, built from here: sections in file order, in each —
+authors in order of first appearance and their licences. The project's own works
+("elaction") do not go into the list.
 
-    python tools/build_credits.py            # пересобрать assets/credits.json
-    python tools/build_credits.py --check    # только сверить, код 1 — расходятся
+    python tools/build_credits.py            # rebuild assets/credits.json
+    python tools/build_credits.py --check    # only compare, exit code 1 — they differ
 
-Тест `test_credits` сверяет то же самое из игры.
+The `test_credits` test checks the same thing from the game.
 """
 
 from __future__ import annotations
@@ -24,17 +24,17 @@ ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "CREDITS.md"
 TARGET = ROOT / "assets" / "credits.json"
 
-# Раздел `CREDITS.md` — ключ перевода его заголовка на странице.
+# A `CREDITS.md` section — the translation key of its heading on the page.
 SECTIONS = {
-    "Люди и машины": "UI_CREDITS_ACTORS",
-    "Обстановка и крыша": "UI_CREDITS_PROPS",
-    "Фактуры": "UI_CREDITS_TEXTURES",
-    "Город и небо": "UI_CREDITS_CITY",
-    "Звук": "UI_CREDITS_SOUND",
-    "Шрифты": "UI_CREDITS_FONTS",
+    "People and cars": "UI_CREDITS_ACTORS",
+    "Props and roof": "UI_CREDITS_PROPS",
+    "Textures": "UI_CREDITS_TEXTURES",
+    "City and sky": "UI_CREDITS_CITY",
+    "Sound": "UI_CREDITS_SOUND",
+    "Fonts": "UI_CREDITS_FONTS",
 }
-AUTHOR = "Автор"
-LICENCE = "Лицензия"
+AUTHOR = "Author"
+LICENCE = "Licence"
 OWN = "elaction"
 
 
@@ -43,7 +43,7 @@ def _cells(line: str) -> list[str]:
 
 
 def parse(text: str) -> list[dict]:
-    """Разделы с авторами: [{key, authors: [{name, licences}]}]."""
+    """Sections with authors: [{key, authors: [{name, licences}]}]."""
     sections: list[dict] = []
     current: dict | None = None
     header: list[str] = []

@@ -1,66 +1,68 @@
 class_name ShaftHazards
 extends RefCounted
 
-## Правила гибели в шахте лифта: падение и сдавливание кабиной.
+## Rules of death in an elevator shaft: falling and being crushed by a cab.
 ##
-## Физику определяют узлы, а решение «жив или нет» принимается здесь: так его
-## видно в одном месте и можно проверить тестами. Основания — в ADR-0004
-## и ADR-0037, решение 7.
+## Nodes determine the physics, and the "alive or not" decision is made here: this way
+## it is visible in one place and can be checked by tests. Grounds are in ADR-0004
+## and ADR-0037, decision 7.
 
-## Сколько сверх этажа падение ещё считается падением на этаж, в долях этажа.
+## How much beyond a floor a fall still counts as a one-floor fall, as a fraction of a
+## floor.
 ##
-## Ровно этажа не бывает почти никогда. Крыша кабины ниже пола над ней на
-## толщину плиты — упавший на кабину двумя этажами ниже пролетает этаж и плиту.
-## Опускающаяся кабина уходит из-под падающего, и крыша, бывшая этажом ниже в
-## миг шага, встречает его ниже. Половина этажа — граница между «на этаж» и
-## «на два»: ближе к двум, чем к одному, — уже два.
+## An exact floor almost never happens. A cab roof is lower than the floor above it by
+## the slab thickness: someone falling onto a cab two floors below flies past a floor and
+## a slab. A descending cab moves away from under the faller, and a roof that was one
+## floor lower at the moment of the step meets him lower. Half a floor is the border
+## between "one floor" and "two": closer to two than to one already means two.
 const FALL_SLACK: float = 0.5
-## Насколько тело может выступать за борт кабины и всё ещё считаться «целиком
-## под ней», м: пара сантиметров на округление положения, не больше.
+## How far a body may stick out past the cab side and still count as "entirely
+## under it", m: a couple of centimeters for position rounding, no more.
 const UNDER_SLACK: float = 0.04
 
 
-## Смертельно ли приземление после падения на [param drop] метров.
+## Whether landing after a fall of [param drop] meters is fatal.
 ##
-## Одно правило на всё, на что можно упасть: пол, крышу кабины и дно шахты.
-## Спрыгнуть на этаж ниже или на кабину этажом ниже можно, с двух этажей и
-## глубже — смерть. Прежнее «дно шахты убивает, крыша кабины спасает с любой
-## высоты» ушло в M24a: его нельзя было понять из игры. Глубина считается от
-## последней опоры, а не от верхней точки прыжка — свой прыжок к падению
-## не прибавляет.
+## One rule for everything you can fall onto: the floor, a cab roof and the shaft
+## bottom. Jumping down one floor or onto a cab one floor lower is fine; from two floors
+## and deeper it is death. The former "the shaft bottom kills, a cab roof saves from any
+## height" went away in M24a: it could not be understood from the game. Depth is counted
+## from the last support, not from the top point of the jump: your own jump does not add
+## to the fall.
 static func is_deadly_fall(drop: float, floor_height: float) -> bool:
 	return drop > floor_height * (1.0 + FALL_SLACK)
 
 
-## Раздавит ли кабина того, кто попал ей под днище.
+## Whether the cab will crush someone who has got under its bottom.
 ##
-## Само перекрытие областей проверяет узел; здесь решается остальное. Смертельно
-## сочетание трёх вещей: кабина идёт вниз, деться жертве некуда (она стоит на
-## полу) и это не пассажир — тот стоит на полу кабины и едет с ней заодно.
+## The node checks the overlap of areas itself; the rest is decided here. Fatal is the
+## combination of three things: the cab is going down, the victim has nowhere to go (it
+## stands on the floor), and it is not a passenger, who stands on the cab floor and rides
+## along with it.
 ##
-## Флагами [code]is_on_ceiling[/code] это не ловится: кабина двигает игрока
-## физическим сервером, а флаг выставляет только собственный move_and_slide.
+## The [code]is_on_ceiling[/code] flags do not catch this: the cab moves the player
+## through the physics server, and the flag is set only by its own move_and_slide.
 ##
-## Четвёртое условие — с M24h, по ROM (@4A30, @46E9): жертва под днищем
-## [b]целиком[/b]. Задетого краем кабина не давит, а выталкивает к краю шахты
-## ([method push_out]); раньше случайное касание бортом убивало (ADR-0044,
-## решение 6).
+## The fourth condition, since M24h, per the ROM (@4A30, @46E9): the victim is under the
+## bottom [b]entirely[/b]. Someone caught by the edge is not crushed by the cab but pushed
+## out to the shaft edge ([method push_out]); previously an accidental touch of the side
+## killed (ADR-0044, decision 6).
 static func crushes(
 	car_speed: float, victim_grounded: bool, victim_is_passenger: bool, fully_under: bool = true
 ) -> bool:
 	return car_speed > 0.0 and victim_grounded and not victim_is_passenger and fully_under
 
 
-## Целиком ли тело шириной [param body_width] с серединой в [param body_x]
-## стоит под кабиной шириной [param car_width] с серединой в [param car_x].
+## Whether a body of width [param body_width] with its middle at [param body_x] stands
+## entirely under a cab of width [param car_width] with its middle at [param car_x].
 static func is_fully_under(
 	body_x: float, body_width: float, car_x: float, car_width: float
 ) -> bool:
 	return absf(body_x - car_x) + body_width * 0.5 <= car_width * 0.5 + UNDER_SLACK
 
 
-## Куда выталкивает кабина задетого краем: середина тела у борта с той
-## стороны, где середина тела (@4713/@4722 ROM, по стороне середины).
+## Where the cab pushes someone caught by the edge: the body's middle at the side on the
+## side where the body's middle is (@4713/@4722 ROM, by the side of the middle).
 static func push_out(body_x: float, body_width: float, car_x: float, car_width: float) -> float:
 	var side := 1.0 if body_x >= car_x else -1.0
 	return car_x + side * (car_width + body_width) * 0.5

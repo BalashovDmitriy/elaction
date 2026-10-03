@@ -1,77 +1,77 @@
 class_name ElevatorCar
 extends AnimatableBody3D
 
-## Кабина лифта.
+## Elevator cab.
 ##
-## Решение о движении принимает [ElevatorMotion]; узел только переносит его в
-## координату и раздаёт события. Кабина слушается Otto, пока он внутри, и ездит
-## сама, когда пуста (ADR-0004, пункты 1 и 4).
+## The movement decision is made by [ElevatorMotion]; the node only turns it into a
+## coordinate and hands out events. The cab obeys Otto while he is inside, and moves
+## on its own when empty (ADR-0004, points 1 and 4).
 ##
-## Стоящего на крыше переносит физика: [member AnimatableBody3D.sync_to_physics].
-## Управлять кабиной с крыши нельзя — в оригинале так же.
+## Whoever stands on the roof is carried by physics: [member AnimatableBody3D.sync_to_physics].
+## The cab cannot be controlled from the roof — same as in the original.
 ##
-## [ElevatorMotion] считает в координатах правил, где вниз — это рост Y. Узел
-## переводит это в сцену в одном месте, [method _place], и больше о развороте
-## Y не знает: правило движения при переезде не тронуто (ADR-0021, решение 2).
+## [ElevatorMotion] works in rules coordinates, where down means growing Y. The node
+## converts this to the scene in one place, [method _place], and knows nothing else about the Y
+## flip: the movement rule was left untouched by the move (ADR-0021, decision 2).
 
-## Кабина совпала с этажом и из неё можно выйти.
+## The cab is level with a floor and one can step out of it.
 signal floor_reached(index: int)
 
-## Трогание и остановка кабины: докуда слышно, м, и насколько тише гула, дБ.
+## Cab start and stop: how far it is heard, m, and how much quieter than the hum, dB.
 const CLUNK_REACH: float = 12.0
 const CLUNK_DB: float = -4.0
 
-## Докуда слышно гул кабины, м. Дальше по этажу он уже не мешает.
+## How far the cab hum is heard, m. Farther along the floor it no longer gets in the way.
 const HUM_REACH: float = 10.8
 
-## Насколько гаснет указатель, когда в эту сторону ходу нет.
+## How much an arrow dims when there is no travel in that direction.
 const ARROW_DIM: float = 0.18
 
-## Индикаторы на крыше кабины: габарит, разнос от середины в долях ширины
-## кабины и на сколько их середина выше крыши, м. Два красных огонька —
-## читаемость кабины на погашенном этаже (ADR-0023, решение 6).
+## Indicators on the cab roof: size, spread from the middle as a fraction of cab
+## width and how far their middle is above the roof, m. Two red indicator lights —
+## cab readability on a darkened floor (ADR-0023, decision 6).
 const INDICATOR_SIZE := Vector3(0.1, 0.06, 0.1)
 const INDICATOR_SPREAD: float = 0.35
 const INDICATOR_RISE: float = 0.03
 
-## Стрелки в кабине: разнос от середины в долях ширины кабины.
+## Arrows in the cab: spread from the middle as a fraction of cab width.
 const ARROW_SPREAD: float = 0.275
 
-## Насколько проём входа и зона сдавливания уже самой кабины, м: у краёв
-## остаётся по 6 см, чтобы стоящий на полу этажа вплотную к шахте не считался
-## ни пассажиром, ни придавленным.
+## How much narrower the entry opening and the crush zone are than the cab itself, m: at the edges
+## 6 cm remain on each side, so that someone standing on the floor right next to the shaft counts
+## neither as a passenger nor as crushed.
 const INNER_INSET: float = 0.12
 
-## Толщина пола и крыши кабины, м. Задана сценой; здесь она нужна затем, что
-## высоту кабина берёт из правил здания, а не из сцены.
+## Thickness of the cab floor and roof, m. Set by the scene; it is needed here because
+## the cab takes its height from the building rules, not from the scene.
 const SLAB_THICKNESS: float = 0.18
 
-## Насколько ступни могут отстоять от пола кабины, чтобы Otto считался стоящим
-## на нём, м: на прижим к полу у движка и на кадр хода кабины, и только на них.
+## How far the feet may be from the cab floor for Otto to count as standing
+## on it, m: for the engine's floor snap and for one frame of cab travel, and only for those.
 const BOARD_REACH: float = 0.08
 
-## Просвет этажа и ширина шахты по умолчанию, м — те же, что у стандартных
-## правил. Кабина строится по ним, пока уровень не сказал своё — так одиночная
-## кабина, поднятая тестом без здания, всё равно собрана целиком.
+## Default floor clearance and shaft width, m — the same as in the standard
+## rules. The cab is built from them until the level says otherwise — so a single
+## cab spawned by a test without a building is still fully assembled.
 const DEFAULT_CLEAR_HEIGHT: float = Proportions.CLEARANCE
 const DEFAULT_WIDTH: float = Proportions.SHAFT
 
-## На сколько стрелки утоплены от крыши, м.
+## How deep the arrows are recessed from the roof, m.
 const ARROW_DROP: float = 0.3
 
-## Тяги между ярусами пары: сечение, разнос от середины в долях ширины кабины
-## и глубина, м.
+## Tie rods between the decks of a pair: section, spread from the middle as a fraction of cab width
+## and depth, m.
 ##
-## Ярусы скреплены и едут вместе, но стоят через этаж — между крышей нижнего и
-## днищем верхнего остаётся этаж пустоты. Без тяг это две отдельные кабины,
-## которые почему-то ходят вместе (ADR-0025, решение 1).
+## The decks are tied together and move together, but stand a floor apart — between the lower one's
+## roof and the upper one's bottom there is a floor of emptiness. Without rods these are two
+## separate cabs that for some reason move together (ADR-0025, decision 1).
 const TIE_WIDTH: float = 0.1
 const TIE_SPREAD: float = 0.45
 const TIE_DEPTH: float = 0.6
 
-## Ход кабины по ROM: 2 px за тик логики, этаж за 1.6 с (ADR-0027, решение 4).
-## Полоса над полом кабины, в которой части тела лежат на пороге, м: ниже —
-## на плиту, выше — на толщину лежащего тела.
+## Cab travel per ROM: 2 px per logic tick, a floor in 1.6 s (ADR-0027, decision 4).
+## The band above the cab floor in which body parts lie on the threshold, m: below —
+## on the slab, above — on the thickness of a lying body.
 const TEAR_REACH: float = 0.25
 const TEAR_HEIGHT: float = 0.45
 
@@ -83,24 +83,24 @@ var _occupant: PhysicsBody3D = null
 var _command: float = 0.0
 var _aligned_floor: int = -1
 
-## Ведущий ярус пары. Пустой — кабина обычная и ходит сама.
+## The lead deck of a pair. Empty — the cab is regular and moves on its own.
 var _leader: ElevatorCar = null
-## Нижний ярус пары, если он есть. Держит его ведущий.
+## The lower deck of a pair, if there is one. The lead holds it.
 var _deck: ElevatorCar = null
-## На сколько нижний ярус ниже ведущего, м.
+## How far the lower deck is below the lead, m.
 var _deck_drop: float = 0.0
 
 var _hum: AudioStreamPlayer3D = null
-## Ехала ли кабина в прошлый шаг: по смене — звук трогания и остановки.
+## Whether the cab moved in the previous step: on change — the start and stop sound.
 var _was_moving: bool = false
-## Огоньки на крыше: их двигает [method fit_to_story], когда меняется высота.
+## Indicator lights on the roof: [method fit_to_story] moves them when the height changes.
 var _indicators: Array[MeshInstance3D] = []
-## Ширина кабины, м. Задаёт её [method fit_to_story] из правил здания.
+## Cab width, m. Set by [method fit_to_story] from the building rules.
 var _width: float = DEFAULT_WIDTH
-## Стенки, светильник, пульт, тросы и противовес — только вид (ADR-0031).
+## Walls, light fixture, control panel, ropes and counterweight — looks only (ADR-0031).
 var _detail: CarDetail = null
-## Тела, которые днище начало резать: у срезанного целиком формы нет, и зона
-## давки его уже не видит, а срез идёт до пола.
+## Bodies the bottom has started to cut: a fully cut one has no shape, and the crush
+## zone no longer sees it, while the cut continues down to the floor.
 var _cutting: Array[Corpse] = []
 @onready var _interior: Area3D = $Interior
 @onready var _crush_zone: Area3D = $CrushZone
@@ -111,9 +111,9 @@ var _cutting: Array[Corpse] = []
 func _ready() -> void:
 	_interior.body_exited.connect(_on_body_exited)
 	_hum = Sounds.source(self, Sounds.ELEVATOR_HUM, HUM_REACH)
-	# Кабина — то, на чём стоят и в чём едут: читаться она обязана и на
-	# погашенном этаже (ADR-0019, решение 5). Держат это два индикатора на
-	# крыше, а сама кабина — металл, как шахта.
+	# The cab is what you stand on and ride in: it must read even on a
+	# darkened floor (ADR-0019, decision 5). Two indicators on the roof
+	# take care of this, and the cab itself is metal, like the shaft.
 	var slab := GreyboxLook.metal(GreyboxLook.CAR)
 	($FloorVisual as MeshInstance3D).material_override = slab
 	($RoofVisual as MeshInstance3D).material_override = slab
@@ -131,32 +131,32 @@ func _ready() -> void:
 	fit_to_story(DEFAULT_CLEAR_HEIGHT, DEFAULT_WIDTH)
 
 
-## Одевает кабину по типу здания (ADR-0057, решение 6). Звать до
-## [method fit_to_story]: тот собирает одежду.
+## Dresses the cab by building kind (ADR-0057, decision 6). Call before
+## [method fit_to_story]: that one assembles the dressing.
 func dress_as(kind: BuildingIdentity.Kind) -> void:
 	if _detail != null:
 		_detail.dress_as(kind)
 
 
-## Растягивает кабину на просвет этажа и ширину шахты: пол на полу этажа, крыша
-## у низа плиты, борта у стенок шахты.
+## Stretches the cab to the floor clearance and shaft width: floor on the storey floor, roof
+## at the slab underside, sides at the shaft walls.
 ##
-## **Кабина занимает просвет целиком — как в оригинале.** Сверка по кадру
-## (256×224): шаг этажа 48 px, плита 7, просвет 41, кабина 40. У нас она была
-## 1.8 м при просвете 3.0 — ровно вполовину ниже, и это расхождение нигде
-## не решалось: размер приехал из 2D-версии M2 и пережил пересчёт пропорций M13
-## (ADR-0025, решение 10).
+## **The cab fills the clearance entirely — as in the original.** Checked against a frame
+## (256×224): floor pitch 48 px, slab 7, clearance 41, cab 40. Ours was
+## 1.8 m with a 3.0 clearance — exactly half as tall, and this discrepancy was never
+## decided anywhere: the size came from the M2 2D version and survived the M13 proportion
+## recalculation (ADR-0025, decision 10).
 ##
-## Езде на крыше полная высота не мешает: крыша встаёт у низа плиты, а плита
-## в этом месте прорезана шахтой — стоящий на крыше стоит в проёме, и корпус
-## уходит в этаж выше. Так же это устроено и в оригинале.
+## Full height does not hinder riding on the roof: the roof stands at the slab underside, and the
+## slab is cut through by the shaft there — whoever stands on the roof stands in the opening, and
+## the body goes into the floor above. The original works the same way.
 ##
-## Размеры задаёт уровень из правил здания, а не сцена: [member
-## BuildingRules.floor_height], [member BuildingRules.slab_height] и [member
-## BuildingRules.shaft_width] — экспортируемые поля, и здание с другими
-## пропорциями собирают тесты. Ширина пришла сюда в M18c: шахта выросла
-## до 1.8 м, а кабина из сцены осталась бы в 1.2 и болталась бы в ней
-## (ADR-0026, решение 3).
+## Sizes are set by the level from the building rules, not by the scene: [member
+## BuildingRules.floor_height], [member BuildingRules.slab_height] and [member
+## BuildingRules.shaft_width] are exported fields, and tests build buildings with other
+## proportions. Width arrived here in M18c: the shaft grew
+## to 1.8 m, while the cab from the scene would have stayed at 1.2 and rattled around in it
+## (ADR-0026, decision 3).
 func fit_to_story(clear_height: float, car_width: float) -> void:
 	_width = car_width
 	if _detail != null:
@@ -189,20 +189,20 @@ func fit_to_story(clear_height: float, car_width: float) -> void:
 		)
 
 
-## Ширина кабины, м.
+## Cab width, m.
 func width() -> float:
 	return _width
 
 
-## Высота низа днища в сцене, м: по ней кабина режет тех, кто под ней.
+## Height of the bottom underside in the scene, m: by it the cab cuts those below it.
 func bottom() -> float:
 	return global_position.y + _under_the_floor()
 
 
-## Меняет габарит формы по ширине и, если задана, по высоте.
+## Changes the shape's size by width and, if given, by height.
 ##
-## Форма своя на каждую кабину: подресурс сцены общий на все её копии, и
-## правка размера на месте растянула бы заодно все остальные кабины здания.
+## Each cab has its own shape: the scene subresource is shared by all its copies, and
+## resizing it in place would stretch all the other cabs of the building as well.
 static func _resize(shape: CollisionShape3D, box_width: float, box_height: float = -1.0) -> void:
 	var box := (shape.shape as BoxShape3D).duplicate() as BoxShape3D
 	box.size.x = box_width
@@ -213,15 +213,15 @@ static func _resize(shape: CollisionShape3D, box_width: float, box_height: float
 
 func _physics_process(delta: float) -> void:
 	_admit_riders()
-	# Решётка грузовой кабины — вид окна выхода ROM (ADR-0057, решение 6);
-	# лязгает только кабина с Otto, как и пуск с остановкой.
+	# The freight cab grille is the look of the ROM step-out window (ADR-0057, decision 6);
+	# only the cab with Otto clangs, as with start and stop.
 	_detail.tend_gate(can_step_out(), delta, _carries_otto())
 	if _leader != null:
 		_ride_along()
 		return
 
-	# Пассажир любого яруса ведёт всю пару: ярусы скреплены, и своего хода
-	# у нижнего нет.
+	# A passenger of either deck drives the whole pair: the decks are tied, and the lower one
+	# has no travel of its own.
 	var occupied := has_rider() or (_deck != null and _deck.has_rider())
 	_place(_motion.update(delta, _command if occupied else 0.0, occupied))
 	_detail.follow(global_position.y, global_position.x)
@@ -230,18 +230,18 @@ func _physics_process(delta: float) -> void:
 	if reached != _aligned_floor:
 		_aligned_floor = reached
 		if reached >= 0:
-			# Звонка на этаже нет с M21: решение пользователя — звенели все кабины,
-			# и пустые тоже, на каждом проезжаемом этаже, будто звонят в дверь.
+			# There is no floor bell since M21: the user's decision — all cabs rang,
+			# empty ones too, on every floor passed, as if someone rang the doorbell.
 			floor_reached.emit(reached)
 
-	# Гул идёт, пока кабина едет. Источник позиционный: шахт в здании пять,
-	# и слышно должно быть только ту, рядом с которой стоишь.
+	# The hum plays while the cab moves. The source is positional: there are five shafts in a
+	# building, and only the one you stand next to should be heard.
 	var moving := not is_zero_approx(_motion.velocity)
 	Sounds.keep_playing(_hum, moving)
 	if moving != _was_moving:
 		_was_moving = moving
-		# Трогается и встаёт — лязгом, только кабина с Otto: звенящие на каждом
-		# этаже пустые кабины пользователь уже отверг в M21 (ADR-0052, решение 7).
+		# Starts and stops with a clang, only the cab with Otto: empty cabs ringing on every
+		# floor were already rejected by the user in M21 (ADR-0052, decision 7).
 		if _carries_otto():
 			var clunk := Sounds.ELEVATOR_START if moving else Sounds.ELEVATOR_STOP
 			Sounds.play_at(self, clunk, global_position, CLUNK_REACH, CLUNK_DB)
@@ -251,15 +251,15 @@ func _physics_process(delta: float) -> void:
 	_tear_across_the_walls(_motion.velocity)
 
 
-## Задаёт шахту: координаты этажей-остановок в правилах и этаж, с которого
-## кабина начинает.
+## Sets the shaft: coordinates of the stop floors in the rules and the floor the
+## cab starts from.
 func setup(stops: PackedFloat32Array, start_floor: int = 0) -> void:
 	_motion.speed = speed
 	_motion.floor_pause = floor_pause
 	_motion.setup(stops, start_floor)
 	_place(_motion.position)
 	_aligned_floor = _motion.aligned_floor()
-	# Тросы и противовес: остановки — высоты правил, у сцены ось y вверх.
+	# Ropes and counterweight: stops are rules heights, the scene's y axis points up.
 	if _detail != null and not stops.is_empty():
 		var low := WorldSpace.height_to_scene(Array(stops).max())
 		var high := WorldSpace.height_to_scene(Array(stops).min())
@@ -268,11 +268,11 @@ func setup(stops: PackedFloat32Array, start_floor: int = 0) -> void:
 		_detail.follow(global_position.y, global_position.x)
 
 
-## Верх шахты [param top] в плоскости правил: докуда идут тросы и противовес.
+## Top of the shaft [param top] in the rules plane: how far the ropes and counterweight go.
 ##
-## Без этого верх — потолок верхней остановки. У шахты на крышу над верхней
-## остановкой небо, и тросы уходили бы на три метра над настилом — выше
-## машинного отделения. Верх ей даёт уровень: [method BuildingShafts.top_of].
+## Without this the top is the ceiling of the highest stop. A shaft to the roof has sky above the
+## highest stop, and the ropes would go three metres above the deck — higher than the
+## machine room. The level gives it the top: [method BuildingShafts.top_of].
 func set_shaft_top(top: float) -> void:
 	if _detail == null:
 		return
@@ -280,41 +280,41 @@ func set_shaft_top(top: float) -> void:
 	_detail.follow(global_position.y, global_position.x)
 
 
-## Делает кабину нижним ярусом пары: своего хода у неё больше нет, она держится
-## на [param drop] метров ниже ведущего и отдаёт ему всё, что от неё хотят.
+## Makes the cab the lower deck of a pair: it no longer has travel of its own, it keeps
+## [param drop] metres below the lead and passes it everything asked of it.
 ##
-## Своим узлом, а не вторым телом внутри ведущего: в кабину входят, на её крыше
-## стоят и под её днищем гибнут — ярусу нужны и свой [Area3D] входа, и своя
-## зона сдавливания, и своя крыша. Копия сцены даёт всё это разом.
+## As its own node, not a second body inside the lead: people enter the cab, stand on its
+## roof and die under its bottom — the deck needs its own entry [Area3D], its own
+## crush zone and its own roof. A copy of the scene gives all of this at once.
 func serve_as_deck(leader: ElevatorCar, drop: float) -> void:
 	_leader = leader
 	_deck_drop = drop
 	leader.take_a_deck(self, drop)
 	_ride_along()
-	# Свои источники звука у яруса остаются, но молчат: гудит и звенит ведущий,
-	# а пара в одной шахте звучала бы вдвое громче одиночной кабины.
+	# The deck keeps its own sound sources, but they are silent: the lead hums and rings,
+	# and a pair in one shaft would sound twice as loud as a single cab.
 
 
-## Есть ли кто-нибудь в этой кабине.
+## Whether anyone is in this cab.
 func has_rider() -> bool:
 	return _occupant != null
 
 
-## Ярус ли это двухэтажной пары. У яруса нет своего хода: он держится
-## за ведущим и все вопросы о движении передаёт ему.
+## Whether this is a deck of a two-storey pair. A deck has no travel of its own: it keeps
+## to the lead and passes all movement questions to it.
 func is_deck() -> bool:
 	return _leader != null
 
 
-## Может ли кабина ещё пойти в эту сторону. У яруса пары решает ведущий.
+## Whether the cab can still go in this direction. For a pair's deck the lead decides.
 func can_go(towards: float) -> bool:
 	return _leader.can_go(towards) if _leader != null else _motion.can_go(towards)
 
 
-## Запирает или открывает нижнюю остановку шахты ([member ElevatorMotion.bottom_locked]).
+## Locks or unlocks the shaft's bottom stop ([member ElevatorMotion.bottom_locked]).
 ##
-## У яруса пары своего хода нет — запирает ведущий: у двухэтажной пары его
-## нижняя остановка и есть та, где нижний ярус стоит на дне шахты.
+## A pair's deck has no travel of its own — the lead locks: for a two-storey pair its
+## bottom stop is exactly where the lower deck stands at the bottom of the shaft.
 func lock_bottom_stop(locked: bool) -> void:
 	if _leader != null:
 		_leader.lock_bottom_stop(locked)
@@ -322,14 +322,14 @@ func lock_bottom_stop(locked: bool) -> void:
 	_motion.bottom_locked = locked
 
 
-## Заперта ли нижняя остановка шахты.
+## Whether the shaft's bottom stop is locked.
 func is_bottom_locked() -> bool:
 	return _leader.is_bottom_locked() if _leader != null else _motion.bottom_locked
 
 
-## Докуда пара спускается, в плоскости правил: пол нижнего яруса на нижней
-## остановке ведущего. У одиночной кабины — просто её нижняя остановка; NAN —
-## остановок нет.
+## How far down the pair goes, in the rules plane: the lower deck's floor at the lead's
+## bottom stop. For a single cab — simply its bottom stop; NAN —
+## no stops.
 func bottom_reach() -> float:
 	if _leader != null:
 		return _leader.bottom_reach()
@@ -339,23 +339,23 @@ func bottom_reach() -> float:
 	return lowest + (_deck._deck_drop if _deck != null else 0.0)
 
 
-## Задержка отклика на команду, с. По тревоге кабина слушается хуже.
+## Response delay to a command, s. During the alarm the cab responds worse.
 ##
-## У яруса пары своего хода нет, и задержку принимает ведущий: в списке кабин
-## уровня лежат оба, потому что садятся в любой.
+## A pair's deck has no travel of its own, and the lead takes the delay: the level's
+## cab list holds both, because one can board either.
 func set_response_delay(value: float) -> void:
 	if _leader != null:
 		_leader.set_response_delay(value)
 		return
 	_motion.response_delay = maxf(value, 0.0)
-	# Чтобы новая задержка застала и ту поездку, что уже идёт.
+	# So that the new delay also catches the ride already in progress.
 	_motion.forget_command()
 
 
-## Команда от пассажира на этот кадр: -1 вверх, +1 вниз, 0 отпущено.
+## Passenger command for this frame: -1 up, +1 down, 0 released.
 ##
-## Кабина её принимает, но выполняет только от того, кто внутри. Ярус пары
-## передаёт её ведущему: ярусы скреплены, и своей воли у нижнего нет.
+## The cab accepts it, but executes it only from whoever is inside. A pair's deck
+## passes it to the lead: the decks are tied, and the lower one has no will of its own.
 func drive(command: float) -> void:
 	if _leader != null:
 		_leader.drive(command)
@@ -363,29 +363,29 @@ func drive(command: float) -> void:
 	_command = command
 
 
-## Совпал ли пол кабины с полом этажа.
+## Whether the cab floor is level with the storey floor.
 ##
-## У яруса пары спрашивать нечего: ход один на двоих, и шаг этажа один и тот же
-## по всей высоте здания — значит совпали оба яруса или ни один.
+## Nothing to ask a pair's deck: the travel is shared, and the floor pitch is the same
+## over the whole building height — so either both decks are level or neither.
 func is_aligned() -> bool:
 	return _leader.is_aligned() if _leader != null else _motion.is_aligned()
 
 
-## Можно ли сойти из кабины на этаж прямо сейчас — [method ElevatorMotion.can_step_out].
-## У яруса пары отвечает ведущий: шаг этажа один по всей высоте, и ярус
-## на столько же выше этажа под ним, на сколько ведущий.
+## Whether one can step from the cab onto the floor now — [method ElevatorMotion.can_step_out].
+## For a pair's deck the lead answers: the floor pitch is the same over the whole height, and the
+## deck is as far above the floor below it as the lead is.
 func can_step_out() -> bool:
 	return _leader.can_step_out() if _leader != null else _motion.can_step_out()
 
 
-## Берёт нижний ярус под себя и связывает его с собой тягами.
+## Takes the lower deck under itself and ties it with rods.
 ##
-## Зовёт [method serve_as_deck], и только он: пара задаётся с одной стороны,
-## иначе половина связи однажды останется незаданной.
+## Calls [method serve_as_deck], and only it does: the pair is set from one side,
+## otherwise half of the link would one day stay unset.
 func take_a_deck(deck: ElevatorCar, drop: float) -> void:
 	_deck = deck
-	# Зона сдавливания верхнего яруса остаётся: между ярусами этаж пустоты,
-	# на крышу нижнего можно встать, и опускающаяся пара прижмёт стоящего.
+	# The upper deck's crush zone stays: there is a floor of emptiness between the decks,
+	# one can stand on the lower one's roof, and a descending pair will press whoever stands there.
 	var tie := GreyboxLook.metal(GreyboxLook.CAR)
 	var length := drop - _body_height()
 	if length <= 0.0:
@@ -396,26 +396,26 @@ func take_a_deck(deck: ElevatorCar, drop: float) -> void:
 		add_child(strut)
 
 
-## Высота кабины от днища до верха крыши, м.
+## Cab height from the bottom to the top of the roof, m.
 func _body_height() -> float:
 	return _roof_top() - _under_the_floor()
 
 
-## Верх крыши в своих координатах, м.
+## Top of the roof in its own coordinates, m.
 func _roof_top() -> float:
 	return ($RoofVisual as MeshInstance3D).position.y + SLAB_THICKNESS * 0.5
 
 
-## Низ днища в своих координатах, м.
+## Bottom underside in its own coordinates, m.
 func _under_the_floor() -> float:
 	return ($FloorVisual as MeshInstance3D).position.y - SLAB_THICKNESS * 0.5
 
 
-## Держит нижний ярус под ведущим.
+## Keeps the lower deck under the lead.
 ##
-## Ведущий стоит в дереве выше и успевает встать на своё место первым, поэтому
-## ярус берёт его сегодняшнюю высоту, а не вчерашнюю: разъехаться на кадр им
-## нельзя — на этом и держится «совпали оба или ни один».
+## The lead stands higher in the tree and gets to its place first, so
+## the deck takes its current height, not the previous one: they must not drift apart for a
+## frame — "both level or neither" rests on this.
 func _ride_along() -> void:
 	position.y = _leader.position.y - _deck_drop
 	_show_arrows()
@@ -423,9 +423,9 @@ func _ride_along() -> void:
 	_tear_across_the_walls(_leader.speed_now())
 
 
-## Постоять на этаже ещё не меньше [param seconds] — см. [method ElevatorMotion.hold].
-## У яруса пары своего хода нет — стоит ведущий, а с ним и ярус: свой счётчик
-## яруса никто не читает, и придержанный ярус уезжал бы с парой.
+## Stay at the floor for at least [param seconds] more — see [method ElevatorMotion.hold].
+## A pair's deck has no travel of its own — the lead stays, and the deck with it: nobody reads
+## the deck's own counter, and a held deck would drive off with the pair.
 func hold(seconds: float) -> void:
 	if _leader != null:
 		_leader.hold(seconds)
@@ -433,26 +433,26 @@ func hold(seconds: float) -> void:
 	_motion.hold(seconds)
 
 
-## Скорость кабины за последний кадр: её спрашивает нижний ярус, чтобы решить,
-## давит ли он. У яруса пары своего хода нет — отвечает за него ведущий, иначе
-## едущий вниз ярус отчитывался бы нулём и никого не придавил.
+## Cab speed over the last frame: the lower deck asks for it to decide
+## whether it crushes. A pair's deck has no travel of its own — the lead answers for it, otherwise
+## a deck going down would report zero and crush no one.
 func speed_now() -> float:
 	return _leader.speed_now() if _leader != null else _motion.velocity
 
 
-## Указатели: погасшая стрелка объясняет, почему кабина не идёт дальше.
+## Arrows: a dimmed arrow explains why the cab goes no farther.
 func _show_arrows() -> void:
 	_up_arrow.transparency = 0.0 if can_go(Intent.UP) else 1.0 - ARROW_DIM
 	_down_arrow.transparency = 0.0 if can_go(Intent.DOWN) else 1.0 - ARROW_DIM
 
 
-## Ставит кабину на высоту, посчитанную правилами.
+## Puts the cab at the height computed by the rules.
 func _place(height_in_plane: float) -> void:
 	position.y = WorldSpace.height_to_scene(height_in_plane)
 
 
-## Давит тех, кто оказался под днищем едущей вниз кабины, и режет днищем
-## тела под ним (ADR-0043, решения 7–9).
+## Crushes those who ended up under the bottom of a cab going down, and cuts with the bottom
+## the bodies under it (ADR-0043, decisions 7–9).
 func _crush_those_underneath(speed: float) -> void:
 	if speed <= 0.0:
 		return
@@ -463,25 +463,25 @@ func _crush_those_underneath(speed: float) -> void:
 	for body: Node3D in _crush_zone.get_overlapping_bodies():
 		var part := body as PhysicalBone3D
 		if part != null:
-			# Часть упавшего тела под днищем, а не на полу кабины: у лежащей
-			# на полу середина выше днища на плиту и больше.
+			# A part of a fallen body under the bottom, not on the cab floor: one lying
+			# on the floor has its middle above the bottom by a slab or more.
 			if Ragdoll.center_of(part).y < bottom():
 				_start_cutting(Corpse.of(part))
 			continue
 		var agent := body as Enemy
 		if agent != null:
-			# Кабина давит и агентов, как в ROM (ADR-0027, решение 6). Зона
-			# заходит на полу кабины выше днища, и ноги пассажира в неё попадают:
-			# пассажир — тот, кто стоит на полу кабины, а жертва — тот, кто под
-			# днищем. Разводит их высота ступней.
+			# The cab crushes agents too, as in the ROM (ADR-0027, decision 6). The zone
+			# reaches above the bottom on the cab floor, and a passenger's feet get into it:
+			# a passenger is whoever stands on the cab floor, and a victim is whoever is under
+			# the bottom. Feet height tells them apart.
 			var riding := to_local(agent.global_position).y > _under_the_floor()
 			if agent.is_dead() or not _pinned(speed, agent, agent.is_on_floor(), riding):
 				continue
 			agent.kill(true)
 			Sounds.play_at(get_parent(), Sounds.CRUSH, agent.global_position, CLUNK_REACH)
-			# 300 очков — только если давит кабина, в которой едет Otto (@4A97
-			# ROM, ADR-0044, решение 7). Надбавка за темноту — та же, что у
-			# пули и лампы (ADR-0010).
+			# 300 points — only if the crushing cab is the one Otto rides (@4A97
+			# ROM, ADR-0044, decision 7). The darkness bonus is the same as for
+			# a bullet and a lamp (ADR-0010).
 			if _carries_otto():
 				var points := GameState.kill_score(GameState.CRUSH_SCORE, agent.is_in_the_dark())
 				GameState.instance().add_score(points, agent.global_position + GameState.OVER_HEAD)
@@ -493,9 +493,9 @@ func _crush_those_underneath(speed: float) -> void:
 			victim.kill(true)
 
 
-## Прижало ли днищем [param body]: он под кабиной целиком и деваться ему
-## некуда. Задетого краем выталкивает к краю шахты и отпускает живым
-## (ADR-0044, решение 6).
+## Whether the bottom pinned [param body]: it is entirely under the cab and has nowhere
+## to go. One clipped by the edge is pushed to the shaft edge and released alive
+## (ADR-0044, decision 6).
 func _pinned(speed: float, body: Node3D, grounded: bool, passenger: bool) -> bool:
 	if not ShaftHazards.crushes(speed, grounded, passenger):
 		return false
@@ -507,15 +507,15 @@ func _pinned(speed: float, body: Node3D, grounded: bool, passenger: bool) -> boo
 	return false
 
 
-## Едет ли Otto в этой кабине — или в паре, с которой она скреплена.
+## Whether Otto rides in this cab — or in the pair it is tied to.
 func _carries_otto() -> bool:
 	if _leader != null:
 		return _leader._carries_otto()
 	return has_rider() or (_deck != null and _deck.has_rider())
 
 
-## Начинает резать днищем тело [param corpse]; дальше срез ведёт список:
-## срезанная часть пропадает, и зона давки её уже не видит.
+## Starts cutting the body [param corpse] with the bottom; from then on the list drives the cut:
+## the cut part disappears, and the crush zone no longer sees it.
 func _start_cutting(corpse: Corpse) -> void:
 	if corpse == null or corpse.cut != null or corpse.gone:
 		return
@@ -524,9 +524,9 @@ func _start_cutting(corpse: Corpse) -> void:
 		_cutting.append(corpse)
 
 
-## Рвёт стенкой тела, лежащие поперёк порога едущей кабины (ADR-0043,
-## решение 11): части внутри уезжают с кабиной, части снаружи остаются. Без
-## крови не рвёт — тело тянут суставы.
+## Tears with the wall bodies lying across the threshold of a moving cab (ADR-0043,
+## decision 11): parts inside ride away with the cab, parts outside stay. Without
+## blood it does not tear — the joints pull the body.
 func _tear_across_the_walls(speed: float) -> void:
 	if not Blood.enabled or is_zero_approx(speed):
 		return
@@ -538,8 +538,8 @@ func _tear_across_the_walls(speed: float) -> void:
 		var corpse := Corpse.of(node)
 		if corpse == null or corpse.gone or corpse.torn or corpse.cut != null:
 			continue
-		# Трупов до конца здания много, а кабин в ходу — каждая: сперва
-		# дешёвая прикидка по одной части, габарит — только у близких.
+		# There are many corpses until the end of the building, and every cab in motion: first
+		# a cheap estimate by one part, the bounds — only for close ones.
 		if not corpse.near(x, _width):
 			continue
 		var reach := corpse.span()
@@ -550,18 +550,18 @@ func _tear_across_the_walls(speed: float) -> void:
 			corpse.tear(self, inside)
 
 
-## Сажает Otto, если он в проёме и в кабину можно войти (ADR-0037, решение 1).
+## Boards Otto if he is in the opening and the cab can be entered (ADR-0037, decision 1).
 ##
-## Одного перекрытия мало: проём кабины высотой в просвет, и тело заходит в него
-## задолго до того, как кабина подъехала. Раньше этого хватало — и Otto
-## становился пассажиром кабины, стоящей на пару метров ниже этажа. Занятая
-## кабина без команды стоит, а невровень с этажом из неё не шагнуть: оба
-## застывали навсегда. А сверху занятость ещё и спасала от сдавливания того,
-## кто стоит под днищем.
+## Overlap alone is not enough: the cab opening is as tall as the clearance, and the body enters it
+## long before the cab has arrived. That used to be enough — and Otto
+## became a passenger of a cab standing a couple of metres below the floor. An occupied
+## cab without a command stands still, and one cannot step out of it unless level: both
+## froze forever. On top of that, occupancy also saved whoever stood under the bottom
+## from being crushed.
 ##
-## Поэтому пассажир — тот, кто вошёл в стоящую вровень кабину или уже стоит на
-## её полу. Перекрытие проверяется каждый кадр, пока кабина пуста: вход в зону
-## случается один раз, а войти можно и позже — когда кабина доедет.
+## So a passenger is whoever entered a cab standing level or already stands on
+## its floor. Overlap is checked every frame while the cab is empty: entering the zone
+## happens once, but one can enter later too — when the cab arrives.
 func _admit_riders() -> void:
 	if _occupant != null:
 		return
@@ -574,12 +574,12 @@ func _admit_riders() -> void:
 		return
 
 
-## Можно ли Otto войти в кабину прямо сейчас: она вровень с этажом или он уже
-## стоит на её полу.
+## Whether Otto can enter the cab right now: it is level with the floor or he already
+## stands on its floor.
 ##
-## Стоит на полу — значит ступни у верха днища в пределах [constant
-## BOARD_REACH]; тот, кто в проёме над опущенной кабиной, ещё падает на её
-## пол и сядет, когда встанет.
+## Standing on the floor means feet near the top of the bottom within [constant
+## BOARD_REACH]; whoever is in the opening above a lowered cab is still falling onto its
+## floor and will board once he lands.
 func _can_board(rider: Otto) -> bool:
 	if is_aligned():
 		return true
@@ -591,8 +591,8 @@ func _on_body_exited(body: Node3D) -> void:
 	if rider == null or rider != _occupant:
 		return
 	_occupant = null
-	# Через [method drive], а не полем: у яруса пары команду исполняет ведущий,
-	# и забытая у него «вниз» тронула бы пару с места в тот кадр, когда в неё
-	# войдёт следующий, — ещё до того, как тот успеет нажать хоть что-то.
+	# Through [method drive], not a field: for a pair's deck the lead executes the command,
+	# and a "down" left over on it would start the pair the frame the next one
+	# enters — before he even gets to press anything.
 	drive(0.0)
 	rider.leave(self)

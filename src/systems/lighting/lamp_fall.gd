@@ -1,16 +1,16 @@
 class_name LampFall
 extends RefCounted
 
-## Падение лампы: сбита или нет, сколько пролетела, долетела ли.
+## Lamp fall: shot down or not, how far it has fallen, whether it reached the floor.
 ##
-## Ни узлов, ни физики — узел спрашивает, на сколько сдвинуться в этом кадре.
-## Тем же приёмом, что [DoorVisit] и [EnemyBrain]: правила проверяются без сцены,
-## как требуют соглашения проекта.
+## No nodes, no physics — the node asks how far to move in this frame. The same trick
+## as [DoorVisit] and [EnemyBrain]: the rules are checked without a scene, as the project
+## conventions require.
 
-## Скорость падения, px/с.
+## Fall speed, px/s.
 var speed: float = 780.0
 
-## Сколько лететь до пола, px. Считается от формы самой лампы.
+## How far to fall to the floor, px. Computed from the lamp's own shape.
 var distance: float = 120.0
 
 var falling: bool = false
@@ -18,8 +18,9 @@ var falling: bool = false
 var _fallen: float = 0.0
 
 
-## Сбивает лампу. Возвращает false, если она уже падает или давно упала: иначе
-## вторая пуля в том же кадре подняла бы её обратно — узел исчезает не сразу.
+## Shoots the lamp down. Returns false if it is already falling or fell long ago:
+## otherwise a second bullet in the same frame would raise it back — the node does not
+## disappear at once.
 func start() -> bool:
 	if falling or _fallen > 0.0:
 		return false
@@ -27,7 +28,7 @@ func start() -> bool:
 	return true
 
 
-## На сколько лампа сдвигается вниз в этом кадре. Ноль, пока висит или уже упала.
+## How far the lamp moves down in this frame. Zero while it hangs or has already fallen.
 func advance(delta: float) -> float:
 	if not falling:
 		return 0.0
@@ -39,6 +40,6 @@ func advance(delta: float) -> float:
 	return step
 
 
-## Долетела ли лампа до пола.
+## Whether the lamp has reached the floor.
 func has_landed() -> bool:
 	return _fallen >= distance

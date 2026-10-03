@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Прохожие у выезда из паков горожан Quaternius (ADR-0054, решение 3).
+"""Pedestrians at the exit from Quaternius's townspeople packs (ADR-0054, decision 3).
 
-Мужчины — Ultimate Modular Men Pack, женщины — Ultimate Modular Women Pack
-(CC0): один скелет на всех и 24 анимации. Прохожему нужны две — ходьба и
-стойка, — и из модели уходят остальные: так она вчетверо легче. Выход —
-`assets/models/people/<имя>.glb`.
+Men — Ultimate Modular Men Pack, women — Ultimate Modular Women Pack
+(CC0): one skeleton for all and 24 animations. A pedestrian needs two — walking and
+standing — and the rest are removed from the model: this makes it four times lighter.
+Output — `assets/models/people/<name>.glb`.
 
-Исходники — glTF отдельных персонажей пака в `.cache/people/` под именами
-`men_casual_2.gltf`, `women_formal.gltf` и т. д.; в репозитории их нет, как и
-пака города. Скачать: https://quaternius.com/packs/ultimatemodularcharacters.html
-и https://quaternius.com/packs/ultimatemodularwomen.html — папка
+Sources are glTF files of individual pack characters in `.cache/people/` named
+`men_casual_2.gltf`, `women_formal.gltf` and so on; they are not in the repository,
+like the city pack. Download: https://quaternius.com/packs/ultimatemodularcharacters.html
+and https://quaternius.com/packs/ultimatemodularwomen.html — folder
 `Individual Characters/glTF`.
 
     python tools/build_people.py
@@ -33,7 +33,7 @@ ROOT = TOOLS.parent
 SOURCE = ROOT / ".cache" / "people"
 TARGET = ROOT / "assets" / "models" / "people"
 
-# Кто идёт по тротуару: имя исходника в `.cache/people/`.
+# Who walks along the sidewalk: the source name in `.cache/people/`.
 PEOPLE = [
     "men_casual_2",
     "men_casual_hoodie",
@@ -45,10 +45,10 @@ PEOPLE = [
     "women_worker",
 ]
 
-# Какие анимации остаются: ходьба и стойка у светофора.
+# Which animations remain: walking and standing at the traffic light.
 KEEP = {"Walk", "Idle"}
 
-# Что из модели убирается: у части персонажей пака в руке оружие.
+# What is removed from the model: some characters of the pack hold a weapon.
 WEAPONS = ("Pistol", "Gun", "Sword", "Knife", "Revolver")
 
 
@@ -57,7 +57,7 @@ def inside_blender() -> int:
     for name in PEOPLE:
         bpy.ops.wm.read_factory_settings(use_empty=True)
         bpy.ops.import_scene.gltf(filepath=str(SOURCE / f"{name}.gltf"))
-        # Оружие пака — пистолет и меч у некоторых — прохожему ни к чему.
+        # The pack's weapons — a pistol and, for some, a sword — are of no use to a pedestrian.
         for obj in list(bpy.context.scene.objects):
             if any(word in obj.name for word in WEAPONS):
                 bpy.data.objects.remove(obj, do_unlink=True)

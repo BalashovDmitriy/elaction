@@ -1,32 +1,33 @@
-# Авторы ассетов
+# Asset credits
 
-Idea & Development — **Dmitry Balashov**. Оригинальная игра —
-**Elevator Action**, Taito, 1983. В игре — первыми двумя строками страницы «Авторы»,
-ключи `UI_CREDITS_CREATOR` и `UI_CREDITS_ORIGINAL` в `assets/i18n/ui.csv`. Страница
-авторов — только по-английски на любом языке игры, имя — всегда Dmitry Balashov.
+Idea & Development — **Dmitry Balashov**. Original game — **Elevator Action**,
+Taito, 1983. In the game these are the first two lines of the Credits page, keys
+`UI_CREDITS_CREATOR` and `UI_CREDITS_ORIGINAL` in `assets/i18n/ui.csv`. The Credits page
+is English-only in every game language, and the name is always Dmitry Balashov.
 
-Код проекта — MIT (см. README). Здесь — чужие модели, фактуры, звуки и шрифты, которые
-лежат в репозитории, и их лицензии. CC0 авторства не требует, но мы указываем всех: так
-честно. CC-BY 3.0 требует указать автора — это и есть эта страница
-([ADR-0033](docs/adr/0033-dressing-from-packs.md), решение 4).
+The project code is MIT (see README). This page lists third-party models, textures,
+sounds and fonts stored in the repository, with their licences. CC0 does not require
+attribution, but we credit everyone anyway: it is the fair thing to do. CC-BY 3.0 requires
+crediting the author, and this page is that credit
+([ADR-0033](docs/adr/0033-dressing-from-packs.md), decision 4).
 
-Тест `test_prop_catalog` сверяет: у каждой модели из `assets/models/props/`
-есть строка здесь и в `assets/models/props/credits.json`.
+The `test_prop_catalog` test checks that every model in `assets/models/props/` has a
+row here and in `assets/models/props/credits.json`.
 
-## Люди и машины
+## People and cars
 
-| Что | Автор | Лицензия | Источник |
+| What | Author | Licence | Source |
 |---|---|---|---|
-| Ultimate Modular Men Pack (Otto, агенты, пилот вертолёта, прохожие) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/ultimatemodularcharacters.html) |
-| Ultimate Modular Women Pack (прохожие) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/ultimatemodularwomen.html) |
-| Cars Pack (машины у выхода) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/cars.html) |
-| Universal Animation Library (движение Otto и агентов) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/universalanimationlibrary.html) |
+| Ultimate Modular Men Pack (Otto, agents, helicopter pilot, pedestrians) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/ultimatemodularcharacters.html) |
+| Ultimate Modular Women Pack (pedestrians) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/ultimatemodularwomen.html) |
+| Cars Pack (cars at the exit) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/cars.html) |
+| Universal Animation Library (Otto and agent movement) | Quaternius | CC0 1.0 | [quaternius.com](https://quaternius.com/packs/universalanimationlibrary.html) |
 
-## Обстановка и крыша
+## Props and roof
 
-Файл `assets/models/props/<имя>.glb`.
+File `assets/models/props/<name>.glb`.
 
-| Имя | Модель | Автор | Лицензия | Источник |
+| Name | Model | Author | Licence | Source |
 |---|---|---|---|---|
 | `air_conditioner` | Air Conditioner | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/amFuyE3IF6) |
 | `air_vent` | Air Vent | J-Toastie | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/PCqBwDkgAz) |
@@ -82,7 +83,7 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `lounge_armchair` | Furniture Kit: loungeChair | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/furniture-kit) |
 | `lounge_chair` | Chair | CMHT Oculus | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/aVo4dG09vfD) |
 | `lounge_sofa` | Furniture Kit: loungeSofa | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/furniture-kit) |
-| `mailboxes` | Mailboxes, своя | elaction | MIT | `tools/build_residential.py` |
+| `mailboxes` | Mailboxes, in-house | elaction | MIT | `tools/build_residential.py` |
 | `message_board` | Message board | Poly by Google | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/fDpegPgEB0j) |
 | `microwave` | Kitchen Microwave | Kenney | CC0 1.0 | [poly.pizza](https://poly.pizza/m/vUsvf2HGDv) |
 | `night_stand` | Night Stand | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/A9vPgVUrF9) |
@@ -91,7 +92,7 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `painting` | Painting | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/Pi6oReAizt) |
 | `paper_bag` | Bag | Kenney | CC0 1.0 | [poly.pizza](https://poly.pizza/m/fLNcjJnsJi) |
 | `potted_plant` | Potted Plant | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/GJ3Bm5FDE4) |
-| `radiator` | Radiator, своя | elaction | MIT | `tools/build_residential.py` |
+| `radiator` | Radiator, in-house | elaction | MIT | `tools/build_residential.py` |
 | `roof_antenna` | Roof Antenna | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/Fbdg52kqJ6) |
 | `roof_exit` | Roof Exit | J-Toastie | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/GEB4pWBI8l) |
 | `round_table` | Furniture Kit: tableRound | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/furniture-kit) |
@@ -101,7 +102,7 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `solar_panel` | Solar Panel Structure | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/snXloZEimW) |
 | `speaker` | Furniture Kit: speaker | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/furniture-kit) |
 | `stove` | Oven | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/VNjPRwui7t) |
-| `stroller` | Pram, своя | elaction | MIT | `tools/build_residential.py` |
+| `stroller` | Pram, in-house | elaction | MIT | `tools/build_residential.py` |
 | `table_lamp` | Table Lamp | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/9Mo3JruPHY) |
 | `trash_bag` | Trash Bag | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/jYrMKg2Q7C) |
 | `trash_bags` | Trash Bags | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/eitNk4I4R1) |
@@ -124,11 +125,11 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `workstation_a` | Desk | dook | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/ISpMh81QGq) |
 | `workstation_b` | Desk | dook | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/EtJlOllzbf) |
 
-## Фактуры
+## Textures
 
-Собирает `tools/build_textures.py` в `assets/textures/`.
+Built by `tools/build_textures.py` into `assets/textures/`.
 
-| Имя | Набор | Автор | Лицензия |
+| Name | Set | Author | Licence |
 |---|---|---|---|
 | `hotel_wainscot` | [Wood051](https://ambientcg.com/view?id=Wood051) | ambientCG | CC0 1.0 |
 | `hotel_pilaster` | [Marble012](https://ambientcg.com/view?id=Marble012) | ambientCG | CC0 1.0 |
@@ -142,15 +143,15 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `shaft_concrete` | [Concrete046](https://ambientcg.com/view?id=Concrete046) | ambientCG | CC0 1.0 |
 | `tread_plate` | [DiamondPlate008A](https://ambientcg.com/view?id=DiamondPlate008A) | ambientCG | CC0 1.0 |
 | `roof_gravel` | [Gravel043](https://ambientcg.com/view?id=Gravel043) | ambientCG | CC0 1.0 |
-| `hotel_wall` | своя, рисуется кодом | elaction | MIT |
+| `hotel_wall` | in-house, drawn by code | elaction | MIT |
 
-## Город и небо
+## City and sky
 
-Фасады города запекает `tools/build_city.py` из модулей пака в
-`assets/textures/city/`; панорамы неба качает `tools/build_sky.py` в `assets/sky/`
-([ADR-0051](docs/adr/0051-time-of-day.md), решения 10 и 11).
+City facades are baked by `tools/build_city.py` from the pack modules into
+`assets/textures/city/`; sky panoramas are downloaded by `tools/build_sky.py` into
+`assets/sky/` ([ADR-0051](docs/adr/0051-time-of-day.md), decisions 10 and 11).
 
-| Имя | Набор | Автор | Лицензия |
+| Name | Set | Author | Licence |
 |---|---|---|---|
 | `city/facade_*` | [Downtown City MegaKit, Standard](https://quaternius.com/packs/downtowncitymegakit.html) | Quaternius | CC0 1.0 |
 | `sky/morning_clear` | [Syferfontein 0d Clear (Pure Sky)](https://polyhaven.com/a/syferfontein_0d_clear_puresky) | Greg Zaal, Jarod Guest | CC0 1.0 |
@@ -161,14 +162,14 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `sky/rain` | [Mud Road (Pure Sky)](https://polyhaven.com/a/mud_road_puresky) | Sergey Rudavin, Jarod Guest | CC0 1.0 |
 | `sky/dusk_overcast` | [Kloppenheim 01 (Pure Sky)](https://polyhaven.com/a/kloppenheim_01_puresky) | Greg Zaal, Jarod Guest | CC0 1.0 |
 
-## Звук
+## Sound
 
-Собирает `tools/build_audio.py` в `assets/audio/` — обрезка, петля, громкость
-([ADR-0036](docs/adr/0036-sound-from-libraries.md)). `имя.2`, `имя.3` — варианты
-одного звука. «Фрагмент» — отрезок трека: концовка как джингл. Тест `test_sounds`
-сверяет: у каждого файла есть строка здесь и в `assets/audio/credits.json`.
+Built by `tools/build_audio.py` into `assets/audio/`: trimming, looping, levels
+([ADR-0036](docs/adr/0036-sound-from-libraries.md)). `name.2`, `name.3` are variants of
+one sound. "Excerpt" is a cut from a track, such as an ending used as a jingle. The
+`test_sounds` test checks that every file has a row here and in `assets/audio/credits.json`.
 
-| Имя | Звук | Автор | Лицензия | Источник |
+| Name | Sound | Author | Licence | Source |
 |---|---|---|---|---|
 | `theme` | Covert Affair | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
 | `theme.2` | Dances and Dames | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
@@ -209,9 +210,9 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `game_over_theme` | Just As Soon | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
 | `document` | Music Jingles: SAX16 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/music-jingles) |
 | `extra_life` | Inquisitive Vibraphone 09 | nomiqbomi | CC0 1.0 | [freesound.org](https://freesound.org/people/nomiqbomi/sounds/578401/) |
-| `building_bonus` | Rollin at 5 (фрагмент) | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
+| `building_bonus` | Rollin at 5 (excerpt) | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
 | `death_jingle` | horn_fail_wahwah_3 | TaranP | CC0 1.0 | [freesound.org](https://freesound.org/people/TaranP/sounds/362204/) |
-| `game_over` | Hard Boiled (фрагмент) | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
+| `game_over` | Hard Boiled (excerpt) | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
 | `step_carpet` | footstep-carpet.wav | swuing | CC-BY 4.0 | [freesound.org](https://freesound.org/people/swuing/sounds/38872/) |
 | `step_concrete` | Impact Sounds: footstep_concrete_000 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/impact-sounds) |
 | `step_concrete.2` | Impact Sounds: footstep_concrete_001 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/impact-sounds) |
@@ -301,8 +302,8 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `shaft_hum` | low hum control room | gchase | CC0 1.0 | [freesound.org](https://freesound.org/people/gchase/sounds/144046/) |
 | `neon_buzz` | bulb buzz loop | Nox_Sound | CC0 1.0 | [freesound.org](https://freesound.org/people/Nox_Sound/sounds/553075/) |
 
-## Шрифты
+## Fonts
 
-| Что | Автор | Лицензия |
+| What | Author | Licence |
 |---|---|---|
-| Exo 2 (интерфейс, вывески, таблички, табло) | The Exo 2 Project Authors | SIL OFL 1.1, `assets/fonts/Exo2.LICENSE.txt` |
+| Exo 2 (interface, signs, plates, indicator boards) | The Exo 2 Project Authors | SIL OFL 1.1, `assets/fonts/Exo2.LICENSE.txt` |

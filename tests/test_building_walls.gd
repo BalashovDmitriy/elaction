@@ -1,17 +1,17 @@
 extends GutTest
 
-## Тесты внутренних стен, делящих этаж надвое (ADR-0024, решение 5).
+## Tests of inner walls splitting a floor in two (ADR-0024, decision 5).
 ##
-## Стена — единственное, что режет этаж, не делая дыры в полу, и потому она
-## опаснее проёма: проём видно, а запертую половину — нет. Проверяется здесь и
-## то, где стена стоит, и то, что она никого не заперла.
+## A wall is the only thing that cuts a floor without making a hole in it, and that is
+## why it is more dangerous than an opening: an opening is visible, a locked half is not.
+## Both where a wall stands and that it has locked nobody in are checked here.
 ##
-## Своим файлом, а не в [code]test_building_plan.gd[/code]: тот уже уперся
-## в потолок публичных методов, а стены — отдельная история со своим счётом
-## кусков этажа.
+## In its own file, not in [code]test_building_plan.gd[/code]: that one has already hit
+## the ceiling of public methods, and walls are a separate story with their own count of
+## floor pieces.
 
-## Сиды, на которых проверяются правила. Здание случайно, и одна проверка на
-## одном сиде подтверждает только его — а дыры вылезают на редких.
+## Seeds on which the rules are checked. The building is random, and one check on one
+## seed confirms only that seed — while holes come out on rare ones.
 const SEEDS: Array[int] = [1, 2, 3, 5, 8, 13, 21, 34]
 
 
@@ -19,9 +19,9 @@ func _rules() -> BuildingRules:
 	return BuildingRules.new()
 
 
-## Стена стоит на плите и между местами, а не над проёмом: ADR-0024, решение 5.
-## Стена над шахтой висела бы в воздухе, а у самого края отрезала бы не половину
-## этажа, а полоску, на которой нечему стоять.
+## A wall stands on the slab and between slots, not over an opening: ADR-0024,
+## decision 5. A wall over a shaft would hang in the air, and at the very edge it would
+## cut off not half the floor but a strip with nothing to stand on.
 func test_walls_stand_on_the_slab_between_the_openings() -> void:
 	var rules := _rules()
 	var floors_with_walls := 0
@@ -45,15 +45,16 @@ func test_walls_stand_on_the_slab_between_the_openings() -> void:
 	assert_gt(floors_with_walls, 0, "стены должны хоть где-то появляться")
 
 
-## Стена не растёт сквозь шахту — ни на одном её уровне, дно включая.
+## A wall does not grow through a shaft — on none of its levels, bottom included.
 ##
-## Дно у шахты — единственный уровень, где проёма в плите нет: кабина на нём
-## стоит, а не проезжает. Раскладка искала место стене по одним проёмам
-## ([method BuildingPlan.gaps_on]), и на дне шахта для неё пропадала: на сиде 6
-## стена вырастала на 0.45 м внутрь кабины шахты 15..21, а на сиде 7 — сразу двух.
-## Вошедший в такую кабину Otto оказывался в стене.
+## The shaft bottom is the only level where there is no opening in the slab: the cab
+## stands on it rather than passing through. The layout looked for a place for a wall by
+## openings alone ([method BuildingPlan.gaps_on]), and at the bottom the shaft vanished
+## for it: on seed 6 a wall grew 0.45 m into the cab of shaft 15..21, and on seed 7 into
+## two at once. Otto entering such a cab ended up in the wall.
 ##
-## Зазор мерится тот же, что и везде: полшага сетки от края проёма (ADR-0024).
+## The gap is measured the same as everywhere: half a grid step from the opening's edge
+## (ADR-0024).
 func test_no_wall_grows_through_a_shaft() -> void:
 	var rules := _rules()
 	var clearance := rules.slot_x(1) - rules.slot_x(0)
@@ -77,8 +78,8 @@ func test_no_wall_grows_through_a_shaft() -> void:
 				)
 
 
-## Стена — не на каждом этаже: это крюк через другой этаж, и подряд они
-## превратили бы спуск в лабиринт.
+## A wall is not on every floor: it is a detour through another floor, and in a row they
+## would turn the descent into a maze.
 func test_walls_are_not_on_every_floor() -> void:
 	var rules := _rules()
 	for building_seed in SEEDS:
@@ -91,8 +92,8 @@ func test_walls_are_not_on_every_floor() -> void:
 		assert_lt(share, 0.6, "сид %d: стены почти на каждом этаже" % building_seed)
 
 
-## Стена, из-за которой документ или выход стали недостижимы, снимается при
-## раскладке. Проверяется на многих сидах: запирает не всякая стена и не всегда.
+## A wall that made a document or the exit unreachable is removed during layout. Checked
+## on many seeds: not every wall locks, and not always.
 func test_no_wall_locks_a_document_or_the_exit_away() -> void:
 	var rules := _rules()
 	for building_seed in range(1, 60):
@@ -101,9 +102,9 @@ func test_no_wall_locks_a_document_or_the_exit_away() -> void:
 		assert_true(missing.is_empty(), "сид %d: заперто — %s" % [building_seed, str(missing)])
 
 
-## Раскладка со стенами обязана быть тяжелее раскладки без них, иначе проверка
-## выше подтверждает не работу отбраковки, а её отсутствие: здание, в котором
-## стен не появляется вовсе, проходимо само по себе.
+## A layout with walls must be heavier than a layout without them, otherwise the check
+## above confirms not that the rejection works but that it is absent: a building where no
+## walls appear at all is passable by itself.
 func test_walls_really_cut_the_floors_they_stand_on() -> void:
 	var rules := _rules()
 	var cut := 0
@@ -118,8 +119,8 @@ func test_walls_really_cut_the_floors_they_stand_on() -> void:
 	assert_gt(cut, 0, "стены должны хоть где-то появляться")
 
 
-## Агент по другую сторону глухой стены Otto не видит: стрелять в стену незачем.
-## Разбирается это тем же путём, что и темнота, — не видит, значит не цель.
+## An agent on the other side of a solid wall does not see Otto: no point shooting at a
+## wall. This is resolved the same way as darkness — does not see, so not a target.
 func test_a_wall_hides_otto_from_an_agent_on_the_same_floor() -> void:
 	var rules := _rules()
 	var plan := BuildingPlan.generate(rules, 1)

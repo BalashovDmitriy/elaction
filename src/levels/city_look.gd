@@ -1,18 +1,18 @@
 class_name CityLook
 extends RefCounted
 
-## Вид города вблизи (M24a, замечание пользователя — «детализацию фона
-## поднять»): фасады с поясами и простенками, окна с рамой и жизнью за
-## стеклом, вывески с буквами (ADR-0037, решение 4).
+## The city look up close (M24a, user's remark — "raise the background
+## detail"): facades with bands and piers, windows with a frame and life behind
+## the glass, signs with letters (ADR-0037, decision 4).
 ##
-## Всё шейдерами на тех же мультимешах, что и в M19: узлов и источников
-## света не прибавилось, и бюджет кадра город не трогает. Что за каким окном,
-## решает хеш окна и дома — город по сиду повторяется до окна.
+## All by shaders on the same multimeshes as in M19: no nodes or light
+## sources were added, and the city does not touch the frame budget. What is behind which window
+## is decided by the window and house hash — the city repeats by seed down to the window.
 
-## Что за стеклом горящего окна: так же и в [code]city_window.gdshaderinc[/code].
+## What is behind the glass of a lit window: the same in [code]city_window.gdshaderinc[/code].
 enum Inside { PLAIN, BLINDS, CURTAINS, PERSON, TV, FLICKER }
 
-## Стили запечённого фасада — столбцы атласа в порядке `tools/build_city.py`.
+## Baked facade styles — atlas columns in the order of `tools/build_city.py`.
 enum Style { BRICK, DOUBLE, INSET, GLASS, OFFICE, STONE }
 
 const FACADE_SHADER := preload("res://src/levels/city_facade.gdshader")
@@ -20,8 +20,8 @@ const LIT_SHADER := preload("res://src/levels/city_window_lit.gdshader")
 const DARK_SHADER := preload("res://src/levels/city_window_dark.gdshader")
 const SIGN_SHADER := preload("res://src/levels/city_sign.gdshader")
 
-## Что за стеклом по типу дома ([enum CityPlan.Kind]), веса [enum Inside]: у
-## контор жалюзи и лампы дневного света, у жилых — шторы, телевизоры и люди.
+## What is behind the glass by house type ([enum CityPlan.Kind]), weights of [enum Inside]:
+## offices have blinds and fluorescent lamps, residential ones — curtains, TVs and people.
 const INSIDE_WEIGHTS: Array[Array] = [
 	[0.3, 0.4, 0.0, 0.1, 0.0, 0.2],
 	[0.2, 0.1, 0.35, 0.15, 0.2, 0.0],
@@ -29,8 +29,8 @@ const INSIDE_WEIGHTS: Array[Array] = [
 	[0.2, 0.1, 0.35, 0.15, 0.2, 0.0],
 ]
 
-## Тон фасада по типу дома. Все — ночь: фасад виден дымкой, поясами и окнами,
-## а не цветом, но кирпич теплее бетона, а стекло холоднее.
+## Facade tone by house type. All are night: a facade is seen by haze, bands and windows,
+## not by colour, but brick is warmer than concrete, and glass colder.
 const FACADE_TONES: Array[Color] = [
 	Color(0.04, 0.042, 0.052),
 	Color(0.05, 0.045, 0.048),
@@ -38,14 +38,14 @@ const FACADE_TONES: Array[Color] = [
 	Color(0.06, 0.036, 0.03),
 ]
 
-## Окно по типу дома, м: у контор широкие, у стеклянных башен — почти во весь
-## шаг сетки ([constant CityPlan.WINDOW_STEP]), у жилых и кирпичных — узкие
-## и высокие.
+## Window by house type, m: offices have wide ones, glass towers — almost the whole
+## grid pitch ([constant CityPlan.WINDOW_STEP]), residential and brick ones — narrow
+## and tall.
 const WINDOW_SIZES: Array[Vector2] = [
 	Vector2(1.7, 1.6), Vector2(1.1, 1.5), Vector2(2.1, 2.3), Vector2(1.0, 1.7)
 ]
 
-## Зарево улиц на фасадах снизу — тон [constant CityDetails.GLOW_COLOUR].
+## Street glow on facades from below — the tone of [constant CityDetails.GLOW_COLOUR].
 const STREET_GLOW := Color(1.0, 0.55, 0.25)
 
 const BUILDING_SHADER := preload("res://src/levels/city_building.gdshader")
@@ -53,8 +53,8 @@ const ALBEDO_ATLAS := preload("res://assets/textures/city/facade_albedo.png")
 const NORMAL_ATLAS := preload("res://assets/textures/city/facade_normal.png")
 const ORM_ATLAS := preload("res://assets/textures/city/facade_orm.png")
 
-## Какие стили у какого дома ([enum CityPlan.Kind]): контора — металл и
-## камень, жилой — кирпич трёх видов, башня — стекло, кирпичный — кирпич.
+## Which styles which house has ([enum CityPlan.Kind]): office — metal and
+## stone, residential — three kinds of brick, tower — glass, brick — brick.
 const STYLES_OF: Array[Array] = [
 	[Style.OFFICE, Style.STONE],
 	[Style.BRICK, Style.DOUBLE, Style.INSET],
@@ -62,8 +62,8 @@ const STYLES_OF: Array[Array] = [
 	[Style.BRICK, Style.INSET, Style.DOUBLE],
 ]
 
-## Тон стен поверх фактуры: красный кирпич, бледный, бурый, закопчённый.
-## Стекло окон тоном не красится — его держит маска фасада.
+## Wall tone over the texture: red brick, pale, brown, sooty.
+## Window glass is not tinted — the facade mask holds it.
 const WALL_TINTS: Array[Color] = [
 	Color(1.0, 1.0, 1.0),
 	Color(1.18, 1.08, 0.98),
@@ -71,15 +71,15 @@ const WALL_TINTS: Array[Color] = [
 	Color(0.62, 0.62, 0.64),
 ]
 
-## Тон камня и металла контор: песчаник, серый, тёмный.
+## Tone of office stone and metal: sandstone, grey, dark.
 const STONE_TINTS: Array[Color] = [
 	Color(0.78, 0.74, 0.68),
 	Color(0.66, 0.67, 0.69),
 	Color(0.52, 0.5, 0.48),
 ]
 
-## Атлас фасадов: размер, пикселей на метр, ширина плитки, поле по бокам столбца
-## стиля и ряды, м
+## Facade atlas: size, pixels per metre, tile width, margin at the sides of a style
+## column and rows, m
 ## (`assets/textures/city/facade_layout.json`).
 const ATLAS_SIZE := Vector2(1920.0, 448.0)
 const ATLAS_DENSITY: float = 64.0
@@ -90,7 +90,7 @@ const ROW_FLOOR: float = 3.0
 const ROW_GROUND: float = 3.0
 
 
-## Материал домов: запечённый фасад пака на коробке (ADR-0051, решение 10).
+## House material: the pack's baked facade on a box (ADR-0051, decision 10).
 static func building() -> ShaderMaterial:
 	var look := ShaderMaterial.new()
 	look.shader = BUILDING_SHADER
@@ -109,24 +109,24 @@ static func building() -> ShaderMaterial:
 	return look
 
 
-## Стиль фасада дома и его сид для шейдера: в [code]INSTANCE_CUSTOM[/code].
+## House facade style and its seed for the shader: in [code]INSTANCE_CUSTOM[/code].
 static func building_custom(block: CityPlan.Block) -> Color:
 	var styles: Array = STYLES_OF[block.kind]
 	var style: int = styles[absi(hash([block.x, "style"])) % styles.size()]
 	return Color(float(style), _unit(hash([block.x, "house"])), 0.0, 0.0)
 
 
-## Тон стен дома: у стекла и металла — свой, почти белый.
+## House wall tone: glass and metal have their own, almost white.
 static func wall_tint(block: CityPlan.Block) -> Color:
 	if block.kind == CityPlan.Kind.GLASS:
 		return Color(0.95, 0.97, 1.0)
 	if block.kind == CityPlan.Kind.OFFICE:
-		# Светлый камень пака под полным солнцем выгорал в белое: он темнее.
+		# The pack's light stone burned out to white under full sun: it is darker.
 		return STONE_TINTS[absi(hash([block.x, "tint"])) % STONE_TINTS.size()]
 	return WALL_TINTS[absi(hash([block.x, "tint"])) % WALL_TINTS.size()]
 
 
-## Материал фасадов: пояса, простенки, карниз, зарево снизу.
+## Facade material: bands, piers, cornice, glow from below.
 static func facade() -> ShaderMaterial:
 	var look := ShaderMaterial.new()
 	look.shader = FACADE_SHADER
@@ -139,7 +139,7 @@ static func facade() -> ShaderMaterial:
 	return look
 
 
-## Материал окон: горящих — мимо дымки, погасших — в ней.
+## Window material: lit ones bypass the haze, dark ones are in it.
 static func windows(lit: bool) -> ShaderMaterial:
 	var look := ShaderMaterial.new()
 	look.shader = LIT_SHADER if lit else DARK_SHADER
@@ -147,31 +147,31 @@ static func windows(lit: bool) -> ShaderMaterial:
 	return look
 
 
-## Материал неоновых вывесок.
+## Neon sign material.
 static func signs() -> ShaderMaterial:
 	var look := ShaderMaterial.new()
 	look.shader = SIGN_SHADER
 	return look
 
 
-## Во сколько раз окно дома [param block] больше квада окон
+## How many times house [param block]'s window is larger than the windows quad
 ## ([constant CityBackdrop.WINDOW_SIZE]).
 static func window_scale(block: CityPlan.Block) -> Vector3:
 	var size := WINDOW_SIZES[block.kind]
 	return Vector3(size.x / CityBackdrop.WINDOW_SIZE.x, size.y / CityBackdrop.WINDOW_SIZE.y, 1.0)
 
 
-## Тон фасада дома [param block].
+## Facade tone of house [param block].
 static func facade_tone(block: CityPlan.Block) -> Color:
 	return FACADE_TONES[block.kind]
 
 
-## Тип дома для шейдера фасада: в [code]INSTANCE_CUSTOM.x[/code].
+## House type for the facade shader: in [code]INSTANCE_CUSTOM.x[/code].
 static func facade_custom(block: CityPlan.Block) -> Color:
 	return Color(float(block.kind), 0.0, 0.0, 0.0)
 
 
-## Данные окна для шейдера: жребий, что за стеклом, переплёт, горит ли.
+## Window data for the shader: draw, what is behind the glass, mullions, whether it is lit.
 static func window_custom(block: CityPlan.Block, cell: Vector2i, lit: bool) -> Color:
 	var roll := _unit(hash([block.x, cell, "window"]))
 	var inside := 0
@@ -182,7 +182,7 @@ static func window_custom(block: CityPlan.Block, cell: Vector2i, lit: bool) -> C
 	return Color(roll, float(inside), float(block.mullions), 1.0 if lit else 0.0)
 
 
-## Жребий вывески для шейдера.
+## Sign draw for the shader.
 static func sign_custom(block: CityPlan.Block) -> Color:
 	return Color(_unit(hash([block.x, "sign"])), 0.0, 0.0, 0.0)
 

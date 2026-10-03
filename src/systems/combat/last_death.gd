@@ -1,28 +1,28 @@
 class_name LastDeath
 extends Node
 
-## Последняя смерть Otto (ADR-0042, решение 5): мир замедляется, камера наезжает
-## на Otto, он падает клипом смерти, и только потом — конец партии.
+## Otto's last death (ADR-0042, decision 5): the world slows down, the camera pushes in on Otto, he
+## falls with the death clip, and only then — game over.
 ##
-## До M24f меню конца выходило в тот же кадр, что и смерть: прыжок — пробел, а
-## пробел жмёт «Заново», и игрок, давящий прыжок, перезапускал партию, не
-## увидев, как погиб.
+## Before M24f the game over menu came up in the same frame as the death: jump is the space bar, and
+## the space bar presses "Restart", and a player mashing jump restarted the game without seeing how
+## he died.
 ##
-## Живёт по настоящим часам, а не по часам мира: мир замедлен, и сцена по ним
-## растянулась бы втрое. Замедление — относительно прежнего темпа, как у сценки
-## добивания: тесты гоняют мир ускоренным.
+## Runs on the real clock, not the world clock: the world is slowed down, and by it the scene would
+## stretch threefold. The slow-down is relative to the previous pace, as with the takedown scene:
+## tests run the world sped up.
 
-## Кончилась: пора показывать конец партии.
+## Finished: time to show game over.
 signal finished
 
-## Во сколько раз замедлен мир.
+## How many times the world is slowed down.
 const SLOW: float = 0.3
-## За сколько камера наезжает, с настоящего времени.
+## How long the camera push-in takes, s of real time.
 const CLOSE_IN: float = 0.8
-## Сколько длится вся сцена, с настоящего времени.
+## How long the whole scene lasts, s of real time.
 const DURATION: float = 1.6
-## Насколько выше ступней середина крупного плана, м: лежащий Otto — у низа
-## кадра, а не посередине.
+## How far above the feet the middle of the close-up is, m: the lying Otto is at the bottom of the
+## frame, not in the middle.
 const CLOSE_HEIGHT: float = 0.6
 
 var _otto: Node3D = null
@@ -31,8 +31,8 @@ var _time_scale_before: float = 1.0
 var _slowed: bool = false
 
 
-## Начинает сцену над [param otto]. Узел встаёт в [param parent] и уходит сам,
-## когда сцена кончилась.
+## Starts the scene over [param otto]. The node goes into [param parent] and leaves by itself when
+## the scene has finished.
 static func play(parent: Node, otto: Node3D) -> LastDeath:
 	var scene := LastDeath.new()
 	scene.name = "LastDeath"
@@ -42,7 +42,7 @@ static func play(parent: Node, otto: Node3D) -> LastDeath:
 
 
 func _ready() -> void:
-	# Идёт и под паузой: на паузе мир стоит, а сцена всё равно должна кончиться.
+	# Runs during pause too: on pause the world stands still, but the scene must still finish.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_time_scale_before = Engine.time_scale
 	Engine.time_scale = _time_scale_before * SLOW
@@ -50,7 +50,7 @@ func _ready() -> void:
 	Sounds.play(Sounds.SLOWMO)
 
 
-## Ведёт сцену на [param real_delta] секунд настоящего времени. Отдан тестам.
+## Runs the scene for [param real_delta] seconds of real time. Exposed for tests.
 func advance(real_delta: float) -> void:
 	if not _slowed:
 		return
@@ -66,12 +66,12 @@ func advance(real_delta: float) -> void:
 
 
 func _process(delta: float) -> void:
-	# Дельта кадра уже помножена на темп мира — делим обратно.
+	# The frame delta is already multiplied by the world pace — divide it back.
 	advance(delta / maxf(Engine.time_scale, 0.001))
 
 
 func _notification(what: int) -> void:
-	# Сцену выбросили раньше конца — мир не должен остаться медленным.
+	# The scene was thrown out before the end — the world must not stay slow.
 	if what == NOTIFICATION_EXIT_TREE:
 		_speed_up()
 

@@ -1,33 +1,33 @@
 class_name StreetSnow
 extends Node3D
 
-## Снег на улице у выезда (ADR-0054, решения 2 и 5): хлопья над мостовой и
-## тротуаром и покров — сверху на тротуаре, бордюре, маркизах, подоконниках и
-## карнизах домов через дорогу. По мостовой — колеи: там, где идёт поток
-## машин ([StreetTraffic]), снег раскатан до мокрого асфальта, по бокам колей
-## — рыхлый.
+## Snow on the street at the exit (ADR-0054, decisions 2 and 5): flakes above the roadway and
+## sidewalk and cover — on top of the sidewalk, kerb, awnings, window sills and
+## cornices of the houses across the road. On the roadway — ruts: where the traffic
+## flows ([StreetTraffic]), snow is packed down to wet asphalt, on the sides of the ruts
+## — loose.
 ##
-## Покров — наклейка сверху на слой улицы [constant LAYER]: на него
-## [method mark] переводит неподвижное на улице. Машины потока и машина у
-## бордюра на нём не числятся: наклейка в мире, и по едущей машине снег
-## скользил бы пятнами.
+## The cover is a decal from above on the street layer [constant LAYER]: [method mark]
+## moves whatever is static on the street onto it. Traffic cars and the car at the
+## kerb are not on it: the decal is in the world, and on a moving car snow would
+## slide in patches.
 
-## Слой неподвижного на улице. Девятнадцатый: двадцатый занят крышей
-## ([constant RoofCatch.LAYER]), и камеры и свет видят все двадцать.
+## Layer of static things on the street. The nineteenth: the twentieth is taken by the roof
+## ([constant RoofCatch.LAYER]), and cameras and lights see all twenty.
 const LAYER: int = 1 << 18
 
-## Хлопьев на «высоком», высота неба над улицей, м.
+## Flakes at "high", sky height above the street, m.
 const FLAKES: int = 2400
 const HEIGHT: float = 16.0
 
-## Колея: полуширина следа колеса, м, и на сколько колёса машины отстоят от
-## её оси, м.
+## Rut: half-width of a wheel track, m, and how far a car's wheels are from
+## its axis, m.
 const RUT: float = 0.24
 const WHEEL_TRACK: float = 0.78
-## Где по глубине идут колёса обеих полос потока ([StreetTraffic]). Числом,
-## а не двумя циклами по полосам и сторонам: [method rut_at] зовётся на каждую
-## точку покрова — их сотни тысяч, — и массивы на каждый вызов стоили половину
-## сборки покрова, 60 мс из 120 (авторевью M24l).
+## At what depth the wheels of both traffic lanes run ([StreetTraffic]). As a number,
+## not two loops over lanes and sides: [method rut_at] is called for every
+## cover point — there are hundreds of thousands — and arrays on every call cost half
+## of the cover build, 60 ms of 120 (code review M24l).
 const WHEEL_LINES: Array[float] = [
 	StreetTraffic.NEAR_LANE_Z - WHEEL_TRACK,
 	StreetTraffic.NEAR_LANE_Z + WHEEL_TRACK,
@@ -35,24 +35,24 @@ const WHEEL_LINES: Array[float] = [
 	StreetTraffic.FAR_LANE_Z + WHEEL_TRACK,
 ]
 
-## Снег: цвет рыхлого и раскатанного, цвет мокрой колеи; насколько высоко над
-## улицей лежит покров — до карнизов домов через дорогу.
+## Snow: colour of loose and packed, colour of the wet rut; how high above the
+## street the cover lies — up to the cornices of the houses across the road.
 const COVER := Color(0.88, 0.9, 0.95, 1.0)
 const PACKED := Color(0.7, 0.72, 0.76, 0.85)
 const SLUSH := Color(0.08, 0.085, 0.095, 0.9)
 const COVER_HEIGHT: float = 24.0
 const COVER_NORMAL_FADE: float = 0.55
 
-## Сколько точек покрова на метр.
+## How many cover points per metre.
 const TEXELS_PER_METRE: float = 24.0
 
 var _flakes: GPUParticles3D = null
 var _cover: Decal = null
 
 
-## Собирает снег над улицей от [param from] до [param to] по x, на уровне
-## [param street] сцены, по глубине — от [param front] до [param back], во
-## время суток [param time].
+## Builds snow above the street from [param from] to [param to] along x, at scene level
+## [param street], in depth — from [param front] to [param back], at
+## time of day [param time].
 func build(
 	from: float, to: float, street: float, front: float, back: float, time: TimeOfDay.Kind
 ) -> void:
@@ -63,8 +63,8 @@ func build(
 	apply_graphics()
 
 
-## Переводит на слой [constant LAYER] неподвижное под [param root], кроме
-## того, что под узлами [param moving].
+## Moves onto layer [constant LAYER] whatever is static under [param root], except
+## what is under the nodes [param moving].
 static func mark(root: Node, moving: Array[Node]) -> void:
 	for node: Node in root.find_children("*", "GeometryInstance3D", true, false):
 		if node is GPUParticles3D:
@@ -78,22 +78,22 @@ static func mark(root: Node, moving: Array[Node]) -> void:
 			(node as GeometryInstance3D).layers |= LAYER
 
 
-## Сколько хлопьев по уровню качества — та же доля, что у капель.
+## How many flakes by quality level — the same fraction as for drops.
 func apply_graphics() -> void:
 	RainLook.scale_amount(_flakes, Graphics.rain_share())
 
 
-## Хлопья — для теста.
+## Flakes — for the test.
 func flakes() -> GPUParticles3D:
 	return _flakes
 
 
-## Покров — для теста.
+## Cover — for the test.
 func cover() -> Decal:
 	return _cover
 
 
-## Снег, раскатанный колёсами, на глубине [param z]: 1 — колея, 0 — рыхлый.
+## Snow packed by wheels at depth [param z]: 1 — a rut, 0 — loose.
 static func rut_at(z: float) -> float:
 	var nearest := INF
 	for line: float in WHEEL_LINES:
@@ -105,7 +105,7 @@ func _snow(
 	from: float, to: float, street: float, front: float, back: float, time: TimeOfDay.Kind
 ) -> void:
 	var drift := HEIGHT / RoofSnow.FALL.x * RoofSnow.WIND
-	# Жизнь — до тротуара и самому косому хлопку, поток — прежний, как на крыше
+# Lifetime — down to the sidewalk even for the most slanted flake, flow — as before, as on the roof
 	# ([method RoofSnow._snow]).
 	var slowest := SnowLook.slowest_fall(RoofSnow.FALL, RoofSnow.WIND)
 	_flakes = SnowLook.flakes(
@@ -118,8 +118,8 @@ func _snow(
 		SnowLook.brightness(time)
 	)
 	_flakes.name = "Flakes"
-	# Гаснут о маркизы, машины и мостовую по карте высот улицы
-	# ([method ExitStreet._catch]), а не по таймеру.
+	# They die against awnings, cars and the roadway by the street height map
+	# ([method ExitStreet._catch]), not by a timer.
 	_flakes.collision_base_size = 0.02
 	(_flakes.process_material as ParticleProcessMaterial).collision_mode = (
 		ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT
@@ -131,8 +131,8 @@ func _snow(
 	add_child(_flakes)
 
 
-## Покров: картинка сверху, по x — ровная, по глубине — колеи на мостовой и
-## рыхлый снег на тротуаре, с шумом по краям.
+## Cover: a picture from above, even along x, in depth — ruts on the roadway and
+## loose snow on the sidewalk, with noise at the edges.
 func _lay(from: float, to: float, street: float, front: float, back: float) -> void:
 	var size := Vector2i(
 		clampi(int((to - from) * TEXELS_PER_METRE), 64, 2048),
@@ -143,7 +143,7 @@ func _lay(from: float, to: float, street: float, front: float, back: float) -> v
 	noise.frequency = 0.08
 	var image := Image.create(size.x, size.y, false, Image.FORMAT_RGBA8)
 	for row in size.y:
-		# Строка картинки — глубина: верх картинки — дальний край (−Z).
+		# A picture row is depth: the top of the picture is the far edge (−Z).
 		var z := lerpf(back, front, (float(row) + 0.5) / float(size.y))
 		var on_road := z > ExitStreet.FAR_KERB_Z
 		for column in size.x:

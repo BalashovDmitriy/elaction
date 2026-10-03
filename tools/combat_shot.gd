@@ -1,22 +1,22 @@
 extends Node3D
 
-## Снимки боя на настоящем здании — по состоянию, а не по секундомеру.
+## Combat shots on a real building, by state rather than by stopwatch.
 ##
-## Стойки агента (стоя, на колене, лёжа) игровым сценарием съёмки не поймать:
-## тот водится выдержками и снимает то, что успело случиться (docs/testing.md).
-## Агент уходит на колено не по расписанию, а когда в него летит высокая пуля,
-## — вот этого мига и ждёт инструмент.
+## Agent stances (standing, kneeling, lying) cannot be caught by the gameplay capture
+## scenario: it is driven by delays and shoots whatever has managed to happen
+## (docs/testing.md). An agent drops to one knee not on a schedule but when a high bullet
+## flies at him, and that is the moment the tool waits for.
 ##
-## Запуск:
+## Run:
 ##     godot --path . res://tools/combat_shot.tscn
 ##     godot --path . res://tools/combat_shot.tscn -- --folder=M11 --seed=2 --floor=12
 ##
-## Кадры ложатся в screens/M11/. Папка локальная, в репозиторий не идёт.
+## Shots go to screens/M11/. The folder is local and does not go into the repository.
 ##
-## Агенту на время съёмки обнуляется дальность огня и скорость шага: уклоняться
-## это ему не мешает, зато Otto не застрелят на втором кадре, а сам агент не
-## подойдёт вплотную — в упор пуля рождается уже за ним, уклоняться не от чего,
-## и вместо стойки выходит труп.
+## For the duration of the shoot the agent's fire range and step speed are zeroed: this
+## does not stop him from dodging, but Otto will not get shot on the second frame, and
+## the agent will not come up close: point-blank the bullet is born already behind him,
+## there is nothing to dodge, and instead of a stance you get a corpse.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
@@ -24,18 +24,18 @@ const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 
 const DEFAULT_FOLDER := "M11"
 
-## Сколько кадров дать камере доехать до Otto: сглаживание у неё 8.0.
+## How many frames to give the camera to reach Otto: its smoothing is 8.0.
 const SETTLE_FRAMES: int = 45
 
-## Сколько кадров ждать стойки, прежде чем сдаться. Не наступившее состояние
-## ждётся вечно, и однажды инструмент уже висел вместо того, чтобы сказать.
+## How many frames to wait for a stance before giving up. A state that never comes is
+## waited for forever, and once the tool already hung instead of saying so.
 const PATIENCE: int = 180
 
-## Где стоит агент, м от Otto. Дальше приседа, но ближе дальности его огня:
-## так в кадр влезают оба.
+## Where the agent stands, m from Otto. Farther than the crouch but closer than his fire
+## range: this way both fit into the frame.
 const GAP: float = 4.5
 
-## Сколько кадров дать позе досвестись перед снимком.
+## How many frames to give the pose to finish blending before the shot.
 const POSE_SETTLE_FRAMES: int = 12
 
 var _level: GreyboxLevel = null
@@ -70,20 +70,20 @@ func _read_arguments() -> void:
 
 func _run() -> void:
 	var rules := BuildingRules.new()
-	# Стрелять агенту нечем, а уклоняться — есть чем: злости хватает и на колено,
-	# и на «лёжа».
+	# The agent has nothing to shoot with, but has something to dodge with: his anger is
+	# enough both for kneeling and for "lying".
 	rules.agents_hold_fire = true
 
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	if _level == null:
-		# Чаще всего это незарегистрированный class_name: лечится godot_check.py.
+		# Most often this is an unregistered class_name: fixed by godot_check.py.
 		push_error("сцена уровня не собралась — проверьте импорт проекта")
 		get_tree().quit(1)
 		return
 	_level.rules = rules
 	_level.building_seed = _seed
-	# Своих агентов здание не выпускает: в кадре должен быть один, и на известном
-	# месте. Как их выходит по-настоящему, показывает последний кадр.
+	# The building does not release its own agents: the frame must have one, in a known
+	# place. How they come out for real is shown by the last shot.
 	_level.spawn_agents = false
 	add_child(_level)
 	await get_tree().physics_frame
@@ -99,10 +99,11 @@ func _run() -> void:
 	await get_tree().physics_frame
 	await _shoot("01_standoff")
 
-	# Высокая пуля идёт в 1.13 м над полом, колено — 1.05: агент уходит под неё.
+	# A high bullet goes 1.13 m above the floor, a knee is 1.05: the agent ducks under it.
 	await _stage(EnemyBrain.Stance.KNEEL, false, "02_agent_kneels")
 
-	# Низкая, из приседа, идёт в 0.68 м: колено её уже не пропускает, и агент ложится.
+	# A low one, from a crouch, goes at 0.68 m: kneeling no longer lets it pass, and the
+	# agent lies down.
 	await _stage(EnemyBrain.Stance.PRONE, true, "03_agent_goes_prone")
 
 	Input.action_release(&"move_down")
@@ -111,7 +112,7 @@ func _run() -> void:
 	get_tree().quit()
 
 
-## Ставит Otto на этаж и ждёт, пока камера доедет. Возвращает его место.
+## Puts Otto on a floor and waits for the camera to arrive. Returns his position.
 func _stand_on(index: int) -> float:
 	var spot := _level.plan().safe_x(_level.rules, index)
 	_level.otto.global_position = WorldSpace.to_scene(
@@ -122,19 +123,19 @@ func _stand_on(index: int) -> float:
 	return spot
 
 
-## Снимает кадр в тот миг, когда агент встал в нужную стойку.
-## [param crouching] — Otto стреляет из приседа, и пуля идёт ниже.
+## Takes a shot at the moment the agent has taken the required stance.
+## [param crouching]: Otto shoots from a crouch, and the bullet goes lower.
 ##
-## Стреляет по одной пуле и ждёт чистого неба перед каждой. Очередь тут всё
-## ломает: агент уклоняется от ближайшей к нему пули, и пока мимо идёт старая,
-## высокая, новую — низкую — он не видит. Она и убивает его вместо того, чтобы
-## уложить.
+## Fires one bullet at a time and waits for a clear sky before each. A burst breaks
+## everything here: the agent dodges the bullet nearest to him, and while an old, high
+## one is passing, he does not see the new, low one. It then kills him instead of
+## making him lie down.
 ##
-## Кадр снимается сразу, как стойка принята, а не после: агент держит её, только
-## пока пуля летит, и «сниму потом» показало бы его уже выпрямившимся.
+## The shot is taken as soon as the stance is taken, not afterward: the agent holds it
+## only while the bullet is flying, and "shoot later" would show him already upright.
 func _stage(wanted: EnemyBrain.Stance, crouching: bool, label: String) -> void:
-	# Увёртка в ROM — действие целиком (@1C7A): пока агент в прошлой стойке,
-	# новую он не примет, и низкая пуля застала бы его на колене.
+	# A dodge in the ROM is a whole action (@1C7A): while the agent is in the previous
+	# stance, he will not take a new one, and the low bullet would catch him kneeling.
 	while not _agent.is_dead() and _agent.stance() != EnemyBrain.Stance.STAND:
 		await get_tree().physics_frame
 	if crouching:
@@ -144,9 +145,9 @@ func _stage(wanted: EnemyBrain.Stance, crouching: bool, label: String) -> void:
 	var left := PATIENCE
 	while left > 0 and not _agent.is_dead():
 		left -= await _wait_for_clear_sky()
-		# Выстрел одиночный, и между нажатием и отпусканием проходит целый кадр:
-		# Otto читает выстрел по фронту нажатия, а нажатие и отпускание в одном
-		# кадре фронтом не считаются — движок их не видит вовсе.
+		# The shot is single, and a whole frame passes between press and release:
+		# Otto reads a shot by the press edge, and a press and release in the same
+		# frame do not count as an edge: the engine does not see them at all.
 		Input.action_press(&"shoot")
 		await get_tree().physics_frame
 		Input.action_release(&"shoot")
@@ -157,8 +158,8 @@ func _stage(wanted: EnemyBrain.Stance, crouching: bool, label: String) -> void:
 			await get_tree().physics_frame
 			left -= 1
 			if _agent.stance() == wanted:
-				# Риг сводит позы плавно (ADR-0022, решение 2): снятый в тот же
-				# кадр, агент вышел бы серединой между двумя стойками.
+				# The rig blends poses smoothly (ADR-0022, decision 2): shot in the same
+				# frame, the agent would come out halfway between two stances.
 				for _frame in POSE_SETTLE_FRAMES:
 					await get_tree().physics_frame
 				await _shoot(label)
@@ -172,7 +173,7 @@ func _stage(wanted: EnemyBrain.Stance, crouching: bool, label: String) -> void:
 	)
 
 
-## Ждёт, пока в воздухе не останется пуль Otto. Возвращает, сколько кадров ушло.
+## Waits until no Otto bullets are left in the air. Returns how many frames it took.
 func _wait_for_clear_sky() -> int:
 	var spent := 0
 	while _bullets_in_air() > 0 and spent < PATIENCE:
@@ -190,8 +191,8 @@ func _bullets_in_air() -> int:
 	return count
 
 
-## Возвращает зданию его собственных агентов и даёт дверям время их выпустить:
-## последний кадр показывает не поставленного руками, а тех, кого выпускает игра.
+## Returns the building its own agents and gives the doors time to release them:
+## the last shot shows not one placed by hand but those the game releases.
 func _crowd() -> void:
 	_agent.kill()
 	_level.spawn_agents = true

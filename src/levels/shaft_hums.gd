@@ -1,20 +1,19 @@
 class_name ShaftHums
 extends Node3D
 
-## Гул шахт (ADR-0036): у каждой шахты свой источник, и он ходит по ней вровень
-## с Otto, в пределах её этажей, — шахта гудит вся, а не одной точкой на
-## середине высоты.
+## Shaft hum (ADR-0036): each shaft has its own source, and it moves along the shaft
+## level with Otto, within its floors — the whole shaft hums, not one point at mid-height.
 
-## Докуда слышно гул шахты, м, и где он стоит в глубине: за кабиной.
+## How far a shaft's hum is heard, m, and where it stands in depth: behind the cab.
 const REACH: float = 9.0
 const Z: float = -0.4
 
 var _holders: Array[Node3D] = []
-## Полоса высот каждой шахты, м плоскости: верх и низ.
+## Height band of each shaft, plane m: top and bottom.
 var _spans: Array[Vector2] = []
 
 
-## Заводит гул шахты [param shaft] от [param top] до [param bottom], м.
+## Starts the hum of shaft [param shaft] from [param top] to [param bottom], m.
 func add(shaft: BuildingPlan.ShaftSpot, top: float, bottom: float) -> void:
 	var holder := Node3D.new()
 	holder.name = "ShaftHum"
@@ -26,7 +25,7 @@ func add(shaft: BuildingPlan.ShaftSpot, top: float, bottom: float) -> void:
 	_spans.append(Vector2(minf(top, bottom), maxf(top, bottom)))
 
 
-## Ставит источники на высоту [param height], м плоскости.
+## Places the sources at height [param height], plane m.
 func follow(height: float) -> void:
 	for index: int in _holders.size():
 		var span := _spans[index]
@@ -36,6 +35,6 @@ func follow(height: float) -> void:
 		holder.position.z = Z
 
 
-## Высота источника шахты номер [param index], м плоскости. Нужна тестам.
+## Source height of shaft number [param index], plane m. Needed for tests.
 func height_of(index: int) -> float:
 	return WorldSpace.to_plane(_holders[index].position).y

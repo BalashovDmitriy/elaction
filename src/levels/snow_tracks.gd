@@ -1,48 +1,48 @@
 class_name SnowTracks
 extends Node3D
 
-## Следы на снегу крыши и скользкий настил (ADR-0054, решения 2 и 4).
+## Tracks in the roof snow and a slippery deck (ADR-0054, decisions 2 and 4).
 ##
-## Каждый шаг физики смотрит, кто стоит на заснеженном настиле: Otto и
-## агенты. Тот скользит ([member Otto.icy], [member Enemy.icy] — сцепление в
-## [Footing]) и оставляет отпечатки — подошва с каблуком, вдавленная в снег,
-## левой и правой ногой по очереди. Следы лежат до конца здания; когда их
-## набирается [constant LIMIT], новые встают на место самых старых.
+## Every physics step checks who stands on the snowy deck: Otto and
+## the agents. They slide ([member Otto.icy], [member Enemy.icy] — grip in
+## [Footing]) and leave prints — a sole with a heel, pressed into the snow,
+## left and right foot in turn. The tracks stay until the end of the building; when
+## [constant LIMIT] of them accumulate, new ones take the place of the oldest.
 ##
-## Отпечаток — наклейка на слой крыши [constant RoofCatch.LAYER], поверх
-## покрова: техника и парапеты следов не получают — по ним не ходят.
+## A print is a decal on the roof layer [constant RoofCatch.LAYER], on top of the
+## cover: equipment and parapets do not get tracks — nobody walks on them.
 
-## Шаг: столько метров между отпечатками одной цепочки, и на сколько левая
-## и правая нога расходятся по глубине.
+## Stride: this many metres between prints of one chain, and how far apart the left
+## and right foot are in depth.
 const STRIDE: float = 0.55
 const GAIT: float = 0.07
-## Отпечаток: длина, ширина, м; цвет вдавленного снега — темнее и холоднее
-## покрова, он в тени своих краёв.
+## Print: length, width, m; colour of the pressed snow — darker and colder than the
+## cover, it is in the shadow of its edges.
 const PRINT := Vector2(0.3, 0.14)
 const PRESSED := Color(0.36, 0.41, 0.5, 0.9)
-## Сколько отпечатков лежит разом.
+## How many prints lie at once.
 const LIMIT: int = 240
-## Насколько ступни могут быть выше или ниже настила, м, чтобы стоять на нём.
+## How far the feet may be above or below the deck, m, to stand on it.
 const ON_DECK: float = 0.2
 
-## Картинка подошвы — одна на все отпечатки.
+## The sole texture — one for all prints.
 static var _sole: ImageTexture = null
 
 var _deck: float = 0.0
 var _span := Vector2.ZERO
-## Проёмы шахт в настиле, по x: над ними под ногами кабина — её пол или крыша
-## вровень с настилом, — металл, а не снег.
+## Shaft openings in the deck, by x: above them underfoot is the cab — its floor or roof
+## flush with the deck — metal, not snow.
 var _shafts: Array[Vector2] = []
 var _prints: Array[Decal] = []
 var _next: int = 0
-## Где каждый шёл последний отпечаток и какой ногой: по id тела.
+## Where each one left the last print and with which foot: by body id.
 var _last: Dictionary = {}
 var _left_foot: Dictionary = {}
 
 
-## Следит за настилом крыши на высоте [param deck] сцены, от [param from] до
-## [param to] по x. [param shafts] — проёмы шахт в настиле: кто стоит над
-## проёмом, стоит на кабине — не скользит и следов не оставляет.
+## Watches the roof deck at scene height [param deck], from [param from] to
+## [param to] along x. [param shafts] — shaft openings in the deck: whoever stands above an
+## opening stands on a cab — does not slide and leaves no tracks.
 func watch(deck: float, from: float, to: float, shafts: Array[Vector2] = []) -> void:
 	name = "Tracks"
 	_deck = deck
@@ -50,7 +50,7 @@ func watch(deck: float, from: float, to: float, shafts: Array[Vector2] = []) -> 
 	_shafts = shafts
 
 
-## Сколько отпечатков уже лежит — для теста.
+## How many prints already lie — for a test.
 func count() -> int:
 	return _prints.size()
 
@@ -90,7 +90,7 @@ func _physics_process(_delta: float) -> void:
 		_stamp(feet, signf(feet.x - from.x), left)
 
 
-## Над проёмом ли шахты [param x]: там под ногами кабина, а не настил.
+## Whether [param x] is above a shaft opening: underfoot there is a cab, not the deck.
 func _over_a_shaft(x: float) -> bool:
 	for gap in _shafts:
 		if x > gap.x and x < gap.y:
@@ -115,11 +115,11 @@ func _stamp(at: Vector3, heading: float, left: bool) -> void:
 		_next = (_next + 1) % LIMIT
 	var side := GAIT if left else -GAIT
 	print_here.global_position = Vector3(at.x, _deck, at.z + side)
-	# Носок — по ходу: картинка носком к +X, налево — разворот.
+	# Toe along the direction of travel: the texture has the toe towards +X, going left — a flip.
 	print_here.rotation = Vector3(0.0, 0.0 if heading >= 0.0 else PI, 0.0)
 
 
-## Подошва с каблуком носком к +X: вдавленный снег с мягким краем.
+## A sole with a heel, toe towards +X: pressed snow with a soft edge.
 static func sole() -> ImageTexture:
 	if _sole != null:
 		return _sole
@@ -129,7 +129,7 @@ static func sole() -> ImageTexture:
 		for x in size.x:
 			var u := (float(x) + 0.5) / float(size.x)
 			var v := ((float(y) + 0.5) / float(size.y)) * 2.0 - 1.0
-			# Подошва — овал от середины к носку, каблук — овал у пятки.
+			# The sole is an oval from the middle to the toe, the heel an oval at the heel.
 			var toe := Vector2((u - 0.66) / 0.33, v / 0.95).length()
 			var heel := Vector2((u - 0.17) / 0.15, v / 0.8).length()
 			var shape := maxf(1.0 - smoothstep(0.75, 1.0, toe), 1.0 - smoothstep(0.7, 1.0, heel))

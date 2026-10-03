@@ -1,258 +1,265 @@
-# Как проверяется проект
+# How the project is checked
 
-Три уровня проверки, от дешёвого к дорогому. Все три идут в общем прогоне
-`python tools/run_tests.py`, он же на push и в CI.
+Three levels of checking, from cheap to expensive. All three run in the common run
+`python tools/run_tests.py`, which is also what runs on push and in CI.
 
-**Повтор на push отсекается.** `tools/check.ps1` после зелёного прогона
-записывает отпечаток рабочей копии — хеш дерева всех файлов, закоммиченных и
-нет, — и хук на push пропускает разбор движком и тесты, если с тех пор не
-изменился ни один файл (`tools/check_stamp.py`). Изменился хоть один — хук
-гоняет всё, как раньше. Проверка не обходится, а не повторяется: три минуты
-одного и того же набора на одном дереве ничего не добавляли.
+**The repeat on push is skipped.** After a green run, `tools/check.ps1` records a
+fingerprint of the working copy — a tree hash of all files, committed or
+not — and the push hook skips the engine parse and the tests if not a single file
+has changed since then (`tools/check_stamp.py`). If even one file has changed, the hook
+runs everything, as before. The check is not bypassed, it is just not repeated: three
+minutes of the same suite on the same tree added nothing.
 
-## 1. Правила без сцены
+## 1. Rules without a scene
 
-Машины состояний, раскладка здания, правила гибели, счёт. Вынесены в отдельные
-классы (`OttoStateMachine`, `ElevatorMotion`, `DoorVisit`, `EnemyBrain`, `BuildingPlan`
-и другие), которые не знают ни про узлы, ни про физику.
+State machines, building layout, death rules, score. They are pulled out into separate
+classes (`OttoStateMachine`, `ElevatorMotion`, `DoorVisit`, `EnemyBrain`, `BuildingPlan`
+and others) that know nothing about nodes or physics.
 
-Это основная масса тестов и первое, куда добавляется проверка новой механики.
-Соглашение простое: **новая механика приезжает вместе с тестом**.
+This is the bulk of the tests and the first place a check for a new mechanic goes.
+The convention is simple: **a new mechanic arrives together with a test**.
 
-## 2. Свойства здания на многих сидах
+## 2. Building properties over many seeds
 
-Здание — чистая функция от сида, поэтому проверять надо не «этот уровень работает»,
-а «любое здание, которое сгенерируется, работает». Такие тесты гоняют генерацию на
-десятках сидов и стерегут инварианты:
+The building is a pure function of the seed, so the check is not "this level works"
+but "any building that gets generated works". These tests run generation on
+dozens of seeds and guard invariants:
 
-- каждый этаж обслуживается шахтой, полосы не налезают друг на друга;
-- на каждом стыке полос стоит эскалатор;
-- проём эскалатора не лежит между лифтом и его площадкой;
-- все документы и выход достижимы из точки старта;
-- ничто не стоит на одном месте с другим.
+- every floor is served by a shaft, the bands do not overlap;
+- every band junction has an escalator;
+- an escalator opening does not lie between an elevator and its landing;
+- all documents and the exit are reachable from the start point;
+- nothing stands in the same place as something else.
 
-Три бага M5a — проём между лифтом и площадкой, выход на месте возрождения и молча
-пропадающий документ — проявлялись не на всех сидах. На сиде 1 их было не видно.
+Three M5a bugs — the opening between an elevator and its landing, the exit at the respawn
+point and a silently vanishing document — did not show on every seed. On seed 1 they were
+not visible.
 
-## 3. Сборка и прохождение
+## 3. Assembly and playthrough
 
-Самый дорогой уровень: здание собирается по-настоящему, с физикой.
+The most expensive level: the building is assembled for real, with physics.
 
-- **Дымовой тест сборки** — уровень строится для нескольких сидов, прокручивается
-  несколько физических кадров: не падает, Otto стоит на полу, кабины на своих этажах.
-  Ловит расхождение между раскладкой и кодом, который её расставляет.
-- **Бот** — водит Otto по зданию и проверяет, что здание действительно проходится:
-  документы собираются, выход срабатывает. Зданий у него три: маленькое на пяти
-  сидах (дёшево и ловит вырожденные раскладки), настоящее на тридцать этажей и
-  настоящее **с агентами** — последнее и есть DoD вехи M11, то есть проверка
-  баланса боя, а не геометрии.
+- **Assembly smoke test** — the level is built for several seeds, a few physics frames
+  are stepped: it does not crash, Otto stands on the floor, the cabs are on their floors.
+  It catches a mismatch between the layout and the code that places it.
+- **Bot** — drives Otto through the building and checks that the building is actually
+  completable: documents are collected, the exit triggers. It has three buildings: a small
+  one on five seeds (cheap, and catches degenerate layouts), a real thirty-floor one and
+  a real one **with agents** — the last one is the DoD of milestone M11, i.e. a check of
+  combat balance, not geometry.
 
-**Бот водится по состоянию, а не по времени.** Не «держи вправо 3.5 секунды», а
-«держи вправо, пока не дойдёшь». Тесты по выдержкам ломались в этом проекте четыре
-раза подряд — на сценариях съёмки, — и каждый раз молча снимали не то, что обещали.
+**The bot is driven by state, not by time.** Not "hold right for 3.5 seconds", but
+"hold right until you get there". Timing-based tests broke in this project four times
+in a row — in the capture scenarios — and each time silently captured something other
+than what they promised.
 
-## 4. Сам инструмент замера
+## 4. The measuring tool itself
 
-Бот — это тоже код, и ошибка в нём выглядит как вывод об игре.
+The bot is code too, and a bug in it looks like a conclusion about the game.
 
-В M11 он не выстрелил ни разу за всю веху: выстрел и прыжок Otto читает по фронту
-нажатия, а бот отпускал и нажимал действие в одном кадре — движок такого фронта не
-видит. Ходьба и присед держатся, поэтому работали, а одиночные действия пропадали
-целиком. Четыре строки замеров подряд описывали игру, в которой Otto умеет только
-приседать, и по ним чуть не пошли правки чисел боя.
+In M11 it did not fire a single shot during the whole milestone: Otto reads shooting and
+jumping on the press edge, and the bot released and pressed the action in the same
+frame — the engine sees no such edge. Walking and crouching are held, so they worked,
+while one-off actions vanished entirely. Four rows of measurements in a row described a
+game in which Otto can only crouch, and combat numbers almost got changed based on them.
 
-Отсюда правило: **у инструмента замера должен быть свой тест, и проверять он должен
-результат, а не намерение.** `test_bot_fights.gd` не смотрит, нажал ли бот «выстрел»,
-— он требует, чтобы агент на линии огня умер.
+Hence the rule: **a measuring tool must have its own test, and it must check the
+result, not the intent.** `test_bot_fights.gd` does not look at whether the bot pressed
+"fire" — it requires that the agent in the line of fire dies.
 
-Косвенный признак был и в самих замерах: ноль убитых агентов в каждой строке таблицы.
-Цифра, которая не меняется ни от одной правки, — это не результат, а неработающий
-тракт.
+There was an indirect sign in the measurements themselves: zero agents killed in every
+row of the table. A number that no change moves is not a result but a broken
+pipeline.
 
-**Бот в тестах управляет вдвое реже, чем игрок.** `wait_physics_frames(1)` у GUT
-ждёт не один кадр, а два: внутри стоит `_elapsed_frames > _wait_physics_frames`.
-Значит на каждое решение бота мир успевает пройти два физических кадра, и любой
-допуск, который меньше пути за два кадра, бот проскакивает.
+**In tests the bot steers half as often as a player.** GUT's `wait_physics_frames(1)`
+waits not one frame but two: inside it is `_elapsed_frames > _wait_physics_frames`.
+So for every bot decision the world advances two physics frames, and the bot overshoots
+any tolerance smaller than the distance covered in two frames.
 
-На этом веха M13 и споткнулась: кабина лифта доводится до этажа, только если до
-него ближе `settle_distance`, а тот остался в старом масштабе — 12 единиц при
-36 за два кадра. Кабина замирала на 24 единицы ниже этажа, Otto оказывался внутри
-перекрытия и переставал двигаться. В ручном прогоне (`tools/playthrough.gd`, один
-кадр на решение) всё проходило, в тестах — вставало намертво.
+Milestone M13 tripped over exactly this: an elevator cab is snapped to a floor only if
+it is closer than `settle_distance`, and that stayed at the old scale — 12 units versus
+36 per two frames. The cab froze 24 units below the floor, Otto ended up inside the
+slab and stopped moving. In a manual run (`tools/playthrough.gd`, one frame per decision)
+everything passed; in the tests it got stuck dead.
 
-Отсюда правило: **допуски в мире не должны быть меньше пути за два кадра под
-`Engine.time_scale`**. Прогон ботом — это не только проверка проходимости, но и
-самая грубая петля управления, какая случится с игрой.
+Hence the rule: **tolerances in the world must not be smaller than the distance covered
+in two frames under `Engine.time_scale`**. A bot run is not only a completability check
+but also the coarsest control loop the game will ever face.
 
-Длина шага подтверждена замером и закреплена тестом
-(`test_a_tick_is_two_physics_frames`): она задана поведением чужого кода и может
-молча поменяться с обновлением GUT. Считать её надо движком,
-`Engine.get_physics_frames()`, а не своим обработчиком `physics_frame`:
-обработчики идут в порядке подключения, аваитер GUT подключён раньше и будит
-корутину прямо внутри эмиссии, так что свой счётчик занижает ответ на кадр.
+The step length is confirmed by measurement and pinned by a test
+(`test_a_tick_is_two_physics_frames`): it is defined by the behaviour of someone else's
+code and may silently change with a GUT update. It must be counted by the engine,
+`Engine.get_physics_frames()`, not by your own `physics_frame` handler: handlers run in
+connection order, GUT's awaiter is connected earlier and wakes the coroutine right inside
+the emission, so your own counter undercounts by one frame.
 
-**Рэгдолл под ускорением тестов (M24g).** `Engine.time_scale = 4` удлиняет не
-только кадр, но и шаг физики: на вчетверо длинном шаге суставы трупа
-разлетаются, и тело проваливается сквозь пол. Тесты трупов поэтому вместе с
-ускорением поднимают `Engine.physics_ticks_per_second` до 240 — шаг остаётся
-игровым, 1/60 с — и возвращают 60 в `after_all`. Остальные тесты этого не
-делают: трупы в них — декорация, и их полёт на проверку не влияет. Физика
-Jolt считает в нескольких потоках, и тело ложится от прогона к прогону чуть
-по-разному: проверки трупов меряют суть («таз верхнего выше таза нижнего»,
-«середины частей не дальше радиуса от стенки»), а не точное место, и дают
-телу улечься, прежде чем мерить.
+**Ragdoll under test speed-up (M24g).** `Engine.time_scale = 4` lengthens not only
+the frame but also the physics step: on a four times longer step the corpse's joints
+fly apart and the body falls through the floor. So the corpse tests, along with the
+speed-up, raise `Engine.physics_ticks_per_second` to 240 — the step stays the
+game's 1/60 s — and restore 60 in `after_all`. The other tests do not do this: corpses
+there are decoration, and their flight does not affect the check. Jolt physics
+computes in several threads, and the body comes to rest slightly differently from run
+to run: corpse checks measure the essence ("the upper one's pelvis is above the lower
+one's pelvis", "the centres of the parts are no farther than a radius from the wall"),
+not the exact position, and let the body settle before measuring.
 
-**Второе правило, из M18a: инструмент замера и тест обязаны водить Otto
-одинаково.** `tools/playthrough.gd` ходил одним кадром на решение, а тесты —
-двумя. Числа у обоих назывались «кадрами», но значили разное, и бюджет,
-поставленный по замеру инструмента, в тесте означал вдвое меньше. Сид 2 «не
-проходил здание» в тесте, проходя в инструменте, — и три коммита подряд
-объясняли это то длиной маршрута по графу, то балансом боя.
+**The second rule, from M18a: the measuring tool and the test must drive Otto
+the same way.** `tools/playthrough.gd` stepped one frame per decision, while the tests
+stepped two. Both numbers were called "frames" but meant different things, and a budget
+set from the tool's measurement meant half as much in the test. Seed 2 "did not
+complete the building" in the test while completing it in the tool — and three commits
+in a row explained this first by the route length on the graph, then by combat balance.
 
-Само правило M13 при этом сработало как обещано. На той же вехе оно нашло
-настоящий баг: бот ждал кабину в 0.81 м от оси шахты, его край оказывался
-в 0.54 м, а кабина занимает 0.6 м. Поднимающаяся снизу кабина цепляла его
-крышей и увозила наверх, а крышей управлять нельзя — получался бесконечный
-круг. Допуск снова оказался меньше габарита, и поймала это именно грубая петля.
+The M13 rule itself worked as promised. On the same milestone it found
+a real bug: the bot waited for the cab 0.81 m from the shaft axis, its edge ended up
+at 0.54 m, and the cab takes up 0.6 m. A cab rising from below caught it with its
+roof and carried it up, and the roof cannot be controlled — the result was an endless
+loop. The tolerance again turned out smaller than the size, and it was precisely the
+coarse loop that caught it.
 
-**Третье правило, из M18b: ход здания считается шагами физики, а не кадрами.**
-Прогон бота на сиде 1 не повторялся — тест давал то четыре смерти, то пять, при
-одном и том же числе шагов, — и объяснения искали в бою. Причина была в петле:
-выпуск агентов у дверей и таймер возвращения Otto жили в `_process`, то есть
-шли по настенным часам, а бот водит Otto шагами физики. На быстрой машине за
-тот же шаг бота из дверей выходило больше агентов, чем на медленной, и одно
-и то же здание оказывалось разной трудности.
+**The third rule, from M18b: the building's progress is counted in physics steps, not
+frames.** The bot run on seed 1 did not reproduce — the test gave four deaths one time
+and five another, with the same number of steps — and the explanation was sought in
+combat. The cause was in the loop: the agent release at doors and Otto's return timer
+lived in `_process`, i.e. ran on wall-clock time, while the bot drives Otto in physics
+steps. On a fast machine more agents came out of the doors during the same bot step
+than on a slow one, and the same building ended up with different difficulty.
 
-Отсюда правило: **всё, что влияет на исход партии, идёт от `_physics_process`
-и от `SceneTreeTimer` с отсчётом в физике.** В `_process` остаётся картинка —
-у нас это, например, гашение ламп и столбов света вне кадра, камера, погода и HUD. Признак нарушения простой:
-результат прогона меняется от запуска к запуску, а числа игры никто не трогал.
+Hence the rule: **everything that affects the outcome of a session comes from
+`_physics_process` and from `SceneTreeTimer` counting in physics.** `_process` keeps the
+picture — for us that is, for example, turning off lamps and light shafts off-screen,
+the camera, the weather and the HUD. The sign of a violation is simple:
+the result of a run changes from launch to launch, while nobody touched the game's
+numbers.
 
-Виновник почти никогда не один. После первой правки сид 1 всё ещё давал то
-четыре смерти, то три — **при одном и том же числе шагов**, то есть по одному
-и тому же маршруту. Одинаковый путь и разный счёт смертей означает, что
-менялась не навигация, а бой; осталась сирена, которую `GameState` тикал
-в `_process`. От неё зависят злость агентов и задержка кабин, так что здание
-выходило то злее, то добрее. **Ищите по признаку:** разошлись шаги — разошлась
-навигация; сошлись шаги, разошлись смерти — разошёлся бой.
+There is almost never just one culprit. After the first fix seed 1 still gave
+four deaths one time and three another — **with the same number of steps**, i.e. along
+the same route. The same path and a different death count mean that what changed was
+not navigation but combat; what remained was the siren, which `GameState` ticked
+in `_process`. Agent anger and cab delay depend on it, so the building came out
+sometimes meaner, sometimes kinder. **Search by symptom:** steps diverged — navigation
+diverged; steps matched, deaths diverged — combat diverged.
 
-Вторую ошибку M11 нашла не проверка, а **инструмент съёмки**: `combat_shot.gd` ждал
-позу «лёжа», а агент вместо неё раз за разом умирал. Оказалось, что уклонившийся
-агент распрямляется, пока пуля ещё внутри его габарита, и ловит её грудью
-([ADR-0016](adr/0016-combat-balance.md)). Инструмент, который ждёт состояние, —
-это ещё и проверка того, что состояние вообще наступает.
+The second M11 bug was found not by a check but by **the capture tool**: `combat_shot.gd`
+waited for the "lying" pose, and instead the agent died again and again. It turned out
+that an agent who dodged straightens up while the bullet is still inside its bounds, and
+catches it with its chest ([ADR-0016](adr/0016-combat-balance.md)). A tool that waits for
+a state is also a check that the state happens at all.
 
-## Прогон идёт шардами
+## The run goes in shards
 
-`python tools/run_tests.py` раскидывает тесты по процессам Godot — по числу ядер,
-но не больше шести: при переходе на шарды набор пошёл **139 с против 755**
-(сейчас, на 60 файлах и 66 единицах, — около 170 с). Устройство держится на
-одном замере, а не на догадке, — его делал `tools/test_times.py --by-test` (с M24j
-замер — `python tools/run_tests.py --batch-cost 0`, см. ниже):
+`python tools/run_tests.py` spreads the tests over Godot processes — one per core,
+but no more than six: on the switch to shards the suite went **139 s versus 755**
+(now, at 60 files and 66 units, about 170 s). The design rests on
+one measurement, not a guess — it was made by `tools/test_times.py --by-test` (since M24j
+the measurement is `python tools/run_tests.py --batch-cost 0`, see below):
 
-| Единица | Было, с |
+| Unit | Was, s |
 |---|---|
 | `test_bot_survives_the_real_building_with_agents` | 328 |
 | `test_bot_finishes_the_real_building` | 188 |
 | `test_bot_finishes_every_building` | 60 |
 | `test_building_architecture.gd` | 54 |
-| остальные 46 файлов | 1.4–36, всего ~190 |
+| the other 46 files | 1.4–36, ~190 in total |
 
-Отсюда всё остальное:
+Everything else follows from this:
 
-- **Резать по файлам бесполезно.** Один тест-метод весил 40% набора, а шард
-  не умеет делить файл: шесть шардов давали 574 с против 755. Поэтому оба
-  дорогих теста разрезаны **по сидам** на отдельные тесты, и пол прогона упал
-  с 328 с до ~120. Заодно упавший сид теперь виден по имени теста.
-- **Единица работы — файл или один тест в нём.** GUT принимает
-  `-gunit_test_name`, поэтому разрезать файл можно не трогая его содержимое;
-  цена — свой процесс на каждый такой кусок.
-- **`-gconfig=` пустым обязателен.** Иначе `-gdir` берётся из `.gutconfig.json`,
-  к списку шарда добавляется весь `res://tests`, и каждый процесс гоняет набор
-  целиком — вшестером те же одиннадцать минут.
-- **Своя папка `user://` каждому шарду.** `test_records` и `test_interface` в неё
-  пишут, а флага для неё у Godot нет — она выводится из `APPDATA`/`HOME`, и их
-  подменяет сам прогон.
-- **Раскладка жадная, по замеренным числам** (`KNOWN_SLOW`). Разъедутся —
-  прогон переживёт, просто шарды станут неровными; перемерить дешевле, чем гадать.
+- **Splitting by files is useless.** One test method weighed 40% of the suite, and a shard
+  cannot split a file: six shards gave 574 s versus 755. So both
+  expensive tests are cut **by seed** into separate tests, and the run's floor dropped
+  from 328 s to ~120. As a bonus, a failed seed is now visible by the test name.
+- **A unit of work is a file or one test in it.** GUT accepts
+  `-gunit_test_name`, so a file can be split without touching its contents;
+  the price is a separate process for each such piece.
+- **An empty `-gconfig=` is mandatory.** Otherwise `-gdir` is taken from `.gutconfig.json`,
+  the whole `res://tests` is added to the shard's list, and every process runs the whole
+  suite — six of them take the same eleven minutes.
+- **Each shard gets its own `user://` folder.** `test_records` and `test_interface` write
+  to it, and Godot has no flag for it — it is derived from `APPDATA`/`HOME`, and the run
+  substitutes those itself.
+- **The distribution is greedy, by measured numbers** (`KNOWN_SLOW`). If they drift,
+  the run survives, the shards just become uneven; remeasuring is cheaper than guessing.
 
-## Кадры без настоящих часов (M24j)
+## Frames without a real clock (M24j)
 
-Шесть шардов грузили процессор на 5–30 %, а набор шёл шесть минут: тест со
-сценой ждёт кадров физики, а их движок отдаёт по настоящим часам — 60 в
-секунду, и процесс спит между ними. `Engine.time_scale = 4` удлинял шаг, но
-не учащал кадры. С **`--fixed-fps 60`** кадр — ровно 1/60 с игрового времени,
-и часы его не держат: сид бота пошёл **9 с против 97**, весь набор — **около
-минуты против 374 с**, при той же игре — шаг физики и все её числа те же.
+Six shards loaded the CPU at 5–30 %, while the suite took six minutes: a test with a
+scene waits for physics frames, and the engine hands them out by the real clock — 60 per
+second, with the process sleeping in between. `Engine.time_scale = 4` lengthened the step
+but did not make frames more frequent. With **`--fixed-fps 60`** a frame is exactly
+1/60 s of game time, and the clock does not hold it back: a bot seed went **9 s versus
+97**, the whole suite **about a minute versus 374 s**, with the same game — the physics
+step and all its numbers are the same.
 
-Отсюда правило: **время в коде игры и в тестах меряется кадрами, а не часами.**
-«Настоящее время» поверх замедления мира — это `delta / Engine.time_scale`, а не
-`Time.get_ticks_msec()`: под `--fixed-fps` часы и кадры расходятся, и эффект,
-отмеренный часами, гас бы через сотни кадров или не начинался вовсе. На этом
-упали толчок камеры и вспышка добивания (переведены на кадры) и тест последней
-смерти, ждавший по часам (переведён тоже). Часы годятся только там, где сама
-секунда ничего не решает: мигание тревоги в HUD, покачивание на тросе.
+Hence the rule: **time in game code and in tests is measured in frames, not by the
+clock.** "Real time" on top of world slow-down is `delta / Engine.time_scale`, not
+`Time.get_ticks_msec()`: under `--fixed-fps` the clock and frames diverge, and an effect
+timed by the clock would fade out after hundreds of frames or not start at all. The
+camera shake and the takedown flash fell on this (moved to frames), and so did the
+last-death test that waited by the clock (moved as well). The clock is only fine where
+the second itself decides nothing: the alarm blinking in the HUD, swaying on the rope.
 
-**Задания — очередью, а не раскладкой заранее.** Процессов столько, сколько
-потоков у процессора (`--jobs`, не больше 16), и освободившийся берёт следующее
-задание — самое тяжёлое из оставшихся. Задание — разрезанный тест, известный
-тяжёлый файл или пачка мелких файлов весом до `BATCH_COST`: старт движка стоит
-секунды две, и процесс на каждый мелкий файл съел бы больше, чем его тесты.
-Веса — `KNOWN_SLOW`, замер — `python tools/run_tests.py --batch-cost 0 --slowest 120`,
-каждый файл своим процессом, под той же нагрузкой, что и прогон. Упирается набор теперь в самые долгие задания —
-`test_car_corpses.gd` и сиды бота, около 50 с под полной нагрузкой; дальше —
-только резать их. `--real-time` гонит по настоящим часам, как было.
+**Jobs go in a queue, not in a distribution made in advance.** There are as many
+processes as CPU threads (`--jobs`, no more than 16), and a freed process takes the next
+job — the heaviest of the remaining ones. A job is a split test, a known
+heavy file or a batch of small files weighing up to `BATCH_COST`: an engine start costs
+about two seconds, and a process per small file would eat more than its tests.
+Weights are `KNOWN_SLOW`, measured with `python tools/run_tests.py --batch-cost 0
+--slowest 120`, each file in its own process, under the same load as the run. The suite
+is now bounded by the longest jobs — `test_car_corpses.gd` and the bot seeds, about 50 s
+under full load; going further means only cutting them. `--real-time` runs on the real
+clock, as before.
 
-**В CI набор идёт матрицей на трёх машинах.** `run_tests.py --part K/N` делит
-единицы на N частей жадной раскладкой по `KNOWN_SLOW` и гонит K-ю, а на машине
-она снова идёт очередью по её потокам. Импорт ресурсов каждая машина делает
-сама: без `.godot/imported` тесты не загрузят ни одной сцены.
+**In CI the suite runs as a matrix on three machines.** `run_tests.py --part K/N` splits
+the units into N parts by a greedy distribution over `KNOWN_SLOW` and runs the K-th one,
+and on the machine it again goes as a queue over its threads. Each machine does the
+resource import itself: without `.godot/imported` the tests will not load a single scene.
 
-**Остальные проверки — тоже по всем потокам.** `godot_check.py` разбирает
-скрипты пачками — процесс движка грузит пачку (`tools/check_scripts.gd`), — а
-не запуском движка на скрипт: две с половиной сотни стартов подряд шли две с
-половиной минуты, пачками — восемь секунд. Формат и линт — `tools/gd_tools.py`,
-кусками и разом: две секунды против одиннадцати. `check.ps1` целиком — около
-минуты против трёх с половиной.
+**The other checks also use all threads.** `godot_check.py` parses
+scripts in batches — an engine process loads a batch (`tools/check_scripts.gd`) — rather
+than starting the engine per script: two hundred fifty starts in a row took two and a
+half minutes, in batches eight seconds. Format and lint are `tools/gd_tools.py`,
+in chunks and all at once: two seconds versus eleven. `check.ps1` as a whole takes about
+a minute versus three and a half.
 
-## Долгий прогон смотрят по ходу
+## A long run is watched as it goes
 
-Набор идёт около минуты, а один сид бота на настоящем здании — до пятидесяти
-секунд под полной нагрузкой. Ждать конца, чтобы узнать, что
-бот встал на третьей минуте, незачем: он печатает «бот зациклился: N шагов без
-продвижения» сразу, а потом лишь добирает бюджет шагов.
+The suite takes about a minute, and one bot seed on the real building up to fifty
+seconds under full load. There is no point waiting for the end to learn that
+the bot got stuck in the third minute: it prints "bot is looping: N steps without
+progress" right away, and then only
+uses up the step budget.
 
-Поэтому два правила:
+So two rules:
 
-- **Вывод Godot идёт потоком.** `tools/godot_bin.run` отдаёт строки наружу, пока
-  процесс работает, а не копит их до его конца. Смотреть прогон надо по ходу,
-  примерно раз в минуту.
-- **Сторож снимает прогон на первой же такой строке** (`STALLED_MARKERS`
-  в `run_tests.py`). Прогон при этом считается проваленным — код возврата тот же,
-  что у таймаута.
+- **Godot output is streamed.** `tools/godot_bin.run` passes lines out while the
+  process is running instead of accumulating them until it ends. A run should be watched
+  as it goes, roughly once a minute.
+- **The watchdog stops the run on the first such line** (`STALLED_MARKERS`
+  in `run_tests.py`). The run then counts as failed — the exit code is the same
+  as for a timeout.
 
-Сторож не заменяет собой проверку: он экономит минуты ожидания, а разбираться
-всё равно приходится с тем, почему бот встал.
+The watchdog does not replace the check: it saves minutes of waiting, but you still have
+to figure out why the bot got stuck.
 
-## Чего тесты не проверяют
+## What the tests do not check
 
-Рендер, анимации и «красиво ли». Для этого есть скриншоты вехи
-(`python tools/capture.py <веха>`) — но они показывают, а не проверяют. Всё, что
-можно проверить программой, проверяется программой.
+Rendering, animations and "does it look good". For that there are the milestone
+screenshots (`python tools/capture.py <milestone>`) — but they show, they do not check.
+Everything that can be checked by a program is checked by a program.
 
-## Журнал прогона
+## Run log
 
-Провал прогона ботом разбирается по журналу, а не перезапусками с отладочной
-печатью (M24g: сид 3 стоил десяти перезапусков). `RunLog` пишет строкой JSON
-каждое событие: смерть Otto с причиной (пуля, кабина, падение), местом и тем,
-кто стрелял и откуда, попадания, выпуск и гибель агентов, возвращения в игру,
-поездки, смену решения бота.
+A failed bot run is investigated through the log, not by reruns with debug
+printing (M24g: seed 3 cost ten reruns). `RunLog` writes each event as a line of JSON:
+Otto's death with its cause (bullet, cab, fall), place, and who shot and from where,
+hits, agent release and death, returns to play, rides, the bot's decision changes.
 
-- Тест прохождения с агентами пишет его всегда: `logs/playthrough_seed<N>.jsonl`.
-- Инструмент прогона и игра — по флагу: `--log=logs/run_{seed}.jsonl`
-  (`{seed}` — номер сида) или переменной окружения `ELACTION_LOG`.
-- Разбор: `python tools/run_log.py FILE` — сводка (события, смерти по месту и
-  причине, откуда стреляли); `--deaths` — каждая смерть целиком; фильтры
-  `--kind`, `--floor`, `--from`/`--to` (секунды), `--around КАДР --span N`.
+- The playthrough test with agents always writes it: `logs/playthrough_seed<N>.jsonl`.
+- The run tool and the game write it on a flag: `--log=logs/run_{seed}.jsonl`
+  (`{seed}` is the seed number) or the `ELACTION_LOG` environment variable.
+- Analysis: `python tools/run_log.py FILE` — a summary (events, deaths by place and
+  cause, where shots came from); `--deaths` — every death in full; filters
+  `--kind`, `--floor`, `--from`/`--to` (seconds), `--around FRAME --span N`.
 
-Папка `logs/` в репозиторий не идёт.
+The `logs/` folder does not go into the repository.

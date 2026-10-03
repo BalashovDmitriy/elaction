@@ -1,61 +1,64 @@
 class_name Corpse
 extends RefCounted
 
-## Тело на суставах у агента, Otto и оторванного куска (ADR-0043, решения 7–12).
+## A jointed body for an agent, Otto and a torn-off piece (ADR-0043, decisions 7–12).
 ##
-## Рэгдолл ([Ragdoll]) собирается с рождения актёра и ждёт выключенным: живой
-## ходит своей формой по правилам аркады, а части тела только повторяют позу и
-## ни с чем не сталкиваются. В миг смерти тело падает ([method fall]): части
-## включаются и летят от толчка пули, дальше всё решает физика — тело оседает,
-## ложится на другие трупы, едет на полу кабины, падает в шахту. Засыпают части
-## сами, когда улеглись: лежащие до конца здания трупы ничего не стоят кадру.
+## The ragdoll ([Ragdoll]) is built when the actor is born and waits switched off: the
+## living one walks with its own shape by the arcade rules, and the body parts only
+## repeat the pose and collide with nothing. At the moment of death the body falls
+## ([method fall]): the parts switch on and fly from the bullet's push, then physics
+## decides everything: the body slumps, lands on other corpses, rides on the cab floor,
+## falls into the shaft. The parts fall asleep by themselves once they have settled:
+## corpses lying until the end of the building cost the frame nothing.
 ##
-## Трупы лежат на своём слое [constant LAYER] и видят друг друга (решение 10).
-## Живые и Otto на этот слой не смотрят и проходят сквозь.
+## Corpses lie on their own layer [constant LAYER] and see each other (decision 10).
+## The living and Otto do not look at this layer and pass through.
 ##
-## Кабина режет тело двумя способами. Днищем сверху — [method cut_under]: что
-## под днищем, пропадает. Стенкой — [method tear]: тело поперёк порога едущей
-## кабины рвётся, и части внутри уезжают отдельным [CorpsePiece]. Без крови
-## тело не рвётся: под днищем оно исчезает целиком.
+## The cab cuts a body in two ways. With its bottom from above, [method cut_under]:
+## whatever is under the bottom disappears. With a wall, [method tear]: a body across the
+## threshold of a moving cab is torn, and the parts inside ride away as a separate
+## [CorpsePiece]. Without blood the body is not torn: under the bottom it disappears
+## whole.
 
-## Через сколько после начала падения тело бьётся о пол, с, и докуда это
-## слышно, м.
+## How long after the fall starts the body hits the floor, s, and how far that can be
+## heard, m.
 const THUD_AFTER: float = 0.4
 const THUD_REACH: float = 16.0
 
-## Группа упавших тел: по ней кабина ищет, кого рвать стенкой.
+## Group of fallen bodies: the cab searches it for whom to tear with its wall.
 const GROUP := &"corpses"
-## Слой трупов в `project.godot`.
+## The corpse layer in `project.godot`.
 const LAYER: int = 5
-## Слой геометрии: пол, стены, кабины.
+## The geometry layer: floor, walls, cabs.
 const GEOMETRY_MASK: int = 1
-## Толчок пули в туловище, Н·с, и насколько он поддаёт вверх. Без пули тело
-## толкает назад, от взгляда, вполсилы: обмякший столбом оседал бы сидя.
+## The bullet's push into the torso, N·s, and how much it lifts upward. Without a bullet
+## the body is pushed backward, away from its gaze, at half strength: a limp body would
+## otherwise sink straight down into a sitting position.
 const HIT_IMPULSE: float = 60.0
 const HIT_LIFT: float = 0.15
 const SLUMP: float = 1.0
-## Длина лужицы у порога, м.
+## Length of the puddle at the threshold, m.
 const TEAR_PUDDLE: float = 0.3
-## Метки, которыми пуля отмечает удар: куда (−1 влево, +1 вправо) и где.
+## Metadata with which a bullet marks a hit: which way (−1 left, +1 right) and where.
 const HIT_META := &"hit_from"
 const HIT_POINT := &"hit_at"
 
-## Тело упало и живёт физикой.
+## The body has fallen and lives by physics.
 var fallen: bool = false
-## Тела больше нет: срезано целиком или зажато.
+## The body is gone: cut off entirely or crushed.
 var gone: bool = false
-## Срез днищем кабины, если он начался.
+## The cut by the cab bottom, if it has started.
 var cut: CarCut = null
 var ragdoll: Ragdoll = null
-## Тело уже порвано стенкой: второй раз кабина его не рвёт.
+## The body has already been torn by a wall: the cab does not tear it a second time.
 var torn: bool = false
 
 var _holder: Node3D
 var _figure: FigureRig
 
 
-## Собирает тело при фигуре [param figure] актёра [param holder]. [param only]
-## — только эти части (кусок); пусто — все.
+## Builds the body with figure [param figure] of actor [param holder]. [param only]
+## means only these parts (a piece); empty means all.
 func _init(
 	holder: Node3D, figure: FigureRig, only: PackedStringArray = PackedStringArray()
 ) -> void:
@@ -65,7 +68,7 @@ func _init(
 	ragdoll.corpse = self
 
 
-## Тело при узле [param node] — актёре, куске или части тела, — или null.
+## The body at node [param node] (an actor, a piece or a body part), or null.
 static func of(node: Object) -> Corpse:
 	if node == null:
 		return null
@@ -80,10 +83,11 @@ static func of(node: Object) -> Corpse:
 	return null
 
 
-## Тело падает: поза отпускает скелет, части летят со скоростью [param velocity]
-## и от толчка пули, если она отметила актёра ([constant HIT_META]). Толчок
-## приходит в ту часть, куда попала пуля, и в саму точку: в голову — голову
-## запрокидывает, в ноги — их выбивает, в корпус — отбрасывает всё тело.
+## The body falls: the pose releases the skeleton, the parts fly at speed
+## [param velocity] and from the bullet's push, if it marked the actor ([constant
+## HIT_META]). The push comes into the part the bullet hit and at that very point: in the
+## head, the head snaps back; in the legs, they are knocked out; in the torso, the whole
+## body is thrown back.
 func fall(velocity: Vector3) -> void:
 	if fallen:
 		return
@@ -95,21 +99,21 @@ func fall(velocity: Vector3) -> void:
 	var at: Variant = _holder.get_meta(HIT_POINT) if _holder.has_meta(HIT_POINT) else null
 	ragdoll.start(velocity, impulse, at)
 	_holder.add_to_group(GROUP)
-	# Тело оземь — чуть позже начала падения, когда оно долетело до пола.
+	# The body hits the ground a bit after the fall starts, when it has reached the floor.
 	if _holder.is_inside_tree():
 		var timer := _holder.get_tree().create_timer(THUD_AFTER, false)
 		timer.timeout.connect(_thud)
 
 
-## Удар тела о пол на месте тела (ADR-0052, решение 7).
+## The body's impact on the floor at the body's place (ADR-0052, decision 7).
 func _thud() -> void:
 	if is_instance_valid(_holder) and _holder.is_inside_tree():
 		var parent := _holder.get_parent()
 		Sounds.play_at(parent, Sounds.BODY_FALL, _holder.global_position, THUD_REACH)
 
 
-## Тело встаёт: Otto воскрес. Скелет собирается заново — отрезанное кабиной
-## возвращается, — и поза снова ведёт фигуру.
+## The body gets up: Otto has revived. The skeleton is rebuilt (whatever the cab cut off
+## comes back), and the pose drives the figure again.
 func rise() -> void:
 	ragdoll.dispose()
 	ragdoll = Ragdoll.new(_figure)
@@ -126,7 +130,7 @@ func rise() -> void:
 	cut = null
 
 
-## Тела больше нет: не видно и не сталкивается.
+## The body is gone: not visible and does not collide.
 func vanish() -> void:
 	if gone:
 		return
@@ -136,9 +140,9 @@ func vanish() -> void:
 	_holder.remove_from_group(GROUP)
 
 
-## Может ли тело лежать не дальше [param reach] от [param x] по этажу. Прикидка
-## по тазу: целое тело — ни срезанное, ни порванное — держат суставы, и дальше
-## роста от таза ни одна его часть не уходит.
+## Whether the body can lie no farther than [param reach] from [param x] along the floor.
+## An estimate by the pelvis: a whole body, neither cut nor torn, is held by its joints,
+## and no part of it goes farther than its height from the pelvis.
 func near(x: float, reach: float) -> bool:
 	if ragdoll.parts.is_empty():
 		return false
@@ -146,15 +150,15 @@ func near(x: float, reach: float) -> bool:
 	return absf(Ragdoll.center_of(pelvis).x - x) < reach + Proportions.BODY
 
 
-## Где тело лежит по X в мире: от и до.
+## Where the body lies along X in the world: from and to.
 func span() -> Vector2:
 	var box := ragdoll.bounds()
 	return Vector2(box.position.x, box.end.x)
 
 
-## Днище кабины [param car] проходит по телу сверху (решения 7–9). Части, по
-## которым оно прошло до середины, пропадают; кабина сквозь тело не толкает —
-## иначе вдавливала бы его в пол.
+## The bottom of cab [param car] passes over the body from above (decisions 7–9). Parts
+## it has passed over to their middle disappear; the cab does not push through the body,
+## otherwise it would press it into the floor.
 func cut_under(car: ElevatorCar) -> void:
 	if not fallen or (gone and (cut == null or cut.done)):
 		return
@@ -166,16 +170,16 @@ func cut_under(car: ElevatorCar) -> void:
 	var bottom := car.bottom()
 	if cut == null:
 		cut = CarCut.new()
-		# Режущая кабина тело не толкает вовсе: иначе заталкивала бы лежащее
-		# снаружи себе под днище, где его уже не видно.
+		# A cutting cab does not push the body at all: otherwise it would push what lies
+		# outside under its own bottom, where it is no longer visible.
 		for part: PhysicalBone3D in ragdoll.parts.values():
 			part.add_collision_exception_with(car)
-	# Срез идёт до пола и тогда, когда частей под днищем уже нет: пятно
-	# ложится, когда днище дошло до пола.
+	# The cut goes down to the floor even when no parts are left under the bottom: the stain
+	# is laid when the bottom has reached the floor.
 	var reach := ragdoll.bounds() if not ragdoll.parts.is_empty() else AABB()
 	cut.advance(_figure, _holder.get_parent(), left, right, bottom, reach)
-	# Дойдя до пола, днище забирает всё, что в створе, — и то, что кабина в
-	# последний миг задвинула под себя.
+	# On reaching the floor, the bottom takes everything in its footprint, including what
+	# the cab pushed under itself at the last moment.
 	var under := PackedStringArray()
 	for bone_name: String in ragdoll.parts:
 		var center := Ragdoll.center_of(ragdoll.parts[bone_name] as PhysicalBone3D)
@@ -187,12 +191,12 @@ func cut_under(car: ElevatorCar) -> void:
 		_holder.remove_from_group(GROUP)
 
 
-## Части тела внутри кабины [param car], если оно лежит поперёк порога:
-## часть снаружи, между высотами [param low] и [param high], лежит на чём-то
-## неподвижном — на площадке. Свесившаяся над пустотой рука — не порог, и
-## тело тогда не рвётся. Внутри — всё, что в кабине по всей её высоте до
-## [param roof]: поднятая рука, оставшись у тела, утянула бы его за кабиной.
-## Пусто, если рвать нечего.
+## Body parts inside cab [param car], if the body lies across the threshold:
+## the part outside, between heights [param low] and [param high], lies on something
+## stationary, the landing. An arm hanging over the void is not a threshold, and
+## then the body is not torn. Inside is everything in the cab over its whole height up to
+## [param roof]: a raised arm, if left with the body, would drag it after the cab.
+## Empty if there is nothing to tear.
 func across(car: ElevatorCar, low: float, high: float, roof: float) -> PackedStringArray:
 	var left := car.global_position.x - car.width() * 0.5
 	var right := car.global_position.x + car.width() * 0.5
@@ -208,7 +212,7 @@ func across(car: ElevatorCar, low: float, high: float, roof: float) -> PackedStr
 			landed = _rests_on_ground(part, car)
 	if not landed:
 		return PackedStringArray()
-	# Стопа там же, где её голень: одна она осталась бы на пороге обрубком.
+	# The foot goes where its shin goes: alone it would stay on the threshold as a stump.
 	for foot: String in Ragdoll.ANKLES:
 		var leg := String(Ragdoll.ANKLES[foot])
 		if inside.has(leg) != inside.has(foot) and ragdoll.parts.has(foot):
@@ -219,7 +223,7 @@ func across(car: ElevatorCar, low: float, high: float, roof: float) -> PackedStr
 	return inside
 
 
-## Лежит ли часть [param part] на неподвижном — не на кабине [param car].
+## Whether part [param part] lies on something stationary, not on cab [param car].
 func _rests_on_ground(part: PhysicalBone3D, car: ElevatorCar) -> bool:
 	var shape := part.get_child(0) as CollisionShape3D
 	var reach := (shape.shape as CapsuleShape3D).radius + 0.1
@@ -231,8 +235,8 @@ func _rests_on_ground(part: PhysicalBone3D, car: ElevatorCar) -> bool:
 	return not part.get_world_3d().direct_space_state.intersect_ray(query).is_empty()
 
 
-## Рвёт тело стенкой кабины [param car]: части [param inside] уезжают с ней
-## отдельным куском, остальные лежат где лежали (решение 11).
+## Tears the body with the wall of cab [param car]: the parts [param inside] ride away
+## with it as a separate piece, the rest stay where they lay (decision 11).
 func tear(car: ElevatorCar, inside: PackedStringArray) -> void:
 	torn = true
 	var host := _holder.get_parent()
@@ -245,8 +249,8 @@ func tear(car: ElevatorCar, inside: PackedStringArray) -> void:
 	Corpse.bleed(host, Vector3(wall, box.position.y, WorldSpace.PLAY_Z), side)
 
 
-## Брызги и лужица у стенки, по которой порвалось тело; [param inside] —
-## в какую сторону от стенки кабина.
+## Spatter and a puddle at the wall along which the body was torn; [param inside] is
+## which side of the wall the cab is on.
 static func bleed(host: Node, at: Vector3, inside: float) -> void:
 	var spot := at + Vector3(0.0, Proportions.PRONE, 0.0)
 	Blood.spray(host, spot, inside)

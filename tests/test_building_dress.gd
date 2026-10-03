@@ -1,22 +1,22 @@
 extends GutTest
 
-## Одежда здания: шахта и машинное отделение. Вступление с вертолётом —
-## в `test_roof_arrival.gd`.
+## Building dress: the shaft and the machine room. The helicopter intro is
+## in `test_roof_arrival.gd`.
 ##
-## Части одежды — коробки без тела, и тест узнаёт их по габариту: тому же, каким
-## их собирают [BuildingShafts] и [GreyboxLevel]. Другого признака у серой коробки
-## нет, а материал у створок шахты и у домика один и тот же.
+## Dress parts are boxes without a body, and the test recognises them by extent: the same one
+## [BuildingShafts] and [GreyboxLevel] build them with. A grey box has no other
+## feature, and the shaft leaves and the hut share one material.
 ##
-## Мерит тест в плоскости правил: каждая коробка переводится в [Rect2] с началом
-## в левом верхнем углу — так считала раскладка, и так считал этот же тест до
-## переезда в 3D. Утверждения при переезде не менялись (ADR-0021).
+## The test measures in the rule plane: each box is converted into a [Rect2] with its origin
+## at the top left corner — that is how the layout counted, and how this same test counted before
+## the move to 3D. The assertions did not change in the move (ADR-0021).
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
-## Сколько кадров даётся зданию, чтобы встать на места.
+## How many frames the building is given to settle into place.
 const SETTLE_FRAMES: int = 4
 
-## Насколько часть считается стоящей на своём месте, м: сантиметр.
+## How close a part counts as standing in its place, m: a centimetre.
 const TOLERANCE: float = 0.01
 
 
@@ -29,7 +29,7 @@ func after_all() -> void:
 	GameState.instance().reset()
 
 
-## Здание настоящее: тридцать этажей, пять шахт, крыша сверху.
+## The building is real: thirty floors, five shafts, a roof on top.
 func _build(building_seed: int) -> GreyboxLevel:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
@@ -44,11 +44,11 @@ func _drop(level: GreyboxLevel) -> void:
 	remove_child(level)
 
 
-## Части одежды нужного вида, прямоугольниками в плоскости правил.
+## Dress parts of the required kind, as rectangles in the rule plane.
 ##
-## Ищутся и в самом уровне, и в [BuildingShafts]: одежда шахт живёт своим узлом
-## (частей за полсотни на здание, и под каждый обход детей они попадать не
-## должны), а машинное отделение — прямой ребёнок уровня.
+## Searched both in the level itself and in [BuildingShafts]: the shaft dress lives in its own node
+## (over fifty parts per building, and they must not fall under every walk of the
+## children), while the machine room is a direct child of the level.
 func _parts(level: GreyboxLevel, kind: String) -> Array[Rect2]:
 	var found: Array[Rect2] = []
 	var hosts: Array[Node] = [level]
@@ -67,13 +67,13 @@ func _parts(level: GreyboxLevel, kind: String) -> Array[Rect2]:
 	return found
 
 
-## Узнаёт часть по габариту — тому же, которым её собирали.
+## Recognises a part by extent — the same one it was built with.
 static func _is_a(kind: String, size: Vector3) -> bool:
 	match kind:
 		"shaft_rail":
 			return is_equal_approx(size.x, BuildingShafts.RAIL_WIDTH)
 		"shaft_door":
-			# Проём портала шахты: во всю её ширину и в высоту двери (ADR-0031).
+			# Shaft portal opening: the full shaft width and the door height (ADR-0031).
 			return (
 				is_equal_approx(size.x, Proportions.SHAFT)
 				and is_equal_approx(size.y, Proportions.DOOR.y)
@@ -88,20 +88,20 @@ static func _is_a(kind: String, size: Vector3) -> bool:
 	return false
 
 
-## Где Otto стоит в плоскости правил.
+## Where Otto stands in the rule plane.
 func _otto_at(level: GreyboxLevel) -> Vector2:
 	return WorldSpace.to_plane(level.otto.global_position)
 
 
-## У каждой шахты есть обе направляющие во всю её высоту.
+## Each shaft has both guide rails over its full height.
 ##
-## Шахта была дырой в перекрытии, и в кадре её почти не было (ADR-0017,
-## решение 3). Проверяется не «есть хоть что-то», а что стойки идут по краям
-## проёма и кончаются вместе с шахтой: короткая стойка обманет глаз сильнее,
-## чем её отсутствие.
+## A shaft used to be a hole in the slab, and it was barely in the frame (ADR-0017,
+## decision 3). What is checked is not "there is something" but that the rails run along the edges
+## of the opening and end together with the shaft: a short rail fools the eye more
+## than its absence.
 ##
-## Стойка ищется сразу по краю и по низу: шахты не сквозные, и в одном столбце
-## их стоит несколько — одна под другой.
+## A rail is searched by edge and bottom at once: shafts do not run through, and one column
+## holds several of them — one below another.
 func test_every_shaft_wears_both_rails() -> void:
 	for building_seed: int in [1, 2, 3]:
 		var level := _build(building_seed)
@@ -121,8 +121,8 @@ func test_every_shaft_wears_both_rails() -> void:
 						continue
 					if absf(rail.end.y - bottom) > TOLERANCE:
 						continue
-					# Стойка идёт от потолка верхнего этажа шахты, то есть выше
-					# его пола: ниже пролёта она не бывает.
+					# The rail runs from the ceiling of the shaft's top floor, that is, above
+					# its floor: it is never shorter than the run.
 					assert_gt(
 						rail.size.y, span, "сид %d: стойка короче своей шахты" % building_seed
 					)
@@ -138,8 +138,8 @@ func test_every_shaft_wears_both_rails() -> void:
 		_drop(level)
 
 
-## Портал стоит на каждом этаже, который шахта обслуживает, — и только там. На
-## крыше портала нет: там шахта уходит в машинное отделение.
+## A portal stands on every floor the shaft serves — and only there. On
+## the roof there is no portal: there the shaft goes into the machine room.
 func test_shaft_doors_stand_on_every_floor_it_serves() -> void:
 	var level := _build(1)
 	await wait_physics_frames(SETTLE_FRAMES)
@@ -163,11 +163,11 @@ func test_shaft_doors_stand_on_every_floor_it_serves() -> void:
 	_drop(level)
 
 
-## Надстройка стоит над верхней шахтой и не занимает место, где появляется Otto.
+## The superstructure stands over the top shaft and does not take the spot where Otto appears.
 ##
-## Тела у неё нет намеренно: под ней проём той самой шахты, с которой начинается
-## спуск. А вот встать на неё Otto не должен — иначе он начинал бы здание внутри
-## домика.
+## It has no body on purpose: under it is the opening of the very shaft the descent
+## starts with. But Otto must not stand on it — otherwise he would start the building inside
+## the hut.
 func test_machine_room_stands_over_the_top_shaft() -> void:
 	for building_seed: int in [1, 2, 3]:
 		var level := _build(building_seed)
@@ -200,11 +200,11 @@ func test_machine_room_stands_over_the_top_shaft() -> void:
 		_drop(level)
 
 
-## У каждой шахты есть упоры сверху и снизу: по ним видно, где полоса кончается.
+## Each shaft has buffers at the top and bottom: they show where the run ends.
 ##
-## Проверяется и место по вертикали, а не только счёт: нижний упор однажды уехал
-## в толщу перекрытия — считался он там же, где и раньше, но в кадре его не было
-## вовсе. Счёт этого не заметил.
+## The vertical position is checked too, not only the count: the bottom buffer once slid
+## into the depth of the slab — it was counted in the same place as before, but in the frame it
+## was not there at all. The count did not notice.
 func test_every_shaft_is_capped_at_both_ends() -> void:
 	var level := _build(1)
 	await wait_physics_frames(SETTLE_FRAMES)
@@ -215,11 +215,12 @@ func test_every_shaft_is_capped_at_both_ends() -> void:
 
 	for shaft: BuildingPlan.ShaftSpot in level.plan().shafts:
 		var mine := 0
-		# Низ шахты — пол её нижнего этажа: упор стоит на нём, а не под ним.
+		# The bottom of a shaft is the floor of its bottom level: the buffer stands on it, not under
+		# it.
 		var floor_surface := level.rules.floor_surface(shaft.bottom)
-		# Своя шахта опознаётся столбцом и высотой разом. Одного столбца мало
-		# с M18: шахты перехлёстываются, место сетки достаётся нескольким из них
-		# на разной высоте, и по одному x в кучу попадали чужие упоры (ADR-0024).
+		# Its own shaft is identified by column and height at once. A column alone is not enough
+		# since M18: shafts overlap, a grid slot goes to several of them
+		# at different heights, and by x alone others' buffers got mixed in (ADR-0024).
 		var top_edge := level.rules.story_top(shaft.top)
 		var capped_below := false
 		for buffer: Rect2 in buffers:
@@ -241,11 +242,11 @@ func test_every_shaft_is_capped_at_both_ends() -> void:
 	_drop(level)
 
 
-## Номер на каждом этаже, как в оригинале: у правой стены, под потолком, и
-## верхний этаж — самый большой номер (ADR-0026, решение 9).
+## A number on every floor, as in the original: at the right wall, under the ceiling, and
+## the top floor has the highest number (ADR-0026, decision 9).
 ##
-## Табличка не должна висеть над проёмом шахты: там её закрыла бы кабина, а
-## на любом сиде в крайнем правом месте шахта может стоять.
+## The sign must not hang over a shaft opening: there a cab would cover it, and
+## on any seed a shaft can stand in the rightmost slot.
 func test_every_floor_wears_its_number() -> void:
 	var level := _build(1)
 	await wait_physics_frames(SETTLE_FRAMES)
@@ -264,11 +265,12 @@ func test_every_floor_wears_its_number() -> void:
 		var at := WorldSpace.to_plane(plate.position)
 		var span := rules.floor_span(index)
 		assert_lt(at.x + half.x, span.y - BuildingShell.WALL_WIDTH, "внутри стен")
-		# Ниже полосы, которую прячет кромка перекрытия, — иначе цифр не видно.
+		# Below the band hidden by the slab edge — otherwise the digits are not visible.
 		assert_gt(
 			at.y - half.y, rules.story_top(index) + FloorSigns.hidden_band(), "не под кромкой"
 		)
-		# Правее крайнего места: там ни двери, ни табло над ней, ни лампы.
+		# Right of the outermost slot: there is neither a door, nor an indicator above it, nor a
+		# lamp.
 		var last := rules.slot_x(rules.slot_range(index).y)
 		assert_gt(at.x - half.x, last + Proportions.SLOT * 0.5, "за крайним местом")
 		for shaft in level.plan().shafts:

@@ -1,110 +1,108 @@
-# ADR-0029 · M19: город, погода, обстановка и крыша
+# ADR-0029 · M19: city, weather, dressing and roof
 
-- **Статус:** принято; обстановка решения 3 — модели паков по каталогу вместо
-  коробок, табло над шахтами живое ([ADR-0033](0033-dressing-from-packs.md),
-  решения 3 и 7); палитра решения 5 входит в стены сильнее 18%
-  ([ADR-0031](0031-scene-detail.md), решение 5) и ложится на фактуры (ADR-0033,
-  решение 5)
-- **Дата:** 2026-09-23
+- **Status:** accepted; the dressing of decision 3 is pack models from a catalogue instead of boxes,
+  the indicator board above the shafts is live ([ADR-0033](0033-dressing-from-packs.md),
+  decisions 3 and 7); the palette of decision 5 enters the walls more strongly than 18%
+  ([ADR-0031](0031-scene-detail.md), decision 5) and is applied to textures (ADR-0033,
+  decision 5)
+- **Date:** 2026-09-23
 
-## Контекст
+## Context
 
-После M18 здание играется по правилам оригинала, но в кадре это схема здания:
-за башней и над крышей чёрная пустота (на кадре крыши — полэкрана), этаж — голая
-стена с дверями, крыша — плоский настил, и раунды отличаются только общим тоном.
-DoD M19 — «по кадру видно, что это здание ночью в городе».
+After M18 the building plays by the original's rules, but in the frame it is a diagram of a building:
+behind the tower and above the roof there is black emptiness (half the screen in the roof frame), a
+floor is a bare wall with doors, the roof is a flat deck, and rounds differ only by overall tone.
+The M19 DoD is "the frame shows it is a building at night in a city".
 
-### Что показала сверка
+### What the check showed
 
-- **В аркаде нет ни мебели, ни погоды, ни города.** Этаж — двери, лампы и шахты,
-  снаружи здания серое поле. Всё, что добавляет веха, — наше, и правило у него
-  одно: не мешать читаемости (ADR-0019, ADR-0023).
-- **Крыша оригинала** (кадр MAME, `tools/compare_original.py`): над тридцатым
-  этажом по обе стороны шахты — скаты ступенями, шахта выходит над ними. У нас —
-  плоский настил и машинное отделение.
-- **Референс вида** (`docs/reference/3d-look-reference.jpg`): предметы стоят у
-  задней стены коридора — кадка, витрина, неоновая вывеска, — над лифтами табло,
-  на стене номер этажа. Геймплея они не касаются.
-- **Камера ортографическая** (ADR-0023, решение 1). У неё слои на разной глубине
-  сдвигаются одинаково: город, поставленный в тот же мир за зданием, параллакса
-  не даст.
+- **The arcade has no furniture, no weather, no city.** A floor is doors, lamps and shafts, outside
+  the building a grey field. Everything the milestone adds is ours, and it has one rule: do not
+  hinder readability (ADR-0019, ADR-0023).
+- **The original's roof** (MAME frame, `tools/compare_original.py`): above the thirtieth floor, on
+  both sides of the shaft, stepped slopes, the shaft rising above them. Ours is a flat deck and a
+  machine room.
+- **The look reference** (`docs/reference/3d-look-reference.jpg`): objects stand at the back wall of
+  the corridor — a planter, a display case, a neon sign — indicator boards above the elevators, the
+  floor number on the wall. They do not touch gameplay.
+- **The camera is orthographic** (ADR-0023, decision 1). With it, layers at different depths shift
+  equally: a city placed in the same world behind the building gives no parallax.
 
-## Решения
+## Decisions
 
-### 1. Город — 3D-кварталы генерацией в своём перспективном виде
+### 1. The city — generated 3D blocks in a perspective view of its own
 
-Решение пользователя: кварталы, а не нарисованные слои. Дома — коробки с окнами
-эмиссией, без источников света: кадр не дорожает по бюджету ламп. Три–четыре
-ряда по глубине, дальние темнее и глубже в тумане. Раскладка — по сиду здания.
+The user's decision: blocks, not drawn layers. Houses are boxes with emissive windows, without light
+sources: the frame does not get more expensive against the lamp budget. Three or four rows in depth,
+the far ones darker and deeper in the fog. The layout is by the building seed.
 
-Параллакс ортокамера не даёт, поэтому город живёт в **своём мире** (`SubViewport`
-с `World3D`) под **перспективной камерой**, которая повторяет ход основной и
-стоит в 30 м от плоскости игры: плоскость игры видна в том же масштабе, ближний
-ряд домов (60 м за ней) — втрое мельче, дальний (220 м) — в восемь раз, и сдвигаются
-они при ходе камеры тем медленнее, чем дальше. Картинка подкладывается фоном основного кадра
-(`Environment.BG_CANVAS`): везде, где нет здания, — за башней, над крышей —
-виден город. Так глубина настоящая, а правило «этаж — полоса кадра» у основной
-камеры не трогается. Вид города рендерится в пониженном разрешении: он в тумане
-и не резкий по замыслу.
+The ortho camera gives no parallax, so the city lives in **its own world** (`SubViewport` with
+`World3D`) under a **perspective camera** that follows the main one and stands 30 m from the play
+plane: the play plane is seen at the same scale, the near row of houses (60 m behind it) three times
+smaller, the far row (220 m) eight times smaller, and as the camera moves they shift the slower the
+farther away they are. The image is laid under the main frame as its background
+(`Environment.BG_CANVAS`): wherever there is no building — behind the tower, above the roof — the city
+is visible. This way the depth is real, and the rule "a floor is a band of the frame" of the main
+camera is not touched. The city view is rendered at a reduced resolution: it is in fog and not sharp
+by design.
 
-### 2. Погода — по сиду здания: дождь, туман или ясная ночь
+### 2. Weather — by the building seed: rain, fog or a clear night
 
-Решение пользователя. Одна погода на здание, выбирается сидом, поэтому раунды
-отличаются не только цветом.
+The user's decision. One weather per building, picked by the seed, so rounds differ not only in
+colour.
 
-- **Ясно** — чистый воздух, город виден дальше.
-- **Туман** — плотнее воздух между кварталами, дальние ряды тают.
-- **Дождь** — частицы в виде города и капли над крышей, туман чуть плотнее.
+- **Clear** — clean air, the city is visible farther.
+- **Fog** — denser air between blocks, the far rows melt away.
+- **Rain** — particles in the city view and drops above the roof, the fog slightly denser.
 
-Внутри здания погоды нет: коридор сухой. Частиц — в пределах бюджета кадра,
-замер `tools/light_bench.gd`.
+There is no weather inside the building: the corridor is dry. Particles — within the frame budget,
+measured with `tools/light_bench.gd`.
 
-### 3. Обстановка этажа — только декор
+### 3. Floor dressing — decoration only
 
-Решение пользователя. Предметы стоят у задней стены коридора, за плоскостью
-игры: без тел, пули и люди проходят мимо, укрытием не служат — как в оригинале,
-где на этаже ничего нет. Набор: кадки, автоматы, кулеры, скамьи, шкафы, вывески;
-под потолком — трубы; над шахтами — табло этажа. Цифры табло холодные, не
-красные: красный огонёк на высоте вывески — знак двери с документом.
+The user's decision. Objects stand at the back wall of the corridor, behind the play plane: without
+bodies, bullets and people pass by them, they do not serve as cover — as in the original, where there
+is nothing on a floor. The set: planters, vending machines, water coolers, benches, cabinets, signs;
+pipes under the ceiling; floor indicator boards above the shafts. The board's digits are cold, not
+red: a red light at sign height is the mark of a door with a document.
 
-Раскладывается своим классом по плану здания (`BuildingDressing`) и сидом, без
-сцены — поэтому проверяется тестами. Предмет **не встаёт** на место двери, лампы,
-шахты, эскалатора, выхода и рядом со стеной: дверь и шахта должны читаться, под
-лампой падать ей некуда. Тона у предметов приглушённые, светится только то, что
-и в жизни светится (вывеска, панель автомата, табло), а силуэт актёра держит его
-обводка (ADR-0022, решение 4) — поэтому и высокий автомат за спиной Otto его не
-прячет.
+It is laid out by its own class from the building plan (`BuildingDressing`) and the seed, without a
+scene — so it is checked by tests. An object **does not occupy** the place of a door, lamp, shaft,
+escalator or exit, nor stand next to a wall: the door and the shaft must read, and a lamp must have
+somewhere to fall. Objects have muted tones; only what glows in real life glows (a sign, a vending
+machine panel, an indicator board), and an actor's silhouette is held by his outline (ADR-0022,
+decision 4) — so even a tall vending machine behind Otto does not hide him.
 
-### 4. Крыша — силуэтом за игрой
+### 4. The roof — a silhouette behind the play
 
-Решение пользователя. Скаты ступенями по бокам шахты — декор за плоскостью
-игры; парапетами по краям служат наружные стены крыши, они уже есть. Otto ходит по плоскому настилу, как сейчас: путь, бот и
-проверки проходимости не меняются, а в кадре читается верх дома.
+The user's decision. Stepped slopes on the sides of the shaft are decoration behind the play plane;
+the roof's outer walls serve as parapets at the edges, they already exist. Otto walks on the flat
+deck, as now: the path, the bot and the traversability checks do not change, and the frame reads as
+the top of a building.
 
-### 5. Палитра раунда — материалами и светом
+### 5. The round palette — through materials and light
 
-Приём ADR-0017 возвращается не цветом заливки, а материалами: задняя стена берёт
-тон этажа палитры раунда, наружные стены — кладку (18%), скаты крыши — кладку
-на 8%: крыша — фон. Свет ламп палитрой не красится: свет палитры почти белый
-во всех раундах, и 18% к нему делали лампы лишь светлее (авторевью M19). Разница
-раундов — в оттенке, не в яркости: читаемость держится на всех.
+The technique of ADR-0017 returns not as a fill colour but through materials: the back wall takes the
+floor tone of the round palette, the outer walls the brickwork (18%), the roof slopes the brickwork at
+8%: the roof is background. Lamp light is not tinted by the palette: the palette's light is almost
+white in all rounds, and 18% only made the lamps lighter (M19 code review). Rounds differ in hue, not
+in brightness: readability holds in all of them.
 
-### 6. Тёмный этаж — заметно темнее светлого
+### 6. A dark floor is noticeably darker than a lit one
 
-Кадры M18e показали: на сумрачной башне тёмный этаж отличается от светлого
-слабо. Задняя стена тёмного этажа карты (ADR-0028, решение 4) — в 0.45 от
-светлой; огоньки читаемости остаются.
+The M18e frames showed: in the dim tower a dark floor differs from a lit one only weakly. The back wall
+of a map-dark floor (ADR-0028, decision 4) is at 0.45 of a lit one; the readability lights stay.
 
-## Чего в вехе нет
+## What is not in the milestone
 
-- Отражения дождя на стекле фасада и мокрый асфальт — M20, грейдинг.
-- Движение в городе (машины, мигающие вывески) — не в этой вехе.
+- Rain reflections on the facade glass and wet asphalt — M20, grading.
+- Movement in the city (cars, blinking signs) — not in this milestone.
 
-## Как проверяем
+## How we check
 
-- `BuildingDressing` на любом сиде: ни один предмет не стоит на месте двери,
-  лампы, шахты, эскалатора, выхода и вплотную к стене; у предметов нет тел.
-- Город и погода повторяются по сиду; разные сиды дают разные погоды.
-- Бюджет источников света в кадре не растёт — окна города без источников.
-- Кадр: `light_bench` не хуже M18c больше чем на треть; кадры вехи и сравнение с
-  оригиналом.
+- `BuildingDressing` on any seed: no object stands in the place of a door, lamp, shaft, escalator or
+  exit, or right next to a wall; the objects have no bodies.
+- The city and weather repeat by seed; different seeds give different weathers.
+- The light source budget in the frame does not grow — the city's windows have no sources.
+- Frame: `light_bench` no more than a third worse than M18c; the milestone frames and the comparison
+  with the original.

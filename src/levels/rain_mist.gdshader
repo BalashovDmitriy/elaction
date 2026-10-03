@@ -1,19 +1,19 @@
 shader_type fog;
 
-// Дымка дождя над крышей (M24a, ADR-0037, решение 3, дополнение): у настила
-// гуще — там водяная пыль брызг, — и по ней медленно идут косые полосы
-// порывов, так что воздух не ровный. Светят в неё лампы сцены через объёмный
-// туман: у лампы на крыше в дожде виден конус.
+// Rain haze above the roof (M24a, ADR-0037, decision 3, addendum): denser at the
+// deck — the water spray of splashes is there — and slanted gust bands move slowly
+// through it, so the air is not even. Scene lamps shine into it through the volumetric
+// fog: in rain a lamp on the roof shows a cone.
 //
-// Дымка тонкая и к задней стене тает: гуще — и она проявила бы плоские щиты
-// позади крыши.
+// The haze is thin and melts towards the back wall: denser — and it would reveal the flat
+// panels behind the roof.
 
 uniform float density = 0.009;
-// Во сколько раз гуще у самого настила и на какой высоте это сходит на нет, м.
+// How many times denser right at the deck and at what height this fades out, m.
 uniform float deck_boost = 4.0;
 uniform float deck_height = 1.2;
 uniform float deck_y = 0.0;
-// Где задняя кромка дымки по глубине и за сколько метров от неё она густеет.
+// Where the back edge of the haze is in depth and over how many metres from it it thickens.
 uniform float back_z = -3.3;
 uniform float back_fade = 3.0;
 uniform vec3 albedo : source_color = vec3(0.8, 0.85, 1.0);

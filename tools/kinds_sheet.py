@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Три типа здания рядом одним кадром (ADR-0056): этаж башни и стилобата у
-каждого типа в одно время суток и погоду — по нему и видно, разведены ли типы.
+"""Three building kinds side by side in one shot (ADR-0056): a tower floor and a podium
+floor of each kind at the same time of day and weather, which shows whether the kinds
+are set apart.
 
-Снимает `tools/m24j_shot.tscn --only=floor --kind=N --floor=F` на каждый тип и
-этаж и склеивает ряды: отель, офис, жилой дом.
+Shoots `tools/m24j_shot.tscn --only=floor --kind=N --floor=F` for every kind and
+floor and stitches the rows: hotel, office, residential building.
 
-    python tools/kinds_sheet.py M24n            # ночь, ясно
-    python tools/kinds_sheet.py M24n --time=1   # день
-    python tools/kinds_sheet.py M24o --floors=27,24,18,16   # залы особых этажей
+    python tools/kinds_sheet.py M24n            # night, clear
+    python tools/kinds_sheet.py M24n --time=1   # day
+    python tools/kinds_sheet.py M24o --floors=27,24,18,16   # halls of special floors
 
-Пишет `screens/<веха>/kinds_t<время>_w<погода>.jpg`; со своими этажами —
-`kinds_t<время>_w<погода>_f<этажи>.jpg`.
+Writes `screens/<milestone>/kinds_t<time>_w<weather>.jpg`; with custom floors,
+`kinds_t<time>_w<weather>_f<floors>.jpg`.
 """
 
 from __future__ import annotations
@@ -42,8 +43,8 @@ def main() -> int:
     sheet = Image.new("RGB", (tile[0] * len(floors), tile[1] * len(KINDS)))
     for row, _name in enumerate(KINDS):
         for column, floor in enumerate(floors):
-            # Своя папка на время и погоду: кадр зовётся по ним, и в общей папке
-            # «последний по имени» был бы кадром прошлого прогона (3night после 1day).
+            # A separate folder per time and weather: the shot is named after them, and in a shared
+            # folder "the last by name" would be a shot from the previous run (3night after 1day).
             folder = f"{args.milestone}/kinds/t{args.time}_w{args.weather}/k{row}_f{floor}"
             code, output = run(godot, [
                 "res://tools/m24j_shot.tscn", "--", "--only=floor", f"--kind={row}",

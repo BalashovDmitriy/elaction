@@ -1,22 +1,22 @@
 class_name WallSconce
 extends RefCounted
 
-## Бра отеля на пилястре (ADR-0048): латунная планка, рожок и светящийся
-## абажур, над ним и под ним — тёплое пятно на стене.
+## Hotel sconce on a pilaster (ADR-0048): a brass plate, an arm and a glowing
+## shade, above and below it — a warm patch on the wall.
 ##
-## Пятно — прозрачный градиент, а не источник: пилястр в здании сотни, и свет
-## от каждого съел бы бюджет кадра, который M24h еле вернул внизу здания.
-## Сетка одна на все бра: собирается раз и кэшируется.
+## The patch is a transparent gradient, not a source: there are hundreds of pilasters in a building,
+## and light from each would eat the frame budget that M24h barely won back at the bottom of the
+## building. One mesh for all sconces: assembled once and cached.
 
-## Высота середины абажура над полом, м.
+## Height of the shade's middle above the floor, m.
 const HEIGHT: float = 2.05
 const PLATE := Vector3(0.1, 0.22, 0.02)
 const ARM := Vector3(0.03, 0.03, 0.12)
-## Абажур: ширина низа и верха, высота, м.
+## Shade: bottom and top width, height, m.
 const SHADE_BOTTOM: float = 0.18
 const SHADE_TOP: float = 0.11
 const SHADE_HEIGHT: float = 0.15
-## Пятно на стене: размер, м, и яркость середины.
+## Patch on the wall: size, m, and brightness of the middle.
 const GLOW := Vector2(0.9, 1.3)
 const GLOW_ALPHA: float = 0.55
 const BRASS := Color(0.7, 0.54, 0.26)
@@ -27,7 +27,7 @@ const SHADE_GLOW: float = 2.2
 static var _mesh: ArrayMesh = null
 
 
-## Сетка бра: нуль — на стене под серединой абажура, лицом к +Z.
+## Sconce mesh: zero is on the wall under the middle of the shade, facing +Z.
 static func mesh() -> ArrayMesh:
 	if _mesh != null:
 		return _mesh
@@ -63,7 +63,7 @@ static func mesh() -> ArrayMesh:
 	return _mesh
 
 
-## Бра на стену: узел в точке [param at] сцены.
+## A sconce on the wall: a node at scene point [param at].
 static func hang(at: Vector3) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
 	node.name = "Sconce"
@@ -83,7 +83,7 @@ static func _box(tool: SurfaceTool, size: Vector3, centre: Vector3) -> void:
 		tool.add_vertex(verts[at] + centre)
 
 
-## Усечённый конус абажура: шире книзу, восемь граней.
+## Truncated cone of the shade: wider at the bottom, eight faces.
 static func _cone(tool: SurfaceTool, centre: Vector3) -> void:
 	var sides := 8
 	for side: int in sides:
@@ -98,9 +98,9 @@ static func _cone(tool: SurfaceTool, centre: Vector3) -> void:
 			tool.add_vertex(vertex - Vector3(0.0, SHADE_HEIGHT * 0.5, 0.0))
 
 
-## Квадрат лицом к +Z, к камере. Лицевая грань у Godot — обход по часовой, если
-## смотреть на неё: против часовой шейдер с `cull_back` пятно не рисовал вовсе
-## (авторевью M24i, как у разряда молнии в M22).
+## A square facing +Z, toward the camera. In Godot the front face is wound clockwise when
+## looking at it: counterclockwise, the shader with `cull_back` did not draw the patch at all
+## (M24i code review, as with the lightning bolt in M22).
 static func _quad(tool: SurfaceTool, size: Vector2, centre: Vector3) -> void:
 	var half := size * 0.5
 	var corners := [

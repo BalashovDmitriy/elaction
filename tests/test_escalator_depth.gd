@@ -1,16 +1,15 @@
 extends GutTest
 
-## Эскалатор в глубине (ADR-0044, решение 10).
+## The escalator in depth (ADR-0044, decision 10).
 ##
-## До M24h пролёт резал плиту этажа во всю глубину от площадки до края, и там
-## было не пройти. Теперь проём — только в задней полосе коридора, за
-## плоскостью игры: пол перед ним цельный, мимо эскалатора ходят. Проверяется
-## на любом здании, а не на одном: раскладка генерируется.
+## Until M24h the span cut the floor slab over the whole depth from the landing to the edge, and you
+## could not walk there. Now the opening is only in the corridor's rear strip, behind the play
+## plane: the floor in front of it is solid, people walk past the escalator. Checked on any
+## building, not on one: the layout is generated.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const SEEDS: Array[int] = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
-## Сколько кадров дать поставленному над проёмом Otto, чтобы он провалился,
-## будь там дыра.
+## How many frames to give an Otto placed over the opening to fall through, if there were a hole.
 const FALL_FRAMES: int = 45
 
 
@@ -48,8 +47,8 @@ func test_the_hole_is_behind_the_play_plane() -> void:
 	)
 
 
-## Дыра в перекрытии под пролётом — там, где он проходит плиту, и не дальше
-## края этажа.
+## The hole in the slab under the span — where it passes through the slab, and no farther than the
+## floor edge.
 func test_the_hole_starts_at_the_bend_and_stays_on_the_floor() -> void:
 	var rules := BuildingRules.new()
 	for building_seed: int in SEEDS:
@@ -63,7 +62,7 @@ func test_the_hole_starts_at_the_bend_and_stays_on_the_floor() -> void:
 			assert_gt(hole.y - hole.x, Proportions.BODY, where + ": голова едущего проходит")
 
 
-## Otto, поставленный над проёмом, стоит на полу: плита в плоскости игры цельная.
+## An Otto placed over the opening stands on the floor: the slab in the play plane is solid.
 func test_otto_stands_over_the_escalator_hole() -> void:
 	GameState.instance().start_game()
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel

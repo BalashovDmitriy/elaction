@@ -1,125 +1,126 @@
-# Соглашения проекта
+# Project conventions
 
-## Структура репозитория
+## Repository structure
 
 ```
 elaction/
-├─ project.godot          настройки движка
-├─ icon.svg               иконка проекта
-├─ src/                   весь игровой код и сцены
-│  ├─ main.tscn|gd        точка входа
-│  ├─ actors/             Otto, враги, пули — всё, что живёт и двигается
-│  ├─ systems/            лифты, двери, освещение, счёт — механики
-│  ├─ levels/             этажи, здания, тестовые сцены
-│  ├─ ui/                 HUD, меню, экраны
-│  └─ autoload/           синглтоны (состояние игры, звук, съёмка кадров)
-├─ assets/                спрайты, звук, шрифты
-├─ tests/                 тесты GUT
-├─ tools/                 скрипты разработчика (Python, PowerShell)
-├─ docs/                  эпик, ADR, заметки
+├─ project.godot          engine settings
+├─ icon.svg               project icon
+├─ src/                   all game code and scenes
+│  ├─ main.tscn|gd        entry point
+│  ├─ actors/             Otto, enemies, bullets — everything that lives and moves
+│  ├─ systems/            elevators, doors, lighting, score — mechanics
+│  ├─ levels/             floors, buildings, test scenes
+│  ├─ ui/                 HUD, menus, screens
+│  └─ autoload/           singletons (game state, sound, screenshots)
+├─ assets/                sprites, sound, fonts
+├─ tests/                 GUT tests
+├─ tools/                 developer scripts (Python, PowerShell)
+├─ docs/                  epic, ADRs, notes
 └─ .github/workflows/     CI
 ```
 
-Сцена и её скрипт лежат рядом и называются одинаково: `src/actors/otto/otto.tscn` и
+A scene and its script sit side by side and share a name: `src/actors/otto/otto.tscn` and
 `src/actors/otto/otto.gd`.
 
-## Именование
+## Naming
 
-| Что | Стиль | Пример |
+| What | Style | Example |
 |---|---|---|
-| Файлы сцен и скриптов | `snake_case` | `elevator_car.gd` |
-| Классы (`class_name`) | `PascalCase` | `ElevatorCar` |
-| Узлы в сцене | `PascalCase` | `FloorShape` |
-| Функции и переменные | `snake_case` | `set_response_delay()` |
-| Приватные члены | ведущее подчёркивание | `_aligned_floor` |
-| Константы | `SCREAMING_SNAKE_CASE` | `SLAB_THICKNESS` |
-| Сигналы | `snake_case`, в прошедшем времени | `document_taken` |
-| Папки | `snake_case`; разделы — во множественном числе, внутри — по сущности или теме | `actors/`, `systems/`; `otto/`, `lighting/` |
+| Scene and script files | `snake_case` | `elevator_car.gd` |
+| Classes (`class_name`) | `PascalCase` | `ElevatorCar` |
+| Nodes in a scene | `PascalCase` | `FloorShape` |
+| Functions and variables | `snake_case` | `set_response_delay()` |
+| Private members | leading underscore | `_aligned_floor` |
+| Constants | `SCREAMING_SNAKE_CASE` | `SLAB_THICKNESS` |
+| Signals | `snake_case`, past tense | `document_taken` |
+| Folders | `snake_case`; sections in the plural, inside them by entity or topic | `actors/`, `systems/`; `otto/`, `lighting/` |
 
 ## GDScript
 
-- **Типы обязательны.** Аргументы, возвращаемые значения, поля класса — всё аннотируется.
-  Вывод типа через `:=` допустим там, где тип очевиден из правой части.
-- **Порядок в файле** (проверяется `gdlint`): `@tool` → `class_name` → `extends` →
-  документация `##` → сигналы → перечисления → константы → статические поля → `@export` →
-  публичные поля → приватные поля → `@onready` → функции. Порядок задан в `.gdlintrc`.
-- **Отступы — табы**, длина строки — 100 символов. Об этом заботится `gdformat`,
-  руками ничего выравнивать не нужно.
-- **Документация** классов и публичных методов — комментариями `##`, они попадают
-  во встроенную справку редактора.
-- **Узлы получаем через `%UniqueName`** или `@onready var x: Type = $Path`, но не строками
-  по месту вызова.
-- **Никакого `get_node()` в `_process`** — кэшируем ссылки в `@onready`.
-- **Новый `class_name` не виден движку, пока проект не переимпортирован:** сцена,
-  которая на него ссылается, молча возвращает `null`. Лечится
-  `python tools/godot_check.py` — он импортирует проект.
+- **Types are mandatory.** Arguments, return values, class fields — everything is annotated.
+  Type inference via `:=` is allowed where the type is obvious from the right-hand side.
+- **Order in a file** (checked by `gdlint`): `@tool` → `class_name` → `extends` →
+  `##` documentation → signals → enums → constants → static fields → `@export` →
+  public fields → private fields → `@onready` → functions. The order is set in `.gdlintrc`.
+- **Indentation is tabs**, line length is 100 characters. `gdformat` takes care of this,
+  nothing needs to be aligned by hand.
+- **Documentation** of classes and public methods is written as `##` comments; they end up
+  in the editor's built-in help.
+- **Nodes are obtained via `%UniqueName`** or `@onready var x: Type = $Path`, not by strings
+  at the call site.
+- **No `get_node()` in `_process`** — cache references in `@onready`.
+- **A new `class_name` is not visible to the engine until the project is reimported:** a
+  scene that refers to it silently returns `null`. The fix is
+  `python tools/godot_check.py` — it imports the project.
 
-## Сцены
+## Scenes
 
-- Одна сцена — одна ответственность. Врага не собираем внутри сцены этажа.
-- Взаимодействие между несвязанными системами — через сигналы, в том числе сигналы
-  автолоада `GameState` в `src/autoload/`, а не через `get_parent().get_parent()`.
-  Отдельной шины событий нет.
-- Публичный интерфейс сцены — это её `@export`-поля и сигналы.
+- One scene, one responsibility. An enemy is not assembled inside a floor scene.
+- Interaction between unrelated systems goes through signals, including signals of the
+  `GameState` autoload in `src/autoload/`, not through `get_parent().get_parent()`.
+  There is no separate event bus.
+- A scene's public interface is its `@export` fields and signals.
 
-## Тесты
+## Tests
 
-- Фреймворк — GUT, тесты лежат в `tests/`, файл называется `test_<что_тестируем>.gd`.
-- Тестируем игровую логику: машины состояний, счёт, условия перехода, взаимодействие
-  лифта с платформой. Рендер и анимации не тестируем.
-- Новая механика приезжает вместе с тестом.
+- The framework is GUT, tests live in `tests/`, a file is named `test_<what_is_tested>.gd`.
+- We test game logic: state machines, score, transition conditions, elevator–platform
+  interaction. Rendering and animations are not tested.
+- A new mechanic arrives together with a test.
 
 ## Git
 
-- **Ветки:** `feat/m2-elevators`, `fix/elevator-crush`, `chore/ci-cache`, `docs/epic-update`.
-  В `main` напрямую не пушим.
-- **Коммиты:** Conventional Commits.
+- **Branches:** `feat/m2-elevators`, `fix/elevator-crush`, `chore/ci-cache`, `docs/epic-update`.
+  No direct pushes to `main`.
+- **Commits:** Conventional Commits.
 
   ```
-  feat(elevator): управление кабиной с этажа
+  feat(elevator): control the cab from a floor
 
-  Кабина реагирует на move_up и move_down, когда Otto внутри.
-  Остановка выравнивается по ближайшему этажу.
+  The cab responds to move_up and move_down when Otto is inside.
+  The stop is aligned to the nearest floor.
   ```
 
-- **Проверки перед коммитом** прогоняются хуками автоматически. Полный прогон вручную —
-  `tools/check.ps1` (Windows) или `tools/check.sh`.
-- **PR** мержим только при зелёном CI.
+- **Pre-commit checks** are run by hooks automatically. A full manual run is
+  `tools/check.ps1` (Windows) or `tools/check.sh`.
+- **PRs** are merged only with green CI.
 
-## Завершение вехи
+## Finishing a milestone
 
-Веха не считается закрытой, пока не сделано всё пять:
+A milestone is not considered closed until all five are done:
 
-1. **Скриншоты** — `python tools/capture.py <веха>`. Кадры ложатся в `screens/<веха>/`
-   и служат материалом для сравнения вех и разбора проблем с картинкой. Папка не
-   коммитится. Одиночный кадр в любой момент — клавиша **F12**. Затем
-   `python tools/compare_original.py <веха>` — кадр рядом с оригиналом,
-   `screens/<веха>/compare_original.jpg`.
+1. **Screenshots** — `python tools/capture.py <milestone>`. Shots go into
+   `screens/<milestone>/` and serve as material for comparing milestones and analysing
+   picture problems. The folder is not committed. A single shot at any moment is the
+   **F12** key. Then `python tools/compare_original.py <milestone>` — the shot next to the
+   original, `screens/<milestone>/compare_original.jpg`.
 
-   Свет, бой и меню этим сценарием не снимаются: тёмный этаж и стойка агента
-   наступают не по расписанию, а от сбитой лампы и летящей пули, а кнопок меню
-   сценарий не нажимает. Их снимают по состоянию `tools/dark_shot.tscn`,
-   `tools/combat_shot.tscn`, `tools/ui_shot.tscn` и другие `tools/*_shot.tscn`.
-2. **Авторевью** — `/code-review xhigh --fix`. Повышенная тщательность, найденные проблемы
-   применяются к рабочей копии сразу.
-3. **Повторный прогон проверок** после правок ревью — `tools/check.ps1`.
-4. **Тесты усилены** — не только на механику вехи, но и на здание целиком, на
-   многих сидах ([testing.md](testing.md)).
-5. **`README.md` актуализирован** — статус, управление, список работающего. Это
-   единственный документ, который читают снаружи проекта, и устаревает он первым.
+   Lighting, combat and menus are not captured by this script: a dark floor and an agent's
+   stance happen not on schedule but from a shot-down lamp and a flying bullet, and the
+   script does not press menu buttons. They are captured by state with
+   `tools/dark_shot.tscn`, `tools/combat_shot.tscn`, `tools/ui_shot.tscn` and other
+   `tools/*_shot.tscn`.
+2. **Code review** — `/code-review xhigh --fix`. High thoroughness, the problems found are
+   applied to the working copy right away.
+3. **Re-running the checks** after the review fixes — `tools/check.ps1`.
+4. **Tests strengthened** — not only for the milestone's mechanics but also for the whole
+   building, on many seeds ([testing.md](testing.md)).
+5. **`README.md` is up to date** — status, controls, the list of what works. It is the only
+   document read from outside the project, and it goes stale first.
 
-Только после этого открывается PR.
+Only after that is a PR opened.
 
-## Что запускать
+## What to run
 
-| Задача | Команда |
+| Task | Command |
 |---|---|
-| Открыть проект | `godot --path .` или `godot -e` |
-| Запустить игру | `godot --path .` |
-| Все проверки | `tools/check.ps1` |
-| Только формат | `.venv/Scripts/gdformat src tests tools` |
-| Только линт | `.venv/Scripts/gdlint src tests tools` |
-| Проверка движком | `python tools/godot_check.py` |
-| Тесты | `python tools/run_tests.py` |
-| Скриншоты вехи | `python tools/capture.py M1` |
-| Прогнать все хуки | `.venv/Scripts/pre-commit run --all-files` |
+| Open the project | `godot --path .` or `godot -e` |
+| Run the game | `godot --path .` |
+| All checks | `tools/check.ps1` |
+| Format only | `.venv/Scripts/gdformat src tests tools` |
+| Lint only | `.venv/Scripts/gdlint src tests tools` |
+| Engine check | `python tools/godot_check.py` |
+| Tests | `python tools/run_tests.py` |
+| Milestone screenshots | `python tools/capture.py M1` |
+| Run all hooks | `.venv/Scripts/pre-commit run --all-files` |

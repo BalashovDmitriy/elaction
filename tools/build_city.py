@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
-"""Фасады города из пака Quaternius Downtown City MegaKit (ADR-0051, решение 10).
+"""City facades from the Quaternius Downtown City MegaKit pack (ADR-0051, decision 10).
 
-Город за зданием — сотни домов в рядах на 90–600 м от камеры, размытых глубиной
-резкости, и дома пака целиком (18–45 тыс. треугольников) столько не потянут.
-Поэтому фасад запекается: на каждый стиль из модулей пака собираются три ряда —
-первый этаж, типовой этаж и карниз, — и снимаются ортокамерой спереди. Игра
-кладёт их фактурой на коробку дома ([CityLook]): этажи повторяются, окна — по
-сетке ряда, а ночью горит то, что под маской окон.
+The city behind the building is hundreds of houses in rows 90–600 m from the camera,
+blurred by depth of field, and whole pack houses (18–45 thousand triangles) cannot
+handle that many. So the facade is baked: for every style three rows are assembled from
+the pack modules, the ground floor, a typical floor and the cornice, and shot with an
+orthographic camera from the front. The game lays them as a texture on a house box
+([CityLook]): floors repeat, windows follow the row grid, and at night whatever is
+under the window mask lights up.
 
-Проходы — по одной картинке ряда на каждый:
-  albedo  — цвет материала без света;
-  normal  — нормаль в пространстве фасада (x вправо, y вверх, z к камере);
-  orm     — затенение углов (AO), шероховатость, металл;
-  mask    — окно: стекло и плоскость комнаты за ним.
-Из рядов складывается атлас `assets/textures/city/facade_*.png`: стили
-столбцами, ряды — сверху вниз: карниз, этаж, первый этаж.
+Passes, one row image for each:
+  albedo  — material color without light;
+  normal  — normal in facade space (x right, y up, z toward the camera);
+  orm     — ambient occlusion (AO), roughness, metal;
+  mask    — window: the glass and the room plane behind it.
+The rows are combined into the atlas `assets/textures/city/facade_*.png`: styles
+in columns, rows from top to bottom: cornice, floor, ground floor.
 
-Исходник — пак Downtown Standard (CC0) в `.cache/downtown/`: его нет в
-репозитории, как и исходников звука. Скачать с https://quaternius.itch.io/downtown-city-megakit
-(Standard, бесплатно), распаковать так, чтобы были `.cache/downtown/gltf/*.gltf`.
+The source is the Downtown Standard pack (CC0) in `.cache/downtown/`: it is not in the
+repository, just like the sound sources. Download from
+https://quaternius.itch.io/downtown-city-megakit (Standard, free), unpack so that `.cache/downtown/gltf/*.gltf` exists.
 
     python tools/build_city.py
 """
@@ -44,23 +45,23 @@ PACK = ROOT / ".cache" / "downtown" / "gltf"
 BAKE = ROOT / ".cache" / "city_bake"
 TARGET = ROOT / "assets" / "textures" / "city"
 
-# Пикселей на метр фасада. Ближний ряд города — около 27 пикселей на метр
-# экрана в FullHD; вдвое больше — с запасом на 4K и мипмапы.
+# Pixels per meter of facade. The near city row is about 27 pixels per meter of
+# screen in FullHD; twice that leaves a margin for 4K and mipmaps.
 DENSITY = 64
 
-# Ширина плитки фасада, м: два модуля по 2 м или один на 4 м.
+# Facade tile width, m: two 2 m modules or one 4 m module.
 TILE_WIDTH = 4.0
 
-# Поле по бокам столбца стиля, м: 32 пикселя — до шестого мипа соседний стиль
-# не подтекает на шов плитки (авторевью M24j). Столбец с полями — 320 пикселей,
-# кратно 64, и блок мипа не ложится на два столбца сразу.
+# Margin on the sides of a style column, m: 32 pixels, so that up to the sixth mip the
+# neighboring style does not bleed into the tile seam (M24j code review). A column with
+# margins is 320 pixels, a multiple of 64, so a mip block does not fall on two columns.
 GUTTER = 0.5
 
-# Ряды плитки сверху вниз: имя и высота, м.
+# Tile rows from top to bottom: name and height, m.
 ROWS = [("top", 1.0), ("floor", 3.0), ("ground", 3.0)]
 
-# Стили фасада: модули ряда слева направо. Тон кирпича и камня игра даёт
-# множителем — красный, бледный, бурый из одного стиля.
+# Facade styles: row modules from left to right. The game supplies the brick and stone
+# tone as a multiplier: red, pale, brown from a single style.
 STYLES = {
     "brick": {
         "top": ["Cornice_Brick_Center", "Cornice_Brick_Center"],
@@ -96,8 +97,8 @@ STYLES = {
 
 PASSES = ["albedo", "normal", "orm", "mask"]
 
-# Окно за стеклом: в цвете — тёмное стекло, в маске — единица. Само стекло
-# пака полупрозрачное и снимается: за ним видна бы была серая плоскость комнаты.
+# The window behind the glass: dark glass in color, one in the mask. The pack's own glass
+# is semi-transparent and is removed: the gray room plane would show behind it.
 WINDOW_MATERIALS = ("MI_FakeInterior",)
 GLASS = "MI_Glass"
 WINDOW_ALBEDO = (0.02, 0.022, 0.026)
@@ -134,8 +135,8 @@ def _source(node_tree, principled, name: str):
 
 
 def _texture(socket):
-    """Фактура, из которой идёт цвет: импортёр glTF умножает её на вершинный
-    цвет, а у пака в нём маска износа — красный канал красил металл в красное."""
+    """The texture the color comes from: the glTF importer multiplies it by the vertex
+    color, and in the pack that holds a wear mask: the red channel painted metal red."""
     queue = [socket.links[0].from_node] if socket.is_linked else []
     seen = set()
     while queue:
@@ -151,7 +152,7 @@ def _texture(socket):
 
 
 def _rig_material(material) -> None:
-    """Готовит у материала по эмиссии на каждый проход: выход переключается."""
+    """Prepares an emission per pass on the material: the output is switched."""
     if material.get("passes_ready"):
         return
     tree = material.node_tree
@@ -176,7 +177,7 @@ def _rig_material(material) -> None:
         else:
             albedo.inputs["Color"].default_value = principled.inputs["Base Color"].default_value
 
-    # Нормаль: мировая из карты нормалей, переведённая в плоскость фасада.
+    # Normal: the world one from the normal map, converted into the facade plane.
     normal = emission("normal")
     geometry = nodes.new("ShaderNodeNewGeometry")
     world = geometry.outputs["Normal"]
@@ -319,7 +320,7 @@ def _compose() -> None:
                 piece = Image.open(BAKE / f"{style}_{row}_{name}.png").convert("RGB")
                 sheet = sheets[name]
                 sheet.paste(piece, (left, top))
-                # Поля — продолжение той же плитки: она повторяется по ширине.
+                # The margins continue the same tile: it repeats across the width.
                 sheet.paste(piece.crop((width - gutter, 0, width, piece.height)), (left - gutter, top))
                 sheet.paste(piece.crop((0, 0, gutter, piece.height)), (left + width, top))
             top += round(row_height * DENSITY)

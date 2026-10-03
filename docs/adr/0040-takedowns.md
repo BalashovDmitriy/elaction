@@ -1,119 +1,124 @@
-# ADR-0040 · M24d: добивания вместо удара ногой
+# ADR-0040 · M24d: takedowns instead of the kick
 
-- **Статус:** принято, реализация — M24d
-- **Дата:** 2026-09-26
-- **Отменяет:** удар ногой в прыжке — [ADR-0006](0006-combat-and-enemies.md),
-  пункт 2 («в воздухе Otto бьёт ногой всегда»), и правило удара из
-  [ADR-0027](0027-rom-combat.md) («засчитывается в любой фазе прыжка»)
-- **Дополняет:** [ADR-0039](0039-animation-and-controls.md) — кнопки и клипы
+- **Status:** accepted, implementation — M24d
+- **Date:** 2026-09-26
+- **Supersedes:** the jump kick — [ADR-0006](0006-combat-and-enemies.md),
+  item 2 ("in the air Otto always kicks"), and the kick rule from
+  [ADR-0027](0027-rom-combat.md) ("counts in any phase of the jump")
+- **Extends:** [ADR-0039](0039-animation-and-controls.md) — buttons and clips
 
-## Контекст
+## Context
 
-Пользователь после M24c: при прыжке Otto выставляет ногу, а удар срабатывает
-сам. Предложение — убрать автоудар и вместо него сделать добивания вплотную:
-короткие скриптовые сценки, выбираемые случайно, дороже выстрела.
+The user after M24c: when jumping Otto sticks out a leg, and the kick fires by
+itself. The proposal — remove the automatic kick and instead make close-range
+takedowns: short scripted scenes, picked at random, worth more than a shot.
 
-### Что показало исследование
+### What the research showed
 
-- **Оригинал 1983 года** (ROM @3127–3198). Удар встроен в прыжок: любое
-  касание агента за весь прыжок убивает, отдельной атаки вплотную нет. Очки
-  (@577B): выстрел 100, удар 150; в тёмном здании или на этажах 11–15 — 150 и
-  200; лампа и лифт — 300.
-- **Elevator Action Returns (1994)** — ближе всего к задуманному: «выстрел»
-  рядом с врагом превращается в рукопашную, кнопка та же по контексту; такое
-  убийство — двойные очки. Прыжок там сам уже не бьёт.
-- **Другие игры** (Mark of the Ninja, Metal Gear, The Last of Us, Hotline Miami,
-  Shadow Complex, Streets of Rage): у добивания всегда есть условие входа —
-  вплотную, сзади, враг не видит, сбит с ног; выгоду оплачивают риском — во
-  время сценки игрок уязвим, другие враги действуют; сценка — 0,6–3 с;
-  вариантов — 2–4, под подход или случайно.
-- **Анимации.** Готовых свободных парных анимаций (нападающий и жертва синхронно)
-  не нашлось — только в платных наборах. Mixamo в публичном репозитории нельзя:
-  его условия запрещают распространять сырые файлы. Годится Universal Animation
-  Library 2 (Quaternius, CC0): хук, отброс от удара, «лежит на спине»; к ним
-  удары и реакции UAL 1. Захват и удушение — позы кодом поверх клипов, как уже
-  сделаны присед и удар.
+- **The 1983 original** (ROM @3127–3198). The kick is built into the jump: any
+  contact with an agent during the whole jump kills, there is no separate
+  close-range attack. Points (@577B): shot 100, kick 150; in a dark building or on
+  floors 11–15 — 150 and 200; lamp and elevator — 300.
+- **Elevator Action Returns (1994)** — closest to the intent: a "shot" next to an
+  enemy turns into melee, the same button by context; such a kill gives double
+  points. The jump there no longer hits by itself.
+- **Other games** (Mark of the Ninja, Metal Gear, The Last of Us, Hotline Miami,
+  Shadow Complex, Streets of Rage): a takedown always has an entry condition —
+  point-blank, from behind, the enemy does not see, knocked down; the benefit is
+  paid for with risk — during the scene the player is vulnerable, other enemies
+  act; a scene lasts 0.6–3 s; there are 2–4 variants, by approach or random.
+- **Animations.** No ready free paired animations (attacker and victim in sync)
+  were found — only in paid sets. Mixamo cannot be used in a public repository:
+  its terms forbid distributing the raw files. Universal Animation Library 2
+  (Quaternius, CC0) fits: a hook, knockback from a hit, "lying on the back"; plus
+  UAL 1 punches and reactions. Grab and choke are code poses on top of clips, as
+  crouch and kick already are.
 
-## Решения
+## Decisions
 
-Все решения — пользователя.
+All decisions are the user's.
 
-### 1. Удара ногой больше нет, прыжок — просто прыжок
+### 1. No more kick, a jump is just a jump
 
-Прыжок не убивает и ногу не выставляет. В полёте — клип полёта UAL
-(`Jump_Loop`, снова в сборке), зона удара и очки за удар уходят.
+A jump does not kill and does not stick out a leg. In flight — the UAL flight clip
+(`Jump_Loop`, back in the build); the kick zone and kick points go away.
 
-### 2. Всё на кнопке выстрела
+### 2. Everything on the shoot button
 
-Вдали от агента кнопка стреляет. Вплотную к агенту, на том же этаже, — добивает.
-Кнопок по-прежнему две, как у автомата.
+Away from an agent the button shoots. Point-blank to an agent, on the same floor,
+it performs a takedown. There are still two buttons, as on the cabinet.
 
-### 3. Вплотную с любой стороны; сценки — свои сзади и спереди
+### 3. Point-blank from any side; separate scenes from behind and from the front
 
-Вариант выбирается случайно из подходящих к стороне, без повтора подряд.
+A variant is picked at random from those matching the side, without repeating in a
+row.
 
-| Сторона | Сценки | Очки |
+| Side | Scenes | Points |
 |---|---|---|
-| Сзади | удушение; свёрнутая шея | 300 |
-| Спереди | серия ударов (джеб, кросс, хук — отброс на спину); рукоятью пистолета | 200 |
-| Сверху | напрыгивание: Otto валит агента на пол и добивает | 300 |
+| From behind | choke; neck snap | 300 |
+| From the front | a series of punches (jab, cross, hook — knockback onto the back); pistol-whip | 200 |
+| From above | pounce: Otto knocks the agent to the floor and finishes him | 300 |
 
-В тёмном здании и на этажах 11–15 — надбавка +100, как у ROM за выстрел и
-удар.
+In a dark building and on floors 11–15 — a +100 bonus, as the ROM gives for a shot
+and a kick.
 
-### 4. Сверху — само, при приземлении на агента
+### 4. From above — automatic, on landing on an agent
 
-Упал на агента с этажа выше или с кабины — сценка напрыгивания без нажатия.
-Единственное добивание без кнопки: попасть на голову агенту и так трудно.
+Fell onto an agent from a floor above or from a cab — the pounce scene without a
+press. The only takedown without a button: landing on an agent's head is hard
+enough as it is.
 
-### 5. Мир на время сценки замедляется, Otto уязвим
+### 5. The world slows down during the scene, Otto is vulnerable
 
-Всё вокруг — агенты, пули, кабины — идёт медленнее, сценка — своим темпом.
-Пуля соседа может долететь к концу сценки: добивать при втором агенте на линии —
-риск.
+Everything around — agents, bullets, cabs — goes slower, the scene runs at its own
+pace. A neighbor's bullet can arrive by the end of the scene: a takedown with a
+second agent on the line is a risk.
 
-### 6. Крупный план: камера наезжает на пару
+### 6. Close-up: the camera pushes in on the pair
 
-Пожелание пользователя по ходу вехи: сценка должна быть кинематографичной. На
-время сценки камера плавно наезжает на пару — кадр уже в 0,38 раза, середина
-между Otto и агентом на высоте груди, — держит крупно до чуть позже ключевого
-кадра и отъезжает к концу сценки. Первая проба, 0,62, крупным планом не
-читалась: в кадре почти четыре этажа, и фигура занимала пятую часть высоты.
-Кадр боя (`SideCamera.rule_view`) крупный план не трогает: кто кого видит,
-решает он.
+The user's wish during the milestone: the scene should be cinematic. For the
+scene the camera smoothly pushes in on the pair — the frame 0.38 times as wide,
+the midpoint between Otto and the agent at chest height — holds close until a
+little after the key frame and pulls back by the end of the scene. The first try,
+0.62, did not read as a close-up: almost four floors were in the frame, and the
+figure took a fifth of the height. The combat frame (`SideCamera.rule_view`) is not
+touched by the close-up: it decides who sees whom.
 
-### 7. Уточнения по кадрам вехи
+### 7. Refinements from the milestone frames
 
-- **Удар рукоятью — позами кодом.** Бросок из-за головы UAL 2, взятый сперва,
-  — выпад вниз: Otto нырял агенту в ноги, как в подкате.
-- **Хук UAL 2 не взят:** со второй половины клипа тело уходит в горизонтальный
-  выпад. Серия спереди — джеб и кросс UAL 1.
-- **Сзади Otto на 14 см дальше от камеры:** тела стоят вплотную в одной
-  плоскости, и агент должен быть спереди, а руки Otto — за ним.
-- **Из UAL 2 в игру идёт один клип** — отброс от удара; его конец и есть труп
-  сценки «на спине».
+- **The pistol-whip — with code poses.** The UAL 2 overhead throw taken first is a
+  lunge downward: Otto dived at the agent's legs, like a slide tackle.
+- **The UAL 2 hook is not used:** from the second half of the clip the body goes
+  into a horizontal lunge. The front series is the UAL 1 jab and cross.
+- **From behind Otto is 14 cm farther from the camera:** the bodies stand
+  point-blank in one plane, and the agent must be in front, with Otto's arms behind
+  him.
+- **One clip from UAL 2 goes into the game** — knockback from a hit; its end is the
+  corpse of the "on the back" scene.
 
-## План реализации (M24d)
+## Implementation plan (M24d)
 
-- Клипы: из UAL 2 Standard — `Hit_Knockback`; из UAL 1 — `Punch_Jab`,
-  `Punch_Cross`, `Hit_Head`, `Hit_Chest`, `Jump_Loop`. Скелет UAL 2 — тот же,
-  что у UAL 1, с другими именами костей: переносу хватает таблицы имён.
-- Режиссёр сценки: ставит агента на смещение от Otto за 0,1–0,15 с, выключает
-  обоим физику и мозг, ведёт два рига по одним часам, на ключевом кадре — смерть
-  и очки.
-- Замедление — через `Engine.time_scale`, втрое: отдельного масштаба времени у
-  мира нет, и завести его значило бы протащить через каждую систему. Сценка
-  идёт в своём темпе — режиссёр делит время на замедление и так же ускоряет оба
-  рига; пауза замедление снимает. HUD замедляется вместе с миром. Ведёт сценку
-  шаг физики, а не кадр: смерть агента и очки решают исход партии, и жребий
-  сценки сеется от сида здания — прогон бота повторяется.
-- Правила — отдельно от узлов, с тестами: кто вплотную, с какой стороны, какая
-  сценка, сколько очков.
-- Бот тестов убивал и ударом в прыжке; без него тест боя проходит заново, бот
-  учится добивать.
+- Clips: from UAL 2 Standard — `Hit_Knockback`; from UAL 1 — `Punch_Jab`,
+  `Punch_Cross`, `Hit_Head`, `Hit_Chest`, `Jump_Loop`. The UAL 2 skeleton is the
+  same as UAL 1, with different bone names: a name table is enough for
+  retargeting.
+- The scene director: puts the agent at an offset from Otto in 0.1–0.15 s, turns
+  off physics and brain for both, drives the two rigs by one clock, on the key
+  frame — death and points.
+- Slowdown — via `Engine.time_scale`, threefold: the world has no separate time
+  scale, and introducing one would mean threading it through every system. The
+  scene runs at its own pace — the director divides time by the slowdown and speeds
+  up both rigs by the same factor; pause cancels the slowdown. The HUD slows down
+  together with the world. The scene is driven by the physics step, not the frame:
+  the agent's death and the points decide the outcome of the game, and the scene
+  draw is seeded from the building seed — the bot run is reproducible.
+- Rules — separate from nodes, with tests: who is point-blank, from which side,
+  which scene, how many points.
+- The test bot also killed with the jump kick; without it the combat test is run
+  again, the bot learns to do takedowns.
 
-## Последствия
+## Consequences
 
-- Кнопка выстрела вплотную не стреляет: агента в упор теперь не застрелить,
-  только добить.
-- Прыжок — снова только уклонение от низкой пули и путь между уровнями.
+- The shoot button does not shoot point-blank: an agent at point-blank range now
+  cannot be shot, only taken down.
+- The jump is again only a dodge from a low bullet and a way between levels.

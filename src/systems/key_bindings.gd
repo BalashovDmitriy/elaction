@@ -1,31 +1,30 @@
 class_name KeyBindings
 extends RefCounted
 
-## Схема управления игрока: одна клавиша и одна кнопка геймпада на действие
-## (ADR-0039, решение 7).
+## The player's control scheme: one key and one gamepad button per action (ADR-0039, decision 7).
 ##
-## Переназначаются шесть игровых действий. Пауза на Esc и Start не
-## переназначается — без неё из игры не выйти, если назначить не то; скриншот на
-## F12 тоже. Стик геймпада ведёт направления всегда, рядом с крестовиной: его
-## события в [InputMap] схема не трогает.
+## Six game actions are remappable. Pause on Esc and Start is not remappable — without it there is
+## no way out of the game if something wrong is assigned; the screenshot on F12 neither. The gamepad
+## stick always drives directions, alongside the d-pad: the scheme does not touch its events in
+## [InputMap].
 ##
-## Занятая клавиша меняется местами: действие, у которого её забрали, получает
-## прежнюю клавишу нового. Ни одно действие не остаётся без клавиши.
+## A taken key is swapped: the action it was taken from gets the new action's previous key. No
+## action is left without a key.
 ##
-## Клавиши — по физическому месту ([member InputEventKey.physical_keycode]):
-## схема переживает смену раскладки, как и раскладка по умолчанию с M1.
+## Keys are by physical location ([member InputEventKey.physical_keycode]): the scheme survives a
+## keyboard layout change, like the default mapping since M1.
 ##
-## Класс без узлов: хранит, меняет, пишет в [ConfigFile] и раскладывает в
-## [InputMap]; кто его позовёт — меню или запуск игры, — ему всё равно.
+## A class without nodes: it stores, changes, writes to [ConfigFile] and lays out into [InputMap];
+## it does not care who calls it — the menu or the game start.
 
 const SECTION := "keys"
 
-## Действия, которые можно переназначить, в порядке экрана управления.
+## Remappable actions, in the order of the controls screen.
 const ACTIONS: Array[StringName] = [
 	&"move_left", &"move_right", &"move_up", &"move_down", &"jump", &"shoot"
 ]
 
-## Клавиши по умолчанию — те же, что первыми стоят в `project.godot`.
+## Default keys — the same as the first ones in `project.godot`.
 const DEFAULT_KEYS: Dictionary = {
 	&"move_left": KEY_LEFT,
 	&"move_right": KEY_RIGHT,
@@ -35,7 +34,7 @@ const DEFAULT_KEYS: Dictionary = {
 	&"shoot": KEY_X,
 }
 
-## Кнопки геймпада по умолчанию — раскладка Xbox, как в `project.godot`.
+## Default gamepad buttons — Xbox layout, as in `project.godot`.
 const DEFAULT_PADS: Dictionary = {
 	&"move_left": JOY_BUTTON_DPAD_LEFT,
 	&"move_right": JOY_BUTTON_DPAD_RIGHT,
@@ -45,21 +44,21 @@ const DEFAULT_PADS: Dictionary = {
 	&"shoot": JOY_BUTTON_X,
 }
 
-## Закреплены за паузой и скриншотом: назначить их игровому действию нельзя.
+## Reserved for pause and screenshot: they cannot be assigned to a game action.
 const RESERVED_KEYS: Array[Key] = [KEY_ESCAPE, KEY_F12]
 const RESERVED_PADS: Array[JoyButton] = [JOY_BUTTON_START, JOY_BUTTON_BACK]
 
-## Событие действия слушает все устройства, как в `project.godot`. Своё событие
-## по умолчанию привязано к одному: клавиатура — к 16, геймпад — к нулевому, и
-## второй геймпад или геймпад не под номером 0 без этого не жал бы ничего.
+## An action event listens to all devices, as in `project.godot`. Our own event is bound to one by
+## default: the keyboard to 16, the gamepad to zero, and without this a second gamepad or a gamepad
+## not numbered 0 would press nothing.
 const ALL_DEVICES: int = -1
 
 var _keys: Dictionary = DEFAULT_KEYS.duplicate()
 var _pads: Dictionary = DEFAULT_PADS.duplicate()
 
 
-## Схема из файла настроек. Нет секции, чужое значение или две клавиши на одно
-## место — схема по умолчанию: полусломанная схема хуже никакой.
+## Scheme from the settings file. No section, a foreign value or two keys in one place — the default
+## scheme: a half-broken scheme is worse than none.
 static func read_from(file: ConfigFile) -> KeyBindings:
 	var bindings := KeyBindings.new()
 	if not file.has_section(SECTION):
@@ -78,7 +77,7 @@ static func read_from(file: ConfigFile) -> KeyBindings:
 	return bindings
 
 
-## Записывает схему в файл настроек.
+## Writes the scheme to the settings file.
 func write_to(file: ConfigFile) -> void:
 	for action: StringName in ACTIONS:
 		file.set_value(SECTION, "key_" + action, int(_keys[action]))
@@ -93,8 +92,8 @@ func pad_of(action: StringName) -> JoyButton:
 	return _pads.get(action, JOY_BUTTON_INVALID) as JoyButton
 
 
-## Назначает клавишу. Занятую другим действием меняет местами. Закреплённую за
-## паузой или скриншотом не берёт и возвращает false.
+## Assigns a key. One taken by another action is swapped. One reserved for pause or screenshot is
+## not taken, and false is returned.
 func bind_key(action: StringName, key: Key) -> bool:
 	if not _keys.has(action) or key == KEY_NONE or RESERVED_KEYS.has(key):
 		return false
@@ -102,7 +101,7 @@ func bind_key(action: StringName, key: Key) -> bool:
 	return true
 
 
-## Назначает кнопку геймпада — так же, как клавишу.
+## Assigns a gamepad button — the same way as a key.
 func bind_pad(action: StringName, button: JoyButton) -> bool:
 	if not _pads.has(action) or button < 0 or RESERVED_PADS.has(button):
 		return false
@@ -110,19 +109,19 @@ func bind_pad(action: StringName, button: JoyButton) -> bool:
 	return true
 
 
-## Схема по умолчанию.
+## The default scheme.
 func reset() -> void:
 	_keys = DEFAULT_KEYS.duplicate()
 	_pads = DEFAULT_PADS.duplicate()
 
 
-## Та же ли это схема, что по умолчанию: тогда «сбросить» нечего.
+## Whether this is the same scheme as the default: then there is nothing to "reset".
 func is_default() -> bool:
 	return _keys == DEFAULT_KEYS and _pads == DEFAULT_PADS
 
 
-## Раскладывает схему в [InputMap]: у каждого действия остаются одна клавиша,
-## одна кнопка и оси стика, какие были.
+## Lays out the scheme into [InputMap]: each action keeps one key, one button and the stick axes it
+## had.
 func apply() -> void:
 	for action: StringName in ACTIONS:
 		if not InputMap.has_action(action):
@@ -140,8 +139,8 @@ func apply() -> void:
 		InputMap.action_add_event(action, button)
 
 
-## Ставит [param value] действию [param action]; у кого оно было — тому
-## достаётся прежнее значение [param action].
+## Gives [param value] to action [param action]; whoever had it gets the previous value of [param
+## action].
 static func _swap_into(slots: Dictionary, action: StringName, value: int) -> void:
 	var previous: int = slots[action]
 	for other: StringName in slots:
@@ -150,7 +149,7 @@ static func _swap_into(slots: Dictionary, action: StringName, value: int) -> voi
 	slots[action] = value
 
 
-## Годится ли набор значений: все разные, ни одного закреплённого и пустого.
+## Whether a set of values is valid: all different, none reserved or empty.
 static func _usable(values: Array, reserved: Array, empty: int) -> bool:
 	var seen := {}
 	for value: Variant in values:

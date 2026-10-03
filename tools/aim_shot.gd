@@ -1,20 +1,20 @@
 extends Node3D
 
-## Снимки выстрела M24a — по состоянию, а не по секундомеру (ADR-0037, решение 5).
+## M24a shot captures — by state, not by stopwatch (ADR-0037, decision 5).
 ##
-## Луч прицела горит только замах агента, трассер — пару кадров, искры — долю
-## секунды: сценарий съёмки с выдержками их не застаёт. Инструмент ставит агента
-## напротив Otto и снимает по событиям: луч горит, пуля вылетела, пуля ударила в
-## стену, тело легло.
+## The aim beam is lit only during an agent's wind-up, the tracer — for a couple of frames, sparks —
+## for a fraction of a second: a capture script with delays does not catch them. The tool puts an
+## agent opposite Otto and shoots by events: the beam is lit, the bullet has left, the bullet hit
+## the wall, the body lay down.
 ##
-## Запуск:
+## Run:
 ##     godot --path . res://tools/aim_shot.tscn
 ##     godot --path . res://tools/aim_shot.tscn -- --folder=M24a --floor=17 --gap=2.5
 ##     godot --path . res://tools/aim_shot.tscn -- --out=C:/tmp/combat
 ##
-## Кадры ложатся в screens/<папка>/ (папка локальная, в репозиторий не идёт) или в
-## каталог [code]--out[/code]. Семнадцатый этаж настоящего здания — тёмный
-## (ROM 13): там луч — единственный знак выстрела.
+## Frames go to screens/<folder>/ (the folder is local, it does not go into the repository) or to
+## the [code]--out[/code] directory. Floor seventeen of a real building is dark
+## (ROM 13): there the beam is the only sign of a shot.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
@@ -22,15 +22,15 @@ const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 
 const DEFAULT_FOLDER := "M24a"
 
-## Сколько кадров дать камере доехать до Otto: сглаживание у неё 8.0.
+## How many frames to give the camera to reach Otto: its smoothing is 8.0.
 const SETTLE_FRAMES: int = 45
 
-## Сколько кадров ждать события, прежде чем сдаться: не наступившее ждалось бы
-## вечно.
+## How many frames to wait for an event before giving up: one that never happens would be waited
+## for forever.
 const PATIENCE: int = 600
 
-## Где стоит агент, м от Otto: оба в кадре, и луч длинный. На тёмном этаже
-## агент видит Otto только вблизи — там его ставят ближе, [code]--gap=[/code].
+## Where the agent stands, m from Otto: both in the frame, and the beam is long. On a dark floor
+## an agent sees Otto only up close — there he is placed closer, [code]--gap=[/code].
 const GAP: float = 6.0
 
 var _level: GreyboxLevel = null
@@ -92,13 +92,13 @@ func _run() -> void:
 	_agent.global_position = WorldSpace.to_scene(Vector2(spot + _gap, rules.floor_surface(_floor)))
 	_agent.walk_speed = 0.0
 	_agent.setup(_level.otto, -1.0)
-	# Злость ноль — замах самый долгий, 10 тиков: луч виден дольше всего.
+	# Anger zero — the longest wind-up, 10 ticks: the beam is visible the longest.
 	_agent.set_threat(0, rules.skill, false)
 
-	# Луч в середине замаха: пистолет вскинут, точка на Otto.
+	# The beam in the middle of the wind-up: the pistol raised, the dot on Otto.
 	if await _until(func() -> bool: return _agent.laser.is_on() and _agent.laser.shot_in < 0.4):
 		await _shoot("01_laser_on_otto")
-	# Под высокий луч Otto приседает: луч уходит над ним в стену.
+	# Under a high beam Otto crouches: the beam goes over him into the wall.
 	Input.action_press(&"move_down")
 	for _frame: int in 3:
 		await get_tree().physics_frame
@@ -108,7 +108,7 @@ func _run() -> void:
 		await _shoot("03_agent_tracer")
 	Input.action_release(&"move_down")
 
-	# Выстрел Otto в стену за спиной: трассер, потом искры, пыль и след.
+	# Otto's shot into the wall behind his back: a tracer, then sparks, dust and a mark.
 	Input.action_press(&"move_left")
 	await get_tree().physics_frame
 	await get_tree().physics_frame
@@ -133,7 +133,7 @@ func _run() -> void:
 	get_tree().quit()
 
 
-## Ставит Otto на этаж и ждёт, пока камера доедет. Возвращает его место.
+## Puts Otto on a floor and waits until the camera arrives. Returns his position.
 func _stand_on(index: int) -> float:
 	var spot := _level.plan().safe_x(_level.rules, index)
 	_level.otto.global_position = WorldSpace.to_scene(
@@ -144,7 +144,7 @@ func _stand_on(index: int) -> float:
 	return spot
 
 
-## Ждёт, пока [param done] не станет истинным. Возвращает, дождался ли.
+## Waits until [param done] becomes true. Returns whether it got there.
 func _until(done: Callable) -> bool:
 	for _frame: int in PATIENCE:
 		if done.call():

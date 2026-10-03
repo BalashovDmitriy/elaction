@@ -1,17 +1,17 @@
 extends GutTest
 
-## Дождь над крышей и в городе (ADR-0037, решение 3): что капли гаснут о
-## крышу, а не по таймеру, и что перед этажами дождя нет, — на любом здании
-## с дождём.
+## Rain above the roof and in the city (ADR-0037, decision 3): that drops die on the
+## roof rather than by a timer, and that there is no rain in front of the floors, on any
+## building with rain.
 ##
-## Как дождь выглядит, тест не видит: это видно на кадрах вехи. Он стережёт
-## то, из-за чего M24a переделывала дождь, — капли под плитой крыши и перед
-## ней, — по устройству частиц: откуда сыплются, обо что гаснут и укрыта ли
-## картой высот вся полоса, куда они падают.
+## The test cannot see how the rain looks: that is visible in the milestone shots. It
+## guards against what made M24a redo the rain, drops under the roof slab and in front of
+## it, through the particle setup: where they fall from, what they die on, and whether
+## the height map covers the whole band they fall into.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 
-## Сколько зданий с дождём проверять.
+## How many buildings with rain to check.
 const RAINY: int = 3
 
 
@@ -19,7 +19,7 @@ func after_all() -> void:
 	GameState.instance().reset()
 
 
-## Первые [param count] сидов, на которых идёт дождь.
+## The first [param count] seeds on which it rains.
 func _rainy_seeds(count: int) -> Array[int]:
 	var found: Array[int] = []
 	var building_seed := 1
@@ -44,8 +44,8 @@ func _rain_of(level: GreyboxLevel) -> RoofRain:
 	return (level.get_node("Scenery") as BuildingScenery).roof_rain()
 
 
-## Капля гаснет, коснувшись крыши: коллизия, брызги в месте удара, карта высот
-## с неподвижного на крыше.
+## A drop dies when it touches the roof: collision, a splash at the impact point, a
+## height map from what is stationary on the roof.
 func test_drops_die_on_the_roof_not_on_a_timer() -> void:
 	for building_seed in _rainy_seeds(RAINY):
 		var level := _level(building_seed)
@@ -66,8 +66,8 @@ func test_drops_die_on_the_roof_not_on_a_timer() -> void:
 		remove_child(level)
 
 
-## Всё, куда падают капли, укрыто картой высот: капля, сносимая вбок, не
-## выходит за её край и не летит мимо крыши вниз по фасаду.
+## Everything drops fall onto is covered by the height map: a drop carried sideways does
+## not go past its edge and does not fly past the roof down the facade.
 func test_the_heightfield_covers_every_drop_path() -> void:
 	for building_seed in _rainy_seeds(RAINY):
 		var level := _level(building_seed)
@@ -79,7 +79,7 @@ func test_the_heightfield_covers_every_drop_path() -> void:
 		var cover := AABB(catcher.global_position - catcher.size * 0.5, catcher.size)
 		var deck := WorldSpace.height_to_scene(level.rules.floor_surface(BuildingRules.ROOF))
 		var fall := drops.global_position.y + box.y - deck
-		# Снос — вправо, разброс — в обе стороны.
+		# Drift is to the right, spread is both ways.
 		var spread := fall * tan(deg_to_rad(process.spread))
 		var from := drops.global_position.x - box.x - spread
 		var to := drops.global_position.x + box.x + fall * RoofRain.SLANT + spread
@@ -92,8 +92,8 @@ func test_the_heightfield_covers_every_drop_path() -> void:
 		remove_child(level)
 
 
-## Перед этажами дождя нет: здание в разрезе, и капли перед плитой крыши
-## читались бы дождём в комнате этажа под ней.
+## There is no rain in front of the floors: the building is in section, and drops in
+## front of the roof slab would read as rain in the room of the floor below it.
 func test_no_rain_in_front_of_the_floors() -> void:
 	for building_seed in _rainy_seeds(RAINY):
 		var level := _level(building_seed)
@@ -107,8 +107,8 @@ func test_no_rain_in_front_of_the_floors() -> void:
 		remove_child(level)
 
 
-## Карта высот снимается с крыши, а не с людей: настил на слое дождя, Otto —
-## нет. Иначе в дожде осталась бы дыра на месте, где Otto стоял при сборке.
+## The height map is taken from the roof, not from people: the deck is on the rain
+## layer, Otto is not. Otherwise the rain would keep a hole where Otto stood at assembly.
 func test_the_roof_catches_rain_and_otto_does_not() -> void:
 	var level := _level(_rainy_seeds(1)[0])
 	var deck := WorldSpace.height_to_scene(level.rules.floor_surface(BuildingRules.ROOF))
@@ -127,7 +127,7 @@ func test_the_roof_catches_rain_and_otto_does_not() -> void:
 	remove_child(level)
 
 
-## Доля капель — по уровню качества; на низком нет кругов и капели.
+## Share of drops follows the quality level; on low there are no rings and no dripping.
 func test_the_rain_follows_the_quality_level() -> void:
 	var level := _level(_rainy_seeds(1)[0])
 	var drops := _rain_of(level).drops()
@@ -142,8 +142,8 @@ func test_the_rain_follows_the_quality_level() -> void:
 	remove_child(level)
 
 
-## В городе дождь слоями на разной глубине и завесами между рядами домов — и
-## только в дождь.
+## In the city the rain is in layers at different depths and in curtains between the
+## rows of houses, and only when it rains.
 func test_the_city_rains_in_layers_only_when_it_rains() -> void:
 	var level := _level(_rainy_seeds(1)[0])
 	var city := level.get_node("Scenery/City/CityView") as SubViewport
@@ -162,7 +162,7 @@ func test_the_city_rains_in_layers_only_when_it_rains() -> void:
 	remove_child(clear)
 
 
-## Режимы отрисовки шейдера: что стоит в его [code]render_mode[/code].
+## Shader render modes: what its [code]render_mode[/code] contains.
 func _render_modes(look: ShaderMaterial) -> PackedStringArray:
 	for line in look.shader.code.split("\n"):
 		if line.begins_with("render_mode"):
@@ -173,9 +173,9 @@ func _render_modes(look: ShaderMaterial) -> PackedStringArray:
 	return PackedStringArray()
 
 
-## Капли видны светом (решение 3, дополнение): шейдер со светом ламп, а не
-## своего цвета, и без тумана — сложение с туманом высветляло город вдвое.
-## Так у капель над крышей, у брызг, у капели и у струй города.
+## Drops are seen by light (decision 3, addendum): a shader lit by lamps rather than
+## its own color, and without fog: blending with fog brightened the city twofold.
+## This holds for drops above the roof, splashes, dripping and city streaks.
 func test_drops_are_lit_and_fog_free() -> void:
 	var level := _level(_rainy_seeds(1)[0])
 	var rain := _rain_of(level)
@@ -198,8 +198,8 @@ func test_drops_are_lit_and_fog_free() -> void:
 	remove_child(level)
 
 
-## Дымка над крышей — объёмный туман, и её нет там, где тумана нет: на низком.
-## Ореол у лампы над крышей и у неона — на любом уровне.
+## The haze above the roof is volumetric fog, and it is absent where there is no fog: on
+## low. The halo at the lamp above the roof and at the neon is on any level.
 func test_mist_and_halos_follow_the_quality_level() -> void:
 	var level := _level(_rainy_seeds(1)[0])
 	var rain := _rain_of(level)
@@ -219,7 +219,7 @@ func test_mist_and_halos_follow_the_quality_level() -> void:
 	remove_child(level)
 
 
-## В сухую погоду ни дымки, ни ореолов: воздух прозрачный.
+## In dry weather there is neither haze nor halos: the air is transparent.
 func test_no_mist_or_halos_when_dry() -> void:
 	var dry := 1
 	while Weather.is_raining(Weather.of_seed(dry)):
@@ -230,9 +230,9 @@ func test_no_mist_or_halos_when_dry() -> void:
 	remove_child(level)
 
 
-## Поток от винта разносит дождь (ADR-0053): пока вертолёт висит низко, под
-## осью винта стоит отталкиватель частиц, а капли его слушают; ушёл вертолёт
-## вверх — поток стих.
+## The rotor downwash scatters the rain (ADR-0053): while the helicopter hovers low, a
+## particle repeller stands under the rotor axis, and the drops obey it; once the
+## helicopter has gone up, the downwash dies down.
 func test_the_rotor_wash_pushes_the_rain() -> void:
 	var wash := Downwash.new()
 	add_child_autofree(wash)

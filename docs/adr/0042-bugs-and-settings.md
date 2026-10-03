@@ -1,108 +1,115 @@
-# ADR-0042 · M24f: баги, настройки, Game Over
+# ADR-0042 · M24f: bugs, settings, Game Over
 
-- **Статус:** принято
-- **Дата:** 2026-09-28
-- **Дополняет:** [ADR-0022](0022-actors-rig.md) (обводка),
-  [ADR-0034](0034-ultra-and-auto-quality.md) (разрешение и «Ультра»),
-  [ADR-0037](0037-polish-bugs-and-combat.md) (трупы),
-  [ADR-0040](0040-takedowns.md) (напрыгивание)
+- **Status:** accepted
+- **Date:** 2026-09-28
+- **Extends:** [ADR-0022](0022-actors-rig.md) (outline),
+  [ADR-0034](0034-ultra-and-auto-quality.md) (resolution and "Ultra"),
+  [ADR-0037](0037-polish-bugs-and-combat.md) (corpses),
+  [ADR-0040](0040-takedowns.md) (pounce)
 
-## Контекст
+## Context
 
-Замечания пользователя после M24e (2026-09-28) — пятнадцать пунктов. Их
-разделили на две вехи: M24f — баги, настройки и последняя смерть; M24g —
-анимация и вид (трос, эскалатор, дверь, фары, окна города,
+The user's remarks after M24e (2026-09-28) — fifteen items. They were split
+into two milestones: M24f — bugs, settings and the last death; M24g —
+animation and look (rope, escalator, door, headlights, city windows,
 [ADR-0043](0043-animation-and-look.md)).
 
-### Что показала сверка
+### What the check showed
 
-Дизассемблер ROM ([`arcade-rom.md`](../reference/arcade-rom.md)) и разбор кода:
+The ROM disassembly ([`arcade-rom.md`](../reference/arcade-rom.md)) and code review:
 
-- **Трупы.** В ROM убитый агент падает и исчезает; у нас с M24a он лежит до
-  конца здания. Лёгшее тело засыпало и переходило в узел кабины, если под его
-  *ступнями* была кабина, — луч из ступней, а не из середины тела. Лежащий
-  туловищем на площадке труп ехал с кабиной сквозь перекрытия; проезжающая мимо
-  кабина подхватывала труп с края площадки.
-- **Управление кабиной с двумя трупами.** По коду трупы ни с чем не
-  сталкиваются (слой 0) и в зоны кабины не попадают; три теста —
-  трупы в кабине, Otto садится к лежащим, добивания в кабине — управление не
-  ломают. Причина не найдена; убирается вместе с переносом трупа в узел кабины,
-  тесты остаются сторожем.
-- **FPS внизу на «Ультре».** У лампы два источника с тенью: конус и заливка.
-  Заливка — всенаправленный свет, его тень кубом — шесть проходов. Внизу горит
-  около пятнадцати ламп против пяти в башне: ~105 проходов теней против ~35, и в
-  каждый идёт вся обстановка этажа.
-- **Разрешение.** Godot 4.7 не переключает видеорежим монитора: полный экран и
-  окно без рамки всегда в родном разрешении, а пункт «Разрешение» там ничего
-  не делал, хотя оставался активным.
-- **Game Over.** Меню выходит в тот же кадр, что и смерть; прыжок — пробел, а
-  пробел жмёт «Заново»: игрок, давящий прыжок, перезапускал партию сразу.
-- **Напрыгивание.** Срабатывало, только если Otto падает с опоры выше этажа
-  агента, — прыжок на том же этаже не срабатывал никогда. В ROM удар в прыжке
-  убивает при любом касании тел за весь прыжок.
+- **Corpses.** In the ROM a killed agent falls and disappears; ours, since M24a,
+  lies until the end of the building. A settled body went to sleep and moved into
+  the cab node if a cab was under its *feet* — a ray from the feet, not from the
+  middle of the body. A corpse lying with its torso on the platform rode with the
+  cab through slabs; a cab passing by picked up a corpse from the platform edge.
+- **Cab control with two corpses.** Per the code, corpses collide with nothing
+  (layer 0) and do not enter cab zones; three tests — corpses in a cab, Otto
+  boarding next to lying ones, takedowns in a cab — do not break control. The
+  cause was not found; it goes away together with moving the corpse into the cab
+  node, the tests stay as a guard.
+- **FPS at the bottom on "Ultra".** A lamp has two shadowed sources: the cone and
+  the fill. The fill is omnidirectional light, its cube shadow is six passes. At
+  the bottom about fifteen lamps are lit versus five in the tower: ~105 shadow
+  passes versus ~35, and each one gets all of the floor's dressing.
+- **Resolution.** Godot 4.7 does not switch the monitor's video mode: fullscreen
+  and borderless window are always at native resolution, and the "Resolution"
+  item did nothing there, although it stayed active.
+- **Game Over.** The menu appears on the same frame as the death; jump is space,
+  and space presses "Restart": a player mashing jump restarted the game
+  immediately.
+- **Pounce.** It fired only if Otto fell from a support above the agent's floor —
+  a jump on the same floor never fired it. In the ROM the jump kick kills on any
+  body contact during the whole jump.
 
-## Решения
+## Decisions
 
-Все решения — пользователя.
+All decisions are the user's.
 
-### 1. Труп — физическое тело
+### 1. A corpse is a physical body
 
-Не рэгдолл костями: тела на каждую кость скелета пака спорят с ригом, который
-сам сэмплирует клипы, а трупов в здании до тридцати. Не отдельное
-`RigidBody3D`: у потолка шахты его продавливает сквозь геометрию, и прогон бота
-перестаёт повторяться. Тело агента остаётся `CharacterBody3D`, но лёжа:
+Not a ragdoll with bones: bodies on every bone of the pack skeleton fight with the
+rig, which samples clips itself, and there are up to thirty corpses in a building.
+Not a separate `RigidBody3D`: at the shaft ceiling it gets pushed through
+geometry, and the bot run stops being reproducible. The agent body stays a
+`CharacterBody3D`, but lying:
 
-- форма после падения — лежачая коробка по длине тела, а не стоячая;
-- пока тело касается колонны шахты, оно не засыпает: гравитация и
-  `move_and_slide` везут его на полу кабины, как на платформе, а ушла кабина —
-  тело падает в шахту, на крышу кабины ниже или на дно;
-- серединой над пустотой тело не висит краем на плите, а соскальзывает в шахту;
-- зажатое между крышей кабины и верхом шахты тело пропадает;
-- вне шахт лёгшее тело засыпает, как и прежде, и кадру ничего не стоит.
+- the shape after the fall is a lying box along the body length, not a standing
+  one;
+- while the body touches a shaft column, it does not sleep: gravity and
+  `move_and_slide` carry it on the cab floor as on a platform, and when the cab
+  leaves the body falls into the shaft, onto the roof of a cab below or to the
+  bottom;
+- with its middle over a void the body does not hang by its edge on the slab but
+  slides into the shaft;
+- a body pinched between the cab roof and the top of the shaft disappears;
+- outside shafts a settled body sleeps as before and costs the frame nothing.
 
-В узел кабины труп больше не переходит.
+A corpse no longer moves into the cab node.
 
-### 2. FPS: тени дешевле, вид тот же
+### 2. FPS: cheaper shadows, same look
 
-Сначала замер по этажам (`light_bench`), потом правка. Тень — только у ламп в
-кадре; у заливки — без тени или двухпроходная; мелкие предметы обстановки тени
-не отбрасывают. Цель — ровный кадр по всему зданию без заметной разницы на
-кадрах.
+First a per-floor measurement (`light_bench`), then the fix. Shadows only for lamps
+in the frame; the fill — without a shadow or dual-paraboloid; small dressing items
+do not cast shadows. The goal is a steady frame across the whole building without
+a visible difference in frames.
 
-### 3. Разрешение в полном экране задаёт разрешение 3D
+### 3. Resolution in fullscreen sets the 3D resolution
 
-В полном экране и окне без рамки сцена рисуется в выбранном разрешении и
-растягивается на экран, интерфейс остаётся чётким. «Масштаб рендера» сводится с
-ним в одно: доля — это выбранное разрешение к родному.
+In fullscreen and borderless window the scene is drawn at the chosen resolution
+and stretched to the screen, the interface stays sharp. "Render scale" is merged
+with it into one: the fraction is the chosen resolution over the native one.
 
-### 4. Курсора во время игры нет
+### 4. No cursor during play
 
-Во время партии курсор скрыт; в меню и на паузе — виден.
+During a game the cursor is hidden; in the menu and on pause it is visible.
 
-### 5. Последняя смерть — замедление и наезд
+### 5. The last death — slowdown and push-in
 
-Мир замедляется, камера наезжает на Otto, он падает клипом смерти, кадр гаснет,
-«GAME OVER» — и только через ~1,5 с меню принимает нажатия.
+The world slows down, the camera pushes in on Otto, he falls with the death clip,
+the frame fades, "GAME OVER" — and only after ~1.5 s does the menu accept presses.
 
-### 6. Авторы в меню
+### 6. Credits in the menu
 
-Страница «Авторы» в главном меню — список из `CREDITS.md`.
+A "Credits" page in the main menu — the list from `CREDITS.md`.
 
-### 7. Обводки нет ни у кого
+### 7. No outline for anyone
 
-Обводка M16 (ADR-0022) снимается с Otto, агентов и трупов. В темноте фигуры
-читаются светом.
+The M16 outline (ADR-0022) is removed from Otto, agents and corpses. In the dark
+figures read by light.
 
-### 8. Свой свет у красной двери
+### 8. A red door has its own light
 
-Над невзятой красной дверью — своё бра: тёплое красное пятно на стене и полу,
-светящаяся табличка; горит и при сбитой лампе, гаснет, когда документ взят.
+Above an uncollected red door — its own sconce: a warm red spot on the wall and
+floor, a glowing plaque; it stays lit even when the lamp is shot out, and goes out
+when the document is taken.
 
-### 9. Напрыгивание — проще
+### 9. Pounce — simpler
 
-Otto приземлился — из прыжка или падения — телом внахлёст на живого агента того
-же этажа: это добивание сверху. Опора выше этажа агента больше не нужна.
+Otto landed — from a jump or a fall — with his body overlapping a living agent on
+the same floor: this is a takedown from above. A support above the agent's floor
+is no longer needed.
 
-## Чего в вехе нет
+## Not in the milestone
 
-Трос, эскалатор, дверь, фары, окна города — M24g.
+Rope, escalator, door, headlights, city windows — M24g.

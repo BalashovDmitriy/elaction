@@ -1,27 +1,27 @@
 shader_type spatial;
 
-// Литой бетон выезда из паркинга (M24b): стена тоннеля и подпорная стена
-// пандуса. Голая заливка на полкадра читалась недостроем, поэтому у стены есть
-// то, что есть у настоящей: щиты опалубки со швами, ряды отверстий от стяжек,
-// полосы заливки, потёки от верха, сырость у пола и пятна. Всё считается по
-// месту в мире, без своих фактур: зерно — фактура бетона шахт
+// Cast concrete of the garage exit (M24b): the tunnel wall and the ramp's retaining
+// wall. A bare pour across half the frame read as unfinished construction, so the wall has
+// what a real one has: formwork panels with seams, rows of tie holes,
+// pour bands, streaks from the top, damp at the floor and stains. Everything is computed by
+// world position, without textures of its own: the grain is the shaft concrete texture
 // ([BuildingFinish.shaft_concrete]).
 //
-// Мокрая стена (дождь) темнее и глаже — в ней ловятся огни.
+// A wet wall (rain) is darker and smoother — lights catch in it.
 
 uniform vec3 tone : source_color = vec3(0.5);
 uniform sampler2D grain : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D grain_normal : hint_normal, filter_linear_mipmap, repeat_enable;
 uniform float grain_repeat = 1.6;
-// Щит опалубки, м: ширина и высота заливки.
+// Formwork panel, m: pour width and height.
 uniform vec2 panel = vec2(2.4, 1.2);
-// Шаг стяжек, м, и их радиус.
+// Tie pitch, m, and their radius.
 uniform vec2 tie_step = vec2(0.6, 0.6);
 uniform float tie_radius = 0.022;
-// Верх и низ стены в сцене, м: от верха текут потёки, у низа — сырость.
+// Top and bottom of the wall in the scene, m: streaks run from the top, damp at the bottom.
 uniform float top_y = 1.0;
 uniform float bottom_y = 0.0;
-// Насколько стена мокрая: 0 — сухо, 1 — под дождём.
+// How wet the wall is: 0 — dry, 1 — in rain.
 uniform float wetness = 0.0;
 
 varying vec3 world;
@@ -45,7 +45,7 @@ float noise(vec2 p) {
 	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
-// Тонкая линия шириной [param width] вокруг нуля, сглаженная по экрану.
+// A thin line of width [param width] around zero, smoothed in screen space.
 float line(float distance, float width) {
 	float blur = fwidth(distance);
 	return 1.0 - smoothstep(width, width + blur * 1.5, abs(distance));
@@ -56,25 +56,25 @@ void fragment() {
 	vec2 uv = at / grain_repeat;
 	vec3 colour = texture(grain, uv).rgb * tone;
 
-	// Пятна: бетон разных замесов.
+	// Stains: concrete from different batches.
 	float blotch = noise(at * 0.9) * 0.6 + noise(at * 3.1) * 0.4;
 	colour *= mix(0.82, 1.12, blotch);
 
-	// Щиты: вертикальные швы, горизонтальные полосы заливки, лёгкий перепад
-	// тона от щита к щиту.
+	// Panels: vertical seams, horizontal pour bands, a slight tone shift
+	// from panel to panel.
 	vec2 cell = floor(at / panel);
 	colour *= mix(0.92, 1.06, hash(cell));
 	float joint = line((fract(at.x / panel.x + 0.5) - 0.5) * panel.x, 0.012);
 	float pour = line((fract(at.y / panel.y + 0.5) - 0.5) * panel.y, 0.006);
 	colour *= 1.0 - joint * 0.55 - pour * 0.25;
 
-	// Стяжки: тёмная точка с ободком по сетке внутри щита.
+	// Ties: a dark dot with a rim on a grid inside the panel.
 	vec2 tie = (fract(at / tie_step) - 0.5) * tie_step;
 	float hole = 1.0 - smoothstep(tie_radius, tie_radius + fwidth(at.x) * 1.5, length(tie));
 	float rim = 1.0 - smoothstep(tie_radius * 2.2, tie_radius * 2.8, length(tie));
 	colour *= 1.0 - hole * 0.6 + (rim - hole) * 0.08;
 
-	// Потёки от верха: полосы разной длины, чуть гуляющие по x.
+	// Streaks from the top: bands of different length, wandering slightly along x.
 	float wobble = (noise(vec2(at.y * 2.0, at.x)) - 0.5) * 0.06;
 	float column = floor((at.x + wobble) / 0.23);
 	float reach = mix(0.2, 1.9, hash(vec2(column, 3.0)));
@@ -83,7 +83,7 @@ void fragment() {
 	float streak = strength * (1.0 - smoothstep(0.0, reach, below)) * step(0.0, below);
 	colour *= 1.0 - streak;
 
-	// Сырость у пола: тёмная кромка с рваным краем.
+	// Damp at the floor: a dark edge with a ragged border.
 	float damp_height = 0.25 + noise(vec2(at.x * 1.7, 0.0)) * 0.35;
 	float damp = 1.0 - smoothstep(0.0, damp_height, at.y - bottom_y);
 	colour *= 1.0 - damp * 0.35;

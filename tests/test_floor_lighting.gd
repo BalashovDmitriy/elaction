@@ -1,13 +1,13 @@
 extends GutTest
 
-## Тесты света этажей по зонам ламп.
+## Tests of floor light by lamp zones.
 ##
-## Сбитая лампа гасит свою зону и обратно та не загорается — наше решение, не
-## механика оригинала (ADR-0007, ADR-0023). Без сцены: [FloorLighting] помнит
-## лампы и темноту, и больше ничего.
+## A shot lamp darkens its zone and the zone does not light up again — our decision, not
+## the original's mechanics (ADR-0007, ADR-0023). Without a scene: [FloorLighting] remembers
+## lamps and darkness, and nothing else.
 
 
-## Этаж 1 с двумя лампами — на 5 и на 15 метрах: граница зон на десяти.
+## Floor 1 with two lamps — at 5 and 15 metres: the zone boundary at ten.
 func _two_lamps() -> FloorLighting:
 	var lighting := FloorLighting.new()
 	lighting.hang(1, 15.0)
@@ -69,7 +69,7 @@ func test_a_second_shot_at_the_same_zone_changes_nothing() -> void:
 
 
 func test_a_floor_without_lamps_never_goes_dark() -> void:
-	# Крыша: ламп нет, светит город.
+	# Roof: no lamps, the city lights it.
 	var lighting := _two_lamps()
 	assert_false(lighting.darken(BuildingRules.ROOF, 0.0), "гасить нечего")
 	assert_false(lighting.is_dark_at(BuildingRules.ROOF, 0.0))
@@ -78,7 +78,7 @@ func test_a_floor_without_lamps_never_goes_dark() -> void:
 
 
 func test_lamps_hang_in_any_order() -> void:
-	# Раскладка отдаёт лампы как выложила; зона считается по месту, не по порядку.
+	# The layout hands out lamps as it laid them; the zone is computed by position, not order.
 	var lighting := FloorLighting.new()
 	lighting.hang(0, 30.0)
 	lighting.hang(0, 10.0)
@@ -89,8 +89,8 @@ func test_lamps_hang_in_any_order() -> void:
 	assert_false(lighting.is_dark_at(0, 29.0))
 
 
-## Тёмный этаж карты тёмен в любой точке с начала здания, и гасить на нём
-## нечего (ADR-0028, решение 4). Соседний этаж без ламп — крыша — светел.
+## A dark floor on the map is dark at any point from the start of the building, and there is nothing
+## to darken on it (ADR-0028, decision 4). The neighbouring floor without lamps — the roof — is lit.
 func test_an_unlit_floor_is_dark_everywhere() -> void:
 	var lighting := FloorLighting.new()
 	lighting.mark_unlit(3)

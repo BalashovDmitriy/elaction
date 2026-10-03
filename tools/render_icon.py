@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Иконка приложения: `icon.ico` из той же геометрии, что и `icon.svg`.
+"""Application icon: `icon.ico` from the same geometry as `icon.svg`.
 
-Windows берёт иконку из `.exe`, а вписывает её туда `rcedit` — и только из
-`.ico`, SVG он не понимает. Рисовать её отдельно в редакторе значит завести
-вторую копию картинки, которая разъедется с первой; поэтому она собирается
-кодом, как и остальные ассеты (ADR-0011, пункт 1, и ADR-0013, пункт 9).
+Windows takes the icon from the `.exe`, and `rcedit` writes it there, and only from
+`.ico`; it does not understand SVG. Drawing it separately in an editor would mean a
+second copy of the picture that drifts from the first; so it is built in code, like the
+other assets (ADR-0011, item 1, and ADR-0013, item 9).
 
-Геометрия — шахта с кабиной и три ряда окон, где одно красное: то же, что
-в `icon.svg`, только в пикселях и во всех размерах, которые спрашивает Windows.
-Результат коммитится в репозиторий, в CI скрипт не вызывается.
+The geometry is a shaft with a cab and three rows of windows, one of them red: the same
+as in `icon.svg`, only in pixels and in all the sizes Windows asks for. The result is
+committed to the repository; CI does not call the script.
 
     python tools/render_icon.py
 """
@@ -24,13 +24,13 @@ from godot_bin import PROJECT_ROOT, use_utf8_output
 
 OUT_FILE = PROJECT_ROOT / "icon.ico"
 
-# Размеры внутри .ico. 256 — для крупных плиток проводника, 16 — для заголовка окна.
+# Sizes inside the .ico. 256 is for large Explorer tiles, 16 is for the window title.
 SIZES: tuple[int, ...] = (16, 24, 32, 48, 64, 128, 256)
 
-# Холст оригинала: те же 128 единиц, что в viewBox иконки-SVG.
+# Original canvas: the same 128 units as in the viewBox of the SVG icon.
 CANVAS: int = 128
 
-# Рисуем крупно и уменьшаем: края ровные на всех размерах, а не рваные на мелких.
+# Draw large and scale down: edges are smooth at all sizes, not ragged at small ones.
 SUPERSAMPLE: int = 8
 
 type Rgba = tuple[int, int, int, int]
@@ -46,23 +46,23 @@ WINDOW_RED: Rgba = (0xC0, 0x39, 0x2B, 0xFF)
 
 CORNER_RADIUS: int = 20
 
-# Прямоугольники поверх фона: (x, y, ширина, высота, цвет) в единицах холста.
+# Rectangles on top of the background: (x, y, width, height, color) in canvas units.
 PARTS: tuple[tuple[int, int, int, int, Rgba], ...] = (
-    (46, 14, 36, 100, SHAFT),  # шахта
-    (63, 14, 2, 44, CABLE),  # трос
-    (50, 56, 28, 32, CAR),  # кабина
-    (50, 56, 28, 4, CAR_TOP),  # блик на крыше кабины
-    (18, 30, 18, 12, WINDOW_LIT),  # окна: слева горит, справа нет
+    (46, 14, 36, 100, SHAFT),  # shaft
+    (63, 14, 2, 44, CABLE),  # rope
+    (50, 56, 28, 32, CAR),  # cab
+    (50, 56, 28, 4, CAR_TOP),  # glint on the cab roof
+    (18, 30, 18, 12, WINDOW_LIT),  # windows: lit on the left, not on the right
     (92, 30, 18, 12, WINDOW_DARK),
     (18, 62, 18, 12, WINDOW_DARK),
     (92, 62, 18, 12, WINDOW_LIT),
-    (18, 94, 18, 12, WINDOW_RED),  # красная дверь — опознавательный знак игры
+    (18, 94, 18, 12, WINDOW_RED),  # red door, the game's identifying mark
     (92, 94, 18, 12, WINDOW_DARK),
 )
 
 
 def draw(scale: int) -> Image.Image:
-    """Рисует иконку на холсте `CANVAS * scale`."""
+    """Draws the icon on a `CANVAS * scale` canvas."""
     size = CANVAS * scale
     image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     canvas = ImageDraw.Draw(image)
@@ -73,8 +73,8 @@ def draw(scale: int) -> Image.Image:
     )
 
     for x, y, width, height, color in PARTS:
-        # Полупрозрачные окна кладём отдельным слоем: рисовать их прямо по фону
-        # Pillow не умеет — он подменяет альфу, а не смешивает цвета.
+        # Semi-transparent windows go on a separate layer: Pillow cannot draw them directly onto
+        # the background, since it replaces alpha instead of blending colors.
         layer = Image.new("RGBA", image.size, (0, 0, 0, 0))
         ImageDraw.Draw(layer).rectangle(
             (x * scale, y * scale, (x + width) * scale - 1, (y + height) * scale - 1),
@@ -89,8 +89,8 @@ def main() -> int:
     use_utf8_output()
     master = draw(SUPERSAMPLE)
     largest = max(SIZES)
-    # Pillow сам разложит крупный кадр по остальным размерам, уменьшая его тем же
-    # LANCZOS; наше дело — отдать ему кадр, уже сведённый с крупного холста.
+    # Pillow itself spreads the large image over the other sizes, scaling it down with the
+    # same LANCZOS; our job is to hand it an image already reduced from the large canvas.
     frame = master.resize((largest, largest), Image.Resampling.LANCZOS)
     frame.save(OUT_FILE, format="ICO", sizes=[(size, size) for size in SIZES])
     print(f"{Path(OUT_FILE).name}: {', '.join(str(size) for size in SIZES)} px")

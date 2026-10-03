@@ -1,91 +1,92 @@
 class_name CityPlan
 extends RefCounted
 
-## Кварталы города за зданием: где стоят дома, какой высоты и какие окна горят
-## (ADR-0029, решение 1).
+## City blocks behind the building: where the houses stand, how tall they are and which
+## windows are lit (ADR-0029, decision 1).
 ##
-## Только числа, без узлов: по ним строит [CityBackdrop], а тесты проверяют, что
-## город повторяется по сиду и закрывает всю ширину кадра. Координаты — метры
-## сцены города: x вдоль здания, y вверх от земли, z вглубь, от камеры прочь.
+## Numbers only, no nodes: [CityBackdrop] builds from them, and tests check that
+## the city repeats by seed and covers the whole frame width. Coordinates are metres
+## of the city scene: x along the building, y up from the ground, z into the depth, away
+## from the camera.
 
-## Чем кончается дом сверху (M22, замечание пользователя — «больше детализации
-## заднему фону»): плоская крыша, уступ, шпиль, бак, антенна. Силуэт горизонта
-## и в размытии читается городом, а не рядом коробок.
+## How a house ends at the top (M22, user remark — "more detail for the
+## background"): flat roof, setback, spire, tank, antenna. The skyline silhouette
+## reads as a city even when blurred, not as a row of boxes.
 enum Crown { FLAT, SETBACK, SPIRE, TANK, ANTENNA }
 
-## Что за дом (M24a): контора, жилой, стеклянная башня, кирпичный. От этого
-## тон фасада, переплёт окон и что за стеклом ([CityLook]).
+## What kind of house (M24a): office, residential, glass tower, brick. This decides
+## the facade tone, the window mullions and what is behind the glass ([CityLook]).
 enum Kind { OFFICE, HOMES, GLASS, BRICK }
 
 
-## Дом: коробка на земле и сетка окон на фасаде, обращённом к камере.
+## A house: a box on the ground and a grid of windows on the facade facing the camera.
 class Block:
 	extends RefCounted
-	## Ряд по глубине: 0 — ближний.
+	## Row in depth: 0 — the nearest.
 	var row: int = 0
 	var x: float = 0.0
 	var width: float = 0.0
 	var height: float = 0.0
-	## Середина дома по глубине.
+	## Middle of the house in depth.
 	var z: float = 0.0
 	var depth: float = 0.0
-	## Горящие окна: пары «колонка, этаж» от левого нижнего угла фасада.
+	## Lit windows: "column, storey" pairs from the bottom left corner of the facade.
 	var lit: Array[Vector2i] = []
-	## Верх дома и мигает ли на нём красный огонь.
+	## Top of the house and whether a red light blinks on it.
 	var crown: Crown = Crown.FLAT
 	var beacon: bool = false
-	## Неоновая вывеска на фасаде: цвет (прозрачный — вывески нет), ширина и
-	## высота, на какой высоте её середина.
+	## Neon sign on the facade: colour (transparent — no sign), width and
+	## height, at what height its middle is.
 	var sign_colour := Color(0.0, 0.0, 0.0, 0.0)
 	var sign_size := Vector2.ZERO
 	var sign_y: float = 0.0
-	## Сдвиг вывески от середины фасада по x: вертикальная висит у угла.
+	## Sign offset from the middle of the facade along x: a vertical one hangs at the corner.
 	var sign_x: float = 0.0
-	## Что за дом и какой у окон переплёт: 0 — нет, 1 — стойка, 2 — крест.
+	## What kind of house and what window mullions: 0 — none, 1 — a mullion, 2 — a cross.
 	var kind: Kind = Kind.OFFICE
 	var mullions: int = 0
 
 
-## Ряды по глубине: насколько ряд позади плоскости игры, м, и какой высоты там
-## дома. Ближний ряд — в шестидесяти метрах: ближе окна выходили размером с
-## дверь, и город читался декорацией вплотную за стеной (первые кадры M19).
-## Ближние ниже нашей башни — над её крышей видно небо и дальние ряды, —
-## дальние выше: горизонт большого города растёт к центру.
+## Rows in depth: how far a row is behind the play plane, m, and how tall the houses
+## there are. The nearest row is sixty metres away: closer, the windows came out the size of
+## a door, and the city read as a backdrop right behind the wall (first M19 shots).
+## The near ones are lower than our tower — the sky and the far rows are seen above its
+## roof — the far ones taller: a big city's skyline grows towards the centre.
 const ROWS: Array[Vector3] = [
-	# глубина, высота от, высота до
+	# depth, height from, height to
 	Vector3(60.0, 30.0, 85.0),
 	Vector3(100.0, 45.0, 120.0),
 	Vector3(150.0, 60.0, 160.0),
 	Vector3(220.0, 80.0, 200.0),
 ]
 
-## Ширина дома, м: от узкой башни до квартала.
+## House width, m: from a narrow tower to a block.
 const WIDTH := Vector2(10.0, 30.0)
 
-## Промежуток между домами ряда, м.
+## Gap between houses of a row, m.
 const GAP := Vector2(1.0, 6.0)
 
-## Глубина дома, м.
+## House depth, m.
 const DEPTH: float = 12.0
 
-## Шаг окон по фасаду, м: колонка и этаж. Этаж как у нашего здания — город
-## того же масштаба.
+## Window pitch on the facade, m: column and storey. The storey is as in our building — the
+## city has the same scale.
 const WINDOW_STEP := Vector2(2.4, Proportions.FLOOR)
 
-## Сколько окон горит ночью.
+## How many windows are lit at night.
 const LIT_SHARE: float = 0.26
 
-## С каким шансом у дома горит целый этаж.
+## With what chance a whole storey of a house is lit.
 const LIT_FLOOR_CHANCE: float = 0.35
 
-## Доли верхов домов: плоских больше всего, шпилей меньше всего.
+## Shares of house tops: flat ones the most, spires the fewest.
 const CROWN_WEIGHTS: Array[float] = [0.4, 0.22, 0.1, 0.16, 0.12]
 
-## С каким шансом у шпиля и антенны мигает огонь, и у высокого плоского дома.
+## With what chance a light blinks on a spire and an antenna, and on a tall flat house.
 const BEACON_CHANCE: float = 0.8
 
-## С каким шансом на доме неоновая вывеска и какие у неё цвета: не цвета
-## огоньков игры (ADR-0023, решение 6).
+## With what chance a house has a neon sign and what its colours are: not the colours
+## of the game's indicator lights (ADR-0023, decision 6).
 const SIGN_CHANCE: float = 0.4
 const SIGN_COLOURS: Array[Color] = [
 	Color(1.0, 0.25, 0.6),
@@ -94,16 +95,16 @@ const SIGN_COLOURS: Array[Color] = [
 	Color(0.75, 0.82, 1.0),
 ]
 
-## Доли типов домов ([enum Kind]) и шанс, что вывеска вертикальная.
+## Shares of house kinds ([enum Kind]) and the chance that a sign is vertical.
 const KIND_WEIGHTS: Array[float] = [0.35, 0.3, 0.15, 0.2]
 const VERTICAL_SIGN_CHANCE: float = 0.4
 
-## Смешивается с сидом, чтобы город не повторял жребий раскладки здания.
+## Mixed with the seed so the city does not repeat the building layout draw.
 const SALT: int = 0x0C17_7A11
 
 
-## Кварталы вдоль здания от [param from_x] до [param to_x] по сиду. Ряд
-## уходит за края с запасом: дальний ряд в перспективе виден шире ближнего.
+## Blocks along the building from [param from_x] to [param to_x] by seed. A row
+## goes past the edges with a margin: in perspective the far row is seen wider than the near.
 static func generate(building_seed: int, from_x: float, to_x: float) -> Array[Block]:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([building_seed, SALT])
@@ -128,8 +129,8 @@ static func generate(building_seed: int, from_x: float, to_x: float) -> Array[Bl
 	return blocks
 
 
-## Тип дома, переплёт и вертикальные вывески — своим жребием, после верхов:
-## раскладка, верхи и горящие окна по сиду те же, что до M24a.
+## House kind, mullions and vertical signs — by their own draw, after the tops:
+## the layout, tops and lit windows by seed are the same as before M24a.
 static func _dress_facades(blocks: Array[Block], building_seed: int) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([building_seed, SALT, "facades"])
@@ -138,7 +139,7 @@ static func _dress_facades(blocks: Array[Block], building_seed: int) -> void:
 		block.mullions = rng.randi_range(0, 2)
 		if block.kind == Kind.GLASS:
 			block.mullions = 1
-		# Часть вывесок — вертикальные, у угла дома, как над входом в отель.
+		# Some signs are vertical, at the corner of the house, as over a hotel entrance.
 		if block.sign_colour.a > 0.0 and rng.randf() < VERTICAL_SIGN_CHANCE:
 			var tall := minf(rng.randf_range(7.0, 14.0), block.height * 0.5)
 			var wide := minf(rng.randf_range(1.8, 3.0), block.width * 0.3)
@@ -148,8 +149,8 @@ static func _dress_facades(blocks: Array[Block], building_seed: int) -> void:
 			block.sign_x = side * (block.width * 0.5 - wide * 0.5 - 0.6)
 
 
-## Верхи и вывески — своим жребием, после раскладки: раскладка кварталов по
-## сиду та же, что до M22, и её тесты не сдвигаются.
+## Tops and signs — by their own draw, after the layout: the block layout by
+## seed is the same as before M22, and its tests do not shift.
 static func _dress_crowns(blocks: Array[Block], building_seed: int) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([building_seed, SALT, "crowns"])
@@ -163,12 +164,12 @@ static func _dress_crowns(blocks: Array[Block], building_seed: int) -> void:
 			block.sign_size = Vector2(
 				block.width * rng.randf_range(0.35, 0.7), rng.randf_range(2.0, 4.0)
 			)
-			# Где угодно по высоте, а не только под крышей: камера города видит
-			# полосу домов на своей высоте, и вывеска под самой крышей близкого
-			# дома с этажей не видна вовсе.
+			# Anywhere in height, not just under the roof: the city camera sees
+			# a band of houses at its own height, and a sign right under the roof of a near
+			# house is not visible from the floors at all.
 			block.sign_y = block.height * rng.randf_range(0.12, 0.9)
-		# Горящие этажи — как у контор ночью: целая строка окон, на которой
-		# видно, что дом живой. Своим списком, чтобы окна раскладки не менялись.
+		# Lit storeys — like offices at night: a whole row of windows that
+		# shows the house is alive. A separate list so the layout windows do not change.
 		if rng.randf() < LIT_FLOOR_CHANCE:
 			var grid := window_grid(block)
 			var level := rng.randi_range(0, grid.y - 1)
@@ -182,8 +183,8 @@ static func _weighted(rng: RandomNumberGenerator, weights: Array[float]) -> int:
 	return pick_weighted(weights, rng.randf())
 
 
-## Индекс по весам [param weights] и жребию [param roll] от 0 до 1. Общий на
-## город: здесь жребий из генератора, у [CityLook] — из хеша окна.
+## Index by weights [param weights] and draw [param roll] from 0 to 1. Shared across the
+## city: here the draw comes from the generator, in [CityLook] — from the window hash.
 static func pick_weighted(weights: Array, roll: float) -> int:
 	var total := 0.0
 	for weight: float in weights:
@@ -196,7 +197,7 @@ static func pick_weighted(weights: Array, roll: float) -> int:
 	return weights.size() - 1
 
 
-## Сколько колонок и этажей окон у фасада дома.
+## How many columns and storeys of windows a house facade has.
 static func window_grid(block: Block) -> Vector2i:
 	return Vector2i(
 		maxi(int(block.width / WINDOW_STEP.x) - 1, 1),

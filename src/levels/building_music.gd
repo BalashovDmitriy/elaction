@@ -1,13 +1,13 @@
 class_name BuildingMusic
 extends RefCounted
 
-## Музыка здания (ADR-0057, решение 7): тема — по типу здания и времени суток,
-## при сирене — мотив тревоги типа. С середины здания вниз играет следующий трек
-## набора — смена темы, как на повороте миссии в Elevator Action Returns; в
-## наборе из одного трека (утро и день офиса — выбор пользователя) он тот же.
-## Тревога половиной не меняется: она звучит до конца здания.
+## Building music (ADR-0057, decision 7): the theme — by building kind and time of day,
+## with the siren — the kind's alarm motif. From the middle of the building down the next track
+## of the set plays — a change of theme, like a mission turn in Elevator Action Returns; in
+## a set of one track (office morning and day — the user's choice) it is the same one.
+## The alarm does not change by half: it plays until the end of the building.
 ##
-## Без узлов: какой трек на каком этаже, проверяется тестом.
+## Without nodes: which track on which floor is checked by a test.
 
 var _rules: BuildingRules = null
 var _seed: int = 0
@@ -19,31 +19,31 @@ func _init(rules: BuildingRules, building_seed: int) -> void:
 	_seed = building_seed
 
 
-## Ниже ли середины здания этаж [param index]: с него играет второй трек.
+## Whether floor [param index] is below the middle of the building: the second track plays from it.
 func is_lower_half(index: int) -> bool:
 	return index >= _rules.floors / 2
 
 
-## Что играть на этаже [param index]: имя набора и вариант в нём.
+## What to play on floor [param index]: the set name and the variant in it.
 func track_at(index: int, alarm: bool) -> Array:
 	if alarm:
 		return [Sounds.alarm_for(_rules.kind), _seed]
 	var theme := Sounds.theme_for(_rules.time_of_day, _rules.kind)
-	# В наборе из одного трека меняться нечему: внизу играет тот же.
+	# In a set of one track there is nothing to change: the same one plays below.
 	var turn := 1 if is_lower_half(index) and Sounds.variants(theme).size() > 1 else 0
 	return [theme, _seed + turn]
 
 
-## Включает музыку этажа [param index] или тревогу.
+## Turns on the music of floor [param index] or the alarm.
 func play(alarm: bool, index: int) -> void:
 	_lower = is_lower_half(index)
 	var track := track_at(index, alarm)
 	Sounds.play_music(String(track[0]), int(track[1]))
 
 
-## Otto на этаже [param index]: перешёл середину здания — меняет тему. Пока
-## [param hold] — тревога, вступление или гибель, — трек не трогает и половину
-## не запоминает: Otto, возрождённый в другой половине, получает её тему.
+## Otto is on floor [param index]: crossed the middle of the building — changes the theme. While
+## [param hold] — alarm, intro or death — it does not touch the track and does not remember the
+## half: Otto respawned in the other half gets its theme.
 func follow(index: int, hold: bool) -> void:
 	if hold or is_lower_half(index) == _lower:
 		return

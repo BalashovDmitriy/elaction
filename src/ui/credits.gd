@@ -1,42 +1,42 @@
 class_name Credits
 extends RefCounted
 
-## Авторы для страницы «Авторы» (ADR-0042, решение 6).
+## Authors for the "Credits" page (ADR-0042, decision 6).
 ##
-## Источник — `CREDITS.md`, его правят руками. В сборку он не идёт, поэтому
-## страница читает [constant PATH], собранный из него `tools/build_credits.py`;
-## тест `test_credits` сверяет одно с другим.
+## The source is `CREDITS.md`, it is edited by hand. It does not go into the build, so the page
+## reads [constant PATH], built from it by `tools/build_credits.py`; the `test_credits` test
+## compares one with the other.
 
 const PATH := "res://assets/credits.json"
-## Между авторами в строке раздела. Точка держится за предыдущего автора
-## неразрывным пробелом: перенос строки — после неё, а не перед.
+## Between authors in a section line. The dot holds on to the previous author with a non-breaking
+## space: the line break comes after it, not before.
 const SEPARATOR := "\u00a0·  "
-## Неразрывный пробел: «имя (лицензия)» не рвётся переносом посередине.
+## Non-breaking space: "name (licence)" does not break in the middle.
 const NBSP := "\u00a0"
 
 
-## Раздел: ключ перевода заголовка и авторы с лицензиями.
+## Section: translation key of the heading and the authors with licences.
 class Section:
 	extends RefCounted
 	var key: String = ""
-	## Имя автора — лицензии его работ в этом разделе.
+	## Author name — licences of their works in this section.
 	var authors: Array[Dictionary] = []
 
-	## Строка раздела: «Quaternius (CC0 1.0)  ·  Kenney (CC0 1.0)».
+	## Section line: "Quaternius (CC0 1.0)  ·  Kenney (CC0 1.0)".
 	func line() -> String:
 		var parts: PackedStringArray = []
 		for author: Dictionary in authors:
 			var licences: Array = author.get("licences", [])
-			# «CC BY», как пишет сама Creative Commons: по дефису «CC-BY» строка
-			# переносилась посередине лицензии.
+			# "CC BY", as Creative Commons itself writes it: at the hyphen in "CC-BY" the line broke in the
+			# middle of the licence.
 			var licence := ", ".join(licences).replace("CC-BY", "CC BY")
 			var entry := "%s (%s)" % [author.get("name", ""), licence]
 			parts.append(entry.replace(" ", NBSP))
 		return SEPARATOR.join(parts)
 
 
-## Разделы из [param path] в порядке файла. Нет файла — пусто: страница без
-## авторов лучше, чем меню, которое не открывается.
+## Sections from [param path] in file order. No file — empty: a page without authors is better than
+## a menu that does not open.
 static func load_sections(path: String = PATH) -> Array[Section]:
 	var found: Array[Section] = []
 	var file := FileAccess.open(path, FileAccess.READ)
@@ -47,8 +47,8 @@ static func load_sections(path: String = PATH) -> Array[Section]:
 	if not data is Dictionary:
 		return found
 	for raw: Variant in (data as Dictionary).get("sections", []):
-		# Проверка типом, а не `as`: словарь не бывает null, и приведение чужого
-		# значения к нему упало бы, а не пропустило раздел.
+		# A type check, not `as`: a dictionary is never null, and casting a foreign value to it would
+		# crash rather than skip the section.
 		if not raw is Dictionary:
 			continue
 		var entry := raw as Dictionary

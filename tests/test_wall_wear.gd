@@ -1,10 +1,10 @@
 extends GutTest
 
-## Потёртость жилого дома (ADR-0055, решение 4): следы на стенах и мигающие
-## лампы. Здание — жребий, поэтому проверяется любое: следы есть только у
-## жилого дома, не ложатся на двери, шахты и глухие стены и не уходят за
-## наружные стены; мигает доля ламп, и только вид — правило темноты не
-## узнаёт о мигании ничего.
+## Residential building wear (ADR-0055, decision 4): marks on the walls and flickering
+## lamps. The building is a draw, so any one is checked: marks exist only in
+## a residential building, do not land on doors, shafts and solid walls and do not go past
+## the outer walls; a share of lamps flickers, and only visually — the darkness rule
+## knows nothing about the flicker.
 
 const SEEDS: Array[int] = [1, 2, 3, 5, 8, 13, 21, 34]
 const SKILLS: Array[int] = [0, 5, 12]
@@ -51,8 +51,8 @@ func test_marks_keep_off_doors_shafts_and_walls() -> void:
 					rules.floor_height - rules.slab_height,
 					where + ": под потолком"
 				)
-				# Картинка лежит на штукатурке, за панелью стены: тэг ниже её
-				# верха панель срезала бы (авторевью M24m).
+				# The picture lies on the plaster, behind the wall panel: a tag below its
+				# top would be cut off by the panel (M24m code review).
 				if WallWear.TAGS.has(mark.image):
 					assert_gte(
 						mark.rise - mark.width * WallWear.TAG_INK,
@@ -61,8 +61,8 @@ func test_marks_keep_off_doors_shafts_and_walls() -> void:
 					)
 
 
-## След не ложится под устройство стены ([WallFeatures]): места у них одни, и
-## тэг торчал бы из-под окна на пожарную лестницу, кирпич — из-под двери.
+## A mark does not land under a wall feature ([WallFeatures]): they share slots, and
+## a tag would stick out from under a fire escape window, brick from under a door.
 func test_marks_keep_off_wall_features() -> void:
 	var identity := BuildingIdentity.typed(BuildingIdentity.Kind.RESIDENTIAL)
 	var marks := 0
@@ -91,8 +91,8 @@ func test_marks_keep_off_wall_features() -> void:
 	assert_gt(marks, SEEDS.size() * SKILLS.size() * 5, "следов почти не осталось")
 
 
-## Мигает доля ламп жилого дома, у отеля и офиса — ни одна; жребий по месту
-## повторяется.
+## A share of the residential building's lamps flickers, in the hotel and office none; the draw by
+## slot repeats.
 func test_a_share_of_residential_lamps_flicker() -> void:
 	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
 		var style := BuildingStyle.of(BuildingIdentity.typed(kind))

@@ -1,29 +1,29 @@
 extends Node3D
 
-## Поиск мерцания: 60 кадров неподвижного этажа подряд и карта того, что между
-## ними менялось.
+## Flicker search: 60 frames of a still floor in a row and a map of what changed
+## between them.
 ##
-## Глазом мерцание ловится плохо: оно на два-три кадра и в разных местах.
-## Здесь камера стоит, Otto стоит, агентов нет, и всё, что всё равно меняется от
-## кадра к кадру, — либо задуманное (мигает буква вывески, огонь антенны, ездят
-## кабины), либо дефект: две поверхности в одной плоскости (z-fighting), шум
-## экранных отражений, свет, который гаснет и зажигается. Карта — максимум
-## разницы соседних кадров по каждому пикселю, усиленный, поверх самого кадра.
+## Flicker is hard to catch by eye: it lasts two or three frames and in different places.
+## Here the camera stands, Otto stands, there are no agents, and everything that still changes from
+## frame to frame is either intended (a sign letter blinks, the antenna light, cabs
+## move) or a defect: two surfaces in one plane (z-fighting), screen-space reflection
+## noise, a light that goes off and on. The map is the maximum
+## difference of adjacent frames per pixel, amplified, over the frame itself.
 ##
-## Вертикальная синхронизация включена — как в игре; без неё кадр рвётся, и
-## карта показала бы разрыв, а не мерцание.
+## Vertical sync is on — as in the game; without it the frame tears, and
+## the map would show tearing, not flicker.
 ##
-## Запуск:
+## Run:
 ##     godot --path . res://tools/flicker_shot.tscn -- --folder=M22 --floor=2 --quality=2
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const SCREENSHOTTER := preload("res://src/autoload/screenshotter.gd")
 
-## Три секунды: за одну камера после переноса Otto ещё доезжает.
+## Three seconds: during the first one the camera is still catching up after Otto is moved.
 const SETTLE_FRAMES: int = 180
 const FRAMES: int = 60
-## Порог разницы, ниже которого пиксель считается неподвижным: шум сжатия и
-## дизеринг меняют младший бит.
+## Difference threshold below which a pixel counts as still: compression noise and
+## dithering change the lowest bit.
 const THRESHOLD: float = 0.04
 
 var _folder: String = "res://screens/M22"
@@ -94,17 +94,17 @@ func _run() -> void:
 	base.save_png("%s/flicker_frame_f%d.png" % [_folder, _floor])
 	_overlay(base, heat).save_png("%s/flicker_map_f%d.png" % [_folder, _floor])
 	print("  мерцание: пикселей с разницей хоть в одном кадре — %d" % changed_frames)
-	# Камера и Otto за эти кадры: если они дрожат, мерцают все кромки разом.
+	# Camera and Otto over these frames: if they shake, all edges flicker at once.
 	print("  камера ходила на %s м, Otto по высоте на %.5f м" % [high - low, otto_high - otto_low])
 	get_tree().quit()
 
 
-## Разница двух кадров по пикселю — в карту максимумом. Возвращает, сколько
-## пикселей в этой паре поменялись заметно.
+## Difference of two frames per pixel — into the map as a maximum. Returns how many
+## pixels in this pair changed noticeably.
 func _accumulate(a: Image, b: Image, heat: Image) -> int:
 	var count := 0
-	# Через шаг в два пикселя: карта нужна на глаз, а полный проход — десятки
-	# миллионов обращений на GDScript.
+	# With a step of two pixels: the map is needed for the eye, and a full pass is tens
+	# of millions of accesses in GDScript.
 	for y in range(0, a.get_height(), 2):
 		for x in range(0, a.get_width(), 2):
 			var ca := a.get_pixel(x, y)
@@ -118,7 +118,7 @@ func _accumulate(a: Image, b: Image, heat: Image) -> int:
 	return count
 
 
-## Кадр, притушенный вдвое, и поверх него красным — где менялось.
+## The frame dimmed by half, and on top of it in red — where things changed.
 func _overlay(base: Image, heat: Image) -> Image:
 	var out := base.duplicate() as Image
 	for y in range(0, out.get_height(), 2):

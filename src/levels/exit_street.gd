@@ -1,107 +1,106 @@
 class_name ExitStreet
 extends Node3D
 
-## Улица за выездом из паркинга (M24b): мостовая, тротуар и ряд домов через
-## дорогу — витрины, маркизы, неон, пожарная лестница, фонарь.
+## The street beyond the garage exit (M24b): roadway, sidewalk and a row of houses across the road —
+## shop windows, awnings, neon, a fire escape, a street lamp.
 ##
-## Машина Otto выезжает из тоннеля на эту улицу, и кадр едет за ней
-## ([ExitBoarding]): улица — последний кадр здания. Раньше за пандусом стояли
-## плоские рыжие прямоугольники и бирюзовые черты, а над ними светилась дымка
-## города на заднике — розовая полоса, читавшаяся ошибкой. Теперь дома через
-## дорогу собраны тем же видом, что город на заднике ([CityLook]): пояса,
-## простенки, окна с жизнью за стеклом — и они выше любого кадра выезда, так
-## что задник над улицей не виден вовсе.
+## Otto's car drives out of the tunnel onto this street, and the view follows it ([ExitBoarding]):
+## the street is the last shot of the building. Before, flat orange rectangles and turquoise strokes
+## stood beyond the ramp, and above them glowed the haze of the city on the backdrop — a pink band
+## that read as a bug. Now the houses across the road are built with the same look as the city on
+## the backdrop ([CityLook]): belts, piers, windows with life behind the glass — and they are taller
+## than any exit shot, so the backdrop above the street is not visible at all.
 ##
-## Нижний этаж домов — свой, объёмный: витрины горят, у закрытых — рулонные
-## шторы и погасший неон, над витринами маркизы и вывески буквами шрифта игры.
-## Свет — эмиссия и пятна на тротуаре; настоящий источник один — отсвет
-## вертикальной вывески, и горит он, только пока выезд в кадре. В дождь
-## мостовая мокрая и в ней ловятся огни, над улицей идут струи, по лужам —
-## круги.
+## The ground floor of the houses is its own, three-dimensional: shop windows are lit, closed ones
+## have roller shutters and dead neon, above the windows are awnings and signs in the game's font.
+## Light is emission and pools on the sidewalk; there is one real light source — the glow of the
+## vertical sign, and it is on only while the exit is in the frame. In rain the roadway is wet and
+## catches the lights, streaks fall over the street, rings spread on the puddles.
 ##
-## Вид, без тел: Otto сюда не выходит, машина — вид без тела — проезжает.
+## Look only, no bodies: Otto does not come out here, the car — a look without a body — drives
+## through.
 ##
-## С M24k (ADR-0052, решение 3) дома через дорогу — запечённый фасад пака, как
-## у города на заднике ([method CityLook.building]), в любое время суток: днём
-## их освещает солнце здания ([Outdoors]), ночью — фонарь, неон и горящие окна.
-## Огни улицы — фонарь, неон, пятна света — горят долей
-## [method TimeOfDay.street_lights], а днём в ясную погоду погашены.
+## Since M24k (ADR-0052, decision 3) the houses across the road are the pack's baked facade, as with
+## the city on the backdrop ([method CityLook.building]), at any time of day: by day they are lit by
+## the building's sun ([Outdoors]), at night — by the street lamp, neon and lit windows. The street
+## lights — lamp, neon, pools of light — burn at a share of [method TimeOfDay.street_lights], and by
+## day in clear weather are off.
 
-## Насколько ряд домов тянется левее торца здания, м: до края самого широкого
-## кадра выезда, когда кадр доехал за машиной до улицы.
+## How far the row of houses extends to the left of the building's end wall, m: to the edge of the
+## widest exit shot, when the view has followed the car to the street.
 const FROM: float = 36.0
-## Мостовая: от тротуара у выезда ([constant NEAR_Z]) до бордюра через дорогу;
-## толщина асфальта, м.
+## Roadway: from the sidewalk at the exit ([constant NEAR_Z]) to the curb across the road; asphalt
+## thickness, m.
 const NEAR_Z: float = -2.2
 const FAR_KERB_Z: float = -8.0
 const ASPHALT: float = 0.1
-## Бордюр через дорогу: ширина и высота над мостовой, м; тротуар — вровень с
-## ним, но на сантиметр ниже, чтобы грани не легли в одну плоскость.
+## Curb across the road: width and height above the roadway, m; the sidewalk is level with it, but a
+## centimetre lower, so the faces do not lie in one plane.
 const KERB := Vector2(0.18, 0.16)
-## Лицо домов через дорогу — насколько за плоскостью игры, м, и сколько
-## какой-то дом может отступить от линии.
+## Front of the houses across the road — how far behind the play plane, m, and how much a house may
+## step back from the line.
 const FACADE_Z: float = -10.0
 const SETBACK: float = 0.45
-## Дома: ширина и высота над улицей, м. Ниже любого не бывает: верх кадра
-## выезда на лице домов — выше улицы на 14 м с лишним.
+## Houses: width and height above the street, m. None is lower: the top of the exit shot at the
+## house fronts is over 14 m above the street.
 const WIDTHS := Vector2(6.5, 10.5)
 const HEIGHTS := Vector2(16.0, 21.0)
-## Нижний этаж с витринами и карниз над ним, м; толщина коробки фасада.
+## Ground floor with shop windows and the cornice above it, m; thickness of the facade box.
 const SHOP_STOREY: float = 4.2
 const CORNICE: float = 0.22
 const FACADE_DEPTH: float = 1.2
-## Яркость витрин: стекло без освещения, и в полную силу оно выгорало в белое.
+## Shop window brightness: the glass is unlit, and at full strength it burned out to white.
 const SHOP_GLOW: float = 0.17
-## Витрина: цоколь под ней, высота стекла, ширина двери, м.
+## Shop window: the plinth under it, glass height, door width, m.
 const RISER: float = 0.55
 const GLASS_HEIGHT: float = 2.1
 const DOOR_WIDTH: float = 0.95
 const DOOR_HEIGHT: float = 2.35
 const FRAME: float = 0.06
-## Вывеска над витриной: низ, высота щита и букв, м.
+## Sign above the shop window: bottom, height of the board and letters, m.
 const SIGN_BOTTOM: float = 2.95
 const SIGN_HEIGHT: float = 0.62
 const LETTERS: float = 0.4
-## Маркиза: низ ламбрекена, вылет и высота ламбрекена, шаг полос, м.
+## Awning: bottom of the valance, projection and valance height, stripe pitch, m.
 const AWNING_LOW: float = 2.5
 const AWNING_REACH: float = 1.1
 const VALANCE: float = 0.26
 const STRIPE: float = 0.32
-## Рулонная штора закрытой лавки: высота до короба, шаг ламелей, м.
+## Roller shutter of a closed shop: height to the box, slat pitch, m.
 const SHUTTER_HEIGHT: float = 2.6
 const SLAT: float = 0.13
-## Вертикальная вывеска на кронштейнах: шаг букв и их кегль, вынос от фасада,
-## м; отсвет — яркость и радиус.
+## Vertical sign on brackets: letter pitch and size, offset from the facade, m; glow — brightness
+## and radius.
 const BLADE_STEP: float = 0.78
 const BLADE_LETTER: float = 0.62
 const BLADE_REACH: float = 0.95
 const BLADE_ENERGY: float = 3.5
 const BLADE_RANGE: float = 6.5
-## Пожарная лестница: вылет площадки, ширина, высота перил, м.
+## Fire escape: landing projection, width, railing height, m.
 const ESCAPE_REACH: float = 0.95
 const ESCAPE_WIDTH: float = 2.6
 const ESCAPE_RAIL: float = 0.9
-## Фонарь через дорогу: высота, вынос консоли, м. Света не даёт — только
-## светильник и пятно на тротуаре.
+## Street lamp across the road: height, arm reach, m. It gives no light — only the fixture and a
+## pool on the sidewalk.
 const LAMP_HEIGHT: float = 4.6
 const LAMP_ARM: float = 1.2
-## Свет фонаря: сила, дальность, м, раствор конуса и наклон к домам, градусы
-## и радианы — светит на тротуар и витрины через дорогу.
+## Street lamp light: energy, range, m, cone angle and tilt toward the houses, degrees and radians —
+## it shines on the sidewalk and shop windows across the road.
 const LAMP_ENERGY: float = 5.0
 const LAMP_RANGE: float = 9.0
 const LAMP_ANGLE: float = 55.0
 const LAMP_LEAN: float = -0.35
-## Пятна света на тротуаре: перед витриной и под фонарём.
+## Pools of light on the sidewalk: in front of a shop window and under the street lamp.
 const SPILL_ENERGY: float = 0.32
 const POOL_ENERGY: float = 0.4
-## Дождь над улицей: сколько струй на «высоком» и кругов на лужах.
+## Rain over the street: how many streaks on "high" and rings on the puddles.
 const DROPS: int = 1300
 const RIPPLES: int = 90
 
-## Асфальт: цвет в sRGB. До M24g он был 0.055 — в линейных единицах 0.004,
-## почти чёрное тело: свет фар на нём не рассеивался вовсе, а мокрый, почти
-## зеркальный, отражал косой луч вперёд, мимо камеры (ADR-0043, решение 5).
-## Настоящий асфальт — около 0.2; мокрый темнее и блестит, но берёт свет.
+## Asphalt: colour in sRGB. Before M24g it was 0.055 — 0.004 in linear units, an almost black body:
+## headlight light did not scatter on it at all, and when wet, almost a mirror, it reflected the
+## slanting beam forward, past the camera (ADR-0043, decision 5). Real asphalt is about 0.2; wet is
+## darker and shines, but takes light.
 const ASPHALT_DRY := Color(0.21, 0.21, 0.22)
 const ASPHALT_WET := Color(0.13, 0.13, 0.145)
 const ASPHALT_DRY_ROUGHNESS: float = 0.78
@@ -114,21 +113,21 @@ const PANEL := Color(0.06, 0.06, 0.07)
 const SHUTTER_TONE := Color(0.3, 0.31, 0.33)
 const IRON := Color(0.07, 0.07, 0.08)
 const POLE := Color(0.16, 0.17, 0.19)
-## Цоколь нижнего этажа по типу дома ([enum CityPlan.Kind]).
+## Ground-floor plinth by house kind ([enum CityPlan.Kind]).
 const BASE_TONES: Array[Color] = [
 	Color(0.3, 0.3, 0.31), Color(0.34, 0.3, 0.27), Color(0.22, 0.25, 0.3), Color(0.3, 0.17, 0.14)
 ]
-## Типы домов ряда: жилые и кирпичные чаще контор, стеклянных башен нет —
-## у стеклянной башни нет витрин.
+## House kinds in the row: residential and brick more often than offices, no glass towers — a glass
+## tower has no shop windows.
 const KINDS: Array[int] = [
 	CityPlan.Kind.HOMES, CityPlan.Kind.BRICK, CityPlan.Kind.OFFICE, CityPlan.Kind.HOMES
 ]
-## Маркизы: густые ночные тона.
+## Awnings: deep night tones.
 const AWNINGS: Array[Color] = [
 	Color(0.36, 0.06, 0.08), Color(0.06, 0.22, 0.16), Color(0.1, 0.12, 0.3), Color(0.3, 0.2, 0.06)
 ]
-## Неон вывесок. Не цвета огоньков игры (ADR-0023, решение 6): без зелёного
-## выхода и красной двери.
+## Sign neon. Not the colours of the game's indicator lights (ADR-0023, decision 6): no exit green
+## and no red door.
 const NEON: Array[Color] = [
 	Color(1.0, 0.25, 0.55),
 	Color(0.3, 0.9, 0.85),
@@ -139,36 +138,36 @@ const NEON: Array[Color] = [
 const SHOPS: Array[String] = [
 	"BAR", "DINER", "CAFE", "PAWN", "LIQUOR", "NOODLES", "JAZZ", "DELI", "BOOKS", "TAILOR", "RADIO"
 ]
-## Без HOTEL: через дорогу от отеля он спорил бы с вывеской здания.
+## No HOTEL: across the road from a hotel it would compete with the building's sign.
 const BLADES: Array[String] = ["BAR", "JAZZ", "CLUB", "LOUNGE", "DANCE", "GRILL"]
-## Натриевый свет фонаря и тёплый — из витрин.
+## Sodium light of the street lamp and warm light from the shop windows.
 const SODIUM := Color(1.0, 0.62, 0.28)
 const WARM := Color(1.0, 0.78, 0.45)
 const COLD := Color(0.62, 0.78, 1.0)
 
 const SALT: int = 0x57_4EE7
 
-## С какой силы огней улицы горят неон и фонарь: утром — да (0.35), днём в
-## ясную — нет (ADR-0052, решение 3).
+## From what street-light strength neon and the lamp are on: in the morning — yes (0.35), by day in
+## clear weather — no (ADR-0052, decision 3).
 const LIGHTS_ON: float = 0.3
-## Витрина днём: стекло в свету дня, свет комнаты за ним тусклее.
+## Shop window by day: the glass is in daylight, the room light behind it is dimmer.
 const SHOP_GLOW_BY_DAY: float = 0.55
-## Фасад пака ставится за линию витрин на столько, м: цоколь с витринами —
-## перед ним, и грани не ложатся в одну плоскость.
+## The pack facade is set back behind the shop window line by this much, m: the plinth with shop
+## windows is in front of it, and the faces do not lie in one plane.
 const PACK_BEHIND: float = 0.05
 
 var _left: float = 0.0
-## Улица и верх тротуара через дорогу в плоскости правил: дома стоят на
-## тротуаре, а не в нём.
+## The street and the top of the sidewalk across the road in the rules plane: houses stand on the
+## sidewalk, not in it.
 var _street: float = 0.0
 var _floor: float = 0.0
 var _weather: Weather.Kind = Weather.Kind.CLEAR
 var _time: TimeOfDay.Kind = TimeOfDay.Kind.NIGHT
-## Сила огней улицы, 0–1: ночью 1, днём в ясную — 0.
+## Street light strength, 0–1: at night 1, by day in clear weather — 0.
 var _lights: float = 1.0
-## Светло ли снаружи — не ночь: погашенный неон тогда в свету дня, а не в темноте.
+## Whether it is light outside — not night: dead neon is then in daylight, not in darkness.
 var _sunlit: bool = false
-## Дома и стёкла витрин — мультимешами, как у города на заднике.
+## Houses and shop window glass — as multimeshes, as with the city on the backdrop.
 var _blocks: Array[CityPlan.Block] = []
 var _glass_places: Array[Transform3D] = []
 var _glass_tones: Array[Color] = []
@@ -181,12 +180,12 @@ var _rain: Array[GPUParticles3D] = []
 var _snow: StreetSnow = null
 var _people: StreetPeople = null
 var _traffic: StreetTraffic = null
-## Колода вывесок: лавки на одной улице не повторяются.
+## Deck of signs: shops on one street do not repeat.
 var _names: Array[String] = []
 
 
-## Собирает улицу у левого торца здания: [param left] — торец, [param street]
-## — уровень улицы в плоскости правил, [param time] — время суток.
+## Assembles the street at the building's left end wall: [param left] — the end wall, [param street]
+## — the street level in the rules plane, [param time] — time of day.
 func build(
 	left: float,
 	street: float,
@@ -233,10 +232,10 @@ func build(
 	apply_graphics()
 
 
-## Асфальт мостовой: в дождь темнее и блестит — в нём ловятся огни.
+## Roadway asphalt: in rain darker and shiny — it catches the lights.
 static func road_material(weather: Weather.Kind) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
-	# В снег под колеями тот же мокрый асфальт, что в дождь (ADR-0054).
+	# In snow the same wet asphalt as in rain lies under the ruts (ADR-0054).
 	if Weather.is_raining(weather) or Weather.is_snowing(weather):
 		material.albedo_color = ASPHALT_WET
 		material.roughness = ASPHALT_WET_ROUGHNESS
@@ -246,13 +245,13 @@ static func road_material(weather: Weather.Kind) -> StandardMaterial3D:
 	return material
 
 
-## Материал мостовой — им же выезд кладёт асфальт у верха пандуса.
+## Roadway material — the exit also uses it to lay asphalt at the top of the ramp.
 func road() -> StandardMaterial3D:
 	return _road
 
 
-## Настоящий свет улицы: горит, пока выезд в кадре. Поток и прохожие тоже идут
-## только тогда. Днём в ясную источников нет вовсе ([method is_lit]).
+## The real street light: on while the exit is in the frame. Traffic and pedestrians also move only
+## then. By day in clear weather there are no sources at all ([method is_lit]).
 func show_light(on: bool) -> void:
 	if _glow != null:
 		_glow.visible = on
@@ -264,17 +263,17 @@ func show_light(on: bool) -> void:
 		_people.set_active(on)
 
 
-## Поток машин улицы (ADR-0044, решение 1).
+## Street traffic (ADR-0044, decision 1).
 func traffic() -> StreetTraffic:
 	return _traffic
 
 
-## Горят ли огни улицы: неон, фонарь, отсвет вывески. Днём в ясную — нет.
+## Whether the street lights are on: neon, lamp, sign glow. By day in clear weather — no.
 func is_lit() -> bool:
 	return _lights > LIGHTS_ON
 
 
-## Настоящие источники улицы — для тестов бюджета.
+## The street's real light sources — for budget tests.
 func lights() -> Array[Light3D]:
 	var found: Array[Light3D] = []
 	if _glow != null:
@@ -284,7 +283,7 @@ func lights() -> Array[Light3D]:
 	return found
 
 
-## Доля струй дождя по уровню качества.
+## Share of rain streaks by quality level.
 func apply_graphics() -> void:
 	for layer in _rain:
 		RainLook.scale_amount(layer, Graphics.rain_share())
@@ -294,7 +293,7 @@ func apply_graphics() -> void:
 		_lamp.light_volumetric_fog_energy = Graphics.light_in_fog()
 
 
-## Мостовая с разметкой, бордюр и тротуар через дорогу.
+## Roadway with markings, curb and sidewalk across the road.
 func _build_road() -> void:
 	var from := _left - FROM
 	var span := _left - from
@@ -305,9 +304,9 @@ func _build_road() -> void:
 		_road,
 		_at(middle, _street + ASPHALT * 0.5, (NEAR_Z + FAR_KERB_Z) * 0.5)
 	)
-	# Прерывистая осевая: по штриху на шаг, чуть над асфальтом. С M24h — между
-	# полосами потока, а не посередине мостовой: у дальнего бордюра стоит
-	# машина, и дальней полосе нужно место перед ней.
+	# Dashed centre line: one dash per pitch, slightly above the asphalt. Since M24h — between the
+	# traffic lanes, not in the middle of the roadway: a car stands at the far curb, and the far lane
+	# needs room in front of it.
 	var paint := GreyboxLook.surface(LANE_PAINT)
 	var lane_z := (StreetTraffic.NEAR_LANE_Z + StreetTraffic.FAR_LANE_Z) * 0.5
 	var x := _left - 1.5
@@ -329,7 +328,7 @@ func _build_road() -> void:
 	)
 
 
-## Ряд домов через дорогу: от торца здания влево, дом за домом.
+## Row of houses across the road: from the building's end wall to the left, house after house.
 func _build_row() -> void:
 	var right := _left + 0.5
 	var index := 0
@@ -354,7 +353,7 @@ func _build_row() -> void:
 		index += 1
 
 
-## Дом через дорогу: цоколь с витринами, карниз, фасад с окнами.
+## A house across the road: plinth with shop windows, cornice, facade with windows.
 func _build_house(block: CityPlan.Block, span: Vector2, face: float) -> void:
 	var width := span.y - span.x
 	var middle := (span.x + span.y) * 0.5
@@ -372,7 +371,7 @@ func _build_house(block: CityPlan.Block, span: Vector2, face: float) -> void:
 		_at(middle, _street - SHOP_STOREY + CORNICE * 0.5, face - 0.25 + 0.08),
 		false
 	)
-	# Фасад пака во всю высоту дома, за цоколем с витринами.
+	# Pack facade over the full height of the house, behind the plinth with shop windows.
 	block.depth = FACADE_DEPTH
 	block.z = face - PACK_BEHIND - FACADE_DEPTH * 0.5
 	_blocks.append(block)
@@ -387,8 +386,8 @@ func _build_house(block: CityPlan.Block, span: Vector2, face: float) -> void:
 			_build_closed_shop(shop_middle, shop_width, face)
 
 
-## Лавка открыта: горящая витрина в раме, дверь со стеклом, неон над ней,
-## иногда маркиза, и пятно света на тротуаре.
+## The shop is open: a lit shop window in a frame, a glazed door, neon above it, sometimes an
+## awning, and a pool of light on the sidewalk.
 func _build_open_shop(middle: float, width: float, face: float) -> void:
 	var glass_width := width - DOOR_WIDTH - FRAME * 3.0
 	var glass_x := middle - width * 0.5 + FRAME + glass_width * 0.5
@@ -403,7 +402,7 @@ func _build_open_shop(middle: float, width: float, face: float) -> void:
 	_add_glass(Vector2(glass_x, glass_y), Vector2(glass_width, GLASS_HEIGHT), face, tone, inside)
 	var frame := GreyboxLook.metal(FRAME_TONE)
 	var front := face + 0.04
-	# Рама витрины: низ, верх, края и средник.
+	# Shop window frame: bottom, top, sides and mullion.
 	for y: float in [_floor - RISER, _floor - RISER - GLASS_HEIGHT]:
 		_box(Vector3(glass_width + FRAME * 2.0, FRAME, 0.05), frame, _at(glass_x, y, front), false)
 	for x: float in [glass_x - glass_width * 0.5, glass_x + glass_width * 0.5, glass_x]:
@@ -414,7 +413,7 @@ func _build_open_shop(middle: float, width: float, face: float) -> void:
 		_at(glass_x, _floor - RISER * 0.5, face + 0.04),
 		false
 	)
-	# Дверь: полотно и стекло в нём, чуть тусклее витрины.
+	# Door: the leaf and the glass in it, slightly dimmer than the shop window.
 	var door_x := middle + width * 0.5 - FRAME - DOOR_WIDTH * 0.5
 	_box(
 		Vector3(DOOR_WIDTH, DOOR_HEIGHT, 0.06),
@@ -436,7 +435,7 @@ func _build_open_shop(middle: float, width: float, face: float) -> void:
 	_spill(Vector2(middle, width), face, tone)
 
 
-## Лавка закрыта: рулонная штора с коробом и погасший неон.
+## The shop is closed: a roller shutter with a box and dead neon.
 func _build_closed_shop(middle: float, width: float, face: float) -> void:
 	var metal := GreyboxLook.metal(SHUTTER_TONE)
 	var groove := GreyboxLook.metal(SHUTTER_TONE.darkened(0.5))
@@ -464,8 +463,8 @@ func _build_closed_shop(middle: float, width: float, face: float) -> void:
 	_hang_sign(middle, width, face, NEON[_rng.randi_range(0, NEON.size() - 1)], false)
 
 
-## Вывеска над витриной: тёмный щит и буквы неоном. У закрытой лавки неон
-## погашен — буквы еле видны.
+## Sign above the shop window: a dark board and neon letters. At a closed shop the neon is off — the
+## letters are barely visible.
 func _hang_sign(middle: float, width: float, face: float, neon: Color, lit: bool) -> void:
 	var board_width := minf(width - 0.2, 3.6)
 	var board := _box(
@@ -486,7 +485,7 @@ func _hang_sign(middle: float, width: float, face: float, neon: Color, lit: bool
 		words.outline_modulate = neon.darkened(0.45)
 		words.outline_size = 10
 	elif _sunlit:
-		# Погашенный неон днём — трубки в свету, как у вывески здания.
+		# Dead neon by day — tubes in daylight, as with the building's sign.
 		words.modulate = VerticalSign.unlit_tube(neon)
 		words.outline_size = 0
 		words.shaded = true
@@ -497,7 +496,7 @@ func _hang_sign(middle: float, width: float, face: float, neon: Color, lit: bool
 	board.add_child(words)
 
 
-## Маркиза: навес над витриной и полосатый ламбрекен.
+## Awning: a canopy over the shop window and a striped valance.
 func _build_awning(middle: float, width: float, face: float) -> void:
 	var cloth := AWNINGS[_rng.randi_range(0, AWNINGS.size() - 1)]
 	var top := _street - AWNING_LOW - VALANCE
@@ -526,8 +525,8 @@ func _build_awning(middle: float, width: float, face: float) -> void:
 		x += STRIPE
 
 
-## Вертикальная вывеска на кронштейнах у угла дома: буквы столбиком и
-## отсвет — единственный настоящий источник улицы.
+## Vertical sign on brackets at the corner of the house: letters in a column and a glow — the
+## street's only real light source.
 func _hang_blade(x: float, face: float) -> void:
 	var text := BLADES[_rng.randi_range(0, BLADES.size() - 1)]
 	var neon := NEON[_rng.randi_range(0, NEON.size() - 1)]
@@ -548,8 +547,7 @@ func _hang_blade(x: float, face: float) -> void:
 			_at(x, bottom - height * share, face + (BLADE_REACH - 0.08) * 0.5),
 			false
 		)
-	# Щит — лицом к камере, как у вывески здания ([VerticalSign]): буквы
-	# столбиком.
+	# The board faces the camera, as with the building's sign ([VerticalSign]): letters in a column.
 	var y := bottom - height + 0.25 + BLADE_STEP * 0.5
 	for letter in text:
 		var label := Label3D.new()
@@ -570,7 +568,7 @@ func _hang_blade(x: float, face: float) -> void:
 		add_child(label)
 		y += BLADE_STEP
 	if not is_lit():
-		# Днём отсвет погашен: источника нет вовсе.
+		# By day the glow is off: there is no source at all.
 		return
 	_glow = OmniLight3D.new()
 	_glow.name = "BladeGlow"
@@ -579,8 +577,8 @@ func _hang_blade(x: float, face: float) -> void:
 	_glow.omni_range = BLADE_RANGE
 	_glow.omni_attenuation = 0.8
 	_glow.shadow_enabled = false
-	# Ниже середины щита и ближе к мостовой: отсвет ложится на маркизы, цоколь и
-	# тротуар — фасад выше без освещения и отсвета не взял бы.
+	# Below the middle of the board and closer to the roadway: the glow falls on the awnings, plinth
+	# and sidewalk — the facade above is unlit and would not take the glow anyway.
 	_glow.position = _at(x, bottom + 0.6, z + 1.4)
 	_glow.visible = false
 	add_child(_glow)
@@ -592,8 +590,8 @@ func _hang_blade(x: float, face: float) -> void:
 		)
 
 
-## Пожарная лестница: площадки у окон каждого этажа, перила и марши между
-## ними — железо на фасаде, как в любом нуаре.
+## Fire escape: landings at the windows of every floor, railings and flights between them — iron on
+## the facade, as in any noir.
 func _build_escape(block: CityPlan.Block, span: Vector2, face: float) -> void:
 	var step := CityPlan.WINDOW_STEP
 	var window := CityLook.WINDOW_SIZES[block.kind]
@@ -632,8 +630,7 @@ func _build_escape(block: CityPlan.Block, span: Vector2, face: float) -> void:
 			_flight(x, deck, levels[index + 1], face, iron, index % 2 == 0)
 
 
-## Марш пожарной лестницы между площадками [param from] и [param to]: две
-## тетивы наискосок.
+## A fire escape flight between landings [param from] and [param to]: two stringers on the diagonal.
 func _flight(
 	x: float, from: float, to: float, face: float, iron: StandardMaterial3D, rightwards: bool
 ) -> void:
@@ -648,8 +645,8 @@ func _flight(
 		stringer.rotation.z = side * atan2(rise, run)
 
 
-## Фонарь через дорогу: столб у бордюра, консоль над мостовой, светильник и
-## пятно света под ним — без источника.
+## Street lamp across the road: a pole at the curb, an arm over the roadway, a fixture and a pool of
+## light under it — without a source.
 func _build_lamp(x: float) -> void:
 	var metal := GreyboxLook.metal(POLE)
 	var z := FAR_KERB_Z - 0.45
@@ -661,12 +658,12 @@ func _build_lamp(x: float) -> void:
 	var head := _at(x, base - LAMP_HEIGHT + 0.08, z + LAMP_ARM)
 	_box(Vector3(0.34, 0.1, 0.5), metal, head + Vector3(0.0, 0.08, 0.0), false)
 	if not is_lit():
-		# Днём фонарь не горит: стекло светильника тёмное, пятна нет.
+		# By day the street lamp is off: the fixture glass is dark, no pool.
 		_box(Vector3(0.28, 0.04, 0.42), GreyboxLook.surface(SODIUM.darkened(0.6)), head, false)
 		return
 	_box(Vector3(0.28, 0.04, 0.42), GreyboxLook.light(SODIUM), head, false)
-	# Фонарь светит по-настоящему: фасад пака без света — тёмная стена, и
-	# витрины, маркизы и тротуар под ним берут натриевый свет (ADR-0052).
+	# The street lamp shines for real: the pack facade without light is a dark wall, and the shop
+	# windows, awnings and sidewalk under it take the sodium light (ADR-0052).
 	_lamp = SpotLight3D.new()
 	_lamp.name = "StreetLamp"
 	_lamp.light_color = SODIUM
@@ -685,12 +682,12 @@ func _build_lamp(x: float) -> void:
 		add_child(RainLook.halo(head + Vector3(0.0, 0.0, -1.2), SODIUM, 0.2, Vector2(5.0, 4.5)))
 
 
-## Чужая машина у бордюра через дорогу, носом влево, с погашенными фарами:
-## улица живая, а мостовая не пустая полоса. Модель и краска — жребий улицы.
+## Someone else's car at the curb across the road, nose to the left, headlights off: the street is
+## alive, and the roadway is not an empty strip. Model and paint are the street's draw.
 func _park_a_car(x: float) -> void:
 	var choice := CarModel.Choice.new()
 	choice.model = _rng.randi_range(0, CarModel.MODELS.size() - 1)
-	# Без чёрной краски — последней: в темноте у бордюра машина пропадала.
+	# Without black paint — the last one: in the dark at the curb the car disappeared.
 	choice.paint = _rng.randi_range(1, CarModel.PAINTS.size() - 2)
 	var model := CarModel.build(choice)
 	model.name = "ParkedCar"
@@ -701,18 +698,18 @@ func _park_a_car(x: float) -> void:
 	add_child(model)
 
 
-## Свет витрины на тротуаре: тёплое пятно перед стеклом.
+## Shop window light on the sidewalk: a warm pool in front of the glass.
 func _spill(shop: Vector2, face: float, tone: Color) -> void:
 	var depth := FAR_KERB_Z - KERB.x - face
 	if not is_lit():
-		# Днём свет витрины на тротуаре не виден.
+		# By day shop window light on the sidewalk is not visible.
 		return
 	var pool := _pool(Vector2(shop.y * 1.3, absf(depth) * 1.6), tone, SPILL_ENERGY * _lights)
 	pool.position = _at(shop.x, _street - KERB.y - 0.004, face)
 	add_child(pool)
 
 
-## Стекло с жизнью за ним — окно шейдером города ([CityLook]), своим мешем.
+## Glass with life behind it — a window with the city shader ([CityLook]), as its own mesh.
 func _add_glass(centre: Vector2, size: Vector2, face: float, tone: Color, inside: int) -> void:
 	var place := Transform3D(
 		Basis.from_scale(
@@ -725,9 +722,9 @@ func _add_glass(centre: Vector2, size: Vector2, face: float, tone: Color, inside
 	_glass_customs.append(Color(_rng.randf(), float(inside), 1.0, 1.0))
 
 
-## Дома и витрины одним махом, мультимешами, как у города на заднике: фасад
-## пака на коробке во всю высоту, его же окна — горящие долей времени суток, —
-## и стёкла лавок с жизнью за ними.
+## Houses and shop windows in one go, as multimeshes, as with the city on the backdrop: the pack
+## facade on a full-height box, its windows — lit at a share depending on time of day, — and shop
+## glass with life behind it.
 func _flush_multimeshes() -> void:
 	var box := BoxMesh.new()
 	var look := CityLook.building()
@@ -750,8 +747,8 @@ func _flush_multimeshes() -> void:
 	var houses := MultiMeshInstance3D.new()
 	houses.name = "PackFacades"
 	houses.multimesh = many
-	# Солнце за спиной камеры: тень домов легла бы за них, где её не видно, а
-	# карту теней грузила бы двадцатиметровыми коробками.
+	# The sun is behind the camera: the houses' shadow would fall behind them, where it is not visible,
+	# and would load the shadow map with twenty-metre boxes.
 	houses.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(houses)
 	var glass := CityBackdrop.window_quads(
@@ -761,12 +758,12 @@ func _flush_multimeshes() -> void:
 	add_child(glass)
 
 
-## Дождь над улицей: струи перед домами и круги на мостовой.
+## Rain over the street: streaks in front of the houses and rings on the roadway.
 func _build_rain() -> void:
 	var from := _left - FROM
 	var height := 16.0
-	# Только над мостовой и тротуаром: ниже улицы капли уходят за асфальт и
-	# грунт, а не в тоннель и не в разрез у камеры.
+	# Only over the roadway and sidewalk: below the street the drops go under the asphalt and ground,
+	# not into the tunnel or into the cutaway at the camera.
 	var front := NEAR_Z
 	var back := FACADE_Z + 0.6
 	var drops := RainLook.streaks(
@@ -780,10 +777,9 @@ func _build_rain() -> void:
 	)
 	drops.name = "Drops"
 	drops.position = _at((from + _left) * 0.5, _street - height, (front + back) * 0.5)
-	# Гаснут о маркизы, машины и мостовую, а не по таймеру ([method _catch]).
-	# Шаг частиц — как на крыше ([constant RoofRain.TICKS]): на тридцати в
-	# секунду капля за шаг проходит до 60 см и гасла уже под маркизой и в
-	# салоне машины, а не на них (авторевью M24l).
+	# They die on the awnings, cars and roadway, not by a timer ([method _catch]). The particle step is
+	# as on the roof ([constant RoofRain.TICKS]): at thirty per second a drop travels up to 60 cm per
+	# step and died already under the awning and inside the car, not on them (M24l code review).
 	(drops.process_material as ParticleProcessMaterial).collision_mode = (
 		ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT
 	)
@@ -828,9 +824,9 @@ func _build_rain() -> void:
 	_rain.append(ripples)
 
 
-## Капли и хлопья гаснут о маркизы, машину у бордюра, тротуар и мостовую —
-## по карте высот, снятой со слоя улицы, как на крыше ([RoofCatch]). Машины
-## потока в карте не числятся: о них гасит их ловец ([Shelter]).
+## Drops and flakes die on the awnings, the car at the curb, the sidewalk and the roadway — by a
+## height map taken from the street layer, as on the roof ([RoofCatch]). Traffic cars are not in the
+## map: their own catcher kills particles on them ([Shelter]).
 func _catch() -> void:
 	var moving: Array[Node] = [_traffic, _people]
 	StreetSnow.mark(self, moving)
@@ -843,9 +839,9 @@ func _catch() -> void:
 	add_child(RoofCatch.catcher(over, "StreetCatcher", StreetSnow.LAYER))
 
 
-## Снег над улицей и покров с колеями ([StreetSnow]). Покров ложится на всё
-## неподвижное на улице — и на машину у бордюра, она стоит, — но не на поток:
-## по едущей машине наклейка скользила бы пятнами.
+## Snow over the street and the cover with ruts ([StreetSnow]). The cover lies on everything
+## stationary in the street — including the car at the curb, it stands still — but not on the
+## traffic: on a moving car the decal would slide in patches.
 func _build_snow() -> void:
 	_snow = StreetSnow.new()
 	add_child(_snow)
@@ -854,18 +850,18 @@ func _build_snow() -> void:
 	_snow.build(from.x, to.x, from.y, NEAR_Z, FACADE_Z - SETBACK, _time)
 
 
-## Прохожие на тротуаре — для теста.
+## Pedestrians on the sidewalk — for tests.
 func people() -> StreetPeople:
 	return _people
 
 
-## Снег над улицей — для теста; null, если снега нет.
+## Snow over the street — for tests; null if there is no snow.
 func snow() -> StreetSnow:
 	return _snow
 
 
-## Пятно света: плоскость с круглым градиентом цвета [param tone], складывается
-## с тем, на чём лежит. Не источник — картинка света.
+## Pool of light: a plane with a round gradient of colour [param tone], added to what it lies on.
+## Not a light source — a picture of light.
 static func _pool(size: Vector2, tone: Color, energy: float) -> MeshInstance3D:
 	var gradient := Gradient.new()
 	gradient.set_color(0, Color(tone, energy))
@@ -897,8 +893,8 @@ func _at(x: float, y: float, z: float) -> Vector3:
 	return Garage.scene_point(x, y, z)
 
 
-## Коробка улицы. Теней улица не кладёт: её источники — без теней, а тени
-## ламп здания сюда не достают.
+## The street box. The street casts no shadows: its sources are shadowless, and the building's lamp
+## shadows do not reach here.
 func _box(
 	size: Vector3, material: StandardMaterial3D, centre: Vector3, shadow: bool = false
 ) -> MeshInstance3D:

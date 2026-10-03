@@ -1,13 +1,13 @@
 shader_type spatial;
-// Ореол фары (ADR-0043, решение 5): мягкое пятно у стекла, всегда лицом к
-// камере, ярче к середине и сходит на нет к краю. Сияет само и ничего не
-// заслоняет.
+// Headlight halo (ADR-0043, decision 5): a soft spot at the glass, always facing the
+// camera, brighter toward the middle and fading out toward the edge. It glows on its own
+// and occludes nothing.
 render_mode unshaded, blend_add, cull_disabled, depth_draw_never, shadows_disabled;
 
 uniform vec4 tint : source_color = vec4(1.0, 0.9, 0.7, 0.5);
 
 void vertex() {
-	// Лицом к камере: плоскость поворачивается вслед за видом.
+	// Facing the camera: the plane turns to follow the view.
 	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(
 		INV_VIEW_MATRIX[0], INV_VIEW_MATRIX[1], INV_VIEW_MATRIX[2], MODEL_MATRIX[3]
 	);

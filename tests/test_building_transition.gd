@@ -1,15 +1,16 @@
 extends GutTest
 
-## Смена здания после выхода (ADR-0038, решение 4): бонус набегает поверх
-## сцены, пока машина уезжает, досчитывается и висит, потом кадр уходит в
-## чёрное, и только под чёрным бонус идёт в счёт, раунд — дальше и собирается
-## следующее здание; кадр выходит из чёрного на нём.
+## Building change after the exit (ADR-0038, decision 4): the bonus counts up over the
+## scene while the car drives off, finishes counting and hangs, then the frame fades to
+## black, and only under the black does the bonus go into the score, the round advance
+## and the next building get assembled; the frame comes out of black on it.
 
 const HUD_SCENE := preload("res://src/ui/hud.tscn")
 const MAIN_SCENE := preload("res://src/main.tscn")
 
-## Сколько кадров ждать затемнения и набега бонуса: вся смена — меньше двух
-## секунд, остальное запас на сборку тридцатиэтажного здания под чёрным.
+## How many frames to wait for the fade and the bonus count-up: the whole change takes
+## less than two seconds, the rest is a margin for building a thirty-floor building
+## under the black.
 const PATIENCE: int = 600
 
 
@@ -71,7 +72,8 @@ func test_the_bonus_counts_up_to_the_building_bonus() -> void:
 	assert_false(hud.bonus_shown())
 
 
-## Вся смена по-настоящему, в main: бонус на отъезде, затемнение, новое здание.
+## The whole change for real, in main: the bonus on the drive-off, the fade, a new
+## building.
 func test_main_builds_the_next_building_under_the_curtain() -> void:
 	var main := MAIN_SCENE.instantiate()
 	add_child_autofree(main)
@@ -89,8 +91,9 @@ func test_main_builds_the_next_building_under_the_curtain() -> void:
 	first.building_cleared.emit()
 	assert_same(main.get(&"_level"), first, "здание меняется не встык")
 
-	# Пока кадр не чёрный, партия прежняя: счёт без бонуса, раунд первый, здание
-	# старое. Бонус на плашке досчитывается раньше, чем кадр начал темнеть.
+	# Until the frame is black, the game is the same: score without the bonus, round one,
+	# the old building. The bonus on the plate finishes counting before the frame starts
+	# to darken.
 	var counted_before_fade := false
 	var changed_before_black := false
 	var darkest := 0.0

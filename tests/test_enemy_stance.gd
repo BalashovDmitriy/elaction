@@ -1,9 +1,9 @@
 extends GutTest
 
-## Стойки агента по правилам ROM: поза выстрела, увёртка, брожение (ADR-0027).
+## Agent stances by the ROM rules: shooting pose, dodge, wandering (ADR-0027).
 ##
-## Отдельно от [code]test_enemy_brain.gd[/code]: там — когда агент стреляет, здесь —
-## в какой стойке он это делает и как уходит с линии пули.
+## Separate from [code]test_enemy_brain.gd[/code]: there — when the agent shoots, here — in which
+## stance he does it and how he leaves the bullet's line.
 
 const STEP: float = 1.0 / 60.0
 const FAR_ABOVE := Vector2(0.4, -1.2)
@@ -24,7 +24,7 @@ func _run(brain: EnemyBrain, seconds: float, to_target: Vector2, sees: bool = tr
 		brain.update(STEP, to_target, sees)
 
 
-## Позы выстрела по злости: спокойный стреляет стоя, злой — чаще лёжа.
+## Shooting poses by anger: a calm one shoots standing, an angry one more often lying.
 func test_a_mean_agent_mostly_fires_lying() -> void:
 	var prone := 0
 	for attempt: int in 40:
@@ -46,7 +46,7 @@ func test_a_calm_agent_never_fires_lying() -> void:
 		assert_ne(brain.stance, EnemyBrain.Stance.PRONE)
 
 
-## Присевшего Otto агент берёт из приседа (@1CD8).
+## The agent takes a crouching Otto from a crouch (@1CD8).
 func test_a_crouching_target_is_shot_from_a_crouch() -> void:
 	var brain := _brain(4)
 	brain.rng.seed = 1
@@ -55,7 +55,7 @@ func test_a_crouching_target_is_shot_from_a_crouch() -> void:
 	assert_ne(brain.stance, EnemyBrain.Stance.STAND, "по присевшему — не стоя")
 
 
-## Увёртка по ROM: от высокой пули на колено, от низкой — лёжа (@05F5).
+## Dodge by the ROM: from a high bullet onto a knee, from a low one — lying (@05F5).
 func test_dodge_picks_the_stance_by_bullet_height() -> void:
 	var brain := _brain()
 	assert_eq(brain.stance_against(brain.kneel_height + 0.04), EnemyBrain.Stance.KNEEL)
@@ -63,7 +63,7 @@ func test_dodge_picks_the_stance_by_bullet_height() -> void:
 	assert_eq(brain.stance_against(-1.0), EnemyBrain.Stance.STAND)
 
 
-## Спокойный не уворачивается вовсе, самый злой — почти сразу.
+## A calm one does not dodge at all, the angriest — almost at once.
 func test_dodge_depends_on_anger() -> void:
 	var calm := _brain(0)
 	_run(calm, 0.4, FAR_ABOVE)
@@ -77,7 +77,7 @@ func test_dodge_depends_on_anger() -> void:
 	assert_eq(mean.stance, EnemyBrain.Stance.KNEEL, "злость 15 — на колено с первого тика")
 
 
-## Увёртка — действие: агент встаёт, когда оно кончилось.
+## A dodge is an action: the agent stands up when it has finished.
 func test_agent_stands_up_after_the_dodge() -> void:
 	var brain := _brain(15)
 	_run(brain, 0.4, FAR_ABOVE)
@@ -87,7 +87,7 @@ func test_agent_stands_up_after_the_dodge() -> void:
 	assert_true(brain.is_standing())
 
 
-## Рост идёт за стойкой: по нему уровень подгоняет форму коллизии.
+## Height follows the stance: the level fits the collision shape by it.
 func test_height_follows_the_stance() -> void:
 	var brain := _brain()
 	brain.stance = EnemyBrain.Stance.STAND
@@ -106,7 +106,7 @@ func test_the_dead_do_not_dodge() -> void:
 	assert_eq(brain.stance, EnemyBrain.Stance.STAND)
 
 
-## За Otto агент не гонится: бродит — идёт и стоит паузу (@5D13).
+## The agent does not chase Otto: he wanders — walks and stands for a pause (@5D13).
 func test_agent_strolls_and_pauses() -> void:
 	var brain := _brain()
 	var walked := false

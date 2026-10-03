@@ -1,30 +1,31 @@
 extends GutTest
 
-## Тесты выхода агента из двери.
+## Tests for an agent coming out of a door.
 ##
-## До M14 уровень ставил агента прямо на коврик закрытой двери, и створка при
-## этом не двигалась вовсе. Здесь проверяется обратное: сперва дверь, потом
-## агент, и пока он в проёме — его не берут (ADR-0020).
+## Before M14 the level placed an agent right on the mat of a closed door, and the door
+## leaf did not move at all. Here the opposite is checked: first the door, then the
+## agent, and while he is in the doorway he cannot be hit (ADR-0020).
 ##
-## Здание собирается по настоящим правилам, как и в [code]test_building_architecture[/code]:
-## уменьшенные здания уже один раз скрыли от нас нерабочий выпуск агентов.
+## The building is assembled by the real rules, as in
+## [code]test_building_architecture[/code]: reduced buildings once already hid a broken
+## agent release from us.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
 const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
 
-## Сколько кадров дать дверям, чтобы кто-нибудь успел выйти.
+## How many frames to give the doors for someone to manage to come out.
 const CROWD_FRAMES: int = 240
 
-## Насколько далеко от своей двери агент ещё считается «только что вышедшим», м.
+## How far from his door an agent still counts as "just came out", m.
 ##
-## Ровно на коврике его не застать: выход из проёма кончается в шаге от двери,
-## и агент оказывается в метре с лишним. Проверка на точное совпадение держалась
-## на случайности и развалилась, как только мелкая сетка M18 сдвинула двери.
+## He cannot be caught exactly on the mat: leaving the doorway ends one step from the
+## door, and the agent ends up a meter and a bit away. A check for exact match relied on
+## chance and fell apart as soon as the fine M18 grid shifted the doors.
 const JUST_LEFT: float = 2.0
 
-## Сколько кадров держать «вверх» у одинокой двери: хватает и на створку, и на
-## то, чтобы Otto успел зайти, если дверь его берёт.
+## How many frames to hold "up" at a lone door: enough both for the leaf and for Otto to
+## get in, if the door takes him.
 const KNOCK_FRAMES: int = 30
 
 
@@ -47,7 +48,7 @@ func _build(building_seed: int) -> GreyboxLevel:
 	return level
 
 
-## Ждёт, пока Otto доедет по тросу и встанет на крышу.
+## Waits until Otto rides down the rope and stands on the roof.
 func _wait_for_the_landing(level: GreyboxLevel) -> void:
 	await level.wait_for_the_landing()
 
@@ -60,9 +61,9 @@ func _live_agents(level: GreyboxLevel) -> Array[Enemy]:
 	return live
 
 
-## Одинокая красная дверь на твёрдом полу: здание для неё поднимать незачем.
-## Красная — потому что Otto пускает только такая (ADR-0044, решение 3), и
-## иначе проверки «пустит ли» прошли бы на двери, которая не пускает никого.
+## A lone red door on a solid floor: there is no point in raising a building for it.
+## Red because only such a door lets Otto in (ADR-0044, decision 3), and
+## otherwise the "will it let him in" checks would pass on a door that lets nobody in.
 func _bare_door() -> Door:
 	var ground := StaticBody3D.new()
 	var shape := CollisionShape3D.new()
@@ -79,7 +80,7 @@ func _bare_door() -> Door:
 	return door
 
 
-## Ставит Otto на коврик двери.
+## Puts Otto on the door mat.
 func _guest_at(door: Door) -> Otto:
 	var otto := OTTO_SCENE.instantiate() as Otto
 	add_child_autofree(otto)
@@ -87,17 +88,17 @@ func _guest_at(door: Door) -> Otto:
 	return otto
 
 
-## Зашёл ли Otto за дверь. Снаружи это видно по вводу: спрятанный дверью, он
-## ввода не слышит вовсе, и зажатое «вверх» до него не доходит.
+## Whether Otto has gone behind the door. From outside this shows in the input: hidden
+## by a door, he does not hear input at all, and a held "up" does not reach him.
 func _is_indoors(otto: Otto) -> bool:
 	return is_zero_approx(otto.vertical_intent())
 
 
-## Otto не заходит в дверь, которая открывается под агента.
+## Otto does not enter a door that is opening for an agent.
 ##
-## Пустить его туда значило бы запереть навсегда: створку за вышедшим агентом
-## закрывает уровень, а отсидка гостя идёт только при открытой двери — за
-## закрытой она не кончается никогда.
+## Letting him in there would lock him in forever: the leaf behind the agent who came out
+## is closed by the level, and a guest's stay runs only while the door is open: behind a
+## closed one it never ends.
 func test_a_door_opening_for_an_agent_does_not_take_otto_in() -> void:
 	var door := _bare_door()
 	var otto := _guest_at(door)
@@ -109,8 +110,8 @@ func test_a_door_opening_for_an_agent_does_not_take_otto_in() -> void:
 	assert_false(_is_indoors(otto), "дверь занята агентом и Otto внутрь не пустила")
 
 
-## А свободная пускает: иначе прошлая проверка прошла бы и на двери, которая
-## не пускает никого и никогда.
+## A free one does let him in: otherwise the previous check would pass even on a door
+## that never lets anyone in.
 func test_a_free_door_still_takes_otto_in() -> void:
 	var door := _bare_door()
 	var otto := _guest_at(door)
@@ -121,9 +122,10 @@ func test_a_free_door_still_takes_otto_in() -> void:
 	assert_true(_is_indoors(otto), "в свободную дверь Otto заходит как прежде")
 
 
-## Здание выбросили, пока Otto за дверью, — «заново» с паузы, выход в меню.
-## Глухую музыку двери снимает сама дверь: помнить об этом каждому, кто
-## выбрасывает здание, — значит однажды забыть (авторевью M23).
+## The building was thrown away while Otto is behind a door: "restart" from the pause,
+## exit to the menu. The door's muffled music is removed by the door itself: making
+## everyone who throws a building away remember it means forgetting it one day (M23 code
+## review).
 func test_a_door_gone_with_otto_inside_brings_the_music_back() -> void:
 	var director := AudioDirector.instance()
 	if director == null:
@@ -144,8 +146,8 @@ func test_a_door_gone_with_otto_inside_brings_the_music_back() -> void:
 func test_no_agent_ever_shows_up_in_front_of_a_shut_door() -> void:
 	var level := _build(3)
 	await _wait_for_the_landing(level)
-	# Каждый кадр: если агент виден, дверь за ним обязана быть открытой.
-	# Именно это и было сломано — агент возникал на закрытой створке.
+	# Every frame: if the agent is visible, the door behind him must be open.
+	# This is exactly what was broken: the agent appeared at a closed leaf.
 	for _frame: int in CROWD_FRAMES:
 		await wait_physics_frames(1)
 		for agent in _live_agents(level):
@@ -207,25 +209,25 @@ func test_the_door_shuts_behind_the_agent_that_left_it() -> void:
 			if door == null or absf(door.mat_position().x - at.x) > JUST_LEFT:
 				continue
 			just_left += 1
-			# Агент ещё у своей двери, но проём уже освободил: створка обязана
-			# идти обратно, а не стоять нараспашку (ADR-0020, решение 4).
+			# The agent is still at his door, but has already cleared the doorway: the leaf must
+			# go back, not stand wide open (ADR-0020, decision 4).
 			if door.openness() < 1.0:
 				closed_behind += 1
-	# «Ноль» бывает и оттого, что дверь не закрылась, и оттого, что за окном
-	# наблюдения никто не вышел, — а это разные поломки.
+	# "Zero" can happen both because the door did not close and because nobody came out
+	# within the observation window, and these are different breakages.
 	assert_gt(just_left, 0, "ни один агент не отходил от своей двери")
 	assert_gt(
 		closed_behind, 0, "ни одна дверь за вышедшим не закрывалась (отошедших %d)" % just_left
 	)
 
 
-## Дверь закрывается и за агентом, которого сняли сразу, как он вышел.
+## The door closes also behind an agent who was taken down as soon as he came out.
 ##
-## Проём свободен одинаково — ушёл агент своим ходом или его убили, — и створка
-## обязана вернуться в обоих случаях (ADR-0020, решение 4). Закрыть её некому,
-## кроме уровня, а тот перебирает посты: пост, оставшийся без живого агента,
-## обязан отпускать дверь, иначе она стоит открытой навсегда и, что хуже,
-## навсегда занятой — [method Door.summon_agent] больше её не откроет.
+## The doorway is equally free whether the agent left on his own or was killed, and the
+## leaf must return in both cases (ADR-0020, decision 4). There is nobody to close it
+## but the level, and the level goes over the posts: a post left without a living agent
+## must release the door, otherwise it stays open forever and, worse, forever
+## occupied: [method Door.summon_agent] will not open it any more.
 func test_a_door_shuts_even_when_its_agent_is_killed_on_the_spot() -> void:
 	var level := _build(3)
 	await _wait_for_the_landing(level)
@@ -249,8 +251,8 @@ func test_a_door_shuts_even_when_its_agent_is_killed_on_the_spot() -> void:
 	fail_test("дверь так и осталась открытой за убитым агентом")
 
 
-## Труп лежит до конца здания (ADR-0037, решение 6), но ни ячейки, ни двери не
-## держит: следующий агент выходит, пока убитый лежит.
+## A corpse lies until the end of the building (ADR-0037, decision 6), but holds neither
+## a cell nor a door: the next agent comes out while the killed one lies there.
 func test_a_corpse_does_not_hold_back_the_next_agent() -> void:
 	var level := _build(3)
 	await _wait_for_the_landing(level)
@@ -285,7 +287,8 @@ func test_an_emptied_red_door_starts_letting_agents_out() -> void:
 	if red == null:
 		return
 
-	# Документ забирают не входом Otto, а прямо: веха про двери, не про визит.
+	# The document is taken directly, not by Otto entering: the milestone is about doors,
+	# not about the visit.
 	assert_false(level.agent_doors().has(red), "красная дверь засад не держит")
 	red.has_document = false
 	red.document_taken.emit()
@@ -294,11 +297,11 @@ func test_an_emptied_red_door_starts_letting_agents_out() -> void:
 	)
 
 
-## Открытая створка не выходит за свой проём.
+## An open leaf does not go beyond its doorway.
 ##
-## Шаг места 1.8 м, створка 1.2: на соседнее место остаётся 0.6. Съезжая вбок
-## на свою ширину, как было до M18c, она налезала бы на соседнюю дверь или
-## шахту — поэтому поворачивается на петле внутрь комнаты (ADR-0026, решение 3).
+## The spot step is 1.8 m, the leaf 1.2: 0.6 is left for the neighboring spot. Sliding
+## sideways by its width, as it did before M18c, it would overlap the neighboring door or
+## shaft, so it swings on a hinge into the room (ADR-0026, decision 3).
 func test_an_open_leaf_stays_inside_its_doorway() -> void:
 	var door := _bare_door()
 	assert_true(door.summon_agent(), "дверь открывается")

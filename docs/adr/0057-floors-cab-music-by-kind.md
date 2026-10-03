@@ -1,187 +1,195 @@
-# ADR-0057 · M24o: особые этажи, кабина и музыка по типу здания
+# ADR-0057 · M24o: special floors, cab and music by building kind
 
-- **Статус:** принято
-- **Дата:** 2026-10-03
-- **Дополняет:** [ADR-0056](0056-building-character.md) (характер типа здания),
-  [ADR-0055](0055-residential.md) (три типа),
-  [ADR-0052](0052-day-for-the-rest-and-arrival.md) (музыка по времени суток),
-  [ADR-0028](0028-building-by-the-map.md) (здание по карте ROM)
+- **Status:** accepted
+- **Date:** 2026-10-03
+- **Extends:** [ADR-0056](0056-building-character.md) (the character of a building kind),
+  [ADR-0055](0055-residential.md) (three kinds),
+  [ADR-0052](0052-day-for-the-rest-and-arrival.md) (music by time of day),
+  [ADR-0028](0028-building-by-the-map.md) (the building by the ROM map)
 
-## Контекст
+## Context
 
-После M24n три типа здания различаются воздухом, светом, палитрой, задней
-стеной коридора и светильниками. Всё остальное у них общее: все этажи
-одинаковые, одна кабина и одна шахта, одна музыка. Силуэт, крыша, паркинг и улица
-выезда тоже общие, но они уходят в следующую веху (решение 1).
+After M24n the three building kinds differ in air, light, palette, the corridor back
+wall and light fixtures. Everything else is shared: all floors are the same, one cab
+and one shaft, one music. The silhouette, roof, garage and exit street are also shared,
+but they go into the next milestone (decision 1).
 
-**Сверка с оригиналом** (2026-10-03).
-- **Аркада 1983 года.** Здание в аркаде одно на всю игру. Карта зашита в ROM:
-  маски дверей `table_280E`, лампы `init_building_2700`. От раунда к раунду
-  меняются только красные двери, шахта в подвал, раскладка двойных лифтов и
-  сложность. Особых этажей по назначению нет, но по устройству этажи
-  различаются:
-  - этажи 1–6 почти без дверей: по одной двери у каждого края (маска `81`);
-  - на этаже 7 дверей нет совсем (маска `00`), у Elevator World это
-    «скай-лобби» с пересадкой между лифтами;
-  - на тёмных этажах 11–15 ламп нет совсем.
+**Check against the original** (2026-10-03).
+- **The 1983 arcade.** The arcade has one building for the whole game. The map is baked
+  into the ROM: door masks `table_280E`, lamps `init_building_2700`. From round to round
+  only the red doors, the shaft to the basement, the layout of double elevators and the
+  difficulty change. There are no special floors by purpose, but floors differ by
+  structure:
+  - floors 1–6 have almost no doors: one door at each edge (mask `81`);
+  - floor 7 has no doors at all (mask `00`), at Elevator World this is a
+    "sky lobby" with a transfer between elevators;
+  - the dark floors 11–15 have no lamps at all.
 
-  Кабины одинаковые, отличаются только двухэтажные. Музыка — одна мелодия на
-  всю партию, плюс мелодия тревоги и джинглы.
-- **Elevator Action Returns (1994).** Это ближайший образец разных зданий. У
-  каждой из шести миссий своё место, свой финал и своя музыка, обычно две
-  мелодии и больше: тема меняется на поворотах миссии. Особых типов кабин нет,
-  отличается только отделка. Первая миссия — та же карта здания оригинала, но
-  это доходный дом с бандитами, то есть прецедент нашего жилого дома.
+  The cabs are the same, only the two-floor ones differ. Music is one melody for the
+  whole game, plus the alarm melody and jingles.
+- **Elevator Action Returns (1994).** This is the closest example of different
+  buildings. Each of the six missions has its own location, its own finale and its own
+  music, usually two melodies or more: the theme changes at the mission's turns. There
+  are no special cab types, only the finish differs. The first mission is the same
+  building map as the original, but it is a tenement with gangsters, that is, a
+  precedent for our residential building.
 
-**Код** (обзор перед вехой):
-- Понятия роли этажа нет: обстановку `BuildingDressing`, `WallFeatures` и
-  `OpenSpace` раскладывают одинаково на всех этажах здания.
-- Кабина (`CarDetail`), шахта и табло (`BuildingShafts`) и номера этажей
-  (`FloorSigns`) не зависят от типа здания.
-- Музыку выбирает `Sounds.theme_for(time)` по одному сиду здания. Тип здания
-  в выборе не участвует.
-- У кабины дверей нет: спереди она открыта, как в оригинале, и Otto входит в
-  неё сбоку.
+**Code** (review before the milestone):
+- There is no notion of a floor role: `BuildingDressing`, `WallFeatures` and
+  `OpenSpace` lay out the dressing the same way on all floors of the building.
+- The cab (`CarDetail`), the shaft and indicator boards (`BuildingShafts`) and the floor
+  numbers (`FloorSigns`) do not depend on the building kind.
+- Music is chosen by `Sounds.theme_for(time)` from the single building seed. The
+  building kind takes no part in the choice.
+- The cab has no doors: it is open at the front, as in the original, and Otto enters it
+  from the side.
 
-## Решения
+## Decisions
 
-Вопросы заданы пользователю 2026-10-03, двумя блоками по четыре.
+Questions asked of the user on 2026-10-03, in two blocks of four.
 
-1. **Веха делится на две.**
-   - M24o: особые этажи, кабина и шахта, музыка. Это то, что видно и слышно
-     всю партию.
-   - M24p: силуэт и фасад, крыша, паркинг, улица выезда и машина по типу.
-2. **Особые этажи стоят по устройству ROM, одинаково во всех зданиях типа.**
-   Особые этажи занимают две полосы:
-   - нижнюю, этажи ROM 1–7, где дверей почти или совсем нет: это общественные
-     залы;
-   - тёмную, этажи ROM 11–15: это технические этажи.
+1. **The milestone is split in two.**
+   - M24o: special floors, cab and shaft, music. This is what is seen and heard the
+     whole game.
+   - M24p: silhouette and facade, roof, garage, exit street and car by kind.
+2. **Special floors follow the ROM structure, the same in all buildings of a kind.**
+   Special floors occupy two bands:
+   - the lower one, ROM floors 1–7, where there are few or no doors: these are public
+     halls;
+   - the dark one, ROM floors 11–15: these are technical floors.
 
-   Каждый этаж полосы особый и не повторяет соседа. Этаж берётся по
-   `Arcade.rom_floor`. Нижний этаж здания остаётся паркингом, крыша — крышей.
+   Each floor of a band is special and does not repeat its neighbor. The floor is taken
+   by `Arcade.rom_floor`. The bottom floor of the building stays the garage, the roof
+   the roof.
 
-   | ROM | Отель | Офис | Жилой дом |
+   | ROM | Hotel | Office | Residential |
    |---|---|---|---|
-   | 1–2 | лобби со стойкой регистрации | лобби с постом охраны и турникетами | лобби с почтовыми ящиками и столом швейцара |
-   | 3 | ресторан | столовая | общая комната |
-   | 4 | бальный зал | спортзал | кладовые-клетки |
-   | 5 | бассейн | конференц-зал | спортзал |
-   | 6 | конференц-зал | переговорные | кладовые-клетки |
-   | 7 | бар скай-лобби | ресепшен скай-лобби | прачечная |
-   | 11 | котельная | вентиляция и насосы | котельная |
-   | 12 | вентиляция и насосы | серверная | мастерская |
-   | 13 | прачечная | архив | кладовая |
-   | 14 | кухня | серверная | вентиляция и насосы |
-   | 15 | бельевая кладовая | склад | прачечная |
+   | 1–2 | lobby with a reception desk | lobby with a security post and turnstiles | lobby with mailboxes and a doorman's desk |
+   | 3 | restaurant | cafeteria | common room |
+   | 4 | ballroom | gym | storage cages |
+   | 5 | swimming pool | conference hall | gym |
+   | 6 | conference hall | meeting rooms | storage cages |
+   | 7 | sky lobby bar | sky lobby reception | laundry |
+   | 11 | boiler room | ventilation and pumps | boiler room |
+   | 12 | ventilation and pumps | server room | workshop |
+   | 13 | laundry | archive | storeroom |
+   | 14 | kitchen | server room | ventilation and pumps |
+   | 15 | linen storeroom | warehouse | laundry |
 
-3. **Особый этаж — зал вглубь.** На особом этаже задней стены коридора нет,
-   как у open space офиса: за плоскостью игры виден зал на всю глубину плиты.
-   - У общественных залов вместо стены колонны: мраморные у отеля, кирпичные
-     пилоны у жилого дома, стекло у офиса.
-   - У технических этажей вместо стены сетка-рабица на стальных стойках.
-     Исключение — серверная офиса: она за стеклом.
+3. **A special floor is a hall into depth.** On a special floor there is no corridor
+   back wall, as with the office open space: behind the play plane a hall through the
+   whole slab depth is visible.
+   - Public halls have columns instead of a wall: marble in the hotel, brick piers in
+     the residential building, glass in the office.
+   - Technical floors have chain-link mesh on steel posts instead of a wall. The
+     exception is the office server room: it is behind glass.
 
-   Плоскость игры, двери, лампы и раскладка остаются по ROM. Дверь особого
-   этажа открывается в сам зал, как у офиса: комната за ней появлялась бы и
-   исчезала посреди зала (авторевью). Перед дверью свободна полоса створки.
-   Обстановка коридора и вещи на
-   задней стене на особом этаже не ставятся: стены нет, а зал сам служит
-   обстановкой.
-4. **Только вид и безопасные мелочи.** Особый этаж механику не трогает. На
-   нём есть:
-   - свой звуковой фон: плеск и эхо бассейна, гул серверной, рокот котельной,
-     барабаны прачечной, говор и посуда ресторана;
-   - живые детали без тел: пар над котлом, рябь воды, мигание индикаторов
-     серверов, светящиеся бутылки бара.
+   The play plane, doors, lamps and layout stay per the ROM. A door on a special floor
+   opens into the hall itself, as in the office: a room behind it would appear and
+   disappear in the middle of the hall (code review). The leaf strip in front of the
+   door is kept free.
+   Corridor dressing and items on the
+   back wall are not placed on a special floor: there is no wall, and the hall itself
+   serves as dressing.
+4. **Only the look and harmless details.** A special floor does not touch mechanics. It
+   has:
+   - its own ambience: the splash and echo of the pool, the hum of the server room, the
+     rumble of the boiler room, the drums of the laundry, the chatter and dishes of the
+     restaurant;
+   - live details without bodies: steam over the boiler, ripples on the water, blinking
+     server indicators, glowing bar bottles.
 
-   Ночью на тёмных этажах ROM весь технический этаж погашен, как open space офиса.
-5. **Модели из свободных паков, недостающее — процедурно.**
-   - Мебель берётся из Kenney Furniture Kit (CC0): стиральные и сушильные
-     машины, барная стойка и табуреты, столы со скатертями, кухня, диваны.
-     Каждая модель получает запись в CREDITS.
-   - Бассейн, серверные стойки, котёл, трубы, кладовые-клетки, спортзал,
-     турникеты и сцену строит код из примитивов, мультимешами без теней, как
-     open space в ADR-0056.
-6. **Кабина и шахта своего типа: вид и живая решётка.**
-   - Отель: латунь и дерево, тёплый свет. Над порталом шахты — табло-циферблат со
-     стрелкой.
-   - Офис: шлифованная нержавейка и холодный свет. Табло — цифры, как сейчас.
-   - Жилой дом: грузовая кабина из крашеной стали, рифлёный пол, лампа в
-     решётке, отбойный брус. Портал — крашеная сталь, цифры табло белые.
+   At night on the ROM dark floors the whole technical floor is dark, like the office
+   open space.
+5. **Models from free packs, the missing ones procedurally.**
+   - Furniture comes from the Kenney Furniture Kit (CC0): washing machines and dryers,
+     a bar counter and stools, tables with tablecloths, a kitchen, sofas. Each model gets
+     an entry in CREDITS.
+   - The pool, server racks, boiler, pipes, storage cages, gym, turnstiles and stage are
+     built by code from primitives, as multimeshes without shadows, like the open space
+     in ADR-0056.
+6. **A cab and shaft of its kind: look and a live gate.**
+   - Hotel: brass and wood, warm light. Above the shaft portal — a dial indicator board
+     with a needle.
+   - Office: brushed stainless steel and cold light. The indicator board is digits, as
+     now.
+   - Residential: a freight cab of painted steel, a diamond-plate floor, a caged lamp, a
+     bumper rail. The portal is painted steel, the indicator board digits are white.
 
-   Цвет цифр выбран не тёплым и не красным: янтарь и красный — огоньки игры,
-   табло двери и двери с документом (ADR-0023, решение 6). Поэтому у отеля
-   цифры кремовые, а ряд ламп этажей у жилого дома заменён белыми цифрами.
-   Номера этажей на стене (`FloorSigns`) остаются общими: это знак игры.
+   The digit color was chosen neither warm nor red: amber and red are game indicator
+   lights, the door indicator board and doors with a document (ADR-0023, decision 6). So
+   the hotel's digits are cream, and the row of floor lamps in the residential building
+   is replaced by white digits. Floor numbers on the wall (`FloorSigns`) stay shared:
+   they are a game sign.
 
-   У грузовой кабины спереди складная решётка-гармошка. Решётка закрыта, пока
-   из кабины нельзя выйти, и складывается к стойке со звуком, когда пол кабины
-   входит в окно выхода ROM: до 18 пикселей над полом этажа, @36F2. Так
-   решётка показывает правило ROM, а не меняет его. Решётка тонкая и тёмная,
-   чтобы Otto читался сквозь неё; это проверяется кадром.
+   The freight cab has a folding accordion gate at the front. The gate is closed while
+   one cannot step out of the cab, and folds to the post with a sound when the cab floor
+   enters the ROM step-out window: up to 18 pixels above the floor level, @36F2. So the
+   gate shows the ROM rule rather than changing it. The gate is thin and dark, so that
+   Otto reads through it; this is checked by a frame.
 
-   *Поправка к вопросу.* Вопрос предлагал решётку «в те же сроки, что двери
-   сейчас». Но у кабины дверей нет, поэтому решётка привязана к окну выхода из
-   кабины.
-7. **Музыка: тип × время суток, смена темы и своя тревога.**
-   - У каждого типа свой набор, в котором время суток даёт вариант:
-     - отель — свинг, лаунж и саксофон;
-     - офис — холодный синти-нуар, днём лифтовая музыка;
-     - жилой дом — блюз и фанк.
-   - В паре «тип × время суток» обычно два трека и больше. На верхней
-     половине здания играет трек по жребию здания, а с середины вниз — следующий
-     трек набора, если он есть. Это смена темы, как в Returns.
-   - Своя тревога у каждого типа, два-три трека.
-   - Все треки — Kevin MacLeod, CC-BY 4.0, выбраны пользователем на слух
-     (таблица ниже).
+   *Correction to the question.* The question proposed the gate "on the same timing as
+   the doors now". But the cab has no doors, so the gate is tied to the cab step-out
+   window.
+7. **Music: kind × time of day, a theme change and an alarm of its own.**
+   - Each kind has its own set, in which time of day gives a variant:
+     - hotel — swing, lounge and saxophone;
+     - office — cold synth-noir, elevator music in the day;
+     - residential — blues and funk.
+   - A "kind × time of day" pair usually has two tracks or more. In the upper half of
+     the building the track from the building draw plays, and from the middle down the
+     next track of the set, if there is one. This is a theme change, as in Returns.
+   - Each kind has its own alarm, two or three tracks.
+   - All tracks are Kevin MacLeod, CC-BY 4.0, chosen by the user by ear (table below).
 
-## Последствия
+## Consequences
 
-- Появляется роль этажа (`FloorRole`) — функция типа здания и этажа ROM. Без
-  узлов её проверяет тест.
-- Залы строит `FloorHall`. `OpenSpace` офиса пропускает особые этажи,
-  а `BuildingDressing` и `WallFeatures` на особых этажах не ставят вещи на
-  заднюю стену.
-- `CarDetail` и `BuildingShafts` получают тип здания; `Door` — признак
-  двери в зал.
-- `Sounds.theme_for` получает тип и половину здания. Музыкальных файлов
-  становится больше: около двадцати новых треков, около 50 МБ.
-- Бюджет кадра по нижней полосе проверяется `light_bench --whole` на всех
-  трёх типах.
+- A floor role appears (`FloorRole`) — a function of the building kind and the ROM
+  floor. A test checks it without nodes.
+- Halls are built by `FloorHall`. The office `OpenSpace` skips special floors,
+  and `BuildingDressing` and `WallFeatures` do not place items on the back wall on
+  special floors.
+- `CarDetail` and `BuildingShafts` get the building kind; `Door` gets a flag for a door
+  into a hall.
+- `Sounds.theme_for` gets the kind and the building half. There are more music files:
+  about twenty new tracks, about 50 MB.
+- The frame budget for the lower band is checked by `light_bench --whole` on all three
+  kinds.
 
-## Музыка, выбранная на слух
+## Music chosen by ear
 
-Треки подобраны сначала по жанру в каталоге и собраны без прослушивания — это
-ошибка порядка: пользователь остановил сборку, и выбор сделан на слух со
-страницы прослушивания (2026-10-03). Первый подбор пересобран по выбору.
+The tracks were first picked by genre in the catalog and built in without listening —
+an error of order: the user stopped the build, and the choice was made by ear from a
+listening page (2026-10-03). The first pick was rebuilt per the choice.
 
-| Набор | Отель | Офис | Жилой дом |
+| Set | Hotel | Office | Residential |
 |---|---|---|---|
-| ночь | Covert Affair, Dances and Dames, Spy Glass, Hard Boiled | Spy Glass, Chill Wave, Lightless Dawn | Hard Boiled, Bass Walker |
-| утро | Shades of Spring, Walking Along | Clean Soul | Walking Along, Groove Grove |
-| день | Lobby Time, George Street Shuffle, Fig Leaf Rag | Local Forecast - Elevator | George Street Shuffle, Groove Grove, Rollin at 5 |
-| вечер | Apero Hour, Backbay Lounge | Ice Flow, Chill Wave | Backed Vibes Clean, Bass Vibes |
-| тревога | Fast Talkin, Hot Swing, Private Eye | Hiding Your Reality, Voltaic, Movement Proposition | Private Eye, Faster Does It |
+| night | Covert Affair, Dances and Dames, Spy Glass, Hard Boiled | Spy Glass, Chill Wave, Lightless Dawn | Hard Boiled, Bass Walker |
+| morning | Shades of Spring, Walking Along | Clean Soul | Walking Along, Groove Grove |
+| day | Lobby Time, George Street Shuffle, Fig Leaf Rag | Local Forecast - Elevator | George Street Shuffle, Groove Grove, Rollin at 5 |
+| evening | Apero Hour, Backbay Lounge | Ice Flow, Chill Wave | Backed Vibes Clean, Bass Vibes |
+| alarm | Fast Talkin, Hot Swing, Private Eye | Hiding Your Reality, Voltaic, Movement Proposition | Private Eye, Faster Does It |
 
-Утро и день офиса — по одному треку: там смены темы с середины здания нет.
+Office morning and day have one track each: there is no theme change from the middle of
+the building there.
 
-## Звуки, выбранные на слух
+## Sounds chosen by ear
 
-Вторая страница прослушивания, 2026-10-03; кандидатов по описаниям нашёл
-поиск по freesound, слушал и выбирал пользователь. Фон зала звучит поверх
-тишины коридора, пока Otto на этаже зала; у лобби, бального и конференц-зала,
-переговорных, общей комнаты, кладовых, архива, склада и мастерской своего
-звука нет.
+The second listening page, 2026-10-03; candidates were found by a freesound search by
+description, the user listened and chose. A hall's ambience plays over the corridor
+silence while Otto is on the hall's floor; the lobby, ballroom and conference hall,
+meeting rooms, common room, storerooms, archive, warehouse and workshop have no sound of
+their own.
 
-| Слот | Запись | Лицензия |
+| Slot | Recording | License |
 |---|---|---|
-| бассейн | tosha73 495399, Public Swimming Pool Atmosphere | CC0 |
-| серверная | Nox_Sound 465613, Object_Fan_Server_Room | CC0 |
-| котельная | rucisko 164746, boiler room | CC0 |
-| прачечная | kyles 454465, laundromat washers rattle vibrate | CC0 |
-| ресторан и столовая | LG 718019, Hotel restaurant breakfast 7 | CC0 |
-| кухня | cognito perceptu 162662, restaurant kitchen, с 9 с | CC0 |
-| спортзал | waweee 370967, gym ambience | CC0 |
-| бар | oliwoli 666292, room tone - small hotel bar | CC-BY 4.0 |
-| вентиляция и насосы | lolamadeus 161224, Hilton Basement Ambience - Plant Room | CC0 |
-| решётка кабины | exuberate 140896, Elevator_OldApartmentBuilding, 7.2–9.6 с | CC0 |
+| swimming pool | tosha73 495399, Public Swimming Pool Atmosphere | CC0 |
+| server room | Nox_Sound 465613, Object_Fan_Server_Room | CC0 |
+| boiler room | rucisko 164746, boiler room | CC0 |
+| laundry | kyles 454465, laundromat washers rattle vibrate | CC0 |
+| restaurant and cafeteria | LG 718019, Hotel restaurant breakfast 7 | CC0 |
+| kitchen | cognito perceptu 162662, restaurant kitchen, from 9 s | CC0 |
+| gym | waweee 370967, gym ambience | CC0 |
+| bar | oliwoli 666292, room tone - small hotel bar | CC-BY 4.0 |
+| ventilation and pumps | lolamadeus 161224, Hilton Basement Ambience - Plant Room | CC0 |
+| cab gate | exuberate 140896, Elevator_OldApartmentBuilding, 7.2–9.6 s | CC0 |

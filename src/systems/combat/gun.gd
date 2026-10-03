@@ -1,13 +1,13 @@
 class_name Gun
 extends RefCounted
 
-## Правило трёх пуль.
+## The three-bullet rule.
 ##
-## В оригинале Otto держит на экране не больше трёх выстрелов разом, и это не
-## техническое ограничение, а основа тактики: расстрелял — стоишь безоружным,
-## пока пули не улетят (ADR-0006, пункт 2).
+## In the original Otto keeps no more than three shots on screen at once, and this is not
+## a technical limitation but the basis of tactics: fire them all and you stand unarmed
+## until the bullets fly off (ADR-0006, point 2).
 ##
-## Класс только считает: сами пули живут в сцене и сообщают о своём конце.
+## The class only counts: the bullets themselves live in the scene and report their end.
 
 const MAX_LIVE_BULLETS: int = 3
 
@@ -18,11 +18,11 @@ func can_fire() -> bool:
 	return live < MAX_LIVE_BULLETS
 
 
-## Выстрел сделан.
+## A shot was fired.
 func fired() -> void:
 	live += 1
 
 
-## Пуля кончилась: попала, ушла за дальность или уничтожена вместе со сценой.
+## A bullet ended: it hit, went out of range or was destroyed together with the scene.
 func bullet_spent() -> void:
 	live = maxi(live - 1, 0)

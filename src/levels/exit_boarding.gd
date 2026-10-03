@@ -1,99 +1,96 @@
 class_name ExitBoarding
 extends RefCounted
 
-## Выход из здания: Otto садится в машину и уезжает (ADR-0038, решение 4).
+## Leaving the building: Otto gets into the car and drives away (ADR-0038, decision 4).
 ##
-## До машины он идёт сам. У водительской двери со всеми документами управление
-## забирают: Otto делает последний шаг к двери, поворачивается к машине,
-## дверца распахивается, он шагает в глубину к борту и скрывается за ней —
-## дверца захлопывается, машина качнулась, — ворота гаража открываются,
-## стартер заводит мотор, загораются фары, и машина уезжает, разгоняясь, по
-## пандусу наверх. Здание сдано, когда она ушла из кадра: следующее собирается
-## после отъезда, а не в тот же кадр (ADR-0011, пункт 14).
+## He walks to the car by himself. At the driver's door with all documents control is taken away:
+## Otto makes the last step to the door, turns to the car, the door swings open, he steps deeper
+## toward the side and disappears behind it — the door slams, the car rocks, — the garage gate
+## opens, the starter turns the engine over, the headlights come on, and the car drives away,
+## accelerating, up the ramp. The building is cleared when it has left the frame: the next one is
+## assembled after the departure, not in the same frame (ADR-0011, item 14).
 ##
-## Машина стоит за плоскостью игры, и раньше Otto, шагнув к двери, просто
-## пропадал перед кузовом. Теперь посадку видно: поворот, дверца, шаг в глубину.
+## The car stands behind the play plane, and before, Otto, stepping to the door, simply vanished in
+## front of the body. Now boarding is visible: the turn, the door, the step into depth.
 ##
-## С посадки кадр раздвигается влево за торец здания ([method exit_frame]):
-## ворота и тоннель за ними — в кадре. Машина трогается, и кадр едет за ней
-## ([method _follow_the_car]): через тоннель, вверх по пандусу — низ кадра
-## поднимается вместе с ней — и на ночную улицу ([ExitStreet]), где машина и
-## уходит из кадра. Сначала кадр показывал полпандуса и голую стену над ним;
-## теперь снаружи в кадре ровно то, по чему едет машина. Границы вернёт
-## следующее здание — у него свой Otto и своя камера.
+## From boarding the view widens to the left past the building's end wall ([method exit_frame]): the
+## gate and the tunnel behind it are in the frame. The car pulls away, and the view follows it
+## ([method _follow_the_car]): through the tunnel, up the ramp — the bottom of the view rises with
+## it — and onto the night street ([ExitStreet]), where the car leaves the frame. At first the view
+## showed half the ramp and a bare wall above it; now outside the frame shows exactly what the car
+## drives along. The next building restores the bounds — it has its own Otto and its own camera.
 ##
-## С шага к двери Otto недосягаем: сначала его «везут», как на эскалаторе, —
-## формы тела выключены, — потом он в машине, и снаружи его нет вовсе. Агенты
-## по спрятанному не стреляют ([method Otto.is_hidden]).
+## From the step to the door Otto is unreachable: first he is "carried", as on an escalator, — the
+## body shapes are off, — then he is in the car, and outside there is no Otto at all. Agents do not
+## shoot at a hidden one ([method Otto.is_hidden]).
 ##
-## Своим классом, а не в уровне: у выхода своё состояние по шагам, которое
-## уровню знать незачем, а уровень упёрся в предел строк. Узлов не держит —
-## ход ему даёт уровень из своего шага физики.
+## As its own class, not in the level: the exit has its own step-by-step state the level has no need
+## to know, and the level has hit its line limit. It holds no nodes — the level drives it from its
+## own physics step.
 
-## Что случилось за шаг: ничего, машина тронулась, машина ушла из кадра.
+## What happened during the step: nothing, the car pulled away, the car left the frame.
 enum Event { NONE, STARTED, LEFT }
 
 enum Phase { WAITING, STEPPING_IN, GETTING_IN, SEATING, STARTING, LEAVING, GONE }
 
-## Ширина места у водительской двери, где Otto садится, м. Шире шага бота за
-## кадр ([constant OttoBot.REACHED] и его последний шаг), но уже машины: садятся
-## у двери, а не у багажника.
+## Width of the spot at the driver's door where Otto gets in, m. Wider than the bot's step per frame
+## ([constant OttoBot.REACHED] and its last step), but narrower than the car: one gets in at the
+## door, not at the boot.
 const DOOR_REACH: float = 0.9
-## Насколько ступни могут быть выше или ниже пола подвала, м: садится стоящий,
-## а не пролетающий мимо в прыжке.
+## How far the feet may be above or below the basement floor, m: the one who gets in is standing,
+## not flying past in a jump.
 const FOOTING: float = 0.2
-## Посадка по шагам, с от её начала: Otto поворачивается к машине, дверца
-## открывается, он шагает к борту, скрывается за дверцей, и она закрывается.
+## Boarding by steps, s from its start: Otto turns to the car, the door opens, he steps to the side,
+## hides behind the door, and it closes.
 const TURN_TIME: float = 0.25
 const DOOR_OPEN_TIME: float = 0.35
 const STEP_BACK_FROM: float = 0.2
 const STEP_BACK_TIME: float = 0.45
 const DOOR_CLOSE_TIME: float = 0.2
-## Насколько Otto пригибается, ныряя в машину, м: кузов ниже его, и без этого
-## голова торчала бы над крышей до самого хлопка.
+## How much Otto ducks while diving into the car, m: the body is lower than he is, and without this
+## his head would stick out above the roof until the very slam.
 const DUCK: float = 0.55
-## Вся посадка: от поворота до хлопка дверцы.
+## The whole boarding: from the turn to the door slam.
 const GET_IN_TIME: float = STEP_BACK_FROM + STEP_BACK_TIME + DOOR_CLOSE_TIME
-## Сколько Otto садится, с: от хлопка дверцы до стартера.
+## How long Otto sits down, s: from the door slam to the starter.
 const SEAT_TIME: float = 0.5
-## Середина кадра на выезде — насколько правее торца здания, м. Кадр ставится
-## серединой, а не краем, и в кадре 16:9 от торца влево — 8 м: ворота,
-## площадка, тоннель и начало подъёма ([constant GarageGate.RAMP_APRON],
-## [constant GarageRamp.TUNNEL]), а справа — машина у ворот и паркинг.
+## The middle of the view at the exit — how far right of the building's end wall, m. The view is
+## placed by its middle, not its edge, and in a 16:9 view there are 8 m to the left of the end wall:
+## the gate, the landing, the tunnel and the start of the climb ([constant GarageGate.RAMP_APRON],
+## [constant GarageRamp.TUNNEL]), and on the right — the car at the gate and the garage.
 const FRAME_SHIFT: float = 3.5
-## Кадр за машиной: сколько она проезжает, прежде чем кадр тронется, м, — ворота
-## и тоннель успевают побыть в кадре, — и насколько кадр уходит влево, м. Край
-## кадра 16:9 доходит до улицы левее верха пандуса, и машина уходит из кадра уже
-## по ней.
+## View following the car: how far it drives before the view starts moving, m, — the gate and the
+## tunnel get to stay in the frame for a while, — and how far the view moves to the left, m. The
+## edge of a 16:9 view reaches the street left of the top of the ramp, and the car leaves the frame
+## already along it.
 const FOLLOW_AFTER: float = 1.5
 const FOLLOW_SPAN: float = 20.0
-## Во сколько раз кадр обгоняет машину: она уходит к заднему краю кадра, и
-## дорога впереди, куда светят фары, остаётся в кадре до затемнения (ADR-0043,
-## решение 5). Шёл кадр вровень с машиной — и последние метры она ехала за
-## краем, светя в темноту, которой не видно.
+## How many times faster the view moves than the car: it falls back toward the rear edge of the
+## frame, and the road ahead, where the headlights shine, stays in the frame until the fade-out
+## (ADR-0043, decision 5). When the view moved level with the car, it drove the last metres beyond
+## the edge, shining into darkness that could not be seen.
 const FOLLOW_LEAD: float = 1.3
-## Сколько улицы под машиной держит кадр, м: низ кадра поднимается с машиной не
-## до её колёс — асфальт, на который ложится свет фар, остаётся в кадре.
+## How much of the street under the car the view keeps, m: the bottom of the view rises with the car
+## but not up to its wheels — the asphalt the headlights fall on stays in the frame.
 const STREET_VIEW: float = 1.5
-## Сколько мотор заводится, с: стартер и газовка ([constant Sounds.CAR_START],
-## 2.8 с) — машина трогается на газовке, не дожидаясь её конца.
+## How long the engine takes to start, s: starter and revving ([constant Sounds.CAR_START], 2.8 s) —
+## the car pulls away during the revving, without waiting for it to end.
 const START_TIME: float = 2.0
 
 var phase: Phase = Phase.WAITING
 
 var _car: ExitCar = null
-## Пол подвала в плоскости правил.
+## Basement floor in the rules plane.
 var _surface: float = 0.0
 var _seat_left: float = 0.0
-## Паркинг, чьи ворота открываются перед машиной. Его строит уровень до
-## машины ([method GreyboxLevel._build_garage]); нет его — машина просто уезжает.
+## The garage whose gate opens in front of the car. The level builds it before the car ([method
+## GreyboxLevel._build_garage]); if there is none — the car just drives away.
 var _garage: Garage = null
-## Границы камеры на выезде; пустые — камера не трогается.
+## Camera bounds at the exit; empty — the camera is not touched.
 var _frame := Rect2()
-## Сколько идёт посадка, с.
+## How long boarding has been going on, s.
 var _getting_in: float = 0.0
-## Где машина стояла, когда тронулась, в плоскости правил: от этого места кадр
-## едет за ней.
+## Where the car stood when it pulled away, in the rules plane: the view follows it from this place.
 var _start_x: float = 0.0
 
 
@@ -104,39 +101,38 @@ func _init(car: ExitCar, surface: float, garage: Garage = null, frame: Rect2 = R
 	_frame = frame
 
 
-## Границы камеры на выезде, в плоскости правил: по вертикали — здание, по
-## горизонтали — узкая полоса вокруг точки правее торца на [constant
-## FRAME_SHIFT]. Полоса уже любого кадра, и камера встаёт серединой на неё
-## ([method CameraBounds.clamp_centre]).
+## Camera bounds at the exit, in the rules plane: vertically — the building, horizontally — a narrow
+## strip around a point [constant FRAME_SHIFT] to the right of the end wall. The strip is narrower
+## than any view, and the camera centres on it ([method CameraBounds.clamp_centre]).
 static func exit_frame(rules: BuildingRules) -> Rect2:
 	var centre := rules.floor_span(rules.floors - 1).x + FRAME_SHIFT
 	return Rect2(centre - 0.5, 0.0, 1.0, rules.total_height())
 
 
-## Где Otto садится в машину, в плоскости правил: у водительской двери, на
-## середине роста над полом подвала.
+## Where Otto gets into the car, in the rules plane: at the driver's door, at mid-height above the
+## basement floor.
 func door_point() -> Vector2:
 	return Vector2(_car.door_x(), _surface - GreyboxLevel.EXIT_HEIGHT * 0.5)
 
 
-## Стоит ли точка [param feet] у водительской двери, на полу подвала.
+## Whether point [param feet] stands at the driver's door, on the basement floor.
 func at_the_door(feet: Vector2) -> bool:
 	return absf(feet.x - _car.door_x()) <= DOOR_REACH * 0.5 and absf(feet.y - _surface) <= FOOTING
 
 
-## Сел ли Otto: с этой минуты им распоряжается машина.
+## Whether Otto got in: from this moment the car is in charge of him.
 func is_boarded() -> bool:
 	return phase != Phase.WAITING
 
 
-## Шаг выхода. [param documents_done] — собраны ли все документы: без них машина не
-## ждёт. [param view] — кадр правил, из которого машина уезжает.
+## Exit step. [param documents_done] — whether all documents are collected: without them the car
+## does not wait. [param view] — the rules view the car drives out of.
 func step(delta: float, otto: Otto, documents_done: bool, view: Rect2) -> Event:
 	match phase:
 		Phase.WAITING:
 			var feet := WorldSpace.to_plane(otto.global_position)
 			if documents_done and otto.is_on_foot() and otto.is_grounded() and at_the_door(feet):
-				# Управление забрано: последний шаг к двери делает уже игра.
+				# Control is taken: the last step to the door is now made by the game.
 				otto.ride(true)
 				if _frame.has_area():
 					otto.apply_camera_bounds(_frame, false)
@@ -177,10 +173,10 @@ func step(delta: float, otto: Otto, documents_done: bool, view: Rect2) -> Event:
 	return Event.NONE
 
 
-## Кадр выезда, едущий за машиной: влево, пока она проехала не больше
-## [constant FOLLOW_AFTER] + [constant FOLLOW_SPAN], и вверх — ровно на столько,
-## на сколько она поднялась по пандусу. Низ полосы кадра поднимается, а цель
-## камеры — Otto в машине — внизу, у пола подвала, и камера встаёт на этот низ.
+## The exit view following the car: to the left while it has driven no more than [constant
+## FOLLOW_AFTER] + [constant FOLLOW_SPAN], and up — exactly as much as it has climbed the ramp. The
+## bottom of the view strip rises, and the camera target — Otto in the car — is below, at the
+## basement floor, so the camera settles on this bottom.
 func _follow_the_car(otto: Otto) -> void:
 	if not _frame.has_area():
 		return
@@ -192,7 +188,7 @@ func _follow_the_car(otto: Otto) -> void:
 	otto.apply_camera_bounds(frame, false)
 
 
-## Ведёт Otto к двери шагом; true — дошёл.
+## Walks Otto to the door; true — arrived.
 func _step_to_the_door(otto: Otto, delta: float) -> bool:
 	var at := WorldSpace.to_plane(otto.global_position)
 	var gap := _car.door_x() - at.x
@@ -206,8 +202,8 @@ func _step_to_the_door(otto: Otto, delta: float) -> bool:
 	return false
 
 
-## Посадка на время [member _getting_in]: поворот к машине, дверца, шаг в
-## глубину к борту, дверца закрывается за спрятавшимся. true — дверца закрыта.
+## Boarding over the time [member _getting_in]: turn to the car, the door, a step deeper toward the
+## side, the door closes behind the hidden Otto. true — the door is closed.
 func _get_in(otto: Otto) -> bool:
 	var t := _getting_in
 	otto.turn_into_depth(clampf(t / TURN_TIME, 0.0, 1.0))
@@ -220,13 +216,14 @@ func _get_in(otto: Otto) -> bool:
 		_car.set_door(t / DOOR_OPEN_TIME)
 		return false
 	if not otto.is_hidden():
-		# За дверцей его уже не видно: дальше он в машине, снаружи его нет.
+		# Behind the door he can no longer be seen: from here on he is in the car, outside there is no
+		# Otto.
 		otto.stay_indoors(true)
 	_car.set_door(1.0 - closing / DOOR_CLOSE_TIME)
 	return closing >= DOOR_CLOSE_TIME
 
 
-## Открывает ворота паркинга, если он есть.
+## Opens the garage gate, if there is one.
 func _open_the_gate() -> void:
 	if _garage != null and is_instance_valid(_garage):
 		_garage.open_gate()

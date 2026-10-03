@@ -1,32 +1,32 @@
 class_name QualityProbe
 extends Node
 
-## Выбор уровня качества при первом запуске — по замеру кадра (ADR-0034,
-## решение 3).
+## Choosing the quality level on first launch — by frame measurement (ADR-0034,
+## decision 3).
 ##
-## Меряется на вступлении первого здания: Otto едет по тросу на крышу, игры в
-## эти секунды почти нет, а кадр — крыша с техникой, неон и город — один из
-## самых насыщенных. Замер начинается с «Ультра» и спускается на уровень, пока
-## медиана времени GPU — окна и вида города вместе — не уложится в
-## [constant TARGET_MS]. Первые кадры каждого
-## уровня пропускаются: в них компилируются шейдеры, и замер вышел бы вдвое
-## хуже правды.
+## Measured during the intro of the first building: Otto rides the rope to the roof, there
+## is almost no gameplay in those seconds, and the frame — the roof with equipment, neon and
+## the city — is one of the busiest. The measurement starts at "Ultra" and steps down a level
+## until the median GPU time — of the window and the city view together — fits into
+## [constant TARGET_MS]. The first frames of each
+## level are skipped: shaders compile in them, and the measurement would come out twice
+## as bad as the truth.
 ##
-## Выбранный уровень пишется в настройки один раз; дальше его меняет только
-## игрок. Правил игры замер не трогает — только картинку.
+## The chosen level is written to the settings once; after that only the player
+## changes it. The measurement does not touch the game rules — only the picture.
 
 signal finished(level: Graphics.Quality)
 
-## Медиана кадра GPU, в которую уровень обязан уложиться, мс: бюджет 16.6 с
-## запасом на тяжёлые этажи и чужие программы.
+## Median GPU frame the level must fit into, ms: a budget of 16.6 with
+## a margin for heavy floors and other programs.
 const TARGET_MS: float = 12.0
 
-## Сколько кадров пропустить после смены уровня и сколько мерить.
+## How many frames to skip after a level change and how many to measure.
 const WARMUP_FRAMES: int = 45
 const SAMPLE_FRAMES: int = 60
 
-## Дольше этого замер не идёт, с. Уровень, на котором время вышло, не доказан:
-## решает то, что успели намерить ([method settle]).
+## The measurement does not go longer than this, s. The level at which time ran out is not
+## proven: what was measured so far decides ([method settle]).
 const TIMEOUT: float = 8.0
 
 var _settings: GameSettings = null
@@ -34,26 +34,27 @@ var _level: Graphics.Quality = Graphics.Quality.ULTRA
 var _frames: int = 0
 var _samples := PackedFloat64Array()
 var _elapsed: float = 0.0
-## Виды, чьё время GPU складывается в кадр: окно и город — у города свой кадр
-## со своим размытием, на «Ультра» в две трети разрешения окна.
+## Views whose GPU time adds up to the frame: the window and the city — the city has its own
+## frame with its own blur, on "Ultra" at two thirds of the window resolution.
 var _views: Array[RID] = []
 
 
-## Нужен ли замер: игрок ещё не выбирал и игра ещё не мерила.
+## Whether a measurement is needed: the player has not chosen yet and the game has not
+## measured yet.
 static func needed(settings: GameSettings) -> bool:
 	return not settings.quality_measured
 
 
-## Начинает замер для настроек [param settings]: с «Ультра», по кадрам окна.
+## Starts measuring for settings [param settings]: from "Ultra", by window frames.
 func start(settings: GameSettings) -> void:
 	name = "QualityProbe"
 	_settings = settings
-	# Замер — картинка, а не игра: пауза его не останавливает, иначе меню
-	# посреди вступления растянуло бы его навсегда.
+	# The measurement is about the picture, not the game: pause does not stop it, otherwise a
+	# menu in the middle of the intro would stretch it forever.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_views = [get_viewport().get_viewport_rid()]
-	# Город рисуется своим видом внутри здания; без него замер видел бы только
-	# половину кадра (авторевью M22).
+	# The city is drawn by its own view inside the building; without it the measurement would
+	# see only half the frame (code review M22).
 	var host := get_parent()
 	if host != null:
 		for node in host.find_children("*", "SubViewport", true, false):
@@ -66,13 +67,14 @@ func start(settings: GameSettings) -> void:
 func _process(delta: float) -> void:
 	if _settings == null:
 		return
-	# Уровень выбрал игрок, пока шёл замер: выбор его, замер его не перебивает
-	# и в настройки не пишет (авторевью M22).
+	# The player chose a level while the measurement was running: the choice is his, the
+	# measurement does not override it and does not write to the settings (code review M22).
 	if _settings.quality_measured:
 		_stop()
 		return
-	# Настройки применили поверх замера — меню сменило язык или кровь и разослало
-	# уровень из настроек: уровень замера ставится снова и меряется заново.
+	# Settings were applied on top of the measurement — the menu changed the language or blood
+	# and broadcast the level from the settings: the measurement level is set again and
+	# measured anew.
 	if Graphics.quality != _level:
 		_switch(_level)
 		return
@@ -101,24 +103,24 @@ func _exit_tree() -> void:
 		RenderingServer.viewport_set_measure_render_time(view, false)
 
 
-## Какой уровень взять по медиане кадра [param gpu_ms] на уровне [param level]:
-## тот же, если укладывается, иначе ступенью ниже. Для тестов — без окна.
+## Which level to take by frame median [param gpu_ms] at level [param level]:
+## the same one if it fits, otherwise a step lower. For tests — without a window.
 static func step(level: Graphics.Quality, gpu_ms: float) -> Graphics.Quality:
 	if gpu_ms <= TARGET_MS or level == Graphics.Quality.LOW:
 		return level
 	return (level - 1) as Graphics.Quality
 
 
-## Какой уровень взять, когда время замера вышло на уровне [param level] с
-## намеренными [param samples]. Хоть что-то намерено — решает медиана. Ничего —
-## кадры так долги, что за отведённое время не прошёл даже разогрев: уровень не
-## укладывается, ступенью ниже. Иначе самая слабая карта, на которой замер не
-## успевает, получала бы «Ультра» (авторевью M22).
+## Which level to take when the measurement time ran out at level [param level] with
+## [param samples] measured. If anything was measured, the median decides. If nothing —
+## frames are so long that not even the warm-up passed in the allotted time: the level does
+## not fit, one step lower. Otherwise the weakest card, on which the measurement does not
+## finish, would get "Ultra" (code review M22).
 static func settle(level: Graphics.Quality, samples: PackedFloat64Array) -> Graphics.Quality:
 	return step(level, median(samples) if not samples.is_empty() else INF)
 
 
-## Медиана: один долгий кадр — загрузка, сборщик — не опускает уровень.
+## Median: one long frame — loading, the garbage collector — does not lower the level.
 static func median(values: PackedFloat64Array) -> float:
 	if values.is_empty():
 		return 0.0
@@ -145,8 +147,8 @@ func _finish(level: Graphics.Quality) -> void:
 	_stop()
 
 
-## Замер окончен или больше не нужен. Счёт времени кадра выключает выход из
-## дерева — и тогда, когда здание выбросили посреди замера.
+## The measurement is over or no longer needed. Leaving the tree turns off frame time
+## counting — also when the building was thrown away in the middle of the measurement.
 func _stop() -> void:
 	_settings = null
 	queue_free()

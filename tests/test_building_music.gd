@@ -1,8 +1,8 @@
 extends GutTest
 
-## Музыка по типу здания (ADR-0057, решение 7): у каждого типа свой набор на
-## каждое время суток и своя тревога; с середины здания играет следующий трек
-## набора, если он есть; тревога половиной не меняется.
+## Music by building kind (ADR-0057, decision 7): each kind has its own set for
+## each time of day and its own alarm; from the middle of the building the next track of
+## the set plays, if there is one; the alarm does not change at the half.
 
 const KINDS: Array[BuildingIdentity.Kind] = [
 	BuildingIdentity.Kind.HOTEL, BuildingIdentity.Kind.OFFICE, BuildingIdentity.Kind.RESIDENTIAL
@@ -14,7 +14,7 @@ func test_every_kind_and_time_has_its_music() -> void:
 		for time: TimeOfDay.Kind in TimeOfDay.Kind.values():
 			var theme := Sounds.theme_for(time, kind)
 			assert_not_null(Sounds.stream(theme), "%s: трек есть" % theme)
-			# Без петли трек здания доигрывал раз и молчал (авторевью M24o).
+			# Without a loop the building track played once and fell silent (code review M24o).
 			assert_true(Sounds.LOOPED.has(theme), "%s звучит петлёй" % theme)
 			assert_true(Sounds.MUSIC.has(theme), "%s — музыка" % theme)
 		var alarm := Sounds.alarm_for(kind)
@@ -62,8 +62,8 @@ func test_lower_half_plays_the_next_track() -> void:
 		assert_eq(String(alarm_top[0]), Sounds.alarm_for(kind))
 
 
-## Пока держит тревога, вступление или гибель, тема не меняется, но и половина
-## не забывается: Otto, отпущенный уже в нижней половине, получает её трек.
+## While the alarm, the intro or death holds, the theme does not change, but the half
+## is not forgotten either: Otto, released already in the lower half, gets its track.
 func test_a_hold_does_not_swallow_the_turn() -> void:
 	var director := AudioDirector.instance()
 	assert_not_null(director, "автолоад звука поднят")

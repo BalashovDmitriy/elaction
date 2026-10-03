@@ -1,118 +1,122 @@
-# elaction — правила проекта
+# elaction — project rules
 
-Ремейк аркадной игры Elevator Action (Taito, 1983). Механика — как в оригинале,
-графика — современная: трёхмерная сцена с ортокамерой сбоку и динамическим светом
+A remake of the arcade game Elevator Action (Taito, 1983). Mechanics as in the original,
+graphics modern: a 3D scene with a side-on orthographic camera and dynamic lighting
 ([ADR-0019](docs/adr/0019-3d-pivot.md)).
 
-**Прежде чем что-то делать, прочитай [`docs/STATUS.md`](docs/STATUS.md)** — там текущая
-веха, что сделано, что следующее. План целиком — в [`docs/EPIC.md`](docs/EPIC.md),
-итоги пройденных вех — в [`docs/milestones.md`](docs/milestones.md).
+**Before doing anything, read [`docs/STATUS.md`](docs/STATUS.md)** — it has the current
+milestone, what is done and what is next. The full plan is in [`docs/EPIC.md`](docs/EPIC.md),
+the results of completed milestones are in [`docs/milestones.md`](docs/milestones.md).
 
-## Стек
+## Stack
 
 | | |
 |---|---|
-| Движок | Godot 4.7.2 (`winget install --id GodotEngine.GodotEngine`) |
-| Язык | GDScript, **статическая типизация обязательна** |
-| Тесты | GUT 9.6.1, вендорится в `addons/gut` |
-| Линтеры | gdtoolkit 4.5.0 (`gdlint`, `gdformat`) в `.venv` |
-| Хуки | pre-commit 4.6.2, на commit и на push |
+| Engine | Godot 4.7.2 (`winget install --id GodotEngine.GodotEngine`) |
+| Language | GDScript, **static typing is mandatory** |
+| Tests | GUT 9.6.1, vendored in `addons/gut` |
+| Linters | gdtoolkit 4.5.0 (`gdlint`, `gdformat`) in `.venv` |
+| Hooks | pre-commit 4.6.2, on commit and on push |
 
-Docker в проекте не используется и не предлагается — см.
+Docker is not used in the project and is not to be proposed — see
 [ADR-0003](docs/adr/0003-no-docker.md).
 
-## Команды
+## Commands
 
 ```powershell
-tools/check.ps1                 # формат, линт, движок и тесты — как в CI
-python tools/run_tests.py       # тесты GUT
-python tools/godot_check.py     # импорт ресурсов и разбор скриптов движком
-python tools/capture.py M1      # скриншоты вехи в screens/M1/
-python tools/compare_original.py M1  # кадр вехи рядом с оригиналом
-godot --path .                  # запустить игру
-godot -e --path .               # открыть редактор
+tools/check.ps1                 # format, lint, engine and tests — same as CI
+python tools/run_tests.py       # GUT tests
+python tools/godot_check.py     # resource import and script parsing by the engine
+python tools/capture.py M1      # milestone screenshots into screens/M1/
+python tools/compare_original.py M1  # milestone shot next to the original
+godot --path .                  # run the game
+godot -e --path .               # open the editor
 ```
 
-Godot ищется в порядке `$GODOT_BIN` → PATH → пути winget; на Windows берётся
-`godot_console.exe`, потому что обычная сборка не пишет в консоль.
+Godot is looked up in the order `$GODOT_BIN` → PATH → winget paths; on Windows
+`godot_console.exe` is used, because the regular build does not write to the console.
 
-## Жёсткие правила
+## Hard rules
 
-1. **Типы везде.** Аргументы, возвращаемые значения, поля, переменные цикла.
-   Проверяет движок, а не `gdlint` (у того правила на типы нет): в `project.godot`
-   нетипизированное объявление — ошибка разбора, её ловят `godot_check.py` и CI.
-2. **Не пушим в `main` напрямую.** Ветка на веху или задачу: `feat/m2-elevators`,
-   `fix/elevator-crush`, `chore/ci-cache`. PR мержится только при зелёном CI.
-   `gh` CLI не установлен — PR открывает и мержит пользователь в вебе.
+1. **Types everywhere.** Arguments, return values, fields, loop variables.
+   Checked by the engine, not by `gdlint` (it has no rule for types): in `project.godot`
+   an untyped declaration is a parse error, caught by `godot_check.py` and CI.
+2. **No direct pushes to `main`.** One branch per milestone or task: `feat/m2-elevators`,
+   `fix/elevator-crush`, `chore/ci-cache`. A PR is merged only with green CI.
+   The `gh` CLI is not installed — the user opens and merges PRs on the web.
 3. **Conventional Commits:** `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`.
-4. **Статус обновляется в каждом коммите, который трогает `src/`, `tests/` или
-   `project.godot`.** Это проверяет хук `status-updated`; без правки `docs/STATUS.md`
-   коммит не пройдёт.
-5. **Проверки не обходим.** Никаких `--no-verify`. Если хук упал — чиним причину.
-6. **Решения оформляем как ADR** в `docs/adr/`, если они влияют на архитектуру.
-7. **Перед каждой вехой — уточняющие вопросы.** Сначала сверка механики с оригиналом,
-   затем вопросы по спорным местам, и только потом код. Подробнее — «Начало вехи» ниже.
+4. **The status is updated in every commit that touches `src/`, `tests/` or
+   `project.godot`.** The `status-updated` hook checks this; without an edit to
+   `docs/STATUS.md` the commit does not pass.
+5. **Checks are not bypassed.** No `--no-verify`. If a hook fails, fix the cause.
+6. **Decisions are recorded as ADRs** in `docs/adr/` if they affect the architecture.
+7. **Clarifying questions before every milestone.** First check the mechanics against the
+   original, then ask about the disputed points, and only then write code. More in
+   "Starting a milestone" below.
+8. **Project documentation and code comments are written in English.** Conversation with
+   the user stays in Russian.
 
-## Начало вехи
+## Starting a milestone
 
-Перед тем как писать код вехи:
+Before writing the milestone's code:
 
-1. **Сверить механику с оригиналом** по доступным источникам и зафиксировать
-   найденное. На M2, M3 и M4 сверка каждый раз меняла состав вехи — дешевле
-   узнать это до реализации, чем переделывать.
-2. **Задать уточняющие вопросы** по спорным местам и дождаться ответов. Спрашивать
-   стоит о том, где разные ответы ведут к разной работе: объём вехи, расхождения
-   с оригиналом, выбор между «как в 1983» и играбельностью.
-3. **Оформить решения как ADR** в `docs/adr/` и обновить `docs/EPIC.md`
-   и `docs/STATUS.md`.
+1. **Check the mechanics against the original** using the available sources and record
+   the findings. On M2, M3 and M4 the check changed the milestone's scope each time — it
+   is cheaper to learn this before implementation than to redo it.
+2. **Ask clarifying questions** about the disputed points and wait for the answers. Ask
+   about things where different answers lead to different work: milestone scope,
+   deviations from the original, the choice between "as in 1983" and playability.
+3. **Record the decisions as ADRs** in `docs/adr/` and update `docs/EPIC.md`
+   and `docs/STATUS.md`.
 
-## Завершение вехи
+## Finishing a milestone
 
-Веха не закрыта, пока не сделаны все пять пунктов:
+A milestone is not closed until all five items are done:
 
-1. `python tools/capture.py <веха>` — скриншоты в `screens/<веха>/`. Папка локальная,
-   в репозиторий не идёт. Одиночный кадр в игре — **F12**. Затем
-   `python tools/compare_original.py <веха>` — кадр рядом с оригиналом в одной
-   высоте, `screens/<веха>/compare_original.jpg`. Расхождения, найденные глазом,
-   записываются в план: в эту веху или в будущую.
-2. `/code-review xhigh --fix` — авторевью повышенной тщательности с автоприменением правок.
-3. `tools/check.ps1` заново после правок ревью.
-4. **Тесты усилены.** Каждая веха должна не только добавить тесты на свою механику,
-   но и подтянуть проверку уровня целиком: здание генерируется, поэтому проверять надо
-   не «этот уровень работает», а «любое здание, которое сгенерируется, работает».
-   Подробнее — [`docs/testing.md`](docs/testing.md).
-5. **`README.md` актуализирован.** Он единственный документ, который читают снаружи
-   проекта, и устаревает первым: статус, управление, список того, что уже работает.
-   Проверять перед каждым PR, а не когда вспомнится.
+1. `python tools/capture.py <milestone>` — screenshots into `screens/<milestone>/`. The
+   folder is local and does not go into the repository. A single in-game shot is **F12**.
+   Then `python tools/compare_original.py <milestone>` — the shot next to the original at
+   the same height, `screens/<milestone>/compare_original.jpg`. Differences spotted by eye
+   are written into the plan: into this milestone or a future one.
+2. `/code-review xhigh --fix` — a high-thoroughness code review with fixes applied
+   automatically.
+3. `tools/check.ps1` again after the review fixes.
+4. **Tests strengthened.** Each milestone must not only add tests for its own mechanics
+   but also tighten the whole-level check: the building is generated, so the check is not
+   "this level works" but "any building that gets generated works".
+   More in [`docs/testing.md`](docs/testing.md).
+5. **`README.md` is up to date.** It is the only document read from outside the project,
+   and it goes stale first: status, controls, the list of what already works.
+   Check it before every PR, not when it comes to mind.
 
-Только потом PR.
+Only then the PR.
 
-## Структура
+## Structure
 
 ```
-src/main.tscn   корневая сцена: меню, HUD, здание
-src/actors/     Otto и агенты
-src/systems/    лифты, эскалаторы, двери, бой и пули, свет, ассеты актёров,
-                камера, настройки, графика, рекорды
-src/levels/     здание: раскладка, отделка, обстановка, крыша; город и погода
-src/ui/         HUD, меню
-src/autoload/   синглтоны: Screenshotter, Game (счёт и партия), Sound
-assets/         модели, фактуры, звук, шрифты, переводы
-tests/          тесты GUT, файлы test_*.gd
-tools/          скрипты разработчика на Python и сцены-инструменты на GDScript
+src/main.tscn   root scene: menu, HUD, building
+src/actors/     Otto and agents
+src/systems/    elevators, escalators, doors, combat and bullets, lighting, actor assets,
+                camera, settings, graphics, high scores
+src/levels/     building: layout, finishing, dressing, roof; city and weather
+src/ui/         HUD, menus
+src/autoload/   singletons: Screenshotter, Game (score and session), Sound
+assets/         models, textures, sound, fonts, translations
+tests/          GUT tests, test_*.gd files
+tools/          Python developer scripts and GDScript tool scenes
 docs/           STATUS.md, EPIC.md, milestones.md, conventions.md, testing.md,
                 adr/, reference/
 ```
 
-Сцена и её скрипт лежат рядом и называются одинаково: `otto.tscn` и `otto.gd`.
-Подробные соглашения по именованию и стилю — в [`docs/conventions.md`](docs/conventions.md).
+A scene and its script sit side by side and share a name: `otto.tscn` and `otto.gd`.
+Detailed naming and style conventions are in [`docs/conventions.md`](docs/conventions.md).
 
-## Чего не делать
+## What not to do
 
-- Не менять настройки рендера в `project.godot` без ADR — они завязаны на выбранный
-  вид: сейчас это [ADR-0030](docs/adr/0030-grading-and-quality.md) и
-  [ADR-0034](docs/adr/0034-ultra-and-auto-quality.md). ADR-0002, на который правило
-  ссылалось раньше, отменён [ADR-0019](docs/adr/0019-3d-pivot.md).
-- Не трогать `addons/` форматтером и линтером, это вендоренный код.
-- Не коммитить `screens/`, `.venv/`, `.godot/`.
-- Не добавлять C# — решение зафиксировано в [ADR-0001](docs/adr/0001-tech-stack.md).
+- Do not change render settings in `project.godot` without an ADR — they are tied to the
+  chosen look: currently [ADR-0030](docs/adr/0030-grading-and-quality.md) and
+  [ADR-0034](docs/adr/0034-ultra-and-auto-quality.md). ADR-0002, which the rule referred
+  to earlier, is superseded by [ADR-0019](docs/adr/0019-3d-pivot.md).
+- Do not run the formatter and linter on `addons/`, it is vendored code.
+- Do not commit `screens/`, `.venv/`, `.godot/`.
+- Do not add C# — the decision is recorded in [ADR-0001](docs/adr/0001-tech-stack.md).

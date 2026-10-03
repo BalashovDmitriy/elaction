@@ -1,11 +1,11 @@
 extends GutTest
 
-## Тесты задержки отклика кабины.
+## Tests of the cab response delay.
 ##
-## По тревоге кабина «слушается хуже» — это прямо описано в оригинале. Задержка
-## не копится между нажатиями: отпустил или вышел — считается заново (ADR-0009,
-## пункт 1). Про выход отдельный тест: пустая кабина в [method ElevatorMotion._drive]
-## не заходит, и без сброса задержка работала бы только на первую поездку.
+## During the alarm the cab "responds worse" — the original describes this directly. The delay
+## does not accumulate between presses: released or stepped out — it is counted anew (ADR-0009,
+## point 1). Stepping out has a separate test: an empty cab does not enter
+## [method ElevatorMotion._drive], and without a reset the delay would work only for the first ride.
 
 const TOP: float = 0.0
 const STEP: float = 0.1
@@ -40,12 +40,12 @@ func test_letting_go_makes_the_car_think_again() -> void:
 	assert_almost_eq(_run(motion, 0.4, ElevatorMotion.DOWN), TOP, 0.01, "отсчёт заново")
 
 
-## Сирена посреди поездки: Otto держит «вниз» всю дорогу, и счётчик ожидания
-## к этому моменту давно переполнен. Без сброса наказание за тревогу догоняло бы
-## только следующее нажатие, а начатая поездка доезжала бы по-старому.
+## The siren mid-ride: Otto holds "down" all the way, and the wait counter
+## has long overflowed by this moment. Without a reset the alarm penalty would catch up
+## only with the next press, while the started ride would finish the old way.
 func test_the_alarm_catches_a_ride_already_under_way() -> void:
 	var motion := _shaft()
-	# Тревоги пока нет: кабина слушается сразу.
+	# No alarm yet: the cab responds immediately.
 	motion.response_delay = 0.0
 	var underway := _run(motion, 0.5, ElevatorMotion.DOWN)
 	assert_gt(underway, TOP, "поехала сразу: тревоги ещё нет")
@@ -61,7 +61,7 @@ func test_the_alarm_catches_a_ride_already_under_way() -> void:
 func test_leaving_the_car_makes_it_think_again() -> void:
 	var motion := _shaft()
 	_run(motion, 1.0, ElevatorMotion.DOWN)
-	# Пассажир вышел: кабина пустая и ещё стоит паузу этажа, то есть не едет сама.
+# The passenger stepped out: the cab is empty and still waits out the floor pause, not moving.
 	motion.update(STEP, 0.0, false)
 	var boarded_at := motion.position
 	assert_almost_eq(

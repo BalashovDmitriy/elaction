@@ -1,21 +1,21 @@
 class_name Records
 extends RefCounted
 
-## Таблица рекордов: десять строк со счётом и датой.
+## High score table: ten rows with score and date.
 ##
-## Без ввода инициалов (ADR-0012, пункт 9): ритуал зала, где за автоматом стоит
-## очередь, дома превращается в лишний экран между смертью и следующей партией.
+## No initials entry (ADR-0012, point 9): the ritual of an arcade hall with a queue at the
+## cabinet turns at home into an extra screen between death and the next game.
 ##
-## Правила таблицы — чистые функции над массивом, и проверяются они без диска:
-## сортировка, обрезка до десяти и место нового счёта. На диск ходят только
-## [method load_from] и [method save_to].
+## The table rules are pure functions over an array, and they are tested without disk:
+## sorting, trimming to ten and the place of a new score. Only [method load_from] and
+## [method save_to] go to disk.
 
 const PATH := "user://records.json"
 
-## Сколько строк держим. Одиннадцатая никому не интересна.
+## How many rows we keep. Nobody cares about the eleventh.
 const LIMIT: int = 10
 
-## Счёт и дата одной записи.
+## Score and date of one entry.
 const SCORE := "score"
 const DATE := "date"
 
@@ -31,17 +31,17 @@ static func load_from(path: String = PATH) -> Records:
 	if file == null:
 		return records
 
-	# Разбор через экземпляр, а не [method JSON.parse_string]: статический
-	# помощник на кривом файле сам пишет ошибку в лог движка, и испорченная
-	# таблица выглядела бы как поломка игры.
+	# Parsing through an instance, not [method JSON.parse_string]: the static
+	# helper writes an error to the engine log by itself on a broken file, and a corrupted
+	# table would look like a game failure.
 	var json := JSON.new()
 	var failed := json.parse(file.get_as_text()) != OK
 	file.close()
 
 	var parsed: Variant = json.data
 	if failed or parsed is not Array:
-		# Файл испорчен или дописан руками: таблица начинается заново, но игра
-		# из-за этого не падает — рекорды не та вещь, ради которой стоит падать.
+		# The file is corrupted or edited by hand: the table starts anew, but the game
+		# does not crash because of it — high scores are not something worth crashing over.
 		push_warning("Таблица рекордов не читается, начинаем заново: %s" % path)
 		return records
 
@@ -66,12 +66,12 @@ func save_to(path: String = PATH) -> void:
 	file.close()
 
 
-## Добавляет счёт и возвращает его место в таблице, считая с нуля.
-## Не попал в десятку — вернётся -1.
+## Adds a score and returns its place in the table, counting from zero.
+## Did not make the top ten — returns -1.
 ##
-## Место считается до вставки, а не поиском строки после неё: тот же счёт в тот
-## же день бывает дважды, и поиск по паре «счёт и дата» находил чужую строку —
-## счёт, не попавший в десятку, объявлялся бы рекордом.
+## The place is computed before insertion, not by searching for the row after it: the same score on
+## the same day happens twice, and searching by the "score and date" pair found someone else's row —
+## a score that did not make the top ten would be announced as a record.
 func submit(score: int, date: String = "") -> int:
 	var stamp := date if not date.is_empty() else today()
 	var place := 0
@@ -82,16 +82,16 @@ func submit(score: int, date: String = "") -> int:
 	return place if place < LIMIT else -1
 
 
-## Лучший счёт таблицы. Пустая таблица — ноль, а не отсутствие значения:
-## тому, кто станет его показывать, особый случай ни к чему.
+## The table's best score. An empty table is zero, not a missing value:
+## whoever displays it does not need a special case.
 func best() -> int:
 	return int(rows[0][SCORE]) if not rows.is_empty() else 0
 
 
-## Сортировка по убыванию с обрезкой до [constant LIMIT].
+## Descending sort with trimming to [constant LIMIT].
 ##
-## Статическая и без состояния: правило таблицы проверяется тестом прямо так,
-## без файлов и без экземпляра.
+## Static and stateless: the table rule is tested by a test directly like this,
+## without files and without an instance.
 static func sorted(entries: Array) -> Array[Dictionary]:
 	var copy: Array[Dictionary] = []
 	for entry: Variant in entries:
@@ -103,7 +103,7 @@ static func sorted(entries: Array) -> Array[Dictionary]:
 	return copy.slice(0, LIMIT)
 
 
-## Сегодняшняя дата в виде «2026-09-13».
+## Today's date in the form "2026-09-13".
 static func today() -> String:
 	var now := Time.get_datetime_dict_from_system()
 	return "%04d-%02d-%02d" % [now["year"], now["month"], now["day"]]

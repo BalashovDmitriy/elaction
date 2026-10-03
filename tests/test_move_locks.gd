@@ -1,6 +1,6 @@
 extends GutTest
 
-## Паузы разворота и приземления (ADR-0039, решение 4).
+## Turnaround and landing pauses (ADR-0039, decision 4).
 
 
 func test_a_fresh_actor_walks_and_jumps() -> void:
@@ -31,8 +31,8 @@ func test_a_landing_holds_walk_and_jump() -> void:
 
 
 func test_the_pauses_end_on_their_frame() -> void:
-	# Физика шагает по 1/60: пауза в 0.1 с — это шесть кадров, а не семь из-за
-	# остатка float, и 0.15 с — девять.
+	# Physics steps at 1/60: a 0.1 s pause is six frames, not seven due to a float
+	# remainder, and 0.15 s is nine.
 	var locks := MoveLocks.new()
 	locks.turn()
 	for _frame in roundi(MoveLocks.TURN_TIME * 60.0):
@@ -62,7 +62,7 @@ func test_clear_drops_both_pauses() -> void:
 
 
 func test_the_pauses_stay_short() -> void:
-	# Паузы — вес движения, а не новая механика: дольше пятой доли секунды
-	# они уже спорят с пулями втрое быстрее ROM (ADR-0037).
+	# Pauses are the weight of movement, not a new mechanic: longer than a fifth of a
+	# second they already compete with bullets three times faster than the ROM (ADR-0037).
 	assert_lt(MoveLocks.TURN_TIME, 0.2, "разворот короче 0.2 с")
 	assert_lt(MoveLocks.LAND_TIME, 0.2, "восстановление короче 0.2 с")

@@ -1,9 +1,9 @@
 extends GutTest
 
-## Кабина, шахта и фон залов по типу здания (ADR-0057, решения 4 и 6): решётка
-## только у грузовой кабины жилого дома и показывает окно выхода ROM, стрелка
-## циферблата отеля ходит от нижнего этажа к верхнему, фон зала звучит только
-## внутри.
+## Cab, shaft and hall ambience by building kind (ADR-0057, decisions 4 and 6): only the
+## residential freight cab has a gate and it shows the ROM's step-out window, the hotel
+## dial's needle moves from the bottom floor to the top, the hall ambience is heard only
+## inside.
 
 
 func test_only_a_freight_cab_has_a_gate() -> void:
@@ -17,8 +17,8 @@ func test_only_a_freight_cab_has_a_gate() -> void:
 		)
 
 
-## Решётка закрывается, когда сойти нельзя, и складывается, когда можно, — за
-## время [constant CarDetail.GATE_TIME], а не мгновенно.
+## The gate closes when one cannot step out and folds when one can — over
+## [constant CarDetail.GATE_TIME], not instantly.
 func test_gate_follows_the_step_out_window() -> void:
 	var detail := CarDetail.new()
 	detail.dress_as(BuildingIdentity.Kind.RESIDENTIAL)
@@ -46,7 +46,7 @@ func test_dial_needle_swings_from_bottom_to_top() -> void:
 	assert_eq(BuildingShafts.needle_angle(shaft, 40), bottom, "за шахтой — у упора")
 
 
-## Цифры табло у каждого типа свои.
+## Each kind has its own indicator board digits.
 func test_board_digits_differ_by_kind() -> void:
 	var seen := {}
 	for colour: Color in BuildingShafts.KIND_DIGITS:

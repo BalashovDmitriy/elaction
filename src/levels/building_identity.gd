@@ -1,47 +1,47 @@
 class_name BuildingIdentity
 extends RefCounted
 
-## Что за здание: отель, офисная башня или жилой дом и как оно зовётся
-## (ADR-0033, решения 1 и 2; ADR-0055, решения 1 и 2).
+## What building this is: a hotel, an office tower or a residential building, and what it is called
+## (ADR-0033, decisions 1 and 2; ADR-0055, decisions 1 and 2).
 ##
-## Тип и имя — жребий по номеру и сиду здания, как машина у выхода
-## (ADR-0032, решение 7). От типа зависят вывеска на углу фасада, отделка стен,
-## набор обстановки и одежда агентов; механика у всех одна. Без узлов: жребий
-## проверяется тестом.
+## Kind and name are a draw by the building's number and seed, like the car at the exit
+## (ADR-0032, decision 7). The kind determines the sign on the facade corner, the wall finish,
+## the dressing set and the agents' clothing; the mechanics are the same for all. No nodes: the draw
+## is checked by a test.
 
 enum Kind { HOTEL, OFFICE, RESIDENTIAL }
 
-## Имена отелей: неон в духе восьмидесятых, коротко — буквы идут столбиком.
+## Hotel names: eighties-style neon, short — the letters go in a column.
 const HOTEL_NAMES: PackedStringArray = [
 	"EMPIRE", "ROYAL", "METRO", "SAVOY", "REGENT", "PLAZA", "ASTOR", "COSMO"
 ]
 
-## Имена корпораций: у них Otto и выносит документы.
+## Corporation names: Otto steals documents from them.
 const OFFICE_NAMES: PackedStringArray = [
 	"KRONOS", "ATLAS", "VECTOR", "ORION", "HALCYON", "NOVA", "TITAN", "ZENITH"
 ]
 
-## Имена жилых домов: нью-йоркские башни восьмидесятых зовутся по улице или
-## парку (ADR-0055, решение 1).
+## Residential building names: eighties New York towers are named after a street or
+## a park (ADR-0055, decision 1).
 const RESIDENTIAL_NAMES: PackedStringArray = [
 	"LENOX", "BELMONT", "HUDSON", "CARLTON", "BEACON", "RIVIERA", "MAJESTIC", "PARKVIEW"
 ]
 
-## Слово, которое пишется под именем отеля.
+## The word written under the hotel name.
 const HOTEL_WORD := "HOTEL"
-## Под именем жилого дома — квартиры, как на вывесках тех лет.
+## Under a residential building name — apartments, as on signs of those years.
 const RESIDENTIAL_WORD := "APTS"
 
-## Соль жребия: своя, чтобы тип не ходил в ногу с машиной и раскладкой.
+## Draw salt: its own, so that the kind does not move in step with the car and the layout.
 const SALT: int = 0x1D_E7_17
 
 var kind: Kind = Kind.HOTEL
 var name: String = HOTEL_NAMES[0]
 
 
-## Здание [param building] партии с сидом [param building_seed]. Первое — отель
-## EMPIRE: с него начинается партия, и первый кадр одинаков у всех. Остальные —
-## жребий поровну на три типа (ADR-0055, решение 2).
+## Building [param building] of a game with seed [param building_seed]. The first is the hotel
+## EMPIRE: the game starts with it, and the first frame is the same for everyone. The rest —
+## an even draw over three kinds (ADR-0055, decision 2).
 static func of(building: int, building_seed: int) -> BuildingIdentity:
 	var identity := BuildingIdentity.new()
 	if building <= 1:
@@ -54,9 +54,9 @@ static func of(building: int, building_seed: int) -> BuildingIdentity:
 	return identity
 
 
-## Номер первого здания партии типа [param which]: съёмке вехи, кадрам и тестам.
-## [param building_seed] — сид зданий; −1 — партия без соли, где сид здания —
-## его номер ([method GameState.building_seed]). Не нашлось — первое здание.
+## Number of the first building of a game of kind [param which]: for milestone capture, shots and
+## tests. [param building_seed] — the building seed; −1 — an unsalted game, where a building's seed
+## is its number ([method GameState.building_seed]). Not found — the first building.
 static func first_of(which: Kind, building_seed: int = -1) -> int:
 	for building: int in range(1, 60):
 		var draw_seed := building if building_seed < 0 else building_seed
@@ -65,7 +65,7 @@ static func first_of(which: Kind, building_seed: int = -1) -> int:
 	return 1
 
 
-## Здание типа [param which] с первым именем своего списка: тестам и кадрам.
+## A building of kind [param which] with the first name of its list: for tests and shots.
 static func typed(which: Kind) -> BuildingIdentity:
 	var identity := BuildingIdentity.new()
 	identity.kind = which
@@ -73,7 +73,7 @@ static func typed(which: Kind) -> BuildingIdentity:
 	return identity
 
 
-## Список имён типа [param which].
+## The name list of kind [param which].
 static func names_of(which: Kind) -> PackedStringArray:
 	match which:
 		Kind.OFFICE:
@@ -83,12 +83,12 @@ static func names_of(which: Kind) -> PackedStringArray:
 	return HOTEL_NAMES
 
 
-## Отель ли это.
+## Whether this is a hotel.
 func is_hotel() -> bool:
 	return kind == Kind.HOTEL
 
 
-## Короткое имя типа: им подписаны фактуры типа в `assets/textures/`.
+## Short kind name: kind textures in `assets/textures/` are labelled with it.
 func key() -> String:
 	match kind:
 		Kind.OFFICE:
@@ -98,7 +98,7 @@ func key() -> String:
 	return "hotel"
 
 
-## Какие предметы каталога уместны в этом здании.
+## Which catalogue items fit in this building.
 func fit() -> PropCatalog.Fit:
 	match kind:
 		Kind.OFFICE:
@@ -108,8 +108,8 @@ func fit() -> PropCatalog.Fit:
 	return PropCatalog.Fit.HOTEL
 
 
-## Строки вывески сверху вниз: у отеля — имя и HOTEL, у жилого дома — имя и
-## APTS, у офиса — одно имя.
+## Sign lines top to bottom: the hotel has the name and HOTEL, the residential building — the name
+## and APTS, the office — the name alone.
 func sign_lines() -> PackedStringArray:
 	match kind:
 		Kind.HOTEL:

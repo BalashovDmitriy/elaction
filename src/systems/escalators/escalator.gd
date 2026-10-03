@@ -1,123 +1,124 @@
 class_name Escalator
 extends Node3D
 
-## Эскалатор между двумя этажами.
+## An escalator between two floors.
 ##
-## В оригинале на него не заходят по пути: надо встать на площадку у края и
-## нажать «вверх» или «вниз» (ADR-0004, пункт 8). Пока везёт — управления нет,
-## позицией Otto распоряжается эскалатор, а не физика.
+## In the original one does not step onto it in passing: one has to stand on the landing at
+## the edge and press "up" or "down" (ADR-0004, item 8). While it carries there is no
+## control, Otto's position is handled by the escalator, not by physics.
 ##
-## Узел ставится на верхнюю площадку, нижняя и точка перегиба задаются в
-## [method setup]. Поездка идёт по тому же пути, который выложен полотном, и
-## начинается с того места, где пассажир стоял: иначе его дёргало бы к центру
-## площадки, а полотно резало бы перекрытие мимо проёма (найдено авторевью M2).
+## The node is placed on the upper landing; the lower one and the bend point are set in
+## [method setup]. The ride follows the same path the belt is laid along, and
+## starts where the passenger stood: otherwise he would be jerked towards the centre of the
+## landing, and the belt would cut the slab outside the opening (found by code review M2).
 ##
-## С M18b эскалатор — конструкция, а не две коробки полотна
-## ([ADR-0025](../../../docs/adr/0025-shafts-escalators-and-riders.md), решение 4):
-## ступени рельефом, площадки в концах, балюстрада и обрамление проёма. Рельеф,
-## а не анимация: свет M17 ложится на геометрию, ради этого пивот и затевался.
+## Since M18b the escalator is a structure, not two belt boxes
+## ([ADR-0025](../../../docs/adr/0025-shafts-escalators-and-riders.md), decision 4):
+## relief steps, landings at the ends, a balustrade and an opening frame. Relief,
+## not animation: the M17 light falls on geometry, which is what the pivot was for.
 ##
-## С M24g конструкция — из деталей модели, собранной своим скриптом в Blender
-## (`tools/build_escalator.py`, ADR-0043, решение 3): рифлёные ступени с жёлтой
-## кромкой, стеклянная балюстрада с поручнем, тумбы, площадки с гребёнкой,
-## ферма. Пролёт в каждом здании свой, поэтому модель — набор деталей, и
-## эскалатор расставляет их по месту: ступени по одной, остальное растягивает
-## по длине.
+## Since M24g the structure is made of parts of a model built by its own Blender script
+## (`tools/build_escalator.py`, ADR-0043, decision 3): ribbed steps with a yellow
+## edge, a glass balustrade with a handrail, newels, landings with a comb plate,
+## a truss. The span differs in every building, so the model is a set of parts, and
+## the escalator places them: the steps one by one, the rest stretched
+## along the length.
 
-## С M24h эскалатор стоит в глубине, у задней стены (ADR-0044, решение 10):
-## пролёт за плоскостью игры, плита перед ним цельная, и мимо эскалатора
-## проходят по полу. На площадку встают шагом вглубь, как в красную дверь, и
-## сходят шагом обратно к камере.
+## Since M24h the escalator stands in the depth, by the back wall (ADR-0044, decision 10):
+## the span is behind the play plane, the slab in front of it is solid, and one walks past
+## the escalator on the floor. One steps onto the landing by a step into the depth, as into
+## a red door, and steps off by a step back towards the camera.
 
-## Детали эскалатора и их размеры в модели, м: по ним детали растягиваются.
+## Escalator parts and their sizes in the model, m: the parts are stretched by them.
 const KIT := preload("res://assets/models/escalator/escalator.glb")
 const KIT_STEP_RUN: float = 0.2
 const KIT_STEP_HEIGHT: float = 0.45
 const KIT_LANDING_RUN: float = 0.42
 
-## Докуда слышен стрёкот полотна, м.
+## How far the clatter of the belt carries, m.
 const HUM_REACH: float = 9.0
 
-## Докуда от камеры плита под эскалатором цельная, м по Z: проём — только за
-## этим краем, в задней полосе коридора. Тело идущего мимо Otto — перед ним.
+## Up to where from the camera the slab under the escalator is solid, m along Z: the opening
+## is only beyond this edge, in the back strip of the corridor. The body of Otto walking
+## past is in front of it.
 const HOLE_FRONT_Z: float = -WorldSpace.BODY_DEPTH * 0.5 - 0.04
 
-## Толщина и глубина полотна, м. Тела у полотна нет: везёт эскалатор, а не пол.
+## Belt thickness and depth, m. The belt has no body: the escalator carries, not the floor.
 const BELT_THICKNESS: float = 0.15
 const BELT_DEPTH: float = 0.72
 
-## Середина полотна по Z: за краем цельной плиты, у задней стены. По ней же
-## едет пассажир.
+## Middle of the belt along Z: beyond the edge of the solid slab, by the back wall. The
+## passenger rides along it too.
 const BELT_Z: float = HOLE_FRONT_Z - BELT_DEPTH * 0.5 - 0.01
 
-## Сколько полотно проходит по горизонтали за одну ступень, м.
+## How far the belt travels horizontally per step, m.
 ##
-## Ступень и есть то, чем эскалатор отличается от пандуса: на пролёте в 1.6 м
-## их выходит полдюжины, и зубчатый край читается с любого этажа.
+## The step is exactly what distinguishes an escalator from a ramp: on a 1.6 m span
+## there are half a dozen of them, and the jagged edge reads from any floor.
 const STEP_RUN: float = 0.2
 
-## Балюстрады по краям полотна — у задней стены и со стороны камеры, м по Z.
-## Спереди с M24h тоже стекло с поручнем, а не низкий борт: перила
-## должны читаться, а едущего Otto за стеклом видно (ADR-0044, решение 10).
+## Balustrades at the edges of the belt — by the back wall and on the camera side, m along Z.
+## In front since M24h it is also glass with a handrail, not a low side: the railing
+## must read, and a riding Otto is visible behind the glass (ADR-0044, decision 10).
 const RAIL_Z: float = BELT_Z - BELT_DEPTH * 0.5 + 0.03
 const FRONT_RAIL_Z: float = BELT_Z + BELT_DEPTH * 0.5 - 0.03
 const RAIL_THICKNESS: float = 0.1
 const RAIL_HEIGHT: float = 0.96
 
-## Поручень поверх балюстрады: квадратный в сечении, м.
+## Handrail on top of the balustrade: square in section, m.
 const HANDRAIL_SIZE: float = 0.1
 
-## Огонёк на конце поручня: ребро куба, м.
+## Indicator light at the end of the handrail: cube edge, m.
 const END_LIGHT_SIZE: float = 0.16
 
-## Свой источник пролёта: радиус, яркость, цвет и вынос перед ступенями.
+## The span's own source: radius, energy, colour and offset in front of the steps.
 ##
-## Без него от конструкции остаются две рейки в темноте: замер на 24 сидах дал
-## 25 эскалаторов из 120 под пятном лампы, в среднем до лампы 5.7 м. Источник
-## не гаснет от выстрела и в зонах темноты не участвует — по той же причине,
-## что и столб света в шахте (ADR-0025, решение 3): темнота решает, видят ли
-## агенты Otto, а путь вниз обязан читаться всегда.
+## Without it two rails in the dark are all that remains of the structure: a measurement
+## on 24 seeds gave 25 escalators out of 120 under a lamp pool, 5.7 m to a lamp on average.
+## The source does not go out from a shot and takes no part in darkness zones — for the same
+## reason as the light column in a shaft (ADR-0025, decision 3): darkness decides whether
+## the agents see Otto, while the way down must always read.
 ##
-## Тени не отбрасывает: пролёт стоит в проёме, ронять их ему не на что, а стоят
-## они дороже всего остального в кадре.
+## It casts no shadows: the span stands in an opening, there is nothing to cast them on,
+## and they cost more than anything else in the frame.
 const GLOW_RANGE: float = 3.6
 const GLOW_ENERGY: float = 1.2
 const GLOW_COLOR := Color(1.0, 0.88, 0.68)
 const GLOW_Z: float = -0.1
 
-## Площадка в конце полотна: длина по ходу и толщина, м.
+## Landing at the end of the belt: length along the travel and thickness, m.
 ##
-## Короче, чем была: площадка не заходит в соседнее место, где этажом ниже
-## может стоять шахта (ADR-0026, решение 6).
+## Shorter than it was: the landing does not reach into the neighbouring slot, where a
+## floor below a shaft may stand (ADR-0026, decision 6).
 const LANDING_RUN: float = 0.42
 const LANDING_THICKNESS: float = 0.12
 
-## Обрамление проёма: ширина стойки по краю дыры, м.
+## Opening frame: width of a post along the edge of the hole, m.
 const FRAME_WIDTH: float = 0.12
 
-## Сетки деталей по имени: одни на все эскалаторы здания.
+## Part meshes by name: shared by all escalators of the building.
 static var _meshes: Dictionary = {}
 
-## Скорость поездки, м/с по пути. До M24g поездка по короткому крутому пролёту
-## шла 1.1 с; с пологим пролётом M24g путь длиннее, и время считается по нему
-## ([method setup]), а скорость остаётся прежней.
+## Ride speed, m/s along the path. Before M24g a ride over the short steep span
+## took 1.1 s; with the gentle span of M24g the path is longer, and the time is computed
+## from it ([method setup]), while the speed stays the same.
 @export var ride_speed: float = 4.3
 
-## Сколько секунд занимает поездка между площадками.
+## How many seconds a ride between the landings takes.
 @export var travel_time: float = 1.1
 
-## Этаж, с которого эскалатор спускается. Ставит его уровень: обратно из
-## координаты этаж не выводят — узел стоит ровно на полу, где округление
-## решает случай. По нему уровень гасит источник пролёта вне кадра.
+## The floor the escalator goes down from. The level sets it: the floor is not derived back
+## from the coordinate — the node stands exactly on the floor, where rounding is
+## a matter of chance. By it the level turns off the span's source off-frame.
 var floor_index: int = 0
 
 var _passenger: Otto = null
 var _path: PackedVector3Array = PackedVector3Array()
 var _progress: float = 0.0
-## Перегиб полотна в своих координатах. Пустой — [method setup] не звали.
+## Belt bend in local coordinates. Empty — [method setup] was not called.
 var _via := Vector3.ZERO
 var _has_via: bool = false
-## Источник пролёта. Пустой — [method setup] не звали.
+## The span's source. Empty — [method setup] was not called.
 var _glow: OmniLight3D = null
 
 var _hum: AudioStreamPlayer3D = null
@@ -131,46 +132,46 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	# Полотно слышно, только пока кто-то едет: в оригинале эскалатор тоже
-	# не гудит сам по себе, а здание и без того шумное.
+	# The belt is audible only while someone rides: in the original the escalator does
+	# not hum by itself either, and the building is noisy enough.
 	Sounds.keep_playing(_hum, _passenger != null)
 
 	if _passenger != null:
 		_carry(delta)
 		return
-	# Наверх зовут с нижней площадки, вниз — с верхней.
+	# Up is called from the lower landing, down from the upper one.
 	if not _try_board(_bottom_pad, _top_pad, Intent.UP):
 		_try_board(_top_pad, _bottom_pad, Intent.DOWN)
 
 
-## Задаёт геометрию в координатах правил. [param descent] — смещение нижней
-## площадки от верхней, [param via] — точка перегиба в проёме перекрытия: через
-## неё идут и полотно, и сама поездка, поэтому пассажир проходит сквозь дыру,
-## а не сквозь плиту. [param gap] — края проёма относительно узла, [param slab] —
-## толщина перекрытия: по ним ставится обрамление.
+## Sets the geometry in rules coordinates. [param descent] — offset of the lower
+## landing from the upper one, [param via] — the bend point in the slab opening: both
+## the belt and the ride itself go through it, so the passenger passes through the hole,
+## not through the slab. [param gap] — opening edges relative to the node, [param slab] —
+## slab thickness: the frame is placed by them.
 func setup(descent: Vector2, via: Vector2, gap: Vector2, slab: float) -> void:
 	var down := WorldSpace.direction_to_scene(descent)
 	_via = WorldSpace.direction_to_scene(via)
 	_has_via = true
 	_bottom_pad.position = down
-	# Шаг вглубь на площадку и обратно к камере — тоже путь.
+	# The step into the depth onto the landing and back towards the camera is part of the path.
 	var depth := absf(BELT_Z) * 2.0
 	travel_time = (_via.length() + (down - _via).length() + depth) / ride_speed
 	_build(down, gap, slab)
 
 
-## Везёт ли эскалатор кого-нибудь прямо сейчас.
+## Whether the escalator is carrying anyone right now.
 func is_busy() -> bool:
 	return _passenger != null
 
 
-## Гасит или зажигает источник пролёта. Зовёт уровень, отбирая видимые этажи —
-## тем же правилом, что у ламп и столбов шахт (ADR-0010, пункт 8).
+## Turns the span's source off or on. Called by the level when picking visible floors —
+## by the same rule as for lamps and shaft columns (ADR-0010, item 8).
 ##
-## Это не то же самое, что «погас от выстрела»: источник пролёта не участвует
-## в зонах темноты и от пули не гаснет (ADR-0025, решение 4), — но светить ему
-## положено в кадре, а не во всём здании разом. Светильников на здание за
-## полсотни, и не гасившиеся эскалаторы съедали бюджет света целиком.
+## This is not the same as "went out from a shot": the span's source takes no part
+## in darkness zones and does not go out from a bullet (ADR-0025, decision 4) — but it is
+## meant to shine in frame, not in the whole building at once. There are over fifty
+## light sources per building, and escalators that never went dark ate the whole light budget.
 func set_light_visible(on: bool) -> void:
 	if _glow != null:
 		_glow.visible = on
@@ -188,7 +189,7 @@ func _try_board(pad: Area3D, target: Area3D, towards: float) -> bool:
 		_passenger = rider
 		_path = _route_from(rider.global_position, target)
 		_progress = 0.0
-		# По ступеням Otto идёт, лицом по ходу (ADR-0043, решение 2).
+		# Otto walks on the steps, facing the direction of travel (ADR-0043, decision 2).
 		rider.ride_look = Otto.LOOK_WALK
 		rider.ride_facing = signf(target.global_position.x - rider.global_position.x)
 		rider.ride(true)
@@ -196,11 +197,11 @@ func _try_board(pad: Area3D, target: Area3D, towards: float) -> bool:
 	return false
 
 
-## Путь поездки: от места, где пассажир стоял, шаг вглубь на полотно, через
-## перегиб к дальней площадке и шаг обратно в плоскость игры.
+## The ride path: from where the passenger stood, a step into the depth onto the belt, via
+## the bend to the far landing and a step back into the play plane.
 ##
-## Перегиб берётся из полотна, поэтому едут ровно там, где выложено. Без
-## [method setup] полотна нет — тогда путь прямой, лишь бы не падать по индексу.
+## The bend is taken from the belt, so one rides exactly where it is laid. Without
+## [method setup] there is no belt — then the path is straight, just to avoid an index error.
 func _route_from(start: Vector3, target: Area3D) -> PackedVector3Array:
 	var finish := target.global_position
 	if not _has_via:
@@ -222,8 +223,8 @@ func _carry(delta: float) -> void:
 	_passenger = null
 
 
-## Точка на ломаной по доле пути: длина считается по самим отрезкам, поэтому
-## на изломе скорость не прыгает.
+## A point on the polyline by fraction of the path: the length is computed from the segments
+## themselves, so the speed does not jump at the bend.
 func _point_at(ratio: float) -> Vector3:
 	var total := 0.0
 	for index in _path.size() - 1:
@@ -241,12 +242,12 @@ func _point_at(ratio: float) -> Vector3:
 	return _path[_path.size() - 1]
 
 
-## Собирает конструкцию заново по заданной геометрии.
+## Rebuilds the structure from the given geometry.
 ##
-## Ломаная — это площадка по этажу до проёма и один прямой пролёт вниз. Двумя
-## пролётами разной крутизны она была до M18b, и в кадре читалась жёлобом:
-## пологий вход под 25° упирался в обрыв под 63°, а балюстрады двух пролётов
-## расходились на изломе веером.
+## The polyline is a landing along the floor up to the opening and one straight span down.
+## Before M18b it was two spans of different steepness, and in the frame it read as a chute:
+## a gentle 25° entry ran into a 63° drop, and the balustrades of the two spans
+## fanned apart at the bend.
 func _build(down: Vector3, gap: Vector2, slab: float) -> void:
 	for part: Node in _ramp.get_children():
 		part.queue_free()
@@ -254,13 +255,13 @@ func _build(down: Vector3, gap: Vector2, slab: float) -> void:
 	var towards := signf(down.x)
 	_lay_landing(Vector3.ZERO, _via)
 	_lay_flight(_via, down)
-	# Нижняя площадка уходит по ходу спуска: с неё сходят, приехав. Гребёнкой
-	# она к ступеням — раскладывается от своего дальнего края к ним.
+	# The lower landing extends along the descent: one steps off it on arrival. With its comb
+	# plate it faces the steps — it is laid out from its far edge towards them.
 	_lay_landing(down + Vector3(towards * LANDING_RUN, 0.0, 0.0), down)
 	_frame_the_gap(gap, slab)
 
 
-## Пролёт: полотно снизу, ступени сверху, балюстрада и борт по бокам.
+## The span: belt below, steps on top, balustrade and side panels at the sides.
 func _lay_flight(from: Vector3, to: Vector3) -> void:
 	var span := to - from
 	if is_zero_approx(span.length()):
@@ -272,10 +273,10 @@ func _lay_flight(from: Vector3, to: Vector3) -> void:
 	_light_the_flight(from, to)
 
 
-## Ферма пролёта с обшивкой снизу, вдоль ломаной.
+## The span truss with cladding underneath, along the polyline.
 ##
-## Со стороны её закрывают ступени, но снизу видно именно её: эскалатор проходит
-## сквозь перекрытие, и с нижнего этажа смотрят ему в брюхо.
+## From the side the steps cover it, but from below this is exactly what is seen: the
+## escalator passes through the slab, and from the floor below one looks at its belly.
 func _lay_belt(from: Vector3, to: Vector3) -> void:
 	var span := to - from
 	_add_kit(
@@ -286,18 +287,18 @@ func _lay_belt(from: Vector3, to: Vector3) -> void:
 	)
 
 
-## Ступени пролёта: коробки с плоским верхом, каждая ниже предыдущей.
+## The span's steps: boxes with flat tops, each lower than the previous one.
 ##
-## Не повёрнуты вдоль пролёта нарочно — повёрнутая коробка снова даёт пандус.
-## Верх ступени лежит на ломаной, низ уходит под неё, и соседние заходят друг
-## за друга: силуэт получается зубчатым, а щелей между ступенями нет.
+## They are deliberately not rotated along the span — a rotated box gives a ramp again.
+## The top of a step lies on the polyline, the bottom goes below it, and neighbours overlap
+## each other: the silhouette comes out jagged, and there are no gaps between the steps.
 func _lay_steps(from: Vector3, span: Vector3) -> void:
 	var count := maxi(int(absf(span.x) / STEP_RUN), 1)
 	var tread := span.x / float(count)
 	var riser := span.y / float(count)
 	var height := absf(riser) + BELT_THICKNESS
 
-	# Жёлтая кромка ступени — по ходу спуска: край, с которого шагают вниз.
+	# The step's yellow edge is on the descent side: the edge one steps down from.
 	for index in count:
 		var top := from.y + riser * float(index)
 		_add_kit(
@@ -308,14 +309,14 @@ func _lay_steps(from: Vector3, span: Vector3) -> void:
 		)
 
 
-## Бока пролёта: стеклянные балюстрады с поручнем у задней стены и у камеры.
+## Span sides: glass balustrades with a handrail by the back wall and by the camera.
 func _lay_sides(from: Vector3, to: Vector3) -> void:
 	var span := to - from
 	var angle := atan2(span.y, span.x)
 	var centre := (from + to) * 0.5
 	var length := span.length()
-	# Нормаль к пролёту, всегда вверх: балюстрада стоит на полотне, а не висит
-	# под ним, и на спуске влево знак пролёта не должен её переворачивать.
+	# The span normal, always up: the balustrade stands on the belt rather than hanging
+	# below it, and on a descent to the left the span sign must not flip it.
 	var up := Vector3(-span.y, span.x, 0.0).normalized()
 	if up.y < 0.0:
 		up = -up
@@ -332,10 +333,10 @@ func _lay_sides(from: Vector3, to: Vector3) -> void:
 	_mark_end(to + cap)
 
 
-## Свет пролёта: одна лампа посередине, перед ступенями.
+## Span light: one lamp in the middle, in front of the steps.
 ##
-## Стоит в самом проёме и светит на оба этажа, которые эскалатор связывает, —
-## это не протечка, а ровно то, что он и делает.
+## It stands right in the opening and lights both floors the escalator links —
+## this is not a leak, but exactly what the escalator does.
 func _light_the_flight(from: Vector3, to: Vector3) -> void:
 	var light := OmniLight3D.new()
 	light.omni_range = GLOW_RANGE
@@ -347,15 +348,15 @@ func _light_the_flight(from: Vector3, to: Vector3) -> void:
 	_glow = light
 
 
-## Огонёк на конце поручня.
+## Indicator light at the end of the handrail.
 ##
-## Замер на 24 сидах: из 120 эскалаторов под пятном лампы стоит 25, до ближайшей
-## лампы в среднем 5.7 м, в худшем 10.5. Мест на этаже мало, эскалатор занимает
-## два — и встаёт он там, где лампы нет. Конструкция, которую не видно, ничего
-## не даёт, а подсвечивать её источником незачем: проект уже отвечает на это
-## огоньками (ADR-0023, решение 6) — так читаются табло дверей, индикаторы
-## кабины и вывеска выхода. Два огонька на концах поручня говорят «здесь
-## эскалатор» ровно так же.
+## Measured on 24 seeds: of 120 escalators 25 stand under a lamp pool, the nearest
+## lamp is 5.7 m away on average, 10.5 at worst. There are few slots on a floor, an escalator
+## takes two — and it ends up where there is no lamp. A structure that cannot be seen gives
+## nothing, and there is no reason to light it with a source: the project already answers
+## this with indicator lights (ADR-0023, decision 6) — that is how the door indicator boards,
+## the cab indicators and the exit sign read. Two lights at the ends of the handrail say
+## "escalator here" just the same.
 func _mark_end(at: Vector3) -> void:
 	_add_part(
 		Vector3(END_LIGHT_SIZE, END_LIGHT_SIZE, END_LIGHT_SIZE),
@@ -365,18 +366,18 @@ func _mark_end(at: Vector3) -> void:
 	)
 
 
-## Площадка: ровная плита между двумя точками одной высоты.
+## Landing: a flat slab between two points of the same height.
 ##
-## Утоплена в перекрытие: её верх вровень с полом, наружу смотрит только торец.
-## Иначе встающий на неё Otto оказывался бы по щиколотку в плите — он стоит
-## на полу этажа, а не на эскалаторе.
+## Sunk into the slab: its top is flush with the floor, only the end faces outwards.
+## Otherwise Otto stepping onto it would be ankle-deep in the slab — he stands
+## on the floor of the storey, not on the escalator.
 func _lay_landing(from: Vector3, to: Vector3) -> void:
 	var run := to.x - from.x
 	if is_zero_approx(run):
 		return
 
-	# Гребёнка площадки — на её конце [param to]; у нижней площадки конец —
-	# там, откуда уходят ступени, и она ляжет, если её раскладывать от ступеней.
+	# The landing's comb plate is at its end [param to]; for the lower landing the end is
+	# where the steps leave from, and it lies right if laid out from the steps.
 	_add_kit(
 		"Landing",
 		Vector3((from.x + to.x) * 0.5, from.y, BELT_Z),
@@ -385,18 +386,18 @@ func _lay_landing(from: Vector3, to: Vector3) -> void:
 	)
 
 
-## Обрамление проёма: стойки по краям дыры в перекрытии.
+## Opening frame: posts along the edges of the hole in the slab.
 ##
-## Без них дыра читается обрывом плиты — тем же, что и провал шахты, в который
-## падают насмерть. Стойки стоят на краях проёма во всю толщину перекрытия и
-## тела не имеют: сквозь проём ходят, а не протискиваются.
+## Without them the hole reads as a break in the slab — the same as a shaft pit one
+## falls to death into. The posts stand on the edges of the opening through the full slab
+## thickness and have no bodies: one walks through the opening, not squeezes through it.
 func _frame_the_gap(gap: Vector2, slab: float) -> void:
 	if slab <= 0.0:
 		return
 
 	var look := GreyboxLook.metal(GreyboxLook.TRIM)
 	for edge: float in [gap.x, gap.y]:
-		# Проём — только в задней полосе, от стены до края цельной плиты.
+		# The opening is only in the back strip, from the wall to the edge of the solid slab.
 		var depth := HOLE_FRONT_Z - WorldSpace.BACK_WALL_Z
 		_add_part(
 			Vector3(FRAME_WIDTH, slab, depth),
@@ -404,7 +405,7 @@ func _frame_the_gap(gap: Vector2, slab: float) -> void:
 			0.0,
 			look
 		)
-	# И кромка вдоль цельной плиты: край, за которым пол кончается.
+	# And an edge strip along the solid slab: the edge beyond which the floor ends.
 	_add_part(
 		Vector3(absf(gap.y - gap.x), slab, FRAME_WIDTH * 0.5),
 		Vector3((gap.x + gap.y) * 0.5, -slab * 0.5, HOLE_FRONT_Z - FRAME_WIDTH * 0.25),
@@ -413,8 +414,8 @@ func _frame_the_gap(gap: Vector2, slab: float) -> void:
 	)
 
 
-## Деталь модели [param part] на своём месте, под своим углом и с растяжкой
-## [param stretch]: пролёт у каждого эскалатора свой.
+## Model part [param part] in its place, at its angle and with stretch
+## [param stretch]: every escalator has its own span.
 func _add_kit(part: String, at: Vector3, angle: float, stretch: Vector3) -> void:
 	var mesh := MeshInstance3D.new()
 	mesh.mesh = Escalator._kit_mesh(part)
@@ -433,7 +434,7 @@ static func _kit_mesh(part: String) -> Mesh:
 	return _meshes.get(part) as Mesh
 
 
-## Кусок конструкции: коробка без тела на своём месте и под своим углом.
+## A piece of the structure: a bodiless box in its place and at its angle.
 func _add_part(size: Vector3, at: Vector3, angle: float, material: StandardMaterial3D) -> void:
 	var part := GreyboxLook.box(size, material)
 	part.position = at

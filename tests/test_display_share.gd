@@ -1,10 +1,10 @@
 extends GutTest
 
-## Разрешение в полном экране — это разрешение 3D (ADR-0042, решение 3).
+## Resolution in full screen is the 3D resolution (ADR-0042, decision 3).
 ##
-## Godot не меняет видеорежим монитора: полный экран и окно без рамки всегда в
-## родном разрешении, и пункт «Разрешение» там ничего не делал. Теперь он задаёт,
-## в каком разрешении рисуется сцена, — долю родного.
+## Godot does not change the monitor's video mode: full screen and borderless window are
+## always at native resolution, and the "Resolution" option did nothing there. Now it
+## sets the resolution the scene is drawn at — a share of native.
 
 const UHD := Vector2i(3840, 2160)
 
@@ -41,8 +41,8 @@ func test_an_odd_native_screen_is_on_the_list() -> void:
 	assert_false(windowed.has(wide), "окно размером с экран — это без рамки, не окно")
 
 
-## Файл до M24f в полном экране хранил размер окна по умолчанию: с M24f это доля
-## 3D, и игрок на 4K получил бы половину. Такой файл переходит на родное.
+## A file from before M24f stored the default window size in full screen: since M24f
+## this is the 3D share, and a player on 4K would get half. Such a file switches to native.
 func test_old_full_screen_settings_move_to_the_native_resolution() -> void:
 	var uhd := Vector2i(3840, 2160)
 	var hd := Vector2i(1920, 1080)

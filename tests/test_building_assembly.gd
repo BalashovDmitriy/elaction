@@ -1,28 +1,28 @@
 extends GutTest
 
-## Дымовой тест сборки здания.
+## Smoke test of building assembly.
 ##
-## Между «раскладка говорит: шахта на 12–17» и «кабина действительно стоит там»
-## лежит код уровня, который не проверялся ничем. Здесь здание собирается
-## по-настоящему, с физикой, и сверяется с собственной раскладкой.
+## Between "the layout says: shaft at 12–17" and "the cab actually stands there" lies level code
+## that nothing checked. Here the building is assembled for real, with physics, and compared against
+## its own layout.
 ##
-## Здание маленькое: генератор тот же, а прогон короче.
+## The building is small: the generator is the same, and the run is shorter.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const SEEDS: Array[int] = [1, 2, 3]
 
-## Сколько кадров дать зданию устояться перед проверками.
+## How many frames to give the building to settle before the checks.
 const SETTLE_FRAMES: int = 10
 
-## Сколько источников света разрешено держать зажжёнными разом.
+## How many light sources may be kept lit at once.
 ##
-## Число художественное, а не техническое: замер (ADR-0010, пункт 1) показал,
-## что железо выдерживает вчетверо больше, но дюжина пятен света в кадре — это
-## уже каша. Проверяется на здании в полный рост: на нём отбор и нужен.
+## The number is artistic, not technical: the measurement (ADR-0010, item 1) showed that the
+## hardware can take four times more, but a dozen pools of light in the frame is already a mess.
+## Checked on a full-height building: that is where the selection is needed.
 const LIGHT_BUDGET: int = 12
 
-## Сколько кадров ждать падения лампы. Ограничение есть намеренно: ожидание
-## несбывшегося состояния иначе тянулось бы до конца прогона.
+## How many frames to wait for a lamp to fall. The limit is there on purpose: otherwise waiting for
+## a state that never comes would drag on until the end of the run.
 const FALL_FRAMES: int = 240
 
 
@@ -41,11 +41,11 @@ func _build(building_seed: int) -> GreyboxLevel:
 	return level
 
 
-## Убирает здание из дерева сразу, не дожидаясь конца теста.
+## Removes the building from the tree at once, without waiting for the end of the test.
 ##
-## [method GutTest.add_child_autofree] освобождает только после всего теста, а сиды
-## перебираются внутри одного: без этого здания стоят друг в друге в одном
-## физическом мире, со своими Otto и своими агентами. Освободит их всё равно GUT.
+## [method GutTest.add_child_autofree] frees only after the whole test, and seeds are iterated
+## inside one test: without this the buildings stand inside each other in one physics world, with
+## their own Ottos and their own agents. GUT will free them anyway.
 func _drop(level: GreyboxLevel) -> void:
 	remove_child(level)
 
@@ -87,20 +87,19 @@ func test_scene_matches_the_plan() -> void:
 		_drop(level)
 
 
-## Сколько источников горит прямо сейчас — по всему дереву уровня, не только
-## среди прямых детей: свет лампы висит ребёнком самой лампы, и счёт по детям
-## уровня его не видел бы вовсе — проверка проходила бы, даже если бы не гасла
-## ни одна лампа в здании.
+## How many sources are lit right now — across the whole level tree, not only among direct children:
+## a lamp's light hangs as a child of the lamp itself, and a count over the level's children would
+## not see it at all — the check would pass even if not a single lamp in the building went out.
 func _lit(level: GreyboxLevel) -> int:
 	var count := 0
 	for node: Node in level.find_children("*", "Light3D", true, false):
 		var light := node as Light3D
-		# Свет камеры светит только на слой фигур: пятна на этаже он не даёт
-		# (ADR-0042, решение 7).
+		# The camera light shines only on the figure layer: it gives no pool on the floor (ADR-0042,
+		# decision 7).
 		if light == null or light.light_cull_mask == FigureRig.RENDER_LAYER:
 			continue
-		# Свет вертолёта вступления гаснет и загорается сам — с дверью и уходом
-		# (ADR-0052): к лампам этажа он отношения не имеет.
+		# The intro helicopter's light turns off and on by itself — with the door and the departure
+		# (ADR-0052): it has nothing to do with the floor lamps.
 		if _in_helicopter(light, level):
 			continue
 		if light.is_visible_in_tree():
@@ -117,7 +116,7 @@ func _in_helicopter(node: Node, level: GreyboxLevel) -> bool:
 	return false
 
 
-## Здание в полный рост: правила по умолчанию, тридцать этажей.
+## Full-height building: default rules, thirty floors.
 func _tall(building_seed: int) -> GreyboxLevel:
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
 	level.building_seed = building_seed
@@ -126,14 +125,13 @@ func _tall(building_seed: int) -> GreyboxLevel:
 	return level
 
 
-## Ближайшая лампа под Otto.
+## The nearest lamp below Otto.
 ##
-## Именно ближайшая, а не первая попавшаяся: этаж под ногами всегда в кадре,
-## а значит, и свет на нём горит. Лампа с произвольного этажа могла бы оказаться
-## за пределами отбора, где её этаж и так погашен, — и «источников стало меньше»
-## не выполнилось бы, хотя гасить нечего.
+## Precisely the nearest, not just any: the floor underfoot is always in the frame, so the light on
+## it is on. A lamp from an arbitrary floor could be outside the selection, where its floor is off
+## anyway, — and "fewer sources" would not hold, although there is nothing to turn off.
 func _nearest_lamp_below(level: GreyboxLevel) -> Lamp:
-	# «Ниже» — в плоскости правил, где вниз это рост Y.
+	# "Below" — in the rules plane, where down is growing Y.
 	var otto_y := WorldSpace.to_plane(level.otto.global_position).y
 	var found: Lamp = null
 	var found_y := INF
@@ -150,7 +148,7 @@ func _nearest_lamp_below(level: GreyboxLevel) -> Lamp:
 	return found
 
 
-## Источников в здании шестьдесят с лишним, а гореть должна горстка.
+## There are sixty-odd sources in the building, and only a handful should be lit.
 func test_a_tall_building_lights_only_what_is_in_frame() -> void:
 	for building_seed: int in SEEDS:
 		var level := _tall(building_seed)
@@ -166,12 +164,12 @@ func test_a_tall_building_lights_only_what_is_in_frame() -> void:
 		_drop(level)
 
 
-## Тот же путь, что в игре: пуля сбивает лампу, лампа долетает — этаж гаснет.
-## Проверяется не флаг, а погасший источник: флаг без света ничего не значит.
+## The same path as in the game: a bullet shoots down a lamp, the lamp lands — the floor goes dark.
+## What is checked is not a flag but a dead source: a flag without light means nothing.
 func test_a_fallen_lamp_puts_its_floor_out() -> void:
 	var level := _tall(1)
-	# Вступление наезжает камерой и меняет, какие этажи в кадре, а с ними и
-	# горящие лампы (ADR-0052): тест — про лампу, и вступление пропускается.
+	# The intro moves the camera in and changes which floors are in the frame, and with them the lit
+	# lamps (ADR-0052): the test is about the lamp, so the intro is skipped.
 	level.skip_the_intro()
 	await wait_physics_frames(SETTLE_FRAMES)
 
@@ -198,12 +196,12 @@ func test_a_fallen_lamp_puts_its_floor_out() -> void:
 
 	await wait_physics_frames(2)
 	assert_true(level.is_dark_at(index, lamp_x), "зона лампы на этаже %d погасла" % index)
-	# Гаснет зона, не этаж: соседние лампы горят (ADR-0023, решение 2).
+	# A zone goes dark, not a floor: neighbouring lamps stay lit (ADR-0023, decision 2).
 	assert_eq(
 		level.is_dark(index), lamps_on_floor == 1, "этаж тёмен целиком, только если лампа была одна"
 	)
-	# У лампы два источника — конус и заливка (ADR-0023, решение 3), и оба уходят
-	# вместе с ней: «зона горит» и «лампа висит» — одно и то же.
+	# A lamp has two sources — the cone and the fill (ADR-0023, decision 3), and both go with it: "the
+	# zone is lit" and "the lamp hangs" are the same thing.
 	assert_eq(_lit(level), before - 2, "и оба источника лампы перестали гореть")
 	_drop(level)
 
@@ -219,22 +217,21 @@ func test_otto_starts_on_the_roof() -> void:
 	)
 
 
-## Ставит Otto на крышу ([method GreyboxLevel.wait_for_the_landing]).
+## Puts Otto on the roof ([method GreyboxLevel.wait_for_the_landing]).
 ##
-## Вступление пропускается, как пропускает его игрок прыжком: здесь проверяется,
-## что здание держит Otto, а не сценка с вертолётом, — а она идёт четыре с
-## лишним секунды на сид без ускорения времени (`test_roof_arrival.gd`).
+## The intro is skipped, as the player skips it with a jump: what is checked here is that the
+## building holds Otto, not the helicopter scene, — and it takes over four seconds per seed without
+## time speed-up (`test_roof_arrival.gd`).
 func _wait_for_the_landing(level: GreyboxLevel) -> void:
 	level.skip_the_intro()
 	assert_true(await level.wait_for_the_landing(), "Otto встал на крышу")
 
 
-## Кабина шириной в шахту: ширину она берёт из правил, а не из сцены.
+## A cab as wide as the shaft: it takes its width from the rules, not from the scene.
 ##
-## До M18c ширину держала сцена — 1.2 м, — и шахта в 1.8 оставила бы по 30 см
-## щели с каждого борта, в которые Otto проваливался бы, выходя из кабины
-## (ADR-0026, решение 3). Правила берутся нестандартные нарочно: с умолчаниями
-## совпало бы и число из сцены.
+## Up to M18c the width was held by the scene — 1.2 m, — and a 1.8 m shaft would leave 30 cm gaps on
+## each side, through which Otto would fall when stepping out of the cab (ADR-0026, decision 3).
+## Non-standard rules are used on purpose: with defaults the number from the scene would also match.
 func test_every_car_is_as_wide_as_its_shaft() -> void:
 	var rules := _rules()
 	rules.shaft_width = 1.62

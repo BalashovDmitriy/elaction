@@ -1,9 +1,9 @@
 extends GutTest
 
-## Тесты машины состояний Otto.
+## Otto state machine tests.
 ##
-## Работают без сцены и без физики: машина принимает снимок ввода и факты
-## о теле, поэтому её поведение проверяется напрямую.
+## They work without a scene and without physics: the machine takes an input snapshot and facts
+## about the body, so its behaviour is checked directly.
 
 
 func _snapshot(move: float = 0.0, crouch: bool = false, jump: bool = false) -> OttoInput:

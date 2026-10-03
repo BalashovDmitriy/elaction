@@ -1,32 +1,35 @@
 class_name AgentSpawn
 extends RefCounted
 
-## Жребий выпуска агентов по правилам ROM: ячейки, этаж, дверь (ADR-0027, решение 2).
+## Agent release draw by ROM rules: slots, floor, door (ADR-0027, decision 2).
 ##
-## Своим классом, а не в уровне: уровень знает двери, этажи и Otto, а сколько
-## агентов может жить и кто выходит следующим — правило, и проверяется оно без
-## сцены. ROM держит четыре ячейки агентов (@594D): занятыми бывают три или
-## четыре, и освободившаяся ждёт смены по сложности (@3866).
+## Its own class, not in the level: the level knows doors, floors and Otto, while how many
+## agents can live and who comes out next is a rule, and it is checked without
+## a scene. ROM keeps four agent slots (@594D): three or four are
+## occupied, and a freed one waits for a shift change by difficulty (@3866).
 
-## Ячеек агентов: столько держит ROM. Ручной потолок здания ([member
-## BuildingRules.agents_at_once_cap]) может просить больше — тогда ячейки
-## добавляются в [method open_slot], иначе он молча упирался бы в четыре.
+## Agent slots: as many as ROM keeps. The building's manual cap ([member
+## BuildingRules.agents_at_once_cap]) may ask for more — then slots
+## are added in [method open_slot], otherwise it would silently hit four.
 const SLOTS: int = 4
 
-## Генератор жребия: свой у здания и посеянный его сидом — прогон бота
-## повторяется до шага.
+## Draw generator: the building's own, seeded by its seed — a bot run
+## repeats down to the step.
 var rng := RandomNumberGenerator.new()
 
 var _busy: Array[bool] = [false, false, false, false]
 var _wait: Array[float] = [0.0, 0.0, 0.0, 0.0]
-## Сколько накопилось до следующего тика жребия, с.
+## How much has accumulated toward the next draw tick, s.
 var _clock: float = 0.0
+## How much of the calm after Otto's return is left, s ([method after_death]).
+var _calm_left: float = 0.0
 
 
-## Отсчитывает время. Возвращает true в тот кадр, когда подошёл тик логики:
-## жребий в ROM бросается раз в тик, а не раз в кадр — иначе на 60 Гц он шёл
-## бы вчетверо чаще, а на 30 вдвое реже.
+## Counts time. Returns true on the frame a logic tick comes:
+## in ROM the draw is rolled once per tick, not once per frame — otherwise at 60 Hz it would go
+## four times as often, and at 30 half as often.
 func tick(delta: float) -> bool:
+	_calm_left = maxf(_calm_left - delta, 0.0)
 	for index in _wait.size():
 		_wait[index] = maxf(_wait[index] - delta, 0.0)
 	_clock += delta
@@ -36,12 +39,12 @@ func tick(delta: float) -> bool:
 	return true
 
 
-## Свободная ячейка из первых [param available] или -1: занятая или ещё ждущая
-## смены не годится.
+## A free slot among the first [param available], or -1: an occupied one or one still waiting
+## for its shift change does not qualify.
 ##
-## [param lead] — сколько до конца смены ячейка уже годится. Столько идёт
-## створка двери: она начинает открываться в конце смены, и агент выходит там,
-## где ROM его и выпускает, а не на ход створки позже (ADR-0028, решение 7).
+## [param lead] — how long before the end of the shift change a slot already qualifies. That is how
+## long the door leaf takes: it starts opening at the end of the shift change, and the agent comes
+## out where ROM releases him, not a leaf travel later (ADR-0028, decision 7).
 func open_slot(available: int, lead: float = 0.0) -> int:
 	while _busy.size() < available:
 		_busy.append(false)
@@ -52,12 +55,12 @@ func open_slot(available: int, lead: float = 0.0) -> int:
 	return -1
 
 
-## Занимает ячейку: агент в ней выходит или вышел.
+## Occupies a slot: the agent in it is coming out or has come out.
 func take(slot: int) -> void:
 	_busy[slot] = true
 
 
-## Освобождает ячейку: смена в ней придёт через паузу по сложности [param level].
+## Frees a slot: its shift change will come after a pause by difficulty [param level].
 func release(slot: int, level: int) -> void:
 	if slot < 0 or slot >= _busy.size():
 		return
@@ -65,10 +68,12 @@ func release(slot: int, level: int) -> void:
 	_wait[slot] = Arcade.respawn_wait(level)
 
 
-## Otto вернулся в игру: все ячейки свободны, и выпуск в них идёт с задержками
-## ROM — 10, 25, 40 и 55 тиков (@2F61; ADR-0053, решение 2). Добавленные сверх
-## четырёх ячейки ждут дальше тем же шагом.
-func after_death() -> void:
+## Otto returned to play: all slots are free, and releases into them go with ROM
+## delays — 10, 25, 40 and 55 ticks (@2F61; ADR-0053, decision 2). Slots added beyond
+## four wait further at the same step. [param calm] — how long doors near him stay shut
+## ([member BuildingRules.agent_respawn_gap], ADR-0059, decision 3).
+func after_death(calm: float = 0.0) -> void:
+	_calm_left = calm
 	var waits := Arcade.RESPAWN_WAIT_TICKS
 	var step := waits[1] - waits[0]
 	for index in _busy.size():
@@ -79,8 +84,8 @@ func after_death() -> void:
 		_wait[index] = Arcade.seconds(ticks)
 
 
-## Этаж жребия: этаж Otto, выше или ниже, а с шансом по сложности — именно
-## этаж Otto (@5A4C).
+## The draw floor: Otto's floor, above or below, and with a chance by difficulty — exactly
+## Otto's floor (@5A4C).
 func pick_floor(here: int, level: int) -> int:
 	var floor_index := here + rng.randi_range(-1, 1)
 	if rng.randf() < Arcade.own_floor_chance(level):
@@ -88,15 +93,24 @@ func pick_floor(here: int, level: int) -> int:
 	return floor_index
 
 
-## Случайный из годных; годных нет — -1.
+## A random one of the eligible ones; none eligible — -1.
 func pick(count: int) -> int:
 	return -1 if count <= 0 else rng.randi_range(0, count - 1)
 
 
-## Ближе ли дверь на этаже [param floor_index] в [param door_x] к Otto, чем
-## [member BuildingRules.agent_release_gap]. По умолчанию запрета нет, как в ROM
-## (ADR-0053, решение 3).
+## Whether the door on floor [param floor_index] at [param door_x] is closer to Otto than
+## [member BuildingRules.agent_release_gap]. By default there is no ban, as in ROM
+## (ADR-0053, decision 3).
 func hugs(rules: BuildingRules, floor_index: int, here: int, door_x: float, otto: Node3D) -> bool:
 	if floor_index != here:
 		return false
-	return absf(door_x - otto.global_position.x) < rules.agent_release_gap
+	# Just after Otto's return the gap is wider ([member BuildingRules.agent_respawn_gap]).
+	var gap := rules.agent_release_gap
+	if _calm_left > 0.0:
+		gap = maxf(gap, rules.agent_respawn_gap)
+	return absf(door_x - otto.global_position.x) < gap
+
+
+## Whether the calm after Otto's return still holds: tests.
+func is_calm() -> bool:
+	return _calm_left > 0.0

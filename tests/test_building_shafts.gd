@@ -1,17 +1,17 @@
 extends GutTest
 
-## Тесты шахт и эскалаторов: из чего складывается спуск.
+## Tests of shafts and escalators: what the descent is made of.
 ##
-## С M18 шахты перехлёстываются и число путей растёт книзу (ADR-0024, решение 3),
-## а эскалаторы стоят полосой у порога и на разрывах перехлёста (решение 4). Обе
-## вещи проверяются по раскладке, без узлов и сцены, и потому на десятках сидов
-## за доли секунды — а дыры в генерации вылезают именно на редких.
+## Since M18 shafts overlap and the number of routes grows toward the bottom (ADR-0024, decision 3),
+## and escalators stand in a band at the threshold and at overlap gaps (decision 4). Both
+## things are checked by the layout, without nodes and a scene, and therefore on dozens of seeds
+## in fractions of a second — and holes in generation show up exactly on rare ones.
 ##
-## Своим файлом, а не в [code]test_building_plan.gd[/code]: тот уперся в потолок
-## публичных методов, и спуск — самая крупная его часть.
+## In its own file, not in [code]test_building_plan.gd[/code]: that one hit the ceiling
+## of public methods, and the descent is its largest part.
 
-## Сиды, на которых проверяются правила. Здание случайно, и одна проверка на
-## одном сиде подтверждает только его.
+## Seeds the rules are checked on. The building is random, and one check on
+## one seed confirms only that seed.
 const SEEDS: Array[int] = [1, 2, 3, 5, 8, 13, 21, 34]
 
 
@@ -19,8 +19,8 @@ func _rules() -> BuildingRules:
 	return BuildingRules.new()
 
 
-## Уровень без шахты — это уровень, с которого не уехать. Перехлёст при этом
-## не только допустим, но и обязателен книзу: ADR-0024, решение 3.
+## A floor without a shaft is a floor one cannot ride away from. Overlap here
+## is not only allowed but required toward the bottom: ADR-0024, decision 3.
 func test_shafts_cover_every_floor() -> void:
 	var rules := _rules()
 	var plan := BuildingPlan.generate(rules, 3)
@@ -34,17 +34,17 @@ func test_shafts_cover_every_floor() -> void:
 	assert_true(serving.has(BuildingRules.ROOF), "верхняя шахта доходит до крыши")
 
 
-## Короткая шахта — не шахта: кабине в ней некуда ехать.
+## A short shaft is not a shaft: the cab in it has nowhere to go.
 ##
-## Длину задаёт [code]_shaft_length[/code], но дно обрезается по дну здания, и
-## открытая у самого низа полоса выходила короче правила — на сиде 2 такая
-## стояла на 29-м этаже одна-одинёшенька. Ловится это только на редком сиде,
-## поэтому проверка идёт по всем сразу.
+## Length is set by [code]_shaft_length[/code], but the bottom is cut at the building's bottom, and
+## a band opened at the very bottom came out shorter than the rule — on seed 2 one such
+## stood on floor 29 all on its own. This is caught only on a rare seed,
+## so the check runs over all of them at once.
 ##
-## Порог — [constant BuildingRules.MIN_SHAFT_FLOORS], четыре этажа, и четыре они
-## не случайно: двухэтажная пара M18b возит только между [code]top + 1[/code] и
-## [code]bottom - 1[/code], и в шахте покороче ей ехать некуда (ADR-0025,
-## решение 2).
+## The threshold is [constant BuildingRules.MIN_SHAFT_FLOORS], four floors, and four is
+## not accidental: the M18b two-storey pair travels only between [code]top + 1[/code] and
+## [code]bottom - 1[/code], and in a shorter shaft it has nowhere to go (ADR-0025,
+## decision 2).
 func test_no_shaft_is_too_short_to_ride() -> void:
 	var rules := _rules()
 	for building_seed: int in SEEDS:
@@ -60,8 +60,8 @@ func test_no_shaft_is_too_short_to_ride() -> void:
 			)
 
 
-## Чем ниже, тем больше путей — главный вывод сверки с оригиналом, где на нижних
-## семи этажах сходятся пять шахт, а в верхней трети работает одна.
+## The lower, the more routes — the main conclusion of the check against the original, where on
+## the bottom seven floors five shafts converge, while in the upper third one works.
 func test_paths_multiply_towards_the_ground() -> void:
 	var rules := _rules()
 	for building_seed in range(1, 12):
@@ -81,7 +81,7 @@ func test_paths_multiply_towards_the_ground() -> void:
 		var bottom := int(serving.get(rules.floors - 1, 0))
 		assert_eq(top, 1, "наверху спуск безальтернативен")
 		assert_eq(above, rules.shafts_max, "над подвалом сходятся все")
-		# В подвал — одна жребием, как в ROM (ADR-0038, решение 3).
+		# To the basement — one, by draw, as in the ROM (ADR-0038, decision 3).
 		assert_eq(bottom, 1, "в подвал спускается одна")
 
 
@@ -93,11 +93,11 @@ func test_neighbouring_shafts_stand_in_different_columns() -> void:
 		assert_ne(here, below, "иначе спуск свёлся бы к «зажать вниз»")
 
 
-## Со дна шахты надо как-то спуститься: либо другая шахта берёт этот этаж
-## и следующий разом, либо на этаже стоит эскалатор (ADR-0024, решение 4).
+## From the bottom of a shaft one has to get down somehow: either another shaft takes this floor
+## and the next one at once, or an escalator stands on the floor (ADR-0024, decision 4).
 ##
-## До M18 шахты шли встык и эскалатор был обязан стоять на каждом стыке. Теперь
-## шахты перехлёстываются, и эскалатор нужен только там, где перехлёста не вышло.
+## Before M18 shafts ran end to end and an escalator had to stand at every joint. Now
+## shafts overlap, and an escalator is needed only where there is no overlap.
 func test_every_shaft_bottom_is_bridged() -> void:
 	for building_seed in range(1, 12):
 		var plan := BuildingPlan.generate(_rules(), building_seed)
@@ -120,9 +120,9 @@ func test_every_shaft_bottom_is_bridged() -> void:
 			)
 
 
-## Эскалаторы живут полосой у порога, где шахта башни кончается над стилобатом
-## (ADR-0024, решение 4). Всё, что вне полосы, оправдано разрывом: там кончилась
-## шахта и другая этот стык не перекрыла.
+## Escalators live in a band at the threshold, where the tower shaft ends above the podium
+## (ADR-0024, decision 4). Everything outside the band is justified by a gap: a shaft ended
+## there and no other one covered that joint.
 func test_escalators_live_in_the_band_or_bridge_a_gap() -> void:
 	var rules := _rules()
 	for building_seed in SEEDS:
@@ -143,8 +143,8 @@ func test_escalators_live_in_the_band_or_bridge_a_gap() -> void:
 		assert_gt(in_band, 0, "сид %d: полоса эскалаторов пуста" % building_seed)
 
 
-## Проём эскалатора лежит сбоку от площадки, и подойти к ней надо, не перейдя его.
-## Иначе Otto, идущий от лифта, проваливается на этаж ниже мимо эскалатора.
+## The escalator opening lies to the side of the landing, and one must reach it without crossing it.
+## Otherwise Otto, walking from the lift, falls to the floor below past the escalator.
 func test_escalator_pad_shields_its_gap_from_the_shaft() -> void:
 	var rules := _rules()
 	for building_seed in range(1, 12):
@@ -163,8 +163,8 @@ func test_escalator_pad_shields_its_gap_from_the_shaft() -> void:
 			)
 
 
-## Шахта проходит сквозь этажи разной ширины, и её столбец должен стоять
-## на каждом из них: здание расширяется книзу, самый тесный — верх полосы.
+## A shaft passes through floors of different widths, and its column must stand
+## on each of them: the building widens toward the bottom, the tightest is the top of the band.
 func test_every_shaft_stands_on_a_slot_its_whole_band_offers() -> void:
 	var rules := _rules()
 	for building_seed: int in SEEDS:
@@ -179,17 +179,17 @@ func test_every_shaft_stands_on_a_slot_its_whole_band_offers() -> void:
 				)
 
 
-## Пассажир проходит сквозь проём, а не сквозь плиту.
+## The passenger passes through the opening, not through the slab.
 ##
-## С M18b ломаная поездки — площадка по этажу до проёма и один прямой пролёт
-## вниз ([ADR-0025](../docs/adr/0025-shafts-escalators-and-riders.md), решение 4).
-## Перегиб отодвинут внутрь дыры на [constant EscalatorSpot.BEND_CLEARANCE],
-## и весь запас там — 15 см: сквозь проём идёт не линия, а тело шириной
-## в полкорпуса. Правится это одним числом в правилах — шириной проёма или
-## его отступом, — и тогда плечо съедается молча.
+## Since M18b the ride polyline is a landing along the floor up to the opening and one straight
+## flight down ([ADR-0025](../docs/adr/0025-shafts-escalators-and-riders.md), decision 4).
+## The bend is moved inside the hole by [constant EscalatorSpot.BEND_CLEARANCE],
+## and the whole margin there is 15 cm: what goes through the opening is not a line but a body
+## half a torso wide. It is changed by one number in the rules — the opening width or
+## its offset — and then the shoulder gets eaten silently.
 ##
-## Проверяются обе опасные точки: начало пролёта, где он входит в перекрытие,
-## и его выход из-под плиты этажом ниже.
+## Both dangerous points are checked: the start of the flight, where it enters the slab,
+## and its exit from under the slab one floor below.
 func test_escalator_carries_its_rider_through_the_gap() -> void:
 	var rules := _rules()
 	for building_seed: int in SEEDS:
@@ -198,7 +198,7 @@ func test_escalator_carries_its_rider_through_the_gap() -> void:
 			var gap := escalator.gap(rules)
 			var bend_x := escalator.x + escalator.bend(rules).x
 			var end_x := escalator.x + escalator.towards * rules.escalator_run
-			# Где пролёт выходит из-под плиты: доля спуска, пройденная к её низу.
+# Where the flight comes out from under the slab: the share of the descent done to its underside.
 			var under := bend_x + (end_x - bend_x) * rules.slab_height / rules.floor_height
 			for at: float in [bend_x, under]:
 				assert_true(
@@ -217,12 +217,12 @@ func _shaft_x_on(plan: BuildingPlan, floor_index: int) -> float:
 	return 0.0
 
 
-## Пар на здание не больше двух, и каждая стоит в шахте, которая её держит.
+## No more than two pairs per building, and each stands in a shaft that holds it.
 ##
-## «Двухэтажная кабина в шахте на три этажа» — это неподвижный лифт: ярусы
-## занимают по высоте два этажа, и возить остаётся между одним (ADR-0025,
-## решение 2). Поэтому проверяется не только число пар, но и то, что диапазон
-## их хода не выродился.
+## "A two-storey cab in a three-floor shaft" is a motionless lift: the decks
+## take up two floors in height, and only one remains to travel (ADR-0025,
+## decision 2). So not only the number of pairs is checked, but also that the range
+## of their travel has not degenerated.
 func test_double_deck_pairs_are_few_and_fit_their_shaft() -> void:
 	var rules := _rules()
 	for building_seed: int in SEEDS:
@@ -249,12 +249,12 @@ func test_double_deck_pairs_are_few_and_fit_their_shaft() -> void:
 		assert_lte(pairs, BuildingDecks.MOST, "сид %d: пар в здании %d" % [building_seed, pairs])
 
 
-## Пара выпадает в каждом здании, где для неё есть место.
+## A pair appears in every building where there is room for it.
 ##
-## Замер, а не пожелание: «не в каждом здании, примерно в одном из трёх» из
-## ADR-0024 было числом выдуманным, и при нём диковину не увидело бы
-## большинство партий. Условие места при этом жёсткое, поэтому доля меряется
-## числом — если она однажды просядет, это будет видно здесь, а не в игре.
+## A measurement, not a wish: "not in every building, about one in three" from
+## ADR-0024 was a made-up number, and with it most games would never see
+## the curiosity. The room condition is strict, so the share is measured
+## by number — if it ever drops, it will be visible here, not in the game.
 func test_double_deck_shows_up_in_every_building() -> void:
 	var rules := _rules()
 	var with_pair := 0
@@ -267,11 +267,11 @@ func test_double_deck_shows_up_in_every_building() -> void:
 	assert_eq(with_pair, 40, "пара нашла себе шахту в каждом здании из сорока")
 
 
-## Пара не запирает спуск: здание с ней проходимо на любом сиде.
+## A pair does not block the descent: a building with it is traversable on any seed.
 ##
-## Стережёт то, ради чего пара ставится последней и снимается при поломке:
-## условие «на каждом этаже есть другой путь» смотрит на этаж целиком, а ходят
-## по кускам этажа, и соседняя шахта может оказаться за проёмом.
+## Guards the reason a pair is placed last and removed on breakage:
+## the condition "every floor has another route" looks at the floor as a whole, while people walk
+## on floor pieces, and the neighbouring shaft may turn out to be beyond an opening.
 func test_double_deck_never_locks_the_descent() -> void:
 	var rules := _rules()
 	for building_seed in range(1, 41):

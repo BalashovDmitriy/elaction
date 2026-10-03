@@ -1,12 +1,12 @@
 extends GutTest
 
-## Подвал заперт, пока не собраны все документы (M24b): шахта в подвал не везёт
-## туда, проём над ним закрыт люком, последний документ открывает и то и другое.
+## The basement is locked until all documents are collected (M24b): the shaft to the basement
+## does not go there, the opening above it is closed by a hatch, the last document opens both.
 ##
-## Правило кабины проверяется без сцены — на [ElevatorMotion]; люки — на
-## раскладке многих сидов: здание генерируется, и дыра в подвал на одном сиде
-## из сорока — это дыра. Сборка с физикой — на маленьком здании: Otto стоит на
-## люке и проваливается, только когда подвал открыт.
+## The cab rule is checked without a scene — on [ElevatorMotion]; the hatches — on the
+## layout of many seeds: the building is generated, and a hole into the basement on one seed
+## out of forty is a hole. The physics assembly is on a small building: Otto stands on the
+## hatch and falls through only when the basement is open.
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
@@ -16,13 +16,13 @@ const MIDDLE: float = 100.0
 const BOTTOM: float = 200.0
 const STEP: float = 0.1
 
-## Сколько сидов раскладки проверять.
+## How many layout seeds to check.
 const SEEDS: int = 40
 const SETTLE_FRAMES: int = 5
-## Сколько шагов физики дать Otto упасть и встать: падение на этаж — меньше
-## секунды, остальное запас.
+## How many physics steps to give Otto to fall and stand up: a fall by one floor is under
+## a second, the rest is margin.
 const FALL_FRAMES: int = 90
-## Сколько шагов физики ждать, пока труп уляжется и уснёт.
+## How many physics steps to wait for the corpse to settle and sleep.
 const SLEEP_FRAMES: int = 600
 
 
@@ -75,7 +75,7 @@ func test_the_unlocked_car_reaches_the_bottom() -> void:
 	assert_almost_eq(_run(motion, 10.0, ElevatorMotion.DOWN, true), BOTTOM, 0.01)
 
 
-## Кабина, уже стоявшая внизу, когда подвал заперли, не едет «вниз» наверх.
+## A cab already standing at the bottom when the basement was locked does not go "down" upward.
 func test_the_lock_does_not_drag_a_car_already_below() -> void:
 	var motion := _shaft(2)
 	motion.bottom_locked = true
@@ -90,8 +90,8 @@ func test_a_one_floor_shaft_has_nothing_to_lock() -> void:
 	assert_almost_eq(_run(motion, 1.0, ElevatorMotion.DOWN, true), TOP, 0.01)
 
 
-## На любом сиде над подвалом нет открытого проёма шахты: каждый закрыт люком
-## ровно по своей ширине, в перекрытии этажа над подвалом.
+## On any seed there is no open shaft opening above the basement: each is closed by a hatch
+## exactly its width, in the slab of the floor above the basement.
 func test_every_shaft_into_the_basement_is_covered_on_any_seed() -> void:
 	var rules := BuildingRules.new()
 	var bottom := rules.floors - 1
@@ -121,9 +121,9 @@ func test_every_shaft_into_the_basement_is_covered_on_any_seed() -> void:
 		)
 
 
-## На любом сиде ни одна кабина в подвал не спускается, пока он заперт: ни сама,
-## ни под пассажиром. Кабины — по остановкам раскладки, как их ставит уровень;
-## у двухэтажной пары в подвал спускается нижний ярус, этажом ниже ведущего.
+## On any seed no cab goes down to the basement while it is locked: neither by itself
+## nor with a passenger. Cabs follow the layout's stops, as the level places them;
+## for a double-deck pair the lower deck goes to the basement, one floor below the leading one.
 func test_no_car_reaches_the_basement_on_any_seed() -> void:
 	var rules := BuildingRules.new()
 	var bottom := rules.floors - 1
@@ -139,8 +139,8 @@ func test_no_car_reaches_the_basement_on_any_seed() -> void:
 			for index in range(shaft.top, lowest + 1):
 				stops.append(rules.floor_surface(index))
 			var motion := ElevatorMotion.new()
-			# Быстрая кабина и короткие паузы: за прогон она обходит шахту
-			# туда и обратно не раз.
+			# A fast cab and short pauses: over the run it goes around the shaft
+			# there and back more than once.
 			motion.speed = 40.0
 			motion.floor_pause = 0.1
 			motion.setup(stops)
@@ -171,7 +171,7 @@ func _building(documents: int) -> GreyboxLevel:
 	return level
 
 
-## Спит ли тело для физики — не «медленно движется», а уснуло.
+## Whether the body is asleep for physics — not "moving slowly" but asleep.
 func _sleeping(ragdoll: Ragdoll) -> bool:
 	for part: PhysicalBone3D in ragdoll.parts.values():
 		if not PhysicsServer3D.body_get_state(part.get_rid(), PhysicsServer3D.BODY_STATE_SLEEPING):
@@ -183,7 +183,7 @@ func _lock_of(level: GreyboxLevel) -> BasementLock:
 	return level.get_node_or_null("BasementLock") as BasementLock
 
 
-## Кабины здания, спускающиеся в подвал.
+## The building's cabs that go down to the basement.
 func _basement_cars(level: GreyboxLevel) -> Array[ElevatorCar]:
 	var found: Array[ElevatorCar] = []
 	var basement := level.rules.floor_surface(level.rules.floors - 1)
@@ -203,8 +203,8 @@ func test_the_building_without_documents_leaves_the_basement_open() -> void:
 		assert_false(car.is_bottom_locked())
 
 
-## Otto на люке над подвалом стоит, а не падает; последний документ открывает
-## люк и кабины — и тот же Otto проваливается в подвал живым: падение на этаж.
+## Otto on the hatch above the basement stands rather than falls; the last document opens
+## the hatch and cabs — and the same Otto falls into the basement alive: a one-floor fall.
 func test_the_hatch_holds_until_the_last_document() -> void:
 	var level := await _building(1)
 	var lock := _lock_of(level)
@@ -225,7 +225,7 @@ func test_the_hatch_holds_until_the_last_document() -> void:
 	assert_true(level.otto.is_grounded(), "стоит на створках")
 	assert_eq(rules.floor_index_near(at.y), above, "над подвалом, а не в нём")
 
-	# Прыжок на месте: приземляется на те же створки.
+	# A jump in place: lands on the same leaves.
 	Input.action_press(&"jump")
 	await get_tree().physics_frame
 	Input.action_release(&"jump")
@@ -249,8 +249,8 @@ func test_the_hatch_holds_until_the_last_document() -> void:
 	assert_eq(lock.find_children("Hatch", "", false, false).size(), 0, "створки разошлись и убраны")
 
 
-## Труп, уснувший на створках, падает в подвал вместе с ними: ушедшая опора
-## спящее тело сама не будит, и оно висело бы над проёмом (ADR-0043, решение 12).
+## A corpse asleep on the leaves falls into the basement together with them: a removed support does
+## not wake a sleeping body by itself, and it would hang over the opening (ADR-0043, decision 12).
 func test_a_corpse_asleep_on_the_hatch_falls_when_it_opens() -> void:
 	var level := await _building(1)
 	var rules := level.rules
@@ -283,8 +283,8 @@ func test_a_corpse_asleep_on_the_hatch_falls_when_it_opens() -> void:
 	)
 
 
-## Запертые створки — тяжёлая сталь, а не плитка пола (кадр M24b): зебра по
-## кромке и красные огоньки, пока заперто; последний документ огоньки гасит.
+## Locked leaves are heavy steel, not floor tiles (M24b shot): hazard stripes along
+## the edge and red indicator lights while locked; the last document puts the lights out.
 func test_the_locked_hatch_reads_as_a_steel_shutter() -> void:
 	var level := await _building(1)
 	var lock := _lock_of(level)
@@ -299,7 +299,7 @@ func test_the_locked_hatch_reads_as_a_steel_shutter() -> void:
 			assert_false((lamp as MeshInstance3D).visible, "открыто — погасли")
 
 
-## Шахта в подвал этого здания и её кабина.
+## This building's basement shaft and its cab.
 func _basement_shaft(level: GreyboxLevel) -> BuildingPlan.ShaftSpot:
 	for shaft in level.plan().shafts:
 		if shaft.bottom == level.rules.floors - 1:
@@ -307,7 +307,7 @@ func _basement_shaft(level: GreyboxLevel) -> BuildingPlan.ShaftSpot:
 	return null
 
 
-## Ставит кабину шахты [param shaft] на остановку этажа над подвалом.
+## Puts the cab of shaft [param shaft] at the stop of the floor above the basement.
 func _park_above_the_basement(
 	level: GreyboxLevel, car: ElevatorCar, shaft: BuildingPlan.ShaftSpot
 ) -> void:
@@ -315,12 +315,12 @@ func _park_above_the_basement(
 	var stops := PackedFloat32Array()
 	for index in range(shaft.top, lowest + 1):
 		stops.append(level.rules.floor_surface(index))
-	# Запертая остановка — последняя; кабина встаёт на предпоследнюю.
+	# The locked stop is the last; the cab stops at the one before.
 	car.setup(stops, stops.size() - 2)
 
 
-## Пассажир жмёт «вниз» в кабине над подвалом — кабина стоит, пока подвал
-## заперт, и едет до дна, когда открыт.
+## A passenger presses "down" in a cab above the basement — the cab stands while the basement
+## is locked, and goes to the bottom when it is open.
 func test_the_rider_goes_down_only_after_the_last_document() -> void:
 	var level := await _building(1)
 	var shaft := _basement_shaft(level)
@@ -352,7 +352,7 @@ func test_the_rider_goes_down_only_after_the_last_document() -> void:
 	assert_eq(rules.floor_index_near(at.y), rules.floors - 1, "и Otto с ней")
 
 
-## Стоящий на крыше кабины над подвалом вниз не уезжает: кабина разворачивается.
+## One standing on the roof of a cab above the basement does not go down: the cab turns back.
 func test_the_car_roof_does_not_carry_otto_into_the_basement() -> void:
 	var level := await _building(1)
 	var shaft := _basement_shaft(level)
@@ -365,7 +365,7 @@ func test_the_car_roof_does_not_carry_otto_into_the_basement() -> void:
 	)
 	level.otto.global_position = WorldSpace.to_scene(Vector2(shaft.x, roof - 0.05))
 	var deepest := -INF
-	# Пауза на этаже и попытка поехать вниз — пустая кабина разворачивается.
+	# A pause on the floor and an attempt to go down — the empty cab turns back.
 	for _frame: int in FALL_FRAMES * 4:
 		await get_tree().physics_frame
 		deepest = maxf(deepest, WorldSpace.to_plane(level.otto.global_position).y)

@@ -1,50 +1,50 @@
 class_name CarDetail
 extends Node3D
 
-## Одежда кабины лифта: стенки, потолок со светильником, поручень, пульт, а в
-## шахте — тросы и противовес (ADR-0031, решение 1).
+## Elevator cab dressing: walls, a ceiling with a fixture, a handrail, a control panel,
+## and in the shaft — ropes and a counterweight (ADR-0031, decision 1).
 ##
-## Только вид: тела кабины — пол, крыша, зона пассажира и давки — остаются в
-## [ElevatorCar] и не меняются (ADR-0025). Спереди кабина открыта, как в
-## оригинале: игрок видит, кто внутри. Светильник — эмиссия, не источник: бюджет
-## ламп кадра кабина не трогает.
+## Looks only: the cab's bodies — floor, roof, passenger and crush zones — stay in
+## [ElevatorCar] and do not change (ADR-0025). The cab is open at the front, as in the
+## original: the player sees who is inside. The fixture is emission, not a light source:
+## the cab does not touch the frame's lamp budget.
 
-## Глубина кабины, м: как у её пола в сцене.
+## Cab depth, m: the same as its floor in the scene.
 const DEPTH: float = 1.0
 
-## Стенка: толщина и то, насколько задняя отстоит от края пола.
+## Wall: thickness and how far the back one stands off the floor's edge.
 const WALL: float = 0.05
 
-## Стойки по углам открытого фасада.
+## Posts at the corners of the open front.
 const POST := Vector2(0.07, 0.07)
 
-## Боковые стенки — только угловые панели у задней: Otto входит в кабину сбоку,
-## и стенка во всю глубину выглядела бы стеной, сквозь которую он проходит.
+## Side walls — only corner panels at the back: Otto enters the cab from the side, and a
+## full-depth wall would look like a wall he walks through.
 const SIDE_DEPTH: float = 0.3
 
-## Поручень на задней стенке: высота над полом, сечение.
+## Handrail on the back wall: height above the floor, cross-section.
 const RAIL_RISE: float = 0.95
 const RAIL := Vector2(0.04, 0.06)
 
-## Пульт на задней стенке у правой стойки: размер и сколько кнопок.
+## Control panel on the back wall at the right post: size and how many buttons.
 const PANEL := Vector3(0.16, 0.42, 0.03)
 const PANEL_RISE: float = 1.05
 const BUTTONS: int = 5
 const BUTTON: float = 0.035
 
-## Светильник под потолком: полоса во всю ширину без краёв.
+## Ceiling fixture: a full-width strip without edges.
 const LIGHT := Vector3(0.0, 0.05, 0.3)
 
-## Тросы: сколько, толщина, разнос от середины кабины, м.
+## Ropes: how many, thickness, spread from the cab's middle, m.
 const CABLES: int = 3
 const CABLE: float = 0.025
 const CABLE_SPREAD: float = 0.14
 
-## Противовес: габарит и где он ходит — за задней стенкой кабины, у левого края.
+## Counterweight: bounds and where it travels — behind the cab's back wall, at the left edge.
 const WEIGHT := Vector3(0.3, 1.1, 0.16)
 const WEIGHT_Z: float = -DEPTH * 0.5 - 0.14
-## Отступ противовеса от края шахты, м: левее он проходил сквозь направляющую
-## ([constant BuildingShafts.RAIL_WIDTH], 0.18 м) — по глубине они перекрываются.
+## Counterweight offset from the shaft's edge, m: farther left it passed through the
+## rail ([constant BuildingShafts.RAIL_WIDTH], 0.18 m) — they overlap in depth.
 const WEIGHT_INSET: float = 0.22
 
 const STEEL := Color(0.42, 0.43, 0.45)
@@ -54,10 +54,10 @@ const CABIN_LIGHT := Color(1.0, 0.95, 0.85)
 const BUTTON_LIT := Color(1.0, 0.75, 0.35)
 const CABLE_COLOR := Color(0.12, 0.12, 0.13)
 
-## Кабина по типу здания (ADR-0057, решение 6). Отель — латунь и дерево,
-## тёплый свет, зеркало над поручнем; офис — шлифованная нержавейка и холодный
-## свет; жилой дом — грузовая кабина из крашеной стали, отбойный брус, лампа в
-## решётке и складная решётка-гармошка спереди. Тела у всех одни (ADR-0025).
+## Cab by building kind (ADR-0057, decision 6). Hotel — brass and wood, warm light, a
+## mirror above the handrail; office — brushed stainless steel and cold light;
+## residential — a freight cab of painted steel, a bump rail, a caged lamp and a
+## folding scissor gate at the front. The bodies are the same for all (ADR-0025).
 const WOOD := Color(0.3, 0.17, 0.1)
 const BRASS := Color(0.78, 0.6, 0.3)
 const MIRROR := Color(0.2, 0.22, 0.23)
@@ -65,71 +65,70 @@ const WARM_LIGHT := Color(1.0, 0.8, 0.55)
 const PAINTED := Color(0.34, 0.39, 0.34)
 const BUMPER := Color(0.35, 0.25, 0.15)
 const GATE := Color(0.1, 0.1, 0.1)
-## Зеркало отеля над поручнем: низ и высота, доля ширины задней стенки.
+## Hotel mirror above the handrail: bottom and height, share of the back wall's width.
 const MIRROR_RISE: float = 1.05
 const MIRROR_HEIGHT: float = 0.9
 const MIRROR_SHARE: float = 0.6
-## Отбойный брус грузовой кабины: высота середины, сечение.
+## Freight cab bump rail: height of the middle, cross-section.
 const BUMPER_RISE: float = 0.4
 const BUMPER_SIZE := Vector2(0.12, 0.06)
 
-## Решётка грузовой кабины: шаг прутьев, их сечение, доля высоты кабины,
-## ширина сложенной гармошки у правой стойки, м, и время складывания, с.
-## Закрыта, пока сойти нельзя, и сложена, пока можно — по окну выхода ROM
-## ([method ElevatorMotion.can_step_out], @36F2): вид правила, а не новое
-## правило. Прутья тонкие и тёмные — Otto за ними читается.
+## Freight cab gate: bar step, their cross-section, share of the cab's height, width of
+## the folded gate at the right post, m, and folding time, s. Closed while one cannot
+## step out and folded while one can — by the ROM's step-out window
+## ([method ElevatorMotion.can_step_out], @36F2): a look of the rule, not a new rule.
+## The bars are thin and dark — Otto reads behind them.
 const GATE_STEP: float = 0.13
 const GATE_BAR := Vector2(0.014, 0.014)
 const GATE_SHARE: float = 0.88
 const GATE_FOLDED: float = 0.2
 const GATE_TIME: float = 0.35
-## Звук решётки: лязг стали, слышно рядом.
+## Gate sound: a clang of steel, heard nearby.
 const GATE_REACH: float = 12.0
 const GATE_DB: float = -6.0
 
 var _width: float = 1.2
-## Тип здания кабины ([method dress_as]): по нему материалы и решётка.
+## The cab's building kind ([method dress_as]): materials and the gate go by it.
 var _kind: BuildingIdentity.Kind = BuildingIdentity.Kind.OFFICE
-## Решётка грузовой кабины: прутья и верхняя и нижняя тяги; 0 — закрыта, 1 —
-## сложена.
+## Freight cab gate: bars and the top and bottom bars; 0 — closed, 1 — folded.
 var _gate_bars: Array[MeshInstance3D] = []
 var _gate_rails: Array[MeshInstance3D] = []
 var _gate_open: float = 1.0
 var _gate_wanted: bool = true
-## Корпус кабины отдельным узлом: его пересобирает [method build], а тросы и
-## противовес живут дольше — их заводит [method hang_cables] один раз.
+## The cab body as a separate node: [method build] rebuilds it, while the ropes and
+## counterweight live longer — [method hang_cables] sets them up once.
 var _body: Node3D = null
 var _height: float = 3.0
 var _cables: Array[MeshInstance3D] = []
 var _weight_cables: Array[MeshInstance3D] = []
 var _weight: MeshInstance3D = null
-## Докуда в шахте ходит кабина: нижняя и верхняя остановки и верх шахты, по y сцены.
+## How far the cab travels in the shaft: bottom and top stops and the shaft top, by scene y.
 var _low: float = 0.0
 var _high: float = 0.0
 var _top: float = 0.0
 
 
-## Одевает кабину по типу здания [param kind]. Звать до [method build]: его
-## зовёт [method ElevatorCar.fit_to_story].
+## Dresses the cab by building kind [param kind]. Call before [method build]: it is
+## called by [method ElevatorCar.fit_to_story].
 func dress_as(kind: BuildingIdentity.Kind) -> void:
 	_kind = kind
 
 
-## Есть ли у кабины решётка: только у грузовой жилого дома.
+## Whether the cab has a gate: only the residential freight one.
 func has_gate() -> bool:
 	return not _gate_bars.is_empty()
 
 
-## Насколько сложена решётка: 1 — сложена, 0 — закрыта.
+## How folded the gate is: 1 — folded, 0 — closed.
 func gate_openness() -> float:
 	return _gate_open
 
 
-## Складывает решётку, когда из кабины можно сойти, и раздвигает, когда
-## нельзя ([param open]), за [constant GATE_TIME] с; лязг — на смене, если
-## [param audible]. Окно выхода открывается на каждом проезжаемом этаже, и
-## лязгали бы все пустые кабины дома, — звенящие пустые кабины пользователь
-## отверг ещё в M21 (ADR-0052, решение 7): слышно только кабину с Otto.
+## Folds the gate when one can step out of the cab and extends it when one cannot
+## ([param open]), over [constant GATE_TIME] s; the clang — on the change, if
+## [param audible]. The step-out window opens on every floor passed, and all the
+## building's empty cabs would clang — the user rejected clanging empty cabs back in M21
+## (ADR-0052, decision 7): only the cab with Otto is heard.
 func tend_gate(open: bool, delta: float, audible: bool = true) -> void:
 	if _gate_bars.is_empty():
 		return
@@ -144,8 +143,8 @@ func tend_gate(open: bool, delta: float, audible: bool = true) -> void:
 		_place_gate()
 
 
-## Собирает одежду под ширину кабины и просвет этажа. Зовётся из
-## [method ElevatorCar.fit_to_story] и пересобирает всё заново.
+## Builds the dressing for the cab's width and the floor's clearance. Called from
+## [method ElevatorCar.fit_to_story] and rebuilds everything anew.
 func build(width: float, clear_height: float) -> void:
 	if _body != null:
 		_body.queue_free()
@@ -166,14 +165,14 @@ func build(width: float, clear_height: float) -> void:
 		BuildingIdentity.Kind.RESIDENTIAL:
 			steel = GreyboxLook.metal(STEEL_DARK)
 			brushed = GreyboxLook.metal(PAINTED)
-	# Пол кабины — в её нуле: плита пола лежит под ним, плита крыши — от
-	# просвета без толщины плиты до просвета. Стенки идут от пола до крыши;
-	# отсчитанные от верха плиты пола, они висели на 18 см выше него.
+	# The cab floor is at its origin: the floor slab lies under it, the roof slab — from
+	# the clearance minus the slab thickness up to the clearance. The walls run from floor
+	# to roof; counted from the top of the floor slab, they hung 18 cm above it.
 	var inner := clear_height - ElevatorCar.SLAB_THICKNESS
 	var middle := inner * 0.5
 	var back_z := -DEPTH * 0.5 + WALL * 0.5
 
-	# Задняя стенка с двумя швами, боковые — угловые панели у задней.
+	# The back wall with two seams, the side ones — corner panels at the back.
 	_part(Vector3(width - WALL * 2.0, inner, WALL), Vector3(0.0, middle, back_z), brushed)
 	for seam: float in [-width / 6.0, width / 6.0]:
 		_part(Vector3(0.012, inner, 0.01), Vector3(seam, middle, back_z + WALL * 0.5), steel)
@@ -188,7 +187,7 @@ func build(width: float, clear_height: float) -> void:
 			steel
 		)
 
-	# Светильник, поручень, пульт с кнопками.
+	# Fixture, handrail, control panel with buttons.
 	var light_y := clear_height - ElevatorCar.SLAB_THICKNESS - LIGHT.y * 0.5
 	_part(
 		Vector3(width - WALL * 4.0, LIGHT.y, LIGHT.z),
@@ -214,7 +213,7 @@ func build(width: float, clear_height: float) -> void:
 		)
 
 
-## Своё у типа: зеркало отеля, брус, лампа в решётке и решётка грузовой.
+## The kind's own: the hotel mirror, the bump rail, the caged lamp and the freight gate.
 func _dress_by_kind(width: float, inner: float, back_z: float, light_y: float) -> void:
 	_gate_bars.clear()
 	_gate_rails.clear()
@@ -228,7 +227,7 @@ func _dress_by_kind(width: float, inner: float, back_z: float, light_y: float) -
 			)
 		BuildingIdentity.Kind.RESIDENTIAL:
 			var dark := GreyboxLook.metal(STEEL_DARK)
-			# Рифлёный пол грузовой — тот же лист, что порог портала шахты.
+			# The freight cab's ribbed floor — the same sheet as the shaft portal's threshold.
 			_part(
 				Vector3(width - WALL * 2.0, 0.01, DEPTH - WALL),
 				Vector3(0.0, 0.005, WALL * 0.5),
@@ -248,8 +247,8 @@ func _dress_by_kind(width: float, inner: float, back_z: float, light_y: float) -
 			_build_gate(width, inner)
 
 
-## Решётка-гармошка у переднего края: прутья и две тяги. Ставит их
-## [method _place_gate] по тому, насколько она сложена.
+## The scissor gate at the front edge: bars and two rails. They are placed by
+## [method _place_gate] according to how folded it is.
 func _build_gate(width: float, inner: float) -> void:
 	var height := inner * GATE_SHARE
 	var iron := GreyboxLook.metal(GATE)
@@ -269,8 +268,8 @@ func _build_gate(width: float, inner: float) -> void:
 	_place_gate()
 
 
-## Расставляет прутья решётки: раздвинутая — на всю ширину проёма, сложенная —
-## пачкой у правой стойки.
+## Places the gate's bars: extended — across the whole opening width, folded — in a
+## bundle at the right post.
 func _place_gate() -> void:
 	if _gate_bars.is_empty():
 		return
@@ -288,8 +287,8 @@ func _place_gate() -> void:
 		rail.position.z = z
 
 
-## Заводит тросы и противовес: кабина ходит между остановками [param low] и
-## [param high] (y сцены её низа), шахта кончается на [param top].
+## Sets up the ropes and counterweight: the cab travels between stops [param low] and
+## [param high] (scene y of its bottom), the shaft ends at [param top].
 func hang_cables(low: float, high: float, top: float) -> void:
 	_low = low
 	_high = high
@@ -306,15 +305,15 @@ func hang_cables(low: float, high: float, top: float) -> void:
 	add_child(_weight)
 
 
-## Переносит верх шахты [param top] (y сцены): докуда идут тросы и выше чего
-## противовес не поднимается. [method hang_cables] ставит его над потолком
-## верхней остановки, а у шахты на крышу над ней небо — верх там задаёт уровень.
+## Moves the shaft top [param top] (scene y): how far the ropes go and above what the
+## counterweight does not rise. [method hang_cables] puts it above the top stop's
+## ceiling, while a shaft to the roof has sky above it — the level sets the top there.
 func set_top(top: float) -> void:
 	_top = top
 
 
-## Ставит тросы и противовес под кабину, низ которой сейчас на [param car_y].
-## Противовес ходит навстречу: кабина внизу — он наверху.
+## Places the ropes and counterweight for the cab whose bottom is now at [param car_y].
+## The counterweight moves the opposite way: the cab is down — it is up.
 func follow(car_y: float, car_x: float) -> void:
 	if _weight == null:
 		return
@@ -322,8 +321,9 @@ func follow(car_y: float, car_x: float) -> void:
 	for index in _cables.size():
 		var x := car_x + (float(index) - float(CABLES - 1) * 0.5) * CABLE_SPREAD
 		_stretch(_cables[index], x, roof, _top, -0.1)
-	# Выше верха шахты противовес не идёт: у шахты на крышу верх — в машинном
-	# отделении, и без упора противовес торчал бы над ним в небо.
+	# The counterweight does not go above the shaft top: in a shaft to the roof the top is
+	# in the machine room, and without a stop the counterweight would stick out above it
+	# into the sky.
 	var weight_y := minf(_low + _high - car_y + _height * 0.5, _top - WEIGHT.y * 0.5)
 	var weight_x := car_x - _width * 0.5 + WEIGHT_INSET + WEIGHT.x * 0.5
 	_weight.global_position = Vector3(weight_x, weight_y, WEIGHT_Z)
@@ -338,7 +338,7 @@ func _part(size: Vector3, at: Vector3, material: StandardMaterial3D) -> void:
 	_body.add_child(part)
 
 
-## Трос без места: ставит его [method follow] каждый шаг.
+## A rope without a place: [method follow] places it every step.
 func _loose(material: StandardMaterial3D) -> MeshInstance3D:
 	var line := GreyboxLook.box(Vector3.ONE, material)
 	line.top_level = true
@@ -346,7 +346,7 @@ func _loose(material: StandardMaterial3D) -> MeshInstance3D:
 	return line
 
 
-## Растягивает трос по вертикали от [param from] до [param to].
+## Stretches the rope vertically from [param from] to [param to].
 func _stretch(line: MeshInstance3D, x: float, from: float, to: float, z: float) -> void:
 	var length := maxf(to - from, 0.01)
 	line.scale = Vector3(CABLE, length, CABLE)

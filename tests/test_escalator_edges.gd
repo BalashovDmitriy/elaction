@@ -1,10 +1,10 @@
 extends GutTest
 
-## Эскалаторы у края этажа, под 45°, зигзагом (ADR-0043, решение 15).
+## Escalators at the floor edge, at 45°, zigzagging (ADR-0043, decision 15).
 ##
-## Посередине этажа эскалатор выглядел нелепо. Теперь он спускается к краю:
-## верхняя площадка внутри этажа, нижняя — у края этажа ниже, проём тянется от
-## площадки к краю и к площадке ведёт пол, а не прыжок через дыру.
+## In the middle of a floor an escalator looked absurd. Now it descends to the edge: the upper
+## landing is inside the floor, the lower one at the edge of the floor below, the opening runs from
+## the landing to the edge and floor leads to the landing, not a jump over a hole.
 
 const SEEDS: Array[int] = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
 
@@ -19,8 +19,8 @@ func test_the_flight_is_forty_five_degrees() -> void:
 	assert_almost_eq(angle, 45.0, 0.01, "пролёт под 45°")
 
 
-## Нижняя площадка — у края, до которого пролёт уходит: не дальше места от
-## отступа, и полотно смотрит к этому краю.
+## The lower landing is at the edge the run goes to: no further than a slot from
+## the margin, and the belt faces that edge.
 func test_every_escalator_lands_at_the_edge() -> void:
 	var rules := _rules()
 	var pitch := rules.slot_x(1) - rules.slot_x(0)
@@ -40,8 +40,8 @@ func test_every_escalator_lands_at_the_edge() -> void:
 			assert_lt(from_edge, rules.escalator_edge_margin + pitch, where + ": площадка у края")
 
 
-## Проём уходит от площадки к краю, и между серединой этажа и площадкой дыры
-## нет: к эскалатору доходят пешком.
+## The opening goes from the landing to the edge, and between the middle of the floor and the
+## landing there is no hole: the escalator is reached on foot.
 func test_the_gap_runs_from_the_pad_to_the_edge() -> void:
 	var rules := _rules()
 	for building_seed: int in SEEDS:
@@ -58,10 +58,10 @@ func test_the_gap_runs_from_the_pad_to_the_edge() -> void:
 				assert_gt(gap.x, escalator.x, where + ": площадка слева от проёма")
 
 
-## Эскалатор с этажа, на который пришёл другой, первым пробует спуск к другому
-## краю: зигзагом (решение 15). Второй на этаже — только в другую сторону, чем
-## первый. Правило проверяется напрямую: в зданиях по умолчанию эскалаторы подряд
-## почти не встают — пара с этажа выше занимает края этажа ниже.
+## An escalator from a floor another one arrived at first tries descending toward the other
+## edge: zigzag (decision 15). The second one on a floor — only in the opposite direction to
+## the first. The rule is checked directly: in default buildings consecutive escalators
+## hardly occur — the pair from the floor above takes the edges of the floor below.
 func test_the_next_escalator_tries_the_other_edge_first() -> void:
 	var plan := BuildingPlan.new()
 	var arrived := EscalatorSpot.new()
@@ -74,7 +74,7 @@ func test_the_next_escalator_tries_the_other_edge_first() -> void:
 	assert_eq(plan._escalator_sides(0, 5, 1.0), [-1.0] as Array[float], "второй — в другую сторону")
 
 
-## Площадка, на которую приехал эскалатор, не лежит в проёме следующего.
+## The landing an escalator arrived at does not lie in the next one's opening.
 func test_no_arrival_lands_in_the_next_gap() -> void:
 	var rules := _rules()
 	for building_seed: int in SEEDS:
@@ -95,7 +95,8 @@ func test_no_arrival_lands_in_the_next_gap() -> void:
 		assert_true(true, "сид %d разобран" % building_seed)
 
 
-## Лампа висит на потолке: под проёмом эскалатора с этажа выше её нет.
+## A lamp hangs on the ceiling: there is none under the opening of an escalator from the floor
+## above.
 func test_no_lamp_hangs_under_an_escalator_gap() -> void:
 	var rules := _rules()
 	for building_seed: int in SEEDS:
@@ -111,8 +112,8 @@ func test_no_lamp_hangs_under_an_escalator_gap() -> void:
 				)
 
 
-## Пролёт под 45° висит над этажом ниже от нижней площадки до верхней: стена
-## под ним прошла бы сквозь полотно.
+## A run at 45° hangs over the floor below from the lower landing to the upper: a wall
+## under it would pass through the belt.
 func test_no_wall_stands_under_a_flight() -> void:
 	var rules := _rules()
 	var half := rules.inner_wall_width * 0.5
@@ -131,7 +132,7 @@ func test_no_wall_stands_under_a_flight() -> void:
 				)
 
 
-## Под низом пролёта полотно ниже роста: обстановке там не место.
+## Under the bottom of the run the belt is below head height: no place for dressing there.
 func test_no_furniture_stands_under_the_low_flight() -> void:
 	var rules := _rules()
 	var under: Array[String] = []
