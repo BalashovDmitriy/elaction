@@ -1209,6 +1209,27 @@ Before the code: a check against the original and questions, as for any mileston
       in fog — find the cause (fog against the city SubViewport, depth precision, LOD) and fix
 - [ ] Shots of every animation, tests, code review, `check.ps1`, README
 
+### M24r · Settings by the monitor, agent release
+
+Requested by the user on 2026-10-03. Two unrelated things that are not animation. Before
+the code: a check against the original (for the release) and questions.
+
+- [ ] The frame limit list shows only what the monitor supports: limits up to its refresh
+      rate (`DisplayServer.screen_get_refresh_rate`), not a fixed 60–240 list. Today
+      `DisplayModes.FRAME_LIMITS` is fixed, because Godot 4.7 cannot enumerate screen modes
+- [ ] The same for resolutions (today they are already cut to what fits on the screen) and
+      auto-detection on first launch: the monitor's own resolution and refresh rate as the
+      defaults, the way quality is measured today; a change of monitor is noticed
+- [ ] Agent release paced: standing on the top floor after the roof, agents come out one
+      after another without a break — the stream needs a rhythm
+- [ ] No empty building below: once the agent slots are filled up top and those agents stay
+      alive, going down meets nobody — the whole building can be walked without agents.
+      Agents left behind must give their slots to the floors where Otto is (by the ROM, if
+      the original does it; `AGENT_KEEP_MARGIN`, `AgentSpawn`, ADR-0053 and ADR-0060,
+      decision 6, are where today's rules live)
+- [ ] Tests on any building: agents keep meeting Otto all the way down; code review,
+      `check.ps1`, README
+
 ### M25 · Online leaderboard (optional)
 
 The only part where a backend and docker compose will appear
