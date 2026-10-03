@@ -361,8 +361,8 @@ func kill(crushed: bool = false) -> void:
 	_states.kill()
 	corpse.fall(velocity)
 	_falling_over = FALLING_TIME
+	# Only the cry: the comic horn over the death is gone at the user's request.
 	Sounds.play(Sounds.OTTO_DEATH)
-	Sounds.play(Sounds.DEATH_JINGLE)
 	_repose()
 	died.emit()
 

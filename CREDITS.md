@@ -211,7 +211,6 @@ one sound. "Excerpt" is a cut from a track, such as an ending used as a jingle. 
 | `document` | Music Jingles: SAX16 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/music-jingles) |
 | `extra_life` | Inquisitive Vibraphone 09 | nomiqbomi | CC0 1.0 | [freesound.org](https://freesound.org/people/nomiqbomi/sounds/578401/) |
 | `building_bonus` | Rollin at 5 (excerpt) | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
-| `death_jingle` | horn_fail_wahwah_3 | TaranP | CC0 1.0 | [freesound.org](https://freesound.org/people/TaranP/sounds/362204/) |
 | `game_over` | Hard Boiled (excerpt) | Kevin MacLeod (incompetech.com) | CC-BY 4.0 | [incompetech.com](https://incompetech.com/music/royalty-free/licenses/) |
 | `step_carpet` | footstep-carpet.wav | swuing | CC-BY 4.0 | [freesound.org](https://freesound.org/people/swuing/sounds/38872/) |
 | `step_concrete` | Impact Sounds: footstep_concrete_000 | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/impact-sounds) |
