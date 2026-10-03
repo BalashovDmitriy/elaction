@@ -53,6 +53,25 @@ const INDICATOR_GLASS := Color(0.55, 0.3, 0.05)
 ## Соль жребия машины: своя, чтобы машина не ходила в ногу с раскладкой.
 const SALT: int = 0x0CA2_5EED
 
+## Жребий по типу здания (ADR-0058, решение 4): веса моделей [constant MODELS]
+## и красок [constant PAINTS] — у отеля спорткары и чёрный седан, у офиса тёмные
+## представительские седаны и SUV, у жилого дома простые седаны и SUV
+## выцветших цветов. По [enum BuildingIdentity.Kind].
+const MODEL_WEIGHTS: Array[Array] = [
+	[3, 3, 2, 1, 0],
+	[1, 0, 3, 3, 2],
+	[0, 0, 2, 3, 3],
+]
+const PAINT_WEIGHTS: Array[Array] = [
+	[1, 1, 2, 0, 0, 1, 2, 4],
+	[0, 2, 0, 0, 2, 3, 0, 3],
+	[0, 1, 2, 3, 2, 1, 1, 0],
+]
+## Насколько краска жилого дома выцвела к серому: старые машины небогатых
+## жильцов. По [enum BuildingIdentity.Kind].
+const FADE: Array[float] = [0.0, 0.0, 0.3]
+const FADED := Color(0.5, 0.5, 0.48)
+
 
 ## Жребий здания: какая модель и какая краска. [param building] — номер здания в
 ## партии, [param building_seed] — его сид.
@@ -61,10 +80,15 @@ class Choice:
 
 	var model: int = 0
 	var paint: int = 0
+	## Насколько краска выцвела к серому ([constant FADE]).
+	var fade: float = 0.0
 
 
-## Что стоит у выхода здания.
-static func choose(building: int, building_seed: int) -> Choice:
+## Что стоит у выхода здания типа [param kind]. Первое здание партии — красная
+## спортивная, какого бы типа оно ни было.
+static func choose(
+	building: int, building_seed: int, kind: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL
+) -> Choice:
 	var choice := Choice.new()
 	if building <= 1:
 		return choice
@@ -72,16 +96,50 @@ static func choose(building: int, building_seed: int) -> Choice:
 	# Номер здания — в жребий вместе с сидом: без соли партии сид и есть номер,
 	# а инструменты снимают разные здания на одном сиде.
 	rng.seed = hash([building_seed, building, SALT])
-	choice.model = rng.randi_range(0, MODELS.size() - 1)
-	choice.paint = rng.randi_range(0, PAINTS.size() - 1)
+	return draw(rng, kind)
+
+
+## Машина здания типа [param kind] жребием [param rng] по весам типа. Краски
+## [param banned] не выпадают: красная — машина Otto первого здания, чёрная
+## пропадает в темноте у бордюра.
+static func draw(
+	rng: RandomNumberGenerator, kind: BuildingIdentity.Kind, banned: Array[int] = []
+) -> Choice:
+	var choice := Choice.new()
+	choice.model = _weighted(rng, MODEL_WEIGHTS[kind], [])
+	choice.paint = _weighted(rng, PAINT_WEIGHTS[kind], banned)
+	choice.fade = FADE[kind]
 	return choice
+
+
+## Номер по весам [param weights] без запрещённых [param banned]. Остались
+## одни нули — жребий поровну по разрешённым.
+static func _weighted(rng: RandomNumberGenerator, weights: Array, banned: Array[int]) -> int:
+	var total := 0
+	for index: int in weights.size():
+		if not banned.has(index):
+			total += int(weights[index])
+	if total <= 0:
+		var allowed: Array[int] = []
+		for index: int in weights.size():
+			if not banned.has(index):
+				allowed.append(index)
+		return allowed[rng.randi_range(0, allowed.size() - 1)]
+	var roll := rng.randi_range(0, total - 1)
+	for index: int in weights.size():
+		if banned.has(index):
+			continue
+		roll -= int(weights[index])
+		if roll < 0:
+			return index
+	return weights.size() - 1
 
 
 ## Собирает машину узлом без тел.
 static func build(choice: Choice = Choice.new()) -> Node3D:
 	var car := (MODELS[choice.model] as PackedScene).instantiate() as Node3D
 	car.name = "Car"
-	var paint := PAINTS[choice.paint]
+	var paint := PAINTS[choice.paint].lerp(FADED, choice.fade)
 	for node in car.find_children("*", "MeshInstance3D", true, false):
 		var mesh_instance := node as MeshInstance3D
 		for surface in mesh_instance.mesh.get_surface_count():

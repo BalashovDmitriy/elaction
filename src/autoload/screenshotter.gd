@@ -457,6 +457,19 @@ const AUTO_PLANS: Dictionary = {
 		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
 		{"label": "floor", "actions": [], "hold": 0.6},
 	],
+	# Здание снаружи по типу (ADR-0058): маршрут в первом офисе партии — корона
+	# над крышей, торцы башни и уступ с этажей. Отель и жилой дом рядом снимают
+	# `tools/kinds_sheet.py`, вступление — `tools/intro_shot.tscn --building=N`.
+	"M24P":
+	[
+		{"label": "roof", "actions": [], "hold": 1.2},
+		{"label": "roof_walk", "actions": ["move_right"], "hold": 2.5},
+		{"label": "to_the_shaft", "actions": ["move_right"], "hold": 2.9},
+		{"label": "riding_down", "actions": ["move_down"], "hold": 1.4},
+		{"label": "stopped", "actions": [], "hold": 1.6},
+		{"label": "walking_out", "actions": ["move_left"], "hold": 1.4},
+		{"label": "floor", "actions": [], "hold": 0.6},
+	],
 	"M19":
 	[
 		{"label": "roof", "actions": [], "hold": 1.2},
@@ -474,7 +487,8 @@ const DEFAULT_PLAN := "M1"
 const CAPTURE_KINDS: Dictionary = {
 	"M24M": BuildingIdentity.Kind.RESIDENTIAL,
 	"M24N": BuildingIdentity.Kind.OFFICE,
-	"M24O": BuildingIdentity.Kind.RESIDENTIAL
+	"M24O": BuildingIdentity.Kind.RESIDENTIAL,
+	"M24P": BuildingIdentity.Kind.OFFICE
 }
 
 var _milestone: String = MANUAL_FOLDER

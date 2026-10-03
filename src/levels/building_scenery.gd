@@ -75,11 +75,20 @@ func build(
 	kit.name = "RoofKit"
 	add_child(kit)
 	kit.build(rules, plan, building_seed)
-	_roof_parts = [roof, kit] as Array[Node]
+	# Корона по типу здания за плоскостью игры (ADR-0058, решение 2).
+	var crown := BuildingCrown.new()
+	add_child(crown)
+	crown.build(rules)
+	_roof_parts = [roof, kit, crown] as Array[Node]
 	var sign_board := VerticalSign.new()
 	_sign = sign_board
 	add_child(sign_board)
 	sign_board.hang(rules, identity)
+	# Торцы башни и уступ стилобата по типу (ADR-0058, решение 3) — после
+	# вывески: перед ней на правом торце они не встают.
+	var flanks := BuildingFlanks.new()
+	add_child(flanks)
+	flanks.build(rules, building_seed, sign_board.span())
 
 	var details := FloorDetail.new()
 	details.name = "FloorDetail"

@@ -37,6 +37,10 @@ const SLOPE_PIECES: int = 24
 const TUNNEL: float = 5.0
 ## Подпорная стена: толщина, м.
 const WALL_THICKNESS: float = 0.24
+## Ширина проезда по глубине — площадки у ворот, пандуса и тоннеля, м: коридор
+## с запасом, середина — в плоскости игры. По ней же шлагбаум офиса тянет
+## стрелу до стены тоннеля ([GarageDressing]).
+const WIDTH: float = WorldSpace.CORRIDOR_DEPTH + 0.4
 ## Тротуар над тоннелем и вдоль рампы: насколько выше мостовой, м.
 const KERB: float = 0.15
 ## Ограждение рампы: высота над тротуаром, шаг стоек, м.
@@ -75,6 +79,9 @@ const BULKHEAD_GLOW := Color(1.0, 0.8, 0.55)
 const POLE := Color(0.16, 0.17, 0.19)
 const WALL_PAINT := Color(0.78, 0.78, 0.74)
 
+## Вход в здание с улицы по типу ([StreetFront]).
+var front: StreetFront = null
+
 var _rules: BuildingRules = null
 ## Пол подвала и улица, в плоскости правил; торец здания; ширина проезда.
 var _surface: float = 0.0
@@ -93,11 +100,16 @@ func build(rules: BuildingRules, building_seed: int = 1) -> void:
 	_surface = rules.floor_surface(rules.floors - 1)
 	_street = _surface - rules.floor_height
 	_left = rules.floor_span(rules.floors - 1).x
-	_width = WorldSpace.CORRIDOR_DEPTH + 0.4
+	_width = WIDTH
 	_weather = Weather.of_building(rules, building_seed)
 	_street_node = ExitStreet.new()
 	add_child(_street_node)
 	_street_node.build(_left, _street, building_seed, _weather, rules.time_of_day)
+	# Вход в здание с улицы по типу (ADR-0058, решение 5): на тротуаре над
+	# тоннелем у торца — его высоту кладёт [method _build_street_edge].
+	front = StreetFront.new()
+	_street_node.add_child(front)
+	front.build(rules, _left, _street - KERB, building_seed, _weather)
 	# Улица — снаружи: днём на ней солнце здания (ADR-0052, решение 3).
 	Outdoors.mark(_street_node)
 	_build_slabs()
@@ -114,6 +126,9 @@ func show_light(on: bool) -> void:
 		_light.visible = on
 	if _street_node != null:
 		_street_node.show_light(on)
+	# Парковщик отеля стоит, как идут прохожие: только пока выезд в кадре.
+	if front != null:
+		front.set_active(on)
 
 
 ## Поток машин улицы у выезда.
