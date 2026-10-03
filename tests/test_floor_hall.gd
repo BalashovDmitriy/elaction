@@ -127,9 +127,18 @@ func test_halls_in_a_built_building_of_every_kind() -> void:
 			var index := _story_of(rules, WorldSpace.to_plane(light.position).y)
 			assert_true(FloorRole.hall_at(rules, index), "light — on special floor %d" % index)
 			assert_false(rules.is_unlit(index), "on a dark floor the hall light is off")
+		# The level already hid the halls out of the frame (ADR-0060).
+		var seen := VisibleFloors.around(rules, level.otto.camera_view())
+		for index: int in hall.hall_floors():
+			assert_eq(
+				(hall.get_node("Hall%d" % index) as Node3D).visible,
+				VisibleFloors.covers(seen, index),
+				"kind %d: the hall of floor %d follows the frame" % [kind, index]
+			)
 		hall.light_span(Vector2i(-10, -5))
 		for light: OmniLight3D in hall.lights():
 			assert_false(light.visible, "out of frame the hall light goes off")
+		assert_eq(hall.parts(true), 0, "out of frame no hall is drawn")
 		_assert_clear_of_doors(level.rules, level.plan(), hall, kind)
 
 
@@ -157,6 +166,42 @@ func test_halls_of_any_building_stay_in_their_spans() -> void:
 				outside, 0, "kind %d, seed %d: details outside the span" % [kind, building_seed]
 			)
 			_assert_clear_of_doors(rules, plan, hall, kind)
+			hall.free()
+
+
+## Each special floor's hall is its own node, and only the floors in the frame (with the
+## margin of [method VisibleFloors.around]) are shown: one set of multimeshes for the
+## whole building was drawn on every floor (ADR-0060). Any building, not one seed.
+func test_only_halls_in_the_frame_are_shown() -> void:
+	for kind: BuildingIdentity.Kind in KINDS:
+		var rules := BuildingRules.new()
+		rules.kind = kind
+		for building_seed: int in range(1, SEEDS + 1, 5):
+			var plan := BuildingPlan.generate(rules, building_seed)
+			var hall := FloorHall.new()
+			hall.build(rules, plan)
+			# In the tree: the hall light asks for its place in the scene.
+			add_child(hall)
+			var expected: Array[int] = []
+			for index: int in range(0, rules.floors - 1):
+				if FloorRole.hall_at(rules, index):
+					expected.append(index)
+			var floors := hall.hall_floors()
+			floors.sort()
+			assert_eq(floors, expected, "kind %d: a node per special floor" % kind)
+			assert_eq(hall.parts(true), hall.parts(), "before the frame every hall is shown")
+			for camera: int in range(BuildingRules.ROOF, rules.floors):
+				var span := Vector2i(camera - VisibleFloors.MARGIN, camera + VisibleFloors.MARGIN)
+				hall.light_span(span)
+				for index: int in floors:
+					assert_eq(
+						(hall.get_node("Hall%d" % index) as Node3D).visible,
+						VisibleFloors.covers(span, index),
+						"kind %d, frame at %d: hall of floor %d" % [kind, camera, index]
+					)
+			hall.light_span(Vector2i(BuildingRules.ROOF, rules.floors - 1))
+			assert_eq(hall.parts(true), hall.parts(), "a frame over all floors shows all halls")
+			assert_eq(hall.placements().size(), hall.parts(), "the places of all details are known")
 			hall.free()
 
 

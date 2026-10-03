@@ -227,3 +227,32 @@ func test_riding_a_car_roof_down_is_not_a_fall() -> void:
 		WorldSpace.to_plane(car.global_position).y, FLOOR * 3.0, 0.05, "the cab rode to the bottom"
 	)
 	assert_false(otto.is_dead(), "a ride down on the roof is not a fall")
+
+
+## The bot runs and the combat runs go at time_scale 4: one physics step is four times
+## longer there, and a fair fall or the jump's first step covers more than
+## [constant Otto.TELEPORT_GAP]. Such a step is his own motion, not a teleport: two
+## floors still kill (ADR-0060).
+func test_falling_two_floors_is_deadly_at_high_time_scale() -> void:
+	Engine.time_scale = 4.0
+	var otto := await _ledge_over(FLOOR * 2.0)
+	await _step_off(otto)
+	Engine.time_scale = 2.0
+	assert_true(otto.is_dead(), "two floors is death at any time scale")
+
+
+## The same at time_scale 4 for the jump: its first step is not a teleport, the air
+## time builds up, and the landing is a landing.
+func test_jump_air_time_counts_at_high_time_scale() -> void:
+	Engine.time_scale = 4.0
+	_slab(-8.0, 8.0, 0.0)
+	var otto := await _standing_otto()
+	Input.action_press(&"jump")
+	await wait_physics_frames(2)
+	Input.action_release(&"jump")
+	var longest := 0.0
+	for step: int in 30:
+		await wait_physics_frames(1)
+		longest = maxf(longest, otto.get(&"_air_time") as float)
+	Engine.time_scale = 2.0
+	assert_gt(longest, Otto.LANDING_AIR_TIME, "the jump's flight counts as air time")

@@ -15,7 +15,9 @@ uniform float flash = 0.0;
 void sky() {
 	vec3 dir = normalize(EYEDIR);
 	// Azimuth from "straight into the city" (minus z) to the right, toward plus x.
-	float azimuth = atan(dir.x, -dir.z);
+	// Straight up or down both are zero and atan is undefined; the radiance bake
+	// samples the poles, where any azimuth is the same point (ADR-0060).
+	float azimuth = abs(dir.x) + abs(dir.z) > 1e-6 ? atan(dir.x, -dir.z) : 0.0;
 	float u = fract(azimuth / TAU + shift);
 	float v = acos(clamp(dir.y, -1.0, 1.0)) / PI;
 	COLOR = texture(panorama, vec2(u, v)).rgb * energy * (1.0 + flash * 3.0);

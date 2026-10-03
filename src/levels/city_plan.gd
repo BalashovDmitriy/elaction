@@ -1,8 +1,9 @@
 class_name CityPlan
 extends RefCounted
 
-## City blocks behind the building: where the houses stand, how tall they are and which
-## windows are lit (ADR-0029, decision 1).
+## City blocks behind the building: where the houses stand and how tall they are
+## (ADR-0029, decision 1). Which windows are lit is decided by the building shader
+## ([CityLook]), not here.
 ##
 ## Numbers only, no nodes: [CityBackdrop] builds from them, and tests check that
 ## the city repeats by seed and covers the whole frame width. Coordinates are metres
@@ -15,7 +16,7 @@ extends RefCounted
 enum Crown { FLAT, SETBACK, SPIRE, TANK, ANTENNA }
 
 ## What kind of house (M24a): office, residential, glass tower, brick. This decides
-## the facade tone, the window mullions and what is behind the glass ([CityLook]).
+## the facade styles and wall tone ([CityLook]).
 enum Kind { OFFICE, HOMES, GLASS, BRICK }
 
 
@@ -30,8 +31,6 @@ class Block:
 	## Middle of the house in depth.
 	var z: float = 0.0
 	var depth: float = 0.0
-	## Lit windows: "column, storey" pairs from the bottom left corner of the facade.
-	var lit: Array[Vector2i] = []
 	## Top of the house and whether a red light blinks on it.
 	var crown: Crown = Crown.FLAT
 	var beacon: bool = false
@@ -121,7 +120,7 @@ static func generate(building_seed: int, from_x: float, to_x: float) -> Array[Bl
 			block.height = rng.randf_range(spec.y, spec.z)
 			block.depth = DEPTH
 			block.z = -spec.x - DEPTH * 0.5
-			block.lit = _lit_windows(rng, block)
+			_skip_lit_windows(rng, block)
 			blocks.append(block)
 			x += block.width + rng.randf_range(GAP.x, GAP.y)
 	_dress_crowns(blocks, building_seed)
@@ -130,7 +129,7 @@ static func generate(building_seed: int, from_x: float, to_x: float) -> Array[Bl
 
 
 ## House kind, mullions and vertical signs — by their own draw, after the tops:
-## the layout, tops and lit windows by seed are the same as before M24a.
+## the layout and tops by seed are the same as before M24a.
 static func _dress_facades(blocks: Array[Block], building_seed: int) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash([building_seed, SALT, "facades"])
@@ -168,23 +167,18 @@ static func _dress_crowns(blocks: Array[Block], building_seed: int) -> void:
 			# a band of houses at its own height, and a sign right under the roof of a near
 			# house is not visible from the floors at all.
 			block.sign_y = block.height * rng.randf_range(0.12, 0.9)
-		# Lit storeys — like offices at night: a whole row of windows that
-		# shows the house is alive. A separate list so the layout windows do not change.
+		# The lit storey's draw is gone with the window quads (ADR-0060): the facade shader
+		# lights windows itself. The draw is kept so the crowns and signs of the houses
+		# after it stay the same by seed.
 		if rng.randf() < LIT_FLOOR_CHANCE:
-			var grid := window_grid(block)
-			var level := rng.randi_range(0, grid.y - 1)
-			for column in grid.x:
-				var cell := Vector2i(column, level)
-				if not block.lit.has(cell):
-					block.lit.append(cell)
+			rng.randi_range(0, window_grid(block).y - 1)
 
 
 static func _weighted(rng: RandomNumberGenerator, weights: Array[float]) -> int:
 	return pick_weighted(weights, rng.randf())
 
 
-## Index by weights [param weights] and draw [param roll] from 0 to 1. Shared across the
-## city: here the draw comes from the generator, in [CityLook] — from the window hash.
+## Index by weights [param weights] and draw [param roll] from 0 to 1.
 static func pick_weighted(weights: Array, roll: float) -> int:
 	var total := 0.0
 	for weight: float in weights:
@@ -205,11 +199,9 @@ static func window_grid(block: Block) -> Vector2i:
 	)
 
 
-static func _lit_windows(rng: RandomNumberGenerator, block: Block) -> Array[Vector2i]:
+## The lit windows' draw, one per window: no longer used (the facade shader lights windows,
+## ADR-0060), but drawn so the houses after it stay the same by seed.
+static func _skip_lit_windows(rng: RandomNumberGenerator, block: Block) -> void:
 	var grid := window_grid(block)
-	var lit: Array[Vector2i] = []
-	for column in grid.x:
-		for level in grid.y:
-			if rng.randf() < LIT_SHARE:
-				lit.append(Vector2i(column, level))
-	return lit
+	for _window in grid.x * grid.y:
+		rng.randf()

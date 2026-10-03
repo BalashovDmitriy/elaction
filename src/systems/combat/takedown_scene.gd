@@ -154,6 +154,9 @@ func _ready() -> void:
 	# world still runs without the slowdown.
 	_frame_number = Engine.get_process_frames()
 	_frame_world = 1.0
+	# The whoosh is the scene's start, not the slowdown's: continuing from the pause slows
+	# the world again, silently (ADR-0060).
+	Sounds.play(Sounds.SLOWMO)
 	_slow_down()
 	_show(0.0)
 
@@ -345,7 +348,7 @@ func _knock_the_hat() -> void:
 		* skeleton.get_bone_global_rest(bone).affine_inverse()
 	)
 	var box := hat.mesh.get_aabb()
-	var body := RigidBody3D.new()
+	var body := FallenHat.new()
 	body.name = "Hat"
 	body.mass = HAT_MASS
 	body.collision_layer = 0
@@ -478,7 +481,6 @@ func _slow_down() -> void:
 		return
 	_time_scale_before = Engine.time_scale
 	_slowed = true
-	Sounds.play(Sounds.SLOWMO)
 	_apply_world()
 
 
@@ -496,3 +498,35 @@ func _set_rig_speed(speed: float) -> void:
 		_otto.figure.speed = speed
 	if is_instance_valid(_agent) and not _agent.is_dead():
 		_agent.figure.speed = speed
+
+
+## The knocked-off hat lies like a corpse (ADR-0060): once it has lain still for
+## [constant Ragdoll.FREEZE_AFTER] it freezes and leaves the simulation, below
+## [member Ragdoll.abyss] it disappears instead of falling forever. On a cab floor it does
+## not freeze, or the cab would drive out from under it.
+class FallenHat:
+	extends RigidBody3D
+
+	## How far below its middle the hat looks for a cab floor, m.
+	const REACH: float = 0.3
+
+	## How long the hat has been lying still, s.
+	var still: float = 0.0
+
+	func _physics_process(delta: float) -> void:
+		if global_position.y < Ragdoll.abyss:
+			queue_free()
+			return
+		var resting := linear_velocity.length() <= Ragdoll.RESTING_SPEED and not _on_a_car()
+		still = still + delta if resting else 0.0
+		if still >= Ragdoll.FREEZE_AFTER:
+			freeze_mode = RigidBody3D.FREEZE_MODE_STATIC
+			freeze = true
+			set_physics_process(false)
+
+	func _on_a_car() -> bool:
+		var from := global_transform * center_of_mass
+		var query := PhysicsRayQueryParameters3D.create(
+			from, from + Vector3.DOWN * REACH, collision_mask, [get_rid()]
+		)
+		return get_world_3d().direct_space_state.intersect_ray(query).get("collider") is ElevatorCar

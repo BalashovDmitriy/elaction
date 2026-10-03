@@ -54,6 +54,10 @@ void fragment() {
 }
 """
 
+## The beacon shader, compiled once for all buildings: a new [Shader] per building was
+## compiled anew each time (ADR-0060).
+static var _beacon_shader: Shader = null
+
 
 ## House tops: setbacks, spires, tanks on legs, antennas.
 static func crowns(blocks: Array[CityPlan.Block], ground: float, facade: Material) -> Node3D:
@@ -130,10 +134,11 @@ static func beacons(blocks: Array[CityPlan.Block], ground: float) -> MultiMeshIn
 		)
 		phases.append(fposmod(block.x * 0.137, 1.0))
 	var quad := QuadMesh.new()
-	var shader := Shader.new()
-	shader.code = BEACON_SHADER
+	if _beacon_shader == null:
+		_beacon_shader = Shader.new()
+		_beacon_shader.code = BEACON_SHADER
 	var look := ShaderMaterial.new()
-	look.shader = shader
+	look.shader = _beacon_shader
 	look.set_shader_parameter("colour", BEACON_COLOUR)
 	look.set_shader_parameter("period", BEACON_PERIOD)
 	quad.material = look

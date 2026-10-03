@@ -11,6 +11,7 @@ extends GutTest
 
 const BULLET_SCENE := preload("res://src/systems/combat/bullet.tscn")
 const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
+const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
 
 ## Bullet speed in the test, m/s: 5 m per frame at 60 frames per second.
 const TOO_FAST: float = 300.0
@@ -136,3 +137,25 @@ func test_a_point_blank_bullet_hits_at_once_and_by_query() -> void:
 		assert_eq(hits[0], target)
 	bullet.strike_point_blank()
 	assert_eq(hits.size(), 1, "one bullet hits once")
+
+
+## A dead Otto is a ragdoll ([Corpse]); his capsule leaves the player layer. A bullet
+## flying through the spot where he stood does not stop in the empty air there and spray
+## blood: it flies on into whatever is behind (ADR-0060).
+func test_bullets_pass_where_a_dead_otto_stood() -> void:
+	_ground()
+	var wall := _wall()
+	var otto := OTTO_SCENE.instantiate() as Otto
+	add_child_autofree(otto)
+	otto.global_position = Vector3(3.0, 0.05, WorldSpace.PLAY_Z)
+	await wait_physics_frames(4)
+	otto.kill()
+	await wait_physics_frames(2)
+	var hits: Array[Node3D] = []
+	var bullet := _fire(0.0, hits)
+	bullet.collision_mask = Bullet.FROM_ENEMY
+	await wait_physics_frames(6)
+	assert_true(hits.size() == 1 and hits[0] == wall, "past the dead one — into the wall")
+	otto.revive()
+	await wait_physics_frames(2)
+	assert_eq(otto.collision_layer, 2, "the revived one is on the player layer again")

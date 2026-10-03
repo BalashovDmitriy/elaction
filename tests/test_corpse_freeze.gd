@@ -187,3 +187,40 @@ func test_a_body_fallen_out_of_the_world_is_gone() -> void:
 			break
 	assert_true(agent.corpse.gone, "a body fallen below the world vanished")
 	Ragdoll.abyss = -INF
+
+
+## The knocked-off hat lies like a corpse: it freezes once it has lain still, and below the
+## abyss it disappears instead of falling forever (ADR-0060).
+func test_a_knocked_off_hat_settles_and_freezes() -> void:
+	_floor_at(0.0)
+	var hat := _loose_hat(Vector3(0.0, 0.5, WorldSpace.PLAY_Z))
+	var frames := 0
+	while not hat.freeze and frames < 600:
+		await wait_physics_frames(1)
+		frames += 1
+	assert_true(hat.freeze, "the hat that lay still froze")
+	assert_lt(hat.global_position.y, 0.3, "on the floor, not in the air")
+
+
+func test_a_hat_that_falls_into_the_abyss_disappears() -> void:
+	var was := Ragdoll.abyss
+	Ragdoll.abyss = -10.0
+	var hat := _loose_hat(Vector3(0.0, -12.0, WorldSpace.PLAY_Z))
+	await wait_physics_frames(3)
+	Ragdoll.abyss = was
+	assert_false(is_instance_valid(hat), "the hat below the abyss is gone")
+
+
+func _loose_hat(at: Vector3) -> TakedownScene.FallenHat:
+	var hat := TakedownScene.FallenHat.new()
+	hat.mass = TakedownScene.HAT_MASS
+	hat.collision_layer = 0
+	hat.collision_mask = 1
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(0.25, 0.1, 0.25)
+	shape.shape = box
+	hat.add_child(shape)
+	add_child_autoqfree(hat)
+	hat.global_position = at
+	return hat

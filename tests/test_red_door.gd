@@ -195,6 +195,37 @@ func test_the_document_is_counted_on_the_way_out() -> void:
 	assert_false(door.is_pending(), "came out - the door is ordinary")
 
 
+## A bullet that reaches Otto in the same step the door takes him does not kill him: his
+## shapes go off only deferred, and a death in the doorway would be undone by the door
+## putting him back on the mat with the document (ADR-0060).
+func test_otto_taken_by_the_door_cannot_be_killed() -> void:
+	var door := _bare_door(true)
+	var otto := _guest_at(door)
+	assert_true(await _knock(otto), "the door took Otto")
+	_release_all()
+	otto.kill()
+	assert_false(otto.is_dead(), "not killed in the doorway")
+	assert_true(await _wait_hidden(otto), "and went in")
+	otto.kill()
+	assert_false(otto.is_dead(), "nor behind the door")
+
+
+## A guest who is dead all the same is let go by the door: it closes, keeps its document
+## and does not bring a dead one back out onto the mat (ADR-0060).
+func test_the_door_lets_go_of_a_dead_guest() -> void:
+	var door := _bare_door(true)
+	var otto := _guest_at(door)
+	watch_signals(door)
+	assert_true(await _knock(otto), "the door took Otto")
+	_release_all()
+	(otto.get(&"_states") as OttoStateMachine).kill()
+	await _wait_game(Arcade.seconds(Arcade.ROOM_TICKS) + 1.0)
+	assert_signal_not_emitted(door, "otto_came_out", "a dead one is not let out")
+	assert_signal_not_emitted(door, "document_taken", "nor given the document")
+	assert_true(door.is_pending(), "the door is still red")
+	assert_eq(door.openness(), 0.0, "and closed")
+
+
 ## While Otto is inside, the closed red leaf glows by itself — red — and the board above it
 ## breathes: in the corridor shadow it does not merge with the darkness (M24b shot).
 func test_the_occupied_red_door_glows_and_its_sign_breathes() -> void:

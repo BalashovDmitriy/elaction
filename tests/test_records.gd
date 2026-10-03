@@ -96,3 +96,49 @@ func test_a_broken_file_does_not_break_the_game() -> void:
 
 func test_a_missing_file_is_an_empty_table() -> void:
 	assert_eq(Records.load_from("user://no_such_records.json").rows.size(), 0)
+
+
+## A valid table with a wrongly typed entry: the entry is skipped, the rest is read, and the
+## game does not stop on a failed conversion (ADR-0060).
+func test_a_wrongly_typed_entry_is_skipped() -> void:
+	var file := FileAccess.open(TEMP, FileAccess.WRITE)
+	file.store_string(
+		'[{"score": null}, {"score": "lots"}, {"score": 900, "date": 7}, 5, {"score": 300}]'
+	)
+	file.close()
+
+	var loaded := Records.load_from(TEMP)
+	assert_eq(loaded.rows.size(), 2, "only the entries with a number for a score")
+	assert_eq(loaded.best(), 900)
+	assert_eq(String(loaded.rows[0][Records.DATE]), "", "a date that is not text is dropped")
+
+
+## Zero is no record, even in a table with free rows: the menu would celebrate it (ADR-0060).
+func test_a_zero_score_is_no_record() -> void:
+	var records := Records.new()
+	assert_eq(records.submit(0), -1, "zero in an empty table")
+	assert_eq(records.submit(-50), -1, "nor below")
+	assert_eq(records.rows.size(), 0, "the table stays empty")
+
+
+## An equal score goes after the ones already in the table: the older one keeps its place.
+## Placed before them by an unstable sort, the new row could even push out its own place.
+func test_an_equal_score_goes_after_the_older_one() -> void:
+	var records := Records.new()
+	var many: Array[int] = []
+	for index: int in Records.LIMIT - 1:
+		many.append(9000 - index * 100)
+	many.append(5000)
+	records.rows = _rows(many)
+	for row: Dictionary in records.rows:
+		row[Records.DATE] = "old"
+	assert_eq(records.submit(5000, "new"), -1, "the eleventh equal one misses")
+	assert_eq(String(records.rows[-1][Records.DATE]), "old", "the old one stays in the table")
+
+	var ties := Records.new()
+	ties.rows = _rows([700, 700, 700, 100])
+	for row: Dictionary in ties.rows:
+		row[Records.DATE] = "old"
+	assert_eq(ties.submit(700, "new"), 3, "after the three equal ones")
+	assert_eq(String(ties.rows[3][Records.DATE]), "new", "and the table says the same")
+	assert_eq(int(ties.rows[4][Records.SCORE]), 100)

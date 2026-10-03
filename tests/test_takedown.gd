@@ -397,3 +397,30 @@ func test_the_camera_kicks_on_the_blow_and_settles() -> void:
 	await get_tree().process_frame
 	assert_false(camera.is_kicked(), "the kick died down")
 	assert_almost_eq(camera.rotation.z, 0.0, 0.0001, "the tilt is removed")
+
+
+## The whoosh sounds once, at the start of the scene: continuing from the pause slows the
+## world down again, silently (ADR-0060).
+func test_the_slowdown_whooshes_once_whatever_the_pauses() -> void:
+	var sounds := AudioDirector.instance()
+	if sounds == null:
+		return
+	sounds.reset()
+	_floor()
+	var otto := _otto_at(0.0)
+	await wait_physics_frames(4)
+	var agent := _agent_at(otto, 0.7, -1.0)
+	await wait_physics_frames(3)
+	await _press_shoot()
+	var director := _director()
+	assert_not_null(director, "the scene started")
+	if director == null or not is_instance_valid(agent):
+		return
+	var whooshes := sounds.voices_playing(Sounds.SLOWMO)
+	assert_gt(whooshes, 0, "the scene starts with a whoosh")
+	for _pause: int in 3:
+		director.notification(Node.NOTIFICATION_PAUSED)
+		assert_almost_eq(Engine.time_scale, 1.0, 0.001, "the pause gives the world its pace back")
+		director.notification(Node.NOTIFICATION_UNPAUSED)
+		assert_lt(Engine.time_scale, 1.0, "continuing slows the world down again")
+	assert_eq(sounds.voices_playing(Sounds.SLOWMO), whooshes, "and does not whoosh again")

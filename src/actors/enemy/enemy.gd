@@ -181,6 +181,17 @@ func _notification(what: int) -> void:
 	probe.target_position = Vector3(0.0, -width, 0.0)
 
 
+## The agent leaves the tree (went into a door, was cleared away) while his bullet is still
+## in flight. The bullet flies on and still kills: the hit is handed over to
+## [method _strike], which does not need the agent. Otherwise the connection would go
+## with him, and the bullet would spray blood on Otto without killing him (ADR-0060).
+func _exit_tree() -> void:
+	if not is_instance_valid(_bullet) or not _bullet.hit_target.is_connected(_on_bullet_hit):
+		return
+	_bullet.hit_target.disconnect(_on_bullet_hit)
+	_bullet.hit_target.connect(Enemy._strike.bind(RunLog.at(self), _brain.stance))
+
+
 func _ready() -> void:
 	add_to_group(GROUP)
 	# Rain and snow die on the hat and shoulders (ADR-0054).
@@ -248,13 +259,17 @@ func _physics_process(delta: float) -> void:
 	# that is exactly what the player called "spawns on top of the door" (ADR-0020).
 	var stepping_out := state == EnemyBrain.State.EMERGING
 	_shield(stepping_out)
+	# A shooter keeps the side he opened fire to (toward Otto) until the shot is over:
+	# one shooting on the move walks on that way, and neither a floor edge, a door, an
+	# exit nor a cab turns him, or the bullet would leave away from Otto (ADR-0060).
+	var shooting := state == EnemyBrain.State.SHOOT
 
 	# Crouching and lying, the agent does not walk: a dodge is freezing, not walking
 	# on bent over. Standing, he walks until the brain tells him to stand.
 	var walking := _brain.wants_to_walk()
 	# One waiting by a door walks to his spot without wandering pauses: he is not wandering but
 	# keeping watch. Arrived — stands facing the door.
-	var watching := not stepping_out and not is_nan(watch_at)
+	var watching := not stepping_out and not shooting and not is_nan(watch_at)
 	if watching:
 		walking = _brain.is_standing() and _head_for(watch_at, WATCH_REACH)
 		if not walking:
@@ -263,7 +278,7 @@ func _physics_process(delta: float) -> void:
 	# decision 6) — there is nothing to decide here by "does he see him": [code]sees_target[/code]
 	# means "Otto is not in shadow and not behind a wall", and ten floors away it is also
 	# true. Gating on it would disable elevators almost always.
-	var free_to_go := walking and not watching and not stepping_out
+	var free_to_go := walking and not watching and not stepping_out and not shooting
 	var to_the_lift := free_to_go and not is_nan(_lift_x)
 	if to_the_lift:
 		walking = _head_for_the_lift()
@@ -280,7 +295,7 @@ func _physics_process(delta: float) -> void:
 			# and there is no point stepping into an empty shaft. He must not be turned — he
 			# would immediately forget why he came. Same for one heading to a door.
 			walking = false
-		elif stepping_out:
+		elif stepping_out or shooting:
 			walking = false
 		else:
 			# A wandering agent turns at the floor edge: he does not chase Otto
@@ -772,15 +787,19 @@ func _fire() -> void:
 
 ## Hit by his own bullet. Nobody gets points for Otto — he simply dies.
 func _on_bullet_hit(target: Node3D) -> void:
+	_strike(target, RunLog.at(self), _brain.stance)
+
+
+## The agent's bullet reached [param target]: Otto dies. Static, so that a bullet whose
+## shooter has already left the tree still kills ([method _exit_tree]); [param shooter]
+## and [param stance] are only for the run log.
+static func _strike(target: Node3D, shooter: Array, stance: EnemyBrain.Stance) -> void:
 	var victim := target as Otto
 	if victim == null:
 		return
 	if not victim.is_dead() and not victim.invulnerable:
 		# Who fired and from where — for the run log.
-		victim.set_meta(&"shooter", RunLog.at(self))
+		victim.set_meta(&"shooter", shooter)
 		victim.set_meta(&"death_cause", "bullet")
-		RunLog.write(
-			"hit_otto",
-			{"shooter": RunLog.at(self), "otto": RunLog.at(victim), "stance": _brain.stance}
-		)
+		RunLog.write("hit_otto", {"shooter": shooter, "otto": RunLog.at(victim), "stance": stance})
 	victim.kill()

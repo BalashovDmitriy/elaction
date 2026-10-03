@@ -109,6 +109,14 @@ func _ready() -> void:
 	_style_static_labels()
 
 
+## The subtitle is translated in code, and the saved language is applied after the menu is
+## ready: without following the change, a restart showed it in the system language
+## (ADR-0060).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSLATION_CHANGED and _subtitle != null:
+		_subtitle.text = tr("UI_SUBTITLE")
+
+
 ## Shows a page and takes focus to item [param focus], usually the first one:
 ## otherwise you cannot move around the menu with the arrows and a gamepad.
 func show_page(page: Page, focus: int = 0) -> void:
@@ -710,5 +718,4 @@ func _on_language_selected(index: Variant) -> void:
 	# will not respond to a language change by themselves. Focus stays on the language: from
 	# the first item the next "right" would already turn the volume (M22b code review).
 	var keep := rows().find(get_viewport().gui_get_focus_owner() as MenuRow)
-	_subtitle.text = tr("UI_SUBTITLE")
 	show_page(_page, maxi(keep, 0))

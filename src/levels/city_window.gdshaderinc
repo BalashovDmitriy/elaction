@@ -3,8 +3,8 @@
 // the room, the flicker of a TV or a fluorescent tube; a dark one — dark glass
 // with the reflected sky and a slanted glint.
 //
-// What is behind the window is decided by the window's lot ([CityLook.window_custom]),
-// not by the shader: the city repeats by seed down to the window. [CityBackdrop] writes it.
+// What is behind the window is decided by the window's lot, not by the shader: the
+// street repeats by seed down to the window. [ExitStreet] writes it.
 //
 // INSTANCE_CUSTOM: x — the window's lot 0–1, y — what is behind the glass
 // ([CityLook.Inside]), z — mullions (0 — none, 1 — a post, 2 — a cross), w — whether lit.

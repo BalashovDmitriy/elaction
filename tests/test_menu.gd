@@ -99,12 +99,25 @@ func test_the_game_behind_blurs_only_over_a_game() -> void:
 	assert_true(blur.visible, "settings from pause - blurred")
 
 
+## The sign hangs only over the main page, and its subtitle follows the language: the saved
+## language is applied after the menu is ready, and the subtitle stayed in the system language
+## until the language row was touched (ADR-0060).
 func test_the_sign_hangs_only_over_the_main_page() -> void:
+	var before := TranslationServer.get_locale()
+	TranslationServer.set_locale("en")
 	var menu := _menu()
 	menu.show_page(Menu.Page.MAIN)
 	assert_true(menu.title().visible)
 	menu.show_page(Menu.Page.SETTINGS)
 	assert_false(menu.title().visible, "settings need the whole screen height")
+
+	var subtitle := menu.get_node("%Subtitle") as Label
+	var english := subtitle.text
+	TranslationServer.set_locale("ru")
+	await wait_process_frames(2)
+	assert_ne(subtitle.text, english, "the subtitle changed its language")
+	assert_eq(subtitle.text, TranslationServer.translate("UI_SUBTITLE"), "to the new one")
+	TranslationServer.set_locale(before)
 
 
 func test_a_choice_wraps_both_ways() -> void:

@@ -52,3 +52,18 @@ func test_old_full_screen_settings_move_to_the_native_resolution() -> void:
 	)
 	var windowed := DisplayModes.Mode.WINDOWED
 	assert_eq(GameSettings.migrated_resolution(true, windowed, hd, uhd), hd, "a window too")
+
+
+## A file from before M22 held only the fullscreen flag — neither the render scale nor a
+## resolution: it is just as old, and on 4K must not get half the resolution (ADR-0060).
+func test_a_file_without_a_resolution_counts_as_old() -> void:
+	var pre_m22 := ConfigFile.new()
+	pre_m22.set_value(GameSettings.SECTION, "fullscreen", true)
+	assert_true(GameSettings.predates_resolution(pre_m22), "only the fullscreen flag — old")
+	var pre_m24f := ConfigFile.new()
+	pre_m24f.set_value(GameSettings.SECTION, "resolution", Vector2i(1920, 1080))
+	pre_m24f.set_value(GameSettings.SECTION, "render_scale", 1.0)
+	assert_true(GameSettings.predates_resolution(pre_m24f), "the render scale — old")
+	var current := ConfigFile.new()
+	current.set_value(GameSettings.SECTION, "resolution", Vector2i(1920, 1080))
+	assert_false(GameSettings.predates_resolution(current), "a resolution alone — current")

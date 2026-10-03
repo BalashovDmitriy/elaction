@@ -63,29 +63,6 @@ const AGENT_KEEP_MARGIN: int = 3
 ## How long Otto lies down before returning to play, s.
 const OTTO_RESPAWN_DELAY: float = 1.2
 
-
-## A post at an agent door: the door itself, its floor and the agent it has already released.
-##
-## The floor is computed once per building: doors do not move, and [method _tend_agents]
-## iterates them every frame — no point deriving the floor from a coordinate sixty times
-## a second for fifty doors.
-class AgentPost:
-	extends RefCounted
-
-	var door: Door = null
-	var floor_index: int = 0
-	## Who stands behind the door right now. Empty — the door is free.
-	var agent: Enemy = null
-	## The door leaf is already opening for the next agent, but he has not shown up yet.
-	##
-	## A door in this state counts as occupied and takes a slot under the cap of
-	## living agents: otherwise any number of doors could open during the telegraph,
-	## and agents would pour out at once above the cap (ADR-0020).
-	var opening: bool = false
-	## Slot of the agent the door is releasing or has released; -1 — none.
-	var slot: int = -1
-
-
 ## Building rules. Empty means defaults are used.
 @export var rules: BuildingRules
 
@@ -416,13 +393,16 @@ func _physics_process(delta: float) -> void:
 				car_started.emit()
 			ExitBoarding.Event.LEFT:
 				building_cleared.emit()
+		# Otto is in the car: the building is done, and the siren clock stops (ADR-0060).
+		if _boarding.is_boarded():
+			GameState.instance().alarm.hold()
 
 	_stir_agents(delta)
 	_shroud_agents()
 	# Agents are recounted every step, not only when the band changes: a door waits
 	# for its pause, and having missed the change step it would not release anyone until the next.
 	if spawn_agents:
-		_tend_agents(VisibleFloors.around(rules, view), delta)
+		_tend_agents(view, delta)
 
 
 ## The lower deck of a two-storey pair: one floor below the lead cab and on its travel.
@@ -725,22 +705,27 @@ func _floor_of(node: Node3D) -> int:
 ## On top of the ROM the door leaf telegraph remains (ADR-0020): a door right next to Otto
 ## releases, as in the ROM (@5AAB), but the agent comes out only once it has opened
 ## (ADR-0053, decision 3). Agents who fell several floors behind beyond the frame
-## are removed, as before: their slot is needed more where the player is.
-func _tend_agents(span: Vector2i, delta: float) -> void:
+## are removed, as before: their slot is needed more where the player is. [param view] — the
+## rules frame.
+func _tend_agents(view: Rect2, delta: float) -> void:
+	var span := VisibleFloors.around(rules, view)
 	var live := 0
 	var per_floor: Dictionary = {}
 	for post: AgentPost in _posts:
 		# Liveness is checked directly on the field: a door has only one agent of its own, and nobody
 		# can put someone else's here.
 		if is_instance_valid(post.agent) and not post.agent.is_dead():
-			if not _within(span, post.floor_index, AGENT_KEEP_MARGIN):
-				post.agent.queue_free()
+			# By the floor the agent is on now, not his door's: one who rode a cab after Otto
+			# is next to him, and nobody vanishes in the frame (ADR-0060).
+			var where := _floor_of(post.agent)
+			var seen := view.has_point(WorldSpace.to_plane(post.agent.global_position))
+			if not seen and not _within(span, where, AGENT_KEEP_MARGIN):
+				_dismiss(post.agent)
 				post.agent = null
 				post.door.dismiss_agent()
 				_free_slot(post)
 				continue
 			live += 1
-			var where := _floor_of(post.agent)
 			per_floor[where] = int(per_floor.get(where, 0)) + 1
 			# The leaf goes back as soon as the agent has cleared the opening: an open
 			# door in the frame means "someone is about to come out", and keeping it
@@ -913,7 +898,12 @@ func _on_alarm_raised(ring: bool = true) -> void:
 		agent.set_alarmed(true)
 
 
+## Only the post's own agent frees its slot: one the level has already let go of may still
+## report, and by then the slot can be another agent's (ADR-0060). The same in
+## [method _on_agent_left].
 func _on_agent_died(agent: Enemy, post: AgentPost) -> void:
+	if post.agent != agent:
+		return
 	RunLog.write("agent_death", {"at": RunLog.at(agent), "floor": post.floor_index})
 	# The slot is freed with a difficulty-based replacement (@3866): the next one is released by
 	# the draw, not by this same door.
@@ -922,10 +912,21 @@ func _on_agent_died(agent: Enemy, post: AgentPost) -> void:
 
 ## The agent reached a door and went into it (@55B0): the body is removed, the slot is free.
 func _on_agent_left(agent: Enemy, post: AgentPost) -> void:
-	agent.queue_free()
-	if post.agent == agent:
-		post.agent = null
+	if post.agent != agent:
+		return
+	_dismiss(agent)
+	post.agent = null
 	_free_slot(post)
+
+
+## Removes an agent the level no longer needs. He stops at once: [method Node.queue_free]
+## waits for the end of the frame, and at a low frame rate a body would make more physics
+## steps — walk, shoot, report leaving again (ADR-0060). Only his steps stop, not the body:
+## a disabled node leaves the physics space, and the step he is in may still need it.
+static func _dismiss(agent: Enemy) -> void:
+	agent.set_physics_process(false)
+	agent.set_process(false)
+	agent.queue_free()
 
 
 func _on_otto_died() -> void:
@@ -965,8 +966,8 @@ func _on_otto_died() -> void:
 func _respawn_otto() -> void:
 	# The timer hangs on the tree, not on the level, and outlives it: a dead Otto
 	# whose level was removed — by exiting to the menu or at the end of a test — would return
-	# to a building that no longer exists.
-	if not is_inside_tree():
+	# to a building that no longer exists. A frozen one — the demo fading out — does not revive.
+	if not is_inside_tree() or not can_process():
 		return
 	_clear_agents()
 	var index := RespawnSpot.floor_for(rules, _floor_of(otto))
@@ -982,7 +983,7 @@ func _respawn_otto() -> void:
 func _clear_agents() -> void:
 	for agent in agents():
 		if not agent.is_dead():
-			agent.queue_free()
+			_dismiss(agent)
 	for post: AgentPost in _posts:
 		post.agent = null
 		post.opening = false

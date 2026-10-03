@@ -208,6 +208,8 @@ var _grace: float = 0.0
 ## Buttons whose press was spent on skipping the intro ([method ride]):
 ## while they are held, Otto does not hear them; once released, he hears them again.
 var _spent_actions: Array[StringName] = []
+## The physics layer Otto lives on, from the scene; a dead one leaves it ([method _apply_pose]).
+var _layer: int = 0
 
 @onready var _standing_shape: CollisionShape3D = $StandingShape
 @onready var _crouching_shape: CollisionShape3D = $CrouchingShape
@@ -236,6 +238,7 @@ func _ready() -> void:
 	var standing := _shape_size(_standing_shape)
 	var crouching := _shape_size(_crouching_shape)
 	_headroom = standing.y - crouching.y
+	_layer = collision_layer
 	_rest_here()
 	_camera.follow(self)
 	_repose()
@@ -340,8 +343,12 @@ func _physics_process(delta: float) -> void:
 func kill(crushed: bool = false) -> void:
 	if _grace > 0.0:
 		return
-
-	if _states.is_dead():
+	# Dead already, or taken by the world: a door or an escalator took him in this same
+	# physics step, and his shapes go off only deferred, so a bullet can still find him.
+	# Killed in there, he would be teleported back alive by the door with the document,
+	# or carried on by the escalator. Neither can hold him under a cab: they are not in
+	# a shaft, and his shapes are off there (ADR-0060).
+	if _states.is_world_driven():
 		return
 	_crushed = crushed
 	if crushed:
@@ -801,6 +808,14 @@ func _apply_pose(state: OttoStateMachine.State) -> void:
 	var untouchable := hidden or state == OttoStateMachine.State.RIDE
 	_standing_shape.set_deferred("disabled", untouchable or crouching)
 	_crouching_shape.set_deferred("disabled", untouchable or not crouching)
+	# A dead one leaves the player layer: the ragdoll ([Corpse]) is the body now, and the
+	# empty capsule would stop bullets in mid-air and spray blood there, and a cab's
+	# crush zone would find it. He keeps his floor mask, so the capsule still settles on
+	# the floor (and rides a cab roof) the level counts his return from (ADR-0060).
+	# Killed inside a cab, he stays on the layer: the cab knows its passenger by it, and
+	# an emptied cab would drive off with the body, moving his return to another floor.
+	var off_the_layer := state == OttoStateMachine.State.DEAD and _car == null
+	set_deferred(&"collision_layer", 0 if off_the_layer else _layer)
 	_body.visible = not hidden
 
 

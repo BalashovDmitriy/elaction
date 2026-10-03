@@ -14,6 +14,10 @@ extends RefCounted
 ## The class only remembers where the lamps are and which are out. The level sets up the
 ## picture and agent behaviour from it, so it is checked without a scene.
 
+## Where a lamp keeps the relight of the frame it got a fill shadow slot in
+## ([method show_in_frame]).
+const RELIGHT := &"floor_lighting_relight"
+
 ## Lamps by floor: floor → x of the lamps in hanging order.
 ##
 ## The order is deliberately not touched after adding: a lamp's index in this list is
@@ -122,7 +126,7 @@ func _nearest(floor_index: int, x: float) -> int:
 	return best
 
 
-## [param count] live lamps from [param lamps] closest to frame point
+## [param count] hanging lamps from [param lamps] closest to frame point
 ## [param centre] in the rules plane: they get the fill shadow (ADR-0044, decision 11).
 ##
 ## They are picked only from those that cast a shadow at all: within band [param band] and
@@ -137,7 +141,9 @@ static func nearest(
 ) -> Array[Lamp]:
 	var alive: Array[Lamp] = []
 	for lamp: Lamp in lamps:
-		if not is_instance_valid(lamp):
+		# A shot lamp is out, falling or not: its slot goes to a lamp that still shines
+		# (ADR-0060).
+		if not is_instance_valid(lamp) or not lamp.is_hanging():
 			continue
 		if not VisibleFloors.covers(floors, lamp.floor_index):
 			continue
@@ -165,9 +171,14 @@ static func show_in_frame(
 	var strip := VisibleFloors.band(seen)
 	var shade := VisibleFloors.band(seen, VisibleFloors.SHADOW_REACH)
 	var filled := nearest(lamps, seen.get_center(), Lamp.FILL_SHADOW_CAP, shade, in_frame)
+	# The level lights the frame anew only when the camera moves floors or the band: a lamp
+	# that falls hands its fill shadow slot on at once by lighting this same frame again
+	# (ADR-0060). Only the lamps holding a slot need it, and only for the latest frame.
+	var relight := func() -> void: show_in_frame(rules, seen, lamps, doors)
 	for lamp: Lamp in lamps:
 		if not is_instance_valid(lamp):
 			continue
+		_hand_on_fall(lamp, relight if filled.has(lamp) else Callable())
 		var x := lamp.global_position.x
 		lamp.set_light_visible(
 			VisibleFloors.in_band(strip, x) and VisibleFloors.covers(span, lamp.floor_index),
@@ -180,6 +191,19 @@ static func show_in_frame(
 			door.set_light_in_view(
 				VisibleFloors.covers(span, index) and VisibleFloors.in_band(strip, door.position.x)
 			)
+
+
+## Connects [param relight] to the fall of [param lamp] in place of the one from an earlier
+## frame; an empty one only disconnects.
+static func _hand_on_fall(lamp: Lamp, relight: Callable) -> void:
+	if lamp.has_meta(RELIGHT):
+		var old: Callable = lamp.get_meta(RELIGHT)
+		if lamp.fell.is_connected(old):
+			lamp.fell.disconnect(old)
+		lamp.remove_meta(RELIGHT)
+	if relight.is_valid():
+		lamp.fell.connect(relight)
+		lamp.set_meta(RELIGHT, relight)
 
 
 ## An escalator shines into the opening between two floors: it is lit while at least

@@ -208,6 +208,16 @@ func test_otto_leaves_prints_and_slides_on_the_snowy_roof() -> void:
 			assert_true(otto.icy, "Otto does not slide on the snowy deck")
 			assert_gt(scenery.roof_snow().tracks().count(), 2, "no tracks behind Otto")
 			assert_gt(after, walking * 0.5, "released on snow, he stopped dead")
+			# Off the deck he thaws, and the tracks forget his stride (ADR-0060).
+			var tracks := scenery.roof_snow().tracks()
+			assert_eq(tracks.remembered(), 1, "the tracks do not follow Otto on the deck")
+			var rules := level.rules
+			otto.global_position = WorldSpace.to_scene(
+				Vector2(level.plan().safe_x(rules, 3), rules.floor_surface(3))
+			)
+			await wait_physics_frames(3)
+			assert_false(otto.icy, "Otto stays icy off the roof")
+			assert_eq(tracks.remembered(), 0, "the tracks remember a walker off the deck")
 		else:
 			assert_false(otto.icy, "dry roof is slippery")
 			assert_almost_eq(after, 0.0, 0.01, "Otto slips on a dry roof")

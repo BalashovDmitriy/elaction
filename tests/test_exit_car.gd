@@ -256,6 +256,22 @@ func test_the_seated_otto_is_locked_and_out_of_reach() -> void:
 	)
 
 
+## The alarm clock stops once Otto is in the car (ADR-0060): the time running out over the
+## drive away rings no siren and brings no alarm theme.
+func test_the_alarm_does_not_go_off_once_otto_is_in_the_car() -> void:
+	var level := await _building()
+	var game := GameState.instance()
+	var rang := [0]
+	game.alarm_raised.connect(func() -> void: rang[0] += 1)
+	_stand_at_the_door(level)
+	assert_true(await _wait_for_the_start(level), "Otto got in, the car started")
+	# The time runs out right now, with Otto in the car.
+	game.alarm._left = 0.05
+	await wait_physics_frames(30)
+	assert_false(game.alarm.raised, "no alarm after boarding")
+	assert_eq(rang[0], 0, "no siren")
+
+
 ## The car drives off in its own direction and accelerates, with headlights on.
 func test_the_car_leaves_accelerating_with_its_lights_on() -> void:
 	var level := await _building()

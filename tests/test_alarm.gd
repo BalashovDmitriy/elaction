@@ -52,3 +52,16 @@ func test_time_left_never_goes_below_zero() -> void:
 	var alarm := _alarm()
 	_run(alarm, 3.0)
 	assert_eq(alarm.time_left(), 0.0)
+
+
+## Otto in the exit car: the countdown stands, the siren does not go off over the drive away,
+## and the next building counts from the start again (ADR-0060).
+func test_a_hold_stops_the_countdown_until_the_next_building() -> void:
+	var alarm := _alarm()
+	_run(alarm, 0.5)
+	alarm.hold()
+	assert_false(_run(alarm, 2.0), "held: the siren does not go off")
+	assert_false(alarm.raised)
+	assert_almost_eq(alarm.elapsed(), 2.5, 0.001, "time in the building still counts")
+	alarm.enter_building()
+	assert_true(_run(alarm, 1.5), "a new building lifts the hold")

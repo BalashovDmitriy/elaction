@@ -73,6 +73,16 @@ static func migrated_resolution(
 	return screen
 
 
+## Whether the file is from before M24f, when the resolution meant nothing in fullscreen.
+## Recognized by the render scale key — or by no resolution at all: a file from before M22
+## held only the fullscreen flag, and on 4K it would get half the resolution (ADR-0060).
+static func predates_resolution(file: ConfigFile) -> bool:
+	return (
+		file.has_section_key(SECTION, "render_scale")
+		or not file.has_section_key(SECTION, "resolution")
+	)
+
+
 ## Settings from disk. No file — default values, language by system locale.
 static func load_from(path: String = PATH) -> GameSettings:
 	var settings := GameSettings.new()
@@ -85,18 +95,19 @@ static func load_from(path: String = PATH) -> GameSettings:
 	if file.load(path) != OK:
 		return settings
 
-	settings.master = clampf(float(file.get_value(SECTION, "master", settings.master)), 0.0, 1.0)
-	settings.music = clampf(float(file.get_value(SECTION, "music", settings.music)), 0.0, 1.0)
-	settings.sfx = clampf(float(file.get_value(SECTION, "sfx", settings.sfx)), 0.0, 1.0)
+	# Every value is checked for its type: a file edited by hand can hold "yes" where a flag
+	# should be, and a failed conversion would stop the game at startup (ADR-0060). A value of
+	# the wrong type is as good as missing.
+	settings.master = clampf(_number(file, "master", settings.master), 0.0, 1.0)
+	settings.music = clampf(_number(file, "music", settings.music), 0.0, 1.0)
+	settings.sfx = clampf(_number(file, "sfx", settings.sfx), 0.0, 1.0)
 	# Before M22 the window was a "fullscreen" flag: it becomes the mode.
-	var legacy_full := bool(file.get_value(SECTION, "fullscreen", false))
+	var legacy_full := _flag(file, "fullscreen", false)
 	settings.window_mode = clampi(
-		int(
-			file.get_value(
-				SECTION,
-				"window_mode",
-				DisplayModes.Mode.FULLSCREEN if legacy_full else settings.window_mode
-			)
+		_whole(
+			file,
+			"window_mode",
+			DisplayModes.Mode.FULLSCREEN if legacy_full else settings.window_mode
 		),
 		0,
 		DisplayModes.Mode.size() - 1
@@ -105,33 +116,52 @@ static func load_from(path: String = PATH) -> GameSettings:
 	if size is Vector2i:
 		settings.resolution = size
 	settings.resolution = migrated_resolution(
-		file.has_section_key(SECTION, "render_scale"),
+		predates_resolution(file),
 		settings.window_mode,
 		settings.resolution,
 		DisplayServer.screen_get_size()
 	)
-	var limit := int(file.get_value(SECTION, "frame_limit", settings.frame_limit))
+	var limit := _whole(file, "frame_limit", settings.frame_limit)
 	if DisplayModes.FRAME_LIMITS.has(limit):
 		settings.frame_limit = limit
-	settings.vsync = bool(file.get_value(SECTION, "vsync", settings.vsync))
-	settings.blood = bool(file.get_value(SECTION, "blood", settings.blood))
-	settings.show_fps = bool(file.get_value(SECTION, "show_fps", settings.show_fps))
+	settings.vsync = _flag(file, "vsync", settings.vsync)
+	settings.blood = _flag(file, "blood", settings.blood)
+	settings.show_fps = _flag(file, "show_fps", settings.show_fps)
 	settings.difficulty = clampi(
-		int(file.get_value(SECTION, "difficulty", settings.difficulty)), 0, DIFFICULTIES - 1
+		_whole(file, "difficulty", settings.difficulty), 0, DIFFICULTIES - 1
 	)
 
 	settings.quality = clampi(
-		int(file.get_value(SECTION, "quality", settings.quality)), 0, Graphics.Quality.size() - 1
+		_whole(file, "quality", settings.quality), 0, Graphics.Quality.size() - 1
 	)
-	# A level saved before M22 was chosen by the player: no point measuring over it.
-	settings.quality_measured = bool(
-		file.get_value(SECTION, "quality_measured", file.has_section_key(SECTION, "quality"))
-	)
+	# A level saved before M22 was chosen by the player: no point measuring over it. One that
+	# is not a number was not read, and is no choice.
+	var chosen: Variant = file.get_value(SECTION, "quality", "")
+	settings.quality_measured = _flag(file, "quality_measured", chosen is int or chosen is float)
 
-	var saved := String(file.get_value(SECTION, "locale", settings.locale))
-	settings.locale = saved if LOCALES.has(saved) else settings.locale
+	var saved: Variant = file.get_value(SECTION, "locale", settings.locale)
+	if saved is String and LOCALES.has(saved):
+		settings.locale = saved
 	settings.bindings = KeyBindings.read_from(file)
 	return settings
+
+
+## A number from the file, [param fallback] if the key is missing or holds something else.
+static func _number(file: ConfigFile, key: String, fallback: float) -> float:
+	var value: Variant = file.get_value(SECTION, key, fallback)
+	return float(value) if value is float or value is int else fallback
+
+
+## A whole number from the file, [param fallback] if the key is missing or holds something else.
+static func _whole(file: ConfigFile, key: String, fallback: int) -> int:
+	var value: Variant = file.get_value(SECTION, key, fallback)
+	return int(value) if value is int or value is float else fallback
+
+
+## A flag from the file, [param fallback] if the key is missing or holds something else.
+static func _flag(file: ConfigFile, key: String, fallback: bool) -> bool:
+	var value: Variant = file.get_value(SECTION, key, fallback)
+	return value if value is bool else fallback
 
 
 ## The system language, if we know it. Otherwise English: an unknown language is better
