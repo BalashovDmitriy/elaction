@@ -420,6 +420,7 @@ the same ADR.
 | [ADR-0056](adr/0056-building-character.md) | M24n: each kind's own air and lamp colour within noir, the round palette by kind, the back wall by layout — the office's open space, the hotel's niches, the residential building's pipes and windows, light fixtures by kind |
 | [ADR-0057](adr/0057-floors-cab-music-by-kind.md) | M24o: special floors by the ROM layout — halls in depth on 1–7, technical floors on 11–15; a cab and shaft of the kind's own style, a freight gate by the step-out window; music kind × time of day with a theme change and its own alarm |
 | [ADR-0058](adr/0058-exterior-by-kind.md) | M24p: exterior by kind is look only — a crown above the roof, setback ledge and end walls, the garage and the street entrance, the car drawn by kind; the barrier and the valet are animated |
+| [ADR-0059](adr/0059-deterministic-combat-run.md) | Deterministic combat run: bullets decide hits by a direct query instead of Jolt overlap events, the bot jumps onto prone agents, a 4 s calm after the return keeps near doors shut |
 | [ADR-0036](adr/0036-sound-from-libraries.md) | M23: sound from CC0/CC-BY libraries, noir jazz, ambience by location, the music follows the game; synthesis goes away; supersedes items 1–2 of ADR-0012 |
 
 Other: the base viewport is 1920×1080 (ADR-0018 superseded 640×360 from ADR-0002,
