@@ -1191,7 +1191,13 @@ code: a check against the original and questions, as for any milestone.
 
 - [ ] Frame-by-frame pass over all animations: a series of frames for each one (tools in
       `tools/*_shot.gd`), a list of what is missing or looks wrong
-- [ ] Otto leaving the helicopter: today it looks unnatural
+- [ ] The helicopter and Otto leaving it, analysed thoroughly: the approach, the hover and
+      the rotor, the sliding door, the winch and the rope, Otto climbing out and down, his
+      landing on the roof, the helicopter leaving. Today Otto's exit looks unnatural
+- [ ] Otto getting into the exit car, analysed just as thoroughly: the walk up, the door,
+      sitting down, the door shutting, the start and the drive out
+- [ ] The bar for all of it: every frame looks right — no pose snaps, no sliding feet, no
+      hands through doors or bodies
 - [ ] Agents coming out of doors: the door opens and the agent just appears — he should
       open it and step out
 - [ ] Otto entering a door: he vanishes instead of going in and closing the door behind him
