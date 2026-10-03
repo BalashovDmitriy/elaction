@@ -152,6 +152,14 @@ func test_a_busy_lane_makes_the_car_wait_with_the_indicator_on() -> void:
 	assert_eq(car.stage, ExitCar.Stage.CRUISE, "merged into traffic")
 	assert_almost_eq(car.position.z, car.traffic.near_lane_z(), 0.01, "in the near lane")
 	assert_true(lit and dark_while_signalling, "indicator blinked while the car waited")
+	# The lamps glow, but throw no light onto the asphalt: the flashes in front of the car
+	# looked out of place (user's request).
+	for light: Node in car.find_children("*", "OmniLight3D", true, false):
+		assert_ne(
+			(light as OmniLight3D).light_color,
+			ExitCar.INDICATOR,
+			"the turn signal lights nothing around the car"
+		)
 	await get_tree().physics_frame
 	assert_false(car.is_signalling(), "indicator off in the lane")
 	assert_false(car.indicator_lit())
