@@ -329,14 +329,12 @@ static func _build() -> Dictionary:
 		Entry.of("sofa", Place.ROOM, Fit.RESIDENTIAL, 0.78),
 		Entry.of("paper_bag", Place.TOP, Fit.RESIDENTIAL, 0.38, 90.0),
 		# Залы особых этажей (ADR-0057, решение 5): Kenney Furniture Kit, цвет —
-		# по типу здания ([HallLook]). Фасадом к камере пришли все, кроме
-		# стеллажа — тот спиной.
+		# по типу здания ([HallLook]). Фасадом к камере пришли все.
 		Entry.of("washer", Place.HALL, Fit.ANY, 0.85),
 		Entry.of("dryer", Place.HALL, Fit.ANY, 0.85),
 		Entry.of("washer_dryer", Place.HALL, Fit.ANY, 1.8),
 		Entry.of("bar_stool", Place.HALL, Fit.ANY, 0.78),
 		Entry.of("bar_counter", Place.HALL, Fit.ANY, 1.1),
-		Entry.of("bar_counter_end", Place.HALL, Fit.ANY, 1.1),
 		Entry.of("dining_table", Place.HALL, Fit.ANY, 0.76),
 		Entry.of("round_table", Place.HALL, Fit.ANY, 0.74),
 		Entry.of("dining_chair", Place.HALL, Fit.ANY, 0.95),
@@ -346,10 +344,8 @@ static func _build() -> Dictionary:
 		Entry.of("kitchen_fridge", Place.HALL, Fit.ANY, 1.9),
 		Entry.of("kitchen_sink", Place.HALL, Fit.ANY, 0.95),
 		Entry.of("lounge_sofa", Place.HALL, Fit.ANY, 0.8),
-		Entry.of("lounge_sofa_long", Place.HALL, Fit.ANY, 0.8),
 		Entry.of("lounge_armchair", Place.HALL, Fit.ANY, 0.85),
 		Entry.of("coffee_table", Place.HALL, Fit.ANY, 0.42),
-		Entry.of("bookcase", Place.HALL, Fit.ANY, 1.9, 180.0),
 		Entry.of("box_closed", Place.HALL, Fit.ANY, 0.4),
 		Entry.of("desk_chair", Place.HALL, Fit.ANY, 1.05),
 		Entry.of("long_table", Place.HALL, Fit.ANY, 0.76),

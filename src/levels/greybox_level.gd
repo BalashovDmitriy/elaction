@@ -477,6 +477,7 @@ func _spawn_doors() -> void:
 		var span := rules.floor_span(spot.floor_index) - Vector2(spot.x, spot.x)
 		var unlit := rules.is_unlit(spot.floor_index)
 		door.furnish(identity, room_seed, span, unlit, rules.time_of_day, sky)
+		door.opens_into_hall = FloorRole.hall_at(rules, spot.floor_index)
 		add_child(door)
 		_doors.append(door)
 		door.otto_hid.connect(_on_otto_hid.bind(door))
@@ -681,16 +682,22 @@ func agents() -> Array[Enemy]:
 	return found
 
 
-## Звук по месту Otto — правила в [PlaceSound]: на крыше и у ворот паркинга
-## улица в полную силу, на этажах — из-за стекла; шаг по полу здания.
-## Музыка здания по типу ([BuildingMusic], ADR-0057, решение 7).
+## Музыка здания по типу ([BuildingMusic], ADR-0057, решение 7): тема
+## половины здания, где Otto, или тревога [param alarm].
 func music(alarm: bool) -> void:
 	soundtrack.play(alarm, _floor_of(otto))
 
 
+## Звук по месту Otto — правила в [PlaceSound]: на крыше и у ворот паркинга
+## улица в полную силу, на этажах — из-за стекла; шаг по полу здания.
 func _listen_where_otto_is() -> void:
 	var index := _floor_of(otto)
-	soundtrack.follow(index, GameState.instance().alarm.raised or _arrival.is_playing())
+	# Тему не трогают тревога, вступление и гибель Otto: под последней смертью
+	# партии уже играет трек конца, и тело, уехавшее через середину здания, не
+	# должно вернуть тему здания (авторевью M24o).
+	soundtrack.follow(
+		index, GameState.instance().alarm.raised or _arrival.is_playing() or otto.is_dead()
+	)
 	Sounds.set_building(rules.kind, Sounds.hall_tone_of(FloorRole.at(rules, index)))
 	var at := WorldSpace.to_plane(otto.global_position)
 	Sounds.set_outdoors(PlaceSound.hears_street(rules, index, at.x, Garage.gate_x(rules)))

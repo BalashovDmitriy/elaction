@@ -35,7 +35,6 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `antenna_small` | Antenna | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/l5Oc9swvKk) |
 | `armchair` | Armchair | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/myd1WSucAz) |
 | `bar_counter` | Furniture Kit: kitchenBar | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/furniture-kit) |
-| `bar_counter_end` | Furniture Kit: kitchenBarEnd | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/furniture-kit) |
 | `bar_stool` | Furniture Kit: stoolBar | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/furniture-kit) |
 | `bed_double` | Bed Double | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/BuRay4fVFr) |
 | `bed_hotel` | Bed | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/rXo5Rkl5LC) |
@@ -43,7 +42,6 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `bench_hotel` | Bench | Quaternius | CC0 1.0 | [poly.pizza](https://poly.pizza/m/jLxjFxFRpw) |
 | `bicycle` | Bicycle | Poly by Google | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/19VoUuA2pcN) |
 | `bins` | Bins | Dilan Shah | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/75lHRN19gMY) |
-| `bookcase` | Furniture Kit: bookcaseClosedWide | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/furniture-kit) |
 | `bookshelf` | Bookshelf | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/30Iealxb0p) |
 | `box_closed` | Furniture Kit: cardboardBoxClosed | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/furniture-kit) |
 | `cabinet` | Cabinet | CreativeTrio | CC0 1.0 | [poly.pizza](https://poly.pizza/m/wOiMrnUuhe) |
@@ -84,7 +82,6 @@ Idea & Development — **Dmitry Balashov**. Оригинальная игра �
 | `lounge_armchair` | Furniture Kit: loungeChair | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/furniture-kit) |
 | `lounge_chair` | Chair | CMHT Oculus | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/aVo4dG09vfD) |
 | `lounge_sofa` | Furniture Kit: loungeSofa | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/furniture-kit) |
-| `lounge_sofa_long` | Furniture Kit: loungeSofaLong | Kenney | CC0 1.0 | [kenney.nl](https://kenney.nl/assets/furniture-kit) |
 | `mailboxes` | Mailboxes, своя | elaction | MIT | `tools/build_residential.py` |
 | `message_board` | Message board | Poly by Google | CC-BY 3.0 | [poly.pizza](https://poly.pizza/m/fDpegPgEB0j) |
 | `microwave` | Kitchen Microwave | Kenney | CC0 1.0 | [poly.pizza](https://poly.pizza/m/vUsvf2HGDv) |

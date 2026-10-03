@@ -14,8 +14,13 @@ func test_every_kind_and_time_has_its_music() -> void:
 		for time: TimeOfDay.Kind in TimeOfDay.Kind.values():
 			var theme := Sounds.theme_for(time, kind)
 			assert_not_null(Sounds.stream(theme), "%s: трек есть" % theme)
+			# Без петли трек здания доигрывал раз и молчал (авторевью M24o).
+			assert_true(Sounds.LOOPED.has(theme), "%s звучит петлёй" % theme)
+			assert_true(Sounds.MUSIC.has(theme), "%s — музыка" % theme)
 		var alarm := Sounds.alarm_for(kind)
 		assert_not_null(Sounds.stream(alarm), "%s: тревога есть" % alarm)
+		assert_true(Sounds.LOOPED.has(alarm), "%s звучит петлёй" % alarm)
+		assert_true(Sounds.MUSIC.has(alarm), "%s — музыка" % alarm)
 
 
 func test_kinds_do_not_share_themes() -> void:
@@ -55,3 +60,30 @@ func test_lower_half_plays_the_next_track() -> void:
 		var alarm_bottom: Array = music.track_at(rules.floors - 2, true)
 		assert_eq(alarm_top, alarm_bottom, "тревога половиной не меняется")
 		assert_eq(String(alarm_top[0]), Sounds.alarm_for(kind))
+
+
+## Пока держит тревога, вступление или гибель, тема не меняется, но и половина
+## не забывается: Otto, отпущенный уже в нижней половине, получает её трек.
+func test_a_hold_does_not_swallow_the_turn() -> void:
+	var director := AudioDirector.instance()
+	assert_not_null(director, "автолоад звука поднят")
+	if director == null:
+		return
+	var rules := BuildingRules.new()
+	var music := BuildingMusic.new(rules, 7)
+	var lower := rules.floors - 2
+	var top: Array = music.track_at(0, false)
+	var bottom: Array = music.track_at(lower, false)
+	music.play(false, 0)
+	var upper_stream := director.music_stream()
+	music.follow(lower, true)
+	assert_eq(director.music_stream(), upper_stream, "под удержанием тема та же")
+	music.follow(lower, false)
+	assert_eq(
+		director.music_stream(),
+		Sounds.variant(String(bottom[0]), int(bottom[1])),
+		"удержание снято — играет нижняя тема"
+	)
+	assert_ne(top[1], bottom[1], "у ночного отеля внизу другой трек")
+	director.stop_music()
+	director.reset()

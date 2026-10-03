@@ -7,6 +7,10 @@ extends GutTest
 
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const SETTLE_FRAMES: int = 5
+## Сколько сидов проходит проверка залов без сцены.
+const SEEDS: int = 30
+## Запас по высоте, с которым деталь относится к своему этажу ([method _story_of]), м.
+const STORY_SLACK: float = 0.2
 const KINDS: Array[BuildingIdentity.Kind] = [
 	BuildingIdentity.Kind.HOTEL, BuildingIdentity.Kind.OFFICE, BuildingIdentity.Kind.RESIDENTIAL
 ]
@@ -125,7 +129,32 @@ func test_halls_in_a_built_building_of_every_kind() -> void:
 		hall.light_span(Vector2i(-10, -5))
 		for light: OmniLight3D in hall.lights():
 			assert_false(light.visible, "вне кадра свет зала гаснет")
-		_assert_clear_of_doors(level, hall, kind)
+		_assert_clear_of_doors(level.rules, level.plan(), hall, kind)
+
+
+## Залы любого здания, а не одного сида: на коротком пролёте между шахтами
+## деталь не выворачивается наизнанку и не вылезает за край пролёта, и ни одна
+## не стоит перед дверью. Короткие пролёты бывают не на каждом сиде — на
+## первом их не было, и стойка регистрации отрицательной ширины прошла тест.
+func test_halls_of_any_building_stay_in_their_spans() -> void:
+	for kind: BuildingIdentity.Kind in KINDS:
+		var rules := BuildingRules.new()
+		rules.kind = kind
+		for building_seed: int in range(1, SEEDS + 1):
+			var plan := BuildingPlan.generate(rules, building_seed)
+			var hall := FloorHall.new()
+			hall.build(rules, plan)
+			var inverted := 0
+			var outside := 0
+			for place: Transform3D in hall.placements():
+				if place.basis.determinant() <= 0.0:
+					inverted += 1
+				if not _within_a_span(rules, plan, place.origin):
+					outside += 1
+			assert_eq(inverted, 0, "тип %d, сид %d: детали наизнанку" % [kind, building_seed])
+			assert_eq(outside, 0, "тип %d, сид %d: детали вне пролёта" % [kind, building_seed])
+			_assert_clear_of_doors(rules, plan, hall, kind)
+			hall.free()
 
 
 ## Обстановка коридора и вещи на стене не ставятся на особом этаже: стены нет.
@@ -146,39 +175,59 @@ func test_no_corridor_dressing_on_hall_floors() -> void:
 			)
 
 
+## Стоит ли середина детали [param origin] (сцена) в пролёте зала своего
+## этажа: между шахтами и стенами, с допуском на край.
+func _within_a_span(rules: BuildingRules, plan: BuildingPlan, origin: Vector3) -> bool:
+	var index := _story_of(rules, -origin.y)
+	var bounds := rules.floor_span(index)
+	var inner := Vector2(bounds.x + BuildingShell.WALL_WIDTH, bounds.y - BuildingShell.WALL_WIDTH)
+	for span: Vector2 in BuildingPlan.spans_between(plan.blocks_on(rules, index), inner):
+		if origin.x >= span.x - 0.05 and origin.x <= span.y + 0.05:
+			return true
+	return false
+
+
 func _assert_clear_of_doors(
-	level: GreyboxLevel, hall: FloorHall, kind: BuildingIdentity.Kind
+	rules: BuildingRules, plan: BuildingPlan, hall: FloorHall, kind: BuildingIdentity.Kind
 ) -> void:
-	var rules := level.rules
-	var office := kind == BuildingIdentity.Kind.OFFICE
-	var reach := FloorHall.LEAF_CLEAR if office else DoorRoom.DEPTH
-	var clear := Door.LEAF_SIZE.x * 0.5 if office else DoorRoom.WIDTH * 0.5 + DoorRoom.SHIFT
-	for many: Node in hall.find_children("*", "MultiMeshInstance3D", true, false):
-		var multimesh := (many as MultiMeshInstance3D).multimesh
-		for item: int in multimesh.instance_count:
-			var place := multimesh.get_instance_transform(item)
-			# Пол, стены и ленты окон — во весь пролёт, их середина где угодно.
-			if place.basis.get_scale().x > 2.5:
+	# Дверь особого этажа открывается в зал (ADR-0057): свободна полоса створки.
+	var reach := FloorHall.LEAF_CLEAR
+	var clear := Door.LEAF_SIZE.x * 0.5
+	# Места — из набора, а не из мультимеша: под headless-движком мультимеш их не
+	# хранит и отдаёт единичные, и проверка не видела ни одной детали.
+	var places := hall.placements()
+	assert_eq(places.size(), hall.parts(), "места всех деталей известны")
+	var checked := 0
+	for place: Transform3D in places:
+		# Пол, стены и ленты окон — во весь пролёт, их середина где угодно.
+		if absf(place.basis.get_scale().x) > 2.5:
+			continue
+		var depth := WorldSpace.BACK_WALL_Z - place.origin.z
+		if depth > reach - 0.2 or depth < 0.0:
+			continue
+		checked += 1
+		var index := _story_of(rules, -place.origin.y)
+		for spot: BuildingPlan.DoorSpot in plan.doors:
+			if spot.floor_index != index:
 				continue
-			var depth := WorldSpace.BACK_WALL_Z - place.origin.z
-			if depth > reach - 0.2 or depth < 0.0:
-				continue
-			var index := _story_of(rules, -place.origin.y)
-			for spot: BuildingPlan.DoorSpot in level.plan().doors:
-				if spot.floor_index != index:
-					continue
-				assert_true(
-					absf(place.origin.x - spot.x) >= clear - 0.05,
-					(
-						"тип %d, этаж %d: деталь в %.2f перед дверью в %.2f"
-						% [kind, index, place.origin.x, spot.x]
-					)
+			assert_true(
+				absf(place.origin.x - spot.x) >= clear - 0.05,
+				(
+					"тип %d, этаж %d: деталь в %.2f перед дверью в %.2f"
+					% [kind, index, place.origin.x, spot.x]
 				)
+			)
+	# Полоса створки узкая, и мелочи в ней бывает немного: проверено столько,
+	# сколько нашлось, — ноль тоже честный ответ.
+	gut.p("тип %d: у дверей проверено деталей %d" % [kind, checked])
 
 
 ## Этаж, в высоту которого попадает [param y]: от пола этажа выше до своего пола.
+## Мебель стоит низом на полу, а начало меша у иной модели и на сантиметр ниже:
+## без запаса [constant STORY_SLACK] деталь относилась к этажу ниже. Выше
+## потолка зала деталей нет, и запас этажа выше не задевает.
 func _story_of(rules: BuildingRules, y: float) -> int:
-	return int(ceilf((y - rules.sky_height) / rules.floor_height)) - 1
+	return int(ceilf((y - STORY_SLACK - rules.sky_height) / rules.floor_height)) - 1
 
 
 func _level(kind: BuildingIdentity.Kind, building_seed: int = 1) -> GreyboxLevel:

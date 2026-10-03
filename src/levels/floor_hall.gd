@@ -9,10 +9,8 @@ extends Node3D
 ## Тел нет, теней нет: примитивы и мебель паков собраны мультимешами
 ## ([MeshBatch]) — деталей сотни на этаж, вызовов отрисовки десятки на здание.
 ##
-## Зал обходит комнаты за дверями: перед дверью на глубину комнаты
-## ([constant DoorRoom.DEPTH]) ничего не стоит — створка открывается в комнату,
-## и та встаёт в зале как отгороженный угол. У офиса комнат нет, дверь
-## открывается в зал, и свободна только полоса створки.
+## Дверь особого этажа открывается в сам зал ([member Door.opens_into_hall]):
+## комнаты за ней нет, и перед дверью свободна только полоса створки.
 ##
 ## Ночью на тёмных этажах ROM всё, что светится само, погашено: экраны,
 ## индикаторы, бутылки бара, окно топки. Пар над котлом живёт и в темноте.
@@ -28,6 +26,9 @@ const MESH_POST_STEP: float = 1.5
 const DEPTH: float = WorldSpace.ROOM_DEPTH - 0.15
 ## Ближе этого к краю пролёта зал ничего не ставит, м.
 const EDGE: float = 0.5
+## Короче этого стойку регистрации и бара зал не ставит, м: на коротком
+## пролёте между шахтами она не помещается.
+const MIN_COUNTER: float = 1.0
 ## Полоса створки офисной двери, м: глубже стоять можно.
 const LEAF_CLEAR: float = DoorRoom.LEAF_CLEAR
 
@@ -39,6 +40,15 @@ const LIGHT_STEP: float = 5.0
 const LIGHT_HEIGHT: float = 2.4
 const LIGHT_RANGE: float = 5.5
 const LIGHT_ENERGY: float = 1.3
+## Чаша бассейна: середина по глубине и ширина, м. Ближний край — за комнатой
+## двери, дальний — перед лентой окон.
+const POOL_DEPTH: float = 5.15
+const POOL_WIDTH: float = 2.6
+## Труба котла начинается над ним, м; пар идёт с его верха и тает под
+## потолком.
+const CHIMNEY_FROM: float = 2.0
+const STEAM_FROM: float = 2.15
+
 ## Свой оттенок у зала, где свет особый: вода, серверы, топка, неон бара.
 const POOL_LIGHT := Color(0.55, 0.85, 1.0)
 const SERVER_LIGHT := Color(0.6, 0.75, 1.0)
@@ -92,6 +102,8 @@ var _doors: Array[float] = []
 var _steam: Array[Vector3] = []
 ## Свет залов по этажу: [method light_span] гасит невидимые.
 var _lights: Dictionary = {}
+## Места всех деталей залов ([method placements]).
+var _placed: Array[Transform3D] = []
 
 
 ## Собирает залы всех особых этажей здания.
@@ -103,6 +115,7 @@ func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 		var role := FloorRole.at(rules, index)
 		if FloorRole.is_hall(role):
 			_floor(index, role)
+	_placed = _batch.places()
 	_batch.commit(self)
 	for at: Vector3 in _steam:
 		add_child(HallLook.steam_plume(at))
@@ -123,6 +136,12 @@ func lights() -> Array[OmniLight3D]:
 	for index: int in _lights:
 		all.append_array(_lights[index] as Array[OmniLight3D])
 	return all
+
+
+## Места всех деталей залов в сцене: тестам. Мультимеш под headless-движком
+## мест не хранит ([method MeshBatch.places]).
+func placements() -> Array[Transform3D]:
+	return _placed
 
 
 ## Сколько деталей в залах: тестам.
@@ -240,6 +259,8 @@ func _lobby(span: Vector2) -> void:
 					continue
 				_turnstile(x, 5.0)
 			for x: float in _along(span, 4.0, 2.0):
+				if not _free(x + 0.6, 1.0, 1.4):
+					continue
 				_prop("bench_cushion", x, 1.4)
 				_prop("houseplant_c", x + 1.2, 1.2)
 		BuildingIdentity.Kind.RESIDENTIAL:
@@ -250,7 +271,7 @@ func _lobby(span: Vector2) -> void:
 			var middle := (span.x + span.y) * 0.5
 			_desk_row(middle, 1.4, 3.6, Color(0.35, 0.24, 0.15), false)
 			for x: float in _along(span, 3.5, 1.5):
-				if absf(x - middle) < 1.6:
+				if absf(x - middle) < 1.6 or not _free(x + 0.6, 1.2, 0.5):
 					continue
 				_prop("bench_hotel", x, 1.2)
 				_prop("radiator", x + 1.2, 0.5)
@@ -258,12 +279,15 @@ func _lobby(span: Vector2) -> void:
 			_floor_cover(span, GreyboxLook.polished(MARBLE))
 			_far_wall(span, GreyboxLook.surface(Color(0.36, 0.22, 0.14)))
 			var middle := (span.x + span.y) * 0.5
+			# Стойка — на пролёт с запасом в метр по краям: на коротком пролёте
+			# ширина выходила отрицательной, и коробка выворачивалась наизнанку.
 			var counter := minf(span.y - span.x - 2.0, 6.0)
-			_on(GreyboxLook.surface(WOOD), Vector3(counter, 1.1, 0.7), middle, 0.0, 4.6)
-			_on(GreyboxLook.metal(BRASS), Vector3(counter + 0.1, 0.05, 0.8), middle, 1.1, 4.6)
-			_key_rack(middle, counter)
+			if counter >= MIN_COUNTER:
+				_on(GreyboxLook.surface(WOOD), Vector3(counter, 1.1, 0.7), middle, 0.0, 4.6)
+				_on(GreyboxLook.metal(BRASS), Vector3(counter + 0.1, 0.05, 0.8), middle, 1.1, 4.6)
+				_key_rack(middle, counter)
 			for x: float in _along(span, 3.2, 1.0):
-				if not _free(x, 1.2, 2.2):
+				if not _free(x, 1.4, 1.1):
 					continue
 				_prop("lounge_sofa", x, 2.0)
 				_prop("coffee_table", x, 1.1)
@@ -330,21 +354,32 @@ func _pool(span: Vector2) -> void:
 	_windows(span)
 	var length := span.y - span.x - 1.0
 	var middle := _mid(span)
+	# Чаша — за комнатами дверей ([constant DoorRoom.DEPTH]): во весь пролёт
+	# она проходила бы сквозь пол открытой комнаты.
+	var near := POOL_DEPTH - POOL_WIDTH * 0.5
 	var water := HallLook.water()
 	_batch.box(
-		water,
-		Vector3(length, 0.03, 2.6),
-		Vector3(middle, _surface - 0.035, WorldSpace.BACK_WALL_Z - 4.0)
+		water, Vector3(length, 0.03, POOL_WIDTH), Vector3(middle, _surface - 0.035, _z(POOL_DEPTH))
 	)
 	var rim := GreyboxLook.polished(Color(0.86, 0.88, 0.88))
-	for edge: float in [2.6, 5.4]:
+	for edge: float in [near - 0.1, near + POOL_WIDTH + 0.1]:
 		_on(rim, Vector3(length + 0.3, 0.06, 0.15), middle, 0.0, edge)
 	for side: float in [-1.0, 1.0]:
-		_on(rim, Vector3(0.15, 0.06, 2.95), middle + side * (length * 0.5 + 0.08), 0.0, 4.0)
+		_on(
+			rim,
+			Vector3(0.15, 0.06, POOL_WIDTH + 0.35),
+			middle + side * (length * 0.5 + 0.08),
+			0.0,
+			POOL_DEPTH
+		)
 	var rail := GreyboxLook.metal(STEEL)
 	for x: float in [span.x + 1.2, span.y - 1.2]:
+		if not _free(x, 0.3, near - 0.05):
+			continue
 		for offset: float in [-0.25, 0.25]:
-			_batch.cylinder_on(rail, 0.025, 1.0, _surface, Vector3(x + offset, 0.0, _z(2.65)))
+			_batch.cylinder_on(
+				rail, 0.025, 1.0, _surface, Vector3(x + offset, 0.0, _z(near - 0.05))
+			)
 	for x: float in _along(span, 1.6, 0.0):
 		if _free(x, 0.5, 1.4):
 			_prop("bench_cushion", x, 1.4)
@@ -357,8 +392,18 @@ func _bar(span: Vector2) -> void:
 	_floor_cover(span, GreyboxLook.polished(Color(0.14, 0.08, 0.05)))
 	_far_wall(span, GreyboxLook.surface(Color(0.12, 0.08, 0.07)))
 	var middle := _mid(span)
+	for x: float in [span.x + 1.0, span.y - 1.0]:
+		if _free(x, 1.0, 1.6):
+			_prop("lounge_armchair", x, 1.6)
 	var unit_width := _width_of("bar_counter", 0.0)
-	var units := clampi(int((span.y - span.x - 2.0) / unit_width), 3, 10)
+	# Не меньше трёх секций, но не шире пролёта: на коротком пролёте три
+	# секции вылезали за край — за шахту, в соседний зал.
+	var units := mini(
+		clampi(int((span.y - span.x - 2.0) / unit_width), 3, 10),
+		int((span.y - span.x) / unit_width)
+	)
+	if float(units) * unit_width < MIN_COUNTER:
+		return
 	var left := middle - units * unit_width * 0.5
 	for unit: int in units:
 		_prop("bar_counter", left + unit_width * (unit + 0.5), 4.2)
@@ -372,9 +417,6 @@ func _bar(span: Vector2) -> void:
 			_surface,
 			Vector3(middle, 2.5, _z(DEPTH))
 		)
-	for x: float in [span.x + 1.0, span.y - 1.0]:
-		if _free(x, 1.0, 1.6):
-			_prop("lounge_armchair", x, 1.6)
 
 
 ## Конференц-зал: ряды кресел спинкой к камере, трибуна и экран у дальней стены.
@@ -530,10 +572,15 @@ func _boiler(span: Vector2) -> void:
 			_on(GreyboxLook.surface(DARK_STEEL), Vector3(0.2, 0.45, 1.4), x + side, 0.0, 4.5)
 		var door := GreyboxLook.light(FIRE) if _lit else GreyboxLook.surface(RACK)
 		_batch.box_on(door, Vector3(0.35, 0.25, 0.02), _surface, Vector3(x - 1.62, 1.1, _z(4.5)))
-		_batch.cylinder_on(pipe, 0.12, 2.0, _surface, Vector3(x + 0.8, 2.0, _z(4.5)))
+		# Труба — от котла до потолка: в два метра она уходила сквозь плиту в
+		# зал этажа выше, а пар из-под потолка поднимался туда же.
+		var ceiling := _surface - _rules.story_top(_index)
+		_batch.cylinder_on(
+			pipe, 0.12, ceiling - CHIMNEY_FROM, _surface, Vector3(x + 0.8, CHIMNEY_FROM, _z(4.5))
+		)
 		_batch.sphere(GreyboxLook.surface(CHALK), 0.16, Vector3(x - 0.6, _surface - 2.15, _z(3.6)))
 		_steam.append(
-			WorldSpace.to_scene(Vector2(x + 0.8, _surface - 3.0)) + Vector3(0, 0, _z(4.5))
+			WorldSpace.to_scene(Vector2(x + 0.3, _surface - STEAM_FROM)) + Vector3(0, 0, _z(4.5))
 		)
 	_overhead(span, pipe, lagging)
 
@@ -651,6 +698,8 @@ func _workshop(span: Vector2) -> void:
 				Vector3(x - 0.8 + peg * 0.32, 1.5, _z(DEPTH - 0.05))
 			)
 		_prop("cabinet", x + 1.5, 3.0)
+	if not _free(span.x + 0.6, 0.3, 2.5):
+		return
 	var ladder := GreyboxLook.metal(STEEL)
 	for side: float in [-0.25, 0.25]:
 		_on(ladder, Vector3(0.04, 2.0, 0.04), span.x + 0.6 + side, 0.0, 2.5)
@@ -812,16 +861,13 @@ func _prop(prop_name: String, x: float, d: float, turn: float = 0.0, h: float = 
 		_batch.mesh(part[0] as Mesh, place * (part[1] as Transform3D))
 
 
+## Свободно ли место предмета полушириной [param half] на глубине [param d]:
+## перед дверью свободна полоса створки — она открывается в зал.
 func _free(x: float, half: float, d: float) -> bool:
-	var office := _rules.kind == BuildingIdentity.Kind.OFFICE
-	var reach := LEAF_CLEAR if office else DoorRoom.DEPTH + 0.3
-	if d - 0.5 > reach:
+	if d - 0.5 > LEAF_CLEAR:
 		return true
-	var clear := (
-		Door.LEAF_SIZE.x if office else DoorRoom.WIDTH * 0.5 + DoorRoom.SHIFT + DoorRoom.WALL
-	)
 	for door: float in _doors:
-		if absf(x - door) < clear + half:
+		if absf(x - door) < Door.LEAF_SIZE.x + half:
 			return false
 	return true
 

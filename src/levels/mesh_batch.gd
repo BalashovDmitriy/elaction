@@ -30,8 +30,8 @@ func box_on(material: Material, size: Vector3, surface: float, at: Vector3) -> v
 	box(material, size, Vector3(at.x, surface - at.y - size.y * 0.5, at.z))
 
 
-## Вертикальный цилиндр радиусом [param radius] и высотой [param height], низом
-## на [param bottom] над полом [param surface], осью в (x, z) из [param at].
+## Вертикальный цилиндр радиусом [param radius] и высотой [param height]: [param
+## at] — x, высота низа над полом [param surface] и z оси.
 func cylinder_on(
 	material: Material, radius: float, height: float, surface: float, at: Vector3
 ) -> void:
@@ -44,15 +44,6 @@ func cylinder_on(
 func pipe_x(material: Material, radius: float, length: float, at: Vector3) -> void:
 	var basis := (
 		Basis(Vector3.BACK, PI * 0.5)
-		* Basis.from_scale(Vector3(radius * 2.0, length, radius * 2.0))
-	)
-	_put(Shape.CYLINDER, material, Transform3D(basis, scene_of(at)))
-
-
-## Лежачий цилиндр вдоль Z: труба в глубину.
-func pipe_z(material: Material, radius: float, length: float, at: Vector3) -> void:
-	var basis := (
-		Basis(Vector3.RIGHT, PI * 0.5)
 		* Basis.from_scale(Vector3(radius * 2.0, length, radius * 2.0))
 	)
 	_put(Shape.CYLINDER, material, Transform3D(basis, scene_of(at)))
@@ -72,12 +63,14 @@ func mesh(source: Mesh, place: Transform3D) -> void:
 	(_places[key] as Array[Transform3D]).append(place)
 
 
-## Сколько деталей накоплено: тестам.
-func count() -> int:
-	var total := 0
-	for places: Array in _places.values():
-		total += places.size()
-	return total
+## Места всех накопленных деталей, до [method commit]. Тестам: под
+## headless-движком мультимеш места не хранит и отдаёт единичные — проверка
+## по нему не видела бы ни одной детали.
+func places() -> Array[Transform3D]:
+	var all: Array[Transform3D] = []
+	for each: Array in _places.values():
+		all.append_array(each as Array[Transform3D])
+	return all
 
 
 ## Сдаёт накопленное узлами в [param parent] на слой обстановки.

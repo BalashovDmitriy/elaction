@@ -58,6 +58,7 @@ func test_hall_tone_sounds_only_indoors() -> void:
 	for role: FloorRole.Role in Sounds.HALL_TONES:
 		var tone := Sounds.hall_tone_of(role)
 		assert_not_null(Sounds.stream(tone), "%s: звук есть" % tone)
+		assert_true(Sounds.LOOPED.has(tone), "%s звучит петлёй, пока Otto на этаже" % tone)
 		var inside := Sounds.weather_loops(
 			Weather.Kind.CLEAR, false, TimeOfDay.Kind.NIGHT, BuildingIdentity.Kind.HOTEL, tone
 		)

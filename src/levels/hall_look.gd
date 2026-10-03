@@ -110,8 +110,6 @@ static func chain_link() -> StandardMaterial3D:
 
 
 ## Сбрасывает материалы и меши: тестам, как [method GreyboxLook.forget].
-
-
 static func forget() -> void:
 	_chain_link = null
 	_led = null
@@ -150,8 +148,6 @@ static func template(prop_name: String, kind: BuildingIdentity.Kind) -> Array:
 
 
 ## Копия меша, у которой материалы Kenney заменены на цвета типа здания.
-
-
 static func _recolour(source: Mesh, kind: BuildingIdentity.Kind) -> Mesh:
 	var tones: Dictionary = HOTEL_TONES
 	match kind:
@@ -178,10 +174,8 @@ static func _recolour(source: Mesh, kind: BuildingIdentity.Kind) -> Mesh:
 	return copy
 
 
-## Свободно ли место предмета полушириной [param half] на глубине [param d]:
-## перед дверью на глубину её комнаты ничего не ставится.
-
-
+## Стекло переговорных и турникетов — то же, что у стены офиса
+## ([BuildingShell]): один материал на здание.
 static func glass() -> StandardMaterial3D:
 	if _glass_look == null:
 		_glass_look = StandardMaterial3D.new()
@@ -193,6 +187,7 @@ static func glass() -> StandardMaterial3D:
 	return _glass_look
 
 
+## Индикаторы серверов: мигают каждый в свой такт ([constant LED_SHADER]).
 static func led() -> ShaderMaterial:
 	if _led == null:
 		var shader := Shader.new()
@@ -204,6 +199,7 @@ static func led() -> ShaderMaterial:
 	return _led
 
 
+## Вода бассейна в ряби ([constant WATER_SHADER]).
 static func water() -> ShaderMaterial:
 	if _water == null:
 		var shader := Shader.new()
@@ -215,9 +211,7 @@ static func water() -> ShaderMaterial:
 	return _water
 
 
-## Пар над трубой котла: редкие клубы вверх и в стороны, без теней.
-
-
+## Пар над котлом: редкие клубы вверх и в стороны, без теней.
 static func steam_plume(at: Vector3) -> GPUParticles3D:
 	var steam := GPUParticles3D.new()
 	steam.name = "Steam"

@@ -72,16 +72,22 @@ func _ready() -> void:
 		return
 	level.rules = BuildingRules.new()
 	level.building_seed = 1
+	var kind := -1
 	for argument: String in OS.get_cmdline_user_args():
 		if argument.begins_with("--seed="):
 			level.building_seed = argument.trim_prefix("--seed=").to_int()
 		elif argument.begins_with("--kind="):
 			# Тип здания (M24o): у залов особых этажей свой свет и свои мультимеши.
-			var kind := argument.trim_prefix("--kind=").to_int() as BuildingIdentity.Kind
-			GameState.instance().building = BuildingIdentity.first_of(kind, level.building_seed)
+			kind = argument.trim_prefix("--kind=").to_int()
 		elif argument.begins_with("--time="):
 			# Время суток (M24j): днём город другой — солнце и стекло с небом.
 			level.rules.time_of_day = argument.trim_prefix("--time=").to_int() as TimeOfDay.Kind
+	# Здание типа — по окончательному сиду: `--kind` до `--seed` искал его по
+	# прежнему, и тип выходил другой.
+	if kind >= 0:
+		GameState.instance().building = BuildingIdentity.first_of(
+			kind as BuildingIdentity.Kind, level.building_seed
+		)
 	add_child(level)
 
 	# Не крыша, а широкий этаж: три лампы, двери с табло и агенты у них —

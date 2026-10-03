@@ -42,11 +42,9 @@ func play(alarm: bool, index: int) -> void:
 
 
 ## Otto на этаже [param index]: перешёл середину здания — меняет тему. Пока
-## [param hold] — тревога или вступление, — трек не трогает.
+## [param hold] — тревога, вступление или гибель, — трек не трогает и половину
+## не запоминает: Otto, возрождённый в другой половине, получает её тему.
 func follow(index: int, hold: bool) -> void:
-	var lower := is_lower_half(index)
-	if lower == _lower:
+	if hold or is_lower_half(index) == _lower:
 		return
-	_lower = lower
-	if not hold:
-		play(false, index)
+	play(false, index)

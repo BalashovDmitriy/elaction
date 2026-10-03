@@ -81,7 +81,7 @@ func _stage() -> void:
 
 
 func _run() -> void:
-	for _frame in 6:
+	for _frame: int in 6:
 		await RenderingServer.frame_post_draw
 	var path := "res://screens/%s/cabs.png" % _folder
 	get_viewport().get_texture().get_image().save_png(path)

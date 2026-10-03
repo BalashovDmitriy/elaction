@@ -65,8 +65,6 @@ var _ribs: BuildingRibs = null
 ## Стены без тел отдельным узлом: их много, и в дереве они не должны мешаться
 ## среди тел, по которым ходят.
 var _panels: Node3D = null
-## Стекло офиса — один материал на здание.
-var _glass: StandardMaterial3D = null
 
 
 ## Куски перекрытия уровня прямоугольниками правил.
@@ -346,48 +344,49 @@ func _build_screen(
 			_build_mesh(opening)
 
 
-## Сетка-рабица технического этажа на стальных стойках, без тел — как стена.
+## Сетка-рабица технического этажа на стальных стойках, без тел — как стена;
+## поперечина — поверху.
 func _build_mesh(rect: Rect2) -> void:
-	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
-		return
-	var z := WorldSpace.BACK_WALL_Z - PANEL_THICKNESS * 0.5
-	var net := GreyboxLook.box(Vector3(rect.size.x, rect.size.y, 0.02), HallLook.chain_link())
-	net.position = WorldSpace.to_scene(rect.get_center())
-	net.position.z = z
-	net.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_panels.add_child(net)
-	var post := GreyboxLook.metal(FloorHall.MESH_POST)
-	var count := maxi(1, roundi(rect.size.x / FloorHall.MESH_POST_STEP))
-	for step: int in count + 1:
-		var x := rect.position.x + rect.size.x * step / count
-		_build_panel(Rect2(x - 0.03, rect.position.y, 0.06, rect.size.y), post, z + 0.03)
-	_build_panel(Rect2(rect.position.x, rect.position.y, rect.size.x, 0.05), post, z + 0.03)
+	_build_infill(
+		rect,
+		HallLook.chain_link(),
+		GreyboxLook.metal(FloorHall.MESH_POST),
+		FloorHall.MESH_POST_STEP,
+		Rect2(rect.position.x, rect.position.y, rect.size.x, 0.05)
+	)
 
 
 ## Стеклянная перегородка офиса в задней стене: стекло и алюминиевые стойки
-## с шагом [constant GLASS_MULLION], без тел — как и сама стена.
+## с шагом [constant GLASS_MULLION], без тел — как и сама стена; поперечина —
+## понизу. Стекло — одно на здание и на залы особых этажей ([method HallLook.glass]).
 func _build_glass(rect: Rect2) -> void:
+	_build_infill(
+		rect,
+		HallLook.glass(),
+		GreyboxLook.metal(GLASS_FRAME),
+		GLASS_MULLION,
+		Rect2(rect.position.x, rect.end.y - 0.08, rect.size.x, 0.08)
+	)
+
+
+## Перегородка в проёме [param rect] задней стены: полотно [param sheet] без
+## теней, стойки [param post] с шагом [param step] и поперечина [param rail].
+func _build_infill(
+	rect: Rect2, sheet: StandardMaterial3D, post: StandardMaterial3D, step: float, rail: Rect2
+) -> void:
 	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
 		return
-	if _glass == null:
-		_glass = StandardMaterial3D.new()
-		_glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		_glass.albedo_color = GLASS
-		_glass.roughness = 0.04
-		_glass.metallic = 0.1
-		_glass.cull_mode = BaseMaterial3D.CULL_DISABLED
 	var z := WorldSpace.BACK_WALL_Z - PANEL_THICKNESS * 0.5
-	var pane := GreyboxLook.box(Vector3(rect.size.x, rect.size.y, 0.02), _glass)
+	var pane := GreyboxLook.box(Vector3(rect.size.x, rect.size.y, 0.02), sheet)
 	pane.position = WorldSpace.to_scene(rect.get_center())
 	pane.position.z = z
 	pane.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_panels.add_child(pane)
-	var frame := GreyboxLook.metal(GLASS_FRAME)
-	var count := maxi(1, roundi(rect.size.x / GLASS_MULLION))
-	for step: int in count + 1:
-		var x := rect.position.x + rect.size.x * step / count
-		_build_panel(Rect2(x - 0.03, rect.position.y, 0.06, rect.size.y), frame, z + 0.03)
-	_build_panel(Rect2(rect.position.x, rect.end.y - 0.08, rect.size.x, 0.08), frame, z + 0.03)
+	var count := maxi(1, roundi(rect.size.x / step))
+	for stand: int in count + 1:
+		var x := rect.position.x + rect.size.x * stand / count
+		_build_panel(Rect2(x - 0.03, rect.position.y, 0.06, rect.size.y), post, z + 0.03)
+	_build_panel(rail, post, z + 0.03)
 
 
 ## Стена, которая только видна: без тела, толщиной [constant PANEL_THICKNESS],

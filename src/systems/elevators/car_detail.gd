@@ -126,13 +126,17 @@ func gate_openness() -> float:
 
 
 ## Складывает решётку, когда из кабины можно сойти, и раздвигает, когда
-## нельзя ([param open]), за [constant GATE_TIME] с; лязг — на смене.
-func tend_gate(open: bool, delta: float) -> void:
+## нельзя ([param open]), за [constant GATE_TIME] с; лязг — на смене, если
+## [param audible]. Окно выхода открывается на каждом проезжаемом этаже, и
+## лязгали бы все пустые кабины дома, — звенящие пустые кабины пользователь
+## отверг ещё в M21 (ADR-0052, решение 7): слышно только кабину с Otto.
+func tend_gate(open: bool, delta: float, audible: bool = true) -> void:
 	if _gate_bars.is_empty():
 		return
 	if open != _gate_wanted:
 		_gate_wanted = open
-		Sounds.play_at(self, Sounds.CAB_GATE, global_position, GATE_REACH, GATE_DB)
+		if audible:
+			Sounds.play_at(self, Sounds.CAB_GATE, global_position, GATE_REACH, GATE_DB)
 	var target := 1.0 if open else 0.0
 	var moved := move_toward(_gate_open, target, delta / GATE_TIME)
 	if moved != _gate_open:
@@ -224,6 +228,12 @@ func _dress_by_kind(width: float, inner: float, back_z: float, light_y: float) -
 			)
 		BuildingIdentity.Kind.RESIDENTIAL:
 			var dark := GreyboxLook.metal(STEEL_DARK)
+			# Рифлёный пол грузовой — тот же лист, что порог портала шахты.
+			_part(
+				Vector3(width - WALL * 2.0, 0.01, DEPTH - WALL),
+				Vector3(0.0, 0.005, WALL * 0.5),
+				BuildingFinish.tread_plate()
+			)
 			_part(
 				Vector3(width - WALL * 2.0, BUMPER_SIZE.x, BUMPER_SIZE.y),
 				Vector3(0.0, BUMPER_RISE, face_z + BUMPER_SIZE.y * 0.5),

@@ -119,16 +119,25 @@ const ALARM_RESIDENTIAL := "alarm_residential"
 const CAB_GATE := "cab_gate"
 ## Фон залов особых этажей (ADR-0057, решение 4): звучит поверх тишины
 ## коридора, пока Otto на этаже зала. У залов без своего звука — только тишина.
+const HALL_POOL := "hall_pool"
+const HALL_SERVER := "hall_server"
+const HALL_BOILER := "hall_boiler"
+const HALL_LAUNDRY := "hall_laundry"
+const HALL_DINING := "hall_dining"
+const HALL_KITCHEN := "hall_kitchen"
+const HALL_GYM := "hall_gym"
+const HALL_BAR := "hall_bar"
+const HALL_MECHANICAL := "hall_mechanical"
 const HALL_TONES := {
-	FloorRole.Role.POOL: "hall_pool",
-	FloorRole.Role.SERVER: "hall_server",
-	FloorRole.Role.BOILER: "hall_boiler",
-	FloorRole.Role.LAUNDRY: "hall_laundry",
-	FloorRole.Role.DINING: "hall_dining",
-	FloorRole.Role.KITCHEN: "hall_kitchen",
-	FloorRole.Role.GYM: "hall_gym",
-	FloorRole.Role.BAR: "hall_bar",
-	FloorRole.Role.MECHANICAL: "hall_mechanical",
+	FloorRole.Role.POOL: HALL_POOL,
+	FloorRole.Role.SERVER: HALL_SERVER,
+	FloorRole.Role.BOILER: HALL_BOILER,
+	FloorRole.Role.LAUNDRY: HALL_LAUNDRY,
+	FloorRole.Role.DINING: HALL_DINING,
+	FloorRole.Role.KITCHEN: HALL_KITCHEN,
+	FloorRole.Role.GYM: HALL_GYM,
+	FloorRole.Role.BAR: HALL_BAR,
+	FloorRole.Role.MECHANICAL: HALL_MECHANICAL,
 }
 const MENU_THEME := "menu_theme"
 const GAME_OVER_THEME := "game_over_theme"
@@ -258,15 +267,15 @@ const AMBIENCE: PackedStringArray = [
 	THUNDER_FAR,
 	SHAFT_HUM,
 	NEON_BUZZ,
-	"hall_pool",
-	"hall_server",
-	"hall_boiler",
-	"hall_laundry",
-	"hall_dining",
-	"hall_kitchen",
-	"hall_gym",
-	"hall_bar",
-	"hall_mechanical",
+	HALL_POOL,
+	HALL_SERVER,
+	HALL_BOILER,
+	HALL_LAUNDRY,
+	HALL_DINING,
+	HALL_KITCHEN,
+	HALL_GYM,
+	HALL_BAR,
+	HALL_MECHANICAL,
 ]
 
 ## Джинглы: на время звучания приглушают трек (ADR-0036, решение 6).
@@ -289,8 +298,24 @@ const LOOPED: PackedStringArray = [
 	THEME_DAY,
 	THEME_EVENING,
 	ALARM_THEME,
+	# Темы и тревоги офиса и жилого дома (ADR-0057, решение 7): без петли трек
+	# здания доигрывал раз и молчал до конца здания (авторевью M24o).
+	THEME_OFFICE,
+	THEME_OFFICE + "_morning",
+	THEME_OFFICE + "_day",
+	THEME_OFFICE + "_evening",
+	ALARM_OFFICE,
+	THEME_RESIDENTIAL,
+	THEME_RESIDENTIAL + "_morning",
+	THEME_RESIDENTIAL + "_day",
+	THEME_RESIDENTIAL + "_evening",
+	ALARM_RESIDENTIAL,
 	MENU_THEME,
 	CITY,
+	# Улица утром, днём и вечером — петлёй, как ночная (ADR-0052, решение 8).
+	CITY_MORNING,
+	CITY_DAY,
+	CITY_EVENING,
 	RAIN,
 	WIND,
 	WIND_SNOW,
@@ -300,6 +325,16 @@ const LOOPED: PackedStringArray = [
 	ROOM_TONE_RESIDENTIAL,
 	SHAFT_HUM,
 	NEON_BUZZ,
+	# Фон залов особых этажей (ADR-0057, решение 4) звучит, пока Otto на этаже.
+	HALL_POOL,
+	HALL_SERVER,
+	HALL_BOILER,
+	HALL_LAUNDRY,
+	HALL_DINING,
+	HALL_KITCHEN,
+	HALL_GYM,
+	HALL_BAR,
+	HALL_MECHANICAL,
 ]
 
 ## Больше стольких вариантов одного имени не бывает: дальше тест не ищет.

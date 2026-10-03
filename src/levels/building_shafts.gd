@@ -170,6 +170,8 @@ var _span := Vector2i(-1_000_000, 1_000_000)
 var _board_host: Node3D = null
 ## Треугольник стрелки, один на все табло.
 var _arrow_mesh: PrismMesh = null
+## Обод и поле циферблата отеля: одни на все табло здания.
+var _dial_discs: Array[CylinderMesh] = []
 
 
 ## Табло и кнопки одного портала.
@@ -398,14 +400,17 @@ func _build_board(x: float, index: int, surface: float) -> void:
 ## стрелка. Возвращает узел стрелки — его поворачивает [method _paint].
 func _dial(centre: Vector3) -> Node3D:
 	var brass := GreyboxLook.metal(KIND_TRIM[BuildingIdentity.Kind.HOTEL])
-	for ring: Array in [[DIAL_RADIUS, brass, 0.0], [DIAL_RADIUS - 0.02, null, 0.012]]:
-		var disc := CylinderMesh.new()
-		disc.top_radius = float(ring[0])
-		disc.bottom_radius = float(ring[0])
-		disc.height = 0.02
-		disc.radial_segments = 24
+	if _dial_discs.is_empty():
+		for radius: float in [DIAL_RADIUS, DIAL_RADIUS - 0.02]:
+			var made := CylinderMesh.new()
+			made.top_radius = radius
+			made.bottom_radius = radius
+			made.height = 0.02
+			made.radial_segments = 24
+			_dial_discs.append(made)
+	for ring: Array in [[_dial_discs[0], brass, 0.0], [_dial_discs[1], null, 0.012]]:
 		var face := MeshInstance3D.new()
-		face.mesh = disc
+		face.mesh = ring[0] as CylinderMesh
 		face.material_override = (
 			ring[1] as StandardMaterial3D
 			if ring[1] != null
