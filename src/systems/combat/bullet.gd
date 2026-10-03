@@ -83,7 +83,10 @@ static func spawn_point(world: World3D, from: Vector3, muzzle: Vector3) -> Vecto
 
 func _ready() -> void:
 	add_to_group(GROUP)
-	body_entered.connect(_on_body_entered)
+	# Overlaps are checked by the bullet itself ([method _strike_overlap]), not by the
+	# engine's monitoring: Jolt reported a point-blank overlap only on some runs, and the
+	# same seed then ended differently (ADR-0059, decision 1).
+	monitoring = false
 	# The look is a thin tracer with a tail ([BulletLook]); the shooter sets the direction
 	# before the bullet enters the tree.
 	_look = BulletLook.make(direction)
@@ -114,6 +117,8 @@ func _physics_process(delta: float) -> void:
 	if _spent:
 		return
 	_flash_once()
+	if _strike_overlap():
+		return
 	# The bullet does not go beyond its range even on the last step: otherwise on a fast frame
 	# it would reach half a step further than its range.
 	var length := minf(speed * delta, max_range - _travelled)
@@ -183,8 +188,32 @@ func _flash_once() -> void:
 	ShotFx.muzzle(get_parent(), global_position, direction)
 
 
-func _on_body_entered(body: Node3D) -> void:
+## Called by the shooter right after placing the bullet: a point-blank shot hits in the
+## same physics frame it is fired, as the engine's overlap used to report it.
+func strike_point_blank() -> void:
+	if not _spent:
+		_strike_overlap()
+
+
+## Hits whatever the bullet's shape already overlaps: point blank, when it is born
+## inside a body, or when a body has moved into it since the last frame. A direct
+## query gives the same answer for the same positions on every run; the engine's
+## overlap events did not. Returns whether something was hit.
+func _strike_overlap() -> bool:
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = ($Shape as CollisionShape3D).shape
+	query.transform = global_transform
+	query.collision_mask = collision_mask
+	query.collide_with_areas = false
+	query.collide_with_bodies = true
+	var touching := get_world_3d().direct_space_state.intersect_shape(query, 1)
+	if touching.is_empty():
+		return false
+	var body := touching[0].get("collider") as Node3D
+	if body == null:
+		return false
 	_hit(body, global_position)
+	return true
 
 
 ## Hit on [param body] at point [param point].
@@ -194,8 +223,8 @@ func _hit(body: Node3D, point: Vector3) -> void:
 	# bring points for each.
 	if _spent:
 		return
-	# Point-blank, the bullet hits before its first physics frame: the overlap is caught
-	# already on the step it was fired in. The muzzle flash — then too.
+	# A point-blank bullet hits on its very first frame, before it has moved; the
+	# muzzle flash is shown then too.
 	_flash_once()
 	_spent = true
 	# A layer, not a class: [Otto] and [Enemy] load the bullet scene themselves, and a reference

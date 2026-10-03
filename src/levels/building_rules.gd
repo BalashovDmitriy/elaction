@@ -226,6 +226,14 @@ const MIN_SHAFT_FLOORS: int = 4
 ## measurement, less than the former 2.88 (ADR-0053, decision 3).
 @export var agent_release_gap: float = 1.2
 
+## For this long after Otto comes back, a door on his floor does not release an agent
+## closer to him than [member agent_respawn_gap], s and m. Our deviation from the ROM,
+## which has no distance check (@5AAB): an agent from the next door used to lie down
+## a step away and kill the returned Otto two seconds later, again and again
+## (ADR-0059, decision 3, user's choice).
+@export var agent_respawn_calm: float = 4.0
+@export var agent_respawn_gap: float = 4.0
+
 ## Whether agents never shoot. For shots and checks that need an agent
 ## who walks and dodges but does not kill; always off in the game.
 @export var agents_hold_fire: bool = false

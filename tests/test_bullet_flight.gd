@@ -115,3 +115,22 @@ func test_bullet_holes_are_left_and_capped() -> void:
 		await wait_physics_frames(2)
 	assert_eq(hits.size(), ShotFx.HOLES_KEPT + 5, "каждая пуля дошла до стены")
 	assert_eq(ShotFx.holes(), ShotFx.HOLES_KEPT, "следов — не больше потолка")
+
+
+## A bullet born inside a body hits it at once, by a direct query, and the engine's
+## overlap events are off: Jolt reported such an overlap only on some runs, and the
+## bot's run on one seed ended differently every time (fix/bot-determinism).
+func test_a_point_blank_bullet_hits_at_once_and_by_query() -> void:
+	_ground()
+	var target := _box(Vector3(2.0, SHOT_HEIGHT, 0.0), Vector3(0.6, 0.6, 0.6))
+	target.collision_layer = 4
+	await wait_physics_frames(1)
+	var hits: Array[Node3D] = []
+	var bullet := _fire(2.0, hits)
+	assert_false(bullet.monitoring, "no engine overlap events")
+	bullet.strike_point_blank()
+	assert_eq(hits.size(), 1, "hit in the same frame it is fired")
+	if hits.size() == 1:
+		assert_eq(hits[0], target)
+	bullet.strike_point_blank()
+	assert_eq(hits.size(), 1, "one bullet hits once")

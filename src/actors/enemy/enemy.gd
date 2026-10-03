@@ -766,6 +766,7 @@ func _fire() -> void:
 	var from := global_position + Vector3(0.0, _shot_height(), 0.0)
 	var muzzle := from + Vector3(_brain.facing * _muzzle_reach(), 0.0, 0.0)
 	bullet.global_position = Bullet.spawn_point(get_world_3d(), from, muzzle)
+	bullet.strike_point_blank()
 	_bullet = bullet
 
 

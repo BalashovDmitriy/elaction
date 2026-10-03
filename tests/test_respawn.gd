@@ -130,3 +130,23 @@ func test_the_farthest_of_a_crowd_goes_to_a_door() -> void:
 	var still := AgentCrowd.extras(crowd, rules, here, otto_x, {crowd[0]: true})
 	assert_eq(still.size(), 1, "уходит всё так же один")
 	assert_true(still.has(crowd[0]), "уходящего отозвали ради дальнего")
+
+
+## Just after Otto's return a door on his floor does not release an agent closer than
+## [member BuildingRules.agent_respawn_gap]; when the calm is over, the usual gap holds
+## (fix/bot-determinism, user's choice — the ROM has no distance check).
+func test_doors_near_otto_stay_shut_just_after_his_return() -> void:
+	var rules := BuildingRules.new()
+	var spawn := AgentSpawn.new()
+	var otto := Node3D.new()
+	add_child_autofree(otto)
+	var middle := (rules.agent_release_gap + rules.agent_respawn_gap) * 0.5
+	assert_false(spawn.hugs(rules, 3, 3, middle, otto), "in play the usual gap")
+	spawn.after_death(rules.agent_respawn_calm)
+	assert_true(spawn.is_calm())
+	assert_true(spawn.hugs(rules, 3, 3, middle, otto), "after the return the wider gap")
+	assert_false(spawn.hugs(rules, 2, 3, middle, otto), "other floors are not held back")
+	assert_false(spawn.hugs(rules, 3, 3, rules.agent_respawn_gap + 0.5, otto), "a far door opens")
+	spawn.tick(rules.agent_respawn_calm + 0.1)
+	assert_false(spawn.is_calm())
+	assert_false(spawn.hugs(rules, 3, 3, middle, otto), "after the calm the usual gap")

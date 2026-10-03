@@ -83,6 +83,12 @@ const ENDLESS_LIVES: int = 99
 ## crowd leaves through doors, release no closer than 1.2 m — **1, 4, 6** on seeds 1–3. Seed 3 was
 ## at the threshold before too (5 of 5); combat by the ROM is a bit meaner, and the threshold was
 ## raised to six by the user's decision.
+##
+## Measurement 2026-10-03, after the determinism fix (ADR-0059): **2, 5, 3** on seeds
+## 1–3. Until then seed 3 gave 4 or 9 at random — Jolt reported a point-blank bullet
+## overlap only on some runs — and the earlier numbers caught the lucky branch. Now a
+## seed gives the same number on every run; the number moves only when the code does,
+## and is then measured again.
 const DEATHS_ALLOWED: int = 6
 
 ## How many steps the bot gets to make at least some progress before the run is declared stuck in a

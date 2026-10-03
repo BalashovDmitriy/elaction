@@ -21,12 +21,15 @@ var _busy: Array[bool] = [false, false, false, false]
 var _wait: Array[float] = [0.0, 0.0, 0.0, 0.0]
 ## How much has accumulated toward the next draw tick, s.
 var _clock: float = 0.0
+## How much of the calm after Otto's return is left, s ([method after_death]).
+var _calm_left: float = 0.0
 
 
 ## Counts time. Returns true on the frame a logic tick comes:
 ## in ROM the draw is rolled once per tick, not once per frame — otherwise at 60 Hz it would go
 ## four times as often, and at 30 half as often.
 func tick(delta: float) -> bool:
+	_calm_left = maxf(_calm_left - delta, 0.0)
 	for index in _wait.size():
 		_wait[index] = maxf(_wait[index] - delta, 0.0)
 	_clock += delta
@@ -67,8 +70,10 @@ func release(slot: int, level: int) -> void:
 
 ## Otto returned to play: all slots are free, and releases into them go with ROM
 ## delays — 10, 25, 40 and 55 ticks (@2F61; ADR-0053, decision 2). Slots added beyond
-## four wait further at the same step.
-func after_death() -> void:
+## four wait further at the same step. [param calm] — how long doors near him stay shut
+## ([member BuildingRules.agent_respawn_gap], ADR-0059, decision 3).
+func after_death(calm: float = 0.0) -> void:
+	_calm_left = calm
 	var waits := Arcade.RESPAWN_WAIT_TICKS
 	var step := waits[1] - waits[0]
 	for index in _busy.size():
@@ -99,4 +104,13 @@ func pick(count: int) -> int:
 func hugs(rules: BuildingRules, floor_index: int, here: int, door_x: float, otto: Node3D) -> bool:
 	if floor_index != here:
 		return false
-	return absf(door_x - otto.global_position.x) < rules.agent_release_gap
+	# Just after Otto's return the gap is wider ([member BuildingRules.agent_respawn_gap]).
+	var gap := rules.agent_release_gap
+	if _calm_left > 0.0:
+		gap = maxf(gap, rules.agent_respawn_gap)
+	return absf(door_x - otto.global_position.x) < gap
+
+
+## Whether the calm after Otto's return still holds: tests.
+func is_calm() -> bool:
+	return _calm_left > 0.0

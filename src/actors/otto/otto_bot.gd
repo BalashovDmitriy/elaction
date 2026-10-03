@@ -57,6 +57,14 @@ const TAKEDOWN_SNEAK: float = 5.0
 ## under the agent's gaze gives him time to wind up.
 const TAKEDOWN_RUSH: float = 2.2
 
+## A prone agent cannot be shot at all: a crouch shot flies over it, as in the ROM
+## ("crouch shot 15 misses prone (top 11)"). The bot goes for the takedown from further
+## away and jumps at it over its low shot so as to land on it (a pounce, ADR-0042,
+## decision 9). Rushing reach for a prone agent and the gap over which a jump forward
+## lands within [constant Takedown.REACH] of it, m.
+const TAKEDOWN_PRONE: float = 4.0
+const POUNCE_GAP := Vector2(0.6, 2.8)
+
 ## How long the bot is willing to fight without moving, in seconds of game time.
 ##
 ## The count runs while anyone at all is nearby and resets only when the line is clear. After that
@@ -233,7 +241,7 @@ func step() -> void:
 	# direction itself, and there is no need to aim in a separate frame.
 	var aiming := not dodging and not car_dodging and not closing and _duelling(threat)
 	if dodging:
-		_dodge(bullet_height)
+		_dodge(bullet_height, threat)
 	elif car_dodging:
 		_dodge_in_car(car, incoming)
 	elif closing:
@@ -493,13 +501,36 @@ func _dodge_height(incoming: Vector2) -> float:
 ## "Did not work" also covers the rest frame: the jump is a single action, and on such a frame
 ## [method _press] does not press it. An empty frame under a bullet costs more than an imperfect
 ## dodge, so the result is checked, not assumed.
-func _dodge(bullet_height: float) -> void:
+func _dodge(bullet_height: float, threat: Enemy = null) -> void:
 	if bullet_height > HIGH_BULLET:
 		_press(&"move_down")
 		return
+	# Over a prone agent's shot the bot jumps towards it: on the spot it lands in front
+	# of the next shot, and the landing pause leaves no time for a second jump.
+	var pounce := _pounce_at(threat)
+	if pounce != 0.0 and _otto.is_grounded():
+		_press(&"move_right" if pounce > 0.0 else &"move_left")
+		if _press(&"jump"):
+			_decision = "прыгаю на лежачего"
+			return
 	if _otto.is_grounded() and _press(&"jump"):
 		return
 	_press(&"move_down")
+
+
+## Which way to jump onto a prone [param threat] so as to land on it: -1, +1, or 0 if
+## it is not prone, is out of jumping reach or is not on Otto's piece of the floor.
+func _pounce_at(threat: Enemy) -> float:
+	if threat == null or threat.stance() != EnemyBrain.Stance.PRONE or _otto.is_riding():
+		return 0.0
+	var here := _at(_otto)
+	var there := _at(threat)
+	var gap := absf(there.x - here.x)
+	if gap < POUNCE_GAP.x or gap > POUNCE_GAP.y:
+		return 0.0
+	if not _same_piece(_rules.floor_index_near(here.y), here.x, there.x):
+		return 0.0
+	return _side_of(threat)
 
 
 ## Whether to go and take down [param threat] (ADR-0040): standing on its own feet, not in a cab,
@@ -522,6 +553,8 @@ func _worth_a_takedown(threat: Enemy) -> bool:
 		return false
 	var side := Takedown.side_of(_otto.global_position.x, threat.global_position.x, threat.facing())
 	var reach := TAKEDOWN_SNEAK if side == Takedown.Side.BACK else TAKEDOWN_RUSH
+	if threat.stance() == EnemyBrain.Stance.PRONE:
+		reach = maxf(reach, TAKEDOWN_PRONE)
 	return absf(there.x - here.x) <= reach
 
 
@@ -569,6 +602,10 @@ func _duelling(threat: Enemy) -> bool:
 	if riding and not _car_aligned():
 		return false
 	if _duel_time > DUEL_PATIENCE:
+		return false
+	# A crouch shot flies over a prone agent: holding the line against it only wastes
+	# shots while it fires back.
+	if threat.stance() == EnemyBrain.Stance.PRONE:
 		return false
 	return absf(_at(threat).x - _at(_otto).x) <= _duel_reach()
 

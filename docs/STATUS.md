@@ -448,6 +448,11 @@ There is no debt. Closed by [ADR-0053](adr/0053-open-questions-and-debt.md): the
 downwash and rain, the facade atlas margins, `Weather.forced`, mipmaps of in-scene labels,
 the indicator board arrows; lamp swinging and weakening darkness were dropped by decision.
 
+- **Determinism of the combat run** ([ADR-0059](adr/0059-deterministic-combat-run.md)):
+  bullets decide hits by a direct query instead of Jolt's overlap events, the bot jumps onto
+  prone agents instead of duelling them, and for 4 s after Otto's return doors near him stay
+  shut. The pre-push hook had failed on the seed-3 combat run at random; now 2, 5, 3 deaths.
+
 - **Ray tracing** — check with every engine update (user's
   question, 2026-09-24). Godot 4.7 has only low-level Vulkan RT in
   `RenderingDevice`, no ready-made RT shadows, reflections or GI; the NVIDIA fork is

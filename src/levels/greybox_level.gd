@@ -988,4 +988,4 @@ func _clear_agents() -> void:
 		post.opening = false
 		post.slot = -1
 		post.door.dismiss_agent()
-	_spawn.after_death()
+	_spawn.after_death(rules.agent_respawn_calm)
