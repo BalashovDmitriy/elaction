@@ -548,7 +548,7 @@ func _build_garage() -> void:
 ## неё можно у водительской двери — туда и ведёт [method exit_position].
 func _spawn_car(exit_x: float, surface: float) -> void:
 	_car = ExitCar.new()
-	var choice := CarModel.choose(GameState.instance().building, building_seed)
+	var choice := CarModel.choose(GameState.instance().building, building_seed, rules.kind)
 	_car.park(exit_x, surface, rules, _plan, choice)
 	add_child(_car)
 	# Заглушённая машина стоит с тёмными фарами: зажигаются они на отъезде.

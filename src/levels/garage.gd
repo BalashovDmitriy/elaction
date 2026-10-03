@@ -290,9 +290,9 @@ static func parked(rules: BuildingRules, plan: BuildingPlan, building_seed: int)
 		# Жребий тянется на каждое место, занятое или нет: иначе правка
 		# запретной зоны переставила бы машины по всему паркингу.
 		var roll := rng.randf()
-		var model := rng.randi_range(0, CarModel.MODELS.size() - 1)
-		# Красная — машина Otto в первом здании: чужие её не повторяют.
-		var paint := rng.randi_range(1, CarModel.PAINTS.size() - 1)
+		# Красная — машина Otto в первом здании: чужие её не повторяют. Модель и
+		# краска — по типу здания (ADR-0058, решение 4).
+		var drawn := CarModel.draw(rng, rules.kind, [0])
 		var nose_in := rng.randf() < 0.75
 		if roll > PARKED_SHARE or bay.y - bay.x < CAR_WIDTH + 0.4:
 			continue
@@ -304,8 +304,7 @@ static func parked(rules: BuildingRules, plan: BuildingPlan, building_seed: int)
 			continue
 		var car := Parked.new()
 		car.x = (bay.x + bay.y) * 0.5
-		car.choice.model = model
-		car.choice.paint = paint
+		car.choice = drawn
 		car.nose_in = nose_in
 		found.append(car)
 	return found

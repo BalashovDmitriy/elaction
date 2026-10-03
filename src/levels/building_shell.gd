@@ -53,8 +53,17 @@ const GLASS_FRAME := Color(0.62, 0.65, 0.7)
 
 ## Парапет крыши: видимая высота, отлив сверху и его свес, м (ADR-0031, решение 2).
 const PARAPET_HEIGHT: float = 1.05
-const COPING_HEIGHT: float = 0.08
-const COPING_OVERHANG: float = 0.06
+## Наибольший вынос карниза парапета, м: по нему дождь и снег решают, где
+## капля ещё ложится на карниз ([RoofRain], [RoofSnow]).
+const COPING_OVERHANG: float = 0.22
+## Карниз парапета по типу здания (ADR-0058, решение 1): у отеля — каменный
+## карниз с выносом, у офиса — тонкий алюминиевый отлив, у жилого дома —
+## кирпичный пояс с терракотовой плиткой. Высота и вынос, м, и цвет по [enum
+## BuildingIdentity.Kind].
+const KIND_COPING: Array[Vector2] = [Vector2(0.22, 0.2), Vector2(0.08, 0.06), Vector2(0.14, 0.12)]
+const KIND_COPING_COLOUR: Array[Color] = [
+	Color(0.62, 0.56, 0.46), Color(0.7, 0.72, 0.75), Color(0.52, 0.27, 0.18)
+]
 
 ## Залы особых этажей (ADR-0057): их свет гасит уровень по кадру.
 var halls: FloorHall = null
@@ -175,16 +184,19 @@ func _build_side_walls(
 func _build_parapets(
 	surface: float, bounds: Vector2, top: float, material: StandardMaterial3D
 ) -> void:
-	var coping := GreyboxLook.metal(GreyboxLook.TRIM)
+	var kind := _rules.kind
+	var coping := (
+		GreyboxLook.metal(KIND_COPING_COLOUR[kind])
+		if kind == BuildingIdentity.Kind.OFFICE
+		else GreyboxLook.surface(KIND_COPING_COLOUR[kind])
+	)
+	var size := KIND_COPING[kind]
 	for left: float in [bounds.x, bounds.y - WALL_WIDTH]:
 		_build_solid(Rect2(left, top, WALL_WIDTH, surface - top), material, false)
 		var wall := Rect2(left, surface - PARAPET_HEIGHT, WALL_WIDTH, PARAPET_HEIGHT)
 		_build_block(wall, material, WorldSpace.CORRIDOR_DEPTH + WorldSpace.ROOM_DEPTH)
 		var cap := Rect2(
-			left - COPING_OVERHANG,
-			surface - PARAPET_HEIGHT - COPING_HEIGHT,
-			WALL_WIDTH + COPING_OVERHANG * 2.0,
-			COPING_HEIGHT
+			left - size.x, surface - PARAPET_HEIGHT - size.y, WALL_WIDTH + size.x * 2.0, size.y
 		)
 		_build_block(cap, coping, WorldSpace.CORRIDOR_DEPTH + WorldSpace.ROOM_DEPTH + 0.1)
 

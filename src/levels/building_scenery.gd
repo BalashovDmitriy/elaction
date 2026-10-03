@@ -75,7 +75,15 @@ func build(
 	kit.name = "RoofKit"
 	add_child(kit)
 	kit.build(rules, plan, building_seed)
-	_roof_parts = [roof, kit] as Array[Node]
+	# Корона по типу здания за плоскостью игры (ADR-0058, решение 2).
+	var crown := BuildingCrown.new()
+	add_child(crown)
+	crown.build(rules)
+	_roof_parts = [roof, kit, crown] as Array[Node]
+	# Торцы башни и уступ стилобата по типу (ADR-0058, решение 3).
+	var flanks := BuildingFlanks.new()
+	add_child(flanks)
+	flanks.build(rules, building_seed)
 	var sign_board := VerticalSign.new()
 	_sign = sign_board
 	add_child(sign_board)

@@ -32,8 +32,11 @@ const BEACON_RED := Color(1.0, 0.12, 0.08)
 ## Что ставится вдоль длинной стороны кровли — по порядку от края, пока
 ## влезает, — и насколько каждый предмет выдвинут от [constant DEPTH_Z]:
 ## высокое — дальше, низкое — ближе, иначе башня закрыла бы кондиционеры.
+##
+## Водонапорная башня ушла с M24p: высокое над крышей — корона здания
+## ([BuildingCrown]), у жилого дома свой бак на опорах. Бак — у края.
 const LONG_SIDE: Array[String] = [
-	"water_tower", "satellite_dish", "air_conditioner", "air_conditioner", "solar_panel"
+	"water_tank", "satellite_dish", "air_conditioner", "air_conditioner", "solar_panel"
 ]
 const FORWARD := {
 	"water_tower": 0.0,
@@ -50,8 +53,8 @@ var _beacon: MeshInstance3D = null
 var _clock: float = 0.0
 
 
-## Ставит технику по правилам и плану. [param building_seed] решает, бак или
-## водонапорная башня: крыши зданий не повторяют друг друга.
+## Ставит технику по правилам и плану. [param building_seed] решает, что у
+## края — бак или кондиционер: крыши зданий не повторяют друг друга.
 func build(rules: BuildingRules, plan: BuildingPlan, building_seed: int = 1) -> void:
 	var shaft := plan.roof_shaft()
 	if shaft == null:
@@ -67,8 +70,9 @@ func build(rules: BuildingRules, plan: BuildingPlan, building_seed: int = 1) -> 
 	var short := right if on_the_left else left
 
 	var line := LONG_SIDE.duplicate()
+	# Жребий по сиду: бак или кондиционер у края — крыши не повторяют друг друга.
 	if building_seed % 2 == 0:
-		line[0] = "water_tank"
+		line[0] = "air_conditioner"
 	# От парапета внутрь: у края — самое высокое, к отделению — низкое.
 	var cursor := long.x + EDGE_GAP if on_the_left else long.y - EDGE_GAP
 	var inward := 1.0 if on_the_left else -1.0
