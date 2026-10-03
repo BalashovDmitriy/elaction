@@ -46,6 +46,8 @@ const WASHING: Array[Color] = [
 var _rules: BuildingRules = null
 var _batch := MeshBatch.new()
 var _lit: bool = true
+## Места деталей до сдачи в мультимеши: тестам ([method placements]).
+var _placed: Array[Transform3D] = []
 ## Марш пожарной лестницы: один меш на все марши — один мультимеш.
 var _stair: BoxMesh = null
 
@@ -72,7 +74,14 @@ func build(rules: BuildingRules, building_seed: int = 1) -> void:
 		)
 		if span.y - span.x > 1.5:
 			_ledge(rules.kind, span, ledge, side, rng)
+	_placed = _batch.places()
 	_batch.commit(self)
+
+
+## Места всех деталей торцов и уступа в сцене: тестам — под headless-движком
+## мультимеш мест не хранит ([method MeshBatch.places]).
+func placements() -> Array[Transform3D]:
+	return _placed
 
 
 ## Торец башни у стены [param wall] со стороны [param side] (−1 — слева): от

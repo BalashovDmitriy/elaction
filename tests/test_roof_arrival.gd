@@ -36,8 +36,16 @@ func after_each() -> void:
 		Input.action_release(action)
 
 
-func _build(building_seed: int, full: bool = false) -> GreyboxLevel:
+func _build(
+	building_seed: int,
+	full: bool = false,
+	kind: BuildingIdentity.Kind = BuildingIdentity.Kind.HOTEL
+) -> GreyboxLevel:
 	GameState.instance().start_game()
+	# У каждого типа своя корона над крышей (ADR-0058, решение 2): здание
+	# нужного типа — первое такое в партии на этом сиде.
+	if kind != BuildingIdentity.Kind.HOTEL:
+		GameState.instance().building = BuildingIdentity.first_of(kind, building_seed)
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
 	level.rules = BuildingRules.new()
 	level.building_seed = building_seed
@@ -45,6 +53,20 @@ func _build(building_seed: int, full: bool = false) -> GreyboxLevel:
 	level.full_intro = full
 	add_child_autofree(level)
 	return level
+
+
+## Сиды отеля [param hotel] и сиды [param others] офиса и жилого дома: пары
+## «сид — тип» для тестов, которым важна корона.
+func _seeds_and_kinds(hotel: Array[int], others: Array[int]) -> Array[Vector2i]:
+	var runs: Array[Vector2i] = []
+	for seed_value: int in hotel:
+		runs.append(Vector2i(seed_value, BuildingIdentity.Kind.HOTEL))
+	for kind: BuildingIdentity.Kind in [
+		BuildingIdentity.Kind.OFFICE, BuildingIdentity.Kind.RESIDENTIAL
+	]:
+		for seed_value: int in others:
+			runs.append(Vector2i(seed_value, kind))
+	return runs
 
 
 func _drop(level: GreyboxLevel) -> void:
@@ -126,10 +148,12 @@ func test_otto_obeys_after_the_landing() -> void:
 	_drop(level)
 
 
-## Трос достаёт до крыши, а вертолёт с винтом и крыша влезают в кадр вместе.
+## Трос достаёт до крыши, а вертолёт с винтом и крыша влезают в кадр вместе —
+## у здания любого типа, с любой короной (ADR-0058, решение 2).
 func test_the_rope_reaches_the_deck_and_the_frame_holds_both() -> void:
-	for building_seed: int in [1, 2, 3]:
-		var level := _build(building_seed)
+	for run: Vector2i in _seeds_and_kinds([1, 2, 3], [1, 2]):
+		var building_seed := run.x
+		var level := _build(building_seed, false, run.y as BuildingIdentity.Kind)
 		var landing := _landing(level)
 		var checked := false
 		for _frame: int in GreyboxLevel.LANDING_PATIENCE:
@@ -161,8 +185,9 @@ func test_the_rope_reaches_the_deck_and_the_frame_holds_both() -> void:
 ## Вступление полное: прилёт есть только у него, а висение и уход — те же, что
 ## у короткого (ADR-0052, решение 6).
 func test_the_flight_clears_everything_on_the_roof() -> void:
-	for building_seed: int in [1, 2, 3, 5, 7]:
-		var level := _build(building_seed, true)
+	for run: Vector2i in _seeds_and_kinds([1, 2, 3, 5, 7], [1, 2]):
+		var building_seed := run.x
+		var level := _build(building_seed, true, run.y as BuildingIdentity.Kind)
 		var deck := WorldSpace.to_scene(_landing(level)).y
 		var roof := RoofArrival.roof_obstacles(level, deck, [level.otto] as Array[Node])
 		# Сначала — что техника вообще нашлась: пустой список прошёл бы всегда.

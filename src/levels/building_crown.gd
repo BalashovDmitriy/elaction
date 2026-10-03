@@ -201,13 +201,16 @@ func _residential(middle: float, width: float) -> void:
 	)
 	var tank_x := middle + width * 0.12
 	var spread := TANK.x * 0.8
+	# Бак шире глубины короны: его середина отодвинута назад, чтобы передний
+	# край не вышел к винту ([constant FRONT_Z]); задний уходит за здание.
+	var tank_z := FRONT_Z - TANK.x * 1.12
 	for side: float in [-1.0, 1.0]:
 		var leg := CylinderMesh.new()
 		leg.top_radius = 0.07
 		leg.bottom_radius = 0.07
 		leg.height = LEG_HEIGHT
 		leg.radial_segments = 6
-		_mesh(leg, iron, tank_x + side * spread, 0.0, z)
+		_mesh(leg, iron, tank_x + side * spread, 0.0, tank_z)
 	for brace: float in [0.9, 2.1]:
 		_box(iron, Vector3(spread * 2.0, 0.06, 0.06), tank_x, brace, z)
 	_box(iron, Vector3(TANK.x * 2.3, 0.12, DEPTH * 0.9), tank_x, LEG_HEIGHT, z)
@@ -216,20 +219,20 @@ func _residential(middle: float, width: float) -> void:
 	barrel.bottom_radius = TANK.x * 1.04
 	barrel.height = TANK.y
 	barrel.radial_segments = 16
-	_mesh(barrel, wood, tank_x, LEG_HEIGHT + 0.12, z)
+	_mesh(barrel, wood, tank_x, LEG_HEIGHT + 0.12, tank_z)
 	for hoop: int in 4:
 		var ring := CylinderMesh.new()
 		ring.top_radius = TANK.x + 0.04
 		ring.bottom_radius = TANK.x + 0.04
 		ring.height = 0.07
 		ring.radial_segments = 16
-		_mesh(ring, iron, tank_x, LEG_HEIGHT + 0.4 + hoop * 0.6, z)
+		_mesh(ring, iron, tank_x, LEG_HEIGHT + 0.4 + hoop * 0.6, tank_z)
 	var cap := CylinderMesh.new()
 	cap.top_radius = 0.05
 	cap.bottom_radius = TANK.x * 1.1
 	cap.height = TANK_ROOF
 	cap.radial_segments = 16
-	_mesh(cap, GreyboxLook.surface(WOOD.darkened(0.35)), tank_x, LEG_HEIGHT + 0.12 + TANK.y, z)
+	_mesh(cap, GreyboxLook.surface(WOOD.darkened(0.35)), tank_x, LEG_HEIGHT + 0.12 + TANK.y, tank_z)
 	for rung: int in 9:
 		_box(iron, Vector3(0.4, 0.03, 0.03), tank_x - TANK.x - 0.3, 0.3 + rung * 0.35, FRONT_Z)
 	for side: float in [-0.2, 0.2]:

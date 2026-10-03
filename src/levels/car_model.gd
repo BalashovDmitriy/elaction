@@ -57,12 +57,12 @@ const SALT: int = 0x0CA2_5EED
 ## и красок [constant PAINTS] — у отеля спорткары и чёрный седан, у офиса тёмные
 ## представительские седаны и SUV, у жилого дома простые седаны и SUV
 ## выцветших цветов. По [enum BuildingIdentity.Kind].
-const MODEL_WEIGHTS: Array[PackedInt32Array] = [
+const MODEL_WEIGHTS: Array[Array] = [
 	[3, 3, 2, 1, 0],
 	[1, 0, 3, 3, 2],
 	[0, 0, 2, 3, 3],
 ]
-const PAINT_WEIGHTS: Array[PackedInt32Array] = [
+const PAINT_WEIGHTS: Array[Array] = [
 	[1, 1, 2, 0, 0, 1, 2, 4],
 	[0, 2, 0, 0, 2, 3, 0, 3],
 	[0, 1, 2, 3, 2, 1, 1, 0],
@@ -114,13 +114,11 @@ static func draw(
 
 ## Номер по весам [param weights] без запрещённых [param banned]. Остались
 ## одни нули — жребий поровну по разрешённым.
-static func _weighted(
-	rng: RandomNumberGenerator, weights: PackedInt32Array, banned: Array[int]
-) -> int:
+static func _weighted(rng: RandomNumberGenerator, weights: Array, banned: Array[int]) -> int:
 	var total := 0
 	for index: int in weights.size():
 		if not banned.has(index):
-			total += weights[index]
+			total += int(weights[index])
 	if total <= 0:
 		var allowed: Array[int] = []
 		for index: int in weights.size():
@@ -131,7 +129,7 @@ static func _weighted(
 	for index: int in weights.size():
 		if banned.has(index):
 			continue
-		roll -= weights[index]
+		roll -= int(weights[index])
 		if roll < 0:
 			return index
 	return weights.size() - 1
