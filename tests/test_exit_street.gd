@@ -84,8 +84,12 @@ func test_the_exit_lights_are_few_unshadowed_and_off_in_play() -> void:
 	remove_child(level)
 
 
+## Здание сида [param building_seed]: тип — по кругу от сида, у каждого типа
+## свой вход с улицы (ADR-0058, решение 5) — и проверки выезда идут по всем.
 func _build(building_seed: int) -> GreyboxLevel:
 	GameState.instance().start_game()
+	var kind := (building_seed % BuildingIdentity.Kind.size()) as BuildingIdentity.Kind
+	GameState.instance().building = BuildingIdentity.first_of(kind, building_seed)
 	var level := LEVEL_SCENE.instantiate() as GreyboxLevel
 	level.rules = BuildingRules.new()
 	level.building_seed = building_seed

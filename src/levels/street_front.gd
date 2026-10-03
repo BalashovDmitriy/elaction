@@ -75,7 +75,7 @@ func _canopy() -> void:
 	_box(
 		GreyboxLook.metal(BRASS),
 		Vector3(REACH + 0.04, 0.05, depth + 0.04),
-		middle,
+		middle - 0.02,
 		height - 0.02,
 		z
 	)
@@ -109,7 +109,10 @@ func _valet(building_seed: int, weather: Weather.Kind, time: TimeOfDay.Kind) -> 
 	for node: Node in person.find_children("*", "MeshInstance3D", true, false):
 		var mesh := node as MeshInstance3D
 		if String(mesh.name).ends_with("Body"):
-			mesh.material_override = GreyboxLook.surface(LIVERY)
+			# Поверхностями, как красит [Passerby]: общий material_override на
+			# модели со скелетом ронял рендер на пустом материале.
+			for surface: int in mesh.mesh.get_surface_count():
+				mesh.set_surface_override_material(surface, GreyboxLook.surface(LIVERY))
 	person.position = _at(stand_x + 0.6, 0.0, -0.9)
 	add_child(person)
 	var player := person.find_child("AnimationPlayer", true, false) as AnimationPlayer
@@ -132,9 +135,10 @@ func _lobby() -> void:
 	glass.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_box(glass, Vector3(REACH, LOBBY_HEIGHT, depth), middle, 0.0, z)
 	var frame := GreyboxLook.metal(FRAME)
-	_box(frame, Vector3(REACH + 0.1, 0.12, depth + 0.1), middle, LOBBY_HEIGHT, z)
+	_box(frame, Vector3(REACH + 0.1, 0.12, depth + 0.1), middle - 0.05, LOBBY_HEIGHT, z)
 	for step: int in 4:
-		var x := _left - REACH + REACH * step / 3.0
+		# Стойки — внутри выноса: крайняя не входит в стену торца.
+		var x := _left - REACH + 0.03 + (REACH - 0.06) * step / 3.0
 		_box(frame, Vector3(0.05, LOBBY_HEIGHT, 0.05), x, 0.0, NEAR + 0.03)
 	var glow := GreyboxLook.light(LOBBY_GLOW) if _lit else GreyboxLook.surface(FRAME)
 	_box(glow, Vector3(REACH - 0.3, 0.06, depth - 0.3), middle, LOBBY_HEIGHT - 0.12, z)
@@ -143,8 +147,9 @@ func _lobby() -> void:
 	drum.bottom_radius = 0.75
 	drum.height = 2.3
 	drum.radial_segments = 16
-	_mesh(drum, glass, middle, 1.15, z)
-	_box(frame, Vector3(0.04, 2.3, 1.4), middle, 0.0, z)
+	# Барабан и створка — на волосок выше пола тамбура: низы не в одной плоскости.
+	_mesh(drum, glass, middle, 1.157, z)
+	_box(frame, Vector3(0.04, 2.3, 1.4), middle, 0.007, z)
 
 
 ## Жилой дом: крыльцо ступенями к двери в торце, перила и баки у бордюра.
@@ -166,9 +171,9 @@ func _stoop() -> void:
 		var run := Vector2(STEP.x * STEPS, top).length()
 		var bar := GreyboxLook.box(Vector3(run, 0.04, 0.04), rail)
 		bar.rotation.z = -atan2(top, STEP.x * STEPS)
-		bar.position = _at(_left - STEP.x * STEPS * 0.5, top * 0.5 + 0.9, side)
+		bar.position = _at(_left - STEP.x * STEPS * 0.5 - 0.06, top * 0.5 + 0.9, side)
 		_add(bar)
-		_box(rail, Vector3(0.04, 0.9, 0.04), _left - STEP.x * STEPS, 0.0, side)
+		_box(rail, Vector3(0.04, 0.9, 0.04), _left - STEP.x * STEPS - 0.06, 0.004, side)
 	var lamp := GreyboxLook.light(BULB) if _lit else GreyboxLook.surface(BULB.darkened(0.5))
 	var ball := SphereMesh.new()
 	ball.radius = 0.12
@@ -197,8 +202,10 @@ func _mesh(mesh: PrimitiveMesh, material: Material, x: float, rise: float, z: fl
 	_add(part)
 
 
+## Точка над тротуаром: всё стоит на 3 мм выше его, чтобы низ не лёг в одну
+## плоскость с плитами тротуара.
 func _at(x: float, rise: float, z: float) -> Vector3:
-	return Garage.scene_point(x, _floor - rise, z)
+	return Garage.scene_point(x, _floor - rise - 0.003, z)
 
 
 func _add(part: MeshInstance3D) -> void:
