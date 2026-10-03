@@ -45,6 +45,8 @@ var _sign: VerticalSign = null
 var _city: CityBackdrop = null
 ## Ambient light of the air without a flash: the lightning flash is counted from it.
 var _ambient: float = 0.0
+## The flash level last written into the air: between flashes it is not rewritten.
+var _flash_shown: float = 0.0
 
 
 ## Builds the building's surroundings by the rules, plan and seed.
@@ -143,7 +145,13 @@ func build(
 func _process(_delta: float) -> void:
 	if _city == null or _air == null:
 		return
-	_air.environment.ambient_light_energy = _ambient * (1.0 + _city.flash_level() * FLASH_AMBIENT)
+	# Between flashes the air is not rewritten every frame, as the city sky is not
+	# ([CityBackdrop], ADR-0060).
+	var flash := _city.flash_level()
+	if flash == _flash_shown:
+		return
+	_flash_shown = flash
+	_air.environment.ambient_light_energy = _ambient * (1.0 + flash * FLASH_AMBIENT)
 
 
 ## Gives the sun what is outside: everything the surroundings built on the roof, the

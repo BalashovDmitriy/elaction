@@ -20,21 +20,32 @@ var _left: float = 0.0
 ## How long the building has been going, s. Counted after the alarm too: difficulty grows
 ## with time in the building, and the siren does not stop it but speeds it up (ADR-0027).
 var _elapsed: float = 0.0
+## Otto has boarded the exit car: the countdown stands until the next building (ADR-0060).
+var _held: bool = false
 
 
 ## A new building: the alarm is cleared and the countdown starts again. The only
 ## way to clear it — the player's death does not do this.
 func enter_building() -> void:
 	raised = false
+	_held = false
 	_left = time_limit
 	_elapsed = 0.0
+
+
+## Stops the countdown until the next building: Otto is in the exit car, and the siren
+## must not go off over the drive away (ADR-0060). A siren already on stays on. Time in
+## the building still counts: difficulty does not depend on the hold, and with Otto in
+## the car it decides nothing anyway.
+func hold() -> void:
+	_held = true
 
 
 ## Counts time. Returns true on the single frame the alarm
 ## switched on, so that everyone can be roused by it once.
 func tick(delta: float) -> bool:
 	_elapsed += delta
-	if raised:
+	if raised or _held:
 		return false
 
 	_left -= delta

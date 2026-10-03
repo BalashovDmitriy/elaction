@@ -2,12 +2,13 @@ class_name CityLook
 extends RefCounted
 
 ## The city look up close (M24a, user's remark — "raise the background
-## detail"): facades with bands and piers, windows with a frame and life behind
-## the glass, signs with letters (ADR-0037, decision 4).
+## detail"): the pack's baked facades (ADR-0051, decision 10), lit glass with a frame
+## and life behind it, signs with letters (ADR-0037, decision 4).
 ##
-## All by shaders on the same multimeshes as in M19: no nodes or light
-## sources were added, and the city does not touch the frame budget. What is behind which window
-## is decided by the window and house hash — the city repeats by seed down to the window.
+## All by shaders on multimeshes: no nodes or light sources were added, and the city
+## does not touch the frame budget. Which facade windows are lit is decided by the
+## building shader from the house seed ([method building_custom]) — the city repeats by
+## seed down to the window.
 
 ## What is behind the glass of a lit window: the same in [code]city_window.gdshaderinc[/code].
 enum Inside { PLAIN, BLINDS, CURTAINS, PERSON, TV, FLICKER }
@@ -15,28 +16,8 @@ enum Inside { PLAIN, BLINDS, CURTAINS, PERSON, TV, FLICKER }
 ## Baked facade styles — atlas columns in the order of `tools/build_city.py`.
 enum Style { BRICK, DOUBLE, INSET, GLASS, OFFICE, STONE }
 
-const FACADE_SHADER := preload("res://src/levels/city_facade.gdshader")
 const LIT_SHADER := preload("res://src/levels/city_window_lit.gdshader")
-const DARK_SHADER := preload("res://src/levels/city_window_dark.gdshader")
 const SIGN_SHADER := preload("res://src/levels/city_sign.gdshader")
-
-## What is behind the glass by house type ([enum CityPlan.Kind]), weights of [enum Inside]:
-## offices have blinds and fluorescent lamps, residential ones — curtains, TVs and people.
-const INSIDE_WEIGHTS: Array[Array] = [
-	[0.3, 0.4, 0.0, 0.1, 0.0, 0.2],
-	[0.2, 0.1, 0.35, 0.15, 0.2, 0.0],
-	[0.55, 0.25, 0.0, 0.1, 0.0, 0.1],
-	[0.2, 0.1, 0.35, 0.15, 0.2, 0.0],
-]
-
-## Facade tone by house type. All are night: a facade is seen by haze, bands and windows,
-## not by colour, but brick is warmer than concrete, and glass colder.
-const FACADE_TONES: Array[Color] = [
-	Color(0.04, 0.042, 0.052),
-	Color(0.05, 0.045, 0.048),
-	Color(0.025, 0.04, 0.07),
-	Color(0.06, 0.036, 0.03),
-]
 
 ## Window by house type, m: offices have wide ones, glass towers — almost the whole
 ## grid pitch ([constant CityPlan.WINDOW_STEP]), residential and brick ones — narrow
@@ -44,9 +25,6 @@ const FACADE_TONES: Array[Color] = [
 const WINDOW_SIZES: Array[Vector2] = [
 	Vector2(1.7, 1.6), Vector2(1.1, 1.5), Vector2(2.1, 2.3), Vector2(1.0, 1.7)
 ]
-
-## Street glow on facades from below — the tone of [constant CityDetails.GLOW_COLOUR].
-const STREET_GLOW := Color(1.0, 0.55, 0.25)
 
 const BUILDING_SHADER := preload("res://src/levels/city_building.gdshader")
 const ALBEDO_ATLAS := preload("res://assets/textures/city/facade_albedo.png")
@@ -126,23 +104,10 @@ static func wall_tint(block: CityPlan.Block) -> Color:
 	return WALL_TINTS[absi(hash([block.x, "tint"])) % WALL_TINTS.size()]
 
 
-## Facade material: bands, piers, cornice, glow from below.
-static func facade() -> ShaderMaterial:
+## Lit window material: past the haze.
+static func windows() -> ShaderMaterial:
 	var look := ShaderMaterial.new()
-	look.shader = FACADE_SHADER
-	look.set_shader_parameter("window_step", CityPlan.WINDOW_STEP)
-	var heights := Vector4.ZERO
-	for kind: int in WINDOW_SIZES.size():
-		heights[kind] = WINDOW_SIZES[kind].y
-	look.set_shader_parameter("window_heights", heights)
-	look.set_shader_parameter("street_glow", STREET_GLOW)
-	return look
-
-
-## Window material: lit ones bypass the haze, dark ones are in it.
-static func windows(lit: bool) -> ShaderMaterial:
-	var look := ShaderMaterial.new()
-	look.shader = LIT_SHADER if lit else DARK_SHADER
+	look.shader = LIT_SHADER
 	look.set_shader_parameter("flash_colour", CityBackdrop.FLASH_GLASS)
 	return look
 
@@ -152,34 +117,6 @@ static func signs() -> ShaderMaterial:
 	var look := ShaderMaterial.new()
 	look.shader = SIGN_SHADER
 	return look
-
-
-## How many times house [param block]'s window is larger than the windows quad
-## ([constant CityBackdrop.WINDOW_SIZE]).
-static func window_scale(block: CityPlan.Block) -> Vector3:
-	var size := WINDOW_SIZES[block.kind]
-	return Vector3(size.x / CityBackdrop.WINDOW_SIZE.x, size.y / CityBackdrop.WINDOW_SIZE.y, 1.0)
-
-
-## Facade tone of house [param block].
-static func facade_tone(block: CityPlan.Block) -> Color:
-	return FACADE_TONES[block.kind]
-
-
-## House type for the facade shader: in [code]INSTANCE_CUSTOM.x[/code].
-static func facade_custom(block: CityPlan.Block) -> Color:
-	return Color(float(block.kind), 0.0, 0.0, 0.0)
-
-
-## Window data for the shader: draw, what is behind the glass, mullions, whether it is lit.
-static func window_custom(block: CityPlan.Block, cell: Vector2i, lit: bool) -> Color:
-	var roll := _unit(hash([block.x, cell, "window"]))
-	var inside := 0
-	if lit:
-		inside = CityPlan.pick_weighted(
-			INSIDE_WEIGHTS[block.kind], _unit(hash([block.x, cell, "inside"]))
-		)
-	return Color(roll, float(inside), float(block.mullions), 1.0 if lit else 0.0)
 
 
 ## Sign draw for the shader.

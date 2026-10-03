@@ -8,7 +8,9 @@ extends Node3D
 ## pool, boiler room, server room. The floor's role follows the ROM's structure
 ## ([FloorRole]); here only the look. No bodies, no shadows: primitives and pack
 ## furniture are assembled into multimeshes ([MeshBatch]) — hundreds of details per
-## floor, tens of draw calls per building.
+## floor, tens of draw calls per hall. Each floor's hall is its own node, and halls out
+## of the frame are hidden ([method light_span], ADR-0060): one set for the whole
+## building was drawn every frame wherever the camera was.
 ##
 ## A special floor's door opens into the hall itself ([member Door.opens_into_hall]):
 ## there is no room behind it, and in front of the door only the leaf's strip is free.
@@ -104,6 +106,8 @@ var _doors: Array[float] = []
 var _steam: Array[Vector3] = []
 ## Hall lights by floor: [method light_span] puts out the invisible ones.
 var _lights: Dictionary = {}
+## Hall nodes by floor: [method light_span] hides the ones out of the frame.
+var _halls: Dictionary = {}
 ## Placements of all hall details ([method placements]).
 var _placed: Array[Transform3D] = []
 
@@ -117,15 +121,15 @@ func build(rules: BuildingRules, plan: BuildingPlan) -> void:
 		var role := FloorRole.at(rules, index)
 		if FloorRole.is_hall(role):
 			_floor(index, role)
-	_placed = _batch.places()
-	_batch.commit(self)
-	for at: Vector3 in _steam:
-		add_child(HallLook.steam_plume(at))
+			_commit(index)
 
 
 ## Turns on hall lights on visible floors and puts out the rest — by the same rule as
-## lamps and shaft pillars (ADR-0010, point 8).
+## lamps and shaft pillars (ADR-0010, point 8). The halls themselves are hidden out of
+## the frame too (ADR-0060); until the first call every hall is visible.
 func light_span(span: Vector2i, strip: Vector2 = Vector2(-INF, INF)) -> void:
+	for index: int in _halls:
+		(_halls[index] as Node3D).visible = VisibleFloors.covers(span, index)
 	for index: int in _lights:
 		var lit := VisibleFloors.covers(span, index)
 		for light: OmniLight3D in _lights[index]:
@@ -146,14 +150,39 @@ func placements() -> Array[Transform3D]:
 	return _placed
 
 
-## How many details there are in the halls: for tests.
-func parts() -> int:
+## How many details there are in the halls: for tests. [param shown_only] — only in
+## halls that are not hidden.
+func parts(shown_only: bool = false) -> int:
 	var total := 0
-	for child: Node in get_children():
-		var many := child as MultiMeshInstance3D
-		if many != null:
-			total += many.multimesh.instance_count
+	for index: int in _halls:
+		var hall := _halls[index] as Node3D
+		if shown_only and not hall.visible:
+			continue
+		for child: Node in hall.get_children():
+			var many := child as MultiMeshInstance3D
+			if many != null:
+				total += many.multimesh.instance_count
 	return total
+
+
+## Floors that have a hall node: for tests.
+func hall_floors() -> Array[int]:
+	var floors: Array[int] = []
+	floors.assign(_halls.keys())
+	return floors
+
+
+## Hands floor [param index]'s details and steam over to its own node.
+func _commit(index: int) -> void:
+	var hall := Node3D.new()
+	hall.name = "Hall%d" % index
+	add_child(hall)
+	_halls[index] = hall
+	_placed.append_array(_batch.places())
+	_batch.commit(hall)
+	for at: Vector3 in _steam:
+		hall.add_child(HallLook.steam_plume(at))
+	_steam.clear()
 
 
 func _floor(index: int, role: FloorRole.Role) -> void:

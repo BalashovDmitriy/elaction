@@ -66,8 +66,14 @@ static func read_from(file: ConfigFile) -> KeyBindings:
 	var keys := {}
 	var pads := {}
 	for action: StringName in ACTIONS:
-		keys[action] = int(file.get_value(SECTION, "key_" + action, DEFAULT_KEYS[action]))
-		pads[action] = int(file.get_value(SECTION, "pad_" + action, DEFAULT_PADS[action]))
+		var key: Variant = file.get_value(SECTION, "key_" + action, DEFAULT_KEYS[action])
+		var pad: Variant = file.get_value(SECTION, "pad_" + action, DEFAULT_PADS[action])
+		# A hand-edited slot that is not a number: the scheme is broken, as with a duplicate —
+		# not a failed conversion that would stop the game at startup (ADR-0060).
+		if key is not int or pad is not int:
+			return bindings
+		keys[action] = key
+		pads[action] = pad
 	if (
 		_usable(keys.values(), RESERVED_KEYS, KEY_NONE)
 		and _usable(pads.values(), RESERVED_PADS, -1)

@@ -25,15 +25,26 @@ const TARGET_MS: float = 12.0
 const WARMUP_FRAMES: int = 45
 const SAMPLE_FRAMES: int = 60
 
-## The measurement does not go longer than this, s. The level at which time ran out is not
-## proven: what was measured so far decides ([method settle]).
-const TIMEOUT: float = 8.0
+## Time each level gets, s. Each level has its own: with one budget for the whole measurement
+## a slow card ran out of time on "Ultra" or "High", and the levels below were never tried
+## (ADR-0060). The level at which time ran out is not proven: what was measured so far
+## decides ([method settle]).
+const LEVEL_TIMEOUT: float = 4.0
+## The whole measurement does not go longer than this, s, whatever the levels have spent:
+## the measurement always ends.
+const TIMEOUT: float = 12.0
+## A frame longer than this, s, is a stall — a shader compiles, a building loads — not the
+## card's speed: it is charged to the level's budget only up to this length.
+const STALL: float = 0.1
+## How much cheaper each level down makes the frame, roughly: a level that ran out of time far
+## over [constant TARGET_MS] drops as many levels as the excess calls for, not one.
+const STEP_GAIN: float = 1.5
+## Fewer frames than this say nothing about the card: right after a level change they are
+## shader compiles. A level the overall time cut off this early steps down one, as unproven.
+const JUDGE_FRAMES: int = 10
 
 var _settings: GameSettings = null
-var _level: Graphics.Quality = Graphics.Quality.ULTRA
-var _frames: int = 0
-var _samples := PackedFloat64Array()
-var _elapsed: float = 0.0
+var _trial := Trial.new()
 ## Views whose GPU time adds up to the frame: the window and the city — the city has its own
 ## frame with its own blur, on "Ultra" at two thirds of the window resolution.
 var _views: Array[RID] = []
@@ -75,27 +86,18 @@ func _process(delta: float) -> void:
 	# Settings were applied on top of the measurement — the menu changed the language or blood
 	# and broadcast the level from the settings: the measurement level is set again and
 	# measured anew.
-	if Graphics.quality != _level:
-		_switch(_level)
+	if Graphics.quality != _trial.level:
+		_switch(_trial.level)
 		return
-	_elapsed += delta
-	_frames += 1
-	if _frames > WARMUP_FRAMES:
-		var gpu := 0.0
-		for view in _views:
-			gpu += RenderingServer.viewport_get_measured_render_time_gpu(view)
-		if gpu > 0.0:
-			_samples.append(gpu)
-	if _elapsed >= TIMEOUT:
-		_finish(settle(_level, _samples))
-		return
-	if _samples.size() < SAMPLE_FRAMES:
-		return
-	var next := step(_level, median(_samples))
-	if next == _level:
-		_finish(_level)
-	else:
-		_switch(next)
+	var gpu := 0.0
+	for view: RID in _views:
+		gpu += RenderingServer.viewport_get_measured_render_time_gpu(view)
+	var was := _trial.level
+	_trial.feed(delta, gpu)
+	if _trial.done:
+		_finish(_trial.level)
+	elif _trial.level != was:
+		Graphics.broadcast(_trial.level)
 
 
 func _exit_tree() -> void:
@@ -112,12 +114,19 @@ static func step(level: Graphics.Quality, gpu_ms: float) -> Graphics.Quality:
 
 
 ## Which level to take when the measurement time ran out at level [param level] with
-## [param samples] measured. If anything was measured, the median decides. If nothing —
-## frames are so long that not even the warm-up passed in the allotted time: the level does
-## not fit, one step lower. Otherwise the weakest card, on which the measurement does not
-## finish, would get "Ultra" (code review M22).
+## [param samples] measured. If anything was measured, the median decides: a level that fits
+## stays, one far over [constant TARGET_MS] drops by the excess — about [constant STEP_GAIN]
+## per level — not by one step (ADR-0060). If nothing — the level does not fit, one step
+## lower. Otherwise the weakest card, on which the measurement does not finish, would get
+## "Ultra" (code review M22).
 static func settle(level: Graphics.Quality, samples: PackedFloat64Array) -> Graphics.Quality:
-	return step(level, median(samples) if not samples.is_empty() else INF)
+	if samples.is_empty():
+		return step(level, INF)
+	var excess := median(samples) / TARGET_MS
+	if excess <= 1.0:
+		return level
+	var drop := maxi(ceili(log(excess) / log(STEP_GAIN)), 1)
+	return maxi(level - drop, Graphics.Quality.LOW) as Graphics.Quality
 
 
 ## Median: one long frame — loading, the garbage collector — does not lower the level.
@@ -130,16 +139,13 @@ static func median(values: PackedFloat64Array) -> float:
 
 
 func _switch(level: Graphics.Quality) -> void:
-	_level = level
-	_frames = 0
-	_samples.clear()
+	_trial.begin(level)
 	Graphics.broadcast(level)
 
 
 func _finish(level: Graphics.Quality) -> void:
-	if level != _level:
+	if level != Graphics.quality:
 		Graphics.broadcast(level)
-	_level = level
 	_settings.quality = level
 	_settings.quality_measured = true
 	_settings.save_to()
@@ -152,3 +158,74 @@ func _finish(level: Graphics.Quality) -> void:
 func _stop() -> void:
 	_settings = null
 	queue_free()
+
+
+## The measurement rules without a window: frames go in, a level comes out. The node feeds it
+## the real frames, the tests — made-up ones.
+class Trial:
+	extends RefCounted
+
+	## The level being measured; once [member done] — the chosen one.
+	var level: Graphics.Quality = Graphics.Quality.ULTRA
+	var done: bool = false
+	var _frames: int = 0
+	## GPU time of the measured frames, ms, and the length of every frame of the level, ms:
+	## the frames stand in when the warm-up does not pass in the level's time.
+	var _samples := PackedFloat64Array()
+	var _times := PackedFloat64Array()
+	## Time charged to this level and to the whole measurement, s.
+	var _spent: float = 0.0
+	var _total: float = 0.0
+
+	## Starts measuring [param at] anew: warm-up, samples and its own time budget.
+	func begin(at: Graphics.Quality) -> void:
+		level = at
+		_frames = 0
+		_samples.clear()
+		_times.clear()
+		_spent = 0.0
+
+	## One frame of [param delta] s with [param gpu_ms] of GPU time, zero if not measured.
+	func feed(delta: float, gpu_ms: float) -> void:
+		if done:
+			return
+		_total += delta
+		# A shader compile stall is charged as one slow frame, not as seconds of the budget.
+		_spent += minf(delta, QualityProbe.STALL)
+		_frames += 1
+		_times.append(delta * 1000.0)
+		if _frames > QualityProbe.WARMUP_FRAMES and gpu_ms > 0.0:
+			_samples.append(gpu_ms)
+		var out_of_time := _total >= QualityProbe.TIMEOUT
+		if out_of_time or _spent >= QualityProbe.LEVEL_TIMEOUT:
+			var next := _judge()
+			# Warm-up passed and still no GPU time: the card does not report it, and the levels
+			# below would not report either — one step down, as decided, and no further.
+			var mute := _samples.is_empty() and _frames > QualityProbe.WARMUP_FRAMES
+			if out_of_time or mute:
+				level = next
+				done = true
+			else:
+				_move(next)
+		elif _samples.size() >= QualityProbe.SAMPLE_FRAMES:
+			_move(QualityProbe.step(level, QualityProbe.median(_samples)))
+
+	## The level when its time ran out. Measured — by the GPU median. The warm-up did not even
+	## pass — by the frame length: frames many times over the budget drop the level as far as
+	## they call for, rather than one step at a time (ADR-0060). A handful of frames is
+	## compile stalls, not the card's speed ([constant JUDGE_FRAMES]): one step down.
+	func _judge() -> Graphics.Quality:
+		if _samples.is_empty() and _frames <= QualityProbe.WARMUP_FRAMES:
+			if _times.size() < QualityProbe.JUDGE_FRAMES:
+				return QualityProbe.step(level, INF)
+			return QualityProbe.settle(level, _times)
+		return QualityProbe.settle(level, _samples)
+
+	## The level stays — it is chosen; lower — measured next. Below low there is nothing to
+	## try, and low is taken without measuring.
+	func _move(next: Graphics.Quality) -> void:
+		if next == level or next == Graphics.Quality.LOW:
+			level = next
+			done = true
+		else:
+			begin(next)

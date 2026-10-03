@@ -13,6 +13,7 @@ extends GutTest
 const LEVEL_SCENE := preload("res://src/levels/greybox_level.tscn")
 const DOOR_SCENE := preload("res://src/systems/doors/door.tscn")
 const OTTO_SCENE := preload("res://src/actors/otto/otto.tscn")
+const ENEMY_SCENE := preload("res://src/actors/enemy/enemy.tscn")
 
 ## How many frames to give the doors for someone to manage to come out.
 const CROWD_FRAMES: int = 240
@@ -320,3 +321,80 @@ func test_an_open_leaf_stays_inside_its_doorway() -> void:
 	)
 	assert_lte(bounds.end.x, centre + half + 0.05, "and on the right")
 	assert_lt(bounds.position.z, WorldSpace.BACK_WALL_Z, "it went into the room, behind the wall")
+
+
+## The first agent who has come out of his doorway, or null.
+func _first_out(level: GreyboxLevel) -> Enemy:
+	for _frame: int in CROWD_FRAMES * 4:
+		await wait_physics_frames(1)
+		for agent: Enemy in _live_agents(level):
+			if not agent.is_emerging():
+				return agent
+	return null
+
+
+## An agent who followed Otto far from his own door — by cab, five floors and more — is
+## not removed next to him: the keep margin counts from the floor the agent is on now,
+## and an agent in the frame never vanishes (ADR-0060).
+func test_an_agent_far_from_his_door_is_kept_next_to_otto() -> void:
+	var level := _build(3)
+	await _wait_for_the_landing(level)
+	var agent: Enemy = await _first_out(level)
+	assert_not_null(agent, "nobody came out of the doors")
+	if agent == null:
+		return
+	var home := level.rules.floor_index_near(level.door_of(agent).mat_position().y)
+	var far := GreyboxLevel.AGENT_KEEP_MARGIN + 4
+	var spot := Vector2.INF
+	for door: Door in level.doors():
+		var mat := door.mat_position()
+		if absi(level.rules.floor_index_near(mat.y) - home) >= far:
+			spot = mat
+			break
+	assert_ne(spot, Vector2.INF, "the building has no floor far enough from the door")
+	if spot == Vector2.INF:
+		return
+
+	level.otto.global_position = WorldSpace.to_scene(spot)
+	agent.global_position = WorldSpace.to_scene(spot)
+	await wait_physics_frames(10)
+	assert_true(is_instance_valid(agent), "the agent next to Otto was freed")
+	if is_instance_valid(agent):
+		assert_false(agent.is_queued_for_deletion(), "the agent next to Otto was removed")
+
+
+## An agent the level has let go of stops at once and frees nothing: a body waiting for
+## the end of the frame may still report leaving or dying, and by then his post may
+## already hold the next agent and his slot (ADR-0060).
+func test_a_dismissed_agent_reporting_again_frees_nothing() -> void:
+	var level := _build(3)
+	await _wait_for_the_landing(level)
+	var agent: Enemy = await _first_out(level)
+	assert_not_null(agent, "nobody came out of the doors")
+	if agent == null:
+		return
+	var post: AgentPost = null
+	for each: AgentPost in level._posts:
+		if each.agent == agent:
+			post = each
+	assert_not_null(post, "the agent has a post")
+	if post == null:
+		return
+
+	agent.left_building.emit(agent)
+	assert_null(post.agent, "the agent who left is off his post")
+	assert_false(agent.is_physics_processing(), "the dismissed agent no longer steps")
+
+	# The post already holds the next agent: the old body's reports are not about him.
+	var next := ENEMY_SCENE.instantiate() as Enemy
+	autofree(next)
+	post.agent = next
+	post.slot = 1
+	agent.left_building.emit(agent)
+	agent.died.emit(agent)
+	var slot := post.slot
+	var holder := post.agent
+	# Given back before the level's next step: the stand-in is not in the tree.
+	post.agent = null
+	assert_eq(slot, 1, "the next agent's slot is not freed")
+	assert_eq(holder, next, "the next agent keeps his post")

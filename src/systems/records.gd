@@ -46,13 +46,17 @@ static func load_from(path: String = PATH) -> Records:
 		return records
 
 	for entry: Variant in parsed as Array:
-		if entry is Dictionary and (entry as Dictionary).has(SCORE):
-			records.rows.append(
-				{
-					SCORE: int((entry as Dictionary)[SCORE]),
-					DATE: String((entry as Dictionary).get(DATE, ""))
-				}
-			)
+		# Every value is checked for its type: a hand-edited [code]{"score": null}[/code] is
+		# skipped as a row, not a failed conversion that stops the game at game over
+		# (ADR-0060). JSON numbers come as floats. A zero, saved before zero stopped being a
+		# record ([method submit]), is dropped too.
+		if entry is not Dictionary:
+			continue
+		var score: Variant = (entry as Dictionary).get(SCORE)
+		if (score is not float and score is not int) or int(score) <= 0:
+			continue
+		var date: Variant = (entry as Dictionary).get(DATE, "")
+		records.rows.append({SCORE: int(score), DATE: date if date is String else ""})
 	records.rows = sorted(records.rows)
 	return records
 
@@ -72,7 +76,13 @@ func save_to(path: String = PATH) -> void:
 ## The place is computed before insertion, not by searching for the row after it: the same score on
 ## the same day happens twice, and searching by the "score and date" pair found someone else's row —
 ## a score that did not make the top ten would be announced as a record.
+##
+## A score of zero or less is no record: it does not enter the table, even a table with free
+## rows (ADR-0060). A score equal to ones already in the table goes after them: the older
+## one keeps its place, as on the arcade.
 func submit(score: int, date: String = "") -> int:
+	if score <= 0:
+		return -1
 	var stamp := date if not date.is_empty() else today()
 	var place := 0
 	for row: Dictionary in rows:
@@ -88,19 +98,26 @@ func best() -> int:
 	return int(rows[0][SCORE]) if not rows.is_empty() else 0
 
 
-## Descending sort with trimming to [constant LIMIT].
+## Descending sort with trimming to [constant LIMIT]. Equal scores keep the order they came
+## in: the sort itself is not stable, and an equal new score could jump ahead of an old one
+## or be trimmed instead of it (ADR-0060).
 ##
 ## Static and stateless: the table rule is tested by a test directly like this,
 ## without files and without an instance.
 static func sorted(entries: Array) -> Array[Dictionary]:
-	var copy: Array[Dictionary] = []
-	for entry: Variant in entries:
-		copy.append(entry as Dictionary)
-	copy.sort_custom(
-		func(first: Dictionary, second: Dictionary) -> bool:
-			return int(first[SCORE]) > int(second[SCORE])
+	var order: Array[int] = []
+	for index: int in entries.size():
+		order.append(index)
+	order.sort_custom(
+		func(first: int, second: int) -> bool:
+			var a := int((entries[first] as Dictionary)[SCORE])
+			var b := int((entries[second] as Dictionary)[SCORE])
+			return a > b or (a == b and first < second)
 	)
-	return copy.slice(0, LIMIT)
+	var copy: Array[Dictionary] = []
+	for index: int in order.slice(0, LIMIT):
+		copy.append(entries[index] as Dictionary)
+	return copy
 
 
 ## Today's date in the form "2026-09-13".

@@ -35,9 +35,14 @@ var _span := Vector2.ZERO
 var _shafts: Array[Vector2] = []
 var _prints: Array[Decal] = []
 var _next: int = 0
-## Where each one left the last print and with which foot: by body id.
+## Where each one left the last print and with which foot: by body id. Only walkers on
+## the deck are here: whoever leaves it is forgotten.
 var _last: Dictionary = {}
 var _left_foot: Dictionary = {}
+## Otto and the agents, re-read from their groups only when the groups change: reading
+## them every physics step allocated two arrays for the whole building (ADR-0060).
+var _walkers: Array[Node] = []
+var _counts := Vector2i(-1, -1)
 
 
 ## Watches the roof deck at scene height [param deck], from [param from] to
@@ -55,15 +60,28 @@ func count() -> int:
 	return _prints.size()
 
 
+## How many walkers the tracks remember the stride of — for a test: only those on the deck.
+func remembered() -> int:
+	return maxi(_last.size(), _left_foot.size())
+
+
 func _physics_process(_delta: float) -> void:
-	var tree := get_tree()
-	var walkers := tree.get_nodes_in_group(Footing.OTTO_GROUP)
-	walkers.append_array(tree.get_nodes_in_group(Enemy.GROUP))
-	for node: Node in walkers:
+	_read_walkers()
+	for index: int in _walkers.size():
+		var node: Variant = _walkers[index]
+		if not is_instance_valid(node) or not (node as Node).is_inside_tree():
+			# Left the building between group reads: read them anew on the next step.
+			_counts = Vector2i(-1, -1)
+			continue
 		var body := node as CharacterBody3D
 		if body == null:
 			continue
 		var feet := body.global_position
+		var id := body.get_instance_id()
+		# Far from the deck and not on it a step ago: nothing to stamp, nothing to thaw.
+		# This is the whole building below the roof, so it is checked first and cheaply.
+		if absf(feet.y - _deck) >= ON_DECK and not _last.has(id):
+			continue
 		var dead: bool = body.call(&"is_dead")
 		var on_deck := (
 			not dead
@@ -74,9 +92,9 @@ func _physics_process(_delta: float) -> void:
 			and not _over_a_shaft(feet.x)
 		)
 		body.set(&"icy", on_deck)
-		var id := body.get_instance_id()
 		if not on_deck:
 			_last.erase(id)
+			_left_foot.erase(id)
 			continue
 		if not _last.has(id):
 			_last[id] = feet
@@ -88,6 +106,27 @@ func _physics_process(_delta: float) -> void:
 		_left_foot[id] = left
 		_last[id] = feet
 		_stamp(feet, signf(feet.x - from.x), left)
+
+
+## Re-reads Otto and the agents when their groups have changed.
+func _read_walkers() -> void:
+	var tree := get_tree()
+	var counts := Vector2i(
+		tree.get_node_count_in_group(Footing.OTTO_GROUP), tree.get_node_count_in_group(Enemy.GROUP)
+	)
+	if counts == _counts:
+		return
+	_counts = counts
+	_walkers = tree.get_nodes_in_group(Footing.OTTO_GROUP)
+	_walkers.append_array(tree.get_nodes_in_group(Enemy.GROUP))
+	# Whoever left the groups is forgotten with the prints of their stride.
+	var present: Dictionary = {}
+	for walker: Node in _walkers:
+		present[walker.get_instance_id()] = true
+	for id: int in _last.keys():
+		if not present.has(id):
+			_last.erase(id)
+			_left_foot.erase(id)
 
 
 ## Whether [param x] is above a shaft opening: underfoot there is a cab, not the deck.

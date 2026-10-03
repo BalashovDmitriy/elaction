@@ -752,7 +752,7 @@ func _flush_multimeshes() -> void:
 	houses.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(houses)
 	var glass := CityBackdrop.window_quads(
-		"LitWindows", _glass_places, _glass_tones, _glass_customs, true
+		"LitWindows", _glass_places, _glass_tones, _glass_customs
 	)
 	glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(glass)

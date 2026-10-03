@@ -17,6 +17,10 @@ enum Shape { BOX, CYLINDER, SPHERE }
 var _places: Dictionary = {}
 var _materials: Dictionary = {}
 var _meshes: Dictionary = {}
+## Primitive meshes already made, by "shape:material". They outlive [method commit]: a
+## hall commits once per floor (ADR-0060, decision 10), and every floor reuses the same
+## mesh resources instead of making its own.
+var _primitives: Dictionary = {}
 
 
 ## A box of size [param size] centered at [param at].
@@ -82,9 +86,11 @@ func commit(parent: Node3D) -> void:
 		if _meshes.has(key):
 			many.mesh = _meshes[key] as Mesh
 		else:
-			var primitive := _mesh(int(key.get_slice(":", 0)) as Shape)
-			primitive.material = _materials[key] as Material
-			many.mesh = primitive
+			if not _primitives.has(key):
+				var primitive := _mesh(int(key.get_slice(":", 0)) as Shape)
+				primitive.material = _materials[key] as Material
+				_primitives[key] = primitive
+			many.mesh = _primitives[key] as Mesh
 		many.instance_count = places.size()
 		for index: int in places.size():
 			many.set_instance_transform(index, places[index])

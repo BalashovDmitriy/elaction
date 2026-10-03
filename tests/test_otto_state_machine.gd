@@ -52,7 +52,25 @@ func test_cannot_jump_while_crouching() -> void:
 
 func test_rising_in_air_is_jump() -> void:
 	var machine := OttoStateMachine.new()
+	machine.update(_snapshot(0.0, false, true), true, 0.0)
 	assert_eq(machine.update(_snapshot(), false, -120.0), OttoStateMachine.State.JUMP)
+
+
+## Walking off a rising cab roof hands Otto upward speed without a jump: that is a fall,
+## not the jump pose and sound (ADR-0060).
+func test_rising_without_a_jump_is_fall() -> void:
+	var machine := OttoStateMachine.new()
+	machine.update(_snapshot(1.0), true, 0.0)
+	assert_eq(machine.update(_snapshot(1.0), false, -120.0), OttoStateMachine.State.FALL)
+
+
+## Past the top of the jump the rise does not come back as a jump.
+func test_jump_past_the_top_stays_a_fall() -> void:
+	var machine := OttoStateMachine.new()
+	machine.update(_snapshot(0.0, false, true), true, 0.0)
+	machine.update(_snapshot(), false, -120.0)
+	machine.update(_snapshot(), false, 10.0)
+	assert_eq(machine.update(_snapshot(), false, -5.0), OttoStateMachine.State.FALL)
 
 
 func test_falling_in_air_is_fall() -> void:

@@ -81,14 +81,13 @@ func test_4k_window_on_a_4k_screen_with_a_taskbar() -> void:
 	assert_eq(small.position, Vector2i(960, 516), "in the middle of the work area")
 
 
-func test_settings_without_a_file_take_the_system_language() -> void:
+func test_the_language_is_always_a_known_one() -> void:
+	# Without a file — the system language, from the list of known ones.
 	var settings := GameSettings.load_from("user://no_such_settings.cfg")
 	assert_true(
 		GameSettings.LOCALES.has(settings.locale), "the language is from the list of known ones"
 	)
 
-
-func test_an_unknown_language_falls_back() -> void:
 	# The file can be edited by hand, and any language can be written in it. Showing the
 	# interface in a nonexistent language is not allowed, so the fallback is used.
 	var file := ConfigFile.new()
@@ -96,6 +95,39 @@ func test_an_unknown_language_falls_back() -> void:
 	file.save(TEMP)
 
 	var loaded := GameSettings.load_from(TEMP)
+	assert_true(GameSettings.LOCALES.has(loaded.locale), "the language is known anyway")
+
+
+## A hand-edited file with a value of the wrong type: the default instead of it, not a script
+## error that would stop the game at startup (ADR-0060).
+func test_a_wrongly_typed_value_falls_back_to_the_default() -> void:
+	var file := ConfigFile.new()
+	file.set_value(GameSettings.SECTION, "vsync", "yes")
+	file.set_value(GameSettings.SECTION, "blood", 1.5)
+	file.set_value(GameSettings.SECTION, "show_fps", [true])
+	file.set_value(GameSettings.SECTION, "master", "loud")
+	file.set_value(GameSettings.SECTION, "music", 0)
+	file.set_value(GameSettings.SECTION, "window_mode", "full")
+	file.set_value(GameSettings.SECTION, "frame_limit", {})
+	file.set_value(GameSettings.SECTION, "difficulty", 2.0)
+	file.set_value(GameSettings.SECTION, "quality", Vector2(1, 2))
+	file.set_value(GameSettings.SECTION, "quality_measured", "true")
+	file.set_value(GameSettings.SECTION, "locale", 7)
+	file.save(TEMP)
+
+	var loaded := GameSettings.load_from(TEMP)
+	var fresh := GameSettings.new()
+	assert_not_null(loaded, "the file is read anyway")
+	assert_eq(loaded.vsync, fresh.vsync, "a word is not a flag")
+	assert_eq(loaded.blood, fresh.blood, "nor is a number")
+	assert_eq(loaded.show_fps, fresh.show_fps)
+	assert_almost_eq(loaded.master, fresh.master, 0.001, "a word is not a volume")
+	assert_almost_eq(loaded.music, 0.0, 0.001, "a whole number is a volume")
+	assert_eq(loaded.window_mode, fresh.window_mode)
+	assert_eq(loaded.frame_limit, fresh.frame_limit)
+	assert_eq(loaded.difficulty, 2, "a float stands for a whole number")
+	assert_eq(loaded.quality, fresh.quality)
+	assert_false(loaded.quality_measured, "a word is not a flag")
 	assert_true(GameSettings.LOCALES.has(loaded.locale), "the language is known anyway")
 
 

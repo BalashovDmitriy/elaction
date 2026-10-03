@@ -95,7 +95,7 @@ on them.
 - Difficulty grows from building to building and over time within a building; each agent
   has his own anger — it sets the wind-up before a shot, the pause after and the
   chance to dodge. Settings have four difficulty levels, like the cabinet's switch.
-- The cab crushes agents — 300 points; the alarm turns on after 277 s, as in the ROM.
+- The cab crushes agents — 300 points; the alarm turns on after 277 s, as in the ROM, and no longer once Otto is in the exit car.
 - Lamps: one to three per floor across its width, hanging right under the ceiling. As in
   the original, a lamp can be shot down only from the cab, riding between floors: from the
   floor a bullet does not reach it, neither standing nor jumping. A downed lamp falls,
@@ -247,7 +247,7 @@ on them.
   way to a game driven by a bot — about 30 seconds from the roof with the helicopter, from
   the middle or from the bottom of the building, in turn. The bot shoots back, dodges
   bullets and takes agents down point-blank. Any key, gamepad button or mouse button
-  returns to the menu; the demo does not record high scores.
+  returns to the menu; the demo does not record high scores, and a score of zero is no record.
 - Interface: main menu, pause, settings (three volumes, language, difficulty, graphics
   quality, window mode, resolution, frame limit, vertical sync, blood, frame counter),
   high-score table, controls screen with key rebinding and the credits page. The mouse
@@ -333,7 +333,7 @@ on them.
   person draws blood (it can be turned off in the settings).
 - Graphics: four quality levels — from low for weak machines to "Ultra" with bounced light
   and lamp halos in the air; anti-aliasing at every level. On first launch the level is
-  chosen automatically, by a frame measurement. The frame's tone is specific to each time
+  chosen automatically, by a frame measurement at each level in turn. The frame's tone is specific to each time
   of day; at night — noir: cold shadows, warm lamps.
 - Any monitor resolution up to 4K: window, borderless window or fullscreen at native
   resolution. In fullscreen and borderless the chosen resolution is the scene resolution:

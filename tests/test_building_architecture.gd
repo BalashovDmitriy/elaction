@@ -179,6 +179,8 @@ func test_no_agent_walks_a_floor_far_from_otto() -> void:
 func test_otto_comes_back_to_the_rom_spot_and_the_agents_leave() -> void:
 	var level := _build(1, false)
 	await wait_physics_frames(SETTLE_FRAMES)
+	# On the intro rope Otto is carried and cannot die (ADR-0060): he is killed on his feet.
+	assert_true(await level.wait_for_the_landing(), "Otto landed on the roof")
 
 	var rules := level.rules
 	var floor_index := 3

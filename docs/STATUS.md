@@ -7,8 +7,8 @@ The `status-updated` hook checks this.
 |---|---|
 | **Updated** | 2026-10-03 |
 | **Current milestone** | none — M24p is merged; next in the plan is M25 (optional) |
-| **Branch** | `docs/english` — documentation translation |
-| **State** | M24p is merged into `main` (PR #66). All documentation, code comments and strings in code are translated into English (`docs/english`); the only Russian left is the game's translation `assets/i18n/ui.csv`. Awaiting PR |
+| **Branch** | `fix/review-sweep` — fixes after the whole-game review |
+| **State** | M24p and the English translation are merged into `main`. A whole-game review found no crash or softlock; its findings are fixed in `fix/review-sweep` ([ADR-0060](adr/0060-review-sweep.md)). Awaiting PR |
 | **Rollback point** | `main` holds the 3D build since M19; 2D remains in history, `d5774df` |
 
 ## Where we are now
@@ -421,6 +421,7 @@ the same ADR.
 | [ADR-0057](adr/0057-floors-cab-music-by-kind.md) | M24o: special floors by the ROM layout — halls in depth on 1–7, technical floors on 11–15; a cab and shaft of the kind's own style, a freight gate by the step-out window; music kind × time of day with a theme change and its own alarm |
 | [ADR-0058](adr/0058-exterior-by-kind.md) | M24p: exterior by kind is look only — a crown above the roof, setback ledge and end walls, the garage and the street entrance, the car drawn by kind; the barrier and the valet are animated |
 | [ADR-0059](adr/0059-deterministic-combat-run.md) | Deterministic combat run: bullets decide hits by a direct query instead of Jolt overlap events, the bot jumps onto prone agents, a 4 s calm after the return keeps near doors shut |
+| [ADR-0060](adr/0060-review-sweep.md) | Whole-game review sweep: agents shoot where Otto is, no death in the frame a door or escalator takes him, the alarm stops in the exit car, agents kept by where they are, quality probe per level, saved files checked by type, zero is not a record, hall furniture by floor |
 | [ADR-0036](adr/0036-sound-from-libraries.md) | M23: sound from CC0/CC-BY libraries, noir jazz, ambience by location, the music follows the game; synthesis goes away; supersedes items 1–2 of ADR-0012 |
 
 Other: the base viewport is 1920×1080 (ADR-0018 superseded 640×360 from ADR-0002,
@@ -453,6 +454,14 @@ the indicator board arrows; lamp swinging and weakening darkness were dropped by
   bullets decide hits by a direct query instead of Jolt's overlap events, the bot jumps onto
   prone agents instead of duelling them, and for 4 s after Otto's return doors near him stay
   shut. The pre-push hook had failed on the seed-3 combat run at random; now 2, 5, 3 deaths.
+
+- **Whole-game review** ([ADR-0060](adr/0060-review-sweep.md)): seven areas, no crash,
+  softlock or state leak; generation gives a winnable building for any seed. The fixes are
+  in `fix/review-sweep`; bot deaths after them are 3, 5, 3. Splitting hall furniture by
+  floor did not change the frame time on the test machine — it keeps the cost from growing.
+  Left for later from the review of the fixes: a falling lamp loses its fill shadow while it
+  still shines if the camera band changes mid-fall, and the knocked-off hat repeats
+  `Ragdoll`'s resting logic without riding a moving cab — both small, both outside the sweep.
 
 - **Ray tracing** — check with every engine update (user's
   question, 2026-09-24). Godot 4.7 has only low-level Vulkan RT in

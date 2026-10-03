@@ -244,6 +244,9 @@ func _physics_process(delta: float) -> void:
 	if _guest == null:
 		_look_for_visitor()
 		return
+	if _guest.is_dead():
+		_drop_the_guest()
+		return
 	if _guest.ride_look == Otto.LOOK_DOOR_IN:
 		# Goes into the depth of the opening while the leaf opens.
 		_guest.ride_progress = _cycle.openness()
@@ -330,7 +333,7 @@ func _look_for_visitor() -> void:
 		return
 	for body: Node3D in _mat.get_overlapping_bodies():
 		var visitor := body as Otto
-		if visitor == null:
+		if visitor == null or visitor.is_dead():
 			continue
 		if not _visit.knock(visitor.is_grounded(), visitor.vertical_intent()):
 			continue
@@ -391,6 +394,17 @@ func _release() -> void:
 	has_document = false
 	Sounds.play(Sounds.DOCUMENT)
 	document_taken.emit()
+
+
+## The guest died at the door: the door lets go of him and closes. A dead one is not
+## taken out again, put back on the mat, nor given the document (ADR-0060).
+func _drop_the_guest() -> void:
+	if _visit.is_hiding():
+		_muffle(false)
+	_guest = null
+	_visit.release()
+	_cycle.close()
+	Sounds.play(Sounds.DOOR_CLOSE)
 
 
 ## The leaf has closed behind the one who came out: control is back with the player.

@@ -173,6 +173,9 @@ func _start_demo() -> void:
 	_demo = DemoRun.start(_level, _demo_point)
 	_demo.finished.connect(_end_demo)
 	_demo_point = DemoPlan.next(_demo_point)
+	# The demo can be the launch's first building too: the warm-up is the same (ADR-0060).
+	if ShaderWarmup.run(_level):
+		_curtain.reveal(ShaderWarmup.HOLD)
 
 
 ## End of the demo: the building freezes, the frame fades to black, from black — the main menu.
@@ -213,6 +216,10 @@ func _open_menu(from_demo: bool = false) -> void:
 	_demo = null
 	_demo_ending = false
 	_idle = 0.0
+	# The building goes away together with Otto behind a door — the door itself clears the door
+	# muffling. Before the pause lifts: a takedown scene paused halfway would hear the unpause and
+	# slow the world down again over the menu (ADR-0060).
+	_drop_level()
 	_unpause()
 	if from_demo:
 		_hud.hide_bonus()
@@ -221,9 +228,6 @@ func _open_menu(from_demo: bool = false) -> void:
 	# The game stops rather than just hides: without this the siren timer
 	# would keep running under the main menu exited to from the pause.
 	GameState.instance().stop_game()
-	# The building goes away together with Otto behind a door — the door itself clears the door
-	# muffling.
-	_drop_level()
 	_raise_stage()
 	_hud.visible = false
 	_menu.show_page(Menu.Page.MAIN)
@@ -233,6 +237,8 @@ func _open_menu(from_demo: bool = false) -> void:
 func _start_game() -> void:
 	_demo = null
 	_playing = true
+	# The old building leaves before the pause lifts — as in [method _open_menu].
+	_drop_level()
 	_unpause()
 	_drop_the_curtain()
 	_drop_stage()
@@ -290,6 +296,13 @@ func _unpause() -> void:
 func _quit() -> void:
 	_settings.save_to()
 	get_tree().quit()
+
+
+## Closing the window is quitting too: settings changed in the menu — the volume — are not
+## lost (ADR-0060).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST and _settings != null:
+		_settings.save_to()
 
 
 ## Assembles the next building. The old one is thrown away whole together with Otto:

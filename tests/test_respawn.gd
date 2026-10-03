@@ -154,3 +154,24 @@ func test_doors_near_otto_stay_shut_just_after_his_return() -> void:
 	spawn.tick(rules.agent_respawn_calm + 0.1)
 	assert_false(spawn.is_calm())
 	assert_false(spawn.hugs(rules, 3, 3, middle, otto), "after the calm the usual gap")
+
+
+## A frozen building — the demo fading to black — does not bring Otto back: the return
+## timer runs on the tree, not on the building, and the revival with its sound would play
+## under the fade (ADR-0060).
+func test_a_frozen_building_does_not_bring_otto_back() -> void:
+	GameState.instance().start_game()
+	var level := preload("res://src/levels/greybox_level.tscn").instantiate() as GreyboxLevel
+	level.rules = BuildingRules.new()
+	level.building_seed = 1
+	level.spawn_agents = false
+	add_child_autofree(level)
+	await wait_physics_frames(2)
+	level.skip_the_intro()
+	await wait_physics_frames(2)
+	level.otto.kill()
+	assert_true(level.otto.is_dead(), "Otto is down")
+	level.process_mode = Node.PROCESS_MODE_DISABLED
+	await wait_seconds(GreyboxLevel.OTTO_RESPAWN_DELAY + 0.3)
+	assert_true(level.otto.is_dead(), "the frozen building did not revive Otto")
+	GameState.instance().reset()

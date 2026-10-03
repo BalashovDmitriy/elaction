@@ -49,10 +49,6 @@ const WINDOW_SIZE := Vector2(1.2, 1.5)
 ## set here.
 const WINDOW_FADE: Array[float] = [1.0, 0.75, 0.55, 0.4]
 
-## An unlit window is dark glass slightly lighter than the facade: through it the facade
-## reads as a grid of windows rather than a scatter of lights (ADR-0031, decision 6).
-const WINDOW_DARK := Color(0.05, 0.06, 0.09)
-
 ## How strongly the panes light up in a lightning flash.
 const FLASH_GLASS := Color(0.55, 0.6, 0.75)
 
@@ -344,18 +340,14 @@ func _buildings(blocks: Array[CityPlan.Block]) -> MultiMeshInstance3D:
 	return node
 
 
-## Windows as one multimesh: a quad per window, colour per vertex, what is behind the
-## glass — in the window data ([CityLook]). [param lit] — lit ones: past the city haze.
+## Lit windows as one multimesh: a quad per window, colour per vertex, what is behind the
+## glass — in the window data ([CityLook]); past the city haze.
 static func window_quads(
-	title: String,
-	places: Array[Transform3D],
-	colors: Array[Color],
-	customs: Array[Color],
-	lit: bool
+	title: String, places: Array[Transform3D], colors: Array[Color], customs: Array[Color]
 ) -> MultiMeshInstance3D:
 	var quad := QuadMesh.new()
 	quad.size = WINDOW_SIZE
-	quad.material = CityLook.windows(lit)
+	quad.material = CityLook.windows()
 	var many := MultiMesh.new()
 	many.transform_format = MultiMesh.TRANSFORM_3D
 	many.use_colors = true

@@ -136,6 +136,9 @@ func _physics_process(delta: float) -> void:
 	# not hum by itself either, and the building is noisy enough.
 	Sounds.keep_playing(_hum, _passenger != null)
 
+	if _passenger != null and _passenger.is_dead():
+		# A dead one is not carried on: the escalator drops him where he is (ADR-0060).
+		_passenger = null
 	if _passenger != null:
 		_carry(delta)
 		return
@@ -180,7 +183,7 @@ func set_light_visible(on: bool) -> void:
 func _try_board(pad: Area3D, target: Area3D, towards: float) -> bool:
 	for body: Node3D in pad.get_overlapping_bodies():
 		var rider := body as Otto
-		if rider == null or not rider.is_grounded():
+		if rider == null or rider.is_dead() or not rider.is_grounded():
 			continue
 		var intent := rider.vertical_intent()
 		if absf(intent) < Intent.PRESS or signf(intent) != towards:

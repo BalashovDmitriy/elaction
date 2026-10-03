@@ -72,3 +72,33 @@ func test_fill_shadows_skip_lamps_that_cast_no_shadow() -> void:
 	for lamp: Lamp in picked:
 		assert_eq(lamp.floor_index, 5, "from a floor in frame")
 		assert_lt(WorldSpace.to_plane(lamp.global_position).x, 30.0, "from the shadow band")
+
+
+## A shot lamp gives up its fill shadow slot: at once when picked, and when it falls the frame
+## is lit again, so the slot does not wait for the camera to move (ADR-0060).
+func test_a_shot_lamp_hands_its_fill_shadow_on() -> void:
+	var rules := BuildingRules.new()
+	var seen := Rect2(VIEW.position + Vector2(0.0, rules.floor_surface(3)), VIEW.size)
+	var in_frame := VisibleFloors.seen(rules, seen)
+	var middle := seen.get_center()
+	var lamps: Array[Lamp] = []
+	for index: int in Lamp.FILL_SHADOW_CAP + 1:
+		var lamp := LAMP_SCENE.instantiate() as Lamp
+		lamp.position = WorldSpace.to_scene(Vector2(middle.x + 1.0 + index, middle.y))
+		lamp.floor_index = in_frame.x
+		add_child_autofree(lamp)
+		lamps.append(lamp)
+	var no_doors: Array[Door] = []
+	FloorLighting.show_in_frame(rules, seen, lamps, no_doors)
+	var spare := lamps[-1]
+	assert_false(spare._fill_shadowed, "the farthest lamp is past the cap")
+
+	var shot := lamps[0]
+	shot.shoot_down()
+	assert_false(
+		FloorLighting.nearest(lamps, middle, Lamp.FILL_SHADOW_CAP).has(shot),
+		"a falling lamp is not picked"
+	)
+	shot.fell.emit()
+	assert_true(spare._fill_shadowed, "the fall handed the slot on")
+	assert_false(shot._fill_shadowed, "and took it from the shot one")

@@ -112,6 +112,11 @@ func test_a_broken_file_falls_back_to_defaults() -> void:
 	file.set_value(KeyBindings.SECTION, "key_jump", KEY_ESCAPE)
 	assert_true(KeyBindings.read_from(file).is_default(), "a reserved one - also")
 	assert_true(KeyBindings.read_from(ConfigFile.new()).is_default(), "no section - also")
+	file.set_value(KeyBindings.SECTION, "key_jump", "space")
+	assert_true(KeyBindings.read_from(file).is_default(), "a word, not a key - also")
+	file.set_value(KeyBindings.SECTION, "key_jump", KEY_A)
+	file.set_value(KeyBindings.SECTION, "pad_jump", [JOY_BUTTON_B])
+	assert_true(KeyBindings.read_from(file).is_default(), "a list, not a button - also")
 
 
 func test_apply_leaves_one_key_one_button_and_the_stick() -> void:

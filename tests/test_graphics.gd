@@ -109,15 +109,94 @@ func test_a_timed_out_probe_does_not_keep_an_unproven_level() -> void:
 		"nothing measured — one step down"
 	)
 	assert_eq(
-		QualityProbe.settle(Graphics.Quality.HIGH, PackedFloat64Array([40.0, 42.0, 41.0])),
-		Graphics.Quality.MEDIUM,
-		"few measured but slow — one step down"
-	)
-	assert_eq(
 		QualityProbe.settle(Graphics.Quality.ULTRA, PackedFloat64Array([5.0, 6.0])),
 		Graphics.Quality.ULTRA,
 		"few measured but fast — stays"
 	)
+	assert_eq(
+		QualityProbe.settle(Graphics.Quality.ULTRA, PackedFloat64Array([15.0, 14.0, 16.0])),
+		Graphics.Quality.HIGH,
+		"a little over — one step down"
+	)
+
+
+## A level far over the budget when its time ran out drops by the excess, not one step: from
+## one step it saved a level too high for good (ADR-0060).
+func test_a_timed_out_probe_drops_by_the_excess() -> void:
+	assert_eq(
+		QualityProbe.settle(Graphics.Quality.ULTRA, PackedFloat64Array([20.0, 21.0, 19.0])),
+		Graphics.Quality.MEDIUM,
+		"two thirds over — two steps"
+	)
+	assert_eq(
+		QualityProbe.settle(Graphics.Quality.HIGH, PackedFloat64Array([40.0, 42.0, 41.0])),
+		Graphics.Quality.LOW,
+		"three times over — as low as it goes"
+	)
+
+
+## Runs the measurement rules on made-up frames: [param gpu] — GPU ms by level, the frame lasts
+## [param frame] ms longer than that; the first [param stalls] frames of each level are shader
+## compile stalls of [param stall] s. Returns the level and the seconds it took.
+func _trial(gpu: Array[float], frame: float, stalls: int = 0, stall: float = 0.0) -> Array:
+	var trial := QualityProbe.Trial.new()
+	var seconds := 0.0
+	var at := trial.level
+	var on_level := 0
+	for _frame: int in 100000:
+		if trial.done:
+			break
+		if trial.level != at:
+			at = trial.level
+			on_level = 0
+		on_level += 1
+		var delta := (gpu[at] + frame) / 1000.0
+		if on_level <= stalls:
+			delta = stall
+		seconds += delta
+		trial.feed(delta, gpu[at])
+	assert_true(trial.done, "the measurement ends")
+	return [trial.level, seconds]
+
+
+## A slow card walks all the way down: each level has its own time, and the one shared budget
+## no longer runs out on "High" and saves it for good (ADR-0060).
+func test_a_slow_card_gets_down_to_the_level_that_fits() -> void:
+	var slow: Array[float] = [10.0, 18.0, 28.0, 40.0]
+	var result := _trial(slow, 2.0)
+	assert_eq(result[0], Graphics.Quality.LOW, "only low fits")
+	assert_lte(float(result[1]), QualityProbe.TIMEOUT + 0.1, "and within the overall cap")
+	var middling: Array[float] = [5.0, 9.0, 14.0, 20.0]
+	assert_eq(_trial(middling, 6.0)[0], Graphics.Quality.MEDIUM, "medium fits — medium")
+
+
+## Shader compile stalls at the start of each level do not eat its time: a fast card keeps
+## "Ultra" even when compiling took seconds.
+func test_shader_stalls_do_not_eat_the_budget() -> void:
+	var fast: Array[float] = [3.0, 4.0, 6.0, 8.0]
+	assert_eq(_trial(fast, 1.0, 4, 2.0)[0], Graphics.Quality.ULTRA)
+
+
+## Frames so slow that not even the warm-up passes: the measurement still ends within the cap,
+## and the frame length decides — far over the budget, so low.
+func test_a_hopeless_card_still_ends_the_measurement() -> void:
+	var hopeless: Array[float] = [400.0, 450.0, 480.0, 500.0]
+	var result := _trial(hopeless, 0.0)
+	assert_eq(result[0], Graphics.Quality.LOW)
+	assert_lte(float(result[1]), QualityProbe.TIMEOUT + 0.5, "the overall cap holds")
+
+
+## The overall time can run out on the first frame of a level, a shader compile stall: one
+## frame says nothing about the card, and the level steps down one, not to low.
+func test_a_level_cut_off_at_its_first_frame_steps_down_once() -> void:
+	var middling: Array[float] = [5.0, 8.0, 11.0, 20.0]
+	assert_eq(_trial(middling, 1.0, 4, 2.0)[0], Graphics.Quality.MEDIUM)
+
+
+## A card that never reports GPU time: one step down, as before, and not on down to low.
+func test_a_card_without_gpu_time_steps_down_once() -> void:
+	var mute: Array[float] = [0.0, 0.0, 0.0, 0.0]
+	assert_eq(_trial(mute, 16.6)[0], Graphics.Quality.HIGH)
 
 
 ## The player chose a level while the measurement was running: the measurement leaves and

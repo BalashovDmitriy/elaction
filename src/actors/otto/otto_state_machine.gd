@@ -105,7 +105,11 @@ func update(
 
 func _resolve(input: OttoInput, on_floor: bool, vertical_velocity: float, can_stand: bool) -> State:
 	if not on_floor:
-		return State.JUMP if vertical_velocity < 0.0 else State.FALL
+		# Only a jump that was pressed rises as a jump. Upward speed alone is not one:
+		# stepping off a rising cab roof hands Otto the cab's velocity, and the jump pose
+		# and sound would play without a jump (ADR-0060).
+		var jumping := previous_state == State.JUMP and vertical_velocity < 0.0
+		return State.JUMP if jumping else State.FALL
 	# One cannot get up from a crouch while there is no room above the head: neither by a step
 	# nor by a jump.
 	if previous_state == State.CROUCH and not can_stand:

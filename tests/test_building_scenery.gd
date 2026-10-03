@@ -60,15 +60,6 @@ func test_every_row_covers_the_building() -> void:
 		assert_gt(to, width, "row %d does not reach the right edge" % row)
 
 
-## Lit windows lie on their own house's facade.
-func test_lit_windows_stay_on_their_facade() -> void:
-	for block in CityPlan.generate(5, 0.0, 30.0):
-		var grid := CityPlan.window_grid(block)
-		for window: Vector2i in block.lit:
-			assert_between(window.x, 0, grid.x - 1, "window past the facade edge in width")
-			assert_between(window.y, 0, grid.y - 1, "window past the facade edge in height")
-
-
 ## Dressing does not take the place of a door, lamp, shaft, escalator or exit and
 ## does not press against a solid wall — on any seed and skill.
 func test_props_keep_off_doors_lamps_shafts_and_walls() -> void:
@@ -252,7 +243,9 @@ func _pipe_blockers(rules: BuildingRules, plan: BuildingPlan, index: int) -> Arr
 func _fingerprint(blocks: Array[CityPlan.Block]) -> String:
 	var parts := PackedStringArray()
 	for block in blocks:
-		parts.append("%d:%.2f:%.2f:%d" % [block.row, block.x, block.height, block.lit.size()])
+		parts.append(
+			"%d:%.2f:%.2f:%d:%d" % [block.row, block.x, block.height, block.crown, block.kind]
+		)
 	return "|".join(parts)
 
 

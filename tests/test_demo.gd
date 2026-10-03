@@ -110,6 +110,62 @@ func test_a_screenshot_does_not_end_the_demo() -> void:
 	main.call("_end_demo")
 
 
+## The building leaves before the pause lifts: whatever was paused inside it — a takedown
+## scene halfway — must not hear the unpause and slow the world down over the menu
+## (ADR-0060).
+func test_leaving_a_paused_building_does_not_wake_it() -> void:
+	var main := MAIN_SCENE.instantiate()
+	add_child_autofree(main)
+	await wait_physics_frames(2)
+	main.call("_start_demo")
+	await wait_physics_frames(2)
+	var level := main.get("_level") as GreyboxLevel
+	var probe := _unpause_probe()
+	level.add_child(probe)
+	main.call("_pause")
+	main.call("_open_menu")
+	assert_false(get_tree().paused, "the pause is lifted")
+	assert_eq(int(probe.get("unpaused")), 0, "the old building did not hear the unpause")
+	probe.free()
+
+
+## Closing the window keeps the settings: the volume set in the menu is not lost
+## (ADR-0060).
+func test_closing_the_window_saves_the_settings() -> void:
+	var main := MAIN_SCENE.instantiate()
+	add_child_autofree(main)
+	await wait_physics_frames(2)
+	var settings := main.get("_settings") as GameSettings
+	var path := "user://test_close_settings.cfg"
+	settings.file_path = path
+	settings.music = 0.25
+	main.notification(NOTIFICATION_WM_CLOSE_REQUEST)
+	assert_almost_eq(GameSettings.load_from(path).music, 0.25, 0.001, "the volume is on disk")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+
+## A node that counts the unpauses it hears.
+func _unpause_probe() -> Node:
+	var script := GDScript.new()
+	script.source_code = (
+		"\n"
+		. join(
+			[
+				"extends Node",
+				"var unpaused: int = 0",
+				"func _notification(what: int) -> void:",
+				"\tif what == NOTIFICATION_UNPAUSED:",
+				"\t\tunpaused += 1",
+			]
+		)
+	)
+	script.reload()
+	var probe := Node.new()
+	probe.set_script(script)
+	probe.process_mode = Node.PROCESS_MODE_PAUSABLE
+	return probe
+
+
 # --- Points --------------------------------------------------------------------
 
 
