@@ -407,7 +407,7 @@ static func stream(name: String) -> AudioStream:
 	var streams := variants(name)
 	var loaded: AudioStream = null
 	if streams.is_empty():
-		push_error("Нет звука %s — запустите tools/build_audio.py" % name)
+		push_error("No sound %s — run tools/build_audio.py" % name)
 	elif streams.size() == 1:
 		loaded = streams[0]
 	else:

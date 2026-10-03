@@ -77,7 +77,7 @@ def inside_blender() -> int:
             export_animations=True,
             export_animation_mode="ACTIONS",
         )
-        print(f"собран {name}")
+        print(f"built {name}")
     return 0
 
 
@@ -87,12 +87,12 @@ def outside() -> int:
     use_utf8_output()
     missing = [name for name in PEOPLE if not (SOURCE / f"{name}.gltf").exists()]
     if missing:
-        print(f"нет исходников в {SOURCE}: {', '.join(missing)} (см. начало файла)")
+        print(f"no sources in {SOURCE}: {', '.join(missing)} (see the top of the file)")
         return 1
     blender = require_blender()
     code, output = run_script(blender, Path(__file__), timeout=1800)
     for line in output.splitlines():
-        if "собран" in line or "Error" in line or "Traceback" in line or "rror:" in line:
+        if "built" in line or "Error" in line or "Traceback" in line or "rror:" in line:
             print(line)
     return code
 

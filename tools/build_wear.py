@@ -193,7 +193,7 @@ def main() -> int:
     for name, image in made:
         image.save(OUT / f"{name}.png", optimize=True)
         print(f"  {name}.png")
-    print(f"Следы в {OUT.relative_to(PROJECT_ROOT).as_posix()}/")
+    print(f"Wear marks in {OUT.relative_to(PROJECT_ROOT).as_posix()}/")
     return 0
 
 

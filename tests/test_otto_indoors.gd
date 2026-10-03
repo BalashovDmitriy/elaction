@@ -46,16 +46,16 @@ func test_coming_out_does_nothing_when_outside() -> void:
 
 func test_world_driven_covers_door_and_escalator() -> void:
 	var machine := OttoStateMachine.new()
-	assert_false(machine.is_world_driven(), "на своих ногах Otto ведёт игрок")
+	assert_false(machine.is_world_driven(), "on his own feet Otto is driven by the player")
 	machine.go_indoors()
-	assert_true(machine.is_world_driven(), "за дверью Otto распоряжается дверь")
+	assert_true(machine.is_world_driven(), "behind a door the door commands Otto")
 	machine.come_out()
 	assert_false(machine.is_world_driven())
 	machine.ride()
-	assert_true(machine.is_world_driven(), "на эскалаторе — эскалатор")
+	assert_true(machine.is_world_driven(), "on an escalator the escalator does")
 	machine.stop_riding()
 	machine.kill()
-	assert_true(machine.is_world_driven(), "мёртвый ввод не разбирает вовсе")
+	assert_true(machine.is_world_driven(), "a dead one does not parse input at all")
 
 
 ## Otto is vulnerable only on his own feet and without a breather: this is how agents
@@ -63,20 +63,20 @@ func test_world_driven_covers_door_and_escalator() -> void:
 func test_otto_can_be_hit_only_on_foot_and_out_of_grace() -> void:
 	var otto := OTTO_SCENE.instantiate() as Otto
 	add_child_autofree(otto)
-	assert_true(otto.hittable, "на своих ногах уязвим")
+	assert_true(otto.hittable, "vulnerable on his own feet")
 	otto.ride(true)
-	assert_false(otto.hittable, "в проёме двери и на эскалаторе — нет")
+	assert_false(otto.hittable, "not in a doorway or on an escalator")
 	otto.ride(false)
 	otto.stay_indoors(true)
-	assert_false(otto.hittable, "за дверью — нет")
+	assert_false(otto.hittable, "not behind a door")
 	otto.stay_indoors(false)
 	assert_true(otto.hittable)
 	otto.kill()
-	assert_false(otto.hittable, "мёртвый — нет")
+	assert_false(otto.hittable, "not when dead")
 	otto.revive()
-	assert_false(otto.hittable, "в передышку после возвращения — нет")
+	assert_false(otto.hittable, "not in the grace period after returning")
 	await wait_seconds(Otto.RESPAWN_GRACE + 0.2)
-	assert_true(otto.hittable, "передышка кончилась — снова уязвим")
+	assert_true(otto.hittable, "grace period over: vulnerable again")
 
 
 ## The cab calls [method Otto.kill] every physics step while Otto is under it, during a
@@ -84,7 +84,7 @@ func test_otto_can_be_hit_only_on_foot_and_out_of_grace() -> void:
 ## voice (M24k code review).
 func test_a_crush_in_grace_makes_no_sound() -> void:
 	var director := AudioDirector.instance()
-	assert_not_null(director, "автолоад звука поднят")
+	assert_not_null(director, "the sound autoload is up")
 	if director == null:
 		return
 	var otto := OTTO_SCENE.instantiate() as Otto
@@ -93,9 +93,9 @@ func test_a_crush_in_grace_makes_no_sound() -> void:
 	otto.revive()
 	for _step: int in 3:
 		otto.kill(true)
-	assert_false(otto.is_dead(), "в передышку кабина не убивает")
-	assert_eq(director.voices_playing(Sounds.CRUSH), 0, "и давка не звучит")
+	assert_false(otto.is_dead(), "the cab does not kill during the grace period")
+	assert_eq(director.voices_playing(Sounds.CRUSH), 0, "and the crush does not sound")
 	await wait_seconds(Otto.RESPAWN_GRACE + 0.2)
 	otto.kill(true)
-	assert_true(otto.is_dead(), "без передышки — давит")
-	assert_eq(director.voices_playing(Sounds.CRUSH), 1, "и давка звучит один раз")
+	assert_true(otto.is_dead(), "without the grace period it crushes")
+	assert_eq(director.voices_playing(Sounds.CRUSH), 1, "and the crush sounds once")

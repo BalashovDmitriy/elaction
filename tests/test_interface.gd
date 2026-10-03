@@ -52,13 +52,15 @@ func test_the_old_fullscreen_flag_becomes_a_window_mode() -> void:
 ## Window sizes — only those that fit on the monitor; 4K — on a 4K screen.
 func test_window_sizes_fit_the_screen() -> void:
 	var full_hd := DisplayModes.available(Vector2i(1920, 1080))
-	assert_eq(full_hd[-1], Vector2i(1920, 1080), "на FullHD больше FullHD не предлагается")
-	assert_has(DisplayModes.available(Vector2i(3840, 2160)), Vector2i(3840, 2160), "4K есть на 4K")
-	assert_eq(DisplayModes.available(Vector2i(800, 600)).size(), 1, "на крошечном — хоть один")
+	assert_eq(full_hd[-1], Vector2i(1920, 1080), "on FullHD nothing above FullHD is offered")
+	assert_has(
+		DisplayModes.available(Vector2i(3840, 2160)), Vector2i(3840, 2160), "4K is offered on 4K"
+	)
+	assert_eq(DisplayModes.available(Vector2i(800, 600)).size(), 1, "on a tiny one — at least one")
 	assert_eq(
 		DisplayModes.nearest(Vector2i(3840, 2160), Vector2i(1920, 1080)),
 		Vector2i(1920, 1080),
-		"сменили монитор — размер ужимается под новый"
+		"the monitor changed — the size shrinks to the new one"
 	)
 
 
@@ -68,18 +70,22 @@ func test_window_sizes_fit_the_screen() -> void:
 func test_4k_window_on_a_4k_screen_with_a_taskbar() -> void:
 	var screen := Rect2i(0, 0, 3840, 2160)
 	var usable := Rect2i(0, 0, 3840, 2112)
-	assert_has(DisplayModes.available(screen.size), Vector2i(3840, 2160), "4K в списке")
+	assert_has(DisplayModes.available(screen.size), Vector2i(3840, 2160), "4K in the list")
 	var frame := DisplayModes.windowed_rect(Vector2i(3840, 2160), screen, usable)
-	assert_eq(frame, screen, "окно 4K — во весь экран")
-	assert_false(DisplayModes.framed(frame, usable), "без рамки: с ней заголовок ушёл бы за край")
+	assert_eq(frame, screen, "a 4K window — full screen")
+	assert_false(
+		DisplayModes.framed(frame, usable), "no frame: with it the title would go off the edge"
+	)
 	var small := DisplayModes.windowed_rect(Vector2i(1920, 1080), screen, usable)
-	assert_true(DisplayModes.framed(small, usable), "меньшее окно — с рамкой")
-	assert_eq(small.position, Vector2i(960, 516), "по середине рабочей области")
+	assert_true(DisplayModes.framed(small, usable), "a smaller window — with a frame")
+	assert_eq(small.position, Vector2i(960, 516), "in the middle of the work area")
 
 
 func test_settings_without_a_file_take_the_system_language() -> void:
 	var settings := GameSettings.load_from("user://no_such_settings.cfg")
-	assert_true(GameSettings.LOCALES.has(settings.locale), "язык из списка известных")
+	assert_true(
+		GameSettings.LOCALES.has(settings.locale), "the language is from the list of known ones"
+	)
 
 
 func test_an_unknown_language_falls_back() -> void:
@@ -90,7 +96,7 @@ func test_an_unknown_language_falls_back() -> void:
 	file.save(TEMP)
 
 	var loaded := GameSettings.load_from(TEMP)
-	assert_true(GameSettings.LOCALES.has(loaded.locale), "язык всё равно известный")
+	assert_true(GameSettings.LOCALES.has(loaded.locale), "the language is known anyway")
 
 
 func test_volumes_are_clamped() -> void:
@@ -100,8 +106,8 @@ func test_volumes_are_clamped() -> void:
 	file.save(TEMP)
 
 	var loaded := GameSettings.load_from(TEMP)
-	assert_almost_eq(loaded.master, 1.0, 0.001, "громче единицы не бывает")
-	assert_almost_eq(loaded.music, 0.0, 0.001, "и тише нуля тоже")
+	assert_almost_eq(loaded.master, 1.0, 0.001, "there is nothing louder than one")
+	assert_almost_eq(loaded.music, 0.0, 0.001, "and nothing quieter than zero")
 
 
 func test_a_bus_level_goes_where_it_belongs() -> void:
@@ -109,7 +115,7 @@ func test_a_bus_level_goes_where_it_belongs() -> void:
 	settings.set_level(Sounds.MUSIC_BUS, 0.25)
 	assert_almost_eq(settings.music, 0.25, 0.001)
 	assert_almost_eq(settings.level_of(Sounds.MUSIC_BUS), 0.25, 0.001)
-	assert_almost_eq(settings.master, 1.0, 0.001, "соседние шины не тронуты")
+	assert_almost_eq(settings.master, 1.0, 0.001, "neighbouring buses are untouched")
 
 
 # --- Translations ------------------------------------------------------------
@@ -117,7 +123,7 @@ func test_a_bus_level_goes_where_it_belongs() -> void:
 
 func _keys() -> PackedStringArray:
 	var file := FileAccess.open(STRINGS, FileAccess.READ)
-	assert_not_null(file, "таблица строк на месте")
+	assert_not_null(file, "the string table is in place")
 	var keys := PackedStringArray()
 	if file == null:
 		return keys
@@ -132,19 +138,19 @@ func _keys() -> PackedStringArray:
 
 
 func test_every_string_exists_in_both_languages() -> void:
-	# An untranslated string is shown as its key — "UI_PLAY" instead of "Играть",
+	# An untranslated string is shown as its key — "UI_PLAY" instead of the text of UI_PLAY,
 	# and it can only be noticed by eye in the right language.
 	var was := TranslationServer.get_locale()
 	for locale: String in GameSettings.LOCALES:
 		TranslationServer.set_locale(locale)
 		for key: String in _keys():
 			var line := TranslationServer.translate(key)
-			assert_ne(line, key, "%s переведён на %s" % [key, locale])
+			assert_ne(line, key, "%s is translated into %s" % [key, locale])
 	TranslationServer.set_locale(was)
 
 
 func test_the_table_is_not_empty() -> void:
-	assert_gt(_keys().size(), 10, "строк в таблице больше десятка")
+	assert_gt(_keys().size(), 10, "more than ten strings in the table")
 
 
 # --- HUD ---------------------------------------------------------------------
@@ -174,10 +180,10 @@ func test_an_extra_life_comes_once() -> void:
 	var lives := game.lives
 
 	game.add_score(GameState.EXTRA_LIFE_SCORE)
-	assert_eq(game.lives, lives + 1, "за десять тысяч дают жизнь")
+	assert_eq(game.lives, lives + 1, "a life is given for ten thousand")
 
 	game.add_score(GameState.EXTRA_LIFE_SCORE)
-	assert_eq(game.lives, lives + 1, "а за двадцать — уже нет")
+	assert_eq(game.lives, lives + 1, "and for twenty — no longer")
 
 
 func test_a_new_game_brings_the_extra_life_back() -> void:
@@ -187,7 +193,7 @@ func test_a_new_game_brings_the_extra_life_back() -> void:
 
 	var lives := game.lives
 	game.add_score(GameState.EXTRA_LIFE_SCORE)
-	assert_eq(game.lives, lives + 1, "в новой партии порог считается заново")
+	assert_eq(game.lives, lives + 1, "in a new game the threshold is counted anew")
 
 
 func test_the_dead_do_not_get_an_extra_life() -> void:
@@ -197,7 +203,7 @@ func test_the_dead_do_not_get_an_extra_life() -> void:
 		game.lose_life()
 
 	game.add_score(GameState.EXTRA_LIFE_SCORE)
-	assert_eq(game.lives, 0, "мёртвому жизнь не выдают")
+	assert_eq(game.lives, 0, "no life is given to the dead")
 
 
 ## The language changed mid-game — HUD labels assembled by code get translated.
@@ -213,14 +219,16 @@ func test_the_hud_follows_a_language_change() -> void:
 	for label in hud.find_children("*", "Label", true, false):
 		captions.append((label as Label).text)
 	TranslationServer.set_locale(was)
-	assert_has(captions, russian, "подпись очков перевелась")
-	assert_does_not_have(captions, english, "подпись очков осталась на прежнем языке")
+	assert_has(captions, russian, "the score caption was translated")
+	assert_does_not_have(captions, english, "the score caption stayed in the old language")
 
 
 ## The HUD has as many document folders as the building has documents: per the ROM
 ## there are 5 to 10 depending on skill, and a five-folder HUD would lie at high skill.
 func test_the_hud_draws_a_folder_per_document() -> void:
-	assert_gte(Hud.DOCUMENT_ICONS, Arcade.red_doors(99), "папок меньше, чем бывает документов")
+	assert_gte(
+		Hud.DOCUMENT_ICONS, Arcade.red_doors(99), "fewer folders than documents there can be"
+	)
 	var hud := HUD_SCENE.instantiate() as Hud
 	add_child_autofree(hud)
 	var game := GameState.instance()
@@ -231,7 +239,7 @@ func test_the_hud_draws_a_folder_per_document() -> void:
 		for icon in hud.find_children("*", "HudIcon", true, false):
 			if (icon as HudIcon).kind == HudIcon.Kind.DOCUMENT and (icon as Control).visible:
 				shown += 1
-		assert_eq(shown, total, "документов %d — столько и папок" % total)
+		assert_eq(shown, total, "%d documents — as many folders" % total)
 	game.reset()
 
 
@@ -248,16 +256,16 @@ func test_the_round_sits_in_the_middle_plate() -> void:
 	for label: Node in hud.find_children("*", "Label", true, false):
 		if (label as Label).text == wanted:
 			shown = label as Label
-	assert_not_null(shown, "номер раунда показан")
+	assert_not_null(shown, "the round number is shown")
 	if shown != null:
 		var box := shown.get_parent()
-		assert_eq(shown.get_index(), 0, "первой строкой")
-		assert_eq(box.get_child_count(), 3, "в плашке раунд, здание и этаж")
+		assert_eq(shown.get_index(), 0, "on the first line")
+		assert_eq(box.get_child_count(), 3, "the plate has the round, building and floor")
 	game.reset()
 
 
-## The bottom floor is the garage: the HUD writes "ПАРКИНГ" rather than "ЭТАЖ 1", just
-## as the columns and indicator boards there write "P" (ADR-0038, decision 3). The floor
+## "FLOOR 1", just as the columns and indicator boards there write "P" (ADR-0038, decision 3).
+## The floor above it is still the second.
 ## above it is still the second.
 func test_the_hud_calls_the_bottom_floor_parking() -> void:
 	var was := TranslationServer.get_locale()
@@ -267,8 +275,8 @@ func test_the_hud_calls_the_bottom_floor_parking() -> void:
 		TranslationServer.set_locale(locale)
 		var parking := TranslationServer.translate("UI_PARKING").to_upper()
 		var floor_word := TranslationServer.translate("UI_FLOOR").to_upper()
-		assert_eq(Hud.floor_text(rules, bottom), parking, "паркинг на %s" % locale)
-		assert_eq(Hud.floor_text(rules, bottom - 1), "%s 2" % floor_word, "над ним — второй")
+		assert_eq(Hud.floor_text(rules, bottom), parking, "parking in %s" % locale)
+		assert_eq(Hud.floor_text(rules, bottom - 1), "%s 2" % floor_word, "above it, the second")
 	TranslationServer.set_locale(was)
 
 
@@ -280,15 +288,15 @@ func test_the_fps_counter_follows_the_setting() -> void:
 	settings.save_to(path)
 	var loaded := GameSettings.load_from(path)
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
-	assert_true(loaded.show_fps, "флажок сохраняется")
+	assert_true(loaded.show_fps, "the flag is saved")
 	var hud := HUD_SCENE.instantiate() as Hud
 	add_child_autofree(hud)
 	Hud.show_fps = loaded.show_fps
 	await _hud_frame()
-	assert_true(_fps_label_visible(hud), "включили — счётчик виден")
+	assert_true(_fps_label_visible(hud), "switched on — the counter is visible")
 	Hud.show_fps = false
 	await _hud_frame()
-	assert_false(_fps_label_visible(hud), "выключили — пропал")
+	assert_false(_fps_label_visible(hud), "switched off — it is gone")
 
 
 ## Waits until the HUD's `_process` is guaranteed to have run at least once.

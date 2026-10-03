@@ -104,7 +104,7 @@ func _run() -> void:
 			failures += 1
 	Engine.time_scale = 1.0
 
-	print("\nПровалено зданий: %d из %d" % [failures, seeds.size()])
+	print("\nFailed buildings: %d of %d" % [failures, seeds.size()])
 	quit(1 if failures > 0 else 0)
 
 
@@ -171,8 +171,8 @@ func _play(
 
 	print(
 		(
-			"\n=== Сид %d, агенты: %s, разом не больше %d ==="
-			% [building_seed, "да" if agents else "нет", level.rules.agents_at_once(0.0)]
+			"\n=== Seed %d, agents: %s, at most %d at once ==="
+			% [building_seed, "yes" if agents else "no", level.rules.agents_at_once(0.0)]
 		)
 	)
 
@@ -203,7 +203,7 @@ func _play(
 		if trace and frames % trace_every == 0:
 			print(
 				(
-					"  [%5d] этаж %d, Otto %s, едет %s, жмёт %s%s; решение: %s"
+					"  [%5d] floor %d, Otto %s, riding %s, pressing %s%s; decision: %s"
 					% [
 						frames,
 						here,
@@ -223,7 +223,7 @@ func _play(
 			deaths += 1
 			print(
 				(
-					"  смерть #%d на этаже %d, шаг %d, Otto %s, в кабине %s%s"
+					"  death #%d on floor %d, step %d, Otto %s, in cab %s%s"
 					% [
 						deaths,
 						here,
@@ -240,19 +240,19 @@ func _play(
 			stuck += 1
 		else:
 			if stuck > 900:
-				print("  этаж %d держал бота %d шагов" % [last_floor, stuck])
+				print("  floor %d held the bot for %d steps" % [last_floor, stuck])
 			stuck = 0
 			last_floor = here
 		if over[0]:
-			print("  партия окончена на этаже %d, шаг %d" % [here, frames])
+			print("  game over on floor %d, step %d" % [here, frames])
 			break
 
 	bot.release()
 	var ok: bool = cleared[0] and game.documents_collected == game.documents_total
-	var verdict := "прошёл" if ok else "НЕ ПРОШЁЛ"
+	var verdict := "passed" if ok else "FAILED"
 	print(
 		(
-			"  %s: шагов %d, этаж %d/%d, документы %d/%d, смертей %d, убито %d, очки %d, ламп сбито %d/%d"
+			"  %s: steps %d, floor %d/%d, documents %d/%d, deaths %d, killed %d, score %d, lamps shot %d/%d"
 			% [
 				verdict,
 				frames,
@@ -269,7 +269,7 @@ func _play(
 		)
 	)
 	if not ok:
-		print("  застрял на этаже %d, стоя там %d шагов" % [last_floor, stuck])
+		print("  stuck on floor %d, standing there for %d steps" % [last_floor, stuck])
 
 	game.game_over.disconnect(on_game_over)
 	root.remove_child(level)
@@ -296,10 +296,10 @@ func _around(level: GreyboxLevel) -> String:
 	var parts := PackedStringArray()
 	for index in mini(3, near.size()):
 		var agent := near[index]
-		parts.append("агент %s (%.2f м)" % [_at(agent), here.distance_to(_at(agent))])
+		parts.append("agent %s (%.2f m)" % [_at(agent), here.distance_to(_at(agent))])
 	if near.is_empty():
 		return ""
-	return " | агентов %d, ближайшие: %s" % [near.size(), ", ".join(parts)]
+	return " | agents %d, nearest: %s" % [near.size(), ", ".join(parts)]
 
 
 ## What most likely got him: the nearest enemy bullet and the nearest cab.
@@ -321,7 +321,7 @@ func _killer(level: GreyboxLevel) -> String:
 			closest = gap
 			aim = here.y - _at(bullet).y
 	if closest < INF:
-		parts.append("пуля в %.2f м, выше ног на %.2f" % [closest, aim])
+		parts.append("bullet at %.2f m, above the feet by %.2f" % [closest, aim])
 
 	for child in level.get_children():
 		var car := child as ElevatorCar
@@ -330,10 +330,10 @@ func _killer(level: GreyboxLevel) -> String:
 		var to_car := _at(car) - here
 		if to_car.length() > 0.6:
 			continue
-		parts.append("кабина %s, выровнена: %s" % [to_car, car.is_aligned()])
+		parts.append("cab %s, aligned: %s" % [to_car, car.is_aligned()])
 
 	if parts.is_empty():
-		return " | рядом ни пули, ни кабины"
+		return " | no bullet or cab nearby"
 	return " | " + ", ".join(parts)
 
 
@@ -357,8 +357,8 @@ func _cars_near(level: GreyboxLevel) -> String:
 		var distance := here.distance_to(at)
 		if distance < gap:
 			gap = distance
-			nearest = "кабина %s (%.2f м, выровнена %s)" % [at, distance, car.is_aligned()]
-	return "" if nearest.is_empty() else " | ближайшая " + nearest
+			nearest = "cab %s (%.2f m, aligned %s)" % [at, distance, car.is_aligned()]
+	return "" if nearest.is_empty() else " | nearest " + nearest
 
 
 ## What the bot holds pressed after its step: this shows whether it decided to walk.

@@ -30,7 +30,7 @@ func test_building_is_cleared_after_the_last_document() -> void:
 	var game := _state()
 	game.start_building(2)
 	game.collect_document()
-	assert_false(game.all_documents_collected(), "один из двух — ещё не всё")
+	assert_false(game.all_documents_collected(), "one of two - not all yet")
 	game.collect_document()
 	assert_true(game.all_documents_collected())
 
@@ -65,7 +65,7 @@ func test_partie_starts_with_three_lives() -> void:
 
 func test_losing_a_life_leaves_otto_in_the_game() -> void:
 	var game := _state()
-	assert_true(game.lose_life(), "после первой смерти партия продолжается")
+	assert_true(game.lose_life(), "after the first death the game goes on")
 	assert_eq(game.lives, GameState.STARTING_LIVES - 1)
 
 
@@ -74,7 +74,7 @@ func test_last_life_ends_the_game() -> void:
 	watch_signals(game)
 	for _death: int in GameState.STARTING_LIVES - 1:
 		game.lose_life()
-	assert_false(game.lose_life(), "жизни кончились")
+	assert_false(game.lose_life(), "lives ran out")
 	assert_signal_emitted(game, "game_over")
 
 
@@ -83,9 +83,9 @@ func test_game_over_comes_once() -> void:
 	for _death: int in GameState.STARTING_LIVES:
 		game.lose_life()
 	watch_signals(game)
-	assert_false(game.lose_life(), "после конца партии жизнь снять нельзя")
+	assert_false(game.lose_life(), "after the game ends a life cannot be taken")
 	assert_eq(game.lives, 0)
-	assert_signal_not_emitted(game, "game_over", "game_over сообщает о переходе, а не о состоянии")
+	assert_signal_not_emitted(game, "game_over", "game_over reports a transition, not a state")
 	assert_signal_not_emitted(game, "lives_changed")
 
 
@@ -105,7 +105,7 @@ func test_kill_in_the_dark_is_worth_more() -> void:
 func test_the_dark_bonus_is_the_same_whatever_the_kill() -> void:
 	var shot := GameState.kill_score(GameState.ENEMY_SHOT_SCORE, true) - GameState.ENEMY_SHOT_SCORE
 	for base: int in [GameState.LAMP_SCORE, GameState.CRUSH_SCORE]:
-		assert_eq(GameState.kill_score(base, true) - base, shot, "надбавка за %d" % base)
+		assert_eq(GameState.kill_score(base, true) - base, shot, "bonus for %d" % base)
 
 
 func test_game_starts_in_the_first_building() -> void:
@@ -119,9 +119,9 @@ func test_finished_building_pays_by_its_number() -> void:
 	var game := _state()
 	game.start_game()
 	game.finish_building()
-	assert_eq(game.score, Arcade.BUILDING_BONUS, "первое здание — одна ставка")
+	assert_eq(game.score, Arcade.BUILDING_BONUS, "first building - one rate")
 	game.finish_building()
-	assert_eq(game.score, Arcade.BUILDING_BONUS * 3, "второе — двойная")
+	assert_eq(game.score, Arcade.BUILDING_BONUS * 3, "second - double")
 
 
 func test_new_building_takes_the_alarm_off() -> void:

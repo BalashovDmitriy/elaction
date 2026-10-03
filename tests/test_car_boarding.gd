@@ -139,7 +139,9 @@ func test_otto_never_freezes_with_an_arriving_car() -> void:
 		var shafts := level.plan().shafts
 		var cars := _cars(level)
 		assert_eq(
-			cars.size(), shafts.size(), "сид %d: кабин не столько, сколько шахт" % building_seed
+			cars.size(),
+			shafts.size(),
+			"seed %d: car count differs from shaft count" % building_seed
 		)
 		for index: int in cars.size():
 			for from_below: bool in [true, false]:
@@ -148,8 +150,8 @@ func test_otto_never_freezes_with_an_arriving_car() -> void:
 				if plan.y == -99:
 					continue
 				var where := (
-					"сид %d, шахта %d, кабина %s, этаж %d"
-					% [building_seed, index + 1, "снизу" if from_below else "сверху", plan.y]
+					"seed %d, shaft %d, car %s, floor %d"
+					% [building_seed, index + 1, "below" if from_below else "above", plan.y]
 				)
 				var outcome := await _meet(
 					level, cars[index], shaft, plan, TRIGGERS[(index + int(from_below)) % 2], where
@@ -160,8 +162,8 @@ func test_otto_never_freezes_with_an_arriving_car() -> void:
 				boarded += outcome
 		remove_child(level)
 	# A check that never fired checks nothing.
-	assert_gt(checked, 10, "встреч с кабиной проверено слишком мало: %d" % checked)
-	assert_gt(boarded, 5, "Otto сел в подошедшую кабину слишком редко: %d" % boarded)
+	assert_gt(checked, 10, "too few car encounters checked: %d" % checked)
+	assert_gt(boarded, 5, "Otto boarded an arriving car too rarely: %d" % boarded)
 
 
 ## One encounter: the cab heads to Otto's floor, he sets off to the shaft at the distance.
@@ -194,7 +196,7 @@ func _meet(
 		await wait_physics_frames(1)
 		left -= 1
 	if left == 0:
-		fail_test("%s: кабина не подошла к этажу" % where)
+		fail_test("%s: the car did not reach the floor" % where)
 		return -1
 
 	var toward := &"move_left" if side > 0.0 else &"move_right"
@@ -221,7 +223,7 @@ func _meet(
 	assert_false(
 		frozen,
 		(
-			"%s: Otto застыл в кабине между этажами (кабина в %.2f м от этажа)"
+			"%s: Otto froze in the car between floors (the car is %.2f m from the floor)"
 			% [where, _plane(car).y - surface]
 		)
 	)

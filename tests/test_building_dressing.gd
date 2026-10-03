@@ -61,11 +61,11 @@ func test_furniture_keeps_off_doors_shafts_walls_and_escalators() -> void:
 						assert_true(
 							span.y <= zone.x + 0.001 or span.x >= zone.y - 0.001,
 							(
-								"сид %d, этаж %d: %s (%.2f..%.2f) задевает %s"
+								"seed %d, floor %d: %s (%.2f..%.2f) touches %s"
 								% [building_seed, prop.floor_index, prop.name, span.x, span.y, zone]
 							)
 						)
-	assert_gt(checked, 0, "мебели нет — проверять нечего")
+	assert_gt(checked, 0, "no furniture - nothing to check")
 
 
 ## Furniture does not stand on top of each other: a wide item takes the neighbouring slots.
@@ -82,7 +82,7 @@ func test_furniture_does_not_overlap() -> void:
 					absf(a.x - b.x) + 0.001,
 					(a.width + b.width) * 0.5,
 					(
-						"сид %d, этаж %d: %s налезает на %s"
+						"seed %d, floor %d: %s overlaps %s"
 						% [building_seed, a.floor_index, a.name, b.name]
 					)
 				)
@@ -101,11 +101,15 @@ func test_wall_decor_keeps_off_shafts_and_tall_furniture() -> void:
 			for item in dressing.decor:
 				hung += 1
 				assert_lte(
-					item.width, BuildingDressing.WALL_WIDTH + 0.001, "%s шире простенка" % item.name
+					item.width,
+					BuildingDressing.WALL_WIDTH + 0.001,
+					"%s is wider than the wall section" % item.name
 				)
 				for shaft in plan.shafts:
 					if shaft.top <= item.floor_index and item.floor_index <= shaft.bottom:
-						assert_gte(absf(shaft.x - item.x), step * 1.5, "%s у шахты" % item.name)
+						assert_gte(
+							absf(shaft.x - item.x), step * 1.5, "%s by the shaft" % item.name
+						)
 				for prop in dressing.props:
 					if prop.floor_index != item.floor_index:
 						continue
@@ -114,9 +118,9 @@ func test_wall_decor_keeps_off_shafts_and_tall_furniture() -> void:
 						assert_gte(
 							absf(prop.x - item.x) + 0.001,
 							(prop.width + BuildingDressing.WALL_WIDTH) * 0.5,
-							"%s над %s" % [item.name, prop.name]
+							"%s above %s" % [item.name, prop.name]
 						)
-	assert_gt(hung, 0, "стены пустые")
+	assert_gt(hung, 0, "the walls are empty")
 
 
 ## Items come from their own building: the hotel has no water coolers or filing cabinets, the office
@@ -132,10 +136,10 @@ func test_each_building_gets_its_own_things() -> void:
 				var fit := PropCatalog.entry(item.name).fit
 				assert_true(
 					fit == identity.fit() or fit == PropCatalog.Fit.ANY,
-					"%s не из этого здания" % item.name
+					"%s is not from this building" % item.name
 				)
 			if identity.is_hotel():
-				assert_eq(dressing.pipes.size(), 0, "в отеле трубы на виду")
+				assert_eq(dressing.pipes.size(), 0, "pipes in plain sight in the hotel")
 
 
 ## "Rich but readable": on the walls on average more than one item per floor, furniture —
@@ -167,12 +171,14 @@ func test_floors_are_not_bare() -> void:
 			decor += WallFeatures.lay(rules, plan, building_seed, identity, dressing).size()
 		# The podium's wide floors since M24o are halls (ADR-0057): corridors remained
 		# in the narrow tower, and an item per three floors is no longer little.
-		assert_gt(float(furniture) / floors, 0.3, "мебели меньше предмета на три этажа")
+		assert_gt(
+			float(furniture) / floors, 0.3, "less than one piece of furniture per three floors"
+		)
 		if identity.kind == BuildingIdentity.Kind.OFFICE:
 			# The office wall is glass (ADR-0056): nothing hangs on it.
-			assert_eq(decor, 0, "на стекле офиса что-то висит")
+			assert_eq(decor, 0, "something hangs on the office glass")
 			continue
-		assert_gt(float(decor) / floors, 1.0, "на стенах меньше предмета на этаж")
+		assert_gt(float(decor) / floors, 1.0, "less than one item per floor on the walls")
 
 
 ## Furniture does not stand in the garage — the exit floor is empty, with one car.
@@ -182,4 +188,4 @@ func test_the_garage_stays_empty() -> void:
 		var plan := BuildingPlan.generate(rules, building_seed)
 		var dressing := BuildingDressing.lay(rules, plan, building_seed, _identities()[0])
 		for item in dressing.props + dressing.decor:
-			assert_lt(item.floor_index, rules.floors - 1, "в гараже %s" % item.name)
+			assert_lt(item.floor_index, rules.floors - 1, "%s in the garage" % item.name)

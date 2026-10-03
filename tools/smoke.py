@@ -85,7 +85,7 @@ def parse(argv: list[str]) -> tuple[list[str], int] | None:
         # Without an explicit check, "--frames" as the last argument crashes the script
         # with a traceback instead of a clear message.
         if index + 1 >= len(argv) or not argv[index + 1].isdigit():
-            print("После --frames нужно число кадров: python tools/smoke.py <билд> --frames 600")
+            print("--frames needs a number of frames: python tools/smoke.py <build> --frames 600")
             return None
         frames = int(argv[index + 1])
         index += 2
@@ -100,17 +100,17 @@ def main(argv: list[str]) -> int:
 
     paths, frames = parsed
     if not paths:
-        print("Нужен путь к собранному билду: python tools/smoke.py build/linux/elaction.x86_64")
+        print("A path to the built build is needed: python tools/smoke.py build/linux/elaction.x86_64")
         return 2
 
     binary = Path(paths[0])
     if not binary.is_absolute():
         binary = PROJECT_ROOT / binary
     if not binary.exists():
-        print(f"Нет такого файла: {binary}")
+        print(f"No such file: {binary}")
         return 2
 
-    print(f"Прогон {binary.name}: {frames} кадров, маркер «{marker()}»", flush=True)
+    print(f"Run of {binary.name}: {frames} frames, marker '{marker()}'", flush=True)
     output, survived = launch(binary, frames)
     print(output.strip())
 
@@ -118,19 +118,19 @@ def main(argv: list[str]) -> int:
     started = marker() in output
 
     if not started:
-        print(f"\nБилд не напечатал строку запуска «{marker()}» — считаем, что он не поднялся.")
+        print(f"\nThe build did not print the startup line '{marker()}' — assuming it did not start.")
     if errors:
-        print("\nВ выводе есть ошибки:")
+        print("\nThe output contains errors:")
         for line in errors[:20]:
             print(f"  {line}")
     if not survived:
-        print("\nБилд вышел с ненулевым кодом.")
+        print("\nThe build exited with a non-zero code.")
 
     if started and survived and not errors:
-        print("\nПрогон пройден: билд запустился, отработал и не ругался.")
+        print("\nRun passed: the build started, ran and did not complain.")
         return 0
 
-    print("\nПрогон провален.")
+    print("\nRun failed.")
     return 1
 
 

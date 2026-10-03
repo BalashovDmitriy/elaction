@@ -50,8 +50,8 @@ def warn_if_dirty() -> None:
     if changed:
         count = len(changed.splitlines())
         print(
-            f"Внимание: {count} файл(ов) с незакоммиченными правками — "
-            "в прогон они не идут.",
+            f"Warning: {count} file(s) with uncommitted changes — "
+            "they are not part of the run.",
             flush=True,
         )
 
@@ -60,7 +60,7 @@ def run_checks(worktree: Path) -> bool:
     """Runs the checks in a clean copy. True if all passed."""
     ok = True
     for check in CHECKS:
-        print(f"\n== {check} на чистой копии ==", flush=True)
+        print(f"\n== {check} on a clean copy ==", flush=True)
         completed = subprocess.run(
             [sys.executable, str(worktree / check)],
             cwd=worktree,
@@ -84,7 +84,7 @@ def main(argv: list[str]) -> int:
 
     resolved = git("rev-parse", "--short", revision)
     if resolved.returncode != 0:
-        print(f"Не понимаю ревизию «{revision}»: {resolved.stderr.strip()}")
+        print(f"Cannot resolve revision '{revision}': {resolved.stderr.strip()}")
         return 2
 
     warn_if_dirty()
@@ -94,16 +94,16 @@ def main(argv: list[str]) -> int:
 
     added = git("worktree", "add", "--detach", str(worktree), revision)
     if added.returncode != 0:
-        print(f"Не удалось развернуть чистую копию: {added.stderr.strip()}")
+        print(f"Failed to create a clean copy: {added.stderr.strip()}")
         return 2
 
-    print(f"Чистая копия {revision} ({resolved.stdout.strip()}) в {worktree}", flush=True)
+    print(f"Clean copy of {revision} ({resolved.stdout.strip()}) in {worktree}", flush=True)
     try:
         ok = run_checks(worktree)
     finally:
         remove_worktree(worktree)
 
-    print("\nНа чистой копии всё прошло." if ok else "\nНа чистой копии проверки провалены.")
+    print("\nEverything passed on the clean copy." if ok else "\nChecks failed on the clean copy.")
     return 0 if ok else 1
 
 

@@ -26,7 +26,7 @@ func _run(alarm: Alarm, seconds: float) -> bool:
 func test_fresh_building_starts_quiet() -> void:
 	var alarm := _alarm()
 	assert_false(alarm.raised)
-	assert_false(_run(alarm, 0.5), "время ещё есть")
+	assert_false(_run(alarm, 0.5), "there is still time")
 
 
 func test_alarm_goes_off_when_the_time_runs_out() -> void:
@@ -38,14 +38,14 @@ func test_alarm_goes_off_when_the_time_runs_out() -> void:
 func test_alarm_goes_off_only_once() -> void:
 	var alarm := _alarm()
 	_run(alarm, 1.5)
-	assert_false(_run(alarm, 1.0), "сирена включается один раз, а не каждый кадр")
+	assert_false(_run(alarm, 1.0), "the siren turns on once, not every frame")
 
 
 func test_new_building_takes_the_alarm_off() -> void:
 	var alarm := _alarm()
 	_run(alarm, 1.5)
 	alarm.enter_building()
-	assert_false(alarm.raised, "снять тревогу может только смена здания")
+	assert_false(alarm.raised, "only a building change can clear the alarm")
 
 
 func test_time_left_never_goes_below_zero() -> void:

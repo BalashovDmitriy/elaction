@@ -38,7 +38,7 @@ def read() -> str:
     """The version from project.godot."""
     found = _PROJECT_VERSION.search(PROJECT_FILE.read_text(encoding="utf-8"))
     if found is None:
-        raise SystemExit("В project.godot нет строки config/version — чинить руками.")
+        raise SystemExit("project.godot has no config/version line — fix it by hand.")
     return found.group(2)
 
 
@@ -64,8 +64,8 @@ def write(version: str) -> list[str]:
         # build will not build at all — and only CI will tell about it.
         if count == 0:
             raise SystemExit(
-                f"В {PRESETS_FILE.name} нет полей application/file_version "
-                "и application/product_version — Windows-сборка без них не собирается."
+                f"{PRESETS_FILE.name} has no application/file_version "
+                "and application/product_version fields — the Windows build does not work without them."
             )
         if patched != presets:
             PRESETS_FILE.write_text(patched, encoding="utf-8", newline="\n")
@@ -79,10 +79,10 @@ def check(tag: str) -> int:
     wanted = tag[1:] if tag.startswith("v") else tag
     current = read()
     if wanted != current:
-        print(f"Тег {tag} не сходится с версией проекта {current}.")
-        print(f"Почините одно из двух: python tools/version.py --set {wanted}")
+        print(f"Tag {tag} does not match the project version {current}.")
+        print(f"Fix one of the two: python tools/version.py --set {wanted}")
         return 1
-    print(f"Тег {tag} сходится с версией проекта {current}.")
+    print(f"Tag {tag} matches the project version {current}.")
     return 0
 
 
@@ -96,20 +96,20 @@ def main(argv: list[str]) -> int:
     command, rest = argv[0], argv[1:]
     if command == "--check":
         if not rest:
-            print("Нужен тег: python tools/version.py --check v0.9.0")
+            print("A tag is needed: python tools/version.py --check v0.9.0")
             return 2
         return check(rest[0])
 
     if command == "--set":
         if not rest:
-            print("Нужна версия: python tools/version.py --set 0.9.0")
+            print("A version is needed: python tools/version.py --set 0.9.0")
             return 2
         version = rest[0]
         if not SEMVER.match(version):
-            print(f"«{version}» не похожа на версию. Формат — MAJOR.MINOR.PATCH, например 0.9.0.")
+            print(f"'{version}' does not look like a version. Format: MAJOR.MINOR.PATCH, e.g. 0.9.0.")
             return 2
         changed = write(version)
-        print(f"Версия {version} проставлена: {', '.join(changed)}" if changed else "Нечего менять.")
+        print(f"Version {version} set: {', '.join(changed)}" if changed else "Nothing to change.")
         return 0
 
     print(__doc__)

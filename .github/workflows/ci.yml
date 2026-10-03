@@ -11,7 +11,7 @@ env:
 
 jobs:
   lint:
-    name: Линт и формат
+    name: Lint and format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -22,7 +22,7 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-dev.txt
 
-      - name: Установить тулинг
+      - name: Install tooling
         run: pip install -r requirements-dev.txt
 
       # The same set of hooks as installed locally — discrepancies are ruled out.
@@ -34,7 +34,7 @@ jobs:
   # clock (`--fixed-fps`, docs/testing.md). The run is bounded by the longest jobs — the bot seeds
   # and the car corpses.
   engine:
-    name: Проверка движком (${{ matrix.part }}/3)
+    name: Engine check (${{ matrix.part }}/3)
     runs-on: ubuntu-latest
     strategy:
       # A failed part does not cancel the others: otherwise the second failure would be visible only
@@ -49,7 +49,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Установить Godot ${{ env.GODOT_VERSION }}
+      - name: Install Godot ${{ env.GODOT_VERSION }}
         run: |
           url="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
           curl -sSL -o godot.zip "$url"
@@ -58,8 +58,8 @@ jobs:
           sudo chmod +x /usr/local/bin/godot
           godot --version
 
-      - name: Импорт ресурсов и разбор скриптов
+      - name: Import resources and parse scripts
         run: python tools/godot_check.py
 
-      - name: Тесты GUT
+      - name: GUT tests
         run: python tools/run_tests.py --part ${{ matrix.part }}/3

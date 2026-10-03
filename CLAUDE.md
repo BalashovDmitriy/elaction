@@ -53,8 +53,11 @@ Godot is looked up in the order `$GODOT_BIN` → PATH → winget paths; on Windo
 7. **Clarifying questions before every milestone.** First check the mechanics against the
    original, then ask about the disputed points, and only then write code. More in
    "Starting a milestone" below.
-8. **Project documentation and code comments are written in English.** Conversation with
-   the user stays in Russian.
+8. **Everything in the repository is in English**: documentation, code comments and every
+   string in code — test messages, logs, errors, tool output, CI step names. The only
+   Russian is the game's own translation in `assets/i18n/ui.csv`; text the player sees
+   goes through `tr()` and that table, never as a literal in code. Conversation with the
+   user stays in Russian.
 
 ## Starting a milestone
 

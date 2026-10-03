@@ -50,9 +50,9 @@ func _from_markdown() -> Dictionary:
 
 func test_the_page_list_matches_credits_md() -> void:
 	var wanted := _from_markdown()
-	assert_eq(wanted.size(), SECTIONS.size(), "в CREDITS.md все разделы")
+	assert_eq(wanted.size(), SECTIONS.size(), "all sections are in CREDITS.md")
 	var sections := Credits.load_sections()
-	assert_eq(sections.size(), wanted.size(), "на странице — все разделы")
+	assert_eq(sections.size(), wanted.size(), "all sections are on the page")
 	for section: Credits.Section in sections:
 		var names: Array = []
 		for author: Dictionary in section.authors:
@@ -65,7 +65,9 @@ func test_the_page_list_matches_credits_md() -> void:
 func test_every_author_has_a_licence() -> void:
 	for section: Credits.Section in Credits.load_sections():
 		for author: Dictionary in section.authors:
-			assert_false((author["licences"] as Array).is_empty(), "лицензия у %s" % author["name"])
+			assert_false(
+				(author["licences"] as Array).is_empty(), "licence for %s" % author["name"]
+			)
 
 
 func test_every_section_is_translated() -> void:
@@ -73,5 +75,7 @@ func test_every_section_is_translated() -> void:
 	for section: Credits.Section in Credits.load_sections():
 		for locale: String in ["en", "ru"]:
 			TranslationServer.set_locale(locale)
-			assert_ne(tr(section.key), section.key, "%s переведён на %s" % [section.key, locale])
+			assert_ne(
+				tr(section.key), section.key, "%s is translated into %s" % [section.key, locale]
+			)
 	TranslationServer.set_locale(before)

@@ -42,7 +42,7 @@ static func load_from(path: String = PATH) -> Records:
 	if failed or parsed is not Array:
 		# The file is corrupted or edited by hand: the table starts anew, but the game
 		# does not crash because of it — high scores are not something worth crashing over.
-		push_warning("Таблица рекордов не читается, начинаем заново: %s" % path)
+		push_warning("High score table is unreadable, starting afresh: %s" % path)
 		return records
 
 	for entry: Variant in parsed as Array:
@@ -60,7 +60,7 @@ static func load_from(path: String = PATH) -> Records:
 func save_to(path: String = PATH) -> void:
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
-		push_warning("Таблица рекордов не сохранилась: %s" % path)
+		push_warning("High score table was not saved: %s" % path)
 		return
 	file.store_string(JSON.stringify(rows))
 	file.close()

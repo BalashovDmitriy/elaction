@@ -31,8 +31,8 @@ def existing_shots(folder: Path) -> set[Path]:
 
 def main() -> int:
     use_utf8_output()
-    parser = argparse.ArgumentParser(description="Снять экраны игры для вехи эпика.")
-    parser.add_argument("milestone", help="Название вехи, например M1")
+    parser = argparse.ArgumentParser(description="Capture game screens for an epic milestone.")
+    parser.add_argument("milestone", help="Milestone name, e.g. M1")
     args = parser.parse_args()
 
     godot = require_godot()
@@ -51,16 +51,16 @@ def main() -> int:
     # in the middle of the run, and then the set of shots is incomplete, even if something
     # was captured.
     if code != 0:
-        print(f"Игра завершилась с кодом {code}, набор кадров неполон. Вывод игры:")
+        print(f"The game exited with code {code}, the set of shots is incomplete. Game output:")
         print(output.strip()[-2000:])
         return 1
 
     if not new_shots:
-        print("Снимки не появились. Вывод игры:")
+        print("No shots appeared. Game output:")
         print(output.strip()[-2000:])
         return 1
 
-    print(f"Снято кадров: {len(new_shots)}")
+    print(f"Shots taken: {len(new_shots)}")
     return 0
 
 

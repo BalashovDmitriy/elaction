@@ -92,8 +92,8 @@ def main() -> int:
         image = read_hdr(path)
         azimuth, elevation, peak = sun_of(image)
         mean = float(image.mean())
-        print(f"{key:14s} {sky:36s} солнце: азимут {azimuth:6.1f}°, высота {elevation:5.1f}°, "
-              f"пик {peak:9.1f}, средняя {mean:6.3f}, {path.stat().st_size // 1024} КБ")
+        print(f"{key:14s} {sky:36s} sun: azimuth {azimuth:6.1f}°, elevation {elevation:5.1f}°, "
+              f"peak {peak:9.1f}, mean {mean:6.3f}, {path.stat().st_size // 1024} KB")
     return 0
 
 

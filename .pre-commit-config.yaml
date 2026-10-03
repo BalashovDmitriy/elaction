@@ -10,7 +10,7 @@
 # Some hooks are called via `python -m <module>`, not by their own name. The reason
 # is external: pre-commit puts generated .exe wrappers into the environment, and
 # Windows application control blocks them as files without reputation —
-# `[WinError 4551] Политика управления приложениями заблокировала этот файл`.
+# `[WinError 4551] An Application Control policy has blocked this file`.
 # python.exe itself in the same environments is not blocked, so calling as a module
 # passes. The check does not change because of this, and the entry is portable: in CI on Linux
 # it works exactly the same. If one more hook hits this — the same trick fixes it.
@@ -56,7 +56,7 @@ repos:
     hooks:
       # Continuity between sessions: code does not get ahead of the development status.
       - id: status-updated
-        name: docs/STATUS.md обновлён вместе с кодом
+        name: docs/STATUS.md updated with the code
         entry: python tools/check_status.py
         language: system
         pass_filenames: false
@@ -67,7 +67,7 @@ repos:
       # If check.ps1 has already passed on this same tree, the repeat is skipped:
       # tools/check_stamp.py compares the working copy fingerprint.
       - id: godot-check
-        name: godot --headless --import (импорт ресурсов и парсинг скриптов)
+        name: godot --headless --import (import resources and parse scripts)
         entry: python tools/check_stamp.py --run python tools/godot_check.py
         language: system
         pass_filenames: false
@@ -75,7 +75,7 @@ repos:
         stages: [pre-push]
 
       - id: gut-tests
-        name: тесты GUT (headless)
+        name: GUT tests (headless)
         entry: python tools/check_stamp.py --run python tools/run_tests.py
         language: system
         pass_filenames: false

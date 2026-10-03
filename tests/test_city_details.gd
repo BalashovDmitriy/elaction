@@ -14,18 +14,24 @@ func test_crowns_follow_the_seed_and_do_not_move_the_blocks() -> void:
 	var signs := 0
 	var beacons := 0
 	for index in first.size():
-		assert_eq(first[index].crown, again[index].crown, "верх повторяется по сиду")
+		assert_eq(first[index].crown, again[index].crown, "crown repeats by seed")
 		assert_eq(first[index].x, again[index].x)
 		crowns[first[index].crown] = true
 		if first[index].sign_colour.a > 0.0:
 			signs += 1
-			assert_lte(first[index].sign_y, first[index].height, "вывеска на фасаде, не над домом")
-			assert_lte(first[index].sign_size.x, first[index].width, "вывеска не шире дома")
+			assert_lte(
+				first[index].sign_y,
+				first[index].height,
+				"sign is on the facade, not above the house"
+			)
+			assert_lte(
+				first[index].sign_size.x, first[index].width, "sign is not wider than the house"
+			)
 		if first[index].beacon:
 			beacons += 1
-	assert_gt(crowns.size(), 2, "город не из одних плоских крыш")
-	assert_gt(signs, 0, "в городе нет ни одной вывески")
-	assert_gt(beacons, 0, "ни одного огня на верхах")
+	assert_gt(crowns.size(), 2, "the city is not all flat roofs")
+	assert_gt(signs, 0, "the city has no signs")
+	assert_gt(beacons, 0, "no lights on the tops")
 
 
 func test_the_sign_colours_are_not_game_signs() -> void:
@@ -37,9 +43,7 @@ func test_the_sign_colours_are_not_game_signs() -> void:
 			var gap := Vector3(
 				colour.r - game_sign.r, colour.g - game_sign.g, colour.b - game_sign.b
 			)
-			assert_gt(
-				gap.length(), 0.3, "вывеска города %s похожа на огонёк %s" % [colour, game_sign]
-			)
+			assert_gt(gap.length(), 0.3, "city sign %s looks like light %s" % [colour, game_sign])
 
 
 ## Lightning is a series of flashes with a pause, and after the series the sky is dark again.
@@ -52,12 +56,12 @@ func test_lightning_flashes_and_goes_dark() -> void:
 	for _step in int(Lightning.PAUSE.y * 60.0) + 120:
 		lightning.advance(1.0 / 60.0)
 		brightest = maxf(brightest, lightning.level())
-	assert_gt(brightest, 0.5, "за самую долгую паузу хоть одна вспышка")
+	assert_gt(brightest, 0.5, "at least one flash within the longest pause")
 	for _step in 120:
 		lightning.advance(1.0 / 60.0)
 		if lightning.level() < 0.01:
 			break
-	assert_lt(lightning.level(), 0.2, "и гаснет")
+	assert_lt(lightning.level(), 0.2, "and fades")
 
 
 ## The strike is visible from the city camera: the polyline goes top to bottom, its triangles
@@ -74,11 +78,11 @@ func test_the_bolt_is_drawn_from_both_sides() -> void:
 		if not found.is_empty():
 			bolt = found[0] as MeshInstance3D
 			break
-	assert_not_null(bolt, "за шесть долгих пауз ни одного разряда")
+	assert_not_null(bolt, "no bolt in six long pauses")
 	if bolt == null:
 		return
 	var look := bolt.material_override as BaseMaterial3D
-	assert_eq(look.cull_mode, BaseMaterial3D.CULL_DISABLED, "разряд отсекается гранью")
+	assert_eq(look.cull_mode, BaseMaterial3D.CULL_DISABLED, "the bolt is culled by its face")
 
 
 ## Lightning, lights and neon — without light sources: the frame's lamp budget does not grow.
@@ -94,6 +98,6 @@ func test_the_city_details_add_no_lights() -> void:
 	for node in nodes:
 		add_child_autofree(node)
 		assert_eq(
-			node.find_children("*", "Light3D", true, false).size(), 0, "%s светит" % node.name
+			node.find_children("*", "Light3D", true, false).size(), 0, "%s emits light" % node.name
 		)
 		assert_false(node is Light3D)

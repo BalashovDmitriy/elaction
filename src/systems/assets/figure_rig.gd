@@ -326,7 +326,7 @@ var _aim_shown: bool = false
 
 func _ready() -> void:
 	if model == null:
-		push_error("FigureRig без модели: %s" % get_path())
+		push_error("FigureRig without a model: %s" % get_path())
 		return
 	_instance = model.instantiate() as Node3D
 	add_child(_instance)
@@ -339,12 +339,12 @@ func _ready() -> void:
 	var found := _instance.find_children("*", "Skeleton3D", true, false)
 	_skeleton = found[0] as Skeleton3D if not found.is_empty() else null
 	if _skeleton == null:
-		push_error("в модели нет скелета: %s" % model.resource_path)
+		push_error("the model has no skeleton: %s" % model.resource_path)
 		return
 	for bone_name in BONES:
 		var index := _skeleton.find_bone(bone_name)
 		if index < 0:
-			push_error("в модели нет кости %s: %s" % [bone_name, model.resource_path])
+			push_error("the model has no bone %s: %s" % [bone_name, model.resource_path])
 			continue
 		_bones[bone_name] = index
 	_rest = _read_rest()
@@ -658,7 +658,7 @@ func _read_clips() -> void:
 	var player := players[0] as AnimationPlayer if not players.is_empty() else null
 	for clip_name in FigurePoses.CLIP_NAMES:
 		if player == null or not player.has_animation(clip_name):
-			push_error("в модели нет клипа %s: %s" % [clip_name, model.resource_path])
+			push_error("the model has no clip %s: %s" % [clip_name, model.resource_path])
 			continue
 		var tracks := ClipTracks.new()
 		tracks.animation = player.get_animation(clip_name)

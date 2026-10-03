@@ -12,21 +12,23 @@ func test_a_door_sounds_now_and_then() -> void:
 		if sound != "":
 			heard.append(sound)
 	# In ten minutes — from four to ten times: a pause of one to two and a half minutes.
-	assert_between(heard.size(), 4, 11, "звук редкий")
+	assert_between(heard.size(), 4, 11, "the sound is rare")
 	for sound: String in heard:
-		assert_has(DoorLife.SOUNDS, sound, "звук из своего набора")
+		assert_has(DoorLife.SOUNDS, sound, "a sound from its own set")
 
 
 func test_a_silent_door_keeps_its_clock() -> void:
 	var life := DoorLife.of(3)
 	for _step: int in 600 * 60:
-		assert_eq(life.advance(1.0 / 60.0, false), "", "неслышная дверь молчит")
+		assert_eq(life.advance(1.0 / 60.0, false), "", "an inaudible door is silent")
 	var first := ""
 	for _step: int in 200 * 60:
 		first = life.advance(1.0 / 60.0, true)
 		if first != "":
 			break
-	assert_ne(first, "", "заслышав, звучит в свой срок, без накопленного залпа")
+	assert_ne(
+		first, "", "once audible, it sounds on its own schedule, without an accumulated burst"
+	)
 
 
 func test_the_same_door_lives_the_same_life() -> void:
@@ -44,16 +46,20 @@ func test_the_step_sounds_the_floor_of_each_kind() -> void:
 	}
 	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
 		var building := BuildingIdentity.typed(kind)
-		assert_eq(PlaceSound.step_at(false, building), steps[kind], "тип %d: шаг по полу" % kind)
-		assert_eq(PlaceSound.step_at(true, building), Sounds.STEP_CONCRETE, "на крыше — бетон")
+		assert_eq(
+			PlaceSound.step_at(false, building), steps[kind], "kind %d: step on the floor" % kind
+		)
+		assert_eq(
+			PlaceSound.step_at(true, building), Sounds.STEP_CONCRETE, "on the roof — concrete"
+		)
 
 
 func test_each_kind_has_its_own_room_tone() -> void:
 	var tones := {}
 	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
 		var loops := Sounds.weather_loops(Weather.Kind.CLEAR, false, TimeOfDay.Kind.NIGHT, kind)
-		assert_eq(loops.size(), 1, "внутри — одна петля")
+		assert_eq(loops.size(), 1, "inside — one loop")
 		tones[loops[0]] = true
 		var outdoors := Sounds.weather_loops(Weather.Kind.CLEAR, true, TimeOfDay.Kind.NIGHT, kind)
-		assert_false(outdoors.has(Sounds.room_tone_of(kind)), "снаружи тишины коридора нет")
-	assert_eq(tones.size(), BuildingIdentity.Kind.size(), "тишина коридора своя у типа")
+		assert_false(outdoors.has(Sounds.room_tone_of(kind)), "outside there is no corridor tone")
+	assert_eq(tones.size(), BuildingIdentity.Kind.size(), "each kind has its own corridor tone")

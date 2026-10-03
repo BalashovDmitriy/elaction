@@ -38,8 +38,8 @@ func test_the_table_keeps_only_ten_rows() -> void:
 func test_a_good_score_gets_its_place() -> void:
 	var records := Records.new()
 	records.rows = _rows([1000, 500])
-	assert_eq(records.submit(2000), 0, "лучший счёт встаёт первым")
-	assert_eq(records.submit(700), 2, "средний — между соседями")
+	assert_eq(records.submit(2000), 0, "the best score comes first")
+	assert_eq(records.submit(700), 2, "a middle one goes between its neighbours")
 
 
 func test_a_poor_score_does_not_make_the_table() -> void:
@@ -48,8 +48,8 @@ func test_a_poor_score_does_not_make_the_table() -> void:
 	for index: int in Records.LIMIT:
 		many.append(10000 + index)
 	records.rows = _rows(many)
-	assert_eq(records.submit(5), -1, "в десятку не попал")
-	assert_eq(records.rows.size(), Records.LIMIT, "и таблицу не раздул")
+	assert_eq(records.submit(5), -1, "did not make the top ten")
+	assert_eq(records.rows.size(), Records.LIMIT, "and did not bloat the table")
 
 
 func test_a_repeated_score_does_not_fake_a_record() -> void:
@@ -61,7 +61,7 @@ func test_a_repeated_score_does_not_fake_a_record() -> void:
 	for _index: int in Records.LIMIT:
 		many.append(7000)
 	records.rows = _rows(many)
-	assert_eq(records.submit(7000, "2026-09-13"), -1, "одиннадцатый такой же — мимо")
+	assert_eq(records.submit(7000, "2026-09-13"), -1, "an eleventh equal one - misses")
 
 
 func test_the_best_of_an_empty_table_is_zero() -> void:
@@ -75,23 +75,23 @@ func test_records_survive_a_restart() -> void:
 	records.save_to(TEMP)
 
 	var loaded := Records.load_from(TEMP)
-	assert_eq(loaded.rows.size(), 1, "запись на месте")
-	assert_eq(loaded.best(), 4200, "и счёт тот же")
-	assert_eq(String(loaded.rows[0][Records.DATE]), "2026-09-13", "и дата тоже")
+	assert_eq(loaded.rows.size(), 1, "the entry is in place")
+	assert_eq(loaded.best(), 4200, "and the score is the same")
+	assert_eq(String(loaded.rows[0][Records.DATE]), "2026-09-13", "and the date too")
 
 
 func test_a_broken_file_does_not_break_the_game() -> void:
 	# The file can be corrupted by hand or left half-written in a power cut. Records
 	# are not the kind of thing worth crashing on startup for.
 	var file := FileAccess.open(TEMP, FileAccess.WRITE)
-	file.store_string("{это не таблица}")
+	file.store_string("{this is not a table}")
 	file.close()
 
 	var loaded := Records.load_from(TEMP)
-	assert_eq(loaded.rows.size(), 0, "таблица начинается заново")
+	assert_eq(loaded.rows.size(), 0, "the table starts afresh")
 	# The warning here is expected, and the test counts it: silently swallowing
 	# a corrupted file is not allowed, and crashing because of records even less so.
-	assert_push_warning("не читается", "игрок узнает, что таблица потеряна")
+	assert_push_warning("is unreadable", "the player learns the table was lost")
 
 
 func test_a_missing_file_is_an_empty_table() -> void:

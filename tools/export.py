@@ -71,7 +71,7 @@ def restore(saved: dict[Path, bytes]) -> None:
     for path, before in saved.items():
         if path.exists() and path.read_bytes() != before:
             path.write_bytes(before)
-            print(f"  ..   {path.name} переписан движком — вернул как было")
+            print(f"  ..   {path.name} was rewritten by the engine — restored")
 
 
 def read_presets() -> list[Preset]:
@@ -129,11 +129,11 @@ def _build(preset: Preset) -> int:
     """Import and export as they are, without watching the configs."""
     godot = require_godot()
 
-    print("== импорт ресурсов перед сборкой ==", flush=True)
+    print("== importing resources before the build ==", flush=True)
     code, output = import_resources(godot)
     errors = find_errors(output)
     if code != 0 or errors:
-        print(f"Импорт провалился (код {code}).")
+        print(f"Import failed (code {code}).")
         for line in errors[:20]:
             print(f"  {line}")
         return 1
@@ -143,7 +143,7 @@ def _build(preset: Preset) -> int:
         # Otherwise an old file would pass for a freshly built one if export silently failed.
         preset.path.unlink()
 
-    print(f"== экспорт «{preset.name}» -> {preset.path.name} ==", flush=True)
+    print(f"== export '{preset.name}' -> {preset.path.name} ==", flush=True)
     # --headless is required: without it export brings up a window and the whole renderer,
     # and the runner has neither a display nor a GPU, so the build fails on DisplayServer.
     code, output = run(godot, ["--headless", "--export-release", preset.name, str(preset.path)])
@@ -151,21 +151,21 @@ def _build(preset: Preset) -> int:
 
     errors = find_errors(output) + export_failures(output)
     if code != 0 or errors:
-        print(f"\nЭкспорт провалился (код {code}).")
+        print(f"\nExport failed (code {code}).")
         for line in errors[:20]:
             print(f"  {line}")
         return 1
 
     if not preset.path.exists():
-        print(f"\nЭкспорт отчитался успехом, но файла {preset.path} нет.")
+        print(f"\nExport reported success, but the file {preset.path} is missing.")
         return 1
 
     size_mb = preset.path.stat().st_size / (1024 * 1024)
     if size_mb < MIN_SIZE_MB:
-        print(f"\n{preset.path.name} весит {size_mb:.1f} МБ — это не похоже на сборку.")
+        print(f"\n{preset.path.name} weighs {size_mb:.1f} MB — that does not look like a build.")
         return 1
 
-    print(f"\nСобрано: {preset.path} ({size_mb:.1f} МБ)")
+    print(f"\nBuilt: {preset.path} ({size_mb:.1f} MB)")
     return 0
 
 
@@ -174,11 +174,11 @@ def main(argv: list[str]) -> int:
     presets = read_presets()
 
     if not presets:
-        print(f"В {PRESETS_FILE.name} нет ни одного пресета.")
+        print(f"{PRESETS_FILE.name} has no presets.")
         return 2
 
     if not argv or argv[0] == "--list":
-        print("Пресеты:")
+        print("Presets:")
         for preset in presets:
             print(f"  {preset.alias:10} {preset.name} -> {preset.path.name}")
         return 0 if argv else 2
@@ -186,7 +186,7 @@ def main(argv: list[str]) -> int:
     preset = pick(presets, argv[0])
     if preset is None:
         known = ", ".join(known_preset.alias for known_preset in presets)
-        print(f"Нет пресета «{argv[0]}». Есть: {known}.")
+        print(f"No preset '{argv[0]}'. Available: {known}.")
         return 2
 
     return export(preset)

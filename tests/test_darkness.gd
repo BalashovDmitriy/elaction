@@ -186,10 +186,10 @@ func test_a_lit_otto_is_shot_from_afar() -> void:
 	var level := _build()
 	await wait_physics_frames(4)
 	var pair := _spot_pair(level)
-	assert_ne(pair.x, pair.y, "на этаже есть два места на дальности выстрела")
+	assert_ne(pair.x, pair.y, "the floor has two spots at shot range")
 	_place_otto(level, pair.x)
 	_agent_at(level, pair.y, signf(pair.x - pair.y))
-	assert_gt(await _shots_within(level, WATCH_FRAMES), 0, "освещённого Otto обстреливают")
+	assert_gt(await _shots_within(level, WATCH_FRAMES), 0, "a lit Otto gets shot at")
 	remove_child(level)
 
 
@@ -198,13 +198,15 @@ func test_an_otto_in_the_dark_is_seen_only_up_close() -> void:
 	var level := _build()
 	await wait_physics_frames(4)
 	var pair := _spot_pair(level)
-	assert_ne(pair.x, pair.y, "пара мест для дуэли нашлась")
+	assert_ne(pair.x, pair.y, "a pair of duel spots was found")
 	_place_otto(level, pair.x)
 	await _put_out(_lamp_near(level, _floor(level), pair.x))
-	assert_true(level.is_dark_at(_floor(level), pair.x), "зона под Otto погасла")
+	assert_true(level.is_dark_at(_floor(level), pair.x), "zone under Otto went dark")
 
 	var agent := _agent_at(level, pair.y, signf(pair.x - pair.y))
-	assert_eq(await _shots_within(level, WATCH_FRAMES), 0, "Otto в тени с этой дальности не виден")
+	assert_eq(
+		await _shots_within(level, WATCH_FRAMES), 0, "Otto in shadow is not visible from this range"
+	)
 
 	# Now the agent approaches Otto to a range from which he is visible even in darkness.
 	#
@@ -215,13 +217,13 @@ func test_an_otto_in_the_dark_is_seen_only_up_close() -> void:
 	# the bullet count does not see it.
 	agent.queue_free()
 	var close := _floor_beside(level, pair.x, level.rules.agent_dark_fire_range * 0.6)
-	assert_false(is_nan(close), "рядом с Otto есть пол, куда встать агенту")
+	assert_false(is_nan(close), "there is floor next to Otto for the agent to stand on")
 	_agent_at(level, close, signf(pair.x - close))
 	var hit := [false]
 	level.otto.died.connect(func() -> void: hit[0] = true)
 	await wait_physics_frames(WATCH_FRAMES)
-	assert_true(level.is_dark_at(_floor(level), pair.x), "Otto так и стоит в тени")
-	assert_true(hit[0], "вплотную его видно и в тени")
+	assert_true(level.is_dark_at(_floor(level), pair.x), "Otto still stands in shadow")
+	assert_true(hit[0], "point-blank he is seen even in shadow")
 	remove_child(level)
 
 
@@ -247,21 +249,21 @@ func test_an_agent_in_the_dark_still_sees_a_lit_otto() -> void:
 	var level := _build()
 	await wait_physics_frames(4)
 	var pair := _spot_pair(level)
-	assert_ne(pair.x, pair.y, "пара мест для дуэли нашлась")
+	assert_ne(pair.x, pair.y, "a pair of duel spots was found")
 	_place_otto(level, pair.y)
 	await _put_out(_lamp_near(level, _floor(level), pair.x))
 	# The duel relies on Otto staying under a burning lamp: the zones are narrow, and the
 	# second spot could fall into the same knocked-out one, and then the wrong thing would
 	# be checked.
-	assert_false(level.is_dark_at(_floor(level), pair.y), "Otto стоит в освещённой зоне")
+	assert_false(level.is_dark_at(_floor(level), pair.y), "Otto stands in a lit zone")
 	var agent := _agent_at(level, pair.x, signf(pair.y - pair.x))
 	# The shadow is checked before the duel, not after: an agent who hits kills Otto, and
 	# Otto, returning per the ROM, takes all living agents off the floor (ADR-0053,
 	# decision 2), so by the end of the observation this agent is gone.
 	await wait_physics_frames(1)
-	assert_true(agent.is_in_the_dark(), "агент стоит в тени")
+	assert_true(agent.is_in_the_dark(), "agent stands in shadow")
 	var shots := await _shots_within(level, WATCH_FRAMES)
-	assert_gt(shots, 0, "и всё равно видит освещённого Otto")
+	assert_gt(shots, 0, "and still sees the lit Otto")
 	remove_child(level)
 
 
@@ -270,13 +272,13 @@ func test_agents_lose_otto_behind_a_door() -> void:
 	var level := _build()
 	await wait_physics_frames(4)
 	var pair := _spot_pair(level)
-	assert_ne(pair.x, pair.y, "пара мест для дуэли нашлась")
+	assert_ne(pair.x, pair.y, "a pair of duel spots was found")
 	_place_otto(level, pair.x)
 	level.otto.stay_indoors(true)
 	_agent_at(level, pair.y, signf(pair.x - pair.y))
-	assert_eq(await _shots_within(level, WATCH_FRAMES), 0, "спрятанного не обстреливают")
+	assert_eq(await _shots_within(level, WATCH_FRAMES), 0, "a hidden target is not shot at")
 	level.otto.stay_indoors(false)
-	assert_gt(await _shots_within(level, WATCH_FRAMES), 0, "вышел — снова цель")
+	assert_gt(await _shots_within(level, WATCH_FRAMES), 0, "stepped out — a target again")
 	remove_child(level)
 
 
@@ -285,7 +287,7 @@ func test_a_blind_agent_patrols_the_floor() -> void:
 	var level := _build()
 	await wait_physics_frames(4)
 	var pair := _spot_pair(level)
-	assert_ne(pair.x, pair.y, "пара мест для дуэли нашлась")
+	assert_ne(pair.x, pair.y, "a pair of duel spots was found")
 	_place_otto(level, pair.x)
 	await _put_out(_lamp_near(level, _floor(level), pair.x))
 	# The agent walks away from Otto, to the floor edge.
@@ -299,5 +301,5 @@ func test_a_blind_agent_patrols_the_floor() -> void:
 		if agent.facing() == -away:
 			turned = true
 			break
-	assert_true(turned, "дошёл до края и развернулся")
+	assert_true(turned, "reached the edge and turned around")
 	remove_child(level)

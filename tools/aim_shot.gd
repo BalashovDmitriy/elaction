@@ -76,7 +76,7 @@ func _run() -> void:
 	var rules := BuildingRules.new()
 	_level = LEVEL_SCENE.instantiate() as GreyboxLevel
 	if _level == null:
-		push_error("сцена уровня не собралась — проверьте импорт проекта")
+		push_error("the level scene did not build — check the project import")
 		get_tree().quit(1)
 		return
 	_level.rules = rules
@@ -150,7 +150,7 @@ func _until(done: Callable) -> bool:
 		if done.call():
 			return true
 		await get_tree().physics_frame
-	push_error("не дождался события за %d кадров" % PATIENCE)
+	push_error("event not reached within %d frames" % PATIENCE)
 	return false
 
 

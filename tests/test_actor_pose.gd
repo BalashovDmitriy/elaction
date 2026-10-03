@@ -19,7 +19,7 @@ func test_every_state_of_otto_has_a_pose() -> void:
 		var pose := ActorPose.of_otto(state, false, false, false, 0.0)
 		assert_true(
 			ActorPose.OTTO_POSES.has(pose),
-			"состояние %s показывается позой %s" % [OttoStateMachine.state_name(state), pose]
+			"state %s is shown by pose %s" % [OttoStateMachine.state_name(state), pose]
 		)
 
 
@@ -44,11 +44,11 @@ func test_every_pose_of_otto_is_reachable() -> void:
 	# And the intro poses — the helicopter sets them ([member Otto.ride_pose]).
 	shown.append_array(ActorPose.ARRIVAL_POSES)
 	for pose: String in ActorPose.OTTO_POSES:
-		assert_true(shown.has(pose), "поза %s кому-то нужна" % pose)
+		assert_true(shown.has(pose), "pose %s is needed by someone" % pose)
 	# And the other way round — as for the agent: only what is drawn can be shown. Without this
 	# a typo in [ActorPose] would reach the player as the pink placeholder square.
 	for pose: String in shown:
-		assert_true(ActorPose.OTTO_POSES.has(pose), "поза %s нарисована" % pose)
+		assert_true(ActorPose.OTTO_POSES.has(pose), "pose %s is drawn" % pose)
 
 
 func test_every_pose_of_the_agent_is_reachable() -> void:
@@ -69,32 +69,32 @@ func test_every_pose_of_the_agent_is_reachable() -> void:
 									shown.append(pose)
 
 	for pose: String in ActorPose.AGENT_POSES:
-		assert_true(shown.has(pose), "поза %s кому-то нужна" % pose)
+		assert_true(shown.has(pose), "pose %s is needed by someone" % pose)
 	for pose: String in shown:
-		assert_true(ActorPose.AGENT_POSES.has(pose), "поза %s нарисована" % pose)
+		assert_true(ActorPose.AGENT_POSES.has(pose), "pose %s is drawn" % pose)
 
 
 func test_death_tells_how_it_happened() -> void:
 	# A crushed actor is shown with his own picture — this is the very finding of the
 	# pre-milestone check against the original (ADR-0011, item 12).
 	var dead := OttoStateMachine.State.DEAD
-	assert_eq(ActorPose.of_otto(dead, false, true, false, 0.0), "dead_0", "падает")
-	assert_eq(ActorPose.of_otto(dead, false, false, false, 0.0), "dead_1", "лежит")
-	assert_eq(ActorPose.of_otto(dead, true, true, false, 0.0), "crushed", "раздавлен")
+	assert_eq(ActorPose.of_otto(dead, false, true, false, 0.0), "dead_0", "falling")
+	assert_eq(ActorPose.of_otto(dead, false, false, false, 0.0), "dead_1", "lying")
+	assert_eq(ActorPose.of_otto(dead, true, true, false, 0.0), "crushed", "crushed")
 
 
 func test_the_dead_do_not_shoot() -> void:
 	var pose := ActorPose.of_otto(OttoStateMachine.State.DEAD, false, false, true, 0.0)
-	assert_eq(pose, "dead_1", "смерть важнее выстрела")
+	assert_eq(pose, "dead_1", "death beats the shot")
 
 
 func test_walking_cycles_three_frames() -> void:
 	# The phase grows fractionally, the frame changes on integers: the cycle must close.
 	assert_eq(ActorPose.walk_frame(0.0), "walk_0")
-	assert_eq(ActorPose.walk_frame(0.9), "walk_0", "дробная часть кадр не меняет")
+	assert_eq(ActorPose.walk_frame(0.9), "walk_0", "the fractional part does not change the frame")
 	assert_eq(ActorPose.walk_frame(1.0), "walk_1")
 	assert_eq(ActorPose.walk_frame(2.9), "walk_2")
-	assert_eq(ActorPose.walk_frame(3.0), "walk_0", "цикл замыкается")
+	assert_eq(ActorPose.walk_frame(3.0), "walk_0", "the cycle wraps around")
 
 
 func test_the_phase_never_skips_a_frame_of_the_cycle() -> void:
@@ -105,11 +105,11 @@ func test_the_phase_never_skips_a_frame_of_the_cycle() -> void:
 	var seen: Array[String] = []
 	for _step: int in 120:
 		phase = ActorPose.advance(phase, 1.0 / 60.0)
-		assert_between(phase, 0.0, float(ActorPose.WALK_FRAMES), "фаза не уходит из цикла")
+		assert_between(phase, 0.0, float(ActorPose.WALK_FRAMES), "phase does not leave the cycle")
 		var frame := ActorPose.walk_frame(phase)
 		if not seen.has(frame):
 			seen.append(frame)
-	assert_eq(seen.size(), ActorPose.WALK_FRAMES, "за две секунды показаны все кадры")
+	assert_eq(seen.size(), ActorPose.WALK_FRAMES, "all frames are shown within two seconds")
 
 
 func test_a_broken_phase_does_not_break_the_frame() -> void:
@@ -129,7 +129,7 @@ func test_every_way_of_dying_counts_as_down() -> void:
 	for crushed: bool in [true, false]:
 		for falling: bool in [true, false]:
 			var pose := ActorPose.of_otto(OttoStateMachine.State.DEAD, crushed, falling, false, 0.0)
-			assert_true(ActorPose.is_down(pose), "%s — это лежащий" % pose)
+			assert_true(ActorPose.is_down(pose), "%s is a lying pose" % pose)
 
 
 func test_an_agent_dodging_prone_counts_as_down() -> void:
@@ -141,7 +141,7 @@ func test_the_living_and_upright_are_not_down() -> void:
 	for pose: String in [
 		"idle", "walk_0", "walk_1", "walk_2", "jump", "fall", "shoot", ActorPose.CROUCH
 	]:
-		assert_false(ActorPose.is_down(pose), "%s — это не лежащий" % pose)
+		assert_false(ActorPose.is_down(pose), "%s is not a lying pose" % pose)
 
 
 func test_the_knee_and_the_crouch_are_one_pose() -> void:
@@ -158,12 +158,10 @@ func test_the_knee_and_the_crouch_are_one_pose() -> void:
 ## crouched — he sits, fired — he shoots.
 func test_landing_shows_only_while_standing() -> void:
 	var idle := OttoStateMachine.State.IDLE
+	assert_eq(ActorPose.of_otto(idle, false, false, false, 0.0, true), "land", "standing — lands")
 	assert_eq(
-		ActorPose.of_otto(idle, false, false, false, 0.0, true), "land", "стоит — приземляется"
-	)
-	assert_eq(
-		ActorPose.of_otto(idle, false, false, false, 0.0, false), "idle", "без приземления — стоит"
+		ActorPose.of_otto(idle, false, false, false, 0.0, false), "idle", "without landing — stands"
 	)
 	var walk := OttoStateMachine.State.WALK
-	assert_eq(ActorPose.of_otto(walk, false, false, false, 0.0, true), "walk_0", "шагнул — идёт")
-	assert_eq(ActorPose.of_otto(idle, false, false, true, 0.0, true), "shoot", "выстрел важнее")
+	assert_eq(ActorPose.of_otto(walk, false, false, false, 0.0, true), "walk_0", "stepped — walks")
+	assert_eq(ActorPose.of_otto(idle, false, false, true, 0.0, true), "shoot", "the shot beats it")

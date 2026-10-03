@@ -91,12 +91,12 @@ static func unreachable_spots(plan: BuildingPlan, rules: BuildingRules) -> Array
 			continue
 		var node := _node(door.floor_index, _segment_at(floors[door.floor_index], door.x))
 		if not seen.has(node):
-			missing.append("документ на этаже %d (x=%.0f)" % [door.floor_index, door.x])
+			missing.append("document on floor %d (x=%.0f)" % [door.floor_index, door.x])
 
 	var bottom := plan.floors - 1
 	var exit_node := _node(bottom, _segment_at(floors[bottom], plan.exit_x))
 	if not seen.has(exit_node):
-		missing.append("выход на этаже %d (x=%.0f)" % [bottom, plan.exit_x])
+		missing.append("exit on floor %d (x=%.0f)" % [bottom, plan.exit_x])
 	return missing
 
 
@@ -279,7 +279,7 @@ static func _graph(
 		# number on the floor, and it cannot be linked: the traversal would mark it reachable,
 		# and after that any floor point inside the hole would count as reachable.
 		if top_segment < 0 or bottom_segment < 0:
-			push_error("эскалатор на этаже %d упирается в проём" % upper)
+			push_error("escalator on floor %d runs into an opening" % upper)
 			continue
 		# The escalator goes both ways: from the landing below one rides up on it.
 		var above := _node(upper, top_segment)

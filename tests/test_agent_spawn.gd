@@ -7,9 +7,9 @@ extends GutTest
 func test_a_taken_slot_is_not_offered_again() -> void:
 	var spawn := AgentSpawn.new()
 	var first := spawn.open_slot(3)
-	assert_gt(first, -1, "свободная нашлась")
+	assert_gt(first, -1, "a free one was found")
 	spawn.take(first)
-	assert_ne(spawn.open_slot(3), first, "занятую второй раз не дают")
+	assert_ne(spawn.open_slot(3), first, "an occupied one is not given a second time")
 
 
 ## A freed cell waits for a change by difficulty (@3866), and only then is it usable.
@@ -18,10 +18,10 @@ func test_a_released_slot_waits_for_its_shift() -> void:
 	for slot: int in 3:
 		spawn.take(slot)
 	spawn.release(0, 0)
-	assert_eq(spawn.open_slot(3), -1, "смена ещё не пришла")
+	assert_eq(spawn.open_slot(3), -1, "the shift has not come yet")
 	for _tick: int in int(ceilf(Arcade.respawn_wait(0) / Arcade.TICK)) + 1:
 		spawn.tick(Arcade.TICK)
-	assert_eq(spawn.open_slot(3), 0, "пришла — ячейка снова годна")
+	assert_eq(spawn.open_slot(3), 0, "it came - the slot is usable again")
 
 
 ## `tools/playthrough.gd --at-once=8`: a cap above the ROM's four cells does not silently run into
@@ -30,9 +30,9 @@ func test_a_manual_cap_above_the_rom_gets_its_slots() -> void:
 	var spawn := AgentSpawn.new()
 	for _agent: int in 8:
 		var slot := spawn.open_slot(8)
-		assert_gt(slot, -1, "ячейка нашлась")
+		assert_gt(slot, -1, "a slot was found")
 		spawn.take(slot)
-	assert_eq(spawn.open_slot(8), -1, "девятой нет")
+	assert_eq(spawn.open_slot(8), -1, "there is no ninth")
 
 
 ## Telegraph at the end of the change (ADR-0028, decision 7): a cell becomes usable one leaf
@@ -45,7 +45,9 @@ func test_a_slot_opens_a_door_travel_before_its_shift_ends() -> void:
 	spawn.release(0, 0)
 	var wait := Arcade.respawn_wait(0)
 	spawn.tick(wait - Door.AGENT_OPEN_TIME - 0.05)
-	assert_eq(spawn.open_slot(3, Door.AGENT_OPEN_TIME), -1, "до хода створки ещё рано")
+	assert_eq(spawn.open_slot(3, Door.AGENT_OPEN_TIME), -1, "too early for the leaf to move")
 	spawn.tick(0.1)
-	assert_eq(spawn.open_slot(3, Door.AGENT_OPEN_TIME), 0, "створка пошла в конце смены")
-	assert_eq(spawn.open_slot(3), -1, "без упреждения смена ещё идёт")
+	assert_eq(
+		spawn.open_slot(3, Door.AGENT_OPEN_TIME), 0, "the leaf started at the end of the shift"
+	)
+	assert_eq(spawn.open_slot(3), -1, "without lead time the shift is still going")

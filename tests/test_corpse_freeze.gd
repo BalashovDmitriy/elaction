@@ -72,20 +72,20 @@ func _wait_frozen(agent: Enemy) -> bool:
 func test_a_body_at_rest_freezes_where_it_lies() -> void:
 	_floor_at(0.0)
 	var agent: Enemy = await _corpse_at(Vector3.ZERO)
-	assert_true(await _wait_frozen(agent), "улёгшееся тело застыло")
+	assert_true(await _wait_frozen(agent), "the settled body froze")
 	var before := agent.corpse.ragdoll.bounds()
 	await wait_physics_frames(60)
 	var after := agent.corpse.ragdoll.bounds()
 	assert_almost_eq(
-		after.get_center().distance_to(before.get_center()), 0.0, 0.01, "и не двигается"
+		after.get_center().distance_to(before.get_center()), 0.0, 0.01, "and does not move"
 	)
-	assert_gt(after.position.y, -0.1, "лежит на полу, а не под ним")
+	assert_gt(after.position.y, -0.1, "lies on the floor, not under it")
 
 
 func test_another_body_lies_on_a_frozen_one() -> void:
 	_floor_at(0.0)
 	var first: Enemy = await _corpse_at(Vector3.ZERO)
-	assert_true(await _wait_frozen(first), "первое застыло")
+	assert_true(await _wait_frozen(first), "the first froze")
 	var top := first.corpse.ragdoll.bounds().end.y
 	var second: Enemy = await _corpse_at(Vector3(0.0, top + 0.3, 0.0))
 	await wait_physics_frames(SETTLE_FRAMES / 2)
@@ -99,22 +99,22 @@ func test_another_body_lies_on_a_frozen_one() -> void:
 		assert_gt(
 			pelvis.y,
 			lower.position.y + 0.2,
-			"второе легло сверху, а не провалилось сквозь застывшее"
+			"the second lay on top instead of falling through the frozen one"
 		)
-	assert_gt(second.corpse.ragdoll.bounds().position.y, -0.1, "и не ушло под пол")
+	assert_gt(second.corpse.ragdoll.bounds().position.y, -0.1, "and did not go under the floor")
 
 
 func test_a_frozen_body_wakes_when_its_floor_goes() -> void:
 	var ground := _floor_at(0.0)
 	var agent: Enemy = await _corpse_at(Vector3.ZERO)
-	assert_true(await _wait_frozen(agent), "застыло")
+	assert_true(await _wait_frozen(agent), "froze")
 	ground.queue_free()
 	await wait_physics_frames(2)
 	agent.corpse.ragdoll.wake()
-	assert_false(agent.corpse.ragdoll.is_frozen(), "проснулось")
+	assert_false(agent.corpse.ragdoll.is_frozen(), "woke up")
 	var before := agent.corpse.ragdoll.bounds().position.y
 	await wait_physics_frames(60)
-	assert_lt(agent.corpse.ragdoll.bounds().position.y, before - 0.5, "и падает")
+	assert_lt(agent.corpse.ragdoll.bounds().position.y, before - 0.5, "and falls")
 
 
 ## A cab with two stops, with a floor [param width] m wide. It stands at the top
@@ -155,11 +155,15 @@ func test_a_pile_in_a_standing_car_rides_on_with_it() -> void:
 	var top := below.corpse.ragdoll.bounds()
 	var above: Enemy = await _corpse_at(Vector3(top.get_center().x, top.end.y + 0.3, 0.0))
 	await wait_physics_frames(SETTLE_FRAMES)
-	assert_false(above.corpse.ragdoll.is_frozen(), "верхнее над кабиной не застыло")
+	assert_false(above.corpse.ragdoll.is_frozen(), "the upper one above the car did not freeze")
 	await _let_go(car)
 	var floor_y := -Proportions.FLOOR
-	assert_lt(below.corpse.ragdoll.bounds().position.y, floor_y + 0.5, "нижнее уехало с кабиной")
-	assert_lt(above.corpse.ragdoll.bounds().position.y, floor_y + 1.0, "и верхнее — не повисло")
+	assert_lt(
+		below.corpse.ragdoll.bounds().position.y, floor_y + 0.5, "the lower one went with the car"
+	)
+	assert_lt(
+		above.corpse.ragdoll.bounds().position.y, floor_y + 1.0, "and the upper one did not hang"
+	)
 
 
 ## A body frozen in the shaft pit is still cut by the cab coming down: a frozen one is
@@ -169,9 +173,9 @@ func test_a_frozen_body_in_a_shaft_pit_is_still_cut() -> void:
 	_floor_at(-Proportions.FLOOR)
 	var car := _held_car()
 	var agent: Enemy = await _corpse_at(Vector3(0.0, -Proportions.FLOOR, 0.0))
-	assert_true(await _wait_frozen(agent), "в яме тело застыло")
+	assert_true(await _wait_frozen(agent), "in the pit the body froze")
 	await _let_go(car, func() -> bool: return agent.corpse.cut != null or agent.corpse.gone)
-	assert_true(agent.corpse.cut != null or agent.corpse.gone, "кабина режет его днищем")
+	assert_true(agent.corpse.cut != null or agent.corpse.gone, "the car cuts it with its underside")
 
 
 func test_a_body_fallen_out_of_the_world_is_gone() -> void:
@@ -181,5 +185,5 @@ func test_a_body_fallen_out_of_the_world_is_gone() -> void:
 		await wait_physics_frames(1)
 		if agent.corpse.gone:
 			break
-	assert_true(agent.corpse.gone, "упавшее ниже мира тело пропало")
+	assert_true(agent.corpse.gone, "a body fallen below the world vanished")
 	Ragdoll.abyss = -INF

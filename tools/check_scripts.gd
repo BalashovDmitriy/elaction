@@ -9,7 +9,7 @@ extends SceneTree
 func _init() -> void:
 	var args := OS.get_cmdline_user_args()
 	if args.is_empty():
-		push_error("нет списка скриптов")
+		push_error("no script list")
 		quit(2)
 		return
 	var listing := FileAccess.get_file_as_string(args[0])

@@ -30,14 +30,14 @@ func test_car_does_not_start_at_once() -> void:
 
 
 func test_car_starts_once_it_has_thought() -> void:
-	assert_gt(_run(_shaft(), 1.0, ElevatorMotion.DOWN), TOP, "дождалась и поехала")
+	assert_gt(_run(_shaft(), 1.0, ElevatorMotion.DOWN), TOP, "waited and set off")
 
 
 func test_letting_go_makes_the_car_think_again() -> void:
 	var motion := _shaft()
 	_run(motion, 0.4, ElevatorMotion.DOWN)
 	_run(motion, 0.2, 0.0)
-	assert_almost_eq(_run(motion, 0.4, ElevatorMotion.DOWN), TOP, 0.01, "отсчёт заново")
+	assert_almost_eq(_run(motion, 0.4, ElevatorMotion.DOWN), TOP, 0.01, "the countdown starts over")
 
 
 ## The siren mid-ride: Otto holds "down" all the way, and the wait counter
@@ -48,14 +48,14 @@ func test_the_alarm_catches_a_ride_already_under_way() -> void:
 	# No alarm yet: the cab responds immediately.
 	motion.response_delay = 0.0
 	var underway := _run(motion, 0.5, ElevatorMotion.DOWN)
-	assert_gt(underway, TOP, "поехала сразу: тревоги ещё нет")
+	assert_gt(underway, TOP, "set off at once: no alarm yet")
 
 	motion.response_delay = 0.5
 	motion.forget_command()
 	assert_almost_eq(
-		_run(motion, 0.4, ElevatorMotion.DOWN), underway, 0.01, "встала и думает заново"
+		_run(motion, 0.4, ElevatorMotion.DOWN), underway, 0.01, "stopped and thinks again"
 	)
-	assert_gt(_run(motion, 0.4, ElevatorMotion.DOWN), underway, "подумала и поехала")
+	assert_gt(_run(motion, 0.4, ElevatorMotion.DOWN), underway, "thought it over and set off")
 
 
 func test_leaving_the_car_makes_it_think_again() -> void:
@@ -65,5 +65,5 @@ func test_leaving_the_car_makes_it_think_again() -> void:
 	motion.update(STEP, 0.0, false)
 	var boarded_at := motion.position
 	assert_almost_eq(
-		_run(motion, 0.4, ElevatorMotion.DOWN), boarded_at, 0.01, "новый пассажир ждёт так же"
+		_run(motion, 0.4, ElevatorMotion.DOWN), boarded_at, 0.01, "a new passenger waits the same"
 	)

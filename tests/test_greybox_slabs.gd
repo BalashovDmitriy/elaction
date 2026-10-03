@@ -33,7 +33,7 @@ func test_gaps_are_cut_in_any_order() -> void:
 	# This is exactly the order in which the level builds them: the shaft is added first.
 	var gaps: Array[Vector2] = [Vector2(560.0, 600.0), Vector2(380.0, 440.0)]
 	var rects := BuildingShell.slab_segments(SURFACE, gaps, BOUNDS, THICKNESS)
-	assert_eq(rects.size(), 3, "два проёма режут перекрытие на три куска")
+	assert_eq(rects.size(), 3, "two openings cut the slab into three pieces")
 	assert_eq(rects[0].end.x, 380.0)
 	assert_eq(rects[1].position.x, 440.0)
 	assert_eq(rects[1].end.x, 560.0)
@@ -54,19 +54,19 @@ func test_narrow_floor_is_cut_within_its_own_walls() -> void:
 	var gaps: Array[Vector2] = [Vector2(620.0, 660.0)]
 	var rects := BuildingShell.slab_segments(SURFACE, gaps, bounds, THICKNESS)
 	assert_eq(rects.size(), 2)
-	assert_eq(rects[0].position.x, bounds.x, "перекрытие начинается у своей стены")
-	assert_eq(rects[1].end.x, bounds.y, "и кончается у своей")
+	assert_eq(rects[0].position.x, bounds.x, "the slab starts at its own wall")
+	assert_eq(rects[1].end.x, bounds.y, "and ends at its own")
 
 
 func test_gap_outside_the_floor_cuts_nothing() -> void:
 	var bounds := Vector2(280.0, 1000.0)
 	var gaps: Array[Vector2] = [Vector2(40.0, 100.0)]
 	var rects := BuildingShell.slab_segments(SURFACE, gaps, bounds, THICKNESS)
-	assert_eq(rects.size(), 1, "проём на улице перекрытие не режет")
+	assert_eq(rects.size(), 1, "an opening in the street does not cut the slab")
 	assert_eq(rects[0], Rect2(bounds.x, SURFACE, bounds.y - bounds.x, THICKNESS))
 
 
 func test_caller_list_is_left_alone() -> void:
 	var gaps: Array[Vector2] = [Vector2(560.0, 600.0), Vector2(380.0, 440.0)]
 	BuildingShell.slab_segments(SURFACE, gaps, BOUNDS, THICKNESS)
-	assert_eq(gaps[0], Vector2(560.0, 600.0), "сортируем копию, а не список вызывающего")
+	assert_eq(gaps[0], Vector2(560.0, 600.0), "we sort a copy, not the caller's list")

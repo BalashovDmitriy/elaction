@@ -64,7 +64,7 @@ func _car_of(level: GreyboxLevel) -> Node3D:
 func test_the_exit_has_a_car() -> void:
 	var level := await _building()
 	var car := _car_of(level)
-	assert_not_null(car, "у выхода стоит машина")
+	assert_not_null(car, "a car stands at the exit")
 	if car == null:
 		return
 
@@ -73,20 +73,20 @@ func test_the_exit_has_a_car() -> void:
 	var exit_x := level.plan().exit_x
 	var surface := level.rules.floor_surface(level.rules.floors - 1)
 	var at := WorldSpace.to_plane(car.global_position)
-	assert_almost_eq(at.y, surface, TOLERANCE, "колёсами на полу")
+	assert_almost_eq(at.y, surface, TOLERANCE, "wheels on the floor")
 
 	# Its place is at the gate in the left end wall, bonnet toward it (ADR-0038, decision 3).
 	var expected := ExitCar.spot(exit_x, level.rules, level.plan())
-	assert_almost_eq(at.x, expected, TOLERANCE, "машина стоит на своём месте")
+	assert_almost_eq(at.x, expected, TOLERANCE, "the car stands in its place")
 	var parked := ExitCar.parked_span(level.rules)
-	assert_almost_eq(at.x, (parked.x + parked.y) * 0.5, TOLERANCE, "машина у ворот")
-	assert_eq((car as ExitCar).towards, -1.0, "капотом к воротам")
+	assert_almost_eq(at.x, (parked.x + parked.y) * 0.5, TOLERANCE, "the car is at the gate")
+	assert_eq((car as ExitCar).towards, -1.0, "hood towards the gate")
 
 	# The exit is the driver's door: the bot goes there and Otto gets in there (ADR-0038, decision 4).
 	var door := level.exit_position()
-	assert_almost_eq(door.x, (car as ExitCar).door_x(), TOLERANCE, "выход — у двери машины")
+	assert_almost_eq(door.x, (car as ExitCar).door_x(), TOLERANCE, "the exit is at the car door")
 	assert_almost_eq(door.y + GreyboxLevel.EXIT_HEIGHT * 0.5, surface, TOLERANCE)
-	assert_between(door.x, parked.x, parked.y, "дверь — в длине машины")
+	assert_between(door.x, parked.x, parked.y, "the door is within the car length")
 
 
 func test_the_building_is_cleared_only_after_the_car_leaves() -> void:
@@ -108,14 +108,14 @@ func test_the_building_is_cleared_only_after_the_car_leaves() -> void:
 		await get_tree().physics_frame
 		started += 1
 
-	assert_ne(car.position.x, parked_at, "машина поехала")
-	assert_false(cleared[0], "выход ещё не конец: машина только тронулась")
+	assert_ne(car.position.x, parked_at, "the car drove off")
+	assert_false(cleared[0], "the exit is not the end yet: the car has only started")
 
 	var waited := 0
 	while not cleared[0] and waited < PATIENCE:
 		await get_tree().process_frame
 		waited += 1
-	assert_true(cleared[0], "здание сдано, когда машина уехала")
+	assert_true(cleared[0], "the building is cleared when the car has left")
 
 
 ## The lane is busy — the car stops at the edge of the roadway, waits for a gap with the right
@@ -126,7 +126,7 @@ func test_a_busy_lane_makes_the_car_wait_with_the_indicator_on() -> void:
 	var level := await _building()
 	var car := _car_of(level) as ExitCar
 	if car == null or car.traffic == null:
-		fail_test("у выезда нет потока")
+		fail_test("there is no traffic at the exit")
 		return
 	_stand_at_the_door(level)
 	var lane := car.traffic.cars(true)
@@ -144,14 +144,16 @@ func test_a_busy_lane_makes_the_car_wait_with_the_indicator_on() -> void:
 			lit = lit or car.indicator_lit()
 			dark_while_signalling = dark_while_signalling or not car.indicator_lit()
 		if car.stage == ExitCar.Stage.WAIT:
-			assert_almost_eq(car.position.x, car.stop_x(), 0.05, "ждёт у края мостовой")
+			assert_almost_eq(car.position.x, car.stop_x(), 0.05, "waits at the edge of the roadway")
 		waited += 1
-	assert_true(stages.has(ExitCar.Stage.WAIT), "полоса занята — машина вставала у края мостовой")
-	assert_eq(car.stage, ExitCar.Stage.CRUISE, "влилась в поток")
-	assert_almost_eq(car.position.z, car.traffic.near_lane_z(), 0.01, "в ближней полосе")
-	assert_true(lit and dark_while_signalling, "поворотник мигал, пока машина ждала")
+	assert_true(
+		stages.has(ExitCar.Stage.WAIT), "lane busy: the car stopped at the edge of the roadway"
+	)
+	assert_eq(car.stage, ExitCar.Stage.CRUISE, "merged into traffic")
+	assert_almost_eq(car.position.z, car.traffic.near_lane_z(), 0.01, "in the near lane")
+	assert_true(lit and dark_while_signalling, "indicator blinked while the car waited")
 	await get_tree().physics_frame
-	assert_false(car.is_signalling(), "в полосе поворотник выключен")
+	assert_false(car.is_signalling(), "indicator off in the lane")
 	assert_false(car.indicator_lit())
 
 
@@ -162,7 +164,7 @@ func test_a_clear_lane_lets_the_car_merge_without_stopping() -> void:
 	var level := await _building()
 	var car := _car_of(level) as ExitCar
 	if car == null or car.traffic == null:
-		fail_test("у выезда нет потока")
+		fail_test("there is no traffic at the exit")
 		return
 	car.traffic.hold_back(true)
 	for other: StreetTraffic.Car in car.traffic.cars(true):
@@ -181,10 +183,10 @@ func test_a_clear_lane_lets_the_car_merge_without_stopping() -> void:
 		if car.is_leaving() and absf(car.position.x - car.stop_x()) < 0.5:
 			slowest = minf(slowest, car.speed_now())
 		waited += 1
-	assert_false(stages.has(ExitCar.Stage.WAIT), "не вставала у края мостовой")
-	assert_gt(slowest, 1.0, "у края мостовой не останавливалась, м/с")
-	assert_eq(car.stage, ExitCar.Stage.CRUISE, "влилась в поток")
-	assert_true(signalled, "поворотник мигал на съезде")
+	assert_false(stages.has(ExitCar.Stage.WAIT), "did not stop at the edge of the roadway")
+	assert_gt(slowest, 1.0, "did not stop at the edge of the roadway, m/s")
+	assert_eq(car.stage, ExitCar.Stage.CRUISE, "merged into traffic")
+	assert_true(signalled, "indicator blinked on the ramp")
 
 
 ## Holds the traffic car [param blocker] right behind the merge point [param x]: behind, five metres
@@ -219,13 +221,15 @@ func _wait_for_the_start(level: GreyboxLevel) -> bool:
 ## rule does not depend on that — here the test places Otto.
 func test_the_car_does_not_take_otto_without_every_document() -> void:
 	var level := await _building(1)
-	assert_false(GameState.instance().all_documents_collected(), "документ ещё за дверью")
+	assert_false(
+		GameState.instance().all_documents_collected(), "the document is still behind the door"
+	)
 	_stand_at_the_door(level)
 	for _frame: int in BOARDING_PATIENCE:
 		await get_tree().physics_frame
 	var car := _car_of(level) as ExitCar
-	assert_false(car.is_leaving(), "машина стоит")
-	assert_true(level.otto.is_on_foot(), "Otto свой — управление не забрали")
+	assert_false(car.is_leaving(), "the car stands")
+	assert_true(level.otto.is_on_foot(), "Otto is his own: control was not taken")
 	assert_false(level.otto.is_hidden())
 
 
@@ -235,20 +239,20 @@ func test_the_seated_otto_is_locked_and_out_of_reach() -> void:
 	var started := [false]
 	level.car_started.connect(func() -> void: started[0] = true)
 	_stand_at_the_door(level)
-	assert_true(await _wait_for_the_start(level), "Otto сел, машина тронулась")
-	assert_true(started[0], "уровень сказал, что машина тронулась")
+	assert_true(await _wait_for_the_start(level), "Otto got in, the car started")
+	assert_true(started[0], "the level reported that the car started")
 
 	var otto := level.otto
-	assert_true(otto.is_hidden(), "Otto в машине: снаружи его нет")
-	assert_false(otto.is_on_foot(), "управление забрано")
-	assert_eq(otto.vertical_intent(), 0.0, "ввод не доходит")
+	assert_true(otto.is_hidden(), "Otto is in the car: not visible outside")
+	assert_false(otto.is_on_foot(), "control is taken")
+	assert_eq(otto.vertical_intent(), 0.0, "input does not arrive")
 	# Body shapes are disabled deferred — by the car's departure they have long been disabled.
 	var standing := otto.get_node("StandingShape") as CollisionShape3D
 	var crouching := otto.get_node("CrouchingShape") as CollisionShape3D
-	assert_true(standing.disabled and crouching.disabled, "пуле попасть не во что")
+	assert_true(standing.disabled and crouching.disabled, "a bullet has nothing to hit")
 	var door := level.exit_position()
 	assert_almost_eq(
-		WorldSpace.to_plane(otto.global_position).x, door.x, 0.01, "сел у водительской двери"
+		WorldSpace.to_plane(otto.global_position).x, door.x, 0.01, "got in at the driver's door"
 	)
 
 
@@ -256,10 +260,10 @@ func test_the_seated_otto_is_locked_and_out_of_reach() -> void:
 func test_the_car_leaves_accelerating_with_its_lights_on() -> void:
 	var level := await _building()
 	var car := _car_of(level) as ExitCar
-	assert_false(car.lights_on(), "заглушённая машина стоит без фар")
+	assert_false(car.lights_on(), "a stopped car stands without headlights")
 	_stand_at_the_door(level)
 	assert_true(await _wait_for_the_start(level))
-	assert_true(car.lights_on(), "фары горят")
+	assert_true(car.lights_on(), "headlights are on")
 
 	var before := car.position.x
 	await get_tree().physics_frame
@@ -269,21 +273,21 @@ func test_the_car_leaves_accelerating_with_its_lights_on() -> void:
 	before = car.position.x
 	await get_tree().physics_frame
 	var later := (car.position.x - before) * car.towards
-	assert_gt(first, 0.0, "едет туда, куда смотрит капот")
-	assert_gt(later, first, "разгоняется")
+	assert_gt(first, 0.0, "drives where the hood points")
+	assert_gt(later, first, "accelerates")
 
 
 ## The garage gate opens when Otto gets in: the car drives out through it.
 func test_the_garage_gate_opens_for_the_car() -> void:
 	var level := await _building()
 	var garage := level.garage()
-	assert_not_null(garage, "паркинг построен")
+	assert_not_null(garage, "the garage is built")
 	if garage == null:
 		return
-	assert_false(garage.is_gate_open(), "до посадки ворота закрыты")
+	assert_false(garage.is_gate_open(), "gate closed before boarding")
 	_stand_at_the_door(level)
 	assert_true(await _wait_for_the_start(level))
-	assert_true(garage.is_gate_open(), "машина тронулась — ворота открыты")
+	assert_true(garage.is_gate_open(), "the car started: gate open")
 
 
 ## The car's bounds over all its meshes, in the car's own space.
@@ -311,17 +315,19 @@ func test_every_car_fits_between_the_wall_and_otto() -> void:
 		add_child_autofree(car)
 		var box := _car_box(car)
 		var label := CarModel.MODELS[index].resource_path.get_file()
-		assert_gt(ExitCar.Z + box.position.z, WorldSpace.BACK_WALL_Z, "%s входит в стену" % label)
+		assert_gt(
+			ExitCar.Z + box.position.z, WorldSpace.BACK_WALL_Z, "%s goes into the wall" % label
+		)
 		assert_lt(
 			ExitCar.Z + box.end.z,
 			WorldSpace.PLAY_Z - WorldSpace.BODY_DEPTH * 0.5,
-			"%s выходит в плоскость игры — Otto пройдёт сквозь неё" % label
+			"%s sticks out into the play plane: Otto would walk through it" % label
 		)
 		# Lengthwise the car is placed into the gap at the exit: any longer and it would hit the opening.
-		assert_almost_eq(box.size.x, CarModel.LENGTH, 0.02, "%s: длина по бамперам" % label)
-		assert_almost_eq(box.position.y, 0.0, 0.02, "%s: колёса на земле" % label)
-		assert_lt(box.size.y, Proportions.BODY, "%s ниже Otto" % label)
-		assert_gt(CarModel.wheels(car).size(), 0, "%s: колёса крутятся" % label)
+		assert_almost_eq(box.size.x, CarModel.LENGTH, 0.02, "%s: length bumper to bumper" % label)
+		assert_almost_eq(box.position.y, 0.0, 0.02, "%s: wheels on the ground" % label)
+		assert_lt(box.size.y, Proportions.BODY, "%s is lower than Otto" % label)
+		assert_gt(CarModel.wheels(car).size(), 0, "%s: wheels spin" % label)
 
 
 ## Wheels on departure spin around their own axles and roll forward: the middle of the wheel stays
@@ -335,7 +341,7 @@ func test_the_wheels_roll_about_their_axles() -> void:
 	car.park(plan.exit_x, 0.0, rules, plan)
 	add_child_autofree(car)
 	var wheels := car.find_children("Wheel*", "MeshInstance3D", true, false)
-	assert_gt(wheels.size(), 0, "у машины есть колёса")
+	assert_gt(wheels.size(), 0, "the car has wheels")
 	var hubs: Array[Vector3] = []
 	var treads: Array[Vector3] = []
 	for node in wheels:
@@ -353,12 +359,12 @@ func test_the_wheels_roll_about_their_axles() -> void:
 		var hub_now := car.to_local(wheel.to_global(hub))
 		var tread_now := car.to_local(wheel.to_global(hub - Vector3(0.0, box.size.y * 0.5, 0.0)))
 		assert_almost_eq(
-			hub_now.distance_to(hubs[index]), 0.0, 0.001, "%s: ось на месте" % wheel.name
+			hub_now.distance_to(hubs[index]), 0.0, 0.001, "%s: axle in place" % wheel.name
 		)
 		assert_lt(
 			(tread_now.x - treads[index].x) * car.towards,
 			-0.01,
-			"%s: низ колеса уходит назад — колесо катится вперёд" % wheel.name
+			"%s: wheel bottom moves back, so the wheel rolls forward" % wheel.name
 		)
 
 
@@ -366,8 +372,8 @@ func test_the_wheels_roll_about_their_axles() -> void:
 func test_the_first_building_parks_the_red_sports_car() -> void:
 	for building_seed: int in [1, 7, 12345]:
 		var choice := CarModel.choose(1, building_seed)
-		assert_eq(choice.model, 0, "спортивная")
-		assert_eq(choice.paint, 0, "красная")
+		assert_eq(choice.model, 0, "sports car")
+		assert_eq(choice.paint, 0, "red")
 
 
 func test_the_car_is_a_draw_of_the_building_and_stays_the_same() -> void:
@@ -375,12 +381,12 @@ func test_the_car_is_a_draw_of_the_building_and_stays_the_same() -> void:
 	for building in range(2, 40):
 		var choice := CarModel.choose(building, building * 31)
 		var again := CarModel.choose(building, building * 31)
-		assert_eq(choice.model, again.model, "жребий повторяется для того же здания")
+		assert_eq(choice.model, again.model, "the draw repeats for the same building")
 		assert_eq(choice.paint, again.paint)
 		assert_between(choice.model, 0, CarModel.MODELS.size() - 1)
 		assert_between(choice.paint, 0, CarModel.PAINTS.size() - 1)
 		seen[choice.model] = true
-	assert_gt(seen.size(), 2, "в зданиях стоят разные машины")
+	assert_gt(seen.size(), 2, "buildings have different cars")
 
 
 ## The body is repainted in the draw's paint: the pack's `Paint` material is replaced.
@@ -397,7 +403,7 @@ func test_the_body_takes_the_drawn_paint() -> void:
 			var override := mesh.get_surface_override_material(surface) as StandardMaterial3D
 			if override != null and override.albedo_color.is_equal_approx(CarModel.PAINTS[1]):
 				painted = true
-	assert_true(painted, "кузов в краске жребия")
+	assert_true(painted, "body in the drawn paint")
 
 
 ## Every car of the draw has a driver's door opening with a hinged door, an interior, a dome light
@@ -412,24 +418,28 @@ func test_every_car_has_a_door_a_cabin_and_indicators() -> void:
 		add_child_autofree(car)
 		var door := car.find_child("DriverDoor", true, false) as MeshInstance3D
 		var cabin := car.find_child("CarInterior", true, false) as MeshInstance3D
-		assert_not_null(door, "модель %d: дверь" % index)
-		assert_not_null(cabin, "модель %d: салон" % index)
-		assert_not_null(car.find_child("DomeLight", true, false), "модель %d: плафон" % index)
+		assert_not_null(door, "model %d: door" % index)
+		assert_not_null(cabin, "model %d: cabin" % index)
+		assert_not_null(car.find_child("DomeLight", true, false), "model %d: dome light" % index)
 		assert_not_null(
-			car.find_child("IndicatorRight", true, false), "модель %d: поворотник" % index
+			car.find_child("IndicatorRight", true, false), "model %d: indicator" % index
 		)
 		if door == null or cabin == null:
 			continue
 		var span := door.mesh.get_aabb()
 		var front := door.position.x
-		assert_lt(door.position.z, 0.0, "модель %d: дверь у борта -Z — к камере у ворот" % index)
-		assert_between(span.size.x, 0.6, 1.4, "модель %d: длина двери, м" % index)
+		assert_lt(
+			door.position.z,
+			0.0,
+			"model %d: door on the -Z side, towards the camera at the gate" % index
+		)
+		assert_between(span.size.x, 0.6, 1.4, "model %d: door length, m" % index)
 		assert_between(
-			front, 0.0, CarModel.LENGTH * 0.5, "модель %d: петля перед серединой" % index
+			front, 0.0, CarModel.LENGTH * 0.5, "model %d: hinge ahead of the middle" % index
 		)
 		var inside := cabin.mesh.get_aabb()
-		assert_gt(inside.position.y, 0.1, "модель %d: салон не под днищем" % index)
-		assert_lt(inside.end.y, 1.4, "модель %d: салон не над крышей" % index)
+		assert_gt(inside.position.y, 0.1, "model %d: cabin not below the floor pan" % index)
+		assert_lt(inside.end.y, 1.4, "model %d: cabin not above the roof" % index)
 
 
 ## Boarding is visible (ADR-0038, decision 4): Otto turns to the car, the door swings open, he steps
@@ -439,10 +449,10 @@ func test_otto_gets_in_through_the_open_driver_door() -> void:
 	var level := await _building()
 	var car := _car_of(level) as ExitCar
 	var boarding := level.get(&"_boarding") as ExitBoarding
-	assert_eq(car.door_openness(), 0.0, "у стоящей машины дверца закрыта")
+	assert_eq(car.door_openness(), 0.0, "a standing car has its door closed")
 	var door := car.find_child("DriverDoor", true, false) as Node3D
-	assert_not_null(door, "дверца — деталь модели, кузов под ней прорезан")
-	assert_almost_eq(door.rotation.y, 0.0, 0.001, "закрытая дверца — вровень с кузовом")
+	assert_not_null(door, "the door is a model part, the body under it is cut out")
+	assert_almost_eq(door.rotation.y, 0.0, 0.001, "a closed door is flush with the body")
 	_stand_at_the_door(level)
 	var widest := 0.0
 	var deepest := WorldSpace.PLAY_Z
@@ -457,11 +467,11 @@ func test_otto_gets_in_through_the_open_driver_door() -> void:
 				hidden_behind_door = true
 		if car.is_leaving():
 			break
-	assert_gt(widest, 0.95, "дверца распахнулась")
-	assert_lt(deepest, car.seat_z() + 0.05, "Otto шагнул в глубину к борту")
-	assert_true(hidden_behind_door, "скрылся, пока дверца ещё открыта")
-	assert_true(car.is_leaving(), "машина тронулась")
-	assert_eq(car.door_openness(), 0.0, "дверца захлопнулась")
+	assert_gt(widest, 0.95, "the door swung open")
+	assert_lt(deepest, car.seat_z() + 0.05, "Otto stepped in towards the side")
+	assert_true(hidden_behind_door, "hidden while the door is still open")
+	assert_true(car.is_leaving(), "the car started")
+	assert_eq(car.door_openness(), 0.0, "the door slammed shut")
 	assert_almost_eq(door.rotation.y, 0.0, 0.001)
 
 
@@ -477,12 +487,12 @@ func test_the_car_drives_up_the_ramp_in_the_widened_frame() -> void:
 	var cleared := [false]
 	level.building_cleared.connect(func() -> void: cleared[0] = true)
 	var before := level.otto.camera_view(true)
-	assert_gte(before.position.x, 0.0, "до посадки кадр — в границах здания")
+	assert_gte(before.position.x, 0.0, "before boarding the frame is within the building")
 	_stand_at_the_door(level)
 	assert_true(await _wait_for_the_start(level))
 	var view := level.otto.camera_view(true)
-	assert_lt(view.position.x, gate - GarageRamp.TUNNEL, "тоннель в кадре")
-	assert_gt(view.end.x, car.position.x + ExitCar.LENGTH * 0.5, "и машина у ворот")
+	assert_lt(view.position.x, gate - GarageRamp.TUNNEL, "the tunnel is in frame")
+	assert_gt(view.end.x, car.position.x + ExitCar.LENGTH * 0.5, "and the car at the gate")
 	var bottom := view.end.y
 	var waited := 0
 	var last := view
@@ -490,10 +500,10 @@ func test_the_car_drives_up_the_ramp_in_the_widened_frame() -> void:
 		last = level.otto.camera_view(true)
 		await get_tree().physics_frame
 		waited += 1
-	assert_true(cleared[0], "машина ушла из кадра")
+	assert_true(cleared[0], "the car left the frame")
 	var top := gate - GarageGate.RAMP_APRON - GarageGate.RAMP_RUN
-	assert_lt(last.position.x, top, "кадр доехал за машиной до улицы")
+	assert_lt(last.position.x, top, "the frame followed the car to the street")
 	# Under the car the view keeps the street strip: without it, it would rise by a floor.
 	var rise := rules.floor_height - ExitBoarding.STREET_VIEW
-	assert_lt(last.end.y, bottom - rise * 0.9, "и поднялся вместе с ней")
-	assert_gt(car.position.y, floor_y + rules.floor_height * 0.99, "уходит по улице")
+	assert_lt(last.end.y, bottom - rise * 0.9, "and rose with it")
+	assert_gt(car.position.y, floor_y + rules.floor_height * 0.99, "goes along the street")

@@ -60,8 +60,8 @@ def main(argv: list[str]) -> int:
     text = section(version)
     if text is None:
         print(
-            f"В CHANGELOG.md нет заметок для {version}: секции «## [{version}]» "
-            "нет или она пуста, а релиз без описания выходит молча."
+            f"CHANGELOG.md has no notes for {version}: the section '## [{version}]' "
+            "is missing or empty, and a release without a description goes out silently."
         )
         return 1
 

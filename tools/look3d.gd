@@ -320,5 +320,5 @@ func _run() -> void:
 		await get_tree().process_frame
 		if frame >= 60:
 			spent += get_process_delta_time()
-	print("  %.2f мс/кадр при бюджете 16.6" % (spent / 120.0 * 1000.0))
+	print("  %.2f ms/frame against a 16.6 budget" % (spent / 120.0 * 1000.0))
 	get_tree().quit()

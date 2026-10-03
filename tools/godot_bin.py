@@ -53,7 +53,7 @@ def require_godot() -> str:
     """Like find_godot, but prints a hint and exits the process if Godot is missing."""
     godot = find_godot()
     if godot is None:
-        print("Godot не найден. Установите его или задайте GODOT_BIN=<путь к godot>.")
+        print("Godot not found. Install it or set GODOT_BIN=<path to godot>.")
         print("Windows: winget install --id GodotEngine.GodotEngine")
         raise SystemExit(127)
     return godot
@@ -116,9 +116,9 @@ def run(
             # point of streaming is lost.
             print(line, end="", flush=True)
         if any(mark in line for mark in stop_on):
-            return _cut_short(process, lines, f"Прогон снят сторожем: {line.strip()}")
+            return _cut_short(process, lines, f"Run killed by the watchdog: {line.strip()}")
         if time.monotonic() - started > timeout:
-            return _cut_short(process, lines, f"Godot не ответил за {timeout} с и был снят.")
+            return _cut_short(process, lines, f"Godot did not respond within {timeout} s and was killed.")
 
     process.stdout.close()
     left = max(timeout - (time.monotonic() - started), 1.0)
@@ -127,7 +127,7 @@ def run(
     except subprocess.TimeoutExpired:
         process.kill()
         process.wait()
-        return TIMEOUT_EXIT_CODE, "".join(lines) + f"\nGodot не ответил за {timeout} с и был снят."
+        return TIMEOUT_EXIT_CODE, "".join(lines) + f"\nGodot did not respond within {timeout} s and was killed."
 
 
 def _cut_short(process: subprocess.Popen, lines: list[str], why: str) -> tuple[int, str]:

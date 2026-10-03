@@ -1,4 +1,4 @@
-name: Релиз
+name: Release
 
 # The `v*` tag builds the archives and publishes a release. A manual run builds the same
 # and attaches the archives to the run, but publishes nothing — this way the build can be
@@ -13,7 +13,7 @@ env:
 
 jobs:
   version:
-    name: Версия
+    name: Version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -24,18 +24,18 @@ jobs:
 
       # The tag and config/version must match, otherwise the archive is named with one
       # version and the game shows another in the menu corner. Fail before the build.
-      - name: Тег сходится с версией проекта
+      - name: Tag matches the project version
         if: startsWith(github.ref, 'refs/tags/v')
         run: python tools/version.py --check "${{ github.ref_name }}"
 
       # Without an argument the version is taken from project.godot — so the check also exists
       # on a manual run, which is what it was set up for: release notes
       # must be ready before the tag, not composed in the web UI after it.
-      - name: Заметки к релизу есть в CHANGELOG
+      - name: Release notes exist in CHANGELOG
         run: python tools/changelog.py ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
 
   build:
-    name: Сборка ${{ matrix.preset }}
+    name: Build ${{ matrix.preset }}
     needs: version
     runs-on: ${{ matrix.os }}
     strategy:
@@ -55,7 +55,7 @@ jobs:
 
       # Export templates live in the user folder, and it differs between OSes.
       # Compute the path once: both the cache and the install look at it afterwards.
-      - name: Путь к шаблонам экспорта
+      - name: Export templates path
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "Windows" ]; then
@@ -65,13 +65,13 @@ jobs:
           fi
 
       # Templates weigh hundreds of megabytes and change only with the engine version.
-      - name: Кэш шаблонов экспорта
+      - name: Export templates cache
         uses: actions/cache@v6
         with:
           path: ${{ env.TEMPLATES_DIR }}
           key: godot-templates-${{ runner.os }}-${{ env.GODOT_VERSION }}
 
-      - name: Godot и шаблоны (Linux)
+      - name: Godot and templates (Linux)
         if: runner.os == 'Linux'
         run: |
           base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
@@ -89,7 +89,7 @@ jobs:
           fi
           godot --version
 
-      - name: Godot и шаблоны (Windows)
+      - name: Godot and templates (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -110,13 +110,13 @@ jobs:
           }
           & $exe --version
 
-      - name: Экспорт
+      - name: Export
         # Shader Baker (ADR-0039) in Godot 4.5 could hang on export for hours
         # (godotengine/godot#112794): a limit so the release fails rather than hangs.
         timeout-minutes: 30
         run: python tools/export.py ${{ matrix.preset }}
 
-      - name: Архив
+      - name: Archive
         run: python tools/package.py ${{ matrix.preset }}
 
       # The unpacked archive is run, not the built file: what must be checked is what the player
@@ -124,14 +124,14 @@ jobs:
       # only: the Windows build has no console, it does not write to the parent process, and there
       # is nowhere to read the launch marker from. The Windows archive is checked by hand — this is
       # the "run on a clean machine" from the DoD.
-      - name: Прогон распакованного архива
+      - name: Run the unpacked archive
         if: runner.os == 'Linux'
         shell: bash
         run: |
           unzip -q -o dist/elaction-*-linux.zip -d smoke
           binary="$(echo smoke/*/elaction.x86_64)"
           if [ ! -x "$binary" ]; then
-            echo "В архиве $binary не помечен исполняемым — игрок его не запустит."
+            echo "$binary in the archive is not marked executable — the player cannot run it."
             exit 1
           fi
           python tools/smoke.py "$binary"
@@ -143,7 +143,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: Публикация
+    name: Publish
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
@@ -161,10 +161,10 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Заметки к релизу
+      - name: Release notes
         run: python tools/changelog.py "${{ github.ref_name }}" > notes.md
 
-      - name: Релиз в GitHub
+      - name: GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

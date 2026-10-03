@@ -119,26 +119,26 @@ func _wait_out(otto: Otto) -> void:
 func test_the_leaf_shuts_behind_otto_and_opens_to_let_him_out() -> void:
 	var door := _bare_door(true)
 	var otto := _guest_at(door)
-	assert_true(await _knock(otto), "дверь взяла Otto")
-	assert_false(otto.is_hidden(), "пока створка идёт, он ещё в проёме")
-	assert_true(await _wait_hidden(otto), "створка открылась — он внутри")
+	assert_true(await _knock(otto), "the door took Otto")
+	assert_false(otto.is_hidden(), "while the leaf moves, he is still in the doorway")
+	assert_true(await _wait_hidden(otto), "the leaf opened - he is inside")
 	# A second: the leaf has had time to close behind him, and the exit is still far off.
 	await _wait_game(1.0)
-	assert_true(otto.is_hidden(), "он всё ещё внутри")
-	assert_eq(door.openness(), 0.0, "за ним створка закрыта")
+	assert_true(otto.is_hidden(), "he is still inside")
+	assert_eq(door.openness(), 0.0, "the leaf is closed behind him")
 	await _wait_out(otto)
-	assert_false(otto.is_hidden(), "вышел")
-	assert_gt(door.openness(), 0.9, "выходит в открытую створку")
-	assert_false(otto.is_on_foot(), "пока она закрывается, он ещё выходит")
+	assert_false(otto.is_hidden(), "came out")
+	assert_gt(door.openness(), 0.9, "he steps out into the open leaf")
+	assert_false(otto.is_on_foot(), "while it closes, he is still coming out")
 	await _wait_game(1.0)
-	assert_eq(door.openness(), 0.0, "и за ним она закрывается")
-	assert_true(otto.is_on_foot(), "закрылась — управление снова у игрока")
+	assert_eq(door.openness(), 0.0, "and it closes behind him")
+	assert_true(otto.is_on_foot(), "closed - the player has control again")
 
 
 func test_otto_is_out_exactly_after_seventy_ticks_whatever_he_presses() -> void:
 	var door := _bare_door(true)
 	var otto := _guest_at(door)
-	assert_true(await _knock(otto), "дверь взяла Otto")
+	assert_true(await _knock(otto), "the door took Otto")
 	var frames := 0
 	var hid := false
 	while frames < PATIENCE * 2:
@@ -150,11 +150,11 @@ func test_otto_is_out_exactly_after_seventy_ticks_whatever_he_presses() -> void:
 		hid = hid or otto.is_hidden()
 		if hid and not otto.is_hidden():
 			break
-		assert_false(otto.is_on_foot(), "раньше срока не выпускают, кадр %d" % frames)
+		assert_false(otto.is_on_foot(), "not released early, frame %d" % frames)
 	_release_all()
 	var inside := float(frames) * _step()
 	var rom := Arcade.seconds(Arcade.ROOM_TICKS)
-	assert_almost_eq(inside, rom, _step() * 2.0, "ровно 70 тиков ROM")
+	assert_almost_eq(inside, rom, _step() * 2.0, "exactly 70 ROM ticks")
 
 
 ## An ordinary door does not let Otto in: as in the ROM (@3BDA), only a red one lets him inside
@@ -162,23 +162,23 @@ func test_otto_is_out_exactly_after_seventy_ticks_whatever_he_presses() -> void:
 func test_a_plain_door_does_not_take_otto_in() -> void:
 	var door := _bare_door(false)
 	var otto := _guest_at(door)
-	assert_false(await _knock(otto), "обычная дверь Otto не взяла")
+	assert_false(await _knock(otto), "an ordinary door did not take Otto")
 	_release_all()
-	assert_eq(door.openness(), 0.0, "и не открылась")
+	assert_eq(door.openness(), 0.0, "and did not open")
 
 
 ## A cleared red door becomes ordinary — and also no longer lets him in.
 func test_an_emptied_red_door_does_not_take_otto_in_again() -> void:
 	var door := _bare_door(true)
 	var otto := _guest_at(door)
-	assert_true(await _knock(otto), "красная дверь взяла Otto")
+	assert_true(await _knock(otto), "the red door took Otto")
 	_release_all()
-	assert_true(await _wait_hidden(otto), "зашёл")
+	assert_true(await _wait_hidden(otto), "went in")
 	await _wait_out(otto)
 	await _wait_game(1.0)
-	assert_false(door.has_document, "документ забран")
-	assert_true(otto.is_on_foot(), "вышел, управление у игрока")
-	assert_false(await _knock(otto), "сданная дверь второй раз не пускает")
+	assert_false(door.has_document, "the document is taken")
+	assert_true(otto.is_on_foot(), "came out, the player has control")
+	assert_false(await _knock(otto), "a cleared door does not let him in a second time")
 	_release_all()
 
 
@@ -186,13 +186,13 @@ func test_the_document_is_counted_on_the_way_out() -> void:
 	var door := _bare_door(true)
 	var otto := _guest_at(door)
 	watch_signals(door)
-	assert_true(await _knock(otto), "дверь взяла Otto")
+	assert_true(await _knock(otto), "the door took Otto")
 	assert_true(await _wait_hidden(otto))
-	assert_signal_not_emitted(door, "document_taken", "за вход документ не дают")
-	assert_true(door.is_pending(), "пока он внутри, дверь ещё красная")
+	assert_signal_not_emitted(door, "document_taken", "no document is given for entering")
+	assert_true(door.is_pending(), "while he is inside, the door is still red")
 	await _wait_out(otto)
-	assert_signal_emit_count(door, "document_taken", 1, "документ — на выходе")
-	assert_false(door.is_pending(), "вышел — дверь обычная")
+	assert_signal_emit_count(door, "document_taken", 1, "the document - on exit")
+	assert_false(door.is_pending(), "came out - the door is ordinary")
 
 
 ## While Otto is inside, the closed red leaf glows by itself — red — and the board above it
@@ -202,46 +202,46 @@ func test_the_occupied_red_door_glows_and_its_sign_breathes() -> void:
 	var leaf := door.get_node("Leaf") as MeshInstance3D
 	var sign_board := door.get_node("Sign") as MeshInstance3D
 	var plain := leaf.material_override as StandardMaterial3D
-	assert_false(plain.emission_enabled, "пустая дверь не светится")
+	assert_false(plain.emission_enabled, "an empty door does not glow")
 	var otto := _guest_at(door)
-	assert_true(await _knock(otto), "дверь взяла Otto")
+	assert_true(await _knock(otto), "the door took Otto")
 	assert_true(await _wait_hidden(otto))
 	await _wait_game(0.4)
 	var glowing := leaf.material_override as StandardMaterial3D
-	assert_true(glowing.emission_enabled, "занятая створка светится")
-	assert_true(glowing.albedo_color.is_equal_approx(GreyboxLook.DOOR_RED), "и остаётся красной")
+	assert_true(glowing.emission_enabled, "the occupied leaf glows")
+	assert_true(glowing.albedo_color.is_equal_approx(GreyboxLook.DOOR_RED), "and stays red")
 	var first := (sign_board.material_override as StandardMaterial3D).emission_energy_multiplier
 	await _wait_game(Door.OCCUPIED_PULSE * 0.5)
 	var later := (sign_board.material_override as StandardMaterial3D).emission_energy_multiplier
-	assert_ne(first, later, "табло дышит")
+	assert_ne(first, later, "the board pulses")
 	await _wait_out(otto)
 	await _wait_game(0.1)
 	assert_false(
-		(leaf.material_override as StandardMaterial3D).emission_enabled, "вышел — не светится"
+		(leaf.material_override as StandardMaterial3D).emission_enabled, "came out - does not glow"
 	)
 
 
 func test_the_corridor_is_muffled_while_otto_is_inside() -> void:
 	var director := AudioDirector.instance()
 	if director == null:
-		pass_test("звука нет — глушить нечего")
+		pass_test("no sound - nothing to muffle")
 		return
 	director.reset()
 	var door := _bare_door(true)
 	var otto := _guest_at(door)
-	assert_true(await _knock(otto), "дверь взяла Otto")
+	assert_true(await _knock(otto), "the door took Otto")
 	assert_true(await _wait_hidden(otto))
-	assert_true(director.world_muffled(), "коридор из-за стены")
-	assert_true(director.music_muffled(), "и музыка тоже")
+	assert_true(director.world_muffled(), "corridor heard through the wall")
+	assert_true(director.music_muffled(), "and the music too")
 	await _wait_out(otto)
-	assert_false(director.world_muffled(), "вышел — коридор слышно")
-	assert_false(director.music_muffled(), "и музыку")
+	assert_false(director.world_muffled(), "came out - the corridor is audible")
+	assert_false(director.music_muffled(), "and the music")
 
 
 func test_a_level_freed_with_otto_inside_brings_the_sound_back() -> void:
 	var director := AudioDirector.instance()
 	if director == null:
-		pass_test("звука нет — глушить нечего")
+		pass_test("no sound - nothing to muffle")
 		return
 	director.reset()
 	var level := _build(SEEDS[0])
@@ -249,13 +249,13 @@ func test_a_level_freed_with_otto_inside_brings_the_sound_back() -> void:
 	var door := level.doors()[0]
 	level.otto.global_position = WorldSpace.to_scene(door.mat_position())
 	await get_tree().physics_frame
-	assert_true(await _knock(level.otto), "дверь взяла Otto")
+	assert_true(await _knock(level.otto), "the door took Otto")
 	assert_true(await _wait_hidden(level.otto))
-	assert_true(director.world_muffled(), "коридор из-за стены")
+	assert_true(director.world_muffled(), "corridor heard through the wall")
 	remove_child(level)
 	level.free()
-	assert_false(director.world_muffled(), "здание ушло — коридор слышно")
-	assert_false(director.music_muffled(), "и музыку")
+	assert_false(director.world_muffled(), "building gone - the corridor is audible")
+	assert_false(director.music_muffled(), "and the music")
 
 
 func _build(building_seed: int) -> GreyboxLevel:
@@ -284,7 +284,7 @@ func test_a_red_door_pays_on_the_way_out_in_any_building() -> void:
 			if door.is_pending():
 				red = door
 				break
-		assert_not_null(red, "в здании нет красной двери, сид %d" % building_seed)
+		assert_not_null(red, "no red door in the building, seed %d" % building_seed)
 		if red == null:
 			_drop(level)
 			continue
@@ -292,14 +292,14 @@ func test_a_red_door_pays_on_the_way_out_in_any_building() -> void:
 		level.otto.global_position = WorldSpace.to_scene(red.mat_position())
 		await get_tree().physics_frame
 		var score := game.score
-		assert_true(await _knock(level.otto), "дверь взяла Otto, сид %d" % building_seed)
+		assert_true(await _knock(level.otto), "the door took Otto, seed %d" % building_seed)
 		assert_true(await _wait_hidden(level.otto))
-		assert_eq(game.documents_collected, 0, "за вход не засчитано, сид %d" % building_seed)
-		assert_eq(game.score, score, "и очков нет")
+		assert_eq(game.documents_collected, 0, "not counted for entering, seed %d" % building_seed)
+		assert_eq(game.score, score, "and no points")
 		await _wait_out(level.otto)
 		_release_all()
-		assert_eq(game.documents_collected, 1, "на выходе засчитано, сид %d" % building_seed)
-		assert_eq(game.score, score + GameState.DOCUMENT_SCORE, "и 500 очков")
+		assert_eq(game.documents_collected, 1, "counted on exit, seed %d" % building_seed)
+		assert_eq(game.score, score + GameState.DOCUMENT_SCORE, "and 500 points")
 		_drop(level)
 
 
@@ -358,7 +358,7 @@ func test_agents_wait_at_otto_s_door_one_at_most_and_let_go_when_he_is_out() -> 
 		var mat := door.mat_position()
 		level.otto.global_position = WorldSpace.to_scene(mat)
 		await get_tree().physics_frame
-		assert_true(await _knock(level.otto), "дверь взяла Otto, сид %d" % building_seed)
+		assert_true(await _knock(level.otto), "the door took Otto, seed %d" % building_seed)
 		assert_true(await _wait_hidden(level.otto))
 		_release_all()
 		var agents: Array[Enemy] = []
@@ -373,17 +373,17 @@ func test_agents_wait_at_otto_s_door_one_at_most_and_let_go_when_he_is_out() -> 
 				if not is_nan(agent.watch_at):
 					waiting += 1
 					watcher = agent
-			assert_lte(waiting, 1, "у двери не больше одного, сид %d" % building_seed)
+			assert_lte(waiting, 1, "at most one at the door, seed %d" % building_seed)
 		if watcher != null:
 			watched += 1
 			var x := WorldSpace.to_plane(watcher.global_position).x
 			var off := absf(x - mat.x)
-			assert_gt(off, Proportions.DOOR_MAT * 0.5, "не на коврике, сид %d" % building_seed)
-			assert_lt(off, Proportions.DOOR.x, "а у самой двери, сид %d" % building_seed)
-			assert_eq(watcher.facing(), signf(mat.x - x), "лицом к двери")
+			assert_gt(off, Proportions.DOOR_MAT * 0.5, "not off the mat, seed %d" % building_seed)
+			assert_lt(off, Proportions.DOOR.x, "but right at the door, seed %d" % building_seed)
+			assert_eq(watcher.facing(), signf(mat.x - x), "facing the door")
 		await get_tree().physics_frame
 		await get_tree().physics_frame
 		for agent in agents:
-			assert_true(is_nan(agent.watch_at), "Otto вышел — ждать некого")
+			assert_true(is_nan(agent.watch_at), "Otto came out - nobody to wait for")
 		_drop(level)
-	assert_gt(watched, 0, "ни в одном здании никто не пошёл к двери — проверять было нечего")
+	assert_gt(watched, 0, "in no building did anyone go to the door - nothing to check")

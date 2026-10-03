@@ -23,26 +23,26 @@ func after_each() -> void:
 
 func test_reach_is_close_ahead_on_the_same_floor() -> void:
 	var otto := Vector2(0.0, 0.0)
-	assert_true(Takedown.can_reach(otto, 1.0, Vector2(0.6, 0.0)), "рядом впереди — достаёт")
-	assert_false(Takedown.can_reach(otto, 1.0, Vector2(-0.6, 0.0)), "за спиной — нет")
-	assert_false(Takedown.can_reach(otto, 1.0, Vector2(2.0, 0.0)), "далеко — стреляет")
-	assert_false(Takedown.can_reach(otto, 1.0, Vector2(0.6, 3.0)), "этажом выше — нет")
-	assert_true(Takedown.can_reach(otto, -1.0, Vector2(-0.6, 0.0)), "смотрит влево — слева")
+	assert_true(Takedown.can_reach(otto, 1.0, Vector2(0.6, 0.0)), "close in front, reaches")
+	assert_false(Takedown.can_reach(otto, 1.0, Vector2(-0.6, 0.0)), "behind, no")
+	assert_false(Takedown.can_reach(otto, 1.0, Vector2(2.0, 0.0)), "far, shoots")
+	assert_false(Takedown.can_reach(otto, 1.0, Vector2(0.6, 3.0)), "a floor above, no")
+	assert_true(Takedown.can_reach(otto, -1.0, Vector2(-0.6, 0.0)), "facing left, from the left")
 
 
 func test_the_side_is_where_the_agent_looks() -> void:
-	assert_eq(Takedown.side_of(0.0, 0.7, -1.0), Takedown.Side.FRONT, "агент смотрит на Otto")
-	assert_eq(Takedown.side_of(0.0, 0.7, 1.0), Takedown.Side.BACK, "агент спиной к Otto")
+	assert_eq(Takedown.side_of(0.0, 0.7, -1.0), Takedown.Side.FRONT, "agent faces Otto")
+	assert_eq(Takedown.side_of(0.0, 0.7, 1.0), Takedown.Side.BACK, "agent has his back to Otto")
 
 
 func test_landing_next_to_an_agent_is_a_pounce() -> void:
 	# ADR-0042, decision 9: close up on the same floor — from any side, from a jump or from the floor
 	# above, it does not matter.
 	var agent := Vector2(0.0, 0.0)
-	assert_true(Takedown.lands_on(Vector2(0.2, 0.0), agent), "на агента — напрыгнул")
-	assert_true(Takedown.lands_on(Vector2(-0.8, 0.05), agent), "вплотную сзади — тоже")
-	assert_false(Takedown.lands_on(Vector2(1.5, 0.0), agent), "в стороне — нет")
-	assert_false(Takedown.lands_on(Vector2(0.2, 3.6), agent), "этажом выше — нет")
+	assert_true(Takedown.lands_on(Vector2(0.2, 0.0), agent), "onto the agent, jumped on")
+	assert_true(Takedown.lands_on(Vector2(-0.8, 0.05), agent), "right behind, also")
+	assert_false(Takedown.lands_on(Vector2(1.5, 0.0), agent), "off to the side, no")
+	assert_false(Takedown.lands_on(Vector2(0.2, 3.6), agent), "a floor above, no")
 
 
 func test_scores_by_side_with_the_dark_bonus() -> void:
@@ -53,13 +53,13 @@ func test_scores_by_side_with_the_dark_bonus() -> void:
 	assert_eq(Takedown.score(Takedown.Side.ABOVE, false), 300)
 	assert_eq(Takedown.score(Takedown.Side.FRONT, true), 300)
 	for side: int in Takedown.SCORES:
-		assert_gt(Takedown.score(side, false), GameState.ENEMY_SHOT_SCORE, "дороже выстрела")
+		assert_gt(Takedown.score(side, false), GameState.ENEMY_SHOT_SCORE, "worth more than a shot")
 
 
 func test_every_side_has_scenes_and_the_front_and_back_vary() -> void:
-	assert_eq(Takedown.scenes_for(Takedown.Side.FRONT).size(), 2, "спереди — серия и рукоять")
-	assert_eq(Takedown.scenes_for(Takedown.Side.BACK).size(), 2, "сзади — удушение и шея")
-	assert_eq(Takedown.scenes_for(Takedown.Side.ABOVE).size(), 1, "сверху — напрыгивание")
+	assert_eq(Takedown.scenes_for(Takedown.Side.FRONT).size(), 2, "front, a combo and a gun butt")
+	assert_eq(Takedown.scenes_for(Takedown.Side.BACK).size(), 2, "behind, a choke and a neck")
+	assert_eq(Takedown.scenes_for(Takedown.Side.ABOVE).size(), 1, "above, a jump-on")
 
 
 func test_a_scene_does_not_repeat_in_a_row() -> void:
@@ -68,7 +68,7 @@ func test_a_scene_does_not_repeat_in_a_row() -> void:
 	var last := ""
 	for _round in 40:
 		var scene := Takedown.pick(Takedown.Side.BACK, last, rng)
-		assert_ne(scene.name, last, "та же сценка подряд не повторяется")
+		assert_ne(scene.name, last, "the same scene is not repeated in a row")
 		last = scene.name
 
 
@@ -76,16 +76,16 @@ func test_every_scene_is_playable() -> void:
 	# Scene poses come from the rig table: an unknown one would play as a stance, and the scene would
 	# play itself out without movement.
 	for scene: Takedown.Scene in Takedown.all_scenes():
-		assert_gt(scene.kill_at, 0.0, "%s: агент гибнет не в первый кадр" % scene.name)
-		assert_lt(scene.kill_at, scene.duration, "%s: и до конца сценки" % scene.name)
-		assert_lte(scene.duration, 1.5, "%s: сценка короткая" % scene.name)
-		assert_true(FigurePoses.knows(scene.corpse), "%s: труп %s" % [scene.name, scene.corpse])
-		assert_true(ActorPose.is_down(scene.corpse), "%s: труп лежит" % scene.name)
+		assert_gt(scene.kill_at, 0.0, "%s: the agent does not die on the first frame" % scene.name)
+		assert_lt(scene.kill_at, scene.duration, "%s: and before the end of the scene" % scene.name)
+		assert_lte(scene.duration, 1.5, "%s: the scene is short" % scene.name)
+		assert_true(FigurePoses.knows(scene.corpse), "%s: corpse %s" % [scene.name, scene.corpse])
+		assert_true(ActorPose.is_down(scene.corpse), "%s: the corpse lies down" % scene.name)
 		for track: Array[Array] in [scene.otto, scene.agent]:
 			var previous := -1.0
 			for key: Array in track:
-				assert_true(FigurePoses.knows(String(key[1])), "%s: поза %s" % [scene.name, key[1]])
-				assert_gt(float(key[0]), previous, "%s: ключи по времени" % scene.name)
+				assert_true(FigurePoses.knows(String(key[1])), "%s: pose %s" % [scene.name, key[1]])
+				assert_gt(float(key[0]), previous, "%s: keys in time order" % scene.name)
 				previous = float(key[0])
 
 
@@ -101,7 +101,7 @@ func test_a_snapped_neck_turns_the_head_aside() -> void:
 	assert_gt(
 		held.angle_to(rig.bone_rotation(FigureRig.HEAD)),
 		deg_to_rad(30.0),
-		"голова повёрнута вбок, а не кивнула"
+		"head is turned sideways, not nodded"
 	)
 
 
@@ -168,8 +168,8 @@ func _wait_for_the_end(agent: Enemy) -> void:
 	while left > 0.0 and _director() != null:
 		await wait_seconds(0.1)
 		left -= 0.1
-	assert_null(_director(), "сценка кончилась")
-	assert_true(agent.is_dead(), "агент добит")
+	assert_null(_director(), "the scene is over")
+	assert_true(agent.is_dead(), "the agent is finished off")
 
 
 func test_shooting_close_up_takes_the_agent_down_from_the_front() -> void:
@@ -181,19 +181,19 @@ func test_shooting_close_up_takes_the_agent_down_from_the_front() -> void:
 	var before := GameState.instance().score
 	await _press_shoot()
 	var director := _director()
-	assert_not_null(director, "выстрел вплотную — добивание, а не выстрел")
+	assert_not_null(director, "a point-blank shot — a takedown, not a shot")
 	if director == null:
 		return
-	assert_eq(director.scene().side, Takedown.Side.FRONT, "агент лицом к Otto — спереди")
+	assert_eq(director.scene().side, Takedown.Side.FRONT, "agent faces Otto — front")
 	# The slow-down is uneven (ADR-0050): the approach is faster, toward the blow — [constant
 	# TakedownScene.SLOW], on the blow — a freeze frame.
 	assert_between(
 		Engine.time_scale,
 		TakedownScene.SLOW - 0.001,
 		TakedownScene.APPROACH + 0.001,
-		"мир замедлен"
+		"the world is slowed down"
 	)
-	assert_true(otto.takedown != null, "Otto в сценке")
+	assert_true(otto.takedown != null, "Otto is in the scene")
 	var froze := false
 	for _frame: int in 600:
 		await wait_physics_frames(1)
@@ -203,18 +203,18 @@ func test_shooting_close_up_takes_the_agent_down_from_the_front() -> void:
 			froze = froze or Engine.time_scale < TakedownScene.SLOW * 0.5
 		if director.killed() and not director.is_frozen():
 			break
-	assert_true(froze, "на ударе — стоп-кадр: мир почти встал")
-	assert_true(agent.is_dead(), "агент погиб на ударе")
-	assert_false(agent.held, "погибший отпущен — падает рэгдоллом, а не позой")
+	assert_true(froze, "on the blow — freeze frame: the world almost stopped")
+	assert_true(agent.is_dead(), "the agent died on the blow")
+	assert_false(agent.held, "the dead one is released — falls as a ragdoll, not as a pose")
 	var hat := agent.figure.find_child("hat", true, false) as MeshInstance3D
-	assert_not_null(hat, "у агента шляпа — своим мешем")
+	assert_not_null(hat, "the agent has a hat — its own mesh")
 	if hat != null:
-		assert_false(hat.visible, "шляпа слетела с головы")
-	assert_not_null(agent.get_parent().find_child("Hat", false, false), "и улетела телом")
+		assert_false(hat.visible, "the hat flew off the head")
+	assert_not_null(agent.get_parent().find_child("Hat", false, false), "and flew off as a body")
 	await _wait_for_the_end(agent)
-	assert_eq(GameState.instance().score - before, 200, "спереди — 200")
-	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "мир снова в своём темпе")
-	assert_null(otto.takedown, "Otto отпущен")
+	assert_eq(GameState.instance().score - before, 200, "front — 200")
+	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "the world is back at its own pace")
+	assert_null(otto.takedown, "Otto is released")
 
 
 func test_from_behind_scores_more() -> void:
@@ -226,12 +226,12 @@ func test_from_behind_scores_more() -> void:
 	var before := GameState.instance().score
 	await _press_shoot()
 	var director := _director()
-	assert_not_null(director, "сзади — тоже добивание")
+	assert_not_null(director, "behind — also a takedown")
 	if director == null:
 		return
-	assert_eq(director.scene().side, Takedown.Side.BACK, "агент спиной — сзади")
+	assert_eq(director.scene().side, Takedown.Side.BACK, "agent has his back — behind")
 	await _wait_for_the_end(agent)
-	assert_eq(GameState.instance().score - before, 300, "сзади — 300")
+	assert_eq(GameState.instance().score - before, 300, "behind — 300")
 
 
 func test_a_far_agent_is_shot_not_taken_down() -> void:
@@ -241,8 +241,8 @@ func test_a_far_agent_is_shot_not_taken_down() -> void:
 	_agent_at(otto, 4.0, -1.0)
 	await wait_physics_frames(3)
 	await _press_shoot()
-	assert_null(_director(), "далеко — сценки нет")
-	assert_gt(get_tree().get_nodes_in_group(Bullet.GROUP).size(), 0, "а пуля летит")
+	assert_null(_director(), "far — no scene")
+	assert_gt(get_tree().get_nodes_in_group(Bullet.GROUP).size(), 0, "and the bullet flies")
 
 
 func test_otto_killed_mid_scene_lets_the_agent_live() -> void:
@@ -254,13 +254,13 @@ func test_otto_killed_mid_scene_lets_the_agent_live() -> void:
 	var agent := _agent_at(otto, 0.7, -1.0)
 	await wait_physics_frames(3)
 	await _press_shoot()
-	assert_not_null(_director(), "сценка началась")
+	assert_not_null(_director(), "the scene started")
 	otto.kill()
 	await wait_physics_frames(2)
-	assert_null(_director(), "сценка оборвалась")
-	assert_false(agent.is_dead(), "агент жив")
-	assert_false(agent.held, "и снова в бою")
-	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "мир в своём темпе")
+	assert_null(_director(), "the scene was cut off")
+	assert_false(agent.is_dead(), "the agent is alive")
+	assert_false(agent.held, "and back in combat")
+	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "the world at its own pace")
 
 
 func test_falling_onto_an_agent_pounces_by_itself() -> void:
@@ -276,17 +276,17 @@ func test_falling_onto_an_agent_pounces_by_itself() -> void:
 	while wait > 0 and not agent.takedown_ready:
 		await wait_physics_frames(1)
 		wait -= 1
-	assert_true(agent.takedown_ready, "агент вышел из двери")
+	assert_true(agent.takedown_ready, "the agent came out of the door")
 	otto.global_position = Vector3(agent.global_position.x, 2.6, WorldSpace.PLAY_Z)
 	var left := 120
 	while left > 0 and _director() == null:
 		await wait_physics_frames(1)
 		left -= 1
 	var director := _director()
-	assert_not_null(director, "упал на агента — напрыгнул без кнопки")
+	assert_not_null(director, "fell on the agent — jumped on without a button")
 	if director == null:
 		return
-	assert_eq(director.scene().side, Takedown.Side.ABOVE, "сверху")
+	assert_eq(director.scene().side, Takedown.Side.ABOVE, "above")
 	await _wait_for_the_end(agent)
 
 
@@ -305,9 +305,9 @@ func test_a_dead_otto_does_not_pounce() -> void:
 	await wait_physics_frames(3)
 	otto.kill()
 	await wait_seconds(1.0)
-	assert_true(otto.is_grounded(), "тело упало")
-	assert_null(_director(), "мёртвый не напрыгивает")
-	assert_false(agent.is_dead(), "агент жив")
+	assert_true(otto.is_grounded(), "the body fell")
+	assert_null(_director(), "the dead do not jump on")
+	assert_false(agent.is_dead(), "the agent is alive")
 
 
 func test_a_jump_onto_an_agent_pounces() -> void:
@@ -331,10 +331,10 @@ func test_a_jump_onto_an_agent_pounces() -> void:
 		await wait_physics_frames(1)
 		left -= 1
 	var director := _director()
-	assert_not_null(director, "прыгнул на агента — напрыгнул")
+	assert_not_null(director, "jumped onto the agent — jumped on")
 	if director == null:
 		return
-	assert_eq(director.scene().side, Takedown.Side.ABOVE, "сверху")
+	assert_eq(director.scene().side, Takedown.Side.ABOVE, "above")
 	await _wait_for_the_end(agent)
 
 
@@ -352,9 +352,9 @@ func test_the_director_does_not_push_the_agent_into_a_wall() -> void:
 		wait -= 1
 	agent.global_position.x = 0.45
 	await _press_shoot()
-	assert_not_null(_director(), "сценка началась")
+	assert_not_null(_director(), "the scene started")
 	await wait_seconds(0.2)
-	assert_lt(agent.global_position.x, 0.75 - 0.3, "агент у стены, а не в ней")
+	assert_lt(agent.global_position.x, 0.75 - 0.3, "the agent is at the wall, not in it")
 
 
 func test_a_freed_agent_ends_the_scene_quietly() -> void:
@@ -366,12 +366,12 @@ func test_a_freed_agent_ends_the_scene_quietly() -> void:
 	var agent := _agent_at(otto, 0.7, -1.0)
 	await wait_physics_frames(3)
 	await _press_shoot()
-	assert_not_null(_director(), "сценка началась")
+	assert_not_null(_director(), "the scene started")
 	agent.free()
 	await wait_physics_frames(3)
-	assert_null(_director(), "сценка снята")
-	assert_null(otto.takedown, "Otto отпущен")
-	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "мир в своём темпе")
+	assert_null(_director(), "the scene is removed")
+	assert_null(otto.takedown, "Otto is released")
+	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "the world at its own pace")
 
 
 ## Camera kick on the blow (ADR-0050): the view is shifted and tilted, and within [constant
@@ -391,9 +391,9 @@ func test_the_camera_kicks_on_the_blow_and_settles() -> void:
 		await get_tree().process_frame
 		moved = moved or not camera.global_position.is_equal_approx(calm)
 		rolled = rolled or not is_zero_approx(camera.rotation.z)
-	assert_true(moved and rolled, "кадр толкнуло и накренило")
+	assert_true(moved and rolled, "the frame was kicked and tilted")
 	await get_tree().create_timer(SideCamera.KICK_FADE + 0.1, true, false, true).timeout
 	await get_tree().process_frame
 	await get_tree().process_frame
-	assert_false(camera.is_kicked(), "толчок погас")
-	assert_almost_eq(camera.rotation.z, 0.0, 0.0001, "крен снят")
+	assert_false(camera.is_kicked(), "the kick died down")
+	assert_almost_eq(camera.rotation.z, 0.0, 0.0001, "the tilt is removed")

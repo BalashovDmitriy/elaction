@@ -41,7 +41,7 @@ func _run() -> void:
 			count += 1
 	var clip_speed := speed_sum / maxi(count, 1)
 	var actor_speed := Arcade.speed(Arcade.WALK_PX)
-	print("клип %.2f с, опорных кадров %d" % [animation.length, count])
-	print("скорость опоры в клипе %.3f м/с, актёра %.3f м/с" % [clip_speed, actor_speed])
+	print("clip %.2f s, support frames %d" % [animation.length, count])
+	print("support speed in the clip %.3f m/s, actor %.3f m/s" % [clip_speed, actor_speed])
 	print("WALK_CLIP_RATE = %.2f" % (actor_speed / maxf(clip_speed, 0.001)))
 	quit()

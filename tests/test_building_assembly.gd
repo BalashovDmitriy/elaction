@@ -64,9 +64,9 @@ func test_every_seed_assembles_and_holds_otto() -> void:
 		await _wait_for_the_landing(level)
 		assert_true(
 			level.otto.is_grounded(),
-			"сид %d: Otto не стоит на полу — провалился сквозь геометрию" % building_seed
+			"seed %d: Otto is not on the floor — fell through the geometry" % building_seed
 		)
-		assert_false(level.otto.is_dead(), "сид %d: Otto погиб на старте" % building_seed)
+		assert_false(level.otto.is_dead(), "seed %d: Otto died at the start" % building_seed)
 		_drop(level)
 
 
@@ -80,10 +80,10 @@ func test_scene_matches_the_plan() -> void:
 		assert_eq(
 			_count(level, ElevatorCar),
 			plan.shafts.size(),
-			"сид %d: кабин не столько, сколько шахт" % building_seed
+			"seed %d: the cars do not match the shafts in number" % building_seed
 		)
-		assert_eq(_count(level, Door), plan.doors.size(), "сид %d: дверей" % building_seed)
-		assert_eq(_count(level, Escalator), plan.escalators.size(), "сид %d" % building_seed)
+		assert_eq(_count(level, Door), plan.doors.size(), "seed %d: doors" % building_seed)
+		assert_eq(_count(level, Escalator), plan.escalators.size(), "seed %d" % building_seed)
 		_drop(level)
 
 
@@ -155,11 +155,11 @@ func test_a_tall_building_lights_only_what_is_in_frame() -> void:
 		await wait_physics_frames(SETTLE_FRAMES)
 
 		var burning := _lit(level)
-		assert_gt(burning, 0, "сид %d: свет вообще не зажёгся" % building_seed)
+		assert_gt(burning, 0, "seed %d: no light came on at all" % building_seed)
 		assert_lte(
 			burning,
 			LIGHT_BUDGET,
-			"сид %d: горит %d источников при бюджете %d" % [building_seed, burning, LIGHT_BUDGET]
+			"seed %d: %d sources burn with a budget of %d" % [building_seed, burning, LIGHT_BUDGET]
 		)
 		_drop(level)
 
@@ -174,13 +174,13 @@ func test_a_fallen_lamp_puts_its_floor_out() -> void:
 	await wait_physics_frames(SETTLE_FRAMES)
 
 	var lamp := _nearest_lamp_below(level)
-	assert_not_null(lamp, "в здании должна быть лампа ниже Otto")
+	assert_not_null(lamp, "the building must have a lamp below Otto")
 	if lamp == null:
 		return
 
 	var index := lamp.floor_index
 	var lamp_x := WorldSpace.to_plane(lamp.global_position).x
-	assert_false(level.is_dark_at(index, lamp_x), "до выстрела зона горит")
+	assert_false(level.is_dark_at(index, lamp_x), "before the shot the zone is lit")
 	var before := _lit(level)
 	var lamps_on_floor := 0
 	for spot in level.plan().lamps:
@@ -192,17 +192,19 @@ func test_a_fallen_lamp_puts_its_floor_out() -> void:
 	while is_instance_valid(lamp) and left > 0:
 		left -= 1
 		await wait_physics_frames(1)
-	assert_false(is_instance_valid(lamp), "лампа долетела до пола")
+	assert_false(is_instance_valid(lamp), "the lamp reached the floor")
 
 	await wait_physics_frames(2)
-	assert_true(level.is_dark_at(index, lamp_x), "зона лампы на этаже %d погасла" % index)
+	assert_true(level.is_dark_at(index, lamp_x), "the lamp zone on floor %d went dark" % index)
 	# A zone goes dark, not a floor: neighbouring lamps stay lit (ADR-0023, decision 2).
 	assert_eq(
-		level.is_dark(index), lamps_on_floor == 1, "этаж тёмен целиком, только если лампа была одна"
+		level.is_dark(index),
+		lamps_on_floor == 1,
+		"the floor is entirely dark only if there was a single lamp"
 	)
 	# A lamp has two sources — the cone and the fill (ADR-0023, decision 3), and both go with it: "the
 	# zone is lit" and "the lamp hangs" are the same thing.
-	assert_eq(_lit(level), before - 2, "и оба источника лампы перестали гореть")
+	assert_eq(_lit(level), before - 2, "and both light sources of the lamp stopped burning")
 	_drop(level)
 
 
@@ -213,7 +215,7 @@ func test_otto_starts_on_the_roof() -> void:
 	assert_eq(
 		rules.floor_index_near(WorldSpace.to_plane(level.otto.global_position).y),
 		BuildingRules.ROOF,
-		"Otto начинает с крыши, а не с верхнего этажа"
+		"Otto starts on the roof, not on the top floor"
 	)
 
 
@@ -224,7 +226,7 @@ func test_otto_starts_on_the_roof() -> void:
 ## time speed-up (`test_roof_arrival.gd`).
 func _wait_for_the_landing(level: GreyboxLevel) -> void:
 	level.skip_the_intro()
-	assert_true(await level.wait_for_the_landing(), "Otto встал на крышу")
+	assert_true(await level.wait_for_the_landing(), "Otto stood on the roof")
 
 
 ## A cab as wide as the shaft: it takes its width from the rules, not from the scene.
@@ -247,8 +249,8 @@ func test_every_car_is_as_wide_as_its_shaft() -> void:
 		if car == null:
 			continue
 		cars += 1
-		assert_almost_eq(car.width(), rules.shaft_width, 0.001, "кабина в ширину шахты")
+		assert_almost_eq(car.width(), rules.shaft_width, 0.001, "the car is as wide as the shaft")
 		var roof := (car.get_node("RoofShape") as CollisionShape3D).shape as BoxShape3D
-		assert_almost_eq(roof.size.x, rules.shaft_width, 0.001, "и крыша у неё той же ширины")
-	assert_gt(cars, 0, "кабины в здании есть")
+		assert_almost_eq(roof.size.x, rules.shaft_width, 0.001, "and its roof is the same width")
+	assert_gt(cars, 0, "the building has cars")
 	_drop(level)

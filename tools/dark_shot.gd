@@ -49,7 +49,10 @@ func _run() -> void:
 	var lamps := _lamps_on(index)
 	if spots.is_empty() or lamps.size() < 2:
 		push_error(
-			"этаж %d не годится для кадра: мест %d, ламп %d" % [index, spots.size(), lamps.size()]
+			(
+				"floor %d is not suitable for a shot: spots %d, lamps %d"
+				% [index, spots.size(), lamps.size()]
+			)
 		)
 		get_tree().quit(1)
 		return
@@ -73,7 +76,7 @@ func _run() -> void:
 	await _settle_after_the_fall()
 	await _shoot("03_floor_dark", null)
 
-	print("  этаж %d, зон %d: кадры в %s" % [index, lamps.size(), FOLDER])
+	print("  floor %d, zones %d: shots in %s" % [index, lamps.size(), FOLDER])
 	get_tree().quit(0)
 
 

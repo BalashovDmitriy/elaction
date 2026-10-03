@@ -62,21 +62,21 @@ func test_without_up_nobody_enters() -> void:
 
 
 func test_jumping_past_the_door_does_not_enter_it() -> void:
-	assert_false(_visit().knock(false, HELD_UP), "в прыжке в дверь не заходят")
+	assert_false(_visit().knock(false, HELD_UP), "nobody enters a door mid-jump")
 
 
 func test_held_up_does_not_pull_back_after_release() -> void:
 	var visit := _visit()
 	visit.admit()
 	visit.release()
-	assert_false(visit.knock(true, HELD_UP), "кнопку надо отпустить и нажать заново")
+	assert_false(visit.knock(true, HELD_UP), "the button must be released and pressed again")
 	visit.knock(true, RELEASED)
 	assert_true(visit.knock(true, HELD_UP))
 
 
 func test_the_time_inside_is_seventy_rom_ticks() -> void:
 	assert_eq(Arcade.ROOM_TICKS, 70, "$82ED = $46 (@2A5B)")
-	assert_almost_eq(DoorVisit.new().hide_time, 4.73, 0.01, "70 тиков — 4,73 с")
+	assert_almost_eq(DoorVisit.new().hide_time, 4.73, 0.01, "70 ticks — 4.73 s")
 
 
 func test_the_guest_hides_only_once_the_leaf_is_open() -> void:
@@ -88,8 +88,8 @@ func test_the_guest_hides_only_once_the_leaf_is_open() -> void:
 		if _frame(visit, cycle) == DoorVisit.Cue.HIDE:
 			hid_at = float(frame + 1) * STEP
 			break
-		assert_false(visit.is_hiding(), "пока створка идёт, гость ещё на виду")
-	assert_almost_eq(hid_at, LEAF_TIME, STEP * 1.5, "прячется, когда створка открылась")
+		assert_false(visit.is_hiding(), "while the leaf moves, the guest is still in view")
+	assert_almost_eq(hid_at, LEAF_TIME, STEP * 1.5, "hides when the leaf has opened")
 	assert_true(visit.is_hiding())
 
 
@@ -108,8 +108,8 @@ func test_the_leaf_is_shut_while_the_guest_is_inside() -> void:
 			shut_frames += 1
 	# He hides after one leaf movement, after another one it closes — from then on it is closed.
 	var expected := visit.hide_time - LEAF_TIME * 3.0
-	assert_gt(float(shut_frames) * STEP, expected - STEP * 3.0, "за ним створка закрыта")
-	assert_gt(hiding_frames, shut_frames, "а сперва закрывается у него за спиной")
+	assert_gt(float(shut_frames) * STEP, expected - STEP * 3.0, "the leaf is closed behind him")
+	assert_gt(hiding_frames, shut_frames, "and at first it closes behind his back")
 
 
 func test_the_leaf_opens_to_let_him_out_and_he_is_out_exactly_on_time() -> void:
@@ -124,10 +124,10 @@ func test_the_leaf_opens_to_let_him_out_and_he_is_out_exactly_on_time() -> void:
 			let_out_at = visit.elapsed()
 		if cue == DoorVisit.Cue.OUT:
 			out_at = visit.elapsed()
-			assert_true(cycle.is_open(), "выходят в открытую створку")
+			assert_true(cycle.is_open(), "they come out into an open leaf")
 			break
-	assert_almost_eq(let_out_at, visit.hide_time - LEAF_TIME, STEP * 1.5, "открывают заранее")
-	assert_almost_eq(out_at, Arcade.seconds(Arcade.ROOM_TICKS), STEP * 1.5, "ровно 70 тиков")
+	assert_almost_eq(let_out_at, visit.hide_time - LEAF_TIME, STEP * 1.5, "opened in advance")
+	assert_almost_eq(out_at, Arcade.seconds(Arcade.ROOM_TICKS), STEP * 1.5, "exactly 70 ticks")
 
 
 func test_the_guest_waits_for_a_leaf_that_is_late() -> void:
@@ -135,8 +135,10 @@ func test_the_guest_waits_for_a_leaf_that_is_late() -> void:
 	visit.admit()
 	# The leaf stays closed: neither hiding nor leaving, however much time passes.
 	for _frame_index: int in 600:
-		assert_ne(visit.tick(STEP, false), DoorVisit.Cue.OUT, "сквозь закрытую не выходят")
-	assert_false(visit.is_hiding(), "и не прячутся")
+		assert_ne(
+			visit.tick(STEP, false), DoorVisit.Cue.OUT, "nobody comes out through a closed one"
+		)
+	assert_false(visit.is_hiding(), "and do not hide")
 
 
 func test_nothing_happens_without_a_guest() -> void:

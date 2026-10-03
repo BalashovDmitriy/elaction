@@ -8,7 +8,7 @@ The `status-updated` hook checks this.
 | **Updated** | 2026-10-03 |
 | **Current milestone** | none — M24p is merged; next in the plan is M25 (optional) |
 | **Branch** | `docs/english` — documentation translation |
-| **State** | M24p is merged into `main` (PR #66). All documentation and code comments are translated into English (`docs/english`); awaiting PR |
+| **State** | M24p is merged into `main` (PR #66). All documentation, code comments and strings in code are translated into English (`docs/english`); the only Russian left is the game's translation `assets/i18n/ui.csv`. Awaiting PR |
 | **Rollback point** | `main` holds the 3D build since M19; 2D remains in history, `d5774df` |
 
 ## Where we are now

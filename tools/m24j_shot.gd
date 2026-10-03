@@ -62,7 +62,7 @@ func _run() -> void:
 	for time: int in _times:
 		for weather: int in _weathers:
 			await _combo(time, weather)
-	print("  кадры M24j в %s" % _folder)
+	print("  M24j shots in %s" % _folder)
 	get_tree().quit(0)
 
 
@@ -105,7 +105,7 @@ func _combo(time: int, weather: int) -> void:
 func _shoot_floor(label: String, index: int) -> void:
 	var spots := _level.plan().safe_spots(_level.rules, index)
 	if spots.is_empty():
-		push_error("этаж %d: вставать некуда" % index)
+		push_error("floor %d: nowhere to stand" % index)
 		return
 	_place(spots[spots.size() / 2], index)
 	await _shoot(label)
@@ -200,7 +200,7 @@ func _shoot_room(label: String) -> void:
 			door = candidate
 			break
 	if door == null:
-		push_error("на этаже %d нет двери" % index)
+		push_error("no door on floor %d" % index)
 		return
 	_place(door.mat_position().x + 2.5, index)
 	await _settle_frames(20)

@@ -35,9 +35,9 @@ func test_the_muzzle_meets_the_bullet_line() -> void:
 		rig.snap()
 		var muzzle := rig.to_local(rig.muzzle_position())
 		var wanted := Vector3(0.0, float(case[2]), reach)
-		var label := "%s в позе %s" % [(case[0] as PackedScene).resource_path.get_file(), case[1]]
-		assert_almost_eq(muzzle.y, wanted.y, 0.03, label + ": дуло на высоте пули")
-		assert_almost_eq(muzzle.z, wanted.z, 0.05, label + ": и на выносе ствола")
+		var label := "%s in pose %s" % [(case[0] as PackedScene).resource_path.get_file(), case[1]]
+		assert_almost_eq(muzzle.y, wanted.y, 0.03, label + ": muzzle at bullet height")
+		assert_almost_eq(muzzle.z, wanted.z, 0.05, label + ": and at the barrel reach")
 
 
 ## A crouching one shoots without changing pose: the arm aims even on a frozen rig, and
@@ -53,9 +53,9 @@ func test_the_arm_aims_on_a_settled_pose() -> void:
 	rig.aim_reach = Proportions.MUZZLE
 	rig.advance(1.0 / 60.0)
 	var aimed := rig.to_local(rig.muzzle_position())
-	assert_almost_eq(aimed.y, Proportions.SHOT_LOW, 0.03, "дуло на высоте пули")
-	assert_almost_eq(aimed.z, Proportions.MUZZLE, 0.05, "и на выносе ствола")
+	assert_almost_eq(aimed.y, Proportions.SHOT_LOW, 0.03, "muzzle at bullet height")
+	assert_almost_eq(aimed.z, Proportions.MUZZLE, 0.05, "and at the barrel reach")
 	rig.aim_height = NAN
 	rig.advance(1.0 / 60.0)
 	var lowered := rig.to_local(rig.muzzle_position())
-	assert_almost_eq(lowered.distance_to(resting), 0.0, 0.01, "выстрел кончился — рука опустилась")
+	assert_almost_eq(lowered.distance_to(resting), 0.0, 0.01, "the shot ended: the arm lowered")

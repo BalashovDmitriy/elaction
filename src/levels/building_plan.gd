@@ -124,7 +124,7 @@ static func generate(rules: BuildingRules, seed_value: int) -> BuildingPlan:
 		if plan._unbridged < 0 and BuildingBasement.shaft_of(plan) != null:
 			return plan
 	if plan._unbridged >= 0:
-		push_error("этаж %d остался без эскалатора: свободных мест нет" % plan._unbridged)
+		push_error("floor %d is left without an escalator: no free spot" % plan._unbridged)
 	return plan
 
 
@@ -688,7 +688,7 @@ func _lay_exit(rules: BuildingRules, taken: Dictionary) -> void:
 	var bottom := floors - 1
 	var slot := BuildingBasement.exit_slot(rules)
 	if is_taken(taken, bottom, slot):
-		push_error("место выхода у ворот занято")
+		push_error("the exit spot by the gate is taken")
 	exit_x = rules.slot_x(slot)
 	occupy(taken, bottom, slot)
 

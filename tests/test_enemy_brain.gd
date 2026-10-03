@@ -39,7 +39,7 @@ func _frames_to_shot(brain: EnemyBrain, to_target: Vector2, limit: float = 8.0) 
 func test_agent_climbs_out_of_the_door_first() -> void:
 	var brain := _brain()
 	assert_eq(brain.update(STEP, IN_FRONT, true), EnemyBrain.State.EMERGING)
-	assert_false(brain.fired(), "пока вылезает — не стреляет")
+	assert_false(brain.fired(), "does not shoot while climbing out")
 
 
 func test_agent_walks_once_it_is_out() -> void:
@@ -53,8 +53,8 @@ func test_a_calm_agent_takes_aim() -> void:
 	var brain := _brain(0)
 	_run(brain, 0.4, FAR_ABOVE)
 	var frames := _frames_to_shot(brain, IN_FRONT)
-	assert_gt(frames, -1, "агент выстрелил")
-	assert_gte(float(frames) * STEP, Arcade.wind_up(0) - STEP, "не раньше замаха")
+	assert_gt(frames, -1, "agent fired")
+	assert_gte(float(frames) * STEP, Arcade.wind_up(0) - STEP, "not before the wind-up")
 
 
 ## The windup is visible: until the bullet has gone out, the agent winds up, and the
@@ -64,11 +64,11 @@ func test_the_wind_up_is_visible_until_the_shot() -> void:
 	var brain := _brain(0)
 	_run(brain, 0.4, FAR_ABOVE)
 	brain.update(STEP, IN_FRONT, true)
-	assert_true(brain.is_winding_up(), "решил стрелять — замахивается")
-	assert_almost_eq(brain.wind_up_left(), Arcade.wind_up(0), STEP * 1.5, "замах ROM")
+	assert_true(brain.is_winding_up(), "decided to shoot — winds up")
+	assert_almost_eq(brain.wind_up_left(), Arcade.wind_up(0), STEP * 1.5, "ROM wind-up")
 	var frames := _frames_to_shot(brain, IN_FRONT)
-	assert_gt(frames, -1, "выстрелил")
-	assert_false(brain.is_winding_up(), "пуля ушла — луча нет")
+	assert_gt(frames, -1, "fired")
+	assert_false(brain.is_winding_up(), "bullet gone — no beam")
 	assert_eq(brain.wind_up_left(), 0.0)
 
 
@@ -79,8 +79,8 @@ func test_a_mean_agent_fires_after_the_shortest_tell() -> void:
 	_run(brain, 0.4, FAR_ABOVE)
 	var frames := _frames_to_shot(brain, IN_FRONT)
 	var tell := int(ceil(EnemyBrain.MIN_TELL / STEP))
-	assert_gte(frames, tell - 1, "не раньше минимального замаха")
-	assert_lte(frames, tell + 1, "и не позже")
+	assert_gte(frames, tell - 1, "not before the minimum wind-up")
+	assert_lte(frames, tell + 1, "and not later")
 
 
 ## The pause after a shot is max(0, 80 − 8·anger) ticks (@0055).
@@ -89,7 +89,7 @@ func test_agent_holds_fire_between_shots() -> void:
 	_run(brain, 0.4, FAR_ABOVE)
 	assert_gt(_frames_to_shot(brain, IN_FRONT), -1)
 	var again := _frames_to_shot(brain, IN_FRONT)
-	assert_gte(float(again) * STEP, Arcade.cooldown(0) - Arcade.action_time(0), "пауза по ROM")
+	assert_gte(float(again) * STEP, Arcade.cooldown(0) - Arcade.action_time(0), "ROM pause")
 
 
 ## An agent has one bullet: while the previous one flies, there is no new one (@1BAE).
@@ -98,7 +98,7 @@ func test_one_bullet_in_flight() -> void:
 	_run(brain, 0.4, FAR_ABOVE)
 	for _frame: int in 120:
 		brain.update(STEP, IN_FRONT, true, -1.0, true, false)
-		assert_false(brain.fired(), "прошлая пуля в полёте — не стреляет")
+		assert_false(brain.fired(), "previous bullet in flight — does not shoot")
 
 
 ## Shoots when facing Otto; with his back to him, no, unless there is an alarm (@0568).
@@ -108,7 +108,7 @@ func test_agent_shoots_only_what_he_faces() -> void:
 	brain.face(1.0)
 	for _frame: int in 30:
 		brain.update(STEP, BEHIND, true)
-		assert_false(brain.fired(), "Otto за спиной — не стреляет")
+		assert_false(brain.fired(), "Otto behind — does not shoot")
 		brain.face(1.0)
 
 
@@ -117,7 +117,7 @@ func test_an_alerted_agent_turns_and_shoots() -> void:
 	_run(brain, 0.4, FAR_ABOVE)
 	brain.face(1.0)
 	brain.alert = true
-	assert_gt(_frames_to_shot(brain, BEHIND, 1.0), -1, "под тревогой — развернулся и выстрелил")
+	assert_gt(_frames_to_shot(brain, BEHIND, 1.0), -1, "under alarm — turned around and fired")
 	assert_eq(brain.facing, -1.0)
 
 
@@ -141,7 +141,7 @@ func test_agent_does_not_shoot_the_unseen() -> void:
 	_run(brain, 0.4, FAR_ABOVE)
 	for _frame: int in 60:
 		brain.update(STEP, IN_FRONT, false)
-		assert_false(brain.fired(), "невидимого не обстреливают")
+		assert_false(brain.fired(), "an invisible target is not shot at")
 
 
 func test_dead_agent_stays_dead() -> void:
@@ -164,10 +164,12 @@ func test_turning_around_flips_the_facing() -> void:
 ## a bullet three times faster is unavoidable without it (ADR-0037, decision 5).
 func test_the_tell_never_drops_below_the_minimum() -> void:
 	for level: int in range(0, 20):
-		assert_gte(EnemyBrain.tell_time(level), EnemyBrain.MIN_TELL, "злость %d" % level)
-		assert_gte(EnemyBrain.tell_time(level), Arcade.wind_up(level), "не короче ROM")
+		assert_gte(EnemyBrain.tell_time(level), EnemyBrain.MIN_TELL, "anger %d" % level)
+		assert_gte(EnemyBrain.tell_time(level), Arcade.wind_up(level), "not shorter than ROM")
 		assert_gt(
-			Arcade.action_time(level), EnemyBrain.tell_time(level), "пуля уходит внутри действия"
+			Arcade.action_time(level),
+			EnemyBrain.tell_time(level),
+			"the bullet leaves within the action"
 		)
 
 
@@ -179,10 +181,12 @@ func test_agent_holds_the_shot_while_otto_cannot_be_hit() -> void:
 	_run(brain, 0.4, FAR_ABOVE)
 	for _frame: int in 300:
 		brain.update(STEP, IN_FRONT, true, -1.0, true, true, false, false)
-		assert_false(brain.fired(), "в неуязвимого не стреляют")
-	assert_true(brain.is_winding_up(), "но целятся: луч прицела горит")
+		assert_false(brain.fired(), "an invulnerable target is not shot at")
+	assert_true(brain.is_winding_up(), "but they aim: the aiming beam is lit")
 	assert_eq(brain.state, EnemyBrain.State.SHOOT)
-	assert_almost_eq(brain.wind_up_left(), EnemyBrain.MIN_TELL, STEP, "замах стоит на минимуме")
+	assert_almost_eq(
+		brain.wind_up_left(), EnemyBrain.MIN_TELL, STEP, "wind-up stays at the minimum"
+	)
 
 
 ## Once he becomes vulnerable, the bullet goes out after [constant EnemyBrain.MIN_TELL]:
@@ -198,9 +202,9 @@ func test_agent_fires_once_otto_can_be_hit_again() -> void:
 		if brain.fired():
 			frames = frame
 			break
-	assert_gt(frames, -1, "стал уязвим — выстрел")
+	assert_gt(frames, -1, "became vulnerable — shot")
 	assert_almost_eq(
-		float(frames + 1) * STEP, EnemyBrain.MIN_TELL, STEP * 1.5, "через замах-минимум"
+		float(frames + 1) * STEP, EnemyBrain.MIN_TELL, STEP * 1.5, "after the minimum wind-up"
 	)
 
 
@@ -211,6 +215,8 @@ func test_a_long_tell_runs_down_while_otto_cannot_be_hit() -> void:
 	_run(brain, 0.4, FAR_ABOVE)
 	brain.update(STEP, IN_FRONT, true, -1.0, true, true, false, false)
 	var start := brain.wind_up_left()
-	assert_gt(start, EnemyBrain.MIN_TELL + STEP * 3.0, "у спокойного замах длиннее минимума")
+	assert_gt(
+		start, EnemyBrain.MIN_TELL + STEP * 3.0, "a calm one winds up longer than the minimum"
+	)
 	brain.update(STEP, IN_FRONT, true, -1.0, true, true, false, false)
-	assert_almost_eq(brain.wind_up_left(), start - STEP, 0.0001, "замах идёт")
+	assert_almost_eq(brain.wind_up_left(), start - STEP, 0.0001, "wind-up is running")

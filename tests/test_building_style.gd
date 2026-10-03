@@ -36,13 +36,13 @@ func test_hotel_and_office_styles_differ_in_every_look() -> void:
 	var identity := BuildingIdentity.new()
 	identity.kind = BuildingIdentity.Kind.OFFICE
 	var office := BuildingStyle.of(identity)
-	assert_ne(hotel.runner, office.runner, "дорожка — только в отеле")
-	assert_ne(hotel.fixture, office.fixture, "светильники разные")
-	assert_ne(hotel.sconces, office.sconces, "бра — только в отеле")
-	assert_ne(hotel.panels, office.panels, "филёнки — у отеля, стекло — у офиса")
+	assert_ne(hotel.runner, office.runner, "runner only in the hotel")
+	assert_ne(hotel.fixture, office.fixture, "fixtures differ")
+	assert_ne(hotel.sconces, office.sconces, "sconces only in the hotel")
+	assert_ne(hotel.panels, office.panels, "panels in the hotel, glass in the office")
 	assert_ne(hotel.vision_glass, office.vision_glass)
-	assert_ne(hotel.departments, office.departments, "отделы на табличках — у офиса")
-	assert_false(hotel.crown.is_equal_approx(office.crown), "карниз разный")
+	assert_ne(hotel.departments, office.departments, "department plates in the office")
+	assert_false(hotel.crown.is_equal_approx(office.crown), "cornice differs")
 
 
 ## The residential building looks like neither the hotel nor the office (ADR-0055,
@@ -52,26 +52,26 @@ func test_a_residential_style_differs_from_both() -> void:
 	var home := BuildingStyle.of(BuildingIdentity.typed(BuildingIdentity.Kind.RESIDENTIAL))
 	for kind: BuildingIdentity.Kind in [BuildingIdentity.Kind.HOTEL, BuildingIdentity.Kind.OFFICE]:
 		var other := BuildingStyle.of(BuildingIdentity.typed(kind))
-		assert_ne(home.fixture, other.fixture, "светильник свой")
-		assert_ne(home.checker, other.checker, "шахматка — только в жилом доме")
-		assert_ne(home.peephole, other.peephole, "глазок — у квартир")
-		assert_ne(home.apartment_letters, other.apartment_letters, "буквы квартир")
-		assert_false(home.leaf_tone.is_equal_approx(other.leaf_tone), "створка своего цвета")
-	assert_false(home.runner, "дорожки нет")
-	assert_gt(home.door_mat_share, 0.0, "коврики у дверей")
+		assert_ne(home.fixture, other.fixture, "own fixture")
+		assert_ne(home.checker, other.checker, "checkerboard only in the residential building")
+		assert_ne(home.peephole, other.peephole, "peephole on apartments")
+		assert_ne(home.apartment_letters, other.apartment_letters, "apartment letters")
+		assert_false(home.leaf_tone.is_equal_approx(other.leaf_tone), "leaf in its own colour")
+	assert_false(home.runner, "no runner")
+	assert_gt(home.door_mat_share, 0.0, "door mats")
 	var red := GreyboxLook.DOOR_RED
 	var gap := Vector3(home.leaf_tone.r - red.r, home.leaf_tone.g - red.g, home.leaf_tone.b - red.b)
-	assert_gt(gap.length(), 0.4, "створка квартиры не путается с красной дверью")
+	assert_gt(gap.length(), 0.4, "an apartment leaf is not confused with the red door")
 
 
 func test_a_residential_building_hangs_domes_and_peepholes() -> void:
 	var level := await _level(BuildingIdentity.Kind.RESIDENTIAL)
-	assert_eq(level.identity.kind, BuildingIdentity.Kind.RESIDENTIAL, "здание — жилой дом")
+	assert_eq(level.identity.kind, BuildingIdentity.Kind.RESIDENTIAL, "the building is residential")
 	for lamp: Lamp in level.find_children("*", "Lamp", true, false):
 		assert_has(
 			[BuildingStyle.Fixture.DOME, BuildingStyle.Fixture.BULB],
 			lamp.fixture,
-			"в жилом доме — тарелка или голая лампочка"
+			"residential: a plate or a bare bulb"
 		)
 	var peepholes := 0
 	var mats := 0
@@ -80,36 +80,36 @@ func test_a_residential_building_hangs_domes_and_peepholes() -> void:
 			peepholes += 1
 		if door.find_child("Doormat", true, false) != null:
 			mats += 1
-		assert_null(door.find_child("VisionGlass", true, false), "стекла в двери квартиры нет")
-	assert_gt(peepholes, 0, "у дверей квартир глазок")
-	assert_gt(mats, 0, "у дверей квартир коврики")
-	assert_eq(level.find_children("Sconce", "", true, false).size(), 0, "бра нет")
+		assert_null(door.find_child("VisionGlass", true, false), "no glass in the apartment door")
+	assert_gt(peepholes, 0, "apartment doors have a peephole")
+	assert_gt(mats, 0, "apartment doors have mats")
+	assert_eq(level.find_children("Sconce", "", true, false).size(), 0, "no sconces")
 
 
 func test_an_office_hangs_panels_and_glazed_doors() -> void:
 	var level := await _level(BuildingIdentity.Kind.OFFICE)
-	assert_false(level.identity.is_hotel(), "здание — офис")
+	assert_false(level.identity.is_hotel(), "the building is an office")
 	for lamp: Lamp in level.find_children("*", "Lamp", true, false):
-		assert_eq(lamp.fixture, BuildingStyle.Fixture.PANEL, "в офисе — короб дневного света")
+		assert_eq(lamp.fixture, BuildingStyle.Fixture.PANEL, "office: a daylight panel box")
 	var glazed := 0
 	for door: Door in level.doors():
 		if door.find_child("VisionGlass", true, false) != null:
 			glazed += 1
-	assert_gt(glazed, 0, "у офисных дверей стекло")
-	assert_eq(level.find_children("Sconce", "", true, false).size(), 0, "бра в офисе нет")
+	assert_gt(glazed, 0, "office doors have glass")
+	assert_eq(level.find_children("Sconce", "", true, false).size(), 0, "no sconces in the office")
 
 
 func test_a_hotel_lights_its_pilasters_but_not_on_dark_floors() -> void:
 	var level := await _level(BuildingIdentity.Kind.HOTEL)
-	assert_true(level.identity.is_hotel(), "здание — отель")
+	assert_true(level.identity.is_hotel(), "the building is a hotel")
 	var sconces := level.find_children("Sconce", "", true, false)
-	assert_gt(sconces.size(), 0, "бра на пилястрах отеля")
+	assert_gt(sconces.size(), 0, "hotel sconces on pilasters")
 	for sconce: Node in sconces:
 		var at := WorldSpace.to_plane((sconce as Node3D).global_position)
 		var index := level.rules.floor_index_near(at.y + WallSconce.HEIGHT)
-		assert_false(level.rules.is_unlit(index), "на тёмном этаже бра не горит")
+		assert_false(level.rules.is_unlit(index), "sconce is off on a dark floor")
 	for door: Door in level.doors():
-		assert_null(door.find_child("VisionGlass", true, false), "у отеля двери без стекла")
+		assert_null(door.find_child("VisionGlass", true, false), "hotel doors have no glass")
 
 
 ## The office wall is glass with a hall behind it (ADR-0056, decision 4); the hotel and
@@ -122,19 +122,21 @@ func test_only_an_office_opens_its_hall_behind_glass() -> void:
 		var halls := level.find_children("OpenSpace", "OpenSpace", true, false)
 		var joints := level.get_node_or_null("Scenery/FloorDetail/Joint")
 		if kind != BuildingIdentity.Kind.OFFICE:
-			assert_eq(halls.size(), 0, "тип %d: зала нет" % kind)
-			assert_not_null(joints, "тип %d: стыки панелей на стене" % kind)
+			assert_eq(halls.size(), 0, "kind %d: no hall" % kind)
+			assert_not_null(joints, "kind %d: panel joints on the wall" % kind)
 			continue
-		assert_null(joints, "у стекла офиса стыков панелей нет")
-		assert_eq(halls.size(), 1, "у офиса зал за стеклом")
+		assert_null(joints, "office glass has no panel joints")
+		assert_eq(halls.size(), 1, "the office has a hall behind glass")
 		var hall := halls[0] as OpenSpace
-		assert_eq(hall.find_children("*", "PhysicsBody3D", true, false).size(), 0, "зал без тел")
+		assert_eq(
+			hall.find_children("*", "PhysicsBody3D", true, false).size(), 0, "hall without bodies"
+		)
 		for part: Node in hall.get_children():
 			var many := part as MultiMeshInstance3D
-			assert_not_null(many, "зал — мультимешами")
+			assert_not_null(many, "hall as multimeshes")
 			if many != null:
 				assert_eq(
-					many.cast_shadow, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, "без теней"
+					many.cast_shadow, GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, "no shadows"
 				)
 
 
@@ -164,12 +166,12 @@ func test_wall_decor_hangs_above_the_wainscot() -> void:
 				assert_gte(
 					rules.floor_surface(index) - bottom,
 					rail_top - 0.001,
-					"тип %d: %s за поручнем" % [kind, item.name]
+					"kind %d: %s behind the rail" % [kind, item.name]
 				)
 				hung += 1
 			level.queue_free()
 			await get_tree().process_frame
-		assert_gt(hung, 0, "тип %d: на стенах ничего" % kind)
+		assert_gt(hung, 0, "kind %d: nothing on the walls" % kind)
 
 
 ## An office door opens into the hall: there is no room of its own behind it.
@@ -178,10 +180,10 @@ func test_an_office_door_opens_into_the_hall() -> void:
 	door.furnish(BuildingIdentity.typed(BuildingIdentity.Kind.OFFICE), 11)
 	add_child_autofree(door)
 	await wait_physics_frames(2)
-	assert_true(door.summon_agent(), "дверь открывается под агента")
+	assert_true(door.summon_agent(), "the door opens for an agent")
 	for _frame: int in 120:
 		await wait_physics_frames(1)
 		if door.openness() > 0.5:
 			break
-	assert_gt(door.openness(), 0.0, "открылась")
-	assert_null(door.room(), "комнаты за дверью офиса нет")
+	assert_gt(door.openness(), 0.0, "opened")
+	assert_null(door.room(), "no room behind the office door")

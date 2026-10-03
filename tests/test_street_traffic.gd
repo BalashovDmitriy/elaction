@@ -33,8 +33,12 @@ func _gaps(traffic: StreetTraffic, near: bool) -> Array[float]:
 func test_both_lanes_carry_cars_from_the_first_frame() -> void:
 	for building_seed: int in SEEDS:
 		var traffic := _traffic(building_seed)
-		assert_gt(traffic.cars(true).size(), 0, "сид %d: ближняя полоса не пустая" % building_seed)
-		assert_gt(traffic.cars(false).size(), 0, "сид %d: дальняя не пустая" % building_seed)
+		assert_gt(
+			traffic.cars(true).size(), 0, "seed %d: the near lane is not empty" % building_seed
+		)
+		assert_gt(
+			traffic.cars(false).size(), 0, "seed %d: the far one is not empty" % building_seed
+		)
 
 
 func test_cars_never_run_into_each_other() -> void:
@@ -49,7 +53,7 @@ func test_cars_never_run_into_each_other() -> void:
 		assert_gte(
 			worst,
 			StreetTraffic.MIN_GAP - 0.2,
-			"сид %d: машины не наезжают друг на друга" % building_seed
+			"seed %d: cars do not run into each other" % building_seed
 		)
 
 
@@ -59,15 +63,15 @@ func test_the_street_keeps_moving() -> void:
 	var before := first.x
 	for _step: int in 60:
 		traffic.step(STEP)
-	assert_lt(first.x, before, "ближняя полоса идёт влево")
+	assert_lt(first.x, before, "the near lane goes left")
 	var far := traffic.cars(false)[0]
 	before = far.x
 	for _step: int in 60:
 		traffic.step(STEP)
-	assert_gt(far.x, before, "дальняя — вправо")
+	assert_gt(far.x, before, "the far one — right")
 	for _step: int in STEPS:
 		traffic.step(STEP)
-	assert_gt(traffic.cars(true).size(), 0, "уехавших сменяют новые")
+	assert_gt(traffic.cars(true).size(), 0, "new ones replace those that left")
 
 
 ## A car behind Otto's merged car keeps its distance: it does not pass through.
@@ -84,7 +88,7 @@ func test_cars_behind_otto_s_car_keep_their_distance() -> void:
 			if traffic.is_clear_for(x):
 				break
 		traffic.hold_back(false)
-		assert_true(traffic.is_clear_for(x), "сид %d: просвет наступил" % building_seed)
+		assert_true(traffic.is_clear_for(x), "seed %d: the gap came" % building_seed)
 		traffic.join(guest)
 		# Otto starts slower than the traffic: those coming up from behind must brake.
 		var worst := INF
@@ -94,13 +98,17 @@ func test_cars_behind_otto_s_car_keep_their_distance() -> void:
 			for car: StreetTraffic.Car in traffic.cars(true):
 				if car.x > guest.position.x:
 					worst = minf(worst, car.x - guest.position.x - CarModel.LENGTH)
-		assert_gte(worst, StreetTraffic.MIN_GAP - 0.2, "сид %d: сзади не наехали" % building_seed)
+		assert_gte(
+			worst,
+			StreetTraffic.MIN_GAP - 0.2,
+			"seed %d: nobody ran into the one behind" % building_seed
+		)
 
 
 func test_a_car_close_behind_closes_the_gap() -> void:
 	var traffic := _traffic(1)
 	var car := traffic.cars(true)[traffic.cars(true).size() - 1]
-	assert_false(traffic.is_clear_for(car.x - CarModel.LENGTH - 3.0), "машина в трёх метрах сзади")
+	assert_false(traffic.is_clear_for(car.x - CarModel.LENGTH - 3.0), "a car three metres behind")
 
 
 ## The traffic situation is a building draw (ADR-0046, decision 3): on different seeds
@@ -111,15 +119,17 @@ func test_the_road_situation_is_a_draw_of_the_building() -> void:
 		var density := StreetTraffic.density_for(building_seed)
 		seen[density] = true
 		var traffic := _traffic(building_seed)
-		assert_eq(traffic.density, density, "сид %d: ситуация — первым жребием" % building_seed)
-	assert_eq(seen.size(), StreetTraffic.Density.size(), "выпадают все ситуации")
+		assert_eq(
+			traffic.density, density, "seed %d: the situation — by the first draw" % building_seed
+		)
+	assert_eq(seen.size(), StreetTraffic.Density.size(), "all situations come up")
 	var light := StreetTraffic.GAPS[StreetTraffic.Density.LIGHT]
 	var heavy := StreetTraffic.GAPS[StreetTraffic.Density.HEAVY]
-	assert_gt(light.x, heavy.y, "в свободной просвет шире, чем в плотной любой")
+	assert_gt(light.x, heavy.y, "in the free one the gap is wider than any in the dense one")
 	assert_lt(
 		StreetTraffic.WAIT_LIMITS[StreetTraffic.Density.LIGHT],
 		StreetTraffic.WAIT_LIMITS[StreetTraffic.Density.HEAVY],
-		"в плотной ждать дольше"
+		"in the dense one the wait is longer"
 	)
 
 
@@ -131,4 +141,4 @@ func test_traffic_cars_are_a_mix_of_models() -> void:
 		for near: bool in [true, false]:
 			for car: StreetTraffic.Car in traffic.cars(near):
 				models[car.node.get_child(0).scene_file_path] = true
-	assert_gt(models.size(), 2, "в потоке больше двух моделей")
+	assert_gt(models.size(), 2, "more than two models in the flow")

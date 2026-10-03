@@ -5,12 +5,12 @@ extends GutTest
 
 func test_every_pose_of_otto_has_a_record() -> void:
 	for pose_name: String in ActorPose.OTTO_POSES:
-		assert_true(FigurePoses.knows(pose_name), "у позы %s нет записи" % pose_name)
+		assert_true(FigurePoses.knows(pose_name), "pose %s has no entry" % pose_name)
 
 
 func test_every_pose_of_the_agent_has_a_record() -> void:
 	for pose_name: String in ActorPose.AGENT_POSES:
-		assert_true(FigurePoses.knows(pose_name), "у позы %s нет записи" % pose_name)
+		assert_true(FigurePoses.knows(pose_name), "pose %s has no entry" % pose_name)
 
 
 func test_every_clip_a_pose_asks_for_is_one_the_model_carries() -> void:
@@ -20,24 +20,26 @@ func test_every_clip_a_pose_asks_for_is_one_the_model_carries() -> void:
 	for pose_name: String in poses:
 		var clip := FigurePoses.clip_of(pose_name)
 		if clip != null:
-			assert_has(FigurePoses.CLIP_NAMES, clip.name, "%s: клип %s" % [pose_name, clip.name])
+			assert_has(FigurePoses.CLIP_NAMES, clip.name, "%s: clip %s" % [pose_name, clip.name])
 
 
 ## ADR-0032, decision 1: where the ROM dictates the height, the pose is in code.
 func test_the_rom_stances_are_poses_in_code() -> void:
 	for pose_name: String in [ActorPose.CROUCH, ActorPose.PRONE, "crushed", "choke_hold"]:
-		assert_null(FigurePoses.clip_of(pose_name), "%s — поза кодом, не клип" % pose_name)
+		assert_null(FigurePoses.clip_of(pose_name), "%s is a pose by code, not a clip" % pose_name)
 
 
 func test_the_jump_takes_off_and_lands_with_clips() -> void:
 	# The jump in three phases (ADR-0039): takeoff and landing are UAL clips; in flight
 	# since M24d — the flight clip, the kick is gone (ADR-0040).
 	var jump := FigurePoses.clip_of("jump")
-	assert_eq(jump.name, FigurePoses.CLIP_JUMP_START, "толчок — клип")
-	assert_gt(jump.start, 0.0, "с отрыва, без приседа-замаха: прыжок в игре мгновенный")
+	assert_eq(jump.name, FigurePoses.CLIP_JUMP_START, "push-off is a clip")
+	assert_gt(
+		jump.start, 0.0, "from take-off, without a wind-up crouch: the jump in the game is instant"
+	)
 	var land := FigurePoses.clip_of("land")
-	assert_eq(land.name, FigurePoses.CLIP_JUMP_LAND, "приземление — клип")
-	assert_gt(land.rate, 1.0, "быстрее записанного: присед мелькает, а не держится")
+	assert_eq(land.name, FigurePoses.CLIP_JUMP_LAND, "landing is a clip")
+	assert_gt(land.rate, 1.0, "faster than recorded: the crouch flashes by instead of holding")
 
 
 func test_every_transition_is_short_and_ends() -> void:
@@ -45,8 +47,8 @@ func test_every_transition_is_short_and_ends() -> void:
 	# none lasts longer than a third of a second — otherwise movement is sluggish again.
 	for pose_name: String in ActorPose.OTTO_POSES + ActorPose.AGENT_POSES:
 		var time := FigurePoses.blend_time(pose_name)
-		assert_gt(time, 0.0, "%s: переход есть" % pose_name)
-		assert_lte(time, 0.3, "%s: и короткий" % pose_name)
+		assert_gt(time, 0.0, "%s: has a transition" % pose_name)
+		assert_lte(time, 0.3, "%s: and a short one" % pose_name)
 
 
 func test_walking_idle_shooting_and_dying_are_clips() -> void:
@@ -82,14 +84,14 @@ func test_a_copy_is_its_own() -> void:
 func test_the_crouch_squats_on_bent_knees() -> void:
 	# M18c debt: the crouch is squatting, not bending the torso.
 	var crouch := FigurePoses.of(ActorPose.CROUCH)
-	assert_gt(crouch.legs.x, 60.0, "бёдра вперёд")
-	assert_gt(crouch.knees.x, 90.0, "колени сложены")
-	assert_lt(crouch.lean, 60.0, "корпус над коленями, а не на них")
+	assert_gt(crouch.legs.x, 60.0, "hips forward")
+	assert_gt(crouch.knees.x, 90.0, "knees bent")
+	assert_lt(crouch.lean, 60.0, "torso above the knees, not on them")
 
 
 func test_the_crushed_are_flat_and_the_prone_face_down() -> void:
-	assert_lt(FigurePoses.of("crushed").squash, 0.5, "раздавленный сплющен")
-	assert_gt(FigurePoses.of(ActorPose.PRONE).tilt, 45.0, "залёгший — лицом вперёд, не на спине")
+	assert_lt(FigurePoses.of("crushed").squash, 0.5, "crushed one is flattened")
+	assert_gt(FigurePoses.of(ActorPose.PRONE).tilt, 45.0, "prone — face forward, not on the back")
 
 
 func test_lift_is_an_extra_above_the_ground_not_a_fix_for_sinking() -> void:

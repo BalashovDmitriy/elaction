@@ -67,14 +67,14 @@ def add(archive: zipfile.ZipFile, source: Path, name: str, executable: bool = Fa
 def package(preset: Preset) -> int:
     """Builds the archive for a preset. Returns the exit code for the process."""
     if not preset.path.exists():
-        print(f"Нет собранного билда {preset.path} — сначала python tools/export.py {preset.alias}")
+        print(f"No built build {preset.path} — run python tools/export.py {preset.alias} first")
         return 1
 
     # Checked before the archive is opened: otherwise a truncated zip is left halfway in dist/,
     # which from the outside cannot be told apart from a finished one.
     missing = [source for source in EXTRAS if not (PROJECT_ROOT / source).exists()]
     if missing:
-        print(f"Не нашёл {', '.join(missing)} — архив без них не собираю.")
+        print(f"Not found: {', '.join(missing)} — not packing the archive without them.")
         return 1
 
     DIST_DIR.mkdir(parents=True, exist_ok=True)
@@ -88,21 +88,21 @@ def package(preset: Preset) -> int:
             add(archive, PROJECT_ROOT / source, f"{INNER_DIR}/{inside}")
 
     size_mb = target.stat().st_size / (1024 * 1024)
-    print(f"Архив: {target} ({size_mb:.1f} МБ)")
+    print(f"Archive: {target} ({size_mb:.1f} MB)")
     return 0
 
 
 def main(argv: list[str]) -> int:
     use_utf8_output()
     if not argv:
-        print("Нужна платформа: python tools/package.py windows|linux")
+        print("A platform is needed: python tools/package.py windows|linux")
         return 2
 
     presets = read_presets()
     preset = pick(presets, argv[0])
     if preset is None:
         known = ", ".join(known_preset.alias for known_preset in presets)
-        print(f"Нет пресета «{argv[0]}». Есть: {known}.")
+        print(f"No preset '{argv[0]}'. Available: {known}.")
         return 2
 
     return package(preset)

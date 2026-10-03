@@ -31,8 +31,8 @@ func test_every_page_builds_and_takes_focus() -> void:
 		menu.show_page(page as Menu.Page)
 		await wait_physics_frames(SETTLE_FRAMES)
 		var rows := menu.rows()
-		assert_gt(rows.size(), 0, "на странице %d есть пункты" % page)
-		assert_true(rows[0].has_focus(), "страница %d отдаёт фокус первому пункту" % page)
+		assert_gt(rows.size(), 0, "page %d has rows" % page)
+		assert_true(rows[0].has_focus(), "page %d gives focus to the first row" % page)
 
 
 func test_settings_have_every_choice() -> void:
@@ -44,10 +44,10 @@ func test_settings_have_every_choice() -> void:
 	var kinds: Array[int] = []
 	for row: MenuRow in menu.rows():
 		kinds.append(row.kind)
-	assert_eq(kinds.count(MenuRow.Kind.LEVEL), 3, "три громкости")
-	assert_eq(kinds.count(MenuRow.Kind.CHOICE), 6, "шесть переключателей")
-	assert_eq(kinds.count(MenuRow.Kind.TOGGLE), 3, "синхронизация, кровь и кадры в секунду")
-	assert_eq(kinds.count(MenuRow.Kind.ACTION), 1, "назад")
+	assert_eq(kinds.count(MenuRow.Kind.LEVEL), 3, "three volumes")
+	assert_eq(kinds.count(MenuRow.Kind.CHOICE), 6, "six choice rows")
+	assert_eq(kinds.count(MenuRow.Kind.TOGGLE), 3, "vsync, blood and frames per second")
+	assert_eq(kinds.count(MenuRow.Kind.ACTION), 1, "back")
 
 
 ## The frame limit follows the monitor by default, the numbers are labeled like the HUD
@@ -61,16 +61,16 @@ func test_the_frame_limit_row_offers_the_caps() -> void:
 	for index: int in rows.size():
 		if rows[index].kind == MenuRow.Kind.CHOICE and rows[index].options.has("144 FPS"):
 			at = index
-	assert_gt(at, -1, "пункт предела кадров")
+	assert_gt(at, -1, "the frame limit row")
 	if at < 0:
 		return
 	var limit := rows[at]
 	assert_eq(limit.options.size(), DisplayModes.FRAME_LIMITS.size())
-	assert_eq(limit.index, 0, "по умолчанию — по монитору")
+	assert_eq(limit.index, 0, "by default - follows the monitor")
 	assert_string_contains(limit.value_text(), menu.frame_limit_name(DisplayModes.FRAME_MONITOR))
 	assert_eq(limit.options[-1], menu.frame_limit_name(DisplayModes.FRAME_UNLIMITED))
-	assert_eq(rows[at + 1].kind, MenuRow.Kind.TOGGLE, "следом — синхронизация")
-	assert_true(rows[at + 1].on, "синхронизация включена")
+	assert_eq(rows[at + 1].kind, MenuRow.Kind.TOGGLE, "next - vsync")
+	assert_true(rows[at + 1].on, "vsync is on")
 
 
 ## Settings grow in items, but the screen does not: "back" must not run onto the
@@ -81,7 +81,7 @@ func test_the_settings_fit_above_the_hint() -> void:
 	await wait_physics_frames(SETTLE_FRAMES)
 	var hint := menu.get_node("%Hint") as Label
 	var bottom := menu.rows()[-1].get_global_rect().end.y
-	assert_lte(bottom, hint.get_global_rect().position.y, "последний пункт выше подсказки")
+	assert_lte(bottom, hint.get_global_rect().position.y, "the last row is above the hint")
 
 
 func test_the_game_behind_blurs_only_over_a_game() -> void:
@@ -90,13 +90,13 @@ func test_the_game_behind_blurs_only_over_a_game() -> void:
 	var menu := _menu()
 	var blur := menu.get_node("Root/Blur") as ColorRect
 	menu.show_page(Menu.Page.MAIN)
-	assert_false(blur.visible, "главное меню — без размытия")
+	assert_false(blur.visible, "main menu - no blur")
 	menu.show_page(Menu.Page.SETTINGS)
-	assert_false(blur.visible, "настройки из главного — без размытия")
+	assert_false(blur.visible, "settings from main - no blur")
 	menu.show_page(Menu.Page.PAUSE)
-	assert_true(blur.visible, "пауза — размыта")
+	assert_true(blur.visible, "pause - blurred")
 	menu.show_page(Menu.Page.SETTINGS)
-	assert_true(blur.visible, "настройки с паузы — размыты")
+	assert_true(blur.visible, "settings from pause - blurred")
 
 
 func test_the_sign_hangs_only_over_the_main_page() -> void:
@@ -104,16 +104,16 @@ func test_the_sign_hangs_only_over_the_main_page() -> void:
 	menu.show_page(Menu.Page.MAIN)
 	assert_true(menu.title().visible)
 	menu.show_page(Menu.Page.SETTINGS)
-	assert_false(menu.title().visible, "настройкам нужна вся высота экрана")
+	assert_false(menu.title().visible, "settings need the whole screen height")
 
 
 func test_a_choice_wraps_both_ways() -> void:
 	var row := MenuRow.choice("x", ["a", "b", "c"] as Array[String], 0)
 	autofree(row)
 	row.step_value(-1)
-	assert_eq(row.index, 2, "влево с первого — на последний")
+	assert_eq(row.index, 2, "left from the first - to the last")
 	row.step_value(1)
-	assert_eq(row.index, 0, "вправо с последнего — на первый")
+	assert_eq(row.index, 0, "right from the last - to the first")
 	assert_string_contains(row.value_text(), "a")
 
 
@@ -121,13 +121,13 @@ func test_a_level_steps_by_five_and_stops_at_the_ends() -> void:
 	var row := MenuRow.slider("x", 0.97)
 	autofree(row)
 	row.step_value(1)
-	assert_almost_eq(row.level, 1.0, 0.001, "выше ста не бывает")
+	assert_almost_eq(row.level, 1.0, 0.001, "never above a hundred")
 	row.step_value(-1)
-	assert_almost_eq(row.level, 0.95, 0.001, "шаг — пять процентов")
+	assert_almost_eq(row.level, 0.95, 0.001, "the step is five percent")
 	assert_eq(row.value_text(), "95%")
 	row.level = 0.02
 	row.step_value(-1)
-	assert_almost_eq(row.level, 0.0, 0.001, "ниже нуля не бывает")
+	assert_almost_eq(row.level, 0.0, 0.001, "never below zero")
 
 
 func test_a_toggle_flips_either_way() -> void:
@@ -146,15 +146,15 @@ func test_the_stage_is_a_city_without_a_building() -> void:
 	add_child_autofree(stage)
 	stage.build(7)
 	await wait_physics_frames(2)
-	assert_true(stage.camera().current, "город ведётся камерой сцены")
+	assert_true(stage.camera().current, "the city is driven by the stage camera")
 	assert_eq(
 		stage.camera().projection,
 		Camera3D.PROJECTION_ORTHOGONAL,
-		"камера — как у игры, ортогональная"
+		"the camera is like the game's, orthographic"
 	)
-	assert_not_null(stage.get_node_or_null("City") as CityBackdrop, "город на месте")
+	assert_not_null(stage.get_node_or_null("City") as CityBackdrop, "the city is in place")
 	for child: Node in stage.get_children():
-		assert_false(child is GreyboxLevel, "здания за меню нет")
+		assert_false(child is GreyboxLevel, "no building behind the menu")
 
 
 func test_the_stage_drifts_along_the_street() -> void:
@@ -163,7 +163,7 @@ func test_the_stage_drifts_along_the_street() -> void:
 	stage.build(7)
 	var start := stage.camera().global_position.x
 	await wait_seconds(0.5)
-	assert_ne(stage.camera().global_position.x, start, "камера плывёт вдоль улицы")
+	assert_ne(stage.camera().global_position.x, start, "the camera drifts along the street")
 
 
 func test_the_sign_measures_its_glow() -> void:
@@ -172,20 +172,20 @@ func test_the_sign_measures_its_glow() -> void:
 	var bare := NeonStyle.font(NeonTitle.WEIGHT).get_string_size(
 		title.text, HORIZONTAL_ALIGNMENT_LEFT, -1, title.font_size
 	)
-	assert_gt(title.get_combined_minimum_size().x, bare.x, "ореолу оставлено место по краям")
+	assert_gt(title.get_combined_minimum_size().x, bare.x, "room is left for the halo at the edges")
 
 
 func test_the_sign_blinks_and_stops_on_demand() -> void:
 	# Shots stop the flicker in the middle of a blink, and the letter must not stay dark.
 	var title := NeonTitle.new()
 	add_child_autofree(title)
-	assert_true(title.is_letter_lit(), "вывеска зажигается горящей")
+	assert_true(title.is_letter_lit(), "the sign lights up lit")
 	title._process(NeonTitle.STEADY.y + 0.1)
-	assert_false(title.is_letter_lit(), "дольше самой длинной паузы — буква моргнула")
+	assert_false(title.is_letter_lit(), "longer than the longest pause - the letter blinked")
 	title.flicker_letter = -1
-	assert_true(title.is_letter_lit(), "мигание снято — трубка горит")
+	assert_true(title.is_letter_lit(), "flicker removed - the tube is lit")
 	title._process(NeonTitle.STEADY.y + 0.1)
-	assert_true(title.is_letter_lit(), "и больше не гаснет")
+	assert_true(title.is_letter_lit(), "and no longer goes out")
 
 
 func test_a_level_at_its_end_stays_quiet() -> void:
@@ -194,9 +194,9 @@ func test_a_level_at_its_end_stays_quiet() -> void:
 	autofree(row)
 	watch_signals(row)
 	row.step_value(1)
-	assert_signal_not_emitted(row, "changed", "выше ста не листается")
+	assert_signal_not_emitted(row, "changed", "does not scroll above a hundred")
 	row.step_value(-1)
-	assert_signal_emit_count(row, "changed", 1, "а вниз — да")
+	assert_signal_emit_count(row, "changed", 1, "but down - yes")
 
 
 func test_a_row_takes_its_neon_after_it_is_built() -> void:
@@ -228,14 +228,14 @@ func test_escape_from_settings_over_the_pause_stops_at_the_pause() -> void:
 	menu._unhandled_input(back)
 	Input.action_press(&"pause")
 	main._process(0.0)
-	assert_eq(menu.current_page(), Menu.Page.PAUSE, "назад — на паузу")
-	assert_true(menu.visible, "и пауза не снялась тем же нажатием")
+	assert_eq(menu.current_page(), Menu.Page.PAUSE, "back - to the pause")
+	assert_true(menu.visible, "and the pause was not lifted by the same press")
 
 	Input.action_release(&"pause")
 	main._process(0.0)
 	Input.action_press(&"pause")
 	main._process(0.0)
-	assert_false(menu.visible, "второе нажатие на паузе снимает её")
+	assert_false(menu.visible, "a second press on the pause lifts it")
 
 	Input.action_release(&"pause")
 	Sounds.stop_music()
@@ -253,10 +253,10 @@ func test_leaving_the_pause_brings_the_music_back() -> void:
 	var main := MAIN_SCENE.instantiate()
 	add_child_autofree(main)
 	main.call("_pause")
-	assert_true(director.music_muffled(), "на паузе музыка из-за стены")
+	assert_true(director.music_muffled(), "on pause the music is muffled")
 	main.call("_unpause")
-	assert_false(get_tree().paused, "пауза снята")
-	assert_false(director.music_muffled(), "и музыка вернулась")
+	assert_false(get_tree().paused, "pause lifted")
+	assert_false(director.music_muffled(), "and the music is back")
 	Sounds.stop_music()
 
 
@@ -266,7 +266,7 @@ func test_no_code_points_at_pixellari() -> void:
 	for dir: String in SOURCE_DIRS:
 		for path: String in _sources(dir):
 			var text := FileAccess.get_file_as_string(path)
-			assert_false(text.contains("Pixellari.ttf"), "%s не грузит Pixellari" % path)
+			assert_false(text.contains("Pixellari.ttf"), "%s does not load Pixellari" % path)
 
 
 func _sources(dir: String) -> Array[String]:
@@ -285,20 +285,20 @@ func test_the_controls_open_from_the_pause_and_lead_back() -> void:
 	var menu := _menu()
 	menu.show_page(Menu.Page.PAUSE)
 	var found := _row_labelled(menu, tr("UI_CONTROLS"))
-	assert_not_null(found, "на паузе есть «Управление»")
+	assert_not_null(found, "the pause has 'Controls'")
 	if found == null:
 		return
 	found.pressed.emit()
-	assert_eq(menu.current_page(), Menu.Page.CONTROLS, "пункт открывает справку")
+	assert_eq(menu.current_page(), Menu.Page.CONTROLS, "the row opens the help")
 	# "Back" saves the settings to disk: empty test ones would overwrite the player's
 	# settings.
 	menu.settings = null
 	var back := _row_labelled(menu, tr("UI_BACK"))
-	assert_not_null(back, "у справки есть «Назад»")
+	assert_not_null(back, "the help has 'Back'")
 	if back == null:
 		return
 	back.pressed.emit()
-	assert_eq(menu.current_page(), Menu.Page.PAUSE, "назад — на паузу, а не в главное меню")
+	assert_eq(menu.current_page(), Menu.Page.PAUSE, "back - to the pause, not to the main menu")
 
 
 func _row_labelled(menu: Menu, text: String) -> MenuRow:
@@ -318,8 +318,8 @@ func test_game_over_rows_hold_still_at_first() -> void:
 	menu.hold_rows(0.3)
 	await wait_physics_frames(SETTLE_FRAMES)
 	for row: MenuRow in menu.rows():
-		assert_true(row.disabled, "пункт «%s» пока не нажимается" % row.text)
+		assert_true(row.disabled, "row '%s' is not pressable yet" % row.text)
 	await wait_seconds(0.5)
 	for row: MenuRow in menu.rows():
-		assert_false(row.disabled, "а потом нажимается")
-	assert_true(menu.rows()[0].has_focus(), "фокус на месте")
+		assert_false(row.disabled, "and then it is pressable")
+	assert_true(menu.rows()[0].has_focus(), "focus is in place")

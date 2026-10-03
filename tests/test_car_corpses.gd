@@ -87,8 +87,8 @@ func test_the_car_obeys_with_two_corpses_inside() -> void:
 	await wait_physics_frames(SETTLE_FRAMES)
 	var car := _first_car(level)
 	var moved := await _moves_with(level, car, 2)
-	assert_true(car.has_rider(), "Otto в кабине")
-	assert_gt(moved, MOVED, "кабина слушается и с двумя трупами")
+	assert_true(car.has_rider(), "Otto in the car")
+	assert_gt(moved, MOVED, "the car obeys even with two corpses")
 
 
 ## All cabs of three buildings: Otto gets in where corpses already lie.
@@ -119,7 +119,7 @@ func test_every_car_obeys_after_corpses_rode_in_it() -> void:
 				start = car.global_position.y
 				await _drive(&"move_up")
 				moved = absf(car.global_position.y - start)
-			assert_gt(moved, MOVED, "сид %d, кабина %s слушается" % [building_seed, car.name])
+			assert_gt(moved, MOVED, "seed %d, car %s obeys" % [building_seed, car.name])
 		level.queue_free()
 		await wait_physics_frames(2)
 
@@ -147,4 +147,4 @@ func test_the_car_obeys_after_takedowns_inside() -> void:
 	await wait_physics_frames(LIE_FRAMES)
 	var start := car.global_position.y
 	await _drive(&"move_down")
-	assert_gt(absf(car.global_position.y - start), MOVED, "кабина слушается после добиваний")
+	assert_gt(absf(car.global_position.y - start), MOVED, "the car obeys after takedowns")

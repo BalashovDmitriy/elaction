@@ -30,27 +30,27 @@ func _init() -> void:
 			rules.shaft_span = argument.trim_prefix("--span=").to_int()
 	var plan := BuildingPlan.generate(rules, building_seed)
 
-	print("Здание по сиду %d: %d этажей" % [building_seed, plan.floors])
-	print("\nШахты (этажи сверху вниз, x):")
+	print("Building for seed %d: %d floors" % [building_seed, plan.floors])
+	print("\nShafts (floors top to bottom, x):")
 	for shaft in plan.shafts:
 		var pair := ""
 		if shaft.double_deck:
 			var span := shaft.ride_span()
-			pair = "  двухэтажная, возит %d..%d" % [span.x, span.y]
+			pair = "  two-storey, carries %d..%d" % [span.x, span.y]
 		print("  %2d..%2d  x=%.0f%s" % [shaft.top, shaft.bottom, shaft.x, pair])
 
-	print("\nЭскалаторы (с этажа, x, куда спускается, проём):")
+	print("\nEscalators (from floor, x, where it descends, opening):")
 	for escalator in plan.escalators:
 		var gap := escalator.gap(rules)
-		var side := "вправо" if escalator.towards > 0.0 else "влево"
+		var side := "right" if escalator.towards > 0.0 else "left"
 		var mark := [escalator.floor_index, escalator.x, side, gap.x, gap.y]
-		print("  %2d  x=%.0f  %s  проём %.0f..%.0f" % mark)
+		print("  %2d  x=%.0f  %s  opening %.0f..%.0f" % mark)
 
-	print("\nВнутренние стены (этаж, x):")
+	print("\nInner walls (floor, x):")
 	for wall in plan.walls:
 		print("  %2d  x=%.1f" % [wall.floor_index, wall.x])
 
-	print("\nШахт на этаже (цель правил / вышло):")
+	print("\nShafts per floor (rules target / actual):")
 	for index in rules.levels():
 		var serving := 0
 		for shaft in plan.shafts:
@@ -60,10 +60,10 @@ func _init() -> void:
 
 	_trace_route(plan, rules)
 
-	print("\nДокументы на этажах: %s" % str(plan.document_floors()))
-	print("Выход: x=%.0f" % plan.exit_x)
-	print("Дверей: %d, ламп: %d" % [plan.doors.size(), plan.lamps.size()])
-	print("Проходимо: %s" % str(BuildingRoute.is_winnable(plan, rules)))
+	print("\nDocument floors: %s" % str(plan.document_floors()))
+	print("Exit: x=%.0f" % plan.exit_x)
+	print("Doors: %d, lamps: %d" % [plan.doors.size(), plan.lamps.size()])
+	print("Winnable: %s" % str(BuildingRoute.is_winnable(plan, rules)))
 
 	quit()
 
@@ -73,7 +73,7 @@ func _init() -> void:
 ## This trace is used to find where the descent gets stuck: "the bot did not get through" names only
 ## the floor, while here one sees what it meant to use and where that leads.
 func _trace_route(plan: BuildingPlan, rules: BuildingRules) -> void:
-	print("\nМаршрут по графу: документы сверху вниз, затем выход")
+	print("\nRoute over the graph: documents top to bottom, then the exit")
 	var graph := BuildingRoute.walkable(plan, rules)
 	var here := BuildingRules.ROOF
 	var x := plan.safe_x(rules, here)
@@ -83,34 +83,34 @@ func _trace_route(plan: BuildingPlan, rules: BuildingRules) -> void:
 	var goals: Array[Dictionary] = []
 	for spot in plan.doors:
 		if spot.has_document:
-			goals.append({"floor": spot.floor_index, "x": spot.x, "what": "документ"})
+			goals.append({"floor": spot.floor_index, "x": spot.x, "what": "document"})
 	goals.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["floor"] < b["floor"])
-	goals.append({"floor": rules.floors - 1, "x": plan.exit_x, "what": "выход"})
+	goals.append({"floor": rules.floors - 1, "x": plan.exit_x, "what": "exit"})
 
 	for goal: Dictionary in goals:
-		print("  → %s на этаже %d, x=%.1f" % [goal["what"], int(goal["floor"]), float(goal["x"])])
+		print("  → %s on floor %d, x=%.1f" % [goal["what"], int(goal["floor"]), float(goal["x"])])
 		var reached := false
 		for _step in rules.floors * 3:
 			var move := BuildingRoute.step_toward(
 				graph, here, x, int(goal["floor"]), float(goal["x"])
 			)
 			if move.is_empty():
-				print("     этаж %2d, x=%5.1f — дальше хода нет" % [here, x])
+				print("     floor %2d, x=%5.1f — no move further" % [here, x])
 				return
 			if String(move["kind"]) == "walk":
-				print("     этаж %2d, x=%5.1f: дойти" % [here, x])
+				print("     floor %2d, x=%5.1f: reach" % [here, x])
 				here = int(goal["floor"])
 				x = float(goal["x"])
 				reached = true
 				break
 			print(
 				(
-					"     этаж %2d, x=%5.1f: %s к x=%.1f → этаж %d"
+					"     floor %2d, x=%5.1f: %s to x=%.1f → floor %d"
 					% [here, x, move["kind"], float(move["x"]), int(move["floor"])]
 				)
 			)
 			here = int(move["floor"])
 			x = float(move["to_x"])
 		if not reached:
-			print("     след оборван: маршрут длиннее, чем этажей втрое")
+			print("     trail cut: the route is longer than three times the floor count")
 			return

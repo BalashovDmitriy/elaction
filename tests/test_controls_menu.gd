@@ -49,19 +49,21 @@ func test_the_controls_rebind_a_key_and_swap_a_taken_one() -> void:
 	var menu := _menu()
 	menu.show_page(Menu.Page.CONTROLS)
 	var bindings := _binding_rows(menu)
-	assert_eq(bindings.size(), KeyBindings.ACTIONS.size(), "строка на каждое действие")
+	assert_eq(bindings.size(), KeyBindings.ACTIONS.size(), "a row for each action")
 	bindings[0].pressed.emit()
-	assert_true(menu.is_listening(), "нажатая строка ждёт клавишу")
-	assert_eq(bindings[0].value_text(), tr("UI_PRESS_KEY"), "и просит её нажать")
+	assert_true(menu.is_listening(), "the pressed row waits for a key")
+	assert_eq(bindings[0].value_text(), tr("UI_PRESS_KEY"), "and asks to press it")
 	menu._input(_key(KEY_RIGHT))
-	assert_false(menu.is_listening(), "клавиша пришла — ждать нечего")
-	assert_eq(menu.settings.bindings.key_of(&"move_left"), KEY_RIGHT, "влево — на стрелке вправо")
-	assert_eq(menu.settings.bindings.key_of(&"move_right"), KEY_LEFT, "а вправо — на прежней влево")
+	assert_false(menu.is_listening(), "the key arrived: nothing to wait for")
+	assert_eq(menu.settings.bindings.key_of(&"move_left"), KEY_RIGHT, "left is on the right arrow")
+	assert_eq(
+		menu.settings.bindings.key_of(&"move_right"), KEY_LEFT, "and right is on the former left"
+	)
 	assert_true(
 		bindings[1].value_text().begins_with(OS.get_keycode_string(KEY_LEFT)),
-		"строка соседа переписана вместе с обменом"
+		"the neighbour's row is rewritten along with the swap"
 	)
-	assert_true(FileAccess.file_exists(TEMP), "схема сохранена")
+	assert_true(FileAccess.file_exists(TEMP), "the scheme is saved")
 
 
 func test_escape_cancels_listening_and_reset_restores_defaults() -> void:
@@ -70,14 +72,14 @@ func test_escape_cancels_listening_and_reset_restores_defaults() -> void:
 	var bindings := _binding_rows(menu)
 	bindings[4].pressed.emit()
 	menu._input(_key(KEY_ESCAPE))
-	assert_false(menu.is_listening(), "Esc отменяет ожидание")
-	assert_true(menu.settings.bindings.is_default(), "и ничего не назначает")
+	assert_false(menu.is_listening(), "Esc cancels the wait")
+	assert_true(menu.settings.bindings.is_default(), "and assigns nothing")
 	menu.settings.bindings.bind_key(&"jump", KEY_C)
 	var reset := _row_labelled(menu, tr("UI_RESET_KEYS"))
-	assert_not_null(reset, "есть сброс")
+	assert_not_null(reset, "there is a reset")
 	if reset != null:
 		reset.pressed.emit()
-	assert_true(menu.settings.bindings.is_default(), "сброс вернул схему по умолчанию")
+	assert_true(menu.settings.bindings.is_default(), "reset returned the default scheme")
 
 
 func _binding_rows(menu: Menu) -> Array[MenuRow]:

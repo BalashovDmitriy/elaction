@@ -39,14 +39,14 @@ func test_the_main_piece_stands_in_the_doorway() -> void:
 			var heroes := room.placed.filter(
 				func(item: Dictionary) -> bool: return HEROES.has(item["prop"])
 			)
-			assert_eq(heroes.size(), 1, "жребий %d: один главный предмет" % seed)
+			assert_eq(heroes.size(), 1, "roll %d: one main prop" % seed)
 			if heroes.is_empty():
 				continue
 			var hero: Dictionary = heroes[0]
 			assert_lte(
 				absf(float(hero["x"])),
 				HERO_REACH,
-				"жребий %d: %s в створе двери" % [seed, hero["prop"]]
+				"roll %d: %s in the door opening" % [seed, hero["prop"]]
 			)
 
 
@@ -60,7 +60,7 @@ func test_furniture_keeps_clear_of_the_swinging_leaf() -> void:
 				assert_lte(
 					reach,
 					DoorRoom.DEPTH - DoorRoom.LEAF_CLEAR + 0.01,
-					"жребий %d: %s не заходит под створку" % [seed, item["prop"]]
+					"roll %d: %s does not go under the leaf" % [seed, item["prop"]]
 				)
 
 
@@ -69,15 +69,19 @@ func test_the_room_holds_its_furniture_inside() -> void:
 		for seed: int in DRAWS / 4:
 			var room := _room(kind, seed)
 			var box := PropCatalog.bounds_of(room)
-			assert_gte(box.position.y, -0.01, "жребий %d: ничего под полом" % seed)
-			assert_lte(box.end.y, DoorRoom.HEIGHT + 0.01, "жребий %d: ничего над потолком" % seed)
+			assert_gte(box.position.y, -0.01, "roll %d: nothing under the floor" % seed)
+			assert_lte(
+				box.end.y, DoorRoom.HEIGHT + 0.01, "roll %d: nothing above the ceiling" % seed
+			)
 			assert_gte(
 				box.position.z,
 				DoorRoom.back_z() - DoorRoom.WALL - 0.01,
-				"жребий %d: за стеной ничего" % seed
+				"roll %d: nothing beyond the wall" % seed
 			)
 			assert_lte(
-				box.end.z, WorldSpace.BACK_WALL_Z + 0.01, "жребий %d: в коридор не торчит" % seed
+				box.end.z,
+				WorldSpace.BACK_WALL_Z + 0.01,
+				"roll %d: nothing sticks out into the corridor" % seed
 			)
 
 
@@ -92,9 +96,9 @@ func test_furniture_stays_between_the_side_walls() -> void:
 			for item: Dictionary in room.placed:
 				var half := (item["size"] as Vector3).x * 0.5
 				var x := float(item["x"])
-				var where := "тип %d, жребий %d: %s" % [kind, seed, item["prop"]]
-				assert_gte(x - half, shell.position.x - 0.12, where + " за левой стеной")
-				assert_lte(x + half, shell.end.x + 0.12, where + " за правой стеной")
+				var where := "kind %d, roll %d: %s" % [kind, seed, item["prop"]]
+				assert_gte(x - half, shell.position.x - 0.12, where + " past the left wall")
+				assert_lte(x + half, shell.end.x + 0.12, where + " past the right wall")
 
 
 ## The living-room TV is turned toward the sofa, not into the side wall, and when turned it does not
@@ -108,19 +112,19 @@ func test_the_tv_faces_the_sofa() -> void:
 			continue
 		var tv := _placed(room, "tv_old")
 		var sofa := _placed(room, "sofa")
-		assert_false(tv.is_empty() or sofa.is_empty(), "жребий %d: телевизор и диван" % seed)
+		assert_false(tv.is_empty() or sofa.is_empty(), "roll %d: TV and sofa" % seed)
 		if tv.is_empty() or sofa.is_empty():
 			continue
 		seen += 1
 		var apart := float(sofa["x"]) - float(tv["x"])
 		var yaw := float(tv["yaw"])
-		assert_eq(signf(yaw), signf(apart), "жребий %d: экран к дивану" % seed)
+		assert_eq(signf(yaw), signf(apart), "roll %d: screen faces the sofa" % seed)
 		var size: Vector3 = tv["size"]
 		var turn := deg_to_rad(absf(yaw))
 		var corner := size.x * 0.5 * cos(turn) + size.z * sin(turn)
 		var sofa_edge := absf(apart) - (sofa["size"] as Vector3).x * 0.5
-		assert_gte(sofa_edge, corner, "жребий %d: угол телевизора не в диване" % seed)
-	assert_gt(seen, 0, "гостиные выпадали")
+		assert_gte(sofa_edge, corner, "roll %d: the TV corner is not inside the sofa" % seed)
+	assert_gt(seen, 0, "living rooms came up")
 
 
 ## Bedroom nightstands are right against the bed. The row measures the bed as it
@@ -133,7 +137,7 @@ func test_the_night_stands_flank_the_bed() -> void:
 		if room.home != DoorRoom.Home.BEDROOM:
 			continue
 		var bed := _placed(room, "bed_double")
-		assert_false(bed.is_empty(), "жребий %d: кровать" % seed)
+		assert_false(bed.is_empty(), "roll %d: bed" % seed)
 		if bed.is_empty():
 			continue
 		seen += 1
@@ -144,8 +148,8 @@ func test_the_night_stands_flank_the_bed() -> void:
 				continue
 			var stand_half := (stand["size"] as Vector3).x * 0.5
 			var gap := absf(float(stand["x"]) - float(bed["x"])) - bed_half - stand_half
-			assert_between(gap, -0.01, 0.2, "жребий %d: %s у кровати" % [seed, stand_name])
-	assert_gt(seen, 0, "спальни выпадали")
+			assert_between(gap, -0.01, 0.2, "roll %d: %s at the bed" % [seed, stand_name])
+	assert_gt(seen, 0, "bedrooms came up")
 
 
 ## What was placed in the room under the name [param prop]; empty — if none.
@@ -191,17 +195,19 @@ func test_a_room_at_the_end_of_the_floor_stays_inside_the_building() -> void:
 					var part := box.transform * box.mesh.get_aabb()
 					shell = part if first else shell.merge(part)
 					first = false
-				assert_gte(shell.position.x, span.x - 0.001, "жребий %d: за левую стену нет" % seed)
-				assert_lte(shell.end.x, span.y + 0.001, "жребий %d: за правую стену нет" % seed)
+				assert_gte(
+					shell.position.x, span.x - 0.001, "roll %d: not past the left wall" % seed
+				)
+				assert_lte(shell.end.x, span.y + 0.001, "roll %d: not past the right wall" % seed)
 
 
 func test_every_room_has_its_light_and_window() -> void:
 	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
 		var room := _room(kind, 7)
-		assert_not_null(room.find_child("RoomLight", true, false), "свет комнаты")
-		assert_not_null(room.find_child("Window", true, false), "окно на город")
+		assert_not_null(room.find_child("RoomLight", true, false), "room light")
+		assert_not_null(room.find_child("Window", true, false), "window to the city")
 		var light := room.find_child("RoomLight", true, false) as OmniLight3D
-		assert_false(light.shadow_enabled, "свет комнаты без тени — в бюджете кадра")
+		assert_false(light.shadow_enabled, "room light without a shadow - within the frame budget")
 
 
 ## The door assembles the room when the leaf starts to move and removes it when it has closed.
@@ -213,15 +219,15 @@ func test_the_door_builds_its_room_only_while_open() -> void:
 	door.furnish(BuildingIdentity.new(), 11)
 	add_child_autofree(door)
 	await wait_physics_frames(2)
-	assert_null(door.room(), "закрытая дверь — без комнаты")
-	assert_true(door.summon_agent(), "дверь открывается под агента")
+	assert_null(door.room(), "a closed door has no room")
+	assert_true(door.summon_agent(), "the door opens for an agent")
 	var opened := false
 	for _frame: int in PATIENCE:
 		await wait_physics_frames(1)
 		if door.openness() > 0.0 and door.room() != null:
 			opened = true
 			break
-	assert_true(opened, "в открытую дверь видна комната")
+	assert_true(opened, "the room is visible through an open door")
 	door.dismiss_agent()
 	var closed := false
 	for _frame: int in PATIENCE:
@@ -230,7 +236,7 @@ func test_the_door_builds_its_room_only_while_open() -> void:
 			await wait_physics_frames(1)
 			closed = door.room() == null
 			break
-	assert_true(closed, "закрылась — комнаты нет")
+	assert_true(closed, "closed - no room")
 
 
 func test_a_bare_door_stays_dark() -> void:
@@ -240,7 +246,7 @@ func test_a_bare_door_stays_dark() -> void:
 	for _frame: int in 30:
 		await wait_physics_frames(1)
 	assert_gt(door.openness(), 0.0)
-	assert_null(door.room(), "без здания комнаты нет")
+	assert_null(door.room(), "no building - no room")
 
 
 ## On a dark floor the room has no light of its own: only the window with the city glows
@@ -249,5 +255,5 @@ func test_a_room_on_a_dark_floor_keeps_the_dark() -> void:
 	for kind: BuildingIdentity.Kind in BuildingIdentity.Kind.values():
 		var room := DoorRoom.build(kind, 5, null, Vector2(-INF, INF), true)
 		add_child_autofree(room)
-		assert_eq(room.find_children("*", "Light3D", true, false).size(), 0, "своего света нет")
-		assert_not_null(room.find_child("Window", true, false), "окно на город есть")
+		assert_eq(room.find_children("*", "Light3D", true, false).size(), 0, "no light of its own")
+		assert_not_null(room.find_child("Window", true, false), "the window to the city is there")

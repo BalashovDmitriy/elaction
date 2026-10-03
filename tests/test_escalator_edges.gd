@@ -16,7 +16,7 @@ func _rules() -> BuildingRules:
 func test_the_flight_is_forty_five_degrees() -> void:
 	var rules := _rules()
 	var angle := rad_to_deg(atan2(rules.floor_height, rules.escalator_run))
-	assert_almost_eq(angle, 45.0, 0.01, "пролёт под 45°")
+	assert_almost_eq(angle, 45.0, 0.01, "the flight is at 45 degrees")
 
 
 ## The lower landing is at the edge the run goes to: no further than a slot from
@@ -33,11 +33,17 @@ func test_every_escalator_lands_at_the_edge() -> void:
 			var left := escalator.towards < 0.0
 			var edge := maxf(here.x, below.x) if left else minf(here.y, below.y)
 			var from_edge := absf(escalator.landing(rules) - edge)
-			var where := "сид %d, этаж %d" % [building_seed, index]
+			var where := "seed %d, floor %d" % [building_seed, index]
 			assert_gte(
-				from_edge, rules.escalator_edge_margin - 0.001, where + ": площадка не в стене"
+				from_edge,
+				rules.escalator_edge_margin - 0.001,
+				where + ": the landing is not in the wall"
 			)
-			assert_lt(from_edge, rules.escalator_edge_margin + pitch, where + ": площадка у края")
+			assert_lt(
+				from_edge,
+				rules.escalator_edge_margin + pitch,
+				where + ": the landing is at the edge"
+			)
 
 
 ## The opening goes from the landing to the edge, and between the middle of the floor and the
@@ -49,13 +55,17 @@ func test_the_gap_runs_from_the_pad_to_the_edge() -> void:
 		for escalator in plan.escalators:
 			var gap := escalator.gap(rules)
 			var span := rules.floor_span(escalator.floor_index)
-			var where := "сид %d, этаж %d" % [building_seed, escalator.floor_index]
+			var where := "seed %d, floor %d" % [building_seed, escalator.floor_index]
 			if escalator.towards < 0.0:
-				assert_almost_eq(gap.x, span.x, 0.001, where + ": проём до левого края")
-				assert_lt(gap.y, escalator.x, where + ": площадка справа от проёма")
+				assert_almost_eq(
+					gap.x, span.x, 0.001, where + ": the opening reaches the left edge"
+				)
+				assert_lt(gap.y, escalator.x, where + ": the landing is right of the opening")
 			else:
-				assert_almost_eq(gap.y, span.y, 0.001, where + ": проём до правого края")
-				assert_gt(gap.x, escalator.x, where + ": площадка слева от проёма")
+				assert_almost_eq(
+					gap.y, span.y, 0.001, where + ": the opening reaches the right edge"
+				)
+				assert_gt(gap.x, escalator.x, where + ": the landing is left of the opening")
 
 
 ## An escalator from a floor another one arrived at first tries descending toward the other
@@ -70,8 +80,10 @@ func test_the_next_escalator_tries_the_other_edge_first() -> void:
 	plan.escalators.append(arrived)
 	for coin: int in [0, 1]:
 		var sides: Array[float] = plan._escalator_sides(coin, 5, 0.0)
-		assert_eq(sides[0], 1.0, "пришли слева — первым вправо, жребий %d" % coin)
-	assert_eq(plan._escalator_sides(0, 5, 1.0), [-1.0] as Array[float], "второй — в другую сторону")
+		assert_eq(sides[0], 1.0, "came from the left - first to the right, draw %d" % coin)
+	assert_eq(
+		plan._escalator_sides(0, 5, 1.0), [-1.0] as Array[float], "the second goes the other way"
+	)
 
 
 ## The landing an escalator arrived at does not lie in the next one's opening.
@@ -88,11 +100,11 @@ func test_no_arrival_lands_in_the_next_gap() -> void:
 				assert_false(
 					arrival >= gap.x and arrival <= gap.y,
 					(
-						"сид %d, этаж %d: площадка прибытия в проёме"
+						"seed %d, floor %d: the arrival landing is in the opening"
 						% [building_seed, lower.floor_index]
 					)
 				)
-		assert_true(true, "сид %d разобран" % building_seed)
+		assert_true(true, "seed %d examined" % building_seed)
 
 
 ## A lamp hangs on the ceiling: there is none under the opening of an escalator from the floor
@@ -108,7 +120,10 @@ func test_no_lamp_hangs_under_an_escalator_gap() -> void:
 				var gap := escalator.gap(rules)
 				assert_false(
 					lamp.x > gap.x and lamp.x < gap.y,
-					"сид %d, этаж %d: лампа под проёмом" % [building_seed, lamp.floor_index]
+					(
+						"seed %d, floor %d: a lamp under the opening"
+						% [building_seed, lamp.floor_index]
+					)
 				)
 
 
@@ -128,7 +143,7 @@ func test_no_wall_stands_under_a_flight() -> void:
 					continue
 				assert_false(
 					wall.x + half > low and wall.x - half < high,
-					"сид %d, этаж %d: стена под пролётом" % [building_seed, wall.floor_index]
+					"seed %d, floor %d: a wall under the flight" % [building_seed, wall.floor_index]
 				)
 
 
@@ -144,5 +159,5 @@ func test_no_furniture_stands_under_the_low_flight() -> void:
 			var start := landing - escalator.towards * rules.escalator_low_span
 			for x: float in BuildingDressing.free_spots(rules, plan, lower):
 				if x > minf(landing, start) and x < maxf(landing, start):
-					under.append("сид %d, этаж %d, x %.2f" % [building_seed, lower, x])
-	assert_eq(under, [] as Array[String], "места под низом пролёта")
+					under.append("seed %d, floor %d, x %.2f" % [building_seed, lower, x])
+	assert_eq(under, [] as Array[String], "spots under the bottom of the flight")

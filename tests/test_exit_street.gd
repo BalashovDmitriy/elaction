@@ -20,14 +20,14 @@ func test_the_exit_keeps_out_of_the_building_and_the_cars_way() -> void:
 	for building_seed: int in SEEDS:
 		var level := _build(building_seed)
 		var ramp := level.garage().gate.ramp()
-		assert_not_null(ramp, "сид %d: выезда нет" % building_seed)
+		assert_not_null(ramp, "seed %d: no exit ramp" % building_seed)
 		if ramp == null:
 			continue
 		var rules := level.rules
 		var gate := rules.floor_span(rules.floors - 1).x
 		var lane := _car_lane(level)
 		var parts := _parts(ramp)
-		assert_gt(parts.size(), 100, "сид %d: выезд почти пуст" % building_seed)
+		assert_gt(parts.size(), 100, "seed %d: the exit ramp is almost empty" % building_seed)
 		var inside: Array[String] = []
 		var in_the_way: Array[String] = []
 		for part: Array in parts:
@@ -37,8 +37,12 @@ func test_the_exit_keeps_out_of_the_building_and_the_cars_way() -> void:
 				inside.append(str(box))
 			if not bool(part[2]) and _blocks(rules, box, lane):
 				in_the_way.append(str(box))
-		assert_eq(inside, [] as Array[String], "сид %d: выезд в здании" % building_seed)
-		assert_eq(in_the_way, [] as Array[String], "сид %d: на пути машины" % building_seed)
+		assert_eq(
+			inside,
+			[] as Array[String],
+			"seed %d: the exit ramp is inside the building" % building_seed
+		)
+		assert_eq(in_the_way, [] as Array[String], "seed %d: in the car's way" % building_seed)
 		remove_child(level)
 
 
@@ -53,7 +57,7 @@ func test_no_two_materials_share_a_face_on_the_exit() -> void:
 		assert_eq(
 			clashes,
 			[] as Array[String],
-			"сид %d: грани в одной плоскости — %s" % [building_seed, clashes]
+			"seed %d: faces in one plane: %s" % [building_seed, clashes]
 		)
 		remove_child(level)
 
@@ -63,12 +67,15 @@ func test_the_exit_lights_are_few_unshadowed_and_off_in_play() -> void:
 	var ramp := level.garage().gate.ramp()
 	var lights := ramp.lights()
 	# Since M24k the street light by the curb casts real light (ADR-0052, decision 3).
-	assert_between(lights.size(), 1, 3, "свет выезда — от одного до трёх источников")
+	assert_between(lights.size(), 1, 3, "exit ramp light: from one to three sources")
 	for light in lights:
-		assert_false(light.shadow_enabled, "%s кладёт тень" % light.name)
+		assert_false(light.shadow_enabled, "%s casts a shadow" % light.name)
 	await wait_process_frames(3)
 	for light in lights:
-		assert_false(light.is_visible_in_tree(), "%s горит, хотя выезд не в кадре" % light.name)
+		assert_false(
+			light.is_visible_in_tree(),
+			"%s is lit although the exit ramp is out of frame" % light.name
+		)
 	var rules := level.rules
 	var bottom := rules.floors - 1
 	level.otto.global_position = WorldSpace.to_scene(
@@ -80,7 +87,9 @@ func test_the_exit_lights_are_few_unshadowed_and_off_in_play() -> void:
 		level.otto.apply_camera_bounds(ExitBoarding.exit_frame(rules))
 		await wait_process_frames(1)
 	for light in lights:
-		assert_true(light.is_visible_in_tree(), "%s не горит в кадре выезда" % light.name)
+		assert_true(
+			light.is_visible_in_tree(), "%s is not lit while the exit ramp is in frame" % light.name
+		)
 	remove_child(level)
 
 
@@ -177,7 +186,7 @@ func _clashes(boxes: Array[Array]) -> Array[String]:
 			var b := boxes[j][0] as AABB
 			for axis: int in [Vector3.AXIS_Y, Vector3.AXIS_Z]:
 				if _share_face(a, b, axis):
-					clashes.append("%s и %s" % [a, b])
+					clashes.append("%s and %s" % [a, b])
 					if clashes.size() > 5:
 						return clashes
 	return clashes

@@ -38,22 +38,22 @@ func test_the_score_rolls_up_to_the_new_value() -> void:
 	bursts.show_score(0)
 	assert_eq(score.text, "0")
 	bursts.show_score(1300)
-	assert_ne(score.text, "1 300", "не перескакивает сразу")
+	assert_ne(score.text, "1 300", "does not jump at once")
 	await wait_seconds(ScoreBursts.ROLL_TIME + 0.2)
-	assert_eq(score.text, Hud.format_score(1300), "набежал до нового числа")
+	assert_eq(score.text, Hud.format_score(1300), "ran up to the new number")
 	bursts.show_score(0)
-	assert_eq(score.text, "0", "новая партия — сразу")
+	assert_eq(score.text, "0", "a new game - at once")
 
 
 func test_a_kill_bursts_over_its_place_and_by_the_score() -> void:
 	var bursts: ScoreBursts = _bursts()[0]
 	GameState.instance().add_score(300, Vector3.ZERO)
-	assert_eq(_pluses(bursts), 2, "прибавка у счёта и над местом")
+	assert_eq(_pluses(bursts), 2, "a bonus at the score and above the spot")
 	await wait_seconds(ScoreBursts.BURST_TIME + 0.3)
-	assert_eq(_pluses(bursts), 0, "прибавки гаснут и уходят")
+	assert_eq(_pluses(bursts), 0, "the bonuses fade and go")
 
 
 func test_the_building_bonus_shows_only_by_the_score() -> void:
 	var bursts: ScoreBursts = _bursts()[0]
 	GameState.instance().add_score(3000, GameState.AT_OTTO, false)
-	assert_eq(_pluses(bursts), 1, "бонус — только у счёта")
+	assert_eq(_pluses(bursts), 1, "a bonus - at the score only")

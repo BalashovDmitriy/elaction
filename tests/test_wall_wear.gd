@@ -26,9 +26,9 @@ func test_only_a_residential_building_is_worn() -> void:
 			var dressing := BuildingDressing.lay(rules, plan, building_seed, identity)
 			total += WallWear.lay(rules, plan, building_seed, identity, dressing).size()
 		if kind == BuildingIdentity.Kind.RESIDENTIAL:
-			assert_gt(total, SEEDS.size() * 10, "у жилого дома стены в следах")
+			assert_gt(total, SEEDS.size() * 10, "a residential building has marked walls")
 		else:
-			assert_eq(total, 0, "тип %d: следов нет" % kind)
+			assert_eq(total, 0, "kind %d: no marks" % kind)
 
 
 func test_marks_keep_off_doors_shafts_and_walls() -> void:
@@ -39,17 +39,19 @@ func test_marks_keep_off_doors_shafts_and_walls() -> void:
 			var plan := BuildingPlan.generate(rules, building_seed)
 			var dressing := BuildingDressing.lay(rules, plan, building_seed, identity)
 			for mark: WallWear.Mark in WallWear.lay(rules, plan, building_seed, identity, dressing):
-				var where := "навык %d, сид %d, этаж %d" % [skill, building_seed, mark.floor_index]
+				var where := (
+					"skill %d, seed %d, floor %d" % [skill, building_seed, mark.floor_index]
+				)
 				var zones := BuildingDressing.blocked_zones(rules, plan, mark.floor_index)
-				assert_false(WallWear.clashes(zones, mark), where + ": след на занятом")
+				assert_false(WallWear.clashes(zones, mark), where + ": mark on an occupied spot")
 				var span := rules.floor_span(mark.floor_index)
-				assert_gte(mark.x - mark.width * 0.5, span.x, where + ": за левой стеной")
-				assert_lte(mark.x + mark.width * 0.5, span.y, where + ": за правой стеной")
-				assert_lt(mark.floor_index, rules.floors - 1, where + ": гараж без следов")
+				assert_gte(mark.x - mark.width * 0.5, span.x, where + ": past the left wall")
+				assert_lte(mark.x + mark.width * 0.5, span.y, where + ": past the right wall")
+				assert_lt(mark.floor_index, rules.floors - 1, where + ": garage without marks")
 				assert_lt(
 					mark.rise + mark.width * 0.5,
 					rules.floor_height - rules.slab_height,
-					where + ": под потолком"
+					where + ": under the ceiling"
 				)
 				# The picture lies on the plaster, behind the wall panel: a tag below its
 				# top would be cut off by the panel (M24m code review).
@@ -57,7 +59,7 @@ func test_marks_keep_off_doors_shafts_and_walls() -> void:
 					assert_gte(
 						mark.rise - mark.width * WallWear.TAG_INK,
 						BuildingRibs.SKIRTING_HEIGHT + BuildingRibs.RAIL_HEIGHT,
-						where + ": тэг над панелью"
+						where + ": tag above the panel"
 					)
 
 
@@ -84,11 +86,11 @@ func test_marks_keep_off_wall_features() -> void:
 						absf(feature.x - mark.x),
 						half + mark.width * 0.5,
 						(
-							"навык %d, сид %d, этаж %d: след на %s"
+							"skill %d, seed %d, floor %d: mark on %s"
 							% [skill, building_seed, mark.floor_index, feature.kind]
 						)
 					)
-	assert_gt(marks, SEEDS.size() * SKILLS.size() * 5, "следов почти не осталось")
+	assert_gt(marks, SEEDS.size() * SKILLS.size() * 5, "almost no marks left")
 
 
 ## A share of the residential building's lamps flickers, in the hotel and office none; the draw by
@@ -108,13 +110,13 @@ func test_a_share_of_residential_lamps_flicker() -> void:
 				again.floor_index = index
 				again.position.x = slot * 1.8
 				again.dress_as(style)
-				assert_eq(lamp.flicker, again.flicker, "жребий повторяется")
+				assert_eq(lamp.flicker, again.flicker, "the roll repeats")
 				flickering += 1 if lamp.flicker else 0
 				count += 1
 				lamp.free()
 				again.free()
 		if kind == BuildingIdentity.Kind.RESIDENTIAL:
 			var share := float(flickering) / count
-			assert_almost_eq(share, style.flicker_share, 0.06, "мигает доля ламп")
+			assert_almost_eq(share, style.flicker_share, 0.06, "a share of lamps flickers")
 		else:
-			assert_eq(flickering, 0, "тип %d: не мигает ни одна" % kind)
+			assert_eq(flickering, 0, "kind %d: none flicker" % kind)

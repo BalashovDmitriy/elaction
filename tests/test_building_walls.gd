@@ -31,18 +31,18 @@ func test_walls_stand_on_the_slab_between_the_openings() -> void:
 		for wall in plan.walls:
 			var index := wall.floor_index
 			var band := wall.band(rules)
-			var where := "сид %d, этаж %d" % [building_seed, index]
+			var where := "seed %d, floor %d" % [building_seed, index]
 
 			for gap: Vector2 in plan.gaps_on(rules, index):
 				var over := band.y > gap.x and band.x < gap.y
-				assert_false(over, "стена висит над проёмом: " + where)
+				assert_false(over, "wall hangs over an opening: " + where)
 
 			var span := rules.floor_span(index)
 			var edge := rules.slot_x(1) - rules.slot_x(0)
-			assert_gt(band.x, span.x + edge, "стена у самой стены: " + where)
-			assert_lt(band.y, span.y - edge, "стена у самой стены: " + where)
+			assert_gt(band.x, span.x + edge, "wall right next to a wall: " + where)
+			assert_lt(band.y, span.y - edge, "wall right next to a wall: " + where)
 
-	assert_gt(floors_with_walls, 0, "стены должны хоть где-то появляться")
+	assert_gt(floors_with_walls, 0, "walls must appear somewhere")
 
 
 ## A wall does not grow through a shaft — on none of its levels, bottom included.
@@ -72,7 +72,7 @@ func test_no_wall_grows_through_a_shaft() -> void:
 						and band.x < shaft.x + half + clearance * 0.5
 					),
 					(
-						"сид %d: стена %.1f жмётся к шахте %.1f на этаже %d"
+						"seed %d: wall %.1f hugs shaft %.1f on floor %d"
 						% [building_seed, wall.x, shaft.x, wall.floor_index]
 					)
 				)
@@ -86,10 +86,10 @@ func test_walls_are_not_on_every_floor() -> void:
 		var plan := BuildingPlan.generate(rules, building_seed)
 		var walled: Dictionary = {}
 		for wall in plan.walls:
-			assert_false(walled.has(wall.floor_index), "на этаже не больше одной стены")
+			assert_false(walled.has(wall.floor_index), "no more than one wall per floor")
 			walled[wall.floor_index] = true
 		var share := float(walled.size()) / float(rules.floors)
-		assert_lt(share, 0.6, "сид %d: стены почти на каждом этаже" % building_seed)
+		assert_lt(share, 0.6, "seed %d: walls on almost every floor" % building_seed)
 
 
 ## A wall that made a document or the exit unreachable is removed during layout. Checked
@@ -99,7 +99,7 @@ func test_no_wall_locks_a_document_or_the_exit_away() -> void:
 	for building_seed in range(1, 60):
 		var plan := BuildingPlan.generate(rules, building_seed)
 		var missing := BuildingRoute.unreachable_spots(plan, rules)
-		assert_true(missing.is_empty(), "сид %d: заперто — %s" % [building_seed, str(missing)])
+		assert_true(missing.is_empty(), "seed %d: locked in - %s" % [building_seed, str(missing)])
 
 
 ## A layout with walls must be heavier than a layout without them, otherwise the check
@@ -114,9 +114,9 @@ func test_walls_really_cut_the_floors_they_stand_on() -> void:
 			var span := rules.floor_span(wall.floor_index)
 			var slab := BuildingPlan.spans_between(plan.gaps_on(rules, wall.floor_index), span)
 			var walk := BuildingPlan.spans_between(plan.blocks_on(rules, wall.floor_index), span)
-			assert_gt(walk.size(), slab.size(), "стена обязана добавлять кусок этажу")
+			assert_gt(walk.size(), slab.size(), "a wall must add a piece to the floor")
 			cut += 1
-	assert_gt(cut, 0, "стены должны хоть где-то появляться")
+	assert_gt(cut, 0, "walls must appear somewhere")
 
 
 ## An agent on the other side of a solid wall does not see Otto: no point shooting at a
@@ -129,7 +129,7 @@ func test_a_wall_hides_otto_from_an_agent_on_the_same_floor() -> void:
 	wall.x = 18.0
 	plan.walls.append(wall)
 
-	assert_true(plan.wall_between(5, 14.0, 22.0), "стена между ними")
-	assert_true(plan.wall_between(5, 22.0, 14.0), "порядок точек не важен")
-	assert_false(plan.wall_between(5, 19.0, 22.0), "по одну сторону стены нет")
-	assert_false(plan.wall_between(6, 14.0, 22.0), "стена делит только свой этаж")
+	assert_true(plan.wall_between(5, 14.0, 22.0), "a wall between them")
+	assert_true(plan.wall_between(5, 22.0, 14.0), "the order of points does not matter")
+	assert_false(plan.wall_between(5, 19.0, 22.0), "no wall on the same side")
+	assert_false(plan.wall_between(6, 14.0, 22.0), "a wall divides only its own floor")

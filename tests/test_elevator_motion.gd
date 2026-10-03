@@ -55,8 +55,10 @@ func test_released_car_runs_on_to_the_floor_ahead() -> void:
 	var motion := _shaft(2)
 	_run(motion, 0.3, ElevatorMotion.UP, true)
 	assert_almost_eq(_run(motion, 2.0, 0.0, true), MIDDLE, 0.01)
-	assert_true(motion.is_aligned(), "кабина довелась до этажа")
-	assert_almost_eq(_run(motion, 5.0, 0.0, true), MIDDLE, 0.01, "с пассажиром сама не едет")
+	assert_true(motion.is_aligned(), "the cab was brought to the floor")
+	assert_almost_eq(
+		_run(motion, 5.0, 0.0, true), MIDDLE, 0.01, "does not move by itself with a passenger"
+	)
 
 
 func test_car_does_not_leave_shaft_at_the_top() -> void:
@@ -73,7 +75,7 @@ func test_car_at_the_limit_stands_still() -> void:
 	var motion := _shaft(0)
 	motion.update(STEP, ElevatorMotion.UP, true)
 	assert_almost_eq(motion.position, TOP, 0.01)
-	assert_true(motion.is_stopped(), "выше верхнего этажа кабина не едет")
+	assert_true(motion.is_stopped(), "the cab does not go above the top floor")
 
 
 func test_occupied_car_does_not_move_on_its_own() -> void:
@@ -84,7 +86,7 @@ func test_occupied_car_does_not_move_on_its_own() -> void:
 func test_car_waits_on_the_floor_it_starts_from() -> void:
 	var motion := _shaft(0)
 	assert_almost_eq(_run(motion, 0.5, 0.0, false), TOP, 0.01)
-	assert_true(motion.is_stopped(), "кабина стоит на этаже, прежде чем тронуться")
+	assert_true(motion.is_stopped(), "the cab stands at the floor before starting")
 
 
 func test_empty_car_travels_by_itself() -> void:
@@ -98,7 +100,7 @@ func test_car_left_by_passenger_waits_before_moving_on() -> void:
 	_run(motion, 0.5, 0.0, true)
 	# The passenger got out on the floor: the cab first stands its pause, like any empty one.
 	assert_almost_eq(_run(motion, 0.8, 0.0, false), TOP, 0.01)
-	assert_gt(_run(motion, 0.8, 0.0, false), TOP, "отстояв паузу, кабина поехала сама")
+	assert_gt(_run(motion, 0.8, 0.0, false), TOP, "after the pause the cab set off by itself")
 
 
 func test_empty_car_pauses_at_the_floor() -> void:
@@ -110,7 +112,7 @@ func test_empty_car_pauses_at_the_floor() -> void:
 func test_empty_car_reverses_at_the_end_of_the_shaft() -> void:
 	var motion := _shaft(0)
 	_run(motion, 5.5, 0.0, false)
-	assert_eq(motion.direction, ElevatorMotion.UP, "с нижнего этажа кабина поехала вверх")
+	assert_eq(motion.direction, ElevatorMotion.UP, "from the bottom floor the cab went up")
 	assert_lt(motion.position, BOTTOM)
 
 
@@ -118,7 +120,7 @@ func test_alignment_reports_current_floor() -> void:
 	var motion := _shaft(1)
 	assert_eq(motion.aligned_floor(), 1)
 	motion.update(STEP, ElevatorMotion.DOWN, true)
-	assert_false(motion.is_aligned(), "тронувшаяся кабина с этажом не совпадает")
+	assert_false(motion.is_aligned(), "a started cab does not match the floor")
 	assert_eq(motion.aligned_floor(), -1)
 
 
@@ -130,9 +132,9 @@ func test_velocity_reports_real_movement() -> void:
 	# A released cab runs on to the floor in its travel and only there stops.
 	_run(motion, 0.4, ElevatorMotion.DOWN, true)
 	motion.update(STEP, 0.0, true)
-	assert_false(motion.is_stopped(), "отпущенная между этажами едет дальше")
+	assert_false(motion.is_stopped(), "released between floors it keeps going")
 	_run(motion, 2.0, 0.0, true)
-	assert_true(motion.is_stopped(), "на этаже встала")
+	assert_true(motion.is_stopped(), "stopped at the floor")
 
 
 func test_shaft_with_one_floor_stays_put() -> void:
@@ -166,11 +168,13 @@ func test_arrival_is_not_lost_to_float_noise() -> void:
 	motion.position = MIDDLE + motion.speed * STEP + 0.000001
 
 	motion.update(STEP, 0.0, false)
-	assert_eq(motion.aligned_floor(), 1, "кабина пришла на этаж")
+	assert_eq(motion.aligned_floor(), 1, "the cab arrived at the floor")
 
 	motion.update(STEP, 0.0, false)
-	assert_eq(motion.aligned_floor(), 1, "и стоит на нём паузу, а не касается и уходит")
-	assert_true(motion.is_stopped(), "стоит, а не едет")
+	assert_eq(
+		motion.aligned_floor(), 1, "and stands there for the pause rather than touching and leaving"
+	)
+	assert_true(motion.is_stopped(), "stands, not moving")
 
 
 ## The demo from the roof holds an empty cab on the floor (ADR-0041): it stands as long as
@@ -178,5 +182,5 @@ func test_arrival_is_not_lost_to_float_noise() -> void:
 func test_a_held_car_waits_then_goes() -> void:
 	var motion := _shaft()
 	motion.hold(3.0)
-	assert_eq(_run(motion, 2.5, 0.0, false), TOP, "придержанная стоит дольше обычной паузы")
-	assert_gt(_run(motion, 1.5, 0.0, false), TOP, "и уходит, когда срок вышел")
+	assert_eq(_run(motion, 2.5, 0.0, false), TOP, "a held one stands longer than the usual pause")
+	assert_gt(_run(motion, 1.5, 0.0, false), TOP, "and leaves when the time is up")

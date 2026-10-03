@@ -124,13 +124,15 @@ func test_every_shaft_wears_both_rails() -> void:
 					# The rail runs from the ceiling of the shaft's top floor, that is, above
 					# its floor: it is never shorter than the run.
 					assert_gt(
-						rail.size.y, span, "сид %d: стойка короче своей шахты" % building_seed
+						rail.size.y,
+						span,
+						"seed %d: the post is shorter than its shaft" % building_seed
 					)
 					found = true
 				assert_true(
 					found,
 					(
-						"сид %d: у шахты %d–%d на %.2f м нет стойки на %.2f м"
+						"seed %d: shaft %d–%d at %.2f m has no post at %.2f m"
 						% [building_seed, shaft.top, shaft.bottom, shaft.x, left]
 					)
 				)
@@ -157,9 +159,9 @@ func test_shaft_doors_stand_on_every_floor_it_serves() -> void:
 					continue
 				if absf(door.end.y - surface) <= TOLERANCE:
 					found = true
-			assert_true(found, "на этаже %d нет створок шахты на %.2f м" % [index, shaft.x])
+			assert_true(found, "floor %d has no shaft leaves at %.2f m" % [index, shaft.x])
 
-	assert_eq(doors.size(), served, "створок ровно столько, сколько этажей у шахт")
+	assert_eq(doors.size(), served, "exactly as many leaves as the shafts have floors")
 	_drop(level)
 
 
@@ -174,7 +176,7 @@ func test_machine_room_stands_over_the_top_shaft() -> void:
 		await wait_physics_frames(SETTLE_FRAMES)
 
 		var rooms := _parts(level, "machine_room")
-		assert_eq(rooms.size(), 1, "сид %d: машинное отделение одно" % building_seed)
+		assert_eq(rooms.size(), 1, "seed %d: one machine room" % building_seed)
 		if rooms.is_empty():
 			_drop(level)
 			continue
@@ -182,20 +184,27 @@ func test_machine_room_stands_over_the_top_shaft() -> void:
 		var room := rooms[0]
 		var centre := room.get_center().x
 		var top_shaft := level.plan().roof_shaft()
-		assert_not_null(top_shaft, "сид %d: в здании есть шахта до крыши" % building_seed)
+		assert_not_null(
+			top_shaft, "seed %d: the building has a shaft up to the roof" % building_seed
+		)
 		assert_eq(
 			top_shaft.top,
 			BuildingRules.ROOF,
-			"сид %d: верхняя шахта доходит до крыши" % building_seed
+			"seed %d: the top shaft reaches the roof" % building_seed
 		)
-		assert_almost_eq(centre, top_shaft.x, TOLERANCE, "сид %d: домик над шахтой" % building_seed)
+		assert_almost_eq(
+			centre, top_shaft.x, TOLERANCE, "seed %d: the housing above the shaft" % building_seed
+		)
 
 		var landing := level.plan().safe_x(level.rules, BuildingRules.ROOF)
 		var gap := absf(landing - centre)
 		assert_gt(
 			gap,
 			room.size.x * 0.5,
-			"сид %d: Otto появляется внутри домика (%.2f м от его середины)" % [building_seed, gap]
+			(
+				"seed %d: Otto appears inside the housing (%.2f m from its middle)"
+				% [building_seed, gap]
+			)
 		)
 		_drop(level)
 
@@ -211,7 +220,7 @@ func test_every_shaft_is_capped_at_both_ends() -> void:
 
 	var buffers := _parts(level, "shaft_buffer")
 	var shafts := level.plan().shafts.size()
-	assert_eq(buffers.size(), shafts * 2, "по упору на каждый конец каждой шахты")
+	assert_eq(buffers.size(), shafts * 2, "one buffer at each end of each shaft")
 
 	for shaft: BuildingPlan.ShaftSpot in level.plan().shafts:
 		var mine := 0
@@ -233,12 +242,12 @@ func test_every_shaft_is_capped_at_both_ends() -> void:
 			assert_lte(
 				buffer.end.y,
 				floor_surface + TOLERANCE,
-				"упор шахты на %.2f м не утоплен в перекрытие" % shaft.x
+				"the buffer of the shaft at %.2f m is not sunk into the slab" % shaft.x
 			)
 			if absf(buffer.end.y - floor_surface) <= TOLERANCE:
 				capped_below = true
-		assert_eq(mine, 2, "у шахты на %.2f м оба конца отмечены" % shaft.x)
-		assert_true(capped_below, "у шахты на %.2f м упор лежит на её дне" % shaft.x)
+		assert_eq(mine, 2, "both ends of the shaft at %.2f m are marked" % shaft.x)
+		assert_true(capped_below, "the buffer of the shaft at %.2f m rests on its bottom" % shaft.x)
 	_drop(level)
 
 
@@ -252,36 +261,36 @@ func test_every_floor_wears_its_number() -> void:
 	await wait_physics_frames(SETTLE_FRAMES)
 	var rules := level.rules
 	var signs := level.get_node("FloorSigns")
-	assert_eq(signs.get_child_count(), rules.floors, "по табличке на этаж, у крыши нет")
+	assert_eq(signs.get_child_count(), rules.floors, "one plate per floor, none at the roof")
 	var half := Proportions.FLOOR_SIGN * 0.5
 	for index in rules.floors:
 		var number := FloorSigns.label_of(rules, index)
 		var plate := signs.get_node("Floor%s" % number) as Node3D
-		assert_not_null(plate, "этаж %s без таблички" % number)
+		assert_not_null(plate, "floor %s has no plate" % number)
 		if plate == null:
 			continue
 		var label := plate.get_child(1) as Label3D
-		assert_eq(label.text, number, "на табличке свой номер")
+		assert_eq(label.text, number, "the plate has its own number")
 		var at := WorldSpace.to_plane(plate.position)
 		var span := rules.floor_span(index)
-		assert_lt(at.x + half.x, span.y - BuildingShell.WALL_WIDTH, "внутри стен")
+		assert_lt(at.x + half.x, span.y - BuildingShell.WALL_WIDTH, "inside the walls")
 		# Below the band hidden by the slab edge — otherwise the digits are not visible.
 		assert_gt(
-			at.y - half.y, rules.story_top(index) + FloorSigns.hidden_band(), "не под кромкой"
+			at.y - half.y, rules.story_top(index) + FloorSigns.hidden_band(), "not under the edge"
 		)
 		# Right of the outermost slot: there is neither a door, nor an indicator above it, nor a
 		# lamp.
 		var last := rules.slot_x(rules.slot_range(index).y)
-		assert_gt(at.x - half.x, last + Proportions.SLOT * 0.5, "за крайним местом")
+		assert_gt(at.x - half.x, last + Proportions.SLOT * 0.5, "beyond the last spot")
 		for shaft in level.plan().shafts:
 			if shaft.top <= index and index <= shaft.bottom:
 				assert_gt(
 					at.x - half.x,
 					shaft.x + rules.shaft_width * 0.5,
-					"этаж %s: табличка над шахтой" % number
+					"floor %s: plate above the shaft" % number
 				)
-	assert_eq(FloorSigns.number_of(rules, 0), rules.floors, "верхний этаж — старший номер")
-	assert_eq(FloorSigns.number_of(rules, rules.floors - 2), 2, "над паркингом — второй")
-	assert_eq(FloorSigns.label_of(rules, rules.floors - 1), "P", "нижний — паркинг, «P»")
-	assert_eq(FloorSigns.label_of(rules, rules.floors - 2), "2", "остальные не сдвинулись")
+	assert_eq(FloorSigns.number_of(rules, 0), rules.floors, "the top floor has the highest number")
+	assert_eq(FloorSigns.number_of(rules, rules.floors - 2), 2, "above the parking: the second")
+	assert_eq(FloorSigns.label_of(rules, rules.floors - 1), "P", "the lowest is the parking, 'P'")
+	assert_eq(FloorSigns.label_of(rules, rules.floors - 2), "2", "the rest did not shift")
 	_drop(level)

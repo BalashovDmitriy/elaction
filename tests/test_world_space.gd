@@ -10,11 +10,11 @@ func test_the_plane_and_the_scene_disagree_about_where_down_is() -> void:
 	# This is what the class exists for: in the rules Y grows downward, in the scene upward.
 	var lower_floor := Vector2(0.0, 100.0)
 	var upper_floor := Vector2(0.0, 10.0)
-	assert_gt(lower_floor.y, upper_floor.y, "у правил нижний этаж дальше по Y")
+	assert_gt(lower_floor.y, upper_floor.y, "in the rules the lower floor is further along Y")
 	assert_lt(
 		WorldSpace.to_scene(lower_floor).y,
 		WorldSpace.to_scene(upper_floor).y,
-		"в сцене нижний этаж обязан оказаться ниже"
+		"in the scene the lower floor must end up lower"
 	)
 
 
@@ -42,7 +42,7 @@ func test_everything_game_side_lands_in_one_plane() -> void:
 func test_falling_down_the_plane_is_falling_down_the_scene() -> void:
 	# A fall into a shaft is a growth of Y in the rules; in the scene it must be a decrease.
 	var fall := WorldSpace.direction_to_scene(Vector2(0.0, 1.0))
-	assert_lt(fall.y, 0.0, "падение по правилам должно опускать и в сцене")
+	assert_lt(fall.y, 0.0, "a fall by the rules must go down in the scene too")
 
 
 func test_the_corridor_is_shallower_than_the_room_behind_it() -> void:

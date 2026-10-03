@@ -121,7 +121,9 @@ func test_every_car_obeys_the_player() -> void:
 		# put a cab on someone else's stops, and the check would turn green
 		# without checking anything.
 		assert_eq(
-			cars.size(), shafts.size(), "сид %d: кабин не столько, сколько шахт" % building_seed
+			cars.size(),
+			shafts.size(),
+			"seed %d: cab count differs from shaft count" % building_seed
 		)
 		var pairs := 0
 		for shaft in shafts:
@@ -130,7 +132,7 @@ func test_every_car_obeys_the_player() -> void:
 		assert_eq(
 			_decks(level).size(),
 			pairs,
-			"сид %d: ярусов не столько, сколько двухэтажных шахт" % building_seed
+			"seed %d: tier count differs from two-floor shaft count" % building_seed
 		)
 		for index: int in cars.size():
 			var shaft: BuildingPlan.ShaftSpot = shafts[index]
@@ -139,7 +141,7 @@ func test_every_car_obeys_the_player() -> void:
 				WorldSpace.to_plane(cars[index].global_position).x,
 				shaft.x,
 				TOLERANCE,
-				"сид %d, кабина %d: встала не в своей шахте" % [building_seed, number]
+				"seed %d, cab %d: stopped in a shaft not its own" % [building_seed, number]
 			)
 			# The cab is put at the top of its band rather than taken where the run
 			# found it. An empty cab rides on its own, and it can be found
@@ -152,7 +154,7 @@ func test_every_car_obeys_the_player() -> void:
 			assert_true(
 				level.otto.is_riding(),
 				(
-					"сид %d, кабина %d: Otto внутри, а кабина этого не заметила"
+					"seed %d, cab %d: Otto is inside but the cab did not notice"
 					% [building_seed, number]
 				)
 			)
@@ -164,7 +166,7 @@ func test_every_car_obeys_the_player() -> void:
 				moved,
 				MOVED,
 				(
-					"сид %d, кабина %d на %.2f: не поехала вниз по команде (сдвинулась на %.2f м)"
+					"seed %d, cab %d at %.2f: did not go down on command (moved %.2f m)"
 					% [building_seed, number, before, moved]
 				)
 			)
@@ -193,10 +195,10 @@ func test_car_at_the_end_of_its_band_still_goes_the_other_way() -> void:
 
 	var before := _height(car)
 	await _drive(&"move_down")
-	assert_almost_eq(_height(car), before, MOVED, "ниже своей полосы кабина не идёт")
+	assert_almost_eq(_height(car), before, MOVED, "the cab does not go below its lane")
 
 	await _drive(&"move_up")
-	assert_lt(_height(car), before - MOVED, "а вверх — идёт")
+	assert_lt(_height(car), before - MOVED, "but it goes up")
 	_drop(level)
 
 
@@ -226,11 +228,11 @@ func test_car_obeys_after_otto_walks_in() -> void:
 		left -= 1
 	Input.action_release(&"move_right")
 	await wait_physics_frames(1)
-	assert_true(level.otto.is_riding(), "Otto вошёл в кабину шагом")
+	assert_true(level.otto.is_riding(), "Otto walked into the cab")
 
 	var before := _height(car)
 	await _drive(&"move_down")
-	assert_gt(_height(car) - before, MOVED, "вошедшего шагом кабина слушается так же")
+	assert_gt(_height(car) - before, MOVED, "the cab obeys one who walked in the same way")
 	_drop(level)
 
 
@@ -250,11 +252,11 @@ func test_car_arrow_goes_dark_at_the_end_of_the_band() -> void:
 
 	await _park(level, car, shaft, shaft.bottom)
 	await wait_physics_frames(1)
-	assert_lt(_alpha(down), 0.5, "внизу полосы стрелка вниз погасла")
-	assert_almost_eq(_alpha(up), 1.0, 0.01, "а вверх — горит")
+	assert_lt(_alpha(down), 0.5, "at the bottom of the lane the down arrow went out")
+	assert_almost_eq(_alpha(up), 1.0, 0.01, "and the up one is lit")
 
 	await _park(level, car, shaft, shaft.top)
 	await wait_physics_frames(1)
-	assert_lt(_alpha(up), 0.5, "наверху полосы гаснет стрелка вверх")
-	assert_almost_eq(_alpha(down), 1.0, 0.01, "а вниз — горит")
+	assert_lt(_alpha(up), 0.5, "at the top of the lane the up arrow goes out")
+	assert_almost_eq(_alpha(down), 1.0, 0.01, "and the down one is lit")
 	_drop(level)

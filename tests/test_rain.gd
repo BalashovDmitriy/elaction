@@ -50,7 +50,7 @@ func test_drops_die_on_the_roof_not_on_a_timer() -> void:
 	for building_seed in _rainy_seeds(RAINY):
 		var level := _level(building_seed)
 		var rain := _rain_of(level)
-		assert_not_null(rain, "сид %d: дождя над крышей нет" % building_seed)
+		assert_not_null(rain, "seed %d: no rain above the roof" % building_seed)
 		if rain == null:
 			continue
 		var drops := rain.drops()
@@ -58,11 +58,15 @@ func test_drops_die_on_the_roof_not_on_a_timer() -> void:
 		assert_eq(
 			process.collision_mode,
 			ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT,
-			"капля гаснет о крышу"
+			"the drop dies on the roof"
 		)
 		assert_eq(process.sub_emitter_mode, ParticleProcessMaterial.SUB_EMITTER_AT_COLLISION)
-		assert_false(drops.sub_emitter.is_empty(), "брызг в месте удара нет")
-		assert_eq(rain.catcher().heightfield_mask, RoofRain.LAYER, "карта высот не с одной крыши")
+		assert_false(drops.sub_emitter.is_empty(), "no splash at the impact point")
+		assert_eq(
+			rain.catcher().heightfield_mask,
+			RoofRain.LAYER,
+			"the heightfield is not from the roof alone"
+		)
 		remove_child(level)
 
 
@@ -83,12 +87,12 @@ func test_the_heightfield_covers_every_drop_path() -> void:
 		var spread := fall * tan(deg_to_rad(process.spread))
 		var from := drops.global_position.x - box.x - spread
 		var to := drops.global_position.x + box.x + fall * RoofRain.SLANT + spread
-		var where := "сид %d" % building_seed
-		assert_gte(from, cover.position.x, where + ": капля слева мимо карты высот")
-		assert_lte(to, cover.end.x, where + ": капля справа мимо карты высот")
+		var where := "seed %d" % building_seed
+		assert_gte(from, cover.position.x, where + ": a drop on the left misses the heightfield")
+		assert_lte(to, cover.end.x, where + ": a drop on the right misses the heightfield")
 		assert_gte(drops.global_position.z - box.z, cover.position.z, where)
 		assert_lte(drops.global_position.z + box.z, cover.end.z, where)
-		assert_lt(cover.position.y, deck, where + ": карта высот не доходит до настила")
+		assert_lt(cover.position.y, deck, where + ": the heightfield does not reach the deck")
 		remove_child(level)
 
 
@@ -102,7 +106,7 @@ func test_no_rain_in_front_of_the_floors() -> void:
 		assert_lt(
 			drops.global_position.z + box.z,
 			WorldSpace.CORRIDOR_DEPTH * 0.5,
-			"сид %d: капли перед передней гранью коридора" % building_seed
+			"seed %d: drops in front of the corridor's front face" % building_seed
 		)
 		remove_child(level)
 
@@ -119,10 +123,12 @@ func test_the_roof_catches_rain_and_otto_does_not() -> void:
 		var top := (part.global_transform * part.get_aabb()).end.y
 		if absf(top - deck) < 0.01 and part.layers & RoofRain.LAYER:
 			caught += 1
-	assert_gt(caught, 0, "плита крыши не на слое дождя")
+	assert_gt(caught, 0, "the roof slab is not on the rain layer")
 	for node: Node in level.otto.find_children("*", "GeometryInstance3D", true, false):
 		assert_eq(
-			(node as GeometryInstance3D).layers & RoofRain.LAYER, 0, "Otto на слое дождя: %s" % node
+			(node as GeometryInstance3D).layers & RoofRain.LAYER,
+			0,
+			"Otto is on the rain layer: %s" % node
 		)
 	remove_child(level)
 
@@ -136,9 +142,9 @@ func test_the_rain_follows_the_quality_level() -> void:
 	var ripples := _rain_of(level).get_node("Ripples") as GPUParticles3D
 	var low_ripples := ripples.emitting
 	Graphics.broadcast(Graphics.Quality.HIGH)
-	assert_lt(low, drops.amount, "на низком капель не меньше")
-	assert_false(low_ripples, "на низком круги на лужах остались")
-	assert_true(ripples.emitting, "на высоком кругов нет")
+	assert_lt(low, drops.amount, "on low there are not fewer drops")
+	assert_false(low_ripples, "on low the puddle ripples remain")
+	assert_true(ripples.emitting, "on high there are no ripples")
 	remove_child(level)
 
 
@@ -148,9 +154,9 @@ func test_the_city_rains_in_layers_only_when_it_rains() -> void:
 	var level := _level(_rainy_seeds(1)[0])
 	var city := level.get_node("Scenery/City/CityView") as SubViewport
 	var layers := city.find_children("Layer*", "GPUParticles3D", true, false)
-	assert_eq(layers.size(), RainLook.CITY_LAYERS.size(), "не все слои дождя в городе")
+	assert_eq(layers.size(), RainLook.CITY_LAYERS.size(), "not all rain layers in the city")
 	var curtains := city.find_children("Curtain*", "MeshInstance3D", true, false)
-	assert_eq(curtains.size(), RainLook.CURTAINS.size(), "не все завесы")
+	assert_eq(curtains.size(), RainLook.CURTAINS.size(), "not all curtains")
 	remove_child(level)
 	var dry := 1
 	while Weather.is_raining(Weather.of_seed(dry)):
@@ -158,7 +164,7 @@ func test_the_city_rains_in_layers_only_when_it_rains() -> void:
 	var clear := _level(dry)
 	var clear_city := clear.get_node("Scenery/City/CityView") as SubViewport
 	assert_eq(clear_city.find_children("Layer*", "GPUParticles3D", true, false).size(), 0)
-	assert_null(_rain_of(clear), "дождь над крышей в сухую погоду")
+	assert_null(_rain_of(clear), "rain above the roof in dry weather")
 	remove_child(clear)
 
 
@@ -189,12 +195,12 @@ func test_drops_are_lit_and_fog_free() -> void:
 		looks.append(((node as GPUParticles3D).draw_pass_1 as QuadMesh).material as ShaderMaterial)
 	for look in looks:
 		var modes := _render_modes(look)
-		assert_false(modes.has("unshaded"), "капля своего цвета, а не светом ламп")
-		assert_true(modes.has("fog_disabled"), "на каплю ложится туман")
-		assert_true(modes.has("blend_add"), "капля не светится поверх фона")
+		assert_false(modes.has("unshaded"), "the drop has its own color, not lamp light")
+		assert_true(modes.has("fog_disabled"), "fog lies on the drop")
+		assert_true(modes.has("blend_add"), "the drop does not glow over the background")
 	for node: Node in city.find_children("Curtain*", "MeshInstance3D", true, false):
 		var curtain := ((node as MeshInstance3D).mesh as QuadMesh).material as ShaderMaterial
-		assert_true(_render_modes(curtain).has("fog_disabled"), "на завесу ложится туман")
+		assert_true(_render_modes(curtain).has("fog_disabled"), "fog lies on the curtain")
 	remove_child(level)
 
 
@@ -204,17 +210,17 @@ func test_mist_and_halos_follow_the_quality_level() -> void:
 	var level := _level(_rainy_seeds(1)[0])
 	var rain := _rain_of(level)
 	var sign_board := level.find_children("VerticalSign", "", true, false)
-	assert_eq(sign_board.size(), 1, "вывески нет")
+	assert_eq(sign_board.size(), 1, "no sign")
 	for quality: Graphics.Quality in [
 		Graphics.Quality.LOW, Graphics.Quality.MEDIUM, Graphics.Quality.HIGH, Graphics.Quality.ULTRA
 	]:
 		Graphics.broadcast(quality)
-		assert_eq(rain.mist().visible, Graphics.volumetric_fog(), "дымка на уровне %d" % quality)
-		assert_true(rain.halo().visible, "ореола лампы нет на уровне %d" % quality)
-	assert_not_null((sign_board[0] as VerticalSign).halo(), "у неона в дожде нет ореола")
+		assert_eq(rain.mist().visible, Graphics.volumetric_fog(), "mist at level %d" % quality)
+		assert_true(rain.halo().visible, "no lamp halo at level %d" % quality)
+	assert_not_null((sign_board[0] as VerticalSign).halo(), "the neon in rain has no halo")
 	var box := AABB(rain.mist().global_position - rain.mist().size * 0.5, rain.mist().size)
 	var deck := WorldSpace.height_to_scene(level.rules.floor_surface(BuildingRules.ROOF))
-	assert_gt(box.position.y, deck - 0.3, "дымка уходит в этажи под крышей")
+	assert_gt(box.position.y, deck - 0.3, "the mist goes into the floors under the roof")
 	Graphics.broadcast(Graphics.Quality.HIGH)
 	remove_child(level)
 
@@ -225,8 +231,12 @@ func test_no_mist_or_halos_when_dry() -> void:
 	while Weather.is_raining(Weather.of_seed(dry)):
 		dry += 1
 	var level := _level(dry)
-	assert_eq(level.find_children("Mist", "FogVolume", true, false).size(), 0, "дымка в сухую")
-	assert_eq(level.find_children("Halo", "MeshInstance3D", true, false).size(), 0, "ореол в сухую")
+	assert_eq(
+		level.find_children("Mist", "FogVolume", true, false).size(), 0, "mist in dry weather"
+	)
+	assert_eq(
+		level.find_children("Halo", "MeshInstance3D", true, false).size(), 0, "halo in dry weather"
+	)
 	remove_child(level)
 
 
@@ -239,15 +249,17 @@ func test_the_rotor_wash_pushes_the_rain() -> void:
 	wash.deck = 10.0
 	wash.follow(3.0, 10.0 + 4.0, true)
 	var gust := wash.gust()
-	assert_lt(gust.strength, 0.0, "низко висит — поток гонит капли прочь")
-	assert_between(gust.global_position.y, 10.0, 14.0, "шар между настилом и винтом")
+	assert_lt(gust.strength, 0.0, "hangs low - the flow drives drops away")
+	assert_between(
+		gust.global_position.y, 10.0, 14.0, "the sphere is between the deck and the rotor"
+	)
 	wash.follow(3.0, 10.0 + Downwash.DUST_REACH + 1.0, true)
-	assert_eq(gust.strength, 0.0, "высоко — потока нет")
+	assert_eq(gust.strength, 0.0, "high - no flow")
 	wash.follow(3.0, 10.0 + 4.0, false)
-	assert_eq(gust.strength, 0.0, "не висит — потока нет")
+	assert_eq(gust.strength, 0.0, "not hovering - no flow")
 	var drops := RainLook.streaks(
 		10, 1.0, Vector3.ONE, Vector2(8.0, 10.0), 0.1, Vector2(0.01, 0.4), null
 	)
 	add_child_autofree(drops)
 	var process := drops.process_material as ParticleProcessMaterial
-	assert_true(process.attractor_interaction_enabled, "капли не слушают поток")
+	assert_true(process.attractor_interaction_enabled, "the drops ignore the flow")

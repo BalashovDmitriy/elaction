@@ -30,8 +30,8 @@ func test_shafts_cover_every_floor() -> void:
 			serving[index] = int(serving.get(index, 0)) + 1
 
 	for index: int in rules.levels():
-		assert_true(serving.has(index), "уровень %d остался без шахты" % index)
-	assert_true(serving.has(BuildingRules.ROOF), "верхняя шахта доходит до крыши")
+		assert_true(serving.has(index), "level %d is left without a shaft" % index)
+	assert_true(serving.has(BuildingRules.ROOF), "the top shaft reaches the roof")
 
 
 ## A short shaft is not a shaft: the cab in it has nowhere to go.
@@ -54,7 +54,7 @@ func test_no_shaft_is_too_short_to_ride() -> void:
 				shaft.bottom - shaft.top + 1,
 				BuildingRules.MIN_SHAFT_FLOORS,
 				(
-					"сид %d: шахта на x=%.1f обслуживает этажи %d..%d"
+					"seed %d: the shaft at x=%.1f serves floors %d..%d"
 					% [building_seed, shaft.x, shaft.top, shaft.bottom]
 				)
 			)
@@ -74,15 +74,15 @@ func test_paths_multiply_towards_the_ground() -> void:
 		for index: int in rules.levels():
 			var here := int(serving.get(index, 0))
 			var wanted := rules.shafts_on(index)
-			assert_eq(here, wanted, "сид %d: этаж %d обслуживают не так" % [building_seed, index])
+			assert_eq(here, wanted, "seed %d: floor %d is served wrongly" % [building_seed, index])
 
 		var top := int(serving.get(BuildingRules.ROOF, 0))
 		var above := int(serving.get(rules.floors - 2, 0))
 		var bottom := int(serving.get(rules.floors - 1, 0))
-		assert_eq(top, 1, "наверху спуск безальтернативен")
-		assert_eq(above, rules.shafts_max, "над подвалом сходятся все")
+		assert_eq(top, 1, "at the top the way down has no alternative")
+		assert_eq(above, rules.shafts_max, "above the basement all of them meet")
 		# To the basement — one, by draw, as in the ROM (ADR-0038, decision 3).
-		assert_eq(bottom, 1, "в подвал спускается одна")
+		assert_eq(bottom, 1, "one goes down to the basement")
 
 
 func test_neighbouring_shafts_stand_in_different_columns() -> void:
@@ -90,7 +90,7 @@ func test_neighbouring_shafts_stand_in_different_columns() -> void:
 	for index in plan.shafts.size() - 1:
 		var here := plan.shafts[index].x
 		var below := plan.shafts[index + 1].x
-		assert_ne(here, below, "иначе спуск свёлся бы к «зажать вниз»")
+		assert_ne(here, below, "otherwise going down would boil down to 'hold down'")
 
 
 ## From the bottom of a shaft one has to get down somehow: either another shaft takes this floor
@@ -113,10 +113,10 @@ func test_every_shaft_bottom_is_bridged() -> void:
 				if other.top <= shaft.bottom and other.bottom > shaft.bottom:
 					overlapped = true
 					break
-			var where := "этаж %d, сид %d" % [shaft.bottom, building_seed]
+			var where := "floor %d, seed %d" % [shaft.bottom, building_seed]
 			assert_true(
 				overlapped or bridged.has(shaft.bottom),
-				"со дна шахты надо как-то спуститься: " + where
+				"one must get down from the shaft bottom somehow: " + where
 			)
 
 
@@ -138,9 +138,11 @@ func test_escalators_live_in_the_band_or_bridge_a_gap() -> void:
 				if shaft.bottom == index:
 					ends_here = true
 					break
-			var where := "сид %d, этаж %d" % [building_seed, index]
-			assert_true(ends_here, "эскалатор вне полосы оправдан разрывом: " + where)
-		assert_gt(in_band, 0, "сид %d: полоса эскалаторов пуста" % building_seed)
+			var where := "seed %d, floor %d" % [building_seed, index]
+			assert_true(
+				ends_here, "an escalator outside the band is justified by a break: " + where
+			)
+		assert_gt(in_band, 0, "seed %d: the escalator band is empty" % building_seed)
 
 
 ## The escalator opening lies to the side of the landing, and one must reach it without crossing it.
@@ -157,7 +159,7 @@ func test_escalator_pad_shields_its_gap_from_the_shaft() -> void:
 			assert_false(
 				near < gap.y and gap.x < far,
 				(
-					"сид %d, этаж %d: дыра между лифтом и площадкой"
+					"seed %d, floor %d: a gap between the lift and the landing"
 					% [building_seed, escalator.floor_index]
 				)
 			)
@@ -175,7 +177,7 @@ func test_every_shaft_stands_on_a_slot_its_whole_band_offers() -> void:
 				var half := rules.shaft_width * 0.5
 				assert_true(
 					shaft.x - half >= span.x and shaft.x + half <= span.y,
-					"сид %d: шахта на этаже %d вышла за стену" % [building_seed, index]
+					"seed %d: the shaft on floor %d went outside the wall" % [building_seed, index]
 				)
 
 
@@ -204,7 +206,7 @@ func test_escalator_carries_its_rider_through_the_gap() -> void:
 				assert_true(
 					at - OttoBot.BODY_HALF_WIDTH >= gap.x and at + OttoBot.BODY_HALF_WIDTH <= gap.y,
 					(
-						"сид %d, этаж %d: пассажир на x=%.2f не влезает в проём %.2f..%.2f"
+						"seed %d, floor %d: the passenger at x=%.2f does not fit the opening %.2f..%.2f"
 						% [building_seed, escalator.floor_index, at, gap.x, gap.y]
 					)
 				)
@@ -236,17 +238,19 @@ func test_double_deck_pairs_are_few_and_fit_their_shaft() -> void:
 			assert_gte(
 				shaft.height(),
 				BuildingRules.MIN_SHAFT_FLOORS,
-				"сид %d: пара в шахте на %d этажей" % [building_seed, shaft.height()]
+				"seed %d: a pair in a shaft of %d floors" % [building_seed, shaft.height()]
 			)
 			assert_lt(
 				span.x,
 				span.y,
 				(
-					"сид %d: паре в шахте %d..%d ехать некуда"
+					"seed %d: a pair in the shaft %d..%d has nowhere to go"
 					% [building_seed, shaft.top, shaft.bottom]
 				)
 			)
-		assert_lte(pairs, BuildingDecks.MOST, "сид %d: пар в здании %d" % [building_seed, pairs])
+		assert_lte(
+			pairs, BuildingDecks.MOST, "seed %d: pairs in the building %d" % [building_seed, pairs]
+		)
 
 
 ## A pair appears in every building where there is room for it.
@@ -264,7 +268,7 @@ func test_double_deck_shows_up_in_every_building() -> void:
 			if shaft.double_deck:
 				with_pair += 1
 				break
-	assert_eq(with_pair, 40, "пара нашла себе шахту в каждом здании из сорока")
+	assert_eq(with_pair, 40, "a pair found a shaft in each of the forty buildings")
 
 
 ## A pair does not block the descent: a building with it is traversable on any seed.
@@ -277,4 +281,4 @@ func test_double_deck_never_locks_the_descent() -> void:
 	for building_seed in range(1, 41):
 		var plan := BuildingPlan.generate(rules, building_seed)
 		var missing := BuildingRoute.unreachable_spots(plan, rules)
-		assert_true(missing.is_empty(), "сид %d: недостижимо — %s" % [building_seed, missing])
+		assert_true(missing.is_empty(), "seed %d: unreachable - %s" % [building_seed, missing])

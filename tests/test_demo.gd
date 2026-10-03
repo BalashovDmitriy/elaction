@@ -22,17 +22,19 @@ func test_the_points_go_round() -> void:
 	for _round: int in DemoPlan.Point.size():
 		seen.append(point)
 		point = DemoPlan.next(point)
-	assert_eq(point, DemoPlan.Point.ROOF, "три точки — и снова крыша")
-	assert_eq(seen.size(), 3, "каждая по разу")
+	assert_eq(point, DemoPlan.Point.ROOF, "three points — and the roof again")
+	assert_eq(seen.size(), 3, "each once")
 
 
 func test_the_start_floors_follow_the_rom() -> void:
 	# The ROM starts from the 18th and 5th floors from the bottom (`$802C`); our floors are counted
 	# from the top, and in a thirty-floor building these are indices 12 and 25.
-	assert_eq(DemoPlan.floor_of(DemoPlan.Point.ROOF, 30), BuildingRules.ROOF, "верх — крыша")
-	assert_eq(DemoPlan.floor_of(DemoPlan.Point.MIDDLE, 30), 12, "середина")
-	assert_eq(DemoPlan.floor_of(DemoPlan.Point.BOTTOM, 30), 25, "низ")
-	assert_eq(DemoPlan.floor_of(DemoPlan.Point.BOTTOM, 3), 0, "в низком здании — в его пределах")
+	assert_eq(DemoPlan.floor_of(DemoPlan.Point.ROOF, 30), BuildingRules.ROOF, "top — the roof")
+	assert_eq(DemoPlan.floor_of(DemoPlan.Point.MIDDLE, 30), 12, "middle")
+	assert_eq(DemoPlan.floor_of(DemoPlan.Point.BOTTOM, 30), 25, "bottom")
+	assert_eq(
+		DemoPlan.floor_of(DemoPlan.Point.BOTTOM, 3), 0, "in a low building — within its bounds"
+	)
 
 
 # --- Main menu -----------------------------------------------------------------
@@ -43,12 +45,12 @@ func test_idle_in_the_main_menu_starts_the_demo() -> void:
 	add_child_autofree(main)
 	await wait_physics_frames(2)
 	main.call("_count_idle", DemoPlan.IDLE_TIME * 0.5)
-	assert_null(main.get("_demo"), "полминуты — ещё меню")
+	assert_null(main.get("_demo"), "half a minute — still the menu")
 	main.call("_count_idle", DemoPlan.IDLE_TIME * 0.6)
 	var demo := main.get("_demo") as DemoRun
-	assert_not_null(demo, "бездействие — демо")
-	assert_false((main.get_node("Menu") as Menu).visible, "меню спряталось")
-	assert_not_null(main.get("_level"), "здание собрано")
+	assert_not_null(demo, "idleness — the demo")
+	assert_false((main.get_node("Menu") as Menu).visible, "the menu hid")
+	assert_not_null(main.get("_level"), "the building is assembled")
 
 
 func test_a_press_resets_the_idle_count() -> void:
@@ -58,7 +60,7 @@ func test_a_press_resets_the_idle_count() -> void:
 	main.call("_count_idle", DemoPlan.IDLE_TIME * 0.9)
 	main._input(_key())
 	main.call("_count_idle", DemoPlan.IDLE_TIME * 0.5)
-	assert_null(main.get("_demo"), "нажатие обнулило отсчёт")
+	assert_null(main.get("_demo"), "a keypress reset the countdown")
 
 
 func test_any_press_ends_the_demo_back_to_the_menu() -> void:
@@ -72,13 +74,13 @@ func test_any_press_ends_the_demo_back_to_the_menu() -> void:
 	pad.button_index = JOY_BUTTON_A
 	pad.pressed = true
 	main._input(pad)
-	assert_eq(level.process_mode, Node.PROCESS_MODE_DISABLED, "здание замерло сразу")
+	assert_eq(level.process_mode, Node.PROCESS_MODE_DISABLED, "the building froze at once")
 	await wait_seconds(FadeCurtain.FADE_OUT + 0.2)
-	assert_null(main.get("_demo"), "демо кончилось")
-	assert_null(main.get("_level"), "здание выброшено")
+	assert_null(main.get("_demo"), "the demo ended")
+	assert_null(main.get("_level"), "the building is thrown away")
 	var menu := main.get_node("Menu") as Menu
-	assert_true(menu.visible, "снова меню")
-	assert_eq(menu.current_page(), Menu.Page.MAIN, "главное")
+	assert_true(menu.visible, "the menu again")
+	assert_eq(menu.current_page(), Menu.Page.MAIN, "main")
 
 
 func test_the_demo_writes_no_records() -> void:
@@ -89,8 +91,8 @@ func test_the_demo_writes_no_records() -> void:
 	await wait_physics_frames(2)
 	GameState.instance().game_over.emit()
 	var menu := main.get_node("Menu") as Menu
-	assert_ne(menu.current_page(), Menu.Page.GAME_OVER, "конца партии демо не показывает")
-	assert_true(main.get("_demo_ending"), "а уходит в меню")
+	assert_ne(menu.current_page(), Menu.Page.GAME_OVER, "the demo does not show the end of a game")
+	assert_true(main.get("_demo_ending"), "and goes to the menu")
 
 
 func test_a_screenshot_does_not_end_the_demo() -> void:
@@ -102,9 +104,9 @@ func test_a_screenshot_does_not_end_the_demo() -> void:
 	var shot := InputEventKey.new()
 	shot.physical_keycode = KEY_F12
 	shot.pressed = true
-	assert_true(shot.is_action(&"screenshot"), "F12 — это кадр")
+	assert_true(shot.is_action(&"screenshot"), "F12 is a shot")
 	main._input(shot)
-	assert_false(main.get("_demo_ending"), "кадр снимается, демо идёт дальше")
+	assert_false(main.get("_demo_ending"), "the shot is taken, the demo goes on")
 	main.call("_end_demo")
 
 
@@ -124,20 +126,20 @@ func test_the_bottom_point_opens_the_basement() -> void:
 	var wanted := DemoPlan.floor_of(DemoPlan.Point.BOTTOM, level.rules.floors)
 	var index := level.rules.floor_index_near(WorldSpace.to_plane(level.otto.global_position).y)
 	# The start is at a shaft whose cab starts from this floor, near the ROM floor.
-	assert_lte(absi(index - wanted), DemoPlan.SHAFT_SEARCH, "Otto внизу, возле этажа ROM")
+	assert_lte(absi(index - wanted), DemoPlan.SHAFT_SEARCH, "Otto is down, near the ROM floor")
 	var starts_here := false
 	for shaft: BuildingPlan.ShaftSpot in level.plan().shafts:
 		starts_here = starts_here or shaft.top == index
-	assert_true(starts_here, "на этаже старта начинает кабина")
-	assert_false(level.is_in_the_intro(), "вступление пропущено")
+	assert_true(starts_here, "the car starts on the start floor")
+	assert_false(level.is_in_the_intro(), "the intro is skipped")
 	# The view snaps onto Otto rather than travelling to him from the roof through the whole building.
 	var feet := WorldSpace.to_plane(level.otto.global_position)
-	assert_true(level.otto.camera_view().has_point(feet), "Otto в кадре с первого шага")
+	assert_true(level.otto.camera_view().has_point(feet), "Otto is in frame from the first step")
 	var pending := 0
 	for door: Door in level.doors():
 		if door.is_pending() and level.rules.floor_index_near(door.mat_position().y) < index:
 			pending += 1
-	assert_eq(pending, 0, "документов выше старта не осталось — бот идёт вниз, а не наверх")
+	assert_eq(pending, 0, "no documents left above the start — the bot goes down, not up")
 	run.stop()
 	remove_child(level)
 
@@ -159,7 +161,7 @@ func test_holding_a_deck_holds_its_pair() -> void:
 		if car != null and car.is_deck():
 			deck = car
 	if deck == null:
-		pending("в здании нет двухэтажной пары")
+		pending("the building has no two-floor pair")
 		remove_child(level)
 		return
 	# The leading cab is the nearest cab above in the same column: one column can also have two shafts
@@ -173,12 +175,12 @@ func test_holding_a_deck_holds_its_pair() -> void:
 		if above > 0.0 and above < closest:
 			closest = above
 			leader = car
-	assert_not_null(leader, "у яруса есть ведущий")
+	assert_not_null(leader, "the tier has a leader")
 	var before := leader.position.y
 	deck.hold(DemoRun.CAR_WAIT)
 	# Longer than an ordinary stop at a floor ([member ElevatorCar.floor_pause]).
 	await wait_physics_frames(int((leader.floor_pause + 1.0) * Engine.physics_ticks_per_second))
-	assert_almost_eq(leader.position.y, before, 0.01, "пара стоит, пока держат ярус")
+	assert_almost_eq(leader.position.y, before, 0.01, "the pair stands while the tier is held")
 	remove_child(level)
 
 
@@ -206,9 +208,9 @@ func test_game_over_waits_for_the_last_death() -> void:
 	GameState.instance().game_over.emit()
 	await wait_physics_frames(2)
 	var menu := main.get_node("Menu") as Menu
-	assert_false(menu.visible, "в кадр смерти меню нет")
-	assert_false(get_tree().paused, "мир ещё идёт — медленно")
-	assert_lt(Engine.time_scale, 1.0, "замедлен")
+	assert_false(menu.visible, "no menu in the death frame")
+	assert_false(get_tree().paused, "the world is still going — slowly")
+	assert_lt(Engine.time_scale, 1.0, "slowed down")
 	# By tree frames: they run during pause too, while a GUT wait under pause stops together with the
 	# building. Time is in frame steps without slow-down, as [LastDeath] counts it, not by the clock:
 	# under `--fixed-fps` frames run faster than the clock, and within two seconds of clock time the
@@ -217,11 +219,11 @@ func test_game_over_waits_for_the_last_death() -> void:
 	while waited < LastDeath.DURATION + 0.1:
 		await get_tree().process_frame
 		waited += get_process_delta_time() / maxf(Engine.time_scale, 0.001)
-	assert_true(menu.visible, "потом — конец партии")
+	assert_true(menu.visible, "then — the end of the game")
 	assert_eq(menu.current_page(), Menu.Page.GAME_OVER)
-	assert_true(get_tree().paused, "здание замерло")
-	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "темп вернулся")
-	assert_true(menu.rows()[0].disabled, "пункты пока не нажимаются")
+	assert_true(get_tree().paused, "the building froze")
+	assert_almost_eq(Engine.time_scale, 1.0, 0.001, "the pace returned")
+	assert_true(menu.rows()[0].disabled, "the items cannot be pressed yet")
 
 
 ## Esc during the last death does not continue the game (M24f code review): the closed menu
@@ -251,6 +253,6 @@ func test_escape_during_the_last_death_does_not_resume() -> void:
 		await get_tree().process_frame
 		waited += get_process_delta_time() / maxf(Engine.time_scale, 0.001)
 	var menu := main.get_node("Menu") as Menu
-	assert_true(menu.visible, "конец партии показан")
+	assert_true(menu.visible, "the end of the game is shown")
 	assert_eq(menu.current_page(), Menu.Page.GAME_OVER)
-	assert_false(main.get("_playing"), "партия не продолжилась")
+	assert_false(main.get("_playing"), "the game did not continue")

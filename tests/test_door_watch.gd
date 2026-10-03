@@ -44,10 +44,10 @@ func test_never_more_than_one_agent_waits_at_the_door() -> void:
 		var watch := _watch(seed_value)
 		for _frame_index: int in 30:
 			var waiting := _waiting(_frame(watch, ids, xs))
-			assert_lte(waiting, 1, "у двери не больше одного, сид %d" % seed_value)
+			assert_lte(waiting, 1, "no more than one at a door, seed %d" % seed_value)
 			if waiting > 0:
 				somebody += 1
-	assert_gt(somebody, 0, "никто ни разу не пошёл — проверять было нечего")
+	assert_gt(somebody, 0, "nobody ever went - nothing to check")
 
 
 func test_the_roll_is_once_per_visit_not_per_frame() -> void:
@@ -62,22 +62,22 @@ func test_the_roll_is_once_per_visit_not_per_frame() -> void:
 		var steady := true
 		for _frame_index: int in 60:
 			steady = steady and is_nan(_frame(watch, ids, xs)[0]) == is_nan(first[0])
-		assert_true(steady, "решение держится весь визит, сид %d" % seed_value)
+		assert_true(steady, "the decision holds for the whole visit, seed %d" % seed_value)
 		if not is_nan(first[0]):
 			went += 1
-	assert_between(went, 60, 140, "каждый второй, а не каждый")
+	assert_between(went, 60, 140, "every second one, not every one")
 
 
 func test_the_post_is_off_the_mat_on_the_agents_side() -> void:
 	var watch := _watch(1)
 	var left := watch.spot(3.0)
 	var right := watch.spot(20.0)
-	assert_lt(left, DOOR_X, "слева пришёл — слева и ждёт")
+	assert_lt(left, DOOR_X, "came from the left - waits on the left")
 	assert_gt(right, DOOR_X)
 	for post: float in [left, right]:
 		var gap := absf(post - DOOR_X)
-		assert_gt(gap - Proportions.BODY_WIDTH * 0.5, Proportions.DOOR_MAT * 0.5, "не на коврике")
-		assert_lt(gap, Proportions.DOOR.x, "но у самой двери")
+		assert_gt(gap - Proportions.BODY_WIDTH * 0.5, Proportions.DOOR_MAT * 0.5, "not on the mat")
+		assert_lt(gap, Proportions.DOOR.x, "but right at the door")
 
 
 func test_other_floors_do_not_wait() -> void:
@@ -92,7 +92,9 @@ func test_nobody_walks_through_a_hole_or_a_wall() -> void:
 	for seed_value: int in range(1, 40):
 		var watch := _watch(seed_value)
 		watch.start_frame()
-		assert_true(is_nan(watch.post_for(1, FLOOR, 3.0, blocks)), "проём между ним и дверью")
+		assert_true(
+			is_nan(watch.post_for(1, FLOOR, 3.0, blocks)), "an opening between him and the door"
+		)
 
 
 func test_the_watcher_lets_go_when_otto_comes_out() -> void:
@@ -103,7 +105,7 @@ func test_the_watcher_lets_go_when_otto_comes_out() -> void:
 		_frame(watch, ids, xs)
 		watch.end()
 		for _frame_index: int in 5:
-			assert_eq(_waiting(_frame(watch, ids, xs)), 0, "вышел — ждать некого")
+			assert_eq(_waiting(_frame(watch, ids, xs)), 0, "left - nobody to wait for")
 
 
 func test_a_gone_watcher_frees_the_door() -> void:
@@ -118,9 +120,9 @@ func test_a_gone_watcher_frees_the_door() -> void:
 		found = true
 		watch.start_frame()
 		watch.start_frame()
-		assert_eq(watch.watcher(), 0, "пропал из кадра — пост свободен")
+		assert_eq(watch.watcher(), 0, "gone from the frame - the post is free")
 		break
-	assert_true(found, "ни на одном сиде никто не пошёл")
+	assert_true(found, "on no seed did anyone go")
 
 
 func test_a_new_visit_rolls_again() -> void:
@@ -134,4 +136,4 @@ func test_a_new_visit_rolls_again() -> void:
 		watch.start_frame()
 		if not is_nan(watch.post_for(1, FLOOR, 4.0, NO_BLOCKS)):
 			went += 1
-	assert_gt(went, 0, "новый визит — новый жребий")
+	assert_gt(went, 0, "a new visit - a new roll")

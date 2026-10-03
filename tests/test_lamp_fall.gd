@@ -17,7 +17,7 @@ func _fall() -> LampFall:
 
 
 func test_hanging_lamp_does_not_move() -> void:
-	assert_eq(_fall().advance(STEP), 0.0, "пока не сбита — висит")
+	assert_eq(_fall().advance(STEP), 0.0, "hangs until it is shot down")
 
 
 func test_shot_lamp_starts_falling() -> void:
@@ -29,7 +29,7 @@ func test_shot_lamp_starts_falling() -> void:
 func test_second_bullet_does_not_restart_the_fall() -> void:
 	var fall := _fall()
 	fall.start()
-	assert_false(fall.start(), "уже падает")
+	assert_false(fall.start(), "already falling")
 
 
 func test_fall_stops_exactly_at_the_floor() -> void:
@@ -38,7 +38,7 @@ func test_fall_stops_exactly_at_the_floor() -> void:
 	var travelled := 0.0
 	for _frame: int in 10:
 		travelled += fall.advance(STEP)
-	assert_almost_eq(travelled, fall.distance, 0.01, "пролетела ровно сколько отмерено")
+	assert_almost_eq(travelled, fall.distance, 0.01, "fell exactly the measured distance")
 	assert_true(fall.has_landed())
 
 
@@ -47,5 +47,5 @@ func test_landed_lamp_stays_down() -> void:
 	fall.start()
 	for _frame: int in 10:
 		fall.advance(STEP)
-	assert_false(fall.start(), "вторая пуля в упавшую лампу её не поднимает")
+	assert_false(fall.start(), "a second bullet into a fallen lamp does not raise it")
 	assert_eq(fall.advance(STEP), 0.0)

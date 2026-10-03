@@ -77,9 +77,9 @@ func test_a_fast_bullet_stops_at_a_thin_wall() -> void:
 	var hits: Array[Node3D] = []
 	var bullet := _fire(0.0, hits)
 	await wait_physics_frames(6)
-	assert_eq(hits.size(), 1, "пуля попала один раз")
-	assert_true(hits.size() == 1 and hits[0] == wall, "в стену, а не мимо неё")
-	assert_false(is_instance_valid(bullet), "и погасла о неё")
+	assert_eq(hits.size(), 1, "the bullet hit once")
+	assert_true(hits.size() == 1 and hits[0] == wall, "into the wall, not past it")
+	assert_false(is_instance_valid(bullet), "and died on it")
 
 
 func test_a_fast_bullet_hits_the_agent_in_its_way() -> void:
@@ -89,7 +89,9 @@ func test_a_fast_bullet_hits_the_agent_in_its_way() -> void:
 	var hits: Array[Node3D] = []
 	_fire(0.0, hits)
 	await wait_physics_frames(6)
-	assert_true(hits.size() == 1 and hits[0] == agent, "пуля встретила агента, а не стену за ним")
+	assert_true(
+		hits.size() == 1 and hits[0] == agent, "the bullet met the agent, not the wall behind him"
+	)
 
 
 ## A corpse stays until the end of the building but is not a target: the bullet flies
@@ -102,7 +104,7 @@ func test_bullets_pass_through_a_corpse() -> void:
 	var hits: Array[Node3D] = []
 	_fire(0.0, hits)
 	await wait_physics_frames(6)
-	assert_true(hits.size() == 1 and hits[0] == wall, "сквозь труп — в стену")
+	assert_true(hits.size() == 1 and hits[0] == wall, "through the corpse — into the wall")
 
 
 ## A bullet in a wall leaves a mark, but there are no more marks in the building than
@@ -113,8 +115,8 @@ func test_bullet_holes_are_left_and_capped() -> void:
 	for _shot: int in ShotFx.HOLES_KEPT + 5:
 		_fire(0.0, hits)
 		await wait_physics_frames(2)
-	assert_eq(hits.size(), ShotFx.HOLES_KEPT + 5, "каждая пуля дошла до стены")
-	assert_eq(ShotFx.holes(), ShotFx.HOLES_KEPT, "следов — не больше потолка")
+	assert_eq(hits.size(), ShotFx.HOLES_KEPT + 5, "every bullet reached the wall")
+	assert_eq(ShotFx.holes(), ShotFx.HOLES_KEPT, "marks — no more than the ceiling")
 
 
 ## A bullet born inside a body hits it at once, by a direct query, and the engine's

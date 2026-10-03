@@ -1,5 +1,5 @@
-# Конфиг gdlint (gdtoolkit 4.5.0). Сгенерирован из дефолтов и подправлен.
-# Проверить вручную: .venv/Scripts/gdlint src tests tools
+# gdlint config (gdtoolkit 4.5.0). Generated from the defaults and adjusted.
+# Check by hand: .venv/Scripts/gdlint src tests tools
 class-definitions-order:
 - tools
 - classnames

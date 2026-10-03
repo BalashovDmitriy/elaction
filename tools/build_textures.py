@@ -116,7 +116,7 @@ def _wallpaper() -> None:
     normal = _normal_from(height, strength=1.6)
     rough = Image.new("L", (size, size), 200)
     _save(OUT / "hotel_wall", albedo, normal, rough)
-    print("  hotel_wall: своя, полоса с ромбиком")
+    print("  hotel_wall: custom, a stripe with a diamond")
 
 
 def _normal_from(height: Image.Image, strength: float) -> Image.Image:
@@ -136,9 +136,9 @@ def _normal_from(height: Image.Image, strength: float) -> Image.Image:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Фактуры стен, шахты и крыши.")
-    parser.add_argument("--local", action="store_true", help="только свои, без сети")
-    parser.add_argument("--only", nargs="*", default=[], help="только эти фактуры ambientCG")
+    parser = argparse.ArgumentParser(description="Textures of walls, shaft and roof.")
+    parser.add_argument("--local", action="store_true", help="custom only, no network")
+    parser.add_argument("--only", nargs="*", default=[], help="only these ambientCG textures")
     arguments = parser.parse_args()
     if not arguments.only:
         _wallpaper()
@@ -146,7 +146,7 @@ def main() -> int:
         for name, (asset, grey) in AMBIENT.items():
             if not arguments.only or name in arguments.only:
                 _ambient(name, asset, grey)
-    print(f"Фактуры в {OUT.relative_to(PROJECT_ROOT).as_posix()}/")
+    print(f"Textures in {OUT.relative_to(PROJECT_ROOT).as_posix()}/")
     return 0
 
 

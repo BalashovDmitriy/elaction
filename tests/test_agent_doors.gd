@@ -102,12 +102,12 @@ func _is_indoors(otto: Otto) -> bool:
 func test_a_door_opening_for_an_agent_does_not_take_otto_in() -> void:
 	var door := _bare_door()
 	var otto := _guest_at(door)
-	assert_true(door.summon_agent(), "свободная дверь открывается под агента")
+	assert_true(door.summon_agent(), "a free door opens for an agent")
 
 	Input.action_press(&"move_up")
 	await wait_physics_frames(KNOCK_FRAMES)
 	Input.action_release(&"move_up")
-	assert_false(_is_indoors(otto), "дверь занята агентом и Otto внутрь не пустила")
+	assert_false(_is_indoors(otto), "the door is taken by an agent and did not let Otto in")
 
 
 ## A free one does let him in: otherwise the previous check would pass even on a door
@@ -119,7 +119,7 @@ func test_a_free_door_still_takes_otto_in() -> void:
 	Input.action_press(&"move_up")
 	await wait_physics_frames(KNOCK_FRAMES)
 	Input.action_release(&"move_up")
-	assert_true(_is_indoors(otto), "в свободную дверь Otto заходит как прежде")
+	assert_true(_is_indoors(otto), "Otto enters a free door as before")
 
 
 ## The building was thrown away while Otto is behind a door: "restart" from the pause,
@@ -137,10 +137,10 @@ func test_a_door_gone_with_otto_inside_brings_the_music_back() -> void:
 	Input.action_press(&"move_up")
 	await wait_physics_frames(KNOCK_FRAMES)
 	Input.action_release(&"move_up")
-	assert_true(_is_indoors(otto), "Otto за дверью")
-	assert_true(director.music_muffled(), "музыка из-за стены")
+	assert_true(_is_indoors(otto), "Otto is behind the door")
+	assert_true(director.music_muffled(), "music from behind the wall")
 	remove_child(door)
-	assert_false(director.music_muffled(), "дверь ушла — звук вернулся")
+	assert_false(director.music_muffled(), "the door left: the sound returned")
 
 
 func test_no_agent_ever_shows_up_in_front_of_a_shut_door() -> void:
@@ -154,10 +154,10 @@ func test_no_agent_ever_shows_up_in_front_of_a_shut_door() -> void:
 			if not agent.is_emerging():
 				continue
 			var door := level.door_of(agent)
-			assert_not_null(door, "агент вышел неизвестно откуда")
+			assert_not_null(door, "an agent came out of nowhere")
 			if door == null:
 				return
-			assert_gt(door.openness(), 0.0, "агент в проёме — значит створка не закрыта")
+			assert_gt(door.openness(), 0.0, "agent in the opening, so the leaf is not closed")
 
 
 func test_an_agent_in_the_doorway_is_not_a_target() -> void:
@@ -172,9 +172,9 @@ func test_an_agent_in_the_doorway_is_not_a_target() -> void:
 			seen += 1
 			assert_false(
 				agent.get_collision_layer_value(Enemy.ENEMY_LAYER),
-				"пока агент в проёме, пуле не во что попадать"
+				"while the agent is in the opening, a bullet has nothing to hit"
 			)
-	assert_gt(seen, 0, "ни один агент не выходил — проверять было нечего")
+	assert_gt(seen, 0, "no agent came out, nothing to check")
 
 
 func test_an_agent_out_of_the_doorway_becomes_a_target() -> void:
@@ -189,9 +189,9 @@ func test_an_agent_out_of_the_doorway_becomes_a_target() -> void:
 			seen += 1
 			assert_true(
 				agent.get_collision_layer_value(Enemy.ENEMY_LAYER),
-				"вышедший агент — обычный противник, и его берёт пуля"
+				"an agent who came out is an ordinary enemy, and a bullet hits him"
 			)
-	assert_gt(seen, 0, "ни один агент так и не вышел из проёма")
+	assert_gt(seen, 0, "no agent ever came out of the opening")
 
 
 func test_the_door_shuts_behind_the_agent_that_left_it() -> void:
@@ -215,9 +215,9 @@ func test_the_door_shuts_behind_the_agent_that_left_it() -> void:
 				closed_behind += 1
 	# "Zero" can happen both because the door did not close and because nobody came out
 	# within the observation window, and these are different breakages.
-	assert_gt(just_left, 0, "ни один агент не отходил от своей двери")
+	assert_gt(just_left, 0, "no agent moved away from his door")
 	assert_gt(
-		closed_behind, 0, "ни одна дверь за вышедшим не закрывалась (отошедших %d)" % just_left
+		closed_behind, 0, "no door closed behind one who came out (moved away: %d)" % just_left
 	)
 
 
@@ -237,7 +237,7 @@ func test_a_door_shuts_even_when_its_agent_is_killed_on_the_spot() -> void:
 		await wait_physics_frames(1)
 		if emptied != null:
 			if emptied.openness() <= 0.0:
-				pass_test("створка вернулась и за убитым")
+				pass_test("the leaf returned for a killed agent too")
 				return
 			continue
 		for agent in _live_agents(level):
@@ -247,8 +247,8 @@ func test_a_door_shuts_even_when_its_agent_is_killed_on_the_spot() -> void:
 			agent.kill()
 			break
 
-	assert_not_null(emptied, "из дверей никто не вышел — убивать было некого")
-	fail_test("дверь так и осталась открытой за убитым агентом")
+	assert_not_null(emptied, "nobody came out of the doors, nobody to kill")
+	fail_test("the door stayed open behind the killed agent")
 
 
 ## A corpse lies until the end of the building (ADR-0037, decision 6), but holds neither
@@ -269,11 +269,11 @@ func test_a_corpse_does_not_hold_back_the_next_agent() -> void:
 					break
 			continue
 		if not live.is_empty():
-			assert_true(is_instance_valid(corpse), "труп лежит, пока выходит следующий")
+			assert_true(is_instance_valid(corpse), "the corpse lies while the next one comes out")
 			return
 
-	assert_not_null(corpse, "из дверей никто не вышел — убивать было некого")
-	fail_test("после убитого не вышел никто: труп держит выпуск")
+	assert_not_null(corpse, "nobody came out of the doors, nobody to kill")
+	fail_test("nobody came out after the killed one: the corpse holds the release")
 
 
 func test_an_emptied_red_door_starts_letting_agents_out() -> void:
@@ -283,17 +283,17 @@ func test_an_emptied_red_door_starts_letting_agents_out() -> void:
 		if door.is_pending():
 			red = door
 			break
-	assert_not_null(red, "в здании обязаны быть красные двери")
+	assert_not_null(red, "the building must have red doors")
 	if red == null:
 		return
 
 	# The document is taken directly, not by Otto entering: the milestone is about doors,
 	# not about the visit.
-	assert_false(level.agent_doors().has(red), "красная дверь засад не держит")
+	assert_false(level.agent_doors().has(red), "a red door holds no ambushes")
 	red.has_document = false
 	red.document_taken.emit()
 	assert_true(
-		level.agent_doors().has(red), "опустевшая дверь выглядит обычной и ведёт себя как обычная"
+		level.agent_doors().has(red), "an emptied door looks and behaves like an ordinary one"
 	)
 
 
@@ -304,17 +304,19 @@ func test_an_emptied_red_door_starts_letting_agents_out() -> void:
 ## shaft, so it swings on a hinge into the room (ADR-0026, decision 3).
 func test_an_open_leaf_stays_inside_its_doorway() -> void:
 	var door := _bare_door()
-	assert_true(door.summon_agent(), "дверь открывается")
+	assert_true(door.summon_agent(), "the door opens")
 	var frames := 0
 	while door.openness() < 1.0 and frames < 240:
 		await wait_physics_frames(1)
 		frames += 1
-	assert_almost_eq(door.openness(), 1.0, 0.001, "дверь открылась до конца")
+	assert_almost_eq(door.openness(), 1.0, 0.001, "the door opened fully")
 
 	var leaf := door.get_node("Leaf") as MeshInstance3D
 	var bounds := leaf.global_transform * leaf.get_aabb()
 	var half := Door.LEAF_SIZE.x * 0.5
 	var centre := door.global_position.x
-	assert_gte(bounds.position.x, centre - half - 0.05, "створка не вышла за проём слева")
-	assert_lte(bounds.end.x, centre + half + 0.05, "и справа")
-	assert_lt(bounds.position.z, WorldSpace.BACK_WALL_Z, "она ушла в комнату, за стену")
+	assert_gte(
+		bounds.position.x, centre - half - 0.05, "the leaf did not go past the opening on the left"
+	)
+	assert_lte(bounds.end.x, centre + half + 0.05, "and on the right")
+	assert_lt(bounds.position.z, WorldSpace.BACK_WALL_Z, "it went into the room, behind the wall")

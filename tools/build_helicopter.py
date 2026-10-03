@@ -336,7 +336,7 @@ def inside_blender() -> int:
     mark("PilotSeat", Vector(PILOT_SEAT))
     TARGET.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.export_scene.gltf(filepath=str(TARGET), export_format="GLB", export_yup=True)
-    print(f"записан {TARGET}")
+    print(f"wrote {TARGET}")
     return 0
 
 
@@ -347,7 +347,7 @@ def outside() -> int:
     blender = require_blender()
     code, output = run_script(blender, Path(__file__))
     for line in output.splitlines():
-        if "записан" in line or "Error" in line or "Traceback" in line or "rror:" in line:
+        if "wrote" in line or "Error" in line or "Traceback" in line or "rror:" in line:
             print(line)
     return code
 
