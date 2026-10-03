@@ -18,7 +18,7 @@ and grading. The last 2D build remains in git history — the M14 merge, `d5774d
 | Engine | Godot 4.7.2 |
 | Language | GDScript with static typing |
 | Platforms | Windows, Linux |
-| Status | Milestones up to M24p are complete: the game is assembled in full — three building kinds with their own halls, cabs, music and exterior. Next — M24q: every animation reviewed frame by frame and finished; M24r: settings by the monitor and agent release; then M25: online leaderboard (optional). |
+| Status | Milestones up to M24p are complete: the game is assembled in full — three building kinds with their own halls, cabs, music and exterior. Next — M24q: every animation reviewed frame by frame and finished; M24r: agent mechanics; M24s: settings by the monitor; then M25: online leaderboard (optional). |
 
 ## Download and play
 

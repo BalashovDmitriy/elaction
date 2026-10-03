@@ -1184,19 +1184,16 @@ mission has its own place and its own finale. Questions — 2026-10-03.
 
 ### M24q · Animation, frame by frame
 
-Requested by the user on 2026-10-03, after the whole-game review — a big one. Every animation in the
-game is reviewed frame by frame, and what looks unnatural or skips a step is finished.
-Before the code: a check against the original and questions, as for any milestone.
+Requested by the user on 2026-10-03, after the whole-game review — a big one. Every
+animation in the game is reviewed frame by frame, and what looks unnatural or skips a step
+is finished. Look only: the rules of who can hit whom and when belong to M24r. Before the
+code: a check against the original and questions, as for any milestone.
 
 - [ ] Frame-by-frame pass over all animations: a series of frames for each one (tools in
       `tools/*_shot.gd`), a list of what is missing or looks wrong
 - [ ] Otto leaving the helicopter: today it looks unnatural
 - [ ] Agents coming out of doors: the door opens and the agent just appears — he should
       open it and step out
-- [ ] An agent is hittable as soon as he has stepped out into Otto's plane: today he is
-      shielded for the whole 0.6 s `EMERGING` phase (ADR-0020), and bullets pass through an
-      agent already standing on the floor. Check against the ROM how long the original
-      shields an agent in a doorway
 - [ ] Otto entering a door: he vanishes instead of going in and closing the door behind him
 - [ ] Otto coming out of a door: the door opens and he is already there — he should open
       it himself and step out
@@ -1205,30 +1202,46 @@ Before the code: a check against the original and questions, as for any mileston
       physics (joint limits, the hand-over from clip to ragdoll), and fix whichever it is
 - [ ] Shots: check that the bullet and the flash leave from the pistol's muzzle, for Otto
       and agents, in every stance (standing, crouching, kneeling, prone, on the move)
-- [ ] Not animation, but in the same pass: buildings flicker behind the main menu at night
-      in fog — find the cause (fog against the city SubViewport, depth precision, LOD) and fix
+- [ ] Buildings flicker behind the main menu at night in fog — find the cause (fog against
+      the city SubViewport, depth precision, LOD) and fix
 - [ ] Shots of every animation, tests, code review, `check.ps1`, README
 
-### M24r · Settings by the monitor, agent release
+### M24r · Agent mechanics
 
-Requested by the user on 2026-10-03. Two unrelated things that are not animation. Before
-the code: a check against the original (for the release) and questions.
+Requested by the user on 2026-10-03. The agents' life in the building is reviewed as a
+whole — release, pacing, who keeps a slot, when an agent can be hit — and everything tied
+to it, not only the symptoms below. Today's rules live in `AgentSpawn`, `AgentCrowd`,
+`AgentLifts`, `DoorWatch`, `GreyboxLevel._tend_agents`, `EnemyBrain` and ADR-0020,
+ADR-0025, ADR-0027, ADR-0053, ADR-0059 (the calm after the return) and ADR-0060
+(decision 6). Before the code: a check against the ROM for each rule, then questions.
 
-- [ ] The frame limit list shows only what the monitor supports: limits up to its refresh
-      rate (`DisplayServer.screen_get_refresh_rate`), not a fixed 60–240 list. Today
-      `DisplayModes.FRAME_LIMITS` is fixed, because Godot 4.7 cannot enumerate screen modes
-- [ ] The same for resolutions (today they are already cut to what fits on the screen) and
-      auto-detection on first launch: the monitor's own resolution and refresh rate as the
-      defaults, the way quality is measured today; a change of monitor is noticed
+- [ ] An agent is hittable as soon as he has stepped out into Otto's plane: today he is
+      shielded for the whole 0.6 s `EMERGING` phase (ADR-0020), and bullets pass through an
+      agent already standing on the floor. How long does the original shield an agent in a
+      doorway? Tied to the door exit animation of M24q
 - [ ] Agent release paced: standing on the top floor after the roof, agents come out one
       after another without a break — the stream needs a rhythm
 - [ ] No empty building below: once the agent slots are filled up top and those agents stay
       alive, going down meets nobody — the whole building can be walked without agents.
-      Agents left behind must give their slots to the floors where Otto is (by the ROM, if
-      the original does it; `AGENT_KEEP_MARGIN`, `AgentSpawn`, ADR-0053 and ADR-0060,
-      decision 6, are where today's rules live)
-- [ ] Tests on any building: agents keep meeting Otto all the way down; code review,
-      `check.ps1`, README
+      Agents left behind must give their slots to the floors where Otto is
+- [ ] Review of the related rules: the slot count and the late agents, release distance and
+      the calm after the return, agents following Otto by cab, the crowd leaving through
+      doors, the keep margin, difficulty over time — each checked against the ROM and against
+      the two symptoms above
+- [ ] Tests on any building: agents keep meeting Otto all the way down at a steady rhythm;
+      the bot runs measured again; code review, `check.ps1`, README
+
+### M24s · Settings by the monitor
+
+Requested by the user on 2026-10-03.
+
+- [ ] The frame limit list shows only what the monitor supports: limits up to its refresh
+      rate (`DisplayServer.screen_get_refresh_rate`), not a fixed 60–240 list. Today
+      `DisplayModes.FRAME_LIMITS` is fixed, because Godot 4.7 cannot enumerate screen modes
+- [ ] The same for resolutions (today they are already cut to what fits on the screen)
+- [ ] Auto-detection on first launch: the monitor's own resolution and refresh rate as the
+      defaults, the way quality is measured today; a change of monitor is noticed
+- [ ] Tests, code review, `check.ps1`, README
 
 ### M25 · Online leaderboard (optional)
 

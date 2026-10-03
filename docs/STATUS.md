@@ -6,7 +6,7 @@ The `status-updated` hook checks this.
 | | |
 |---|---|
 | **Updated** | 2026-10-03 |
-| **Current milestone** | none — next in the plan is M24q, animation frame by frame; then M24r, settings by the monitor and agent release; then M25 (optional) |
+| **Current milestone** | none — next in the plan is M24q, animation frame by frame; then M24r, agent mechanics; M24s, settings by the monitor; then M25 (optional) |
 | **Branch** | `feat/m24q-animation-plan` — the M24q plan and the death horn removed |
 | **State** | The whole-game review sweep is merged (PR #69, [ADR-0060](adr/0060-review-sweep.md)). The comic horn over Otto's death is removed at the user's request. Awaiting PR |
 | **Rollback point** | `main` holds the 3D build since M19; 2D remains in history, `d5774df` |
@@ -350,13 +350,15 @@ of the kind's own style with a freight elevator gate, music and hall ambience ch
 
 - **M24q — animation, frame by frame** (user's request, 2026-10-03): every animation
   reviewed frame by frame and finished — Otto leaving the helicopter, agents opening doors
-  and stepping out instead of appearing and hittable as soon as they are out, Otto opening and closing doors himself, the missing
+  and stepping out instead of appearing, Otto opening and closing doors himself, the missing
   frames of takedowns, deaths in unnatural poses (clip or ragdoll), shots that should leave
   from the pistol's muzzle; also buildings flickering behind the menu in night fog. A big
   milestone. Plan in [EPIC.md](EPIC.md).
-- **M24r — settings by the monitor, agent release** (user's request, 2026-10-03): frame
-  limits and resolutions only those the monitor supports, detected on first launch; agents
-  released at a rhythm, and agents left upstairs not keeping the building below empty.
+- **M24r — agent mechanics** (user's request, 2026-10-03): the agents' life reviewed as
+  a whole against the ROM — hittable as soon as they step out, released at a rhythm, agents
+  left upstairs not keeping the building below empty, and every related rule.
+- **M24s — settings by the monitor** (user's request, 2026-10-03): frame limits and
+  resolutions only those the monitor supports, detected on first launch.
 - **M25 — online leaderboard** (optional).
 
 In the credits the author is listed as "Idea & development" instead of "Game creator",
